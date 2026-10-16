@@ -1,18 +1,19 @@
 import { ICONS } from './icons';
 import type { SketchDocument } from '../model/sketch';
-import type { CanvasInteraction, ToolType } from '../canvas/interaction';
+import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/interaction';
+import { showToast } from './toast';
+export { showToast };
 
 export class Toolbar {
   private container: HTMLElement;
-  private sketch: SketchDocument;
   private interaction: CanvasInteraction;
 
-  constructor(container: HTMLElement, sketch: SketchDocument, interaction: CanvasInteraction) {
+  constructor(container: HTMLElement, _sketch: SketchDocument, interaction: CanvasInteraction) {
     this.container = container;
-    this.sketch = sketch;
     this.interaction = interaction;
 
     this.render();
+    this.setupListeners();
   }
 
   render(): void {
@@ -115,12 +116,17 @@ export class Toolbar {
     this.bindClicks();
   }
 
+  private setupListeners(): void {
+    this.interaction.onToolChange = tool => {
+      this.setActiveButton(tool);
+    };
+  }
+
   private bindClicks(): void {
-    // Tool buttons
+    // Tool buttons (select, point, line, circle, rectangle)
     this.container.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(btn => {
       btn.addEventListener('click', () => {
         const tool = btn.getAttribute('data-tool') as ToolType;
-        this.setActiveToolButton(tool);
         this.interaction.setTool(tool);
       });
     });
@@ -135,173 +141,37 @@ export class Toolbar {
     // Constraint buttons
     this.container.querySelectorAll<HTMLButtonElement>('[data-constraint]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const constraintType = btn.getAttribute('data-constraint');
-        this.applyConstraint(constraintType!);
+        const constraintType = btn.getAttribute('data-constraint') as ConstraintToolType;
+
+        // 1. If required primitives are ALREADY selected, immediately apply constraint!
+        if (this.interaction.canApplyConstraint(constraintType)) {
+          this.interaction.applyConstraint(constraintType);
+          this.interaction.setTool('select');
+          return;
+        }
+
+        // 2. Toggle constraint tool
+        if (this.interaction.activeTool === constraintType) {
+          // Toggle off -> revert to select
+          this.interaction.setTool('select');
+        } else {
+          // Toggle on
+          this.interaction.setTool(constraintType);
+        }
       });
     });
   }
 
-  setActiveToolButton(tool: ToolType): void {
+  setActiveButton(tool: ToolType): void {
     this.container.querySelectorAll('[data-tool]').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-tool') === tool);
     });
+    this.container.querySelectorAll('[data-constraint]').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-constraint') === tool);
+    });
   }
 
-  private applyConstraint(type: string): void {
-    const sel = this.sketch.selection;
-    const pIds = [...sel.pointIds];
-    const lIds = [...sel.lineIds];
-    const cIds = [...sel.circleIds];
-
-    let applied = false;
-
-    switch (type) {
-      case 'fixed': {
-        if (pIds.length >= 1) {
-          for (const pid of pIds) this.sketch.addFixedConstraint(pid);
-          applied = true;
-        } else {
-          showToast('Select 1 or more points to fix');
-        }
-        break;
-      }
-      case 'coincident': {
-        if (pIds.length === 2) {
-          this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
-          applied = true;
-        } else {
-          showToast('Select exactly 2 points to make coincident');
-        }
-        break;
-      }
-      case 'horizontal': {
-        if (lIds.length === 1) {
-          const l = this.sketch.lines.get(lIds[0])!;
-          this.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
-          applied = true;
-        } else if (pIds.length === 2) {
-          this.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
-          applied = true;
-        } else {
-          showToast('Select 1 line or 2 points to make horizontal');
-        }
-        break;
-      }
-      case 'vertical': {
-        if (lIds.length === 1) {
-          const l = this.sketch.lines.get(lIds[0])!;
-          this.sketch.addVerticalConstraint(l.p1Id, l.p2Id);
-          applied = true;
-        } else if (pIds.length === 2) {
-          this.sketch.addVerticalConstraint(pIds[0], pIds[1]);
-          applied = true;
-        } else {
-          showToast('Select 1 line or 2 points to make vertical');
-        }
-        break;
-      }
-      case 'distance': {
-        if (lIds.length === 1) {
-          const l = this.sketch.lines.get(lIds[0])!;
-          this.sketch.addDistanceConstraint(l.p1Id, l.p2Id);
-          applied = true;
-        } else if (pIds.length === 2) {
-          this.sketch.addDistanceConstraint(pIds[0], pIds[1]);
-          applied = true;
-        } else if (cIds.length === 1) {
-          this.sketch.addRadiusConstraint(cIds[0]);
-          applied = true;
-        } else {
-          showToast('Select a line, 2 points, or a circle to add distance/radius');
-        }
-        break;
-      }
-      case 'equal': {
-        if (lIds.length === 2) {
-          this.sketch.addEqualLengthConstraint(lIds[0], lIds[1]);
-          applied = true;
-        } else if (cIds.length === 2) {
-          this.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
-          applied = true;
-        } else {
-          showToast('Select 2 lines (for equal length) or 2 circles (for equal radius)');
-        }
-        break;
-      }
-      case 'parallel': {
-        if (lIds.length === 2) {
-          this.sketch.addParallelConstraint(lIds[0], lIds[1]);
-          applied = true;
-        } else {
-          showToast('Select 2 lines to make parallel');
-        }
-        break;
-      }
-      case 'perpendicular': {
-        if (lIds.length === 2) {
-          this.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
-          applied = true;
-        } else {
-          showToast('Select 2 lines to make perpendicular');
-        }
-        break;
-      }
-      case 'tangent': {
-        if (lIds.length === 1 && cIds.length === 1) {
-          this.sketch.addTangentConstraint(lIds[0], cIds[0]);
-          applied = true;
-        } else {
-          showToast('Select 1 line and 1 circle to make tangent');
-        }
-        break;
-      }
-      case 'concentric': {
-        if (cIds.length === 2) {
-          this.sketch.addConcentricConstraint(cIds[0], cIds[1]);
-          applied = true;
-        } else {
-          showToast('Select 2 circles to make concentric');
-        }
-        break;
-      }
-      case 'point_on_line': {
-        if (pIds.length === 1 && lIds.length === 1) {
-          this.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-          applied = true;
-        } else {
-          showToast('Select 1 point and 1 line');
-        }
-        break;
-      }
-      case 'midpoint': {
-        if (pIds.length === 1 && lIds.length === 1) {
-          this.sketch.addMidpointConstraint(pIds[0], lIds[0]);
-          applied = true;
-        } else {
-          showToast('Select 1 point and 1 line for midpoint');
-        }
-        break;
-      }
-    }
-
-    if (applied) {
-      this.interaction.setTool('select');
-    }
+  setActiveToolButton(tool: ToolType): void {
+    this.setActiveButton(tool);
   }
-}
-
-export function showToast(msg: string): void {
-  const existing = document.getElementById('cad-toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = 'cad-toast';
-  toast.className = 'cad-toast';
-  toast.textContent = msg;
-  document.body.appendChild(toast);
-
-  setTimeout(() => {
-    toast.classList.add('fade-out');
-    setTimeout(() => toast.remove(), 300);
-  }, 2200);
 }

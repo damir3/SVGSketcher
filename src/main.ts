@@ -124,7 +124,7 @@ function initApp(): void {
   };
 
   interaction.onToolChange = tool => {
-    toolbar.setActiveToolButton(tool);
+    toolbar.setActiveButton(tool);
   };
 
   // Resize handling

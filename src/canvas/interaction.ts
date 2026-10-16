@@ -5,8 +5,49 @@ import type { SVGRenderer } from './renderer';
 import { dist, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
 import { DistanceConstraint, RadiusConstraint } from '../solver/constraints';
 import type { SketchLine, SketchCircle } from '../model/types';
+import { showToast } from '../ui/toast';
 
-export type ToolType = 'select' | 'pan' | 'point' | 'line' | 'circle' | 'rectangle';
+export type ConstraintToolType =
+  | 'coincident'
+  | 'fixed'
+  | 'horizontal'
+  | 'vertical'
+  | 'distance'
+  | 'equal'
+  | 'parallel'
+  | 'perpendicular'
+  | 'tangent'
+  | 'concentric'
+  | 'point_on_line'
+  | 'midpoint';
+
+export const CONSTRAINT_TOOLS: Set<string> = new Set([
+  'coincident',
+  'fixed',
+  'horizontal',
+  'vertical',
+  'distance',
+  'equal',
+  'parallel',
+  'perpendicular',
+  'tangent',
+  'concentric',
+  'point_on_line',
+  'midpoint',
+]);
+
+export function isConstraintTool(tool: string): tool is ConstraintToolType {
+  return CONSTRAINT_TOOLS.has(tool);
+}
+
+export type ToolType =
+  | 'select'
+  | 'pan'
+  | 'point'
+  | 'line'
+  | 'circle'
+  | 'rectangle'
+  | ConstraintToolType;
 
 export class CanvasInteraction {
   private svg: SVGSVGElement;
@@ -74,6 +115,9 @@ export class CanvasInteraction {
   setTool(tool: ToolType): void {
     this.activeTool = tool;
     this.cancelDrawing();
+    if (isConstraintTool(tool)) {
+      this.pruneIncompatibleSelection(tool);
+    }
     this.updateCursor();
     this.onToolChange?.(tool);
     this.render();
@@ -161,6 +205,8 @@ export class CanvasInteraction {
       if (e.key === 'Escape') {
         this.cancelDrawing();
         this.setTool('select');
+        this.sketch.clearSelection();
+        this.render();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         this.sketch.deleteSelected();
         this.render();
@@ -300,6 +346,43 @@ export class CanvasInteraction {
 
     const world = this.viewport.screenToWorld(screen.x, screen.y);
     const snap = this.findSnappedPoint(screen);
+
+    // --- ACTIVE CONSTRAINT TOOL MODE ---
+    if (isConstraintTool(this.activeTool)) {
+      const target = e.target as SVGElement;
+      const targetG = target.closest('[data-id]') as SVGElement | null;
+      let id = targetG?.getAttribute('data-id');
+      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | undefined;
+
+      // Fallback geometric hit test if clicking close to point, line or circle
+      if (!type || (type !== 'point' && type !== 'line' && type !== 'circle')) {
+        if (snap) {
+          id = snap.id;
+          type = 'point';
+        } else {
+          const hitLine = this.findLineNearScreen(screen, 18);
+          if (hitLine) {
+            id = hitLine.id;
+            type = 'line';
+          } else {
+            const hitCircle = this.findCircleNearScreen(screen, 18);
+            if (hitCircle) {
+              id = hitCircle.id;
+              type = 'circle';
+            }
+          }
+        }
+      }
+
+      if (id && type) {
+        this.handleConstraintEntityClick(id, type);
+      } else {
+        // Clicked background -> clear selection
+        this.sketch.clearSelection();
+        this.render();
+      }
+      return;
+    }
 
     // --- TOOL: SELECT ---
     if (this.activeTool === 'select') {
@@ -588,9 +671,20 @@ export class CanvasInteraction {
       return;
     }
 
-    // Snapping update during active drawing tools
-    const isDrawingTool = this.activeTool !== 'select' && this.activeTool !== 'pan';
-    const snap = isDrawingTool ? this.findSnappedPoint(screen, this.startPointId ?? undefined) : null;
+    // Snapping update during active drawing tools or constraint mode
+    const isDrawingTool =
+      this.activeTool === 'point' ||
+      this.activeTool === 'line' ||
+      this.activeTool === 'circle' ||
+      this.activeTool === 'rectangle';
+    const isConstraintWithPoints =
+      isConstraintTool(this.activeTool) &&
+      ['fixed', 'coincident', 'horizontal', 'vertical', 'distance', 'point_on_line', 'midpoint'].includes(
+        this.activeTool
+      );
+    const snap = isDrawingTool || isConstraintWithPoints
+      ? this.findSnappedPoint(screen, this.startPointId ?? undefined)
+      : null;
     if (snap && !this.isDraggingPoint && !this.isDraggingLine && !this.isDraggingCircle) {
       const snapScreen = this.viewport.worldToScreen(snap.worldPos.x, snap.worldPos.y);
       this.renderer.renderSnapIndicator(snapScreen);
@@ -776,4 +870,444 @@ export class CanvasInteraction {
       this.svg.style.cursor = 'crosshair';
     }
   }
+
+  pruneIncompatibleSelection(type: string): void {
+    const sel = this.sketch.selection;
+    switch (type) {
+      case 'fixed':
+      case 'coincident': {
+        sel.lineIds.clear();
+        sel.circleIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'parallel':
+      case 'perpendicular': {
+        sel.pointIds.clear();
+        sel.circleIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'concentric': {
+        sel.pointIds.clear();
+        sel.lineIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'tangent': {
+        sel.pointIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'point_on_line':
+      case 'midpoint': {
+        sel.circleIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'horizontal':
+      case 'vertical': {
+        if (sel.lineIds.size > 0) {
+          sel.pointIds.clear();
+        }
+        sel.circleIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'equal': {
+        if (sel.lineIds.size > 0) {
+          sel.circleIds.clear();
+        } else if (sel.circleIds.size > 0) {
+          sel.lineIds.clear();
+        }
+        sel.pointIds.clear();
+        sel.arcIds.clear();
+        break;
+      }
+      case 'distance': {
+        sel.arcIds.clear();
+        break;
+      }
+    }
+    // Clean up constraintIds
+    sel.constraintIds.clear();
+    for (const pid of sel.pointIds) {
+      for (const c of this.sketch.getConstraintsForEntity('point', pid)) {
+        sel.constraintIds.add(c.id);
+      }
+    }
+    for (const lid of sel.lineIds) {
+      for (const c of this.sketch.getConstraintsForEntity('line', lid)) {
+        sel.constraintIds.add(c.id);
+      }
+    }
+    for (const cid of sel.circleIds) {
+      for (const c of this.sketch.getConstraintsForEntity('circle', cid)) {
+        sel.constraintIds.add(c.id);
+      }
+    }
+  }
+
+  isEntityCompatibleWithConstraint(
+    constraintType: string,
+    entityType: 'point' | 'line' | 'circle'
+  ): boolean {
+    switch (constraintType) {
+      case 'fixed':
+      case 'coincident':
+        return entityType === 'point';
+      case 'horizontal':
+      case 'vertical':
+        return entityType === 'line' || entityType === 'point';
+      case 'distance':
+        return entityType === 'line' || entityType === 'circle' || entityType === 'point';
+      case 'equal':
+        return entityType === 'line' || entityType === 'circle';
+      case 'parallel':
+      case 'perpendicular':
+        return entityType === 'line';
+      case 'tangent':
+        return entityType === 'line' || entityType === 'circle';
+      case 'concentric':
+        return entityType === 'circle';
+      case 'point_on_line':
+      case 'midpoint':
+        return entityType === 'point' || entityType === 'line';
+      default:
+        return false;
+    }
+  }
+
+  canApplyConstraint(type: string): boolean {
+    const sel = this.sketch.selection;
+    const pCount = sel.pointIds.size;
+    const lCount = sel.lineIds.size;
+    const cCount = sel.circleIds.size;
+
+    switch (type) {
+      case 'fixed':
+        return pCount >= 1 && lCount === 0 && cCount === 0;
+      case 'coincident':
+        return pCount === 2 && lCount === 0 && cCount === 0;
+      case 'horizontal':
+      case 'vertical':
+        return (lCount === 1 && pCount === 0 && cCount === 0) || (pCount === 2 && lCount === 0 && cCount === 0);
+      case 'distance':
+        return (
+          (lCount === 1 && pCount === 0 && cCount === 0) ||
+          (pCount === 2 && lCount === 0 && cCount === 0) ||
+          (cCount === 1 && pCount === 0 && lCount === 0)
+        );
+      case 'equal':
+        return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
+      case 'parallel':
+      case 'perpendicular':
+        return lCount === 2 && pCount === 0 && cCount === 0;
+      case 'tangent':
+        return lCount === 1 && cCount === 1 && pCount === 0;
+      case 'concentric':
+        return cCount === 2 && pCount === 0 && lCount === 0;
+      case 'point_on_line':
+      case 'midpoint':
+        return pCount === 1 && lCount === 1 && cCount === 0;
+      default:
+        return false;
+    }
+  }
+
+  applyConstraint(type: string): boolean {
+    const sel = this.sketch.selection;
+    const pIds = [...sel.pointIds];
+    const lIds = [...sel.lineIds];
+    const cIds = [...sel.circleIds];
+
+    let applied = false;
+    let toastMsg = '';
+
+    switch (type) {
+      case 'fixed': {
+        if (pIds.length >= 1) {
+          for (const pid of pIds) this.sketch.addFixedConstraint(pid);
+          applied = true;
+          toastMsg = 'Fixed constraint applied';
+        }
+        break;
+      }
+      case 'coincident': {
+        if (pIds.length === 2) {
+          this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
+          applied = true;
+          toastMsg = 'Coincident constraint applied';
+        }
+        break;
+      }
+      case 'horizontal': {
+        if (lIds.length === 1) {
+          const l = this.sketch.lines.get(lIds[0])!;
+          this.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
+          applied = true;
+          toastMsg = 'Horizontal constraint applied';
+        } else if (pIds.length === 2) {
+          this.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
+          applied = true;
+          toastMsg = 'Horizontal constraint applied';
+        }
+        break;
+      }
+      case 'vertical': {
+        if (lIds.length === 1) {
+          const l = this.sketch.lines.get(lIds[0])!;
+          this.sketch.addVerticalConstraint(l.p1Id, l.p2Id);
+          applied = true;
+          toastMsg = 'Vertical constraint applied';
+        } else if (pIds.length === 2) {
+          this.sketch.addVerticalConstraint(pIds[0], pIds[1]);
+          applied = true;
+          toastMsg = 'Vertical constraint applied';
+        }
+        break;
+      }
+      case 'distance': {
+        if (lIds.length === 1) {
+          const l = this.sketch.lines.get(lIds[0])!;
+          const c = this.sketch.addDistanceConstraint(l.p1Id, l.p2Id);
+          applied = true;
+          toastMsg = 'Distance constraint applied';
+          if (c && this.onEditDimension) {
+            const p1 = this.sketch.points.get(l.p1Id);
+            const p2 = this.sketch.points.get(l.p2Id);
+            const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
+            const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
+            const s = this.viewport.worldToScreen(midX, midY);
+            const rect = this.svg.getBoundingClientRect();
+            this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
+          }
+        } else if (pIds.length === 2) {
+          const c = this.sketch.addDistanceConstraint(pIds[0], pIds[1]);
+          applied = true;
+          toastMsg = 'Distance constraint applied';
+          if (c && this.onEditDimension) {
+            const p1 = this.sketch.points.get(pIds[0]);
+            const p2 = this.sketch.points.get(pIds[1]);
+            const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
+            const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
+            const s = this.viewport.worldToScreen(midX, midY);
+            const rect = this.svg.getBoundingClientRect();
+            this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
+          }
+        } else if (cIds.length === 1) {
+          const c = this.sketch.addRadiusConstraint(cIds[0]);
+          applied = true;
+          toastMsg = 'Radius constraint applied';
+          if (c && this.onEditDimension) {
+            const circ = this.sketch.circles.get(cIds[0]);
+            const center = circ ? this.sketch.points.get(circ.centerId) : null;
+            const s = center ? this.viewport.worldToScreen(center.x, center.y) : { x: 100, y: 100 };
+            const rect = this.svg.getBoundingClientRect();
+            this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
+          }
+        }
+        break;
+      }
+      case 'equal': {
+        if (lIds.length === 2) {
+          this.sketch.addEqualLengthConstraint(lIds[0], lIds[1]);
+          applied = true;
+          toastMsg = 'Equal length constraint applied';
+        } else if (cIds.length === 2) {
+          this.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
+          applied = true;
+          toastMsg = 'Equal radius constraint applied';
+        }
+        break;
+      }
+      case 'parallel': {
+        if (lIds.length === 2) {
+          this.sketch.addParallelConstraint(lIds[0], lIds[1]);
+          applied = true;
+          toastMsg = 'Parallel constraint applied';
+        }
+        break;
+      }
+      case 'perpendicular': {
+        if (lIds.length === 2) {
+          this.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
+          applied = true;
+          toastMsg = 'Perpendicular constraint applied';
+        }
+        break;
+      }
+      case 'tangent': {
+        if (lIds.length === 1 && cIds.length === 1) {
+          this.sketch.addTangentConstraint(lIds[0], cIds[0]);
+          applied = true;
+          toastMsg = 'Tangent constraint applied';
+        }
+        break;
+      }
+      case 'concentric': {
+        if (cIds.length === 2) {
+          this.sketch.addConcentricConstraint(cIds[0], cIds[1]);
+          applied = true;
+          toastMsg = 'Concentric constraint applied';
+        }
+        break;
+      }
+      case 'point_on_line': {
+        if (pIds.length === 1 && lIds.length === 1) {
+          this.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+          applied = true;
+          toastMsg = 'Point on line constraint applied';
+        }
+        break;
+      }
+      case 'midpoint': {
+        if (pIds.length === 1 && lIds.length === 1) {
+          this.sketch.addMidpointConstraint(pIds[0], lIds[0]);
+          applied = true;
+          toastMsg = 'Midpoint constraint applied';
+        }
+        break;
+      }
+    }
+
+    if (applied) {
+      if (toastMsg) showToast(toastMsg);
+      this.sketch.solve();
+      this.render();
+    }
+
+    return applied;
+  }
+
+  deselectEntity(id: string, type: 'point' | 'line' | 'circle'): void {
+    if (type === 'point') {
+      this.sketch.selection.pointIds.delete(id);
+    } else if (type === 'line') {
+      this.sketch.selection.lineIds.delete(id);
+    } else if (type === 'circle') {
+      this.sketch.selection.circleIds.delete(id);
+    }
+    this.sketch.selection.constraintIds.clear();
+    for (const pid of this.sketch.selection.pointIds) {
+      for (const c of this.sketch.getConstraintsForEntity('point', pid)) {
+        this.sketch.selection.constraintIds.add(c.id);
+      }
+    }
+    for (const lid of this.sketch.selection.lineIds) {
+      for (const c of this.sketch.getConstraintsForEntity('line', lid)) {
+        this.sketch.selection.constraintIds.add(c.id);
+      }
+    }
+    for (const cid of this.sketch.selection.circleIds) {
+      for (const c of this.sketch.getConstraintsForEntity('circle', cid)) {
+        this.sketch.selection.constraintIds.add(c.id);
+      }
+    }
+    this.sketch.notify();
+  }
+
+  private handleConstraintEntityClick(id: string, type: 'point' | 'line' | 'circle'): void {
+    if (!isConstraintTool(this.activeTool)) return;
+    const constraintType = this.activeTool;
+
+    if (!this.isEntityCompatibleWithConstraint(constraintType, type)) {
+      return;
+    }
+
+    const sel = this.sketch.selection;
+    const isAlreadySelected =
+      (type === 'point' && sel.pointIds.has(id)) ||
+      (type === 'line' && sel.lineIds.has(id)) ||
+      (type === 'circle' && sel.circleIds.has(id));
+
+    if (isAlreadySelected) {
+      this.deselectEntity(id, type);
+      this.render();
+      return;
+    }
+
+    // Prune incompatible combinations before adding new item
+    switch (constraintType) {
+      case 'horizontal':
+      case 'vertical': {
+        if (type === 'line') {
+          sel.pointIds.clear();
+          sel.lineIds.clear();
+        } else if (type === 'point') {
+          sel.lineIds.clear();
+          if (sel.pointIds.size >= 2) sel.pointIds.clear();
+        }
+        break;
+      }
+      case 'distance': {
+        if (type === 'line') {
+          sel.pointIds.clear();
+          sel.circleIds.clear();
+          sel.lineIds.clear();
+        } else if (type === 'circle') {
+          sel.pointIds.clear();
+          sel.lineIds.clear();
+          sel.circleIds.clear();
+        } else if (type === 'point') {
+          sel.lineIds.clear();
+          sel.circleIds.clear();
+          if (sel.pointIds.size >= 2) sel.pointIds.clear();
+        }
+        break;
+      }
+      case 'equal': {
+        if (type === 'line') {
+          sel.circleIds.clear();
+          if (sel.lineIds.size >= 2) sel.lineIds.clear();
+        } else if (type === 'circle') {
+          sel.lineIds.clear();
+          if (sel.circleIds.size >= 2) sel.circleIds.clear();
+        }
+        break;
+      }
+      case 'parallel':
+      case 'perpendicular': {
+        if (sel.lineIds.size >= 2) sel.lineIds.clear();
+        break;
+      }
+      case 'concentric': {
+        if (sel.circleIds.size >= 2) sel.circleIds.clear();
+        break;
+      }
+      case 'coincident': {
+        if (sel.pointIds.size >= 2) sel.pointIds.clear();
+        break;
+      }
+      case 'tangent': {
+        if (type === 'line' && sel.lineIds.size >= 1) {
+          sel.lineIds.clear();
+        } else if (type === 'circle' && sel.circleIds.size >= 1) {
+          sel.circleIds.clear();
+        }
+        break;
+      }
+      case 'point_on_line':
+      case 'midpoint': {
+        if (type === 'point' && sel.pointIds.size >= 1) {
+          sel.pointIds.clear();
+        } else if (type === 'line' && sel.lineIds.size >= 1) {
+          sel.lineIds.clear();
+        }
+        break;
+      }
+    }
+
+    this.sketch.selectEntity(id, type, true);
+
+    if (this.canApplyConstraint(constraintType)) {
+      const applied = this.applyConstraint(constraintType);
+      if (applied) {
+        this.sketch.clearSelection();
+      }
+    }
+
+    this.render();
+  }
 }
+
