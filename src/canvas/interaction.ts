@@ -337,7 +337,7 @@ export class CanvasInteraction {
     const timeDelta = now - this.lastClickTime;
     const distanceDelta = dist(screen, this.lastClickPos);
 
-    if (timeDelta > 40 && timeDelta < 550 && distanceDelta < 28) {
+    if (timeDelta > 40 && timeDelta < 350 && distanceDelta < 28) {
       this.lastClickTime = 0;
       if (this.triggerDimensionEditAt(e, screen, clientPos)) {
         this.cancelDrawing();

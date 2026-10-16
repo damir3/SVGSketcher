@@ -49,8 +49,8 @@ function initApp(): void {
           ${ICONS.redo} Redo
         </button>
         <div class="header-divider"></div>
-        <button class="btn-header" id="btn-reset-view" title="Center Origin (Z)">
-          Reset View
+        <button class="btn-header" id="btn-fit-view" title="Fit to View (Z)">
+          ${ICONS.fitView} Fit to View
         </button>
         <button class="btn-header" id="btn-clear" title="Clear Sketch">
           ${ICONS.clear} Clear
@@ -96,7 +96,7 @@ function initApp(): void {
   const presetSelector = document.getElementById('preset-selector') as HTMLSelectElement;
   const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
   const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
-  const btnResetView = document.getElementById('btn-reset-view') as HTMLButtonElement;
+  const btnFitView = document.getElementById('btn-fit-view') as HTMLButtonElement;
   const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
   const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
 
@@ -191,12 +191,19 @@ function initApp(): void {
     }
   });
 
-  btnResetView.addEventListener('click', () => {
-    viewport.centerOrigin();
-    viewport.zoom = 1.0;
+  function fitToView(): void {
+    const bbox = sketch.getBoundingBox();
+    if (bbox) {
+      viewport.fitToBounds(bbox.minX, bbox.minY, bbox.maxX, bbox.maxY);
+    } else {
+      viewport.centerOrigin();
+      viewport.zoom = 1.0;
+    }
     renderer.render(sketch, viewport);
-    zoomLevel.textContent = '100%';
-  });
+    zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
+  }
+
+  btnFitView.addEventListener('click', fitToView);
 
   btnClear.addEventListener('click', () => {
     if (confirm('Clear sketch canvas?')) {
@@ -258,10 +265,7 @@ function initApp(): void {
 
     if (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я') {
       if (!isCtrlOrCmd) {
-        viewport.centerOrigin();
-        viewport.zoom = 1.0;
-        renderer.render(sketch, viewport);
-        zoomLevel.textContent = '100%';
+        fitToView();
       }
     }
   });

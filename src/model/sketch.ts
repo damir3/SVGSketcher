@@ -850,4 +850,45 @@ export class SketchDocument {
     }
     return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="-500 -500 1000 1000">\n  ${elements.join('\n  ')}\n</svg>`;
   }
+
+  getBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    if (this.points.size === 0) return null;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const p of this.points.values()) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+
+    for (const c of this.circles.values()) {
+      const center = this.points.get(c.centerId);
+      if (center) {
+        if (center.x - c.radius < minX) minX = center.x - c.radius;
+        if (center.x + c.radius > maxX) maxX = center.x + c.radius;
+        if (center.y - c.radius < minY) minY = center.y - c.radius;
+        if (center.y + c.radius > maxY) maxY = center.y + c.radius;
+      }
+    }
+
+    for (const a of this.arcs.values()) {
+      const center = this.points.get(a.centerId);
+      if (center) {
+        if (center.x - a.radius < minX) minX = center.x - a.radius;
+        if (center.x + a.radius > maxX) maxX = center.x + a.radius;
+        if (center.y - a.radius < minY) minY = center.y - a.radius;
+        if (center.y + a.radius > maxY) maxY = center.y + a.radius;
+      }
+    }
+
+    if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+      return null;
+    }
+    return { minX, minY, maxX, maxY };
+  }
 }
+
