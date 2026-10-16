@@ -1,5 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
-import { DistanceConstraint, RadiusConstraint } from '../solver/constraints';
+import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 
@@ -7,7 +7,7 @@ export class Sidebar {
   private container: HTMLElement;
   private sketch: SketchDocument;
 
-  onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint) => void;
+  onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint) => void;
 
   constructor(container: HTMLElement, sketch: SketchDocument) {
     this.container = container;
@@ -298,6 +298,7 @@ export class Sidebar {
       case 'horizontal': return ICONS.horizontal;
       case 'vertical': return ICONS.vertical;
       case 'distance': return ICONS.distance;
+      case 'angle': return ICONS.angle;
       case 'radius': return ICONS.circle;
       case 'equal_length':
       case 'equal_radius': return ICONS.equal;
@@ -324,7 +325,7 @@ export class Sidebar {
 
         if (type === 'constraint') {
           const c = this.sketch.constraints.get(id);
-          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint)) {
+          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {
             this.onEditDimension?.(c);
           }
         }
@@ -374,7 +375,7 @@ export class Sidebar {
           }
         } else if (type === 'constraint') {
           const c = this.sketch.constraints.get(id);
-          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint)) {
+          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {
             this.sketch.selectEntity(c.id, 'constraint', false);
             this.onEditDimension?.(c);
           }
@@ -419,7 +420,7 @@ export class Sidebar {
           this.sketch.addRadiusConstraint(id);
         } else if (action === 'edit-dim') {
           const c = this.sketch.constraints.get(id);
-          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint)) {
+          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {
             this.onEditDimension?.(c);
           }
         } else if (action === 'delete-c') {

@@ -16,6 +16,7 @@ import {
   ConcentricConstraint,
   MidpointConstraint,
   DragPointConstraint,
+  AngleConstraint,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SelectionState } from './types';
 import { dist } from '../math/vector';
@@ -305,13 +306,164 @@ export class SketchDocument {
     return c;
   }
 
-  addDistanceConstraint(p1Id: string, p2Id: string, targetDist?: number): DistanceConstraint | null {
+  addDistanceConstraint(
+    p1Id: string,
+    p2Id: string,
+    targetDist?: number,
+    offset?: number
+  ): DistanceConstraint | null {
     const p1 = this.points.get(p1Id);
     const p2 = this.points.get(p2Id);
     if (!p1 || !p2) return null;
 
     const currentDist = targetDist ?? Math.max(1, Math.round(dist(p1, p2)));
-    const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist);
+    const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset);
+    this.addConstraint(c);
+    return c;
+  }
+
+  calculateLinesAngleGeometry(
+    p1: SketchPoint,
+    p2: SketchPoint,
+    p3: SketchPoint,
+    p4: SketchPoint,
+    cursorPos?: { x: number; y: number }
+  ): {
+    pInt: { x: number; y: number };
+    u1: { x: number; y: number };
+    u2: { x: number; y: number };
+    s1: number;
+    s2: number;
+    initialAngleDeg: number;
+    sign: number;
+  } {
+    const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
+    const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+    const l1 = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
+    const l2 = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
+
+    // Direction unit vectors along the raw segments (p1->p2, p3->p4)
+    const e1 = { x: v1.x / l1, y: v1.y / l1 };
+    const e2 = { x: v2.x / l2, y: v2.y / l2 };
+
+    let pInt: { x: number; y: number };
+    let defS1 = 1;
+    let defS2 = 1;
+
+    if (p1.id === p3.id || (Math.abs(p1.x - p3.x) < 1e-4 && Math.abs(p1.y - p3.y) < 1e-4)) {
+      pInt = { x: p1.x, y: p1.y };
+      defS1 = 1;
+      defS2 = 1;
+    } else if (p1.id === p4.id || (Math.abs(p1.x - p4.x) < 1e-4 && Math.abs(p1.y - p4.y) < 1e-4)) {
+      pInt = { x: p1.x, y: p1.y };
+      defS1 = 1;
+      defS2 = -1;
+    } else if (p2.id === p3.id || (Math.abs(p2.x - p3.x) < 1e-4 && Math.abs(p2.y - p3.y) < 1e-4)) {
+      pInt = { x: p2.x, y: p2.y };
+      defS1 = -1;
+      defS2 = 1;
+    } else if (p2.id === p4.id || (Math.abs(p2.x - p4.x) < 1e-4 && Math.abs(p2.y - p4.y) < 1e-4)) {
+      pInt = { x: p2.x, y: p2.y };
+      defS1 = -1;
+      defS2 = -1;
+    } else {
+      const det = v1.x * v2.y - v1.y * v2.x;
+      if (Math.abs(det) < 1e-6) {
+        pInt = { x: (p1.x + p3.x) * 0.5, y: (p1.y + p3.y) * 0.5 };
+        defS1 = 1;
+        defS2 = 1;
+      } else {
+        const t = ((p3.x - p1.x) * v2.y - (p3.y - p1.y) * v2.x) / det;
+        pInt = { x: p1.x + t * v1.x, y: p1.y + t * v1.y };
+        const m1 = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
+        const m2 = { x: (p3.x + p4.x) * 0.5, y: (p3.y + p4.y) * 0.5 };
+        const w1 = { x: m1.x - pInt.x, y: m1.y - pInt.y };
+        const w2 = { x: m2.x - pInt.x, y: m2.y - pInt.y };
+        defS1 = w1.x * v1.x + w1.y * v1.y >= 0 ? 1 : -1;
+        defS2 = w2.x * v2.x + w2.y * v2.y >= 0 ? 1 : -1;
+      }
+    }
+
+    // Default rays pointing along the physical segments from pInt:
+    const u1Seg = { x: defS1 * e1.x, y: defS1 * e1.y };
+    const u2Seg = { x: defS2 * e2.x, y: defS2 * e2.y };
+
+    let s1 = defS1;
+    let s2 = defS2;
+
+    if (cursorPos) {
+      const w = { x: cursorPos.x - pInt.x, y: cursorPos.y - pInt.y };
+      const wLen = Math.hypot(w.x, w.y);
+      if (wLen > 1e-3) {
+        // Decompose w in the basis of (u1Seg, u2Seg):
+        // w = alpha * u1Seg + beta * u2Seg
+        const detSeg = u1Seg.x * u2Seg.y - u1Seg.y * u2Seg.x;
+        if (Math.abs(detSeg) > 1e-6) {
+          const alpha = (w.x * u2Seg.y - w.y * u2Seg.x) / detSeg;
+          const beta = (u1Seg.x * w.y - u1Seg.y * w.x) / detSeg;
+          const signAlpha = alpha >= 0 ? 1 : -1;
+          const signBeta = beta >= 0 ? 1 : -1;
+          s1 = signAlpha * defS1;
+          s2 = signBeta * defS2;
+        }
+      }
+    }
+
+    const u1 = { x: (s1 * v1.x) / l1, y: (s1 * v1.y) / l1 };
+    const u2 = { x: (s2 * v2.x) / l2, y: (s2 * v2.y) / l2 };
+
+    const dotVal = Math.min(1, Math.max(-1, u1.x * u2.x + u1.y * u2.y));
+    const initialAngleDeg = (Math.acos(dotVal) * 180) / Math.PI;
+    const crossVal = u1.x * u2.y - u1.y * u2.x;
+    const sign = crossVal >= 0 ? 1 : -1;
+
+    return { pInt, u1, u2, s1, s2, initialAngleDeg, sign };
+  }
+
+  addAngleConstraint(
+    line1Id: string,
+    line2Id: string,
+    targetAngleDeg?: number,
+    arcRadius?: number,
+    cursorPosOrS1?: { x: number; y: number } | number,
+    s2Param?: number,
+    signParam?: number
+  ): AngleConstraint | null {
+    const l1 = this.lines.get(line1Id);
+    const l2 = this.lines.get(line2Id);
+    if (!l1 || !l2) return null;
+
+    const p1 = this.points.get(l1.p1Id);
+    const p2 = this.points.get(l1.p2Id);
+    const p3 = this.points.get(l2.p1Id);
+    const p4 = this.points.get(l2.p2Id);
+    if (!p1 || !p2 || !p3 || !p4) return null;
+
+    const cursorPos = typeof cursorPosOrS1 === 'object' && cursorPosOrS1 !== null ? cursorPosOrS1 : undefined;
+    const geom = this.calculateLinesAngleGeometry(p1, p2, p3, p4, cursorPos);
+
+    const s1 = typeof cursorPosOrS1 === 'number' ? cursorPosOrS1 : geom.s1;
+    const s2 = typeof s2Param === 'number' ? s2Param : geom.s2;
+    const sign = typeof signParam === 'number' ? signParam : geom.sign;
+
+    const angleVal =
+      targetAngleDeg ?? Math.max(0.1, Math.min(179.9, Math.round(geom.initialAngleDeg * 10) / 10));
+    const radiusVal = arcRadius ?? 40;
+
+    const c = new AngleConstraint(
+      this.nextId('c_ang'),
+      line1Id,
+      line2Id,
+      l1.p1Id,
+      l1.p2Id,
+      l2.p1Id,
+      l2.p2Id,
+      angleVal,
+      radiusVal,
+      s1,
+      s2,
+      sign
+    );
     this.addConstraint(c);
     return c;
   }

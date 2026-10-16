@@ -8,9 +8,14 @@ import {
   ParallelConstraint,
   PerpendicularConstraint,
   EqualLengthConstraint,
+  EqualRadiusConstraint,
   TangentLineCircleConstraint,
+  ConcentricConstraint,
+  MidpointConstraint,
+  PointOnLineConstraint,
   FixedConstraint,
   CoincidentConstraint,
+  AngleConstraint,
 } from '../solver/constraints';
 import type { Vec2 } from '../math/vector';
 
@@ -64,21 +69,25 @@ export class SVGRenderer {
   }
 
   private setupDefs(): void {
-    // Arrow marker for dimension lines
-    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
-    marker.setAttribute('id', 'dim-arrow');
-    marker.setAttribute('viewBox', '0 0 10 10');
-    marker.setAttribute('refX', '5');
-    marker.setAttribute('refY', '5');
-    marker.setAttribute('markerWidth', '6');
-    marker.setAttribute('markerHeight', '6');
-    marker.setAttribute('orient', 'auto-start-reverse');
+    const createArrowMarker = (id: string, color: string) => {
+      const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+      marker.setAttribute('id', id);
+      marker.setAttribute('viewBox', '0 0 12.5 10');
+      marker.setAttribute('refX', '12.5');
+      marker.setAttribute('refY', '5');
+      marker.setAttribute('markerWidth', '7.5');
+      marker.setAttribute('markerHeight', '6');
+      marker.setAttribute('orient', 'auto-start-reverse');
 
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    path.setAttribute('d', 'M 0 1.5 L 10 5 L 0 8.5 z');
-    path.setAttribute('fill', '#0284c7');
-    marker.appendChild(path);
-    this.defsEl.appendChild(marker);
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', 'M 0 1.5 L 12.5 5 L 0 8.5 z');
+      path.setAttribute('fill', color);
+      marker.appendChild(path);
+      this.defsEl.appendChild(marker);
+    };
+
+    createArrowMarker('dim-arrow', '#0284c7');
+    createArrowMarker('dim-arrow-selected', '#0ea5e9');
   }
 
   render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
@@ -345,6 +354,7 @@ export class SVGRenderer {
 
   private renderConstraints(sketch: SketchDocument, viewport: Viewport): void {
     this.constraintGroup.innerHTML = '';
+    const lineBadgeCounts = new Map<string, number>();
 
     for (const constraint of sketch.constraints.values()) {
       const isSelected = sketch.selection.constraintIds.has(constraint.id);
@@ -354,21 +364,36 @@ export class SVGRenderer {
       } else if (constraint instanceof RadiusConstraint) {
         this.renderRadiusDimension(constraint, sketch, viewport, isSelected);
       } else if (constraint instanceof HorizontalConstraint) {
-        this.renderBadgeOnLine(constraint, sketch, viewport, 'H', isSelected);
+        this.renderBadgeOnSegment(constraint.id, constraint.p1Id, constraint.p2Id, sketch, viewport, 'H', isSelected, lineBadgeCounts);
       } else if (constraint instanceof VerticalConstraint) {
-        this.renderBadgeOnLine(constraint, sketch, viewport, 'V', isSelected);
+        this.renderBadgeOnSegment(constraint.id, constraint.p1Id, constraint.p2Id, sketch, viewport, 'V', isSelected, lineBadgeCounts);
       } else if (constraint instanceof ParallelConstraint) {
-        this.renderBadgeOnLine(constraint, sketch, viewport, '//', isSelected);
+        this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
+        this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
       } else if (constraint instanceof PerpendicularConstraint) {
-        this.renderBadgeOnLine(constraint, sketch, viewport, '⊥', isSelected);
+        this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
+        this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
       } else if (constraint instanceof EqualLengthConstraint) {
-        this.renderBadgeOnLine(constraint, sketch, viewport, '=', isSelected);
+        this.renderBadgeOnSegment(constraint.id, constraint.line1P1, constraint.line1P2, sketch, viewport, '=', isSelected, lineBadgeCounts);
+        this.renderBadgeOnSegment(constraint.id, constraint.line2P1, constraint.line2P2, sketch, viewport, '=', isSelected, lineBadgeCounts);
+      } else if (constraint instanceof EqualRadiusConstraint) {
+        this.renderBadgeOnCircle(constraint.id, constraint.circle1Id, sketch, viewport, '=', isSelected);
+        this.renderBadgeOnCircle(constraint.id, constraint.circle2Id, sketch, viewport, '=', isSelected);
       } else if (constraint instanceof TangentLineCircleConstraint) {
-        this.renderBadgeOnLine(constraint, sketch, viewport, '⟂O', isSelected);
+        this.renderBadgeOnSegment(constraint.id, constraint.lineP1Id, constraint.lineP2Id, sketch, viewport, '⟂O', isSelected, lineBadgeCounts);
+        this.renderBadgeOnCircle(constraint.id, constraint.circleId, sketch, viewport, '⟂O', isSelected);
+      } else if (constraint instanceof ConcentricConstraint) {
+        this.renderConcentricBadge(constraint, sketch, viewport, isSelected);
+      } else if (constraint instanceof MidpointConstraint) {
+        this.renderMidpointBadge(constraint, sketch, viewport, isSelected);
+      } else if (constraint instanceof PointOnLineConstraint) {
+        this.renderPointOnLineBadge(constraint, sketch, viewport, isSelected);
       } else if (constraint instanceof FixedConstraint) {
         this.renderFixedBadge(constraint, sketch, viewport, isSelected);
       } else if (constraint instanceof CoincidentConstraint) {
         this.renderCoincidentBadge(constraint, sketch, viewport, isSelected);
+      } else if (constraint instanceof AngleConstraint) {
+        this.renderAngleDimension(constraint, sketch, viewport, isSelected);
       }
     }
   }
@@ -391,13 +416,13 @@ export class SVGRenderer {
     const len = Math.hypot(dx, dy);
     if (len < 1e-4) return;
 
-    // Normal vector perpendicular to the line (offset dimension line by 32px)
+    // Normal vector perpendicular to the line (offset dimension line)
     const nx = -dy / len;
     const ny = dx / len;
-    const offset = 32;
+    const screenOffset = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 32;
 
-    const d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
-    const d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
+    const d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
+    const d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
     const mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -435,8 +460,9 @@ export class SVGRenderer {
     dimLine.setAttribute('y2', d2.y.toFixed(1));
     dimLine.setAttribute('stroke', color);
     dimLine.setAttribute('stroke-width', '1.5');
-    dimLine.setAttribute('marker-start', 'url(#dim-arrow)');
-    dimLine.setAttribute('marker-end', 'url(#dim-arrow)');
+    const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
+    dimLine.setAttribute('marker-start', arrowUrl);
+    dimLine.setAttribute('marker-end', arrowUrl);
     g.appendChild(dimLine);
 
     // Text label badge with background
@@ -462,6 +488,172 @@ export class SVGRenderer {
     text.setAttribute('font-size', '12');
     text.setAttribute('font-weight', '600');
     text.setAttribute('font-family', 'monospace');
+    text.textContent = textVal;
+    g.appendChild(text);
+
+    this.constraintGroup.appendChild(g);
+  }
+
+  private renderDashedExtensionLines(
+    parentG: SVGElement,
+    sCenter: Vec2,
+    angleRad: number,
+    rScreen: number,
+    pA: Vec2,
+    pB: Vec2,
+    color: string
+  ): void {
+    const vx = Math.cos(angleRad);
+    const vy = Math.sin(angleRad);
+
+    const k1 = (pA.x - sCenter.x) * vx + (pA.y - sCenter.y) * vy;
+    const k2 = (pB.x - sCenter.x) * vx + (pB.y - sCenter.y) * vy;
+    const kMin = Math.min(k1, k2);
+    const kMax = Math.max(k1, k2);
+
+    const kEnd = rScreen + 6;
+    if (kEnd <= 0) return;
+
+    const intervals: Array<[number, number]> = [];
+    if (kMax <= 0) {
+      intervals.push([0, kEnd]);
+    } else if (kMin <= 0) {
+      if (kEnd > kMax) {
+        intervals.push([kMax, kEnd]);
+      }
+    } else {
+      intervals.push([0, Math.min(kMin, kEnd)]);
+      if (kEnd > kMax) {
+        intervals.push([kMax, kEnd]);
+      }
+    }
+
+    for (const [startK, endK] of intervals) {
+      if (endK - startK < 1) continue;
+      const x1 = sCenter.x + startK * vx;
+      const y1 = sCenter.y + startK * vy;
+      const x2 = sCenter.x + endK * vx;
+      const y2 = sCenter.y + endK * vy;
+
+      const extLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      extLine.setAttribute('x1', x1.toFixed(1));
+      extLine.setAttribute('y1', y1.toFixed(1));
+      extLine.setAttribute('x2', x2.toFixed(1));
+      extLine.setAttribute('y2', y2.toFixed(1));
+      extLine.setAttribute('stroke', color);
+      extLine.setAttribute('stroke-width', '1.2');
+      extLine.setAttribute('stroke-dasharray', '4,4');
+      parentG.appendChild(extLine);
+    }
+  }
+
+  private renderAngleDimension(
+    constraint: AngleConstraint,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    isSelected: boolean
+  ): void {
+    const l1 = sketch.lines.get(constraint.line1Id);
+    const l2 = sketch.lines.get(constraint.line2Id);
+    if (!l1 || !l2) return;
+
+    const p1 = sketch.points.get(l1.p1Id);
+    const p2 = sketch.points.get(l1.p2Id);
+    const p3 = sketch.points.get(l2.p1Id);
+    const p4 = sketch.points.get(l2.p2Id);
+    if (!p1 || !p2 || !p3 || !p4) return;
+
+    const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+
+    const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
+    const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+    const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
+    const l2Len = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
+
+    const s1Factor = constraint.s1 ?? geom.s1;
+    const s2Factor = constraint.s2 ?? geom.s2;
+
+    const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
+    const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
+
+    const sCenter = viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
+    const sRay1 = viewport.worldToScreen(geom.pInt.x + u1.x * 20, geom.pInt.y + u1.y * 20);
+    const sRay2 = viewport.worldToScreen(geom.pInt.x + u2.x * 20, geom.pInt.y + u2.y * 20);
+
+    const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
+    const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+
+    let delta = a2 - a1;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+
+    const sweepFlag = delta > 0 ? 1 : 0;
+    const rWorld = constraint.arcRadius ?? 40;
+    const rScreen = Math.max(28, rWorld * viewport.zoom);
+
+    const ax = sCenter.x + rScreen * Math.cos(a1);
+    const ay = sCenter.y + rScreen * Math.sin(a1);
+    const bx = sCenter.x + rScreen * Math.cos(a2);
+    const by = sCenter.y + rScreen * Math.sin(a2);
+
+    const midAngle = a1 + delta * 0.5;
+    const midX = sCenter.x + rScreen * Math.cos(midAngle);
+    const midY = sCenter.y + rScreen * Math.sin(midAngle);
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('class', 'dimension-item');
+    g.setAttribute('data-id', constraint.id);
+    g.setAttribute('data-type', 'constraint');
+    g.style.cursor = 'pointer';
+
+    const color = isSelected ? '#0ea5e9' : '#0284c7';
+
+    // Dashed extension lines if arc points extend beyond the physical line segments
+    const sp1 = viewport.worldToScreen(p1.x, p1.y);
+    const sp2 = viewport.worldToScreen(p2.x, p2.y);
+    const sp3 = viewport.worldToScreen(p3.x, p3.y);
+    const sp4 = viewport.worldToScreen(p4.x, p4.y);
+
+    this.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, sp2, color);
+    this.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
+
+    // Arc path with arrowheads
+    const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arcPath.setAttribute(
+      'd',
+      `M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`
+    );
+    arcPath.setAttribute('fill', 'none');
+    arcPath.setAttribute('stroke', color);
+    arcPath.setAttribute('stroke-width', '1.5');
+    const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
+    arcPath.setAttribute('marker-start', arrowUrl);
+    arcPath.setAttribute('marker-end', arrowUrl);
+    g.appendChild(arcPath);
+
+    // Text label badge with background
+    const textVal = `${constraint.targetAngle.toFixed(1)}°`;
+    const textLen = textVal.length * 8 + 14;
+
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('x', (midX - textLen * 0.5).toFixed(1));
+    bgRect.setAttribute('y', (midY - 10).toFixed(1));
+    bgRect.setAttribute('width', textLen.toString());
+    bgRect.setAttribute('height', '20');
+    bgRect.setAttribute('rx', '4');
+    bgRect.setAttribute('fill', '#ffffff');
+    bgRect.setAttribute('stroke', color);
+    bgRect.setAttribute('stroke-width', '1.5');
+    g.appendChild(bgRect);
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', midX.toFixed(1));
+    text.setAttribute('y', (midY + 4).toFixed(1));
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('fill', color);
+    text.setAttribute('font-size', '11');
+    text.setAttribute('font-weight', '700');
+    text.setAttribute('font-family', 'ui-monospace, monospace');
     text.textContent = textVal;
     g.appendChild(text);
 
@@ -507,7 +699,8 @@ export class SVGRenderer {
     leader.setAttribute('stroke', color);
     leader.setAttribute('stroke-width', '1.5');
     leader.setAttribute('fill', 'none');
-    leader.setAttribute('marker-end', 'url(#dim-arrow)');
+    const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
+    leader.setAttribute('marker-end', arrowUrl);
     g.appendChild(leader);
 
     const textVal = `R ${constraint.targetRadius.toFixed(1)}`;
@@ -538,26 +731,109 @@ export class SVGRenderer {
     this.constraintGroup.appendChild(g);
   }
 
-  private renderBadgeOnLine(
-    constraint: any,
+  private renderBadgeOnSegment(
+    constraintId: string,
+    p1Id: string,
+    p2Id: string,
     sketch: SketchDocument,
     viewport: Viewport,
     label: string,
-    isSelected: boolean
+    isSelected: boolean,
+    lineBadgeCounts?: Map<string, number>
   ): void {
-    const p1Id = constraint.p1Id ?? constraint.l1P1 ?? constraint.line1P1 ?? constraint.lineP1Id;
-    const p2Id = constraint.p2Id ?? constraint.l1P2 ?? constraint.line1P2 ?? constraint.lineP2Id;
-    if (!p1Id || !p2Id) return;
-
     const p1 = sketch.points.get(p1Id);
     const p2 = sketch.points.get(p2Id);
     if (!p1 || !p2) return;
 
     const s1 = viewport.worldToScreen(p1.x, p1.y);
     const s2 = viewport.worldToScreen(p2.x, p2.y);
-    const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 };
 
-    this.renderConstraintBadge(constraint.id, mid.x, mid.y - 12, label, isSelected);
+    const dx = s2.x - s1.x;
+    const dy = s2.y - s1.y;
+    const len = Math.max(Math.hypot(dx, dy), 1);
+    const ux = dx / len;
+    const uy = dy / len;
+
+    let nx = -uy;
+    let ny = ux;
+    if (ny > 0 || (Math.abs(ny) < 1e-4 && nx < 0)) {
+      nx = -nx;
+      ny = -ny;
+    }
+
+    let badgeIndex = 0;
+    if (lineBadgeCounts) {
+      const lineKey = p1Id < p2Id ? `${p1Id}_${p2Id}` : `${p2Id}_${p1Id}`;
+      badgeIndex = lineBadgeCounts.get(lineKey) ?? 0;
+      lineBadgeCounts.set(lineKey, badgeIndex + 1);
+    }
+
+    const offsetAlong =
+      badgeIndex === 0
+        ? 0
+        : (badgeIndex % 2 === 1 ? Math.floor((badgeIndex + 1) / 2) : -Math.floor(badgeIndex / 2)) * 22;
+
+    const midX = (s1.x + s2.x) * 0.5 + nx * 14 + ux * offsetAlong;
+    const midY = (s1.y + s2.y) * 0.5 + ny * 14 + uy * offsetAlong;
+
+    this.renderConstraintBadge(constraintId, midX, midY, label, isSelected);
+  }
+
+  private renderBadgeOnCircle(
+    constraintId: string,
+    circleId: string,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    label: string,
+    isSelected: boolean
+  ): void {
+    const circle = sketch.circles.get(circleId);
+    if (!circle) return;
+    const center = sketch.points.get(circle.centerId);
+    if (!center) return;
+
+    const sc = viewport.worldToScreen(center.x, center.y);
+    const rScreen = circle.radius * viewport.zoom;
+    const bx = sc.x + rScreen * 0.7071;
+    const by = sc.y - rScreen * 0.7071;
+
+    this.renderConstraintBadge(constraintId, bx, by, label, isSelected);
+  }
+
+  private renderConcentricBadge(
+    constraint: ConcentricConstraint,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    isSelected: boolean
+  ): void {
+    const pt = sketch.points.get(constraint.c1CenterId);
+    if (!pt) return;
+    const s = viewport.worldToScreen(pt.x, pt.y);
+    this.renderConstraintBadge(constraint.id, s.x + 12, s.y + 12, '◎', isSelected, '#0284c7');
+  }
+
+  private renderMidpointBadge(
+    constraint: MidpointConstraint,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    isSelected: boolean
+  ): void {
+    const pt = sketch.points.get(constraint.midId);
+    if (!pt) return;
+    const s = viewport.worldToScreen(pt.x, pt.y);
+    this.renderConstraintBadge(constraint.id, s.x, s.y - 14, 'M', isSelected, '#0284c7');
+  }
+
+  private renderPointOnLineBadge(
+    constraint: PointOnLineConstraint,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    isSelected: boolean
+  ): void {
+    const pt = sketch.points.get(constraint.pointId);
+    if (!pt) return;
+    const s = viewport.worldToScreen(pt.x, pt.y);
+    this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, '#0284c7');
   }
 
   private renderFixedBadge(
@@ -644,6 +920,112 @@ export class SVGRenderer {
     const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 - 16 };
     const label = `${len.toFixed(1)} mm | ${angleDeg.toFixed(1)}°`;
     this.renderTooltip(mid.x, mid.y, label);
+  }
+
+  renderDistancePreview(s1: Vec2, s2: Vec2, cursor: Vec2, distVal: number): void {
+    this.previewGroup.innerHTML = '';
+
+    const dx = s2.x - s1.x;
+    const dy = s2.y - s1.y;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-4) return;
+
+    const nx = -dy / len;
+    const ny = dx / len;
+    const midX = (s1.x + s2.x) * 0.5;
+    const midY = (s1.y + s2.y) * 0.5;
+    const offset = (cursor.x - midX) * nx + (cursor.y - midY) * ny;
+
+    const d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
+    const d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
+    const mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
+
+    const ext1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    ext1.setAttribute('x1', s1.x.toFixed(1));
+    ext1.setAttribute('y1', s1.y.toFixed(1));
+    ext1.setAttribute('x2', (d1.x + nx * 4).toFixed(1));
+    ext1.setAttribute('y2', (d1.y + ny * 4).toFixed(1));
+    ext1.setAttribute('stroke', '#0284c7');
+    ext1.setAttribute('stroke-width', '1');
+    ext1.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(ext1);
+
+    const ext2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    ext2.setAttribute('x1', s2.x.toFixed(1));
+    ext2.setAttribute('y1', s2.y.toFixed(1));
+    ext2.setAttribute('x2', (d2.x + nx * 4).toFixed(1));
+    ext2.setAttribute('y2', (d2.y + ny * 4).toFixed(1));
+    ext2.setAttribute('stroke', '#0284c7');
+    ext2.setAttribute('stroke-width', '1');
+    ext2.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(ext2);
+
+    const dimLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    dimLine.setAttribute('x1', d1.x.toFixed(1));
+    dimLine.setAttribute('y1', d1.y.toFixed(1));
+    dimLine.setAttribute('x2', d2.x.toFixed(1));
+    dimLine.setAttribute('y2', d2.y.toFixed(1));
+    dimLine.setAttribute('stroke', '#0284c7');
+    dimLine.setAttribute('stroke-width', '1.5');
+    dimLine.setAttribute('marker-start', 'url(#dim-arrow)');
+    dimLine.setAttribute('marker-end', 'url(#dim-arrow)');
+    this.previewGroup.appendChild(dimLine);
+
+    this.renderTooltip(mid.x, mid.y, `${distVal.toFixed(1)} mm`);
+  }
+
+  renderAnglePreview(
+    sCenter: Vec2,
+    sRay1: Vec2,
+    sRay2: Vec2,
+    cursor: Vec2,
+    angleDeg: number,
+    sp1?: Vec2,
+    sp2?: Vec2,
+    sp3?: Vec2,
+    sp4?: Vec2
+  ): void {
+    this.previewGroup.innerHTML = '';
+
+    const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
+    const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+
+    let delta = a2 - a1;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta < -Math.PI) delta += 2 * Math.PI;
+
+    const sweepFlag = delta > 0 ? 1 : 0;
+    const rScreen = Math.max(28, Math.hypot(cursor.x - sCenter.x, cursor.y - sCenter.y));
+
+    if (sp1 && sp2) {
+      this.renderDashedExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, '#0284c7');
+    }
+    if (sp3 && sp4) {
+      this.renderDashedExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, '#0284c7');
+    }
+
+    const ax = sCenter.x + rScreen * Math.cos(a1);
+    const ay = sCenter.y + rScreen * Math.sin(a1);
+    const bx = sCenter.x + rScreen * Math.cos(a2);
+    const by = sCenter.y + rScreen * Math.sin(a2);
+
+    const midAngle = a1 + delta * 0.5;
+    const midX = sCenter.x + rScreen * Math.cos(midAngle);
+    const midY = sCenter.y + rScreen * Math.sin(midAngle);
+
+    const arcPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arcPath.setAttribute(
+      'd',
+      `M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`
+    );
+    arcPath.setAttribute('fill', 'none');
+    arcPath.setAttribute('stroke', '#0284c7');
+    arcPath.setAttribute('stroke-width', '1.5');
+    arcPath.setAttribute('marker-start', 'url(#dim-arrow)');
+    arcPath.setAttribute('marker-end', 'url(#dim-arrow)');
+    this.previewGroup.appendChild(arcPath);
+
+    this.renderTooltip(midX, midY, `${angleDeg.toFixed(1)}°`);
   }
 
   renderCirclePreview(center: Vec2, current: Vec2, radius: number): void {

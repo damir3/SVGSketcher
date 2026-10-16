@@ -1,11 +1,11 @@
-import type { DistanceConstraint, RadiusConstraint } from '../solver/constraints';
+import type { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from '../math/vector';
 
 export class DimensionModal {
   private modalEl: HTMLElement;
   private sketch: SketchDocument;
-  private currentConstraint: DistanceConstraint | RadiusConstraint | null = null;
+  private currentConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | null = null;
 
   constructor(sketch: SketchDocument) {
     this.sketch = sketch;
@@ -17,18 +17,27 @@ export class DimensionModal {
     this.bindEvents();
   }
 
-  open(constraint: DistanceConstraint | RadiusConstraint, screenPos?: Vec2): void {
+  open(constraint: DistanceConstraint | RadiusConstraint | AngleConstraint, screenPos?: Vec2): void {
     this.currentConstraint = constraint;
     const isDistance = 'targetDistance' in constraint;
-    const curVal = isDistance ? constraint.targetDistance : constraint.targetRadius;
-    const title = isDistance ? 'Modify Distance' : 'Modify Radius';
+    const isAngle = 'targetAngle' in constraint;
+    const curVal = isDistance
+      ? constraint.targetDistance
+      : isAngle
+      ? constraint.targetAngle
+      : constraint.targetRadius;
+    const title = isDistance ? 'Modify Distance' : isAngle ? 'Modify Angle' : 'Modify Radius';
+    const unit = isAngle ? '°' : 'mm';
+    const step = isAngle ? '0.5' : '1';
+    const minVal = isAngle ? '0.1' : '1';
+    const maxAttr = isAngle ? 'max="179.9"' : '';
 
     this.modalEl.innerHTML = `
       <div class="dim-popup-title">${title}</div>
       <div class="dim-popup-body">
         <div class="dim-input-wrapper">
-          <input type="number" step="1" min="1" id="dim-input-val" value="${curVal.toFixed(1)}" autofocus />
-          <span class="dim-unit">mm</span>
+          <input type="number" step="${step}" min="${minVal}" ${maxAttr} id="dim-input-val" value="${curVal.toFixed(1)}" autofocus />
+          <span class="dim-unit">${unit}</span>
         </div>
         <div class="dim-popup-actions">
           <button class="btn-dim-action" id="btn-dim-cancel">Cancel</button>
@@ -77,6 +86,11 @@ export class DimensionModal {
         this.currentConstraint.targetDistance = newVal;
         this.currentConstraint.value = newVal;
         this.currentConstraint.name = `Distance (${newVal.toFixed(1)})`;
+      } else if ('targetAngle' in this.currentConstraint) {
+        const clampedAngle = Math.min(179.9, Math.max(0.1, newVal));
+        this.currentConstraint.targetAngle = clampedAngle;
+        this.currentConstraint.value = clampedAngle;
+        this.currentConstraint.name = `Angle (${clampedAngle.toFixed(1)}°)`;
       } else {
         this.currentConstraint.targetRadius = newVal;
         this.currentConstraint.value = newVal;

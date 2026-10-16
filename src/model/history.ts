@@ -15,6 +15,7 @@ import {
   TangentLineCircleConstraint,
   ConcentricConstraint,
   MidpointConstraint,
+  AngleConstraint,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -35,6 +36,14 @@ export interface SerializedConstraint {
   p1Id?: string;
   p2Id?: string;
   targetDistance?: number;
+  offset?: number;
+  targetAngle?: number;
+  arcRadius?: number;
+  line1Id?: string;
+  line2Id?: string;
+  s1?: number;
+  s2?: number;
+  sign?: number;
 
   circleId?: string;
   circle1Id?: string;
@@ -100,6 +109,19 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
     base.p1Id = c.p1Id;
     base.p2Id = c.p2Id;
     base.targetDistance = c.targetDistance;
+    base.offset = c.offset;
+  } else if (c instanceof AngleConstraint) {
+    base.line1Id = c.line1Id;
+    base.line2Id = c.line2Id;
+    base.l1P1 = c.l1P1;
+    base.l1P2 = c.l1P2;
+    base.l2P1 = c.l2P1;
+    base.l2P2 = c.l2P2;
+    base.targetAngle = c.targetAngle;
+    base.arcRadius = c.arcRadius;
+    base.s1 = c.s1;
+    base.s2 = c.s2;
+    base.sign = c.sign;
   } else if (c instanceof RadiusConstraint) {
     base.circleId = c.circleId;
     base.targetRadius = c.targetRadius;
@@ -159,7 +181,24 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
       c = new VerticalConstraint(d.id, d.p1Id!, d.p2Id!, d.weight);
       break;
     case 'distance':
-      c = new DistanceConstraint(d.id, d.p1Id!, d.p2Id!, d.targetDistance ?? d.value ?? 10, d.weight);
+      c = new DistanceConstraint(d.id, d.p1Id!, d.p2Id!, d.targetDistance ?? d.value ?? 10, d.weight, d.offset);
+      break;
+    case 'angle':
+      c = new AngleConstraint(
+        d.id,
+        d.line1Id ?? d.entityIds[0],
+        d.line2Id ?? d.entityIds[1],
+        d.l1P1!,
+        d.l1P2!,
+        d.l2P1!,
+        d.l2P2!,
+        d.targetAngle ?? d.value ?? 60,
+        d.arcRadius ?? 40,
+        d.s1 ?? 1,
+        d.s2 ?? 1,
+        d.sign ?? 1,
+        d.weight
+      );
       break;
     case 'radius':
       c = new RadiusConstraint(d.id, d.circleId!, d.targetRadius ?? d.value ?? 10, d.weight);

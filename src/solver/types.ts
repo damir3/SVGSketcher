@@ -13,7 +13,8 @@ export type ConstraintType =
   | 'concentric'
   | 'tangent_line_circle'
   | 'midpoint'
-  | 'drag_point';
+  | 'drag_point'
+  | 'angle';
 
 export interface ParamRef {
   id: string;

@@ -3,7 +3,7 @@ import type { SketchSnapshot } from '../model/history';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
 import { dist, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
-import { DistanceConstraint, RadiusConstraint } from '../solver/constraints';
+import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
 import type { SketchLine, SketchCircle } from '../model/types';
 import { showToast } from '../ui/toast';
 
@@ -13,6 +13,7 @@ export type ConstraintToolType =
   | 'horizontal_vertical'
   | 'horizontal'
   | 'vertical'
+  | 'dimension'
   | 'distance'
   | 'equal'
   | 'parallel'
@@ -28,6 +29,7 @@ export const CONSTRAINT_TOOLS: Set<string> = new Set([
   'horizontal_vertical',
   'horizontal',
   'vertical',
+  'dimension',
   'distance',
   'equal',
   'parallel',
@@ -83,6 +85,12 @@ export class CanvasInteraction {
   private dragCircleStartWorld: Vec2 | null = null;
   private circleCenterStart: Vec2 | null = null;
 
+  // Dragging constraint state
+  private isDraggingConstraint = false;
+  private draggedConstraintId: string | null = null;
+  private dragConstraintStartScreen: Vec2 | null = null;
+  private dragConstraintClientPos: Vec2 | null = null;
+
   // Dragging history snapshot
   private preDragSnapshot: SketchSnapshot | null = null;
   private hasDragged = false;
@@ -97,8 +105,18 @@ export class CanvasInteraction {
   private lastClickPos: Vec2 = { x: 0, y: 0 };
 
   // Dimension edit callback
-  onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint, screenPos: Vec2) => void;
+  onEditDimension?: (
+    constraint: DistanceConstraint | RadiusConstraint | AngleConstraint,
+    screenPos: Vec2
+  ) => void;
   onToolChange?: (tool: ToolType) => void;
+
+  // Dimension tool multi-step state: 0 = pick line 1, 1 = pick offset or line 2, 2 = pick angle arc radius
+  private dimensionState: {
+    step: 0 | 1 | 2;
+    line1Id: string | null;
+    line2Id: string | null;
+  } = { step: 0, line1Id: null, line2Id: null };
 
   constructor(
     svg: SVGSVGElement,
@@ -117,6 +135,24 @@ export class CanvasInteraction {
   setTool(tool: ToolType): void {
     this.activeTool = tool;
     this.cancelDrawing();
+    if (tool === 'dimension') {
+      if (this.sketch.selection.lineIds.size === 1) {
+        this.dimensionState = {
+          step: 1,
+          line1Id: [...this.sketch.selection.lineIds][0],
+          line2Id: null,
+        };
+      } else if (this.sketch.selection.lineIds.size === 2) {
+        const [l1, l2] = [...this.sketch.selection.lineIds];
+        this.dimensionState = {
+          step: 2,
+          line1Id: l1,
+          line2Id: l2,
+        };
+      } else {
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+      }
+    }
     if (isConstraintTool(tool)) {
       this.pruneIncompatibleSelection(tool);
     }
@@ -171,8 +207,15 @@ export class CanvasInteraction {
     this.dragCircleStartWorld = null;
     this.circleCenterStart = null;
 
+    this.isDraggingConstraint = false;
+    this.draggedConstraintId = null;
+    this.dragConstraintStartScreen = null;
+    this.dragConstraintClientPos = null;
+
     this.preDragSnapshot = null;
     this.hasDragged = false;
+
+    this.dimensionState = { step: 0, line1Id: null, line2Id: null };
 
     this.renderer.clearPreviews();
   }
@@ -191,7 +234,7 @@ export class CanvasInteraction {
     // Prevent default context menu for smooth right-click panning
     this.svg.addEventListener('contextmenu', e => {
       e.preventDefault();
-      if (this.drawingStep > 0) {
+      if (this.drawingStep > 0 || (this.activeTool === 'dimension' && this.dimensionState.step > 0)) {
         this.cancelDrawing();
         this.setTool('select');
       }
@@ -205,6 +248,13 @@ export class CanvasInteraction {
         return;
       }
       if (e.key === 'Escape') {
+        if (this.activeTool === 'dimension' && this.dimensionState.step > 0) {
+          this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+          this.sketch.clearSelection();
+          this.renderer.clearPreviews();
+          this.render();
+          return;
+        }
         this.cancelDrawing();
         this.setTool('select');
         this.sketch.clearSelection();
@@ -226,6 +276,8 @@ export class CanvasInteraction {
         this.setTool('point');
       } else if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
         this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
+      } else if (e.key === 'd' || e.key === 'D' || e.key === 'в' || e.key === 'В') {
+        this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
       }
     });
 
@@ -353,6 +405,11 @@ export class CanvasInteraction {
 
     // --- ACTIVE CONSTRAINT TOOL MODE ---
     if (isConstraintTool(this.activeTool)) {
+      if (this.activeTool === 'dimension') {
+        this.handleDimensionClick(e, screen, clientPos);
+        return;
+      }
+
       const target = e.target as SVGElement;
       const targetG = target.closest('[data-id]') as SVGElement | null;
       let id = targetG?.getAttribute('data-id');
@@ -416,53 +473,59 @@ export class CanvasInteraction {
       }
 
       if (id && type) {
-        // Dragging is activated ONLY if the entity was ALREADY selected before this click
-        const wasAlreadySelected =
-          (type === 'point' && this.sketch.selection.pointIds.has(id)) ||
-          (type === 'line' && this.sketch.selection.lineIds.has(id)) ||
-          (type === 'circle' && this.sketch.selection.circleIds.has(id));
-
-        // Select entity and automatically select its associated constraints!
+        // Select entity immediately and select its associated constraints
         this.sketch.selectEntity(id, type, e.shiftKey);
 
-        if (wasAlreadySelected) {
-          if (type === 'point') {
-            this.isDraggingPoint = true;
-            this.draggedPointId = id;
+        if (type === 'point') {
+          this.isDraggingPoint = true;
+          this.draggedPointId = id;
+          this.preDragSnapshot = this.sketch.takeSnapshot();
+          this.hasDragged = false;
+          const pt = this.sketch.points.get(id);
+          if (pt) {
+            this.dragPointStartWorld = vec(pt.x, pt.y);
+          }
+        } else if (type === 'line') {
+          const line = this.sketch.lines.get(id);
+          if (line) {
+            const p1 = this.sketch.points.get(line.p1Id);
+            const p2 = this.sketch.points.get(line.p2Id);
+            if (p1 && p2) {
+              this.isDraggingLine = true;
+              this.draggedLineId = id;
+              this.preDragSnapshot = this.sketch.takeSnapshot();
+              this.hasDragged = false;
+              this.dragLineStartWorld = world;
+              this.lineP1Start = vec(p1.x, p1.y);
+              this.lineP2Start = vec(p2.x, p2.y);
+            }
+          }
+        } else if (type === 'circle') {
+          const circle = this.sketch.circles.get(id);
+          if (circle) {
+            const center = this.sketch.points.get(circle.centerId);
+            if (center) {
+              this.isDraggingCircle = true;
+              this.draggedCircleId = id;
+              this.preDragSnapshot = this.sketch.takeSnapshot();
+              this.hasDragged = false;
+              this.dragCircleStartWorld = world;
+              this.circleCenterStart = vec(center.x, center.y);
+            }
+          }
+        } else if (type === 'constraint') {
+          const constraint = this.sketch.constraints.get(id);
+          if (
+            constraint instanceof DistanceConstraint ||
+            constraint instanceof AngleConstraint ||
+            constraint instanceof RadiusConstraint
+          ) {
+            this.isDraggingConstraint = true;
+            this.draggedConstraintId = id;
             this.preDragSnapshot = this.sketch.takeSnapshot();
             this.hasDragged = false;
-            const pt = this.sketch.points.get(id);
-            if (pt) {
-              this.dragPointStartWorld = vec(pt.x, pt.y);
-            }
-          } else if (type === 'line') {
-            const line = this.sketch.lines.get(id);
-            if (line) {
-              const p1 = this.sketch.points.get(line.p1Id);
-              const p2 = this.sketch.points.get(line.p2Id);
-              if (p1 && p2) {
-                this.isDraggingLine = true;
-                this.draggedLineId = id;
-                this.preDragSnapshot = this.sketch.takeSnapshot();
-                this.hasDragged = false;
-                this.dragLineStartWorld = world;
-                this.lineP1Start = vec(p1.x, p1.y);
-                this.lineP2Start = vec(p2.x, p2.y);
-              }
-            }
-          } else if (type === 'circle') {
-            const circle = this.sketch.circles.get(id);
-            if (circle) {
-              const center = this.sketch.points.get(circle.centerId);
-              if (center) {
-                this.isDraggingCircle = true;
-                this.draggedCircleId = id;
-                this.preDragSnapshot = this.sketch.takeSnapshot();
-                this.hasDragged = false;
-                this.dragCircleStartWorld = world;
-                this.circleCenterStart = vec(center.x, center.y);
-              }
-            }
+            this.dragConstraintStartScreen = screen;
+            this.dragConstraintClientPos = clientPos;
           }
         }
 
@@ -600,6 +663,65 @@ export class CanvasInteraction {
       return;
     }
 
+    // Drag constraint handling (Distance offset & Angle radius/quadrant)
+    if (this.isDraggingConstraint && this.draggedConstraintId) {
+      if (this.dragConstraintStartScreen && dist(screen, this.dragConstraintStartScreen) > 3) {
+        this.hasDragged = true;
+      }
+      if (this.hasDragged) {
+        this.svg.style.cursor = 'grabbing';
+        const constraint = this.sketch.constraints.get(this.draggedConstraintId);
+        if (constraint instanceof DistanceConstraint) {
+          const p1 = this.sketch.points.get(constraint.p1Id);
+          const p2 = this.sketch.points.get(constraint.p2Id);
+          if (p1 && p2) {
+            const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+            const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+            const dx = s2.x - s1.x;
+            const dy = s2.y - s1.y;
+            const len = Math.hypot(dx, dy);
+            if (len > 1e-4) {
+              const nx = -dy / len;
+              const ny = dx / len;
+              const midX = (s1.x + s2.x) * 0.5;
+              const midY = (s1.y + s2.y) * 0.5;
+              const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
+              constraint.offset = screenOffset / this.viewport.zoom;
+              this.render();
+            }
+          }
+        } else if (constraint instanceof AngleConstraint) {
+          const l1 = this.sketch.lines.get(constraint.line1Id);
+          const l2 = this.sketch.lines.get(constraint.line2Id);
+          if (l1 && l2) {
+            const p1 = this.sketch.points.get(l1.p1Id);
+            const p2 = this.sketch.points.get(l1.p2Id);
+            const p3 = this.sketch.points.get(l2.p1Id);
+            const p4 = this.sketch.points.get(l2.p2Id);
+            if (p1 && p2 && p3 && p4) {
+              const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world);
+              const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
+              constraint.arcRadius = arcRadiusWorld;
+
+              // If dragged into a different quadrant/sector:
+              if (geom.s1 !== constraint.s1 || geom.s2 !== constraint.s2) {
+                constraint.s1 = geom.s1;
+                constraint.s2 = geom.s2;
+                constraint.sign = geom.sign;
+                const newAngle = Math.round(geom.initialAngleDeg * 10) / 10;
+                constraint.targetAngle = newAngle;
+                constraint.value = newAngle;
+                constraint.name = `Angle (${newAngle.toFixed(1)}°)`;
+                this.sketch.solve();
+              }
+              this.render();
+            }
+          }
+        }
+      }
+      return;
+    }
+
     // Drag point handling (Live solver calculation!)
     if (this.isDraggingPoint && this.draggedPointId && this.dragPointStartWorld) {
       this.hasDragged = true;
@@ -683,7 +805,7 @@ export class CanvasInteraction {
       this.activeTool === 'rectangle';
     const isConstraintWithPoints =
       isConstraintTool(this.activeTool) &&
-      ['fixed', 'coincident', 'horizontal_vertical', 'horizontal', 'vertical', 'distance', 'point_on_line', 'midpoint'].includes(
+      ['fixed', 'coincident', 'horizontal_vertical', 'horizontal', 'vertical', 'dimension', 'distance', 'point_on_line', 'midpoint'].includes(
         this.activeTool
       );
     const snap = isDrawingTool || isConstraintWithPoints
@@ -717,6 +839,43 @@ export class CanvasInteraction {
         this.renderer.renderRectanglePreview(s1, s2, w, h);
       }
     }
+
+    // Dimension tool live preview
+    if (this.activeTool === 'dimension') {
+      if (this.dimensionState.step === 1 && this.dimensionState.line1Id) {
+        const l1 = this.sketch.lines.get(this.dimensionState.line1Id);
+        if (l1) {
+          const p1 = this.sketch.points.get(l1.p1Id);
+          const p2 = this.sketch.points.get(l1.p2Id);
+          if (p1 && p2) {
+            const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+            const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+            const currentDist = dist(p1, p2);
+            this.renderer.renderDistancePreview(s1, s2, screen, currentDist);
+          }
+        }
+      } else if (this.dimensionState.step === 2 && this.dimensionState.line1Id && this.dimensionState.line2Id) {
+        const l1 = this.sketch.lines.get(this.dimensionState.line1Id);
+        const l2 = this.sketch.lines.get(this.dimensionState.line2Id);
+        if (l1 && l2) {
+          const p1 = this.sketch.points.get(l1.p1Id);
+          const p2 = this.sketch.points.get(l1.p2Id);
+          const p3 = this.sketch.points.get(l2.p1Id);
+          const p4 = this.sketch.points.get(l2.p2Id);
+          if (p1 && p2 && p3 && p4) {
+            const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world);
+            const sCenter = this.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
+            const sRay1 = this.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
+            const sRay2 = this.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+            const sp1 = this.viewport.worldToScreen(p1.x, p1.y);
+            const sp2 = this.viewport.worldToScreen(p2.x, p2.y);
+            const sp3 = this.viewport.worldToScreen(p3.x, p3.y);
+            const sp4 = this.viewport.worldToScreen(p4.x, p4.y);
+            this.renderer.renderAnglePreview(sCenter, sRay1, sRay2, screen, geom.initialAngleDeg, sp1, sp2, sp3, sp4);
+          }
+        }
+      }
+    }
   }
 
   private handleMouseUp(): void {
@@ -729,11 +888,13 @@ export class CanvasInteraction {
       this.draggedPointId = null;
       this.dragPointStartWorld = null;
       this.renderer.clearPreviews();
-      // Final solve without soft drag constraint to ensure exact convergence
-      this.sketch.solve();
-      this.render();
-      if (this.hasDragged && this.preDragSnapshot) {
-        this.sketch.pushSnapshot(this.preDragSnapshot);
+      if (this.hasDragged) {
+        // Final solve without soft drag constraint to ensure exact convergence
+        this.sketch.solve();
+        this.render();
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
       }
       this.preDragSnapshot = null;
       this.hasDragged = false;
@@ -746,10 +907,12 @@ export class CanvasInteraction {
       this.lineP1Start = null;
       this.lineP2Start = null;
       this.renderer.clearPreviews();
-      this.sketch.solve();
-      this.render();
-      if (this.hasDragged && this.preDragSnapshot) {
-        this.sketch.pushSnapshot(this.preDragSnapshot);
+      if (this.hasDragged) {
+        this.sketch.solve();
+        this.render();
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
       }
       this.preDragSnapshot = null;
       this.hasDragged = false;
@@ -761,13 +924,44 @@ export class CanvasInteraction {
       this.dragCircleStartWorld = null;
       this.circleCenterStart = null;
       this.renderer.clearPreviews();
-      this.sketch.solve();
-      this.render();
-      if (this.hasDragged && this.preDragSnapshot) {
-        this.sketch.pushSnapshot(this.preDragSnapshot);
+      if (this.hasDragged) {
+        this.sketch.solve();
+        this.render();
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
       }
       this.preDragSnapshot = null;
       this.hasDragged = false;
+      this.updateCursor();
+    }
+    if (this.isDraggingConstraint) {
+      const constraintId = this.draggedConstraintId;
+      const clientPos = this.dragConstraintClientPos;
+      const hadDragged = this.hasDragged;
+
+      this.isDraggingConstraint = false;
+      this.draggedConstraintId = null;
+      this.dragConstraintStartScreen = null;
+      this.dragConstraintClientPos = null;
+
+      if (hadDragged) {
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
+        this.preDragSnapshot = null;
+        this.hasDragged = false;
+        this.render();
+      } else {
+        this.preDragSnapshot = null;
+        this.hasDragged = false;
+        if (constraintId && clientPos && this.onEditDimension) {
+          const c = this.sketch.constraints.get(constraintId);
+          if (c instanceof DistanceConstraint || c instanceof AngleConstraint || c instanceof RadiusConstraint) {
+            this.onEditDimension(c, clientPos);
+          }
+        }
+      }
       this.updateCursor();
     }
   }
@@ -807,7 +1001,9 @@ export class CanvasInteraction {
     if (type === 'constraint') {
       const constraint = this.sketch.constraints.get(id);
       if (
-        (constraint instanceof DistanceConstraint || constraint instanceof RadiusConstraint) &&
+        (constraint instanceof DistanceConstraint ||
+          constraint instanceof RadiusConstraint ||
+          constraint instanceof AngleConstraint) &&
         this.onEditDimension
       ) {
         this.sketch.selectEntity(constraint.id, 'constraint', false);
@@ -863,6 +1059,149 @@ export class CanvasInteraction {
     const screen = this.getScreenPos(e);
     const clientPos = vec(e.clientX, e.clientY);
     this.triggerDimensionEditAt(e, screen, clientPos);
+  }
+
+  private handleDimensionClick(e: MouseEvent, screen: Vec2, clientPos: Vec2): void {
+    const world = this.viewport.screenToWorld(screen.x, screen.y);
+    const snap = this.findSnappedPoint(screen);
+
+    const target = e.target as SVGElement;
+    const targetG = target.closest('[data-id]') as SVGElement | null;
+    let id = targetG?.getAttribute('data-id');
+    let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'constraint' | undefined;
+
+    // Geometric hit test fallback if not clicking directly on entity
+    if (!type || (type !== 'point' && type !== 'line' && type !== 'circle')) {
+      if (snap) {
+        id = snap.id;
+        type = 'point';
+      } else {
+        const hitLine = this.findLineNearScreen(screen, 18);
+        if (hitLine) {
+          id = hitLine.id;
+          type = 'line';
+        } else {
+          const hitCircle = this.findCircleNearScreen(screen, 18);
+          if (hitCircle) {
+            id = hitCircle.id;
+            type = 'circle';
+          }
+        }
+      }
+    }
+
+    // STEP 0: Select first line or circle
+    if (this.dimensionState.step === 0) {
+      if (type === 'line' && id) {
+        this.sketch.clearSelection();
+        this.sketch.selectEntity(id, 'line', false);
+        this.dimensionState = { step: 1, line1Id: id, line2Id: null };
+        this.render();
+      } else if (type === 'circle' && id) {
+        const c = this.sketch.addRadiusConstraint(id);
+        if (c) {
+          showToast('Radius constraint applied');
+          this.sketch.clearSelection();
+          this.render();
+          if (this.onEditDimension) {
+            this.onEditDimension(c, clientPos);
+          }
+        }
+      } else {
+        this.sketch.clearSelection();
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.renderer.clearPreviews();
+        this.render();
+      }
+      return;
+    }
+
+    // STEP 1: First line was selected.
+    // If 2nd click on another line -> Angle constraint mode (step 2)
+    // If 2nd click in empty space/near line -> Distance constraint with offset!
+    if (this.dimensionState.step === 1) {
+      const l1 = this.dimensionState.line1Id ? this.sketch.lines.get(this.dimensionState.line1Id) : null;
+      if (!l1) {
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.renderer.clearPreviews();
+        this.render();
+        return;
+      }
+
+      // If clicked on another line -> switch to Angle constraint mode!
+      if (type === 'line' && id && id !== l1.id) {
+        this.sketch.selectEntity(id, 'line', true);
+        this.dimensionState = { step: 2, line1Id: l1.id, line2Id: id };
+        this.render();
+        return;
+      }
+
+      // Second click sets perpendicular offset for distance constraint
+      const p1 = this.sketch.points.get(l1.p1Id);
+      const p2 = this.sketch.points.get(l1.p2Id);
+      if (p1 && p2) {
+        const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+        const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+        const dx = s2.x - s1.x;
+        const dy = s2.y - s1.y;
+        const len = Math.hypot(dx, dy);
+        let offsetWorld = 20;
+        if (len > 1e-4) {
+          const nx = -dy / len;
+          const ny = dx / len;
+          const midX = (s1.x + s2.x) * 0.5;
+          const midY = (s1.y + s2.y) * 0.5;
+          const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
+          offsetWorld = screenOffset / this.viewport.zoom;
+        }
+
+        const c = this.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld);
+        if (c) {
+          showToast('Distance constraint applied');
+          this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+          this.renderer.clearPreviews();
+          this.sketch.clearSelection();
+          this.render();
+          if (this.onEditDimension) {
+            this.onEditDimension(c, clientPos);
+          }
+        }
+      }
+      return;
+    }
+
+    // STEP 2: Two lines selected. 3rd click specifies the display radius for angle constraint!
+    if (this.dimensionState.step === 2) {
+      const l1 = this.dimensionState.line1Id ? this.sketch.lines.get(this.dimensionState.line1Id) : null;
+      const l2 = this.dimensionState.line2Id ? this.sketch.lines.get(this.dimensionState.line2Id) : null;
+      if (!l1 || !l2) {
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.renderer.clearPreviews();
+        this.render();
+        return;
+      }
+
+      const p1 = this.sketch.points.get(l1.p1Id);
+      const p2 = this.sketch.points.get(l1.p2Id);
+      const p3 = this.sketch.points.get(l2.p1Id);
+      const p4 = this.sketch.points.get(l2.p2Id);
+      if (p1 && p2 && p3 && p4) {
+        const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world);
+        const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
+        const c = this.sketch.addAngleConstraint(l1.id, l2.id, undefined, arcRadiusWorld, world);
+        if (c) {
+          showToast('Angle constraint applied');
+          this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+          this.renderer.clearPreviews();
+          this.sketch.clearSelection();
+          this.render();
+          if (this.onEditDimension) {
+            this.onEditDimension(c, clientPos);
+          }
+        }
+      }
+      return;
+    }
   }
 
   private updateCursor(): void {
@@ -929,6 +1268,7 @@ export class CanvasInteraction {
         sel.arcIds.clear();
         break;
       }
+      case 'dimension':
       case 'distance': {
         sel.arcIds.clear();
         break;
@@ -965,6 +1305,7 @@ export class CanvasInteraction {
       case 'horizontal':
       case 'vertical':
         return entityType === 'line' || entityType === 'point';
+      case 'dimension':
       case 'distance':
         return entityType === 'line' || entityType === 'circle' || entityType === 'point';
       case 'equal':
@@ -999,9 +1340,11 @@ export class CanvasInteraction {
       case 'horizontal':
       case 'vertical':
         return (lCount === 1 && pCount === 0 && cCount === 0) || (pCount === 2 && lCount === 0 && cCount === 0);
+      case 'dimension':
       case 'distance':
         return (
           (lCount === 1 && pCount === 0 && cCount === 0) ||
+          (lCount === 2 && pCount === 0 && cCount === 0) ||
           (pCount === 2 && lCount === 0 && cCount === 0) ||
           (cCount === 1 && pCount === 0 && lCount === 0)
         );
@@ -1111,6 +1454,7 @@ export class CanvasInteraction {
         }
         break;
       }
+      case 'dimension':
       case 'distance': {
         if (lIds.length === 1) {
           const l = this.sketch.lines.get(lIds[0])!;
@@ -1123,6 +1467,22 @@ export class CanvasInteraction {
             const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
             const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
             const s = this.viewport.worldToScreen(midX, midY);
+            const rect = this.svg.getBoundingClientRect();
+            this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
+          }
+        } else if (lIds.length === 2) {
+          const c = this.sketch.addAngleConstraint(lIds[0], lIds[1]);
+          applied = true;
+          toastMsg = 'Angle constraint applied';
+          if (c && this.onEditDimension) {
+            const l1 = this.sketch.lines.get(lIds[0])!;
+            const l2 = this.sketch.lines.get(lIds[1])!;
+            const p1 = this.sketch.points.get(l1.p1Id)!;
+            const p2 = this.sketch.points.get(l1.p2Id)!;
+            const p3 = this.sketch.points.get(l2.p1Id)!;
+            const p4 = this.sketch.points.get(l2.p2Id)!;
+            const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+            const s = this.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
             const rect = this.svg.getBoundingClientRect();
             this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
           }
@@ -1281,6 +1641,22 @@ export class CanvasInteraction {
           sel.lineIds.clear();
         } else if (type === 'point') {
           sel.lineIds.clear();
+          if (sel.pointIds.size >= 2) sel.pointIds.clear();
+        }
+        break;
+      }
+      case 'dimension': {
+        if (type === 'line') {
+          sel.pointIds.clear();
+          sel.circleIds.clear();
+          if (sel.lineIds.size >= 2) sel.lineIds.clear();
+        } else if (type === 'circle') {
+          sel.pointIds.clear();
+          sel.lineIds.clear();
+          sel.circleIds.clear();
+        } else if (type === 'point') {
+          sel.lineIds.clear();
+          sel.circleIds.clear();
           if (sel.pointIds.size >= 2) sel.pointIds.clear();
         }
         break;

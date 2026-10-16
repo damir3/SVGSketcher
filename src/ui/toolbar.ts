@@ -73,9 +73,9 @@ export class Toolbar {
             ${ICONS.horizontalVertical}
             <span class="btn-tooltip">Horiz / Vert (H)</span>
           </button>
-          <button class="tool-btn" data-constraint="distance" title="Distance / Length">
-            ${ICONS.distance}
-            <span class="btn-tooltip">Distance</span>
+          <button class="tool-btn" data-constraint="dimension" title="Dimension (D)">
+            ${ICONS.dimension}
+            <span class="btn-tooltip">Dimension (D)</span>
           </button>
           <button class="tool-btn" data-constraint="equal" title="Equal Length or Radius">
             ${ICONS.equal}
@@ -139,8 +139,8 @@ export class Toolbar {
       btn.addEventListener('click', () => {
         const constraintType = btn.getAttribute('data-constraint') as ConstraintToolType;
 
-        // 1. If required primitives are ALREADY selected, immediately apply constraint!
-        if (this.interaction.canApplyConstraint(constraintType)) {
+        // 1. If required primitives are ALREADY selected, immediately apply constraint (except dimension which needs offset placement)!
+        if (constraintType !== 'dimension' && this.interaction.canApplyConstraint(constraintType)) {
           this.interaction.applyConstraint(constraintType);
           this.interaction.setTool('select');
           return;
