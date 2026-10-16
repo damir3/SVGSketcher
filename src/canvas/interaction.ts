@@ -10,6 +10,7 @@ import { showToast } from '../ui/toast';
 export type ConstraintToolType =
   | 'coincident'
   | 'fixed'
+  | 'horizontal_vertical'
   | 'horizontal'
   | 'vertical'
   | 'distance'
@@ -24,6 +25,7 @@ export type ConstraintToolType =
 export const CONSTRAINT_TOOLS: Set<string> = new Set([
   'coincident',
   'fixed',
+  'horizontal_vertical',
   'horizontal',
   'vertical',
   'distance',
@@ -222,6 +224,8 @@ export class CanvasInteraction {
         this.setTool('rectangle');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'з' || e.key === 'З') {
         this.setTool('point');
+      } else if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
+        this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
       }
     });
 
@@ -679,7 +683,7 @@ export class CanvasInteraction {
       this.activeTool === 'rectangle';
     const isConstraintWithPoints =
       isConstraintTool(this.activeTool) &&
-      ['fixed', 'coincident', 'horizontal', 'vertical', 'distance', 'point_on_line', 'midpoint'].includes(
+      ['fixed', 'coincident', 'horizontal_vertical', 'horizontal', 'vertical', 'distance', 'point_on_line', 'midpoint'].includes(
         this.activeTool
       );
     const snap = isDrawingTool || isConstraintWithPoints
@@ -905,6 +909,7 @@ export class CanvasInteraction {
         sel.arcIds.clear();
         break;
       }
+      case 'horizontal_vertical':
       case 'horizontal':
       case 'vertical': {
         if (sel.lineIds.size > 0) {
@@ -956,6 +961,7 @@ export class CanvasInteraction {
       case 'fixed':
       case 'coincident':
         return entityType === 'point';
+      case 'horizontal_vertical':
       case 'horizontal':
       case 'vertical':
         return entityType === 'line' || entityType === 'point';
@@ -989,6 +995,7 @@ export class CanvasInteraction {
         return pCount >= 1 && lCount === 0 && cCount === 0;
       case 'coincident':
         return pCount === 2 && lCount === 0 && cCount === 0;
+      case 'horizontal_vertical':
       case 'horizontal':
       case 'vertical':
         return (lCount === 1 && pCount === 0 && cCount === 0) || (pCount === 2 && lCount === 0 && cCount === 0);
@@ -1038,6 +1045,43 @@ export class CanvasInteraction {
           this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
           applied = true;
           toastMsg = 'Coincident constraint applied';
+        }
+        break;
+      }
+      case 'horizontal_vertical': {
+        if (lIds.length === 1) {
+          const l = this.sketch.lines.get(lIds[0])!;
+          const p1 = this.sketch.points.get(l.p1Id);
+          const p2 = this.sketch.points.get(l.p2Id);
+          if (p1 && p2) {
+            const dx = Math.abs(p2.x - p1.x);
+            const dy = Math.abs(p2.y - p1.y);
+            if (dx >= dy) {
+              this.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
+              applied = true;
+              toastMsg = 'Horizontal constraint applied';
+            } else {
+              this.sketch.addVerticalConstraint(l.p1Id, l.p2Id);
+              applied = true;
+              toastMsg = 'Vertical constraint applied';
+            }
+          }
+        } else if (pIds.length === 2) {
+          const p1 = this.sketch.points.get(pIds[0]);
+          const p2 = this.sketch.points.get(pIds[1]);
+          if (p1 && p2) {
+            const dx = Math.abs(p2.x - p1.x);
+            const dy = Math.abs(p2.y - p1.y);
+            if (dx >= dy) {
+              this.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
+              applied = true;
+              toastMsg = 'Horizontal constraint applied';
+            } else {
+              this.sketch.addVerticalConstraint(pIds[0], pIds[1]);
+              applied = true;
+              toastMsg = 'Vertical constraint applied';
+            }
+          }
         }
         break;
       }
@@ -1229,6 +1273,7 @@ export class CanvasInteraction {
 
     // Prune incompatible combinations before adding new item
     switch (constraintType) {
+      case 'horizontal_vertical':
       case 'horizontal':
       case 'vertical': {
         if (type === 'line') {

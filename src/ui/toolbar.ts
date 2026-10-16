@@ -69,13 +69,9 @@ export class Toolbar {
             ${ICONS.fixed}
             <span class="btn-tooltip">Fix Point</span>
           </button>
-          <button class="tool-btn" data-constraint="horizontal" title="Horizontal (1 line / 2 points)">
-            ${ICONS.horizontal}
-            <span class="btn-tooltip">Horizontal</span>
-          </button>
-          <button class="tool-btn" data-constraint="vertical" title="Vertical (1 line / 2 points)">
-            ${ICONS.vertical}
-            <span class="btn-tooltip">Vertical</span>
+          <button class="tool-btn" data-constraint="horizontal_vertical" title="Horizontal / Vertical (H)">
+            ${ICONS.horizontalVertical}
+            <span class="btn-tooltip">Horiz / Vert (H)</span>
           </button>
           <button class="tool-btn" data-constraint="distance" title="Distance / Length">
             ${ICONS.distance}
