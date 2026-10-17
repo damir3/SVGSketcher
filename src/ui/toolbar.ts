@@ -45,21 +45,21 @@ export class Toolbar {
             ${ICONS.line}
             <span class="btn-tooltip">Line (L)</span>
           </button>
+          <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
+            ${ICONS.rectangle}
+            <span class="btn-tooltip">Rectangle (R)</span>
+          </button>
           <button class="tool-btn" data-tool="circle" title="Circle (C)">
             ${ICONS.circle}
             <span class="btn-tooltip">Circle (C)</span>
-          </button>
-          <button class="tool-btn" data-tool="arc" title="3-Point Arc (A)">
-            ${ICONS.arc}
-            <span class="btn-tooltip">3-Pt Arc (A)</span>
           </button>
           <button class="tool-btn" data-tool="arc_center" title="Centerpoint Arc">
             ${ICONS.arc_center}
             <span class="btn-tooltip">Center Arc</span>
           </button>
-          <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
-            ${ICONS.rectangle}
-            <span class="btn-tooltip">Rectangle (R)</span>
+          <button class="tool-btn" data-tool="arc" title="3-Point Arc (A)">
+            ${ICONS.arc}
+            <span class="btn-tooltip">3-Pt Arc (A)</span>
           </button>
           <button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
             ${ICONS.ellipse}

@@ -1,39 +1,75 @@
+import select from '../assets/icons/select.svg?raw';
+import pan from '../assets/icons/pan.svg?raw';
+import point from '../assets/icons/point.svg?raw';
+import line from '../assets/icons/line.svg?raw';
+import circle from '../assets/icons/circle.svg?raw';
+import arc from '../assets/icons/arc.svg?raw';
+import arcCenter from '../assets/icons/arc-center.svg?raw';
+import rectangle from '../assets/icons/rectangle.svg?raw';
+import ellipse from '../assets/icons/ellipse.svg?raw';
+import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
+import construction from '../assets/icons/construction.svg?raw';
+import snap from '../assets/icons/snap.svg?raw';
+
+import coincident from '../assets/icons/coincident.svg?raw';
+import fixed from '../assets/icons/fixed.svg?raw';
+import horizontal from '../assets/icons/horizontal.svg?raw';
+import vertical from '../assets/icons/vertical.svg?raw';
+import horizontalVertical from '../assets/icons/horizontal-vertical.svg?raw';
+import distance from '../assets/icons/distance.svg?raw';
+import dimension from '../assets/icons/dimension.svg?raw';
+import angle from '../assets/icons/angle.svg?raw';
+import equal from '../assets/icons/equal.svg?raw';
+import parallel from '../assets/icons/parallel.svg?raw';
+import perpendicular from '../assets/icons/perpendicular.svg?raw';
+import tangent from '../assets/icons/tangent.svg?raw';
+import concentric from '../assets/icons/concentric.svg?raw';
+import pointOnLine from '../assets/icons/point-on-line.svg?raw';
+import midpoint from '../assets/icons/midpoint.svg?raw';
+
+import undo from '../assets/icons/undo.svg?raw';
+import redo from '../assets/icons/redo.svg?raw';
+import deleteIcon from '../assets/icons/delete.svg?raw';
+import clear from '../assets/icons/clear.svg?raw';
+import fitView from '../assets/icons/fit-view.svg?raw';
+import exportIcon from '../assets/icons/export.svg?raw';
+
 export const ICONS = {
-  select: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>`,
-  pan: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>`,
-  point: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>`,
-  line: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="2" fill="currentColor"/><circle cx="19" cy="5" r="2" fill="currentColor"/></svg>`,
-  circle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`,
-  arc: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18 A 10 10 0 0 1 20 18"/><circle cx="4" cy="18" r="2" fill="currentColor"/><circle cx="12" cy="8" r="2" fill="currentColor"/><circle cx="20" cy="18" r="2" fill="currentColor"/></svg>`,
-  arc_center: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="16" r="2" fill="currentColor"/><path d="M5 16 A 7 7 0 0 1 19 16"/><line x1="12" y1="16" x2="5" y2="16" stroke-dasharray="2 2" stroke-width="1.5"/><circle cx="5" cy="16" r="1.5" fill="currentColor"/><circle cx="19" cy="16" r="1.5" fill="currentColor"/></svg>`,
-  rectangle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="14" x="3" y="5" rx="1"/></svg>`,
-  ellipse: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="9" ry="5.5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="21" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="6.5" r="1.5" fill="currentColor"/></svg>`,
-  elliptical_arc: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17 A 9 6 0 0 1 20 17"/><circle cx="12" cy="17" r="1.5" fill="currentColor"/><circle cx="4" cy="17" r="1.5" fill="currentColor"/><circle cx="20" cy="17" r="1.5" fill="currentColor"/></svg>`,
-  construction: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="3 3"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="2"/><circle cx="20" cy="4" r="2"/></svg>`,
-  
+  select,
+  pan,
+  point,
+  line,
+  circle,
+  arc,
+  arc_center: arcCenter,
+  rectangle,
+  ellipse,
+  elliptical_arc: ellipticalArc,
+  construction,
+  snap,
+
   // Constraints
-  coincident: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="12" r="5" stroke-dasharray="2 2"/><circle cx="15" cy="12" r="5"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`,
-  fixed: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><line x1="12" y1="22" x2="12" y2="8"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/></svg>`,
-  horizontal: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="6" y1="8" x2="6" y2="16"/><line x1="18" y1="8" x2="18" y2="16"/></svg>`,
-  vertical: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="3" x2="12" y2="21"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="18" x2="16" y2="18"/></svg>`,
-  horizontalVertical: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="3" x2="5" y2="21"/><line x1="3" y1="19" x2="21" y2="19"/><line x1="12" y1="3" x2="12" y2="21" stroke-width="1.3" stroke-dasharray="3 2 0.1 2"/><line x1="3" y1="12" x2="21" y2="12" stroke-width="1.3" stroke-dasharray="3 2 0.1 2"/></svg>`,
-  distance: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 8 3 4-3 4"/><path d="m5 8-3 4 3 4"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="5" x2="2" y2="19"/><line x1="22" y1="5" x2="22" y2="19"/></svg>`,
-  dimension: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 8 3 4-3 4"/><path d="m5 8-3 4 3 4"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="5" x2="2" y2="19"/><line x1="22" y1="5" x2="22" y2="19"/></svg>`,
-  angle: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="20"/><line x1="4" y1="20" x2="16" y2="6"/><path d="M11 20a7 7 0 0 0-2.5-5"/></svg>`,
-  equal: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="9" x2="18" y2="9"/><line x1="6" y1="15" x2="18" y2="15"/></svg>`,
-  parallel: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="8" y1="4" x2="14" y2="20"/><line x1="12" y1="4" x2="18" y2="20"/></svg>`,
-  perpendicular: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="20"/><line x1="12" y1="20" x2="12" y2="4"/><path d="M12 16h4v4"/></svg>`,
-  tangent: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="10" r="7"/><line x1="3" y1="17" x2="21" y2="17" stroke-width="2"/></svg>`,
-  concentric: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>`,
-  pointOnLine: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="18" x2="20" y2="6"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>`,
-  midpoint: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/><line x1="3" y1="9" x2="3" y2="15"/><line x1="21" y1="9" x2="21" y2="15"/></svg>`,
+  coincident,
+  fixed,
+  horizontal,
+  vertical,
+  horizontalVertical,
+  distance,
+  dimension,
+  angle,
+  equal,
+  parallel,
+  perpendicular,
+  tangent,
+  concentric,
+  pointOnLine,
+  midpoint,
 
   // General tools
-  undo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
-  redo: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>`,
-  delete: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>`,
-  clear: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>`,
-  fitView: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`,
-  export: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
-  snap: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6a2 2 0 0 0 4 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6a8 8 0 0 1-16 0Z"/><line x1="4" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="20" y2="8"/></svg>`,
+  undo,
+  redo,
+  delete: deleteIcon,
+  clear,
+  fitView,
+  export: exportIcon,
 };
