@@ -13,6 +13,7 @@ import {
   ConcentricConstraint,
   MidpointConstraint,
   PointOnLineConstraint,
+  PointOnCircleConstraint,
   FixedConstraint,
   CoincidentConstraint,
   AngleConstraint,
@@ -638,7 +639,7 @@ export class SVGRenderer {
       pointEl.setAttribute('class', 'entity-visible visible-point');
       pointEl.setAttribute('cx', s.x.toFixed(1));
       pointEl.setAttribute('cy', s.y.toFixed(1));
-      pointEl.setAttribute('r', isSelected ? '6' : '4.5');
+      pointEl.setAttribute('r', isSelected ? '4.5' : '3.5');
       pointEl.setAttribute('pointer-events', 'all');
       pointEl.style.pointerEvents = 'all';
 
@@ -701,6 +702,8 @@ export class SVGRenderer {
         this.renderMidpointBadge(constraint, sketch, viewport, isSelected);
       } else if (constraint instanceof PointOnLineConstraint) {
         this.renderPointOnLineBadge(constraint, sketch, viewport, isSelected);
+      } else if (constraint instanceof PointOnCircleConstraint) {
+        this.renderPointOnCircleBadge(constraint, sketch, viewport, isSelected);
       } else if (constraint instanceof FixedConstraint) {
         this.renderFixedBadge(constraint, sketch, viewport, isSelected);
       } else if (constraint instanceof CoincidentConstraint) {
@@ -1277,6 +1280,18 @@ export class SVGRenderer {
     this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, '#0284c7');
   }
 
+  private renderPointOnCircleBadge(
+    constraint: PointOnCircleConstraint,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    isSelected: boolean
+  ): void {
+    const pt = sketch.points.get(constraint.pointId);
+    if (!pt) return;
+    const s = viewport.worldToScreen(pt.x, pt.y);
+    this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, '#0284c7');
+  }
+
   private renderFixedBadge(
     constraint: FixedConstraint,
     sketch: SketchDocument,
@@ -1822,36 +1837,36 @@ export class SVGRenderer {
     this.renderTooltip(se.x + 12, se.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
   }
 
-  renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'grid' = 'point', clearFirst = true): void {
+  renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'circle' | 'grid' = 'point', clearFirst = true): void {
     if (clearFirst) {
       this.overlayGroup.innerHTML = '';
     }
 
-    if (type === 'line') {
-      // Emerald diamond on line
+    if (type === 'line' || type === 'circle') {
+      // Emerald diamond on object - enlarged so it clearly surrounds points
       const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-      const d = 7;
+      const d = 10;
       diamond.setAttribute(
         'points',
         `${s.x.toFixed(1)},${(s.y - d).toFixed(1)} ${(s.x + d).toFixed(1)},${s.y.toFixed(1)} ${s.x.toFixed(1)},${(s.y + d).toFixed(1)} ${(s.x - d).toFixed(1)},${s.y.toFixed(1)}`
       );
-      diamond.setAttribute('fill', 'rgba(16, 185, 129, 0.2)');
-      diamond.setAttribute('stroke', '#10b981');
-      diamond.setAttribute('stroke-width', '2');
+      diamond.setAttribute('fill', 'rgba(16, 185, 129, 0.25)');
+      diamond.setAttribute('stroke', '#0e9c6dff');
+      diamond.setAttribute('stroke-width', '1');
       diamond.setAttribute('pointer-events', 'none');
       diamond.style.pointerEvents = 'none';
       this.overlayGroup.appendChild(diamond);
     } else if (type === 'grid') {
       // Indigo square at grid intersection
-      const size = 6;
+      const size = 7;
       const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       rect.setAttribute('x', (s.x - size).toFixed(1));
       rect.setAttribute('y', (s.y - size).toFixed(1));
       rect.setAttribute('width', (size * 2).toString());
       rect.setAttribute('height', (size * 2).toString());
       rect.setAttribute('fill', 'rgba(99, 102, 241, 0.15)');
-      rect.setAttribute('stroke', '#6366f1');
-      rect.setAttribute('stroke-width', '1.5');
+      rect.setAttribute('stroke', '#7cbdfaff');
+      rect.setAttribute('stroke-width', '1');
       rect.setAttribute('rx', '1');
       rect.setAttribute('pointer-events', 'none');
       rect.style.pointerEvents = 'none';
@@ -1861,10 +1876,10 @@ export class SVGRenderer {
       const snapRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       snapRing.setAttribute('cx', s.x.toFixed(1));
       snapRing.setAttribute('cy', s.y.toFixed(1));
-      snapRing.setAttribute('r', '8');
-      snapRing.setAttribute('fill', 'rgba(2, 132, 199, 0.15)');
+      snapRing.setAttribute('r', '9');
+      snapRing.setAttribute('fill', 'rgba(2, 132, 199, 0.2)');
       snapRing.setAttribute('stroke', '#0284c7');
-      snapRing.setAttribute('stroke-width', '2');
+      snapRing.setAttribute('stroke-width', '1');
       snapRing.setAttribute('pointer-events', 'none');
       snapRing.style.pointerEvents = 'none';
       this.overlayGroup.appendChild(snapRing);

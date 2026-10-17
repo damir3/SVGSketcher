@@ -338,8 +338,8 @@ html, body {
 #cad-svg:not(.is-dragging) .sketch-point:not(.is-selected):hover .visible-point {
   fill: #38bdf8 !important;
   stroke: #ffffff !important;
-  r: 6.5px !important;
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.8));
+  r: 4.5px !important;
+  filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.8));
 }
 
 /* Hover highlighting on already selected primitives */
@@ -350,8 +350,8 @@ html, body {
 
 #cad-svg:not(.is-dragging) .sketch-point.is-selected:hover .visible-point {
   fill: #7dd3fc !important;
-  r: 7.5px !important;
-  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9));
+  r: 5px !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.9));
 }
 
 /* Hover highlighting on dimension annotations */

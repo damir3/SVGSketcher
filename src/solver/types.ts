@@ -2,6 +2,7 @@ export type ConstraintType =
   | 'fixed'
   | 'coincident'
   | 'point_on_line'
+  | 'point_on_circle'
   | 'horizontal'
   | 'vertical'
   | 'distance'

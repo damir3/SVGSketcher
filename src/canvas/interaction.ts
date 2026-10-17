@@ -58,9 +58,10 @@ export type ToolType =
   | ConstraintToolType;
 
 export interface SnapResult {
-  type: 'point' | 'line' | 'grid';
+  type: 'point' | 'line' | 'circle' | 'grid';
   id?: string;
   lineId?: string;
+  circleId?: string;
   worldPos: Vec2;
   screenPos: Vec2;
 }
@@ -167,6 +168,7 @@ export class CanvasInteraction {
   private ellipseStartPointId: string | null = null;
   private ellipseStartPointWorldPos: Vec2 | null = null;
   private startSnapLineId: string | null = null;
+  private startSnapCircleId: string | null = null;
 
   // Dragging point state
   private isDraggingPoint = false;
@@ -391,6 +393,7 @@ export class CanvasInteraction {
     this.ellipseStartPointId = null;
     this.ellipseStartPointWorldPos = null;
     this.startSnapLineId = null;
+    this.startSnapCircleId = null;
 
     this.isDraggingPoint = false;
     this.draggedPointId = null;
@@ -510,6 +513,8 @@ export class CanvasInteraction {
         this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
       } else if (e.key === 'd' || e.key === 'D' || e.key === 'в' || e.key === 'В') {
         this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
+      } else if (e.key === 'i' || e.key === 'I' || e.key === 'ш' || e.key === 'Ш') {
+        this.setTool(this.activeTool === 'coincident' ? 'select' : 'coincident');
       } else if (e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы') {
         if (!e.ctrlKey && !e.metaKey) {
           this.toggleSnapping();
@@ -552,7 +557,7 @@ export class CanvasInteraction {
     }
 
     // Priority 1: Point snapping (Always active, highest priority)
-    const pointSnapDistPx = 14;
+    const pointSnapDistPx = 10;
     let closestPointDist = pointSnapDistPx;
     let foundPoint: { id: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
 
@@ -575,10 +580,13 @@ export class CanvasInteraction {
       };
     }
 
-    // Priority 2: Line snapping (Active independently of Snap button)
-    const lineSnapDistPx = 14;
-    let closestLineDist = lineSnapDistPx;
-    let foundLine: { lineId: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
+    // Priority 2: Line & Circle/Arc snapping (Active independently of Snap button, closest geometry wins)
+    const geomSnapDistPx = 10;
+    let closestGeomDist = geomSnapDistPx;
+    let foundGeom:
+      | { type: 'line'; lineId: string; worldPos: Vec2; screenPos: Vec2 }
+      | { type: 'circle'; circleId: string; worldPos: Vec2; screenPos: Vec2 }
+      | null = null;
 
     for (const line of this.sketch.lines.values()) {
       if (excludePointId && (line.p1Id === excludePointId || line.p2Id === excludePointId)) {
@@ -591,13 +599,14 @@ export class CanvasInteraction {
       const s1 = this.viewport.worldToScreen(p1.x, p1.y);
       const s2 = this.viewport.worldToScreen(p2.x, p2.y);
       const proj = projectPointOntoSegment(screenPos, s1, s2);
-      if (proj.dist < closestLineDist) {
-        closestLineDist = proj.dist;
+      if (proj.dist < closestGeomDist) {
+        closestGeomDist = proj.dist;
         const worldPos = vec(
           p1.x + proj.t * (p2.x - p1.x),
           p1.y + proj.t * (p2.y - p1.y)
         );
-        foundLine = {
+        foundGeom = {
+          type: 'line',
           lineId: line.id,
           worldPos,
           screenPos: proj.point,
@@ -605,13 +614,114 @@ export class CanvasInteraction {
       }
     }
 
-    if (foundLine) {
-      return {
-        type: 'line',
-        lineId: foundLine.lineId,
-        worldPos: foundLine.worldPos,
-        screenPos: foundLine.screenPos,
-      };
+    for (const circle of this.sketch.circles.values()) {
+      if (excludePointId && circle.centerId === excludePointId) {
+        continue;
+      }
+      const center = this.sketch.points.get(circle.centerId);
+      if (!center) continue;
+
+      const sc = this.viewport.worldToScreen(center.x, center.y);
+      const sr = circle.radius * this.viewport.zoom;
+      const dToCenter = dist(screenPos, sc);
+      const dToPerimeter = Math.abs(dToCenter - sr);
+
+      if (dToPerimeter < closestGeomDist) {
+        closestGeomDist = dToPerimeter;
+        const dx = screenPos.x - sc.x;
+        const dy = screenPos.y - sc.y;
+        const d = Math.max(Math.hypot(dx, dy), 1e-6);
+        const snappedScreen = vec(
+          sc.x + (dx / d) * sr,
+          sc.y + (dy / d) * sr
+        );
+        const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+        foundGeom = {
+          type: 'circle',
+          circleId: circle.id,
+          worldPos,
+          screenPos: snappedScreen,
+        };
+      }
+    }
+
+    for (const arc of this.sketch.arcs.values()) {
+      if (
+        excludePointId &&
+        (arc.centerId === excludePointId ||
+          arc.startPointId === excludePointId ||
+          arc.endPointId === excludePointId)
+      ) {
+        continue;
+      }
+      const center = this.sketch.points.get(arc.centerId);
+      const start = this.sketch.points.get(arc.startPointId);
+      const end = this.sketch.points.get(arc.endPointId);
+      if (!center || !start || !end) continue;
+
+      const sc = this.viewport.worldToScreen(center.x, center.y);
+      const ss = this.viewport.worldToScreen(start.x, start.y);
+      const se = this.viewport.worldToScreen(end.x, end.y);
+      const sr = arc.radius * this.viewport.zoom;
+
+      const dToCenter = dist(screenPos, sc);
+      const dToPerimeter = Math.abs(dToCenter - sr);
+      if (dToPerimeter >= closestGeomDist) continue;
+
+      const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+      const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+      const ap = Math.atan2(screenPos.y - sc.y, screenPos.x - sc.x);
+      const clockwise = !!arc.clockwise;
+
+      let sweepAngle = 0;
+      let pAngle = 0;
+      if (clockwise) {
+        sweepAngle = (ae - as) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        pAngle = (ap - as) % (2 * Math.PI);
+        if (pAngle < 0) pAngle += 2 * Math.PI;
+      } else {
+        sweepAngle = (as - ae) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        pAngle = (as - ap) % (2 * Math.PI);
+        if (pAngle < 0) pAngle += 2 * Math.PI;
+      }
+
+      const angTolerance = geomSnapDistPx / Math.max(sr, 1);
+      if (pAngle <= sweepAngle + angTolerance || pAngle >= 2 * Math.PI - angTolerance) {
+        closestGeomDist = dToPerimeter;
+        const clampedPAngle = Math.max(0, Math.min(sweepAngle, pAngle));
+        const actualAng = clockwise ? as + clampedPAngle : as - clampedPAngle;
+        const snappedScreen = vec(
+          sc.x + Math.cos(actualAng) * sr,
+          sc.y + Math.sin(actualAng) * sr
+        );
+        const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+        foundGeom = {
+          type: 'circle',
+          circleId: arc.id,
+          worldPos,
+          screenPos: snappedScreen,
+        };
+      }
+    }
+
+    if (foundGeom) {
+      if (foundGeom.type === 'line') {
+        return {
+          type: 'line',
+          lineId: foundGeom.lineId,
+          worldPos: foundGeom.worldPos,
+          screenPos: foundGeom.screenPos,
+        };
+      } else {
+        return {
+          type: 'circle',
+          circleId: foundGeom.circleId,
+          worldPos: foundGeom.worldPos,
+          screenPos: foundGeom.screenPos,
+        };
+      }
     }
 
     // Priority 3: Grid snapping (Active only when Snap button is enabled)
@@ -640,6 +750,26 @@ export class CanvasInteraction {
     }
 
     return null;
+  }
+
+  private applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void {
+    if (!snap) return;
+    if (snap.type === 'point' && snap.id && snap.id !== pointId) {
+      const c = this.sketch.addCoincidentConstraint(pointId, snap.id);
+      if (c) {
+        showToast('Coincident constraint applied');
+      }
+    } else if (snap.type === 'line' && snap.lineId) {
+      const c = this.sketch.addPointOnLineConstraint(pointId, snap.lineId);
+      if (c) {
+        showToast('Point constrained to line');
+      }
+    } else if (snap.type === 'circle' && snap.circleId) {
+      const c = this.sketch.addPointOnCircleConstraint(pointId, snap.circleId);
+      if (c) {
+        showToast('Point constrained to circle');
+      }
+    }
   }
 
   private findPointNearScreen(screen: Vec2, thresholdPx = 16): SketchPoint | null {
@@ -1278,10 +1408,7 @@ export class CanvasInteraction {
       const finalY = snap ? snap.worldPos.y : world.y;
       this.sketch.beginTransaction();
       const pt = this.sketch.addPoint(finalX, finalY, false, this.isConstructionMode);
-      if (snap && snap.type === 'line' && snap.lineId) {
-        this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-        showToast('Point constrained to line');
-      }
+      this.applySnapConstraintIfNeeded(pt.id, snap);
       this.sketch.commitTransaction();
       this.render();
       return;
@@ -1301,10 +1428,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           pId = pt.id;
           this.startWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.startPointId = pId;
         this.drawingStep = 1;
@@ -1317,10 +1441,7 @@ export class CanvasInteraction {
           const ptPos = snap ? snap.worldPos : world;
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           p2Id = pt.id;
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
 
         this.sketch.addLine(this.startPointId!, p2Id, this.isConstructionMode);
@@ -1349,10 +1470,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           centerId = pt.id;
           this.startWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.startPointId = centerId;
         this.drawingStep = 1;
@@ -1380,10 +1498,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           pId = pt.id;
           this.startWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.startPointId = pId;
         this.drawingStep = 1;
@@ -1403,10 +1518,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
           p2Id = pt.id;
           this.arcPoint2WorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.arcPoint2Id = p2Id;
         this.drawingStep = 2;
@@ -1468,10 +1580,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           cId = pt.id;
           this.startWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.startPointId = cId;
         this.drawingStep = 1;
@@ -1491,10 +1600,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
           p1Id = pt.id;
           this.arcPoint2WorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.arcPoint2Id = p1Id;
         this.drawingStep = 2;
@@ -1527,10 +1633,7 @@ export class CanvasInteraction {
         } else {
           const pt = this.sketch.addPoint(endWorldX, endWorldY, false, this.isConstructionMode);
           endPointId = pt.id;
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
 
         this.sketch.addArc(
@@ -1554,6 +1657,7 @@ export class CanvasInteraction {
       if (this.drawingStep === 0) {
         this.startWorldPos = snap ? snap.worldPos : world;
         this.startSnapLineId = (snap && snap.type === 'line') ? snap.lineId ?? null : null;
+        this.startSnapCircleId = (snap && snap.type === 'circle') ? snap.circleId ?? null : null;
         this.drawingStep = 1;
       } else {
         const c1 = this.startWorldPos!;
@@ -1569,11 +1673,16 @@ export class CanvasInteraction {
 
         if (this.startSnapLineId) {
           this.sketch.addPointOnLineConstraint(p0.id, this.startSnapLineId);
+        } else if (this.startSnapCircleId) {
+          this.sketch.addPointOnCircleConstraint(p0.id, this.startSnapCircleId);
         }
         if (snap && snap.type === 'line' && snap.lineId) {
           this.sketch.addPointOnLineConstraint(p2.id, snap.lineId);
+        } else if (snap && snap.type === 'circle' && snap.circleId) {
+          this.sketch.addPointOnCircleConstraint(p2.id, snap.circleId);
         }
         this.startSnapLineId = null;
+        this.startSnapCircleId = null;
 
         // Create 4 lines
         this.sketch.addLine(p0.id, p1.id, this.isConstructionMode);
@@ -1608,10 +1717,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           cId = pt.id;
           this.startWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.startPointId = cId;
         this.drawingStep = 1;
@@ -1631,10 +1737,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
           p1Id = pt.id;
           this.arcPoint2WorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.arcPoint2Id = p1Id;
         this.drawingStep = 2;
@@ -1667,10 +1770,7 @@ export class CanvasInteraction {
         } else {
           const pt = this.sketch.addPoint(minX, minY, false, this.isConstructionMode);
           p2Id = pt.id;
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
 
         this.sketch.addEllipse(
@@ -1700,10 +1800,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           cId = pt.id;
           this.startWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.startPointId = cId;
         this.drawingStep = 1;
@@ -1721,10 +1818,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
           p1Id = pt.id;
           this.arcPoint2WorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.arcPoint2Id = p1Id;
         this.drawingStep = 2;
@@ -1806,10 +1900,7 @@ export class CanvasInteraction {
           const pt = this.sketch.addPoint(projX, projY, false, this.isConstructionMode);
           startPtId = pt.id;
           this.ellipseStartPointWorldPos = vec(pt.x, pt.y);
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
         this.ellipseStartPointId = startPtId;
         this.drawingStep = 4;
@@ -1877,10 +1968,7 @@ export class CanvasInteraction {
         } else {
           const pt = this.sketch.addPoint(projX, projY, false, this.isConstructionMode);
           endPtId = pt.id;
-          if (snap && snap.type === 'line' && snap.lineId) {
-            this.sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-            showToast('Point constrained to line');
-          }
+          this.applySnapConstraintIfNeeded(pt.id, snap);
         }
 
         this.sketch.addEllipticalArc(
@@ -2526,7 +2614,12 @@ export class CanvasInteraction {
         if (draggedPtId) {
           const screen = e ? this.getScreenPos(e) : this.lastMouseScreen;
           const snap = this.findSnap(screen, draggedPtId);
-          if (snap && snap.type === 'line' && snap.lineId) {
+          if (
+            snap &&
+            ((snap.type === 'point' && snap.id && snap.id !== draggedPtId) ||
+              (snap.type === 'line' && snap.lineId) ||
+              (snap.type === 'circle' && snap.circleId))
+          ) {
             const pt = this.sketch.getPoint(draggedPtId);
             if (pt) {
               pt.x = snap.worldPos.x;
@@ -2538,11 +2631,23 @@ export class CanvasInteraction {
             } else {
               this.sketch.beginTransaction();
             }
-            const c = this.sketch.addPointOnLineConstraint(draggedPtId, snap.lineId);
-            this.sketch.commitTransaction();
-            if (c) {
-              showToast('Point constrained to line');
+            if (snap.type === 'point' && snap.id) {
+              const c = this.sketch.addCoincidentConstraint(draggedPtId, snap.id);
+              if (c) {
+                showToast('Coincident constraint applied');
+              }
+            } else if (snap.type === 'line' && snap.lineId) {
+              const c = this.sketch.addPointOnLineConstraint(draggedPtId, snap.lineId);
+              if (c) {
+                showToast('Point constrained to line');
+              }
+            } else if (snap.type === 'circle' && snap.circleId) {
+              const c = this.sketch.addPointOnCircleConstraint(draggedPtId, snap.circleId);
+              if (c) {
+                showToast('Point constrained to circle');
+              }
             }
+            this.sketch.commitTransaction();
           }
         }
         // Final solve without soft drag constraint to ensure exact convergence
@@ -3028,11 +3133,17 @@ export class CanvasInteraction {
   pruneIncompatibleSelection(type: string): void {
     const sel = this.sketch.selection;
     switch (type) {
-      case 'fixed':
-      case 'coincident': {
+      case 'fixed': {
         sel.lineIds.clear();
         sel.circleIds.clear();
         sel.arcIds.clear();
+        break;
+      }
+      case 'coincident': {
+        if (sel.lineIds.size > 0 && sel.circleIds.size + sel.arcIds.size > 0) {
+          sel.circleIds.clear();
+          sel.arcIds.clear();
+        }
         break;
       }
       case 'parallel':
@@ -3127,8 +3238,9 @@ export class CanvasInteraction {
   ): boolean {
     switch (constraintType) {
       case 'fixed':
-      case 'coincident':
         return entityType === 'point';
+      case 'coincident':
+        return entityType === 'point' || entityType === 'line' || entityType === 'circle' || entityType === 'arc';
       case 'horizontal_vertical':
       case 'horizontal':
       case 'vertical':
@@ -3163,7 +3275,11 @@ export class CanvasInteraction {
       case 'fixed':
         return pCount >= 1 && lCount === 0 && cCount === 0;
       case 'coincident':
-        return pCount === 2 && lCount === 0 && cCount === 0;
+        return (
+          (pCount === 2 && lCount === 0 && cCount === 0) ||
+          (pCount === 1 && lCount === 1 && cCount === 0) ||
+          (pCount === 1 && cCount === 1 && lCount === 0)
+        );
       case 'horizontal_vertical':
       case 'horizontal':
       case 'vertical':
@@ -3212,10 +3328,26 @@ export class CanvasInteraction {
         break;
       }
       case 'coincident': {
-        if (pIds.length === 2) {
+        if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0) {
           this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
           applied = true;
           toastMsg = 'Coincident constraint applied';
+        } else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0) {
+          const c = this.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+          if (c) {
+            applied = true;
+            toastMsg = 'Point on line constraint applied';
+          } else {
+            showToast('Cannot constrain point to this line');
+          }
+        } else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0) {
+          const c = this.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
+          if (c) {
+            applied = true;
+            toastMsg = 'Point on circle constraint applied';
+          } else {
+            showToast('Cannot constrain point to this circle/arc');
+          }
         }
         break;
       }
@@ -3570,7 +3702,31 @@ export class CanvasInteraction {
         break;
       }
       case 'coincident': {
-        if (sel.pointIds.size >= 2) sel.pointIds.clear();
+        if (type === 'point') {
+          if (
+            sel.pointIds.size >= 2 ||
+            (sel.pointIds.size >= 1 && (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 1))
+          ) {
+            sel.pointIds.clear();
+            sel.lineIds.clear();
+            sel.circleIds.clear();
+            sel.arcIds.clear();
+          }
+        } else if (type === 'line') {
+          if (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 1 || sel.pointIds.size >= 2) {
+            sel.lineIds.clear();
+            sel.circleIds.clear();
+            sel.arcIds.clear();
+            if (sel.pointIds.size >= 2) sel.pointIds.clear();
+          }
+        } else if (type === 'circle' || type === 'arc') {
+          if (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 1 || sel.pointIds.size >= 2) {
+            sel.lineIds.clear();
+            sel.circleIds.clear();
+            sel.arcIds.clear();
+            if (sel.pointIds.size >= 2) sel.pointIds.clear();
+          }
+        }
         break;
       }
       case 'tangent': {

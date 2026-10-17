@@ -12,6 +12,7 @@ import {
   ParallelConstraint,
   PerpendicularConstraint,
   PointOnLineConstraint,
+  PointOnCircleConstraint,
   TangentLineCircleConstraint,
   ConcentricConstraint,
   MidpointConstraint,
@@ -399,7 +400,24 @@ export class SketchDocument {
     return c;
   }
 
-  addCoincidentConstraint(p1Id: string, p2Id: string): CoincidentConstraint {
+  addCoincidentConstraint(p1Id: string, p2Id: string): CoincidentConstraint | null {
+    if (p1Id === p2Id) return null;
+    if (!this.points.has(p1Id) || !this.points.has(p2Id)) return null;
+
+    // Do not constrain endpoints of the same line segment (would collapse length to 0)
+    const sameLine = [...this.lines.values()].some(
+      l => (l.p1Id === p1Id && l.p2Id === p2Id) || (l.p1Id === p2Id && l.p2Id === p1Id)
+    );
+    if (sameLine) return null;
+
+    // Check if coincident constraint already exists between these two points
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof CoincidentConstraint &&
+        ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+    );
+    if (existing) return null;
+
     const c = new CoincidentConstraint(this.nextId('c_coinc'), p1Id, p2Id);
     this.addConstraint(c);
     return c;
@@ -697,6 +715,34 @@ export class SketchDocument {
     if (existing) return null;
 
     const c = new PointOnLineConstraint(this.nextId('c_ptline'), pointId, line.p1Id, line.p2Id);
+    this.addConstraint(c);
+    return c;
+  }
+
+  addPointOnCircleConstraint(pointId: string, circleOrArcId: string): PointOnCircleConstraint | null {
+    const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
+    if (!circle) return null;
+
+    if (pointId === circle.centerId) return null;
+    const arc = this.arcs.get(circleOrArcId);
+    if (arc && (pointId === arc.startPointId || pointId === arc.endPointId)) {
+      return null;
+    }
+
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof PointOnCircleConstraint &&
+        c.pointId === pointId &&
+        c.circleId === circleOrArcId
+    );
+    if (existing) return null;
+
+    const c = new PointOnCircleConstraint(
+      this.nextId('c_ptcirc'),
+      pointId,
+      circle.centerId,
+      circleOrArcId
+    );
     this.addConstraint(c);
     return c;
   }
@@ -1031,6 +1077,8 @@ export class SketchDocument {
           if (anyC.p1Id === id || anyC.p2Id === id) res.push(c);
         } else if (c.type === 'point_on_line') {
           if (anyC.pointId === id) res.push(c);
+        } else if (c.type === 'point_on_circle') {
+          if (anyC.pointId === id) res.push(c);
         } else if (c.type === 'midpoint') {
           if (anyC.midId === id) res.push(c);
         } else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
@@ -1104,6 +1152,8 @@ export class SketchDocument {
           }
         } else if (c.type === 'tangent_line_circle') {
           if (anyC.circleId === id) res.push(c);
+        } else if (c.type === 'point_on_circle') {
+          if (anyC.circleId === id) res.push(c);
         } else if (c.entityIds.includes(id)) {
           res.push(c);
         }
@@ -1122,6 +1172,8 @@ export class SketchDocument {
             res.push(c);
           }
         } else if (c.type === 'tangent_line_circle') {
+          if (anyC.circleId === id) res.push(c);
+        } else if (c.type === 'point_on_circle') {
           if (anyC.circleId === id) res.push(c);
         } else if (c.entityIds.includes(id)) {
           res.push(c);

@@ -12,6 +12,7 @@ import {
   ParallelConstraint,
   PerpendicularConstraint,
   PointOnLineConstraint,
+  PointOnCircleConstraint,
   TangentLineCircleConstraint,
   ConcentricConstraint,
   MidpointConstraint,
@@ -167,6 +168,10 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
     base.pointId = c.pointId;
     base.lineP1Id = c.lineP1Id;
     base.lineP2Id = c.lineP2Id;
+  } else if (c instanceof PointOnCircleConstraint) {
+    base.pointId = c.pointId;
+    base.circleCenterId = c.circleCenterId;
+    base.circleId = c.circleId;
   } else if (c instanceof TangentLineCircleConstraint) {
     base.lineP1Id = c.lineP1Id;
     base.lineP2Id = c.lineP2Id;
@@ -262,6 +267,9 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
       break;
     case 'point_on_line':
       c = new PointOnLineConstraint(d.id, d.pointId!, d.lineP1Id!, d.lineP2Id!, d.weight);
+      break;
+    case 'point_on_circle':
+      c = new PointOnCircleConstraint(d.id, d.pointId!, d.circleCenterId!, d.circleId!, d.weight);
       break;
     case 'tangent_line_circle':
       c = new TangentLineCircleConstraint(

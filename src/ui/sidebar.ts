@@ -307,6 +307,12 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: 2 Points (${pIds.join(', ')})</div>
+          <div class="inspector-actions">
+            <button class="btn-sm" data-multi-action="coincident">Coincident</button>
+            <button class="btn-sm" data-multi-action="dist-points">Distance</button>
+            <button class="btn-sm" data-multi-action="horiz-points">Horizontal</button>
+            <button class="btn-sm" data-multi-action="vert-points">Vertical</button>
+          </div>
           ${this.renderConstraintsSublist(related, 'selected points')}
         </div>
       `;
@@ -326,6 +332,11 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: 2 Lines (${lIds.join(', ')})</div>
+          <div class="inspector-actions">
+            <button class="btn-sm" data-multi-action="parallel">Parallel</button>
+            <button class="btn-sm" data-multi-action="perpendicular">Perpendicular</button>
+            <button class="btn-sm" data-multi-action="equal-length">Equal Length</button>
+          </div>
           ${this.renderConstraintsSublist(related, 'selected lines')}
         </div>
       `;
@@ -346,6 +357,9 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: Line & Circle</div>
+          <div class="inspector-actions">
+            <button class="btn-sm" data-multi-action="tangent">Tangent</button>
+          </div>
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
@@ -365,6 +379,10 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: 2 Circles (${cIds.join(', ')})</div>
+          <div class="inspector-actions">
+            <button class="btn-sm" data-multi-action="concentric">Concentric</button>
+            <button class="btn-sm" data-multi-action="equal-radius">Equal Radius</button>
+          </div>
           ${this.renderConstraintsSublist(related, 'selected circles')}
         </div>
       `;
@@ -385,6 +403,33 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: Point & Line</div>
+          <div class="inspector-actions">
+            <button class="btn-sm" data-multi-action="coincident">Coincident</button>
+            <button class="btn-sm" data-multi-action="midpoint">Midpoint</button>
+          </div>
+          ${this.renderConstraintsSublist(related, 'selected entities')}
+        </div>
+      `;
+    } else if (
+      sel.pointIds.size === 1 &&
+      sel.circleIds.size + sel.arcIds.size === 1 &&
+      sel.lineIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
+      const pid = [...sel.pointIds][0];
+      const cid = [...sel.circleIds, ...sel.arcIds][0];
+      const isArc = sel.arcIds.size > 0;
+      const related = [...new Set([
+        ...this.sketch.getConstraintsForEntity('point', pid),
+        ...this.sketch.getConstraintsForEntity(isArc ? 'arc' : 'circle', cid),
+      ])];
+      detailsHtml = `
+        <div class="inspector-card">
+          <div class="inspector-card-title">Selected: Point & ${isArc ? 'Arc' : 'Circle'}</div>
+          <div class="inspector-actions">
+            <button class="btn-sm" data-multi-action="coincident">Coincident</button>
+          </div>
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
@@ -567,6 +612,7 @@ export class Sidebar {
       case 'tangent_line_circle': return ICONS.tangent;
       case 'concentric': return ICONS.concentric;
       case 'point_on_line': return ICONS.pointOnLine;
+      case 'point_on_circle': return ICONS.pointOnLine;
       case 'midpoint': return ICONS.midpoint;
       default: return ICONS.coincident;
     }
@@ -716,10 +762,16 @@ export class Sidebar {
         const sel = this.sketch.selection;
         const pIds = [...sel.pointIds];
         const lIds = [...sel.lineIds];
-        const cIds = [...sel.circleIds];
+        const cIds = [...sel.circleIds, ...sel.arcIds];
 
-        if (action === 'coincident' && pIds.length === 2) {
-          this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
+        if (action === 'coincident') {
+          if (pIds.length === 2) {
+            this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
+          } else if (pIds.length === 1 && lIds.length === 1) {
+            this.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+          } else if (pIds.length === 1 && cIds.length === 1) {
+            this.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
+          }
         } else if (action === 'dist-points' && pIds.length === 2) {
           this.sketch.addDistanceConstraint(pIds[0], pIds[1]);
         } else if (action === 'horiz-points' && pIds.length === 2) {

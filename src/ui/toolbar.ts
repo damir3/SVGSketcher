@@ -81,9 +81,9 @@ export class Toolbar {
       <div class="toolbar-section">
         <div class="toolbar-title">Constraints</div>
         <div class="toolbar-grid">
-          <button class="tool-btn" data-constraint="coincident" title="Coincident (2 points)">
+          <button class="tool-btn" data-constraint="coincident" title="Coincident / Point on Object (I)">
             ${ICONS.coincident}
-            <span class="btn-tooltip">Coincident</span>
+            <span class="btn-tooltip">Coincident (I)</span>
           </button>
           <button class="tool-btn" data-constraint="fixed" title="Fix Point">
             ${ICONS.fixed}
@@ -116,10 +116,6 @@ export class Toolbar {
           <button class="tool-btn" data-constraint="concentric" title="Concentric (2 circles)">
             ${ICONS.concentric}
             <span class="btn-tooltip">Concentric</span>
-          </button>
-          <button class="tool-btn" data-constraint="point_on_line" title="Point on Line">
-            ${ICONS.pointOnLine}
-            <span class="btn-tooltip">Point on Line</span>
           </button>
           <button class="tool-btn" data-constraint="midpoint" title="Midpoint (1 point + 1 line)">
             ${ICONS.midpoint}
