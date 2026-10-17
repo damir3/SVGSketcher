@@ -36,6 +36,7 @@ export class Sidebar {
     const points = [...this.sketch.points.values()];
     const lines = [...this.sketch.lines.values()];
     const circles = [...this.sketch.circles.values()];
+    const arcs = [...this.sketch.arcs.values()];
 
     this.container.innerHTML = `
       <div class="sidebar-header">
@@ -53,13 +54,14 @@ export class Sidebar {
         <!-- Primitives Tree -->
         <div class="tree-group">
           <div class="tree-header">
-            <span class="tree-title">Primitives (${points.length + lines.length + circles.length})</span>
+            <span class="tree-title">Primitives (${points.length + lines.length + circles.length + arcs.length})</span>
           </div>
           <div class="tree-list">
             ${lines.map(l => this.renderLineItem(l)).join('')}
             ${circles.map(c => this.renderCircleItem(c)).join('')}
+            ${arcs.map(a => this.renderArcItem(a)).join('')}
             ${points.map(p => this.renderPointItem(p)).join('')}
-            ${points.length === 0 && lines.length === 0 && circles.length === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
+            ${points.length === 0 && lines.length === 0 && circles.length === 0 && arcs.length === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
           </div>
         </div>
       </div>
@@ -74,6 +76,7 @@ export class Sidebar {
       sel.pointIds.size > 0 ||
       sel.lineIds.size > 0 ||
       sel.circleIds.size > 0 ||
+      sel.arcIds.size > 0 ||
       sel.constraintIds.size > 0;
 
     if (!hasSelection) {
@@ -82,7 +85,7 @@ export class Sidebar {
 
     let detailsHtml = '';
 
-    if (sel.pointIds.size === 1 && sel.lineIds.size === 0 && sel.circleIds.size === 0) {
+    if (sel.pointIds.size === 1 && sel.lineIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
       const pid = [...sel.pointIds][0];
       const pt = this.sketch.points.get(pid);
       if (pt) {
@@ -93,11 +96,16 @@ export class Sidebar {
             <div class="inspector-row"><span>X:</span> <strong>${pt.x.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Y:</span> <strong>${pt.y.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Fixed:</span> <strong>${pt.fixed ? 'Yes' : 'No'}</strong></div>
+            <div class="inspector-row"><span>Type:</span> <strong>${pt.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+            <div class="inspector-actions">
+              <button class="btn-sm" data-action="toggle-fix" data-id="${pt.id}">${pt.fixed ? 'Unfix' : 'Fix Point'}</button>
+              <button class="btn-sm" data-action="toggle-const" data-id="${pt.id}">${pt.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
+            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this point')}
           </div>
         `;
       }
-    } else if (sel.lineIds.size === 1 && sel.pointIds.size === 0 && sel.circleIds.size === 0) {
+    } else if (sel.lineIds.size === 1 && sel.pointIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
       const lid = [...sel.lineIds][0];
       const line = this.sketch.lines.get(lid);
       if (line) {
@@ -110,11 +118,14 @@ export class Sidebar {
             <div class="inspector-card-title">Line: ${line.id}</div>
             <div class="inspector-row"><span>Length:</span> <strong>${length} mm</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${line.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+            <div class="inspector-actions">
+              <button class="btn-sm" data-action="toggle-const" data-id="${line.id}">${line.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
+            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this line')}
           </div>
         `;
       }
-    } else if (sel.circleIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0) {
+    } else if (sel.circleIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.arcIds.size === 0) {
       const cid = [...sel.circleIds][0];
       const circ = this.sketch.circles.get(cid);
       if (circ) {
@@ -124,11 +135,45 @@ export class Sidebar {
             <div class="inspector-card-title">Circle: ${circ.id}</div>
             <div class="inspector-row"><span>Radius:</span> <strong>${circ.radius.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Diameter:</span> <strong>${(circ.radius * 2).toFixed(1)} mm</strong></div>
+            <div class="inspector-row"><span>Type:</span> <strong>${circ.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+            <div class="inspector-actions">
+              <button class="btn-sm" data-action="toggle-const" data-id="${circ.id}">${circ.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
+            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this circle')}
           </div>
         `;
       }
-    } else if (sel.pointIds.size === 2 && sel.lineIds.size === 0 && sel.circleIds.size === 0) {
+    } else if (sel.arcIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.circleIds.size === 0) {
+      const aid = [...sel.arcIds][0];
+      const arc = this.sketch.arcs.get(aid);
+      if (arc) {
+        const center = this.sketch.points.get(arc.centerId);
+        const start = this.sketch.points.get(arc.startPointId);
+        const end = this.sketch.points.get(arc.endPointId);
+        let arcLen = '?';
+        if (center && start && end) {
+          const as = Math.atan2(start.y - center.y, start.x - center.x);
+          const ae = Math.atan2(end.y - center.y, end.x - center.x);
+          let sweep = arc.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
+          if (sweep < 0) sweep += 2 * Math.PI;
+          arcLen = (arc.radius * sweep).toFixed(1);
+        }
+        const relatedConstraints = this.sketch.getConstraintsForEntity('arc', arc.id);
+        detailsHtml = `
+          <div class="inspector-card">
+            <div class="inspector-card-title">Arc: ${arc.id}</div>
+            <div class="inspector-row"><span>Radius:</span> <strong>${arc.radius.toFixed(1)} mm</strong></div>
+            <div class="inspector-row"><span>Length:</span> <strong>${arcLen} mm</strong></div>
+            <div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
+            <div class="inspector-row"><span>Type:</span> <strong>${arc.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+            <div class="inspector-actions">
+              <button class="btn-sm" data-action="toggle-const" data-id="${arc.id}">${arc.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
+            </div>
+            ${this.renderConstraintsSublist(relatedConstraints, 'this arc')}
+          </div>
+        `;
+      }
+    } else if (sel.pointIds.size === 2 && sel.lineIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
       const pIds = [...sel.pointIds];
       const related = [...new Set([
         ...this.sketch.getConstraintsForEntity('point', pIds[0]),
@@ -140,7 +185,7 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected points')}
         </div>
       `;
-    } else if (sel.lineIds.size === 2 && sel.pointIds.size === 0 && sel.circleIds.size === 0) {
+    } else if (sel.lineIds.size === 2 && sel.pointIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
       const lIds = [...sel.lineIds];
       const related = [...new Set([
         ...this.sketch.getConstraintsForEntity('line', lIds[0]),
@@ -152,7 +197,7 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected lines')}
         </div>
       `;
-    } else if (sel.lineIds.size === 1 && sel.circleIds.size === 1) {
+    } else if (sel.lineIds.size === 1 && sel.circleIds.size === 1 && sel.arcIds.size === 0 && sel.pointIds.size === 0) {
       const lid = [...sel.lineIds][0];
       const cid = [...sel.circleIds][0];
       const related = [...new Set([
@@ -165,7 +210,7 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
-    } else if (sel.circleIds.size === 2) {
+    } else if (sel.circleIds.size === 2 && sel.lineIds.size === 0 && sel.pointIds.size === 0 && sel.arcIds.size === 0) {
       const cIds = [...sel.circleIds];
       const related = [...new Set([
         ...this.sketch.getConstraintsForEntity('circle', cIds[0]),
@@ -177,7 +222,7 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected circles')}
         </div>
       `;
-    } else if (sel.pointIds.size === 1 && sel.lineIds.size === 1) {
+    } else if (sel.pointIds.size === 1 && sel.lineIds.size === 1 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
       const pid = [...sel.pointIds][0];
       const lid = [...sel.lineIds][0];
       const related = [...new Set([
@@ -190,7 +235,7 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
-    } else if (sel.constraintIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.circleIds.size === 0) {
+    } else if (sel.constraintIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
       const cid = [...sel.constraintIds][0];
       const c = this.sketch.constraints.get(cid);
       if (c) {
@@ -251,6 +296,20 @@ export class Sidebar {
           <span class="tree-meta">R ${circle.radius.toFixed(1)} mm</span>
         </div>
         <button class="tree-delete-btn" data-delete-id="${circle.id}" title="Delete">${ICONS.delete}</button>
+      </div>
+    `;
+  }
+
+  private renderArcItem(arc: any): string {
+    const isSelected = this.sketch.selection.arcIds.has(arc.id);
+    return `
+      <div class="tree-item ${isSelected ? 'selected' : ''}" data-type="arc" data-id="${arc.id}">
+        <div class="tree-item-info">
+          <span class="tree-icon">${ICONS.arc}</span>
+          <span class="tree-name">${arc.id}</span>
+          <span class="tree-meta">R ${arc.radius.toFixed(1)} mm ${arc.isConstruction ? '(aux)' : ''}</span>
+        </div>
+        <button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>
       </div>
     `;
   }
@@ -319,7 +378,7 @@ export class Sidebar {
         if ((e.target as HTMLElement).closest('.tree-delete-btn')) return;
 
         const id = item.getAttribute('data-id')!;
-        const type = item.getAttribute('data-type')! as 'point' | 'line' | 'circle' | 'constraint';
+        const type = item.getAttribute('data-type')! as 'point' | 'line' | 'circle' | 'arc' | 'constraint';
 
         this.sketch.selectEntity(id, type, false);
 
@@ -366,6 +425,22 @@ export class Sidebar {
 
             if (!radConstraint) {
               radConstraint = this.sketch.addRadiusConstraint(circle.id) ?? undefined;
+            }
+
+            if (radConstraint) {
+              this.sketch.selectEntity(radConstraint.id, 'constraint', false);
+              this.onEditDimension?.(radConstraint);
+            }
+          }
+        } else if (type === 'arc') {
+          const arc = this.sketch.arcs.get(id);
+          if (arc) {
+            let radConstraint = [...this.sketch.constraints.values()].find(
+              c => c instanceof RadiusConstraint && c.circleId === arc.id
+            ) as RadiusConstraint | undefined;
+
+            if (!radConstraint) {
+              radConstraint = this.sketch.addRadiusConstraint(arc.id) ?? undefined;
             }
 
             if (radConstraint) {

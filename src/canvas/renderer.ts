@@ -299,7 +299,96 @@ export class SVGRenderer {
       this.geometryGroup.appendChild(circleG);
     }
 
-    // 3. Render Points (Vertices)
+    // 3. Render Arcs
+    for (const arc of sketch.arcs.values()) {
+      const center = sketch.points.get(arc.centerId);
+      const start = sketch.points.get(arc.startPointId);
+      const end = sketch.points.get(arc.endPointId);
+      if (!center || !start || !end) continue;
+
+      const sc = viewport.worldToScreen(center.x, center.y);
+      const ss = viewport.worldToScreen(start.x, start.y);
+      const se = viewport.worldToScreen(end.x, end.y);
+      const sr = arc.radius * viewport.zoom;
+      const isSelected = sketch.selection.arcIds.has(arc.id);
+
+      const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+      const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+      const clockwise = !!arc.clockwise;
+
+      let sweepAngle = 0;
+      let sweepFlag = 0;
+      if (clockwise) {
+        sweepAngle = (ae - as) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        sweepFlag = 1;
+      } else {
+        sweepAngle = (as - ae) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        sweepFlag = 0;
+      }
+      const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
+
+      const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${sr.toFixed(1)} ${sr.toFixed(1)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+
+      const arcG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      arcG.setAttribute('data-id', arc.id);
+      arcG.setAttribute('data-type', 'arc');
+      arcG.style.cursor = isSelected ? 'grab' : 'pointer';
+
+      // Invisible generous hit target (18px stroke)
+      const hitArc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitArc.setAttribute('d', d);
+      hitArc.setAttribute('fill', 'none');
+      hitArc.setAttribute('stroke', 'rgba(0, 0, 0, 0.001)');
+      hitArc.setAttribute('stroke-width', '18');
+      hitArc.setAttribute('stroke-linecap', 'round');
+      hitArc.setAttribute('pointer-events', 'stroke');
+      hitArc.style.pointerEvents = 'stroke';
+      arcG.appendChild(hitArc);
+
+      // Visible arc path
+      const arcEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcEl.setAttribute('d', d);
+      arcEl.setAttribute('fill', 'none');
+      arcEl.setAttribute('stroke', isSelected ? selectedColor : arc.isConstruction ? '#64748b' : baseColor);
+      arcEl.setAttribute('stroke-width', isSelected ? '3.5' : '2');
+      arcEl.setAttribute('stroke-linecap', 'round');
+      arcEl.setAttribute('pointer-events', 'stroke');
+      arcEl.style.pointerEvents = 'stroke';
+
+      if (arc.isConstruction) {
+        arcEl.setAttribute('stroke-dasharray', '6,6');
+      }
+      arcG.appendChild(arcEl);
+
+      // Light dashed radial lines to center if selected
+      if (isSelected) {
+        const rad1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rad1.setAttribute('x1', sc.x.toFixed(1));
+        rad1.setAttribute('y1', sc.y.toFixed(1));
+        rad1.setAttribute('x2', ss.x.toFixed(1));
+        rad1.setAttribute('y2', ss.y.toFixed(1));
+        rad1.setAttribute('stroke', '#0284c7');
+        rad1.setAttribute('stroke-width', '1');
+        rad1.setAttribute('stroke-dasharray', '3,3');
+        arcG.appendChild(rad1);
+
+        const rad2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rad2.setAttribute('x1', sc.x.toFixed(1));
+        rad2.setAttribute('y1', sc.y.toFixed(1));
+        rad2.setAttribute('x2', se.x.toFixed(1));
+        rad2.setAttribute('y2', se.y.toFixed(1));
+        rad2.setAttribute('stroke', '#0284c7');
+        rad2.setAttribute('stroke-width', '1');
+        rad2.setAttribute('stroke-dasharray', '3,3');
+        arcG.appendChild(rad2);
+      }
+
+      this.geometryGroup.appendChild(arcG);
+    }
+
+    // 4. Render Points (Vertices)
     for (const pt of sketch.points.values()) {
       const s = viewport.worldToScreen(pt.x, pt.y);
       const isSelected = sketch.selection.pointIds.has(pt.id);
@@ -1053,6 +1142,73 @@ export class SVGRenderer {
     this.previewGroup.appendChild(radiusLine);
 
     this.renderTooltip(current.x + 12, current.y - 12, `R ${radius.toFixed(1)} mm`);
+  }
+
+  renderArcPreview(
+    sc: Vec2,
+    ss: Vec2,
+    se: Vec2,
+    sr: number,
+    clockwise: boolean,
+    radiusVal: number,
+    sweepDeg?: number
+  ): void {
+    this.previewGroup.innerHTML = '';
+
+    const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+    const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+
+    let sweepAngle = 0;
+    let sweepFlag = 0;
+    if (clockwise) {
+      sweepAngle = (ae - as) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+      sweepFlag = 1;
+    } else {
+      sweepAngle = (as - ae) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+      sweepFlag = 0;
+    }
+    const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
+
+    const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${sr.toFixed(1)} ${sr.toFixed(1)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+
+    const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arc.setAttribute('d', d);
+    arc.setAttribute('stroke', '#0284c7');
+    arc.setAttribute('stroke-width', '2');
+    arc.setAttribute('stroke-dasharray', '4,4');
+    arc.setAttribute('fill', 'none');
+    this.previewGroup.appendChild(arc);
+
+    // Dashed center rays
+    const r1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    r1.setAttribute('x1', sc.x.toFixed(1));
+    r1.setAttribute('y1', sc.y.toFixed(1));
+    r1.setAttribute('x2', ss.x.toFixed(1));
+    r1.setAttribute('y2', ss.y.toFixed(1));
+    r1.setAttribute('stroke', '#0284c7');
+    r1.setAttribute('stroke-width', '1');
+    r1.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(r1);
+
+    const r2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    r2.setAttribute('x1', sc.x.toFixed(1));
+    r2.setAttribute('y1', sc.y.toFixed(1));
+    r2.setAttribute('x2', se.x.toFixed(1));
+    r2.setAttribute('y2', se.y.toFixed(1));
+    r2.setAttribute('stroke', '#0284c7');
+    r2.setAttribute('stroke-width', '1');
+    r2.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(r2);
+
+    // Tooltip at mid-arc
+    const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
+    const midX = sc.x + sr * Math.cos(midAngle);
+    const midY = sc.y + sr * Math.sin(midAngle);
+
+    const deg = sweepDeg ?? (sweepAngle * 180 / Math.PI);
+    this.renderTooltip(midX, midY, `R ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
   }
 
   renderRectanglePreview(s1: Vec2, s2: Vec2, w: number, h: number): void {

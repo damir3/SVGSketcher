@@ -17,6 +17,7 @@ import {
   MidpointConstraint,
   DragPointConstraint,
   AngleConstraint,
+  ArcEndpointsConstraint,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SelectionState } from './types';
 import { dist } from '../math/vector';
@@ -244,13 +245,22 @@ export class SketchDocument {
     startPointId: string,
     endPointId: string,
     radius: number,
+    clockwise = false,
     isConstruction = false
   ): SketchArc {
     this.pushHistory();
     const id = this.nextId('arc');
-    const arc: SketchArc = { id, centerId, startPointId, endPointId, radius, isConstruction };
+    const arc: SketchArc = { id, centerId, startPointId, endPointId, radius, clockwise, isConstruction };
     this.arcs.set(id, arc);
     this.rebuildParamManager();
+    const c = new ArcEndpointsConstraint(
+      this.nextId('c_arcept'),
+      id,
+      centerId,
+      startPointId,
+      endPointId
+    );
+    this.constraints.set(c.id, c);
     this.solve();
     return arc;
   }
@@ -468,12 +478,12 @@ export class SketchDocument {
     return c;
   }
 
-  addRadiusConstraint(circleId: string, targetRadius?: number): RadiusConstraint | null {
-    const circle = this.circles.get(circleId);
+  addRadiusConstraint(circleOrArcId: string, targetRadius?: number): RadiusConstraint | null {
+    const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
     if (!circle) return null;
 
     const r = targetRadius ?? Math.max(1, Math.round(circle.radius));
-    const c = new RadiusConstraint(this.nextId('c_rad'), circleId, r);
+    const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r);
     this.addConstraint(c);
     return c;
   }
@@ -529,9 +539,9 @@ export class SketchDocument {
     return c;
   }
 
-  addTangentConstraint(lineId: string, circleId: string): TangentLineCircleConstraint | null {
+  addTangentConstraint(lineId: string, circleOrArcId: string): TangentLineCircleConstraint | null {
     const line = this.lines.get(lineId);
-    const circle = this.circles.get(circleId);
+    const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
     if (!line || !circle) return null;
 
     const c = new TangentLineCircleConstraint(
@@ -539,7 +549,7 @@ export class SketchDocument {
       line.p1Id,
       line.p2Id,
       circle.centerId,
-      circleId
+      circleOrArcId
     );
     this.addConstraint(c);
     return c;
@@ -803,7 +813,7 @@ export class SketchDocument {
     return undefined;
   }
 
-  getConstraintsForEntity(type: 'point' | 'line' | 'circle', id: string): IConstraint[] {
+  getConstraintsForEntity(type: 'point' | 'line' | 'circle' | 'arc', id: string): IConstraint[] {
     const res: IConstraint[] = [];
     if (type === 'point') {
       for (const c of this.constraints.values()) {
@@ -891,13 +901,32 @@ export class SketchDocument {
           res.push(c);
         }
       }
+    } else if (type === 'arc') {
+      const arc = this.arcs.get(id);
+      if (!arc) return [];
+      for (const c of this.constraints.values()) {
+        const anyC = c as any;
+        if (c.type === 'radius') {
+          if (anyC.circleId === id) res.push(c);
+        } else if (c.type === 'equal_radius') {
+          if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
+        } else if (c.type === 'concentric') {
+          if (anyC.c1CenterId === arc.centerId || anyC.c2CenterId === arc.centerId) {
+            res.push(c);
+          }
+        } else if (c.type === 'tangent_line_circle') {
+          if (anyC.circleId === id) res.push(c);
+        } else if (c.entityIds.includes(id)) {
+          res.push(c);
+        }
+      }
     }
     return res;
   }
 
   selectEntity(
     id: string,
-    type: 'point' | 'line' | 'circle' | 'constraint',
+    type: 'point' | 'line' | 'circle' | 'arc' | 'constraint',
     multiSelect = false
   ): void {
     if (!multiSelect) {
@@ -917,6 +946,11 @@ export class SketchDocument {
     } else if (type === 'circle') {
       this.selection.circleIds.add(id);
       for (const c of this.getConstraintsForEntity('circle', id)) {
+        this.selection.constraintIds.add(c.id);
+      }
+    } else if (type === 'arc') {
+      this.selection.arcIds.add(id);
+      for (const c of this.getConstraintsForEntity('arc', id)) {
         this.selection.constraintIds.add(c.id);
       }
     } else if (type === 'constraint') {
@@ -997,6 +1031,24 @@ export class SketchDocument {
         const dash = circ.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
           `<circle cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
+        );
+      }
+    }
+    for (const arc of this.arcs.values()) {
+      const center = this.points.get(arc.centerId);
+      const start = this.points.get(arc.startPointId);
+      const end = this.points.get(arc.endPointId);
+      if (center && start && end) {
+        const as = Math.atan2(start.y - center.y, start.x - center.x);
+        const ae = Math.atan2(end.y - center.y, end.x - center.x);
+        const clockwise = !!arc.clockwise;
+        let sweepAngle = clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
+        const sweepFlag = clockwise ? 1 : 0;
+        const dash = arc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+        elements.push(
+          `<path d="M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${end.x.toFixed(2)} ${end.y.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
         );
       }
     }

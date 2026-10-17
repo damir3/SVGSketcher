@@ -127,6 +127,10 @@ function initApp(): void {
     toolbar.setActiveButton(tool);
   };
 
+  interaction.onConstructionChange = active => {
+    toolbar.setConstructionActive(active);
+  };
+
   // Resize handling
   function handleResize(): void {
     const rect = svg.getBoundingClientRect();

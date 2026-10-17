@@ -45,6 +45,14 @@ export class Toolbar {
             ${ICONS.circle}
             <span class="btn-tooltip">Circle (C)</span>
           </button>
+          <button class="tool-btn" data-tool="arc" title="3-Point Arc (A)">
+            ${ICONS.arc}
+            <span class="btn-tooltip">3-Pt Arc (A)</span>
+          </button>
+          <button class="tool-btn" data-tool="arc_center" title="Centerpoint Arc">
+            ${ICONS.arc_center}
+            <span class="btn-tooltip">Center Arc</span>
+          </button>
           <button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
             ${ICONS.rectangle}
             <span class="btn-tooltip">Rectangle (R)</span>
@@ -116,6 +124,9 @@ export class Toolbar {
     this.interaction.onToolChange = tool => {
       this.setActiveButton(tool);
     };
+    this.interaction.onConstructionChange = isConst => {
+      this.setConstructionActive(isConst);
+    };
   }
 
   private bindClicks(): void {
@@ -131,7 +142,6 @@ export class Toolbar {
     const constrBtn = this.container.querySelector('#btn-construction');
     constrBtn?.addEventListener('click', () => {
       this.interaction.toggleConstructionMode();
-      constrBtn.classList.toggle('active', this.interaction.isConstructionMode);
     });
 
     // Constraint buttons
@@ -165,6 +175,11 @@ export class Toolbar {
     this.container.querySelectorAll('[data-constraint]').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-constraint') === tool);
     });
+  }
+
+  setConstructionActive(active: boolean): void {
+    const constrBtn = this.container.querySelector('#btn-construction');
+    constrBtn?.classList.toggle('active', active);
   }
 
   setActiveToolButton(tool: ToolType): void {

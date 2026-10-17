@@ -28,6 +28,7 @@ export interface SketchArc {
   startPointId: string;
   endPointId: string;
   radius: number;
+  clockwise?: boolean;
   isConstruction?: boolean;
 }
 

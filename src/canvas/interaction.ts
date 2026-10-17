@@ -2,9 +2,9 @@ import type { SketchDocument } from '../model/sketch';
 import type { SketchSnapshot } from '../model/history';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
-import { dist, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
+import { dist, vec, projectPointOntoSegment, getCircumcircle, type Vec2 } from '../math/vector';
 import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
-import type { SketchLine, SketchCircle } from '../model/types';
+import type { SketchLine, SketchCircle, SketchArc } from '../model/types';
 import { showToast } from '../ui/toast';
 
 export type ConstraintToolType =
@@ -50,6 +50,8 @@ export type ToolType =
   | 'point'
   | 'line'
   | 'circle'
+  | 'arc'
+  | 'arc_center'
   | 'rectangle'
   | ConstraintToolType;
 
@@ -66,6 +68,8 @@ export class CanvasInteraction {
   private drawingStep = 0;
   private startPointId: string | null = null;
   private startWorldPos: Vec2 | null = null;
+  private arcPoint2Id: string | null = null;
+  private arcPoint2WorldPos: Vec2 | null = null;
 
   // Dragging point state
   private isDraggingPoint = false;
@@ -84,6 +88,14 @@ export class CanvasInteraction {
   private draggedCircleId: string | null = null;
   private dragCircleStartWorld: Vec2 | null = null;
   private circleCenterStart: Vec2 | null = null;
+
+  // Dragging arc state
+  private isDraggingArc = false;
+  private draggedArcId: string | null = null;
+  private dragArcStartWorld: Vec2 | null = null;
+  private arcCenterStart: Vec2 | null = null;
+  private arcStartPointStart: Vec2 | null = null;
+  private arcEndPointStart: Vec2 | null = null;
 
   // Dragging constraint state
   private isDraggingConstraint = false;
@@ -110,6 +122,7 @@ export class CanvasInteraction {
     screenPos: Vec2
   ) => void;
   onToolChange?: (tool: ToolType) => void;
+  onConstructionChange?: (isConstruction: boolean) => void;
 
   // Dimension tool multi-step state: 0 = pick line 1, 1 = pick offset or line 2, 2 = pick angle arc radius
   private dimensionState: {
@@ -166,6 +179,7 @@ export class CanvasInteraction {
     const hasSelection =
       this.sketch.selection.lineIds.size > 0 ||
       this.sketch.selection.circleIds.size > 0 ||
+      this.sketch.selection.arcIds.size > 0 ||
       this.sketch.selection.pointIds.size > 0;
 
     if (hasSelection) {
@@ -176,11 +190,15 @@ export class CanvasInteraction {
       for (const cid of this.sketch.selection.circleIds) {
         this.sketch.toggleConstruction(cid);
       }
+      for (const aid of this.sketch.selection.arcIds) {
+        this.sketch.toggleConstruction(aid);
+      }
       for (const pid of this.sketch.selection.pointIds) {
         this.sketch.toggleConstruction(pid);
       }
       this.sketch.commitTransaction();
     }
+    this.onConstructionChange?.(this.isConstructionMode);
     this.render();
   }
 
@@ -191,6 +209,8 @@ export class CanvasInteraction {
     this.drawingStep = 0;
     this.startPointId = null;
     this.startWorldPos = null;
+    this.arcPoint2Id = null;
+    this.arcPoint2WorldPos = null;
 
     this.isDraggingPoint = false;
     this.draggedPointId = null;
@@ -206,6 +226,13 @@ export class CanvasInteraction {
     this.draggedCircleId = null;
     this.dragCircleStartWorld = null;
     this.circleCenterStart = null;
+
+    this.isDraggingArc = false;
+    this.draggedArcId = null;
+    this.dragArcStartWorld = null;
+    this.arcCenterStart = null;
+    this.arcStartPointStart = null;
+    this.arcEndPointStart = null;
 
     this.isDraggingConstraint = false;
     this.draggedConstraintId = null;
@@ -270,6 +297,8 @@ export class CanvasInteraction {
         this.setTool('line');
       } else if (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') {
         this.setTool('circle');
+      } else if (e.key === 'a' || e.key === 'A' || e.key === 'ф' || e.key === 'Ф') {
+        this.setTool('arc');
       } else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
         this.setTool('rectangle');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'з' || e.key === 'З') {
@@ -370,6 +399,54 @@ export class CanvasInteraction {
     return foundCircle;
   }
 
+  private findArcNearScreen(screen: Vec2, thresholdPx = 18): SketchArc | null {
+    let closestDist = thresholdPx;
+    let foundArc: SketchArc | null = null;
+
+    for (const arc of this.sketch.arcs.values()) {
+      const center = this.sketch.points.get(arc.centerId);
+      const start = this.sketch.points.get(arc.startPointId);
+      const end = this.sketch.points.get(arc.endPointId);
+      if (!center || !start || !end) continue;
+
+      const sc = this.viewport.worldToScreen(center.x, center.y);
+      const ss = this.viewport.worldToScreen(start.x, start.y);
+      const se = this.viewport.worldToScreen(end.x, end.y);
+      const sr = arc.radius * this.viewport.zoom;
+
+      const dToCenter = dist(screen, sc);
+      const dToPerimeter = Math.abs(dToCenter - sr);
+      if (dToPerimeter > closestDist) continue;
+
+      const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+      const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+      const ap = Math.atan2(screen.y - sc.y, screen.x - sc.x);
+      const clockwise = !!arc.clockwise;
+
+      let sweepAngle = 0;
+      let pAngle = 0;
+      if (clockwise) {
+        sweepAngle = (ae - as) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        pAngle = (ap - as) % (2 * Math.PI);
+        if (pAngle < 0) pAngle += 2 * Math.PI;
+      } else {
+        sweepAngle = (as - ae) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        pAngle = (as - ap) % (2 * Math.PI);
+        if (pAngle < 0) pAngle += 2 * Math.PI;
+      }
+
+      const angTolerance = thresholdPx / Math.max(sr, 1);
+      if (pAngle <= sweepAngle + angTolerance || pAngle >= 2 * Math.PI - angTolerance) {
+        closestDist = dToPerimeter;
+        foundArc = arc;
+      }
+    }
+
+    return foundArc;
+  }
+
   private handleMouseDown(e: MouseEvent): void {
     const screen = this.getScreenPos(e);
     const clientPos = vec(e.clientX, e.clientY);
@@ -413,10 +490,10 @@ export class CanvasInteraction {
       const target = e.target as SVGElement;
       const targetG = target.closest('[data-id]') as SVGElement | null;
       let id = targetG?.getAttribute('data-id');
-      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | undefined;
+      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | undefined;
 
-      // Fallback geometric hit test if clicking close to point, line or circle
-      if (!type || (type !== 'point' && type !== 'line' && type !== 'circle')) {
+      // Fallback geometric hit test if clicking close to point, line, circle or arc
+      if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc')) {
         if (snap) {
           id = snap.id;
           type = 'point';
@@ -430,6 +507,12 @@ export class CanvasInteraction {
             if (hitCircle) {
               id = hitCircle.id;
               type = 'circle';
+            } else {
+              const hitArc = this.findArcNearScreen(screen, 18);
+              if (hitArc) {
+                id = hitArc.id;
+                type = 'arc';
+              }
             }
           }
         }
@@ -450,9 +533,9 @@ export class CanvasInteraction {
       const target = e.target as SVGElement;
       const targetG = target.closest('[data-id]') as SVGElement | null;
       let id = targetG?.getAttribute('data-id');
-      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'constraint' | undefined;
+      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
 
-      // Fallback geometric hit test if clicking close to point, line or circle
+      // Fallback geometric hit test if clicking close to point, line, circle or arc
       if (!type) {
         if (snap) {
           id = snap.id;
@@ -467,6 +550,12 @@ export class CanvasInteraction {
             if (hitCircle) {
               id = hitCircle.id;
               type = 'circle';
+            } else {
+              const hitArc = this.findArcNearScreen(screen, 18);
+              if (hitArc) {
+                id = hitArc.id;
+                type = 'arc';
+              }
             }
           }
         }
@@ -511,6 +600,23 @@ export class CanvasInteraction {
               this.hasDragged = false;
               this.dragCircleStartWorld = world;
               this.circleCenterStart = vec(center.x, center.y);
+            }
+          }
+        } else if (type === 'arc') {
+          const arc = this.sketch.arcs.get(id);
+          if (arc) {
+            const center = this.sketch.points.get(arc.centerId);
+            const start = this.sketch.points.get(arc.startPointId);
+            const end = this.sketch.points.get(arc.endPointId);
+            if (center && start && end) {
+              this.isDraggingArc = true;
+              this.draggedArcId = id;
+              this.preDragSnapshot = this.sketch.takeSnapshot();
+              this.hasDragged = false;
+              this.dragArcStartWorld = world;
+              this.arcCenterStart = vec(center.x, center.y);
+              this.arcStartPointStart = vec(start.x, start.y);
+              this.arcEndPointStart = vec(end.x, end.y);
             }
           }
         } else if (type === 'constraint') {
@@ -607,6 +713,166 @@ export class CanvasInteraction {
         this.sketch.commitTransaction();
         this.cancelDrawing();
         this.render();
+      }
+      return;
+    }
+
+    // --- TOOL: ARC (3-Point Arc) ---
+    if (this.activeTool === 'arc') {
+      if (this.drawingStep === 0) {
+        this.sketch.beginTransaction();
+        let pId: string;
+        if (snap) {
+          pId = snap.id;
+          this.startWorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(world.x, world.y, false, this.isConstructionMode);
+          pId = pt.id;
+          this.startWorldPos = vec(pt.x, pt.y);
+        }
+        this.startPointId = pId;
+        this.drawingStep = 1;
+        this.render();
+      } else if (this.drawingStep === 1) {
+        const p1World = this.startWorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+        if (dist(p1World, effectiveWorld) < 2) {
+          return;
+        }
+
+        let p2Id: string;
+        if (snap && snap.id !== this.startPointId) {
+          p2Id = snap.id;
+          this.arcPoint2WorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+          p2Id = pt.id;
+          this.arcPoint2WorldPos = vec(pt.x, pt.y);
+        }
+        this.arcPoint2Id = p2Id;
+        this.drawingStep = 2;
+        this.render();
+      } else if (this.drawingStep === 2) {
+        const p1 = this.startWorldPos!;
+        const p2 = this.arcPoint2WorldPos!;
+        const p3 = snap ? snap.worldPos : world;
+
+        const circum = getCircumcircle(p1, p2, p3);
+        if (!circum || circum.radius < 1 || circum.radius > 50000) {
+          showToast('Cannot form arc from collinear points');
+          return;
+        }
+
+        const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+        const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+        const s3 = this.viewport.worldToScreen(p3.x, p3.y);
+        const sc = this.viewport.worldToScreen(circum.center.x, circum.center.y);
+
+        const as = Math.atan2(s1.y - sc.y, s1.x - sc.x);
+        const ae = Math.atan2(s2.y - sc.y, s2.x - sc.x);
+        const a3 = Math.atan2(s3.y - sc.y, s3.x - sc.x);
+
+        let sweepCW = (ae - as) % (2 * Math.PI);
+        if (sweepCW < 0) sweepCW += 2 * Math.PI;
+        let testCW = (a3 - as) % (2 * Math.PI);
+        if (testCW < 0) testCW += 2 * Math.PI;
+
+        const clockwise = testCW > 0 && testCW < sweepCW;
+
+        const centerPt = this.sketch.addPoint(circum.center.x, circum.center.y, false, this.isConstructionMode);
+        this.sketch.addArc(
+          centerPt.id,
+          this.startPointId!,
+          this.arcPoint2Id!,
+          circum.radius,
+          clockwise,
+          this.isConstructionMode
+        );
+        this.sketch.commitTransaction();
+        this.cancelDrawing();
+        this.render();
+        showToast('3-point arc created');
+      }
+      return;
+    }
+
+    // --- TOOL: ARC_CENTER (Centerpoint Arc) ---
+    if (this.activeTool === 'arc_center') {
+      if (this.drawingStep === 0) {
+        this.sketch.beginTransaction();
+        let cId: string;
+        if (snap) {
+          cId = snap.id;
+          this.startWorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(world.x, world.y, false, this.isConstructionMode);
+          cId = pt.id;
+          this.startWorldPos = vec(pt.x, pt.y);
+        }
+        this.startPointId = cId;
+        this.drawingStep = 1;
+        this.render();
+      } else if (this.drawingStep === 1) {
+        const centerWorld = this.startWorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+        if (dist(centerWorld, effectiveWorld) < 2) {
+          return;
+        }
+
+        let p1Id: string;
+        if (snap && snap.id !== this.startPointId) {
+          p1Id = snap.id;
+          this.arcPoint2WorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+          p1Id = pt.id;
+          this.arcPoint2WorldPos = vec(pt.x, pt.y);
+        }
+        this.arcPoint2Id = p1Id;
+        this.drawingStep = 2;
+        this.render();
+      } else if (this.drawingStep === 2) {
+        const centerWorld = this.startWorldPos!;
+        const startWorld = this.arcPoint2WorldPos!;
+        const radius = Math.max(1, dist(centerWorld, startWorld));
+
+        const effectiveWorld = snap ? snap.worldPos : world;
+        const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+        const sStart = this.viewport.worldToScreen(startWorld.x, startWorld.y);
+        const sCur = this.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+
+        const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
+        const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
+
+        let delta = acur - as;
+        while (delta > Math.PI) delta -= 2 * Math.PI;
+        while (delta < -Math.PI) delta += 2 * Math.PI;
+        const clockwise = delta >= 0;
+
+        const worldAngle = Math.atan2(effectiveWorld.y - centerWorld.y, effectiveWorld.x - centerWorld.x);
+        const endWorldX = centerWorld.x + radius * Math.cos(worldAngle);
+        const endWorldY = centerWorld.y + radius * Math.sin(worldAngle);
+
+        let endPointId: string;
+        if (snap && snap.id !== this.startPointId && snap.id !== this.arcPoint2Id) {
+          endPointId = snap.id;
+        } else {
+          const pt = this.sketch.addPoint(endWorldX, endWorldY, false, this.isConstructionMode);
+          endPointId = pt.id;
+        }
+
+        this.sketch.addArc(
+          this.startPointId!,
+          this.arcPoint2Id!,
+          endPointId,
+          radius,
+          clockwise,
+          this.isConstructionMode
+        );
+        this.sketch.commitTransaction();
+        this.cancelDrawing();
+        this.render();
+        showToast('Centerpoint arc created');
       }
       return;
     }
@@ -797,11 +1063,50 @@ export class CanvasInteraction {
       return;
     }
 
+    // Drag arc handling (Translates center, start point, and end point simultaneously)
+    if (
+      this.isDraggingArc &&
+      this.draggedArcId &&
+      this.dragArcStartWorld &&
+      this.arcCenterStart &&
+      this.arcStartPointStart &&
+      this.arcEndPointStart
+    ) {
+      this.hasDragged = true;
+      this.svg.style.cursor = 'grabbing';
+      const dx = world.x - this.dragArcStartWorld.x;
+      const dy = world.y - this.dragArcStartWorld.y;
+
+      const arc = this.sketch.arcs.get(this.draggedArcId);
+      if (arc) {
+        const center = this.sketch.points.get(arc.centerId);
+        const start = this.sketch.points.get(arc.startPointId);
+        const end = this.sketch.points.get(arc.endPointId);
+        if (center && !center.fixed) {
+          center.x = this.arcCenterStart.x + dx;
+          center.y = this.arcCenterStart.y + dy;
+        }
+        if (start && !start.fixed) {
+          start.x = this.arcStartPointStart.x + dx;
+          start.y = this.arcStartPointStart.y + dy;
+        }
+        if (end && !end.fixed) {
+          end.x = this.arcEndPointStart.x + dx;
+          end.y = this.arcEndPointStart.y + dy;
+        }
+        this.sketch.solve();
+        this.render();
+      }
+      return;
+    }
+
     // Snapping update during active drawing tools or constraint mode
     const isDrawingTool =
       this.activeTool === 'point' ||
       this.activeTool === 'line' ||
       this.activeTool === 'circle' ||
+      this.activeTool === 'arc' ||
+      this.activeTool === 'arc_center' ||
       this.activeTool === 'rectangle';
     const isConstraintWithPoints =
       isConstraintTool(this.activeTool) &&
@@ -811,32 +1116,103 @@ export class CanvasInteraction {
     const snap = isDrawingTool || isConstraintWithPoints
       ? this.findSnappedPoint(screen, this.startPointId ?? undefined)
       : null;
-    if (snap && !this.isDraggingPoint && !this.isDraggingLine && !this.isDraggingCircle) {
+    if (snap && !this.isDraggingPoint && !this.isDraggingLine && !this.isDraggingCircle && !this.isDraggingArc) {
       const snapScreen = this.viewport.worldToScreen(snap.worldPos.x, snap.worldPos.y);
       this.renderer.renderSnapIndicator(snapScreen);
     } else {
       this.renderer.clearPreviews();
     }
 
-    // Active tool drawing preview
+    // Active tool drawing preview: Step 1
     if (this.drawingStep === 1 && this.startWorldPos) {
       const s1 = this.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
       const effectiveWorld = snap ? snap.worldPos : world;
       const s2 = this.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 
-      if (this.activeTool === 'line') {
+      if (this.activeTool === 'line' || this.activeTool === 'arc') {
         const length = dist(this.startWorldPos, effectiveWorld);
         const angleDeg =
           (Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
           Math.PI;
         this.renderer.renderLinePreview(s1, s2, length, angleDeg);
-      } else if (this.activeTool === 'circle') {
+      } else if (this.activeTool === 'circle' || this.activeTool === 'arc_center') {
         const radius = dist(this.startWorldPos, effectiveWorld);
         this.renderer.renderCirclePreview(s1, s2, radius);
       } else if (this.activeTool === 'rectangle') {
         const w = Math.abs(effectiveWorld.x - this.startWorldPos.x);
         const h = Math.abs(effectiveWorld.y - this.startWorldPos.y);
         this.renderer.renderRectanglePreview(s1, s2, w, h);
+      }
+    }
+
+    // Active tool drawing preview: Step 2 (Arcs)
+    if (this.drawingStep === 2 && this.startWorldPos && this.arcPoint2WorldPos) {
+      const effectiveWorld = snap ? snap.worldPos : world;
+
+      if (this.activeTool === 'arc') {
+        const p1 = this.startWorldPos;
+        const p2 = this.arcPoint2WorldPos;
+        const p3 = effectiveWorld;
+        const circum = getCircumcircle(p1, p2, p3);
+
+        const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+        const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+
+        if (!circum || circum.radius < 1 || circum.radius > 50000) {
+          const length = dist(p1, p2);
+          const angleDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
+          this.renderer.renderLinePreview(s1, s2, length, angleDeg);
+        } else {
+          const sc = this.viewport.worldToScreen(circum.center.x, circum.center.y);
+          const s3 = this.viewport.worldToScreen(p3.x, p3.y);
+          const sr = circum.radius * this.viewport.zoom;
+
+          const as = Math.atan2(s1.y - sc.y, s1.x - sc.x);
+          const ae = Math.atan2(s2.y - sc.y, s2.x - sc.x);
+          const a3 = Math.atan2(s3.y - sc.y, s3.x - sc.x);
+
+          let sweepCW = (ae - as) % (2 * Math.PI);
+          if (sweepCW < 0) sweepCW += 2 * Math.PI;
+          let testCW = (a3 - as) % (2 * Math.PI);
+          if (testCW < 0) testCW += 2 * Math.PI;
+
+          const clockwise = testCW > 0 && testCW < sweepCW;
+          this.renderer.renderArcPreview(sc, s1, s2, sr, clockwise, circum.radius);
+        }
+      } else if (this.activeTool === 'arc_center') {
+        const centerWorld = this.startWorldPos;
+        const startWorld = this.arcPoint2WorldPos;
+        const radius = Math.max(1, dist(centerWorld, startWorld));
+
+        const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+        const sStart = this.viewport.worldToScreen(startWorld.x, startWorld.y);
+        const sCur = this.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+        const sr = radius * this.viewport.zoom;
+
+        const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
+        const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
+
+        let delta = acur - as;
+        while (delta > Math.PI) delta -= 2 * Math.PI;
+        while (delta < -Math.PI) delta += 2 * Math.PI;
+        const clockwise = delta >= 0;
+
+        const worldAngle = Math.atan2(effectiveWorld.y - centerWorld.y, effectiveWorld.x - centerWorld.x);
+        const endWorld = vec(
+          centerWorld.x + radius * Math.cos(worldAngle),
+          centerWorld.y + radius * Math.sin(worldAngle)
+        );
+        const sEnd = this.viewport.worldToScreen(endWorld.x, endWorld.y);
+
+        this.renderer.renderArcPreview(
+          sCenter,
+          sStart,
+          sEnd,
+          sr,
+          clockwise,
+          radius,
+          (Math.abs(delta) * 180) / Math.PI
+        );
       }
     }
 
@@ -923,6 +1299,25 @@ export class CanvasInteraction {
       this.draggedCircleId = null;
       this.dragCircleStartWorld = null;
       this.circleCenterStart = null;
+      this.renderer.clearPreviews();
+      if (this.hasDragged) {
+        this.sketch.solve();
+        this.render();
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
+      }
+      this.preDragSnapshot = null;
+      this.hasDragged = false;
+      this.updateCursor();
+    }
+    if (this.isDraggingArc) {
+      this.isDraggingArc = false;
+      this.draggedArcId = null;
+      this.dragArcStartWorld = null;
+      this.arcCenterStart = null;
+      this.arcStartPointStart = null;
+      this.arcEndPointStart = null;
       this.renderer.clearPreviews();
       if (this.hasDragged) {
         this.sketch.solve();
@@ -1068,10 +1463,10 @@ export class CanvasInteraction {
     const target = e.target as SVGElement;
     const targetG = target.closest('[data-id]') as SVGElement | null;
     let id = targetG?.getAttribute('data-id');
-    let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'constraint' | undefined;
+    let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
 
     // Geometric hit test fallback if not clicking directly on entity
-    if (!type || (type !== 'point' && type !== 'line' && type !== 'circle')) {
+    if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc')) {
       if (snap) {
         id = snap.id;
         type = 'point';
@@ -1085,19 +1480,25 @@ export class CanvasInteraction {
           if (hitCircle) {
             id = hitCircle.id;
             type = 'circle';
+          } else {
+            const hitArc = this.findArcNearScreen(screen, 18);
+            if (hitArc) {
+              id = hitArc.id;
+              type = 'arc';
+            }
           }
         }
       }
     }
 
-    // STEP 0: Select first line or circle
+    // STEP 0: Select first line or circle/arc
     if (this.dimensionState.step === 0) {
       if (type === 'line' && id) {
         this.sketch.clearSelection();
         this.sketch.selectEntity(id, 'line', false);
         this.dimensionState = { step: 1, line1Id: id, line2Id: null };
         this.render();
-      } else if (type === 'circle' && id) {
+      } else if ((type === 'circle' || type === 'arc') && id) {
         const c = this.sketch.addRadiusConstraint(id);
         if (c) {
           showToast('Radius constraint applied');
@@ -1291,11 +1692,16 @@ export class CanvasInteraction {
         sel.constraintIds.add(c.id);
       }
     }
+    for (const aid of sel.arcIds) {
+      for (const c of this.sketch.getConstraintsForEntity('arc', aid)) {
+        sel.constraintIds.add(c.id);
+      }
+    }
   }
 
   isEntityCompatibleWithConstraint(
     constraintType: string,
-    entityType: 'point' | 'line' | 'circle'
+    entityType: 'point' | 'line' | 'circle' | 'arc'
   ): boolean {
     switch (constraintType) {
       case 'fixed':
@@ -1307,16 +1713,16 @@ export class CanvasInteraction {
         return entityType === 'line' || entityType === 'point';
       case 'dimension':
       case 'distance':
-        return entityType === 'line' || entityType === 'circle' || entityType === 'point';
+        return entityType === 'line' || entityType === 'circle' || entityType === 'arc' || entityType === 'point';
       case 'equal':
-        return entityType === 'line' || entityType === 'circle';
+        return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
       case 'parallel':
       case 'perpendicular':
         return entityType === 'line';
       case 'tangent':
-        return entityType === 'line' || entityType === 'circle';
+        return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
       case 'concentric':
-        return entityType === 'circle';
+        return entityType === 'circle' || entityType === 'arc';
       case 'point_on_line':
       case 'midpoint':
         return entityType === 'point' || entityType === 'line';
@@ -1329,7 +1735,7 @@ export class CanvasInteraction {
     const sel = this.sketch.selection;
     const pCount = sel.pointIds.size;
     const lCount = sel.lineIds.size;
-    const cCount = sel.circleIds.size;
+    const cCount = sel.circleIds.size + sel.arcIds.size;
 
     switch (type) {
       case 'fixed':
@@ -1369,7 +1775,7 @@ export class CanvasInteraction {
     const sel = this.sketch.selection;
     const pIds = [...sel.pointIds];
     const lIds = [...sel.lineIds];
-    const cIds = [...sel.circleIds];
+    const cIds = [...sel.circleIds, ...sel.arcIds];
 
     let applied = false;
     let toastMsg = '';
@@ -1504,7 +1910,7 @@ export class CanvasInteraction {
           applied = true;
           toastMsg = 'Radius constraint applied';
           if (c && this.onEditDimension) {
-            const circ = this.sketch.circles.get(cIds[0]);
+            const circ = this.sketch.circles.get(cIds[0]) ?? this.sketch.arcs.get(cIds[0]);
             const center = circ ? this.sketch.points.get(circ.centerId) : null;
             const s = center ? this.viewport.worldToScreen(center.x, center.y) : { x: 100, y: 100 };
             const rect = this.svg.getBoundingClientRect();
@@ -1584,13 +1990,15 @@ export class CanvasInteraction {
     return applied;
   }
 
-  deselectEntity(id: string, type: 'point' | 'line' | 'circle'): void {
+  deselectEntity(id: string, type: 'point' | 'line' | 'circle' | 'arc'): void {
     if (type === 'point') {
       this.sketch.selection.pointIds.delete(id);
     } else if (type === 'line') {
       this.sketch.selection.lineIds.delete(id);
     } else if (type === 'circle') {
       this.sketch.selection.circleIds.delete(id);
+    } else if (type === 'arc') {
+      this.sketch.selection.arcIds.delete(id);
     }
     this.sketch.selection.constraintIds.clear();
     for (const pid of this.sketch.selection.pointIds) {
@@ -1608,10 +2016,15 @@ export class CanvasInteraction {
         this.sketch.selection.constraintIds.add(c.id);
       }
     }
+    for (const aid of this.sketch.selection.arcIds) {
+      for (const c of this.sketch.getConstraintsForEntity('arc', aid)) {
+        this.sketch.selection.constraintIds.add(c.id);
+      }
+    }
     this.sketch.notify();
   }
 
-  private handleConstraintEntityClick(id: string, type: 'point' | 'line' | 'circle'): void {
+  private handleConstraintEntityClick(id: string, type: 'point' | 'line' | 'circle' | 'arc'): void {
     if (!isConstraintTool(this.activeTool)) return;
     const constraintType = this.activeTool;
 
@@ -1623,7 +2036,8 @@ export class CanvasInteraction {
     const isAlreadySelected =
       (type === 'point' && sel.pointIds.has(id)) ||
       (type === 'line' && sel.lineIds.has(id)) ||
-      (type === 'circle' && sel.circleIds.has(id));
+      (type === 'circle' && sel.circleIds.has(id)) ||
+      (type === 'arc' && sel.arcIds.has(id));
 
     if (isAlreadySelected) {
       this.deselectEntity(id, type);
@@ -1649,14 +2063,17 @@ export class CanvasInteraction {
         if (type === 'line') {
           sel.pointIds.clear();
           sel.circleIds.clear();
+          sel.arcIds.clear();
           if (sel.lineIds.size >= 2) sel.lineIds.clear();
-        } else if (type === 'circle') {
+        } else if (type === 'circle' || type === 'arc') {
           sel.pointIds.clear();
           sel.lineIds.clear();
           sel.circleIds.clear();
+          sel.arcIds.clear();
         } else if (type === 'point') {
           sel.lineIds.clear();
           sel.circleIds.clear();
+          sel.arcIds.clear();
           if (sel.pointIds.size >= 2) sel.pointIds.clear();
         }
         break;
@@ -1665,14 +2082,17 @@ export class CanvasInteraction {
         if (type === 'line') {
           sel.pointIds.clear();
           sel.circleIds.clear();
+          sel.arcIds.clear();
           sel.lineIds.clear();
-        } else if (type === 'circle') {
+        } else if (type === 'circle' || type === 'arc') {
           sel.pointIds.clear();
           sel.lineIds.clear();
           sel.circleIds.clear();
+          sel.arcIds.clear();
         } else if (type === 'point') {
           sel.lineIds.clear();
           sel.circleIds.clear();
+          sel.arcIds.clear();
           if (sel.pointIds.size >= 2) sel.pointIds.clear();
         }
         break;
@@ -1680,10 +2100,14 @@ export class CanvasInteraction {
       case 'equal': {
         if (type === 'line') {
           sel.circleIds.clear();
+          sel.arcIds.clear();
           if (sel.lineIds.size >= 2) sel.lineIds.clear();
-        } else if (type === 'circle') {
+        } else if (type === 'circle' || type === 'arc') {
           sel.lineIds.clear();
-          if (sel.circleIds.size >= 2) sel.circleIds.clear();
+          if (sel.circleIds.size + sel.arcIds.size >= 2) {
+            sel.circleIds.clear();
+            sel.arcIds.clear();
+          }
         }
         break;
       }
@@ -1693,7 +2117,10 @@ export class CanvasInteraction {
         break;
       }
       case 'concentric': {
-        if (sel.circleIds.size >= 2) sel.circleIds.clear();
+        if (sel.circleIds.size + sel.arcIds.size >= 2) {
+          sel.circleIds.clear();
+          sel.arcIds.clear();
+        }
         break;
       }
       case 'coincident': {
@@ -1703,8 +2130,9 @@ export class CanvasInteraction {
       case 'tangent': {
         if (type === 'line' && sel.lineIds.size >= 1) {
           sel.lineIds.clear();
-        } else if (type === 'circle' && sel.circleIds.size >= 1) {
+        } else if ((type === 'circle' || type === 'arc') && (sel.circleIds.size + sel.arcIds.size >= 1)) {
           sel.circleIds.clear();
+          sel.arcIds.clear();
         }
         break;
       }

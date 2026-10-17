@@ -16,6 +16,7 @@ import {
   ConcentricConstraint,
   MidpointConstraint,
   AngleConstraint,
+  ArcEndpointsConstraint,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -69,6 +70,11 @@ export interface SerializedConstraint {
   c2CenterId?: string;
 
   midId?: string;
+
+  arcId?: string;
+  centerId?: string;
+  startPointId?: string;
+  endPointId?: string;
 }
 
 export interface SketchSnapshot {
@@ -160,6 +166,11 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
     base.midId = c.midId;
     base.p1Id = c.p1Id;
     base.p2Id = c.p2Id;
+  } else if (c instanceof ArcEndpointsConstraint) {
+    base.arcId = c.arcId;
+    base.centerId = c.centerId;
+    base.startPointId = c.startPointId;
+    base.endPointId = c.endPointId;
   }
 
   return base;
@@ -234,6 +245,16 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
       break;
     case 'midpoint':
       c = new MidpointConstraint(d.id, d.midId!, d.p1Id!, d.p2Id!, d.weight);
+      break;
+    case 'arc_endpoints':
+      c = new ArcEndpointsConstraint(
+        d.id,
+        d.arcId!,
+        d.centerId!,
+        d.startPointId!,
+        d.endPointId!,
+        d.weight
+      );
       break;
     default:
       return null;

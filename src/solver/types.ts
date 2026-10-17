@@ -14,7 +14,8 @@ export type ConstraintType =
   | 'tangent_line_circle'
   | 'midpoint'
   | 'drag_point'
-  | 'angle';
+  | 'angle'
+  | 'arc_endpoints';
 
 export interface ParamRef {
   id: string;
