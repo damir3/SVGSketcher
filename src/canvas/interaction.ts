@@ -1478,6 +1478,16 @@ export class CanvasInteraction {
               this.render();
             }
           }
+        } else if (constraint instanceof RadiusConstraint) {
+          const entity = this.sketch.circles.get(constraint.circleId) ?? this.sketch.arcs.get(constraint.circleId);
+          if (entity) {
+            const center = this.sketch.points.get(entity.centerId);
+            if (center) {
+              const sc = this.viewport.worldToScreen(center.x, center.y);
+              constraint.leaderAngle = Math.atan2(screen.y - sc.y, screen.x - sc.x);
+              this.render();
+            }
+          }
         }
       }
       return;
@@ -2141,8 +2151,8 @@ export class CanvasInteraction {
     let id = targetG?.getAttribute('data-id');
     let type = targetG?.getAttribute('data-type');
 
-    // If target didn't resolve to a line, circle, or constraint, use geometric hit test
-    if (!type || (type !== 'line' && type !== 'circle' && type !== 'constraint')) {
+    // If target didn't resolve to a line, circle, arc, or constraint, use geometric hit test
+    if (!type || (type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'constraint')) {
       const hitLine = this.findLineNearScreen(screen, 16);
       if (hitLine) {
         id = hitLine.id;
@@ -2152,6 +2162,12 @@ export class CanvasInteraction {
         if (hitCircle) {
           id = hitCircle.id;
           type = 'circle';
+        } else {
+          const hitArc = this.findArcNearScreen(screen, 16);
+          if (hitArc) {
+            id = hitArc.id;
+            type = 'arc';
+          }
         }
       }
     }
@@ -2192,15 +2208,15 @@ export class CanvasInteraction {
           return true;
         }
       }
-    } else if (type === 'circle') {
-      const circle = this.sketch.circles.get(id);
-      if (circle) {
+    } else if (type === 'circle' || type === 'arc') {
+      const entity = this.sketch.circles.get(id) ?? this.sketch.arcs.get(id);
+      if (entity) {
         let radConstraint = [...this.sketch.constraints.values()].find(
-          c => c instanceof RadiusConstraint && c.circleId === circle.id
+          c => c instanceof RadiusConstraint && c.circleId === entity.id
         ) as RadiusConstraint | undefined;
 
         if (!radConstraint) {
-          radConstraint = this.sketch.addRadiusConstraint(circle.id) ?? undefined;
+          radConstraint = this.sketch.addRadiusConstraint(entity.id) ?? undefined;
         }
 
         if (radConstraint && this.onEditDimension) {
@@ -2264,10 +2280,12 @@ export class CanvasInteraction {
         this.dimensionState = { step: 1, line1Id: id, line2Id: null };
         this.render();
       } else if ((type === 'circle' || type === 'arc') && id) {
+        const existed = this.sketch.hasRadiusConstraint(id);
         const c = this.sketch.addRadiusConstraint(id);
         if (c) {
-          showToast('Radius constraint applied');
+          showToast(existed ? 'Editing radius constraint' : 'Radius constraint applied');
           this.sketch.clearSelection();
+          this.sketch.selectEntity(c.id, 'constraint', false);
           this.render();
           if (this.onEditDimension) {
             this.onEditDimension(c, clientPos);
@@ -2683,9 +2701,10 @@ export class CanvasInteraction {
             this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
           }
         } else if (cIds.length === 1) {
+          const existed = this.sketch.hasRadiusConstraint(cIds[0]);
           const c = this.sketch.addRadiusConstraint(cIds[0]);
           applied = true;
-          toastMsg = 'Radius constraint applied';
+          toastMsg = existed ? 'Editing radius constraint' : 'Radius constraint applied';
           if (c && this.onEditDimension) {
             const circ = this.sketch.circles.get(cIds[0]) ?? this.sketch.arcs.get(cIds[0]);
             const center = circ ? this.sketch.points.get(circ.centerId) : null;

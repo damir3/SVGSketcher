@@ -53,6 +53,7 @@ export interface SerializedConstraint {
   circle2Id?: string;
   circleCenterId?: string;
   targetRadius?: number;
+  leaderAngle?: number;
 
   line1P1?: string;
   line1P2?: string;
@@ -139,6 +140,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
   } else if (c instanceof RadiusConstraint) {
     base.circleId = c.circleId;
     base.targetRadius = c.targetRadius;
+    base.leaderAngle = c.leaderAngle;
   } else if (c instanceof EqualLengthConstraint) {
     base.line1P1 = c.line1P1;
     base.line1P2 = c.line1P2;
@@ -232,7 +234,7 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
       );
       break;
     case 'radius':
-      c = new RadiusConstraint(d.id, d.circleId!, d.targetRadius ?? d.value ?? 10, d.weight);
+      c = new RadiusConstraint(d.id, d.circleId!, d.targetRadius ?? d.value ?? 10, d.weight, d.leaderAngle);
       break;
     case 'equal_length':
       c = new EqualLengthConstraint(d.id, d.line1P1!, d.line1P2!, d.line2P1!, d.line2P2!, d.weight);

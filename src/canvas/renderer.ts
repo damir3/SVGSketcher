@@ -966,22 +966,75 @@ export class SVGRenderer {
     isSelected: boolean
   ): void {
     const circle = sketch.circles.get(constraint.circleId);
-    if (!circle) return;
-    const center = sketch.points.get(circle.centerId);
+    const arc = sketch.arcs.get(constraint.circleId);
+    const entity = circle ?? arc;
+    if (!entity) return;
+    const center = sketch.points.get(entity.centerId);
     if (!center) return;
 
     const sc = viewport.worldToScreen(center.x, center.y);
-    const sr = circle.radius * viewport.zoom;
+    const sr = entity.radius * viewport.zoom;
 
-    // Leader at 45 degree angle
-    const angleRad = Math.PI / 4;
+    // Leader angle in screen space (screen Y is positive downwards)
+    let screenAngle = -Math.PI / 4; // Default for circle: 45° up and right
+
+    if (arc) {
+      const start = sketch.points.get(arc.startPointId);
+      const end = sketch.points.get(arc.endPointId);
+      if (start && end) {
+        const ss = viewport.worldToScreen(start.x, start.y);
+        const se = viewport.worldToScreen(end.x, end.y);
+        const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+        const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+        const clockwise = !!arc.clockwise;
+
+        let sweepAngle = 0;
+        if (clockwise) {
+          sweepAngle = (ae - as) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          if (constraint.leaderAngle !== undefined) {
+            let rel = (constraint.leaderAngle - as) % (2 * Math.PI);
+            if (rel < 0) rel += 2 * Math.PI;
+            if (rel > sweepAngle) {
+              rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
+            }
+            screenAngle = as + rel;
+          } else {
+            screenAngle = as + sweepAngle / 2;
+          }
+        } else {
+          sweepAngle = (as - ae) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          if (constraint.leaderAngle !== undefined) {
+            let rel = (as - constraint.leaderAngle) % (2 * Math.PI);
+            if (rel < 0) rel += 2 * Math.PI;
+            if (rel > sweepAngle) {
+              rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
+            }
+            screenAngle = as - rel;
+          } else {
+            screenAngle = as - sweepAngle / 2;
+          }
+        }
+      }
+    } else {
+      if (constraint.leaderAngle !== undefined) {
+        screenAngle = constraint.leaderAngle;
+      }
+    }
+
+    const cosA = Math.cos(screenAngle);
+    const sinA = Math.sin(screenAngle);
     const edge = {
-      x: sc.x + Math.cos(angleRad) * sr,
-      y: sc.y - Math.sin(angleRad) * sr,
+      x: sc.x + cosA * sr,
+      y: sc.y + sinA * sr,
     };
+
+    const dirX = cosA >= 0 ? 1 : -1;
+    const dirY = sinA >= 0 ? 1 : -1;
     const tip = {
-      x: edge.x + 30,
-      y: edge.y - 20,
+      x: edge.x + dirX * 30,
+      y: edge.y + dirY * 20,
     };
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -991,22 +1044,35 @@ export class SVGRenderer {
     g.style.cursor = 'pointer';
 
     const color = isSelected ? '#0ea5e9' : '#0284c7';
-
-    // Leader line
-    const leader = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-    leader.setAttribute('points', `${sc.x.toFixed(1)},${sc.y.toFixed(1)} ${edge.x.toFixed(1)},${edge.y.toFixed(1)} ${tip.x.toFixed(1)},${tip.y.toFixed(1)}`);
-    leader.setAttribute('stroke', color);
-    leader.setAttribute('stroke-width', '1.5');
-    leader.setAttribute('fill', 'none');
     const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
-    leader.setAttribute('marker-end', arrowUrl);
-    g.appendChild(leader);
+
+    // Leader radial line from center to edge with arrow at circumference
+    const radialLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    radialLine.setAttribute('x1', sc.x.toFixed(1));
+    radialLine.setAttribute('y1', sc.y.toFixed(1));
+    radialLine.setAttribute('x2', edge.x.toFixed(1));
+    radialLine.setAttribute('y2', edge.y.toFixed(1));
+    radialLine.setAttribute('stroke', color);
+    radialLine.setAttribute('stroke-width', '1.5');
+    radialLine.setAttribute('marker-end', arrowUrl);
+    g.appendChild(radialLine);
+
+    // Shelf line from edge to tip
+    const shelf = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    shelf.setAttribute('x1', edge.x.toFixed(1));
+    shelf.setAttribute('y1', edge.y.toFixed(1));
+    shelf.setAttribute('x2', tip.x.toFixed(1));
+    shelf.setAttribute('y2', tip.y.toFixed(1));
+    shelf.setAttribute('stroke', color);
+    shelf.setAttribute('stroke-width', '1.5');
+    g.appendChild(shelf);
 
     const textVal = `R ${constraint.targetRadius.toFixed(1)}`;
     const textLen = textVal.length * 8 + 14;
 
+    const rectX = dirX > 0 ? tip.x : tip.x - textLen;
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('x', tip.x.toFixed(1));
+    bgRect.setAttribute('x', rectX.toFixed(1));
     bgRect.setAttribute('y', (tip.y - 12).toFixed(1));
     bgRect.setAttribute('width', textLen.toString());
     bgRect.setAttribute('height', '20');
@@ -1017,7 +1083,7 @@ export class SVGRenderer {
     g.appendChild(bgRect);
 
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', (tip.x + textLen * 0.5).toFixed(1));
+    text.setAttribute('x', (rectX + textLen * 0.5).toFixed(1));
     text.setAttribute('y', (tip.y + 3).toFixed(1));
     text.setAttribute('text-anchor', 'middle');
     text.setAttribute('fill', color);
@@ -1087,14 +1153,43 @@ export class SVGRenderer {
     isSelected: boolean
   ): void {
     const circle = sketch.circles.get(circleId);
-    if (!circle) return;
-    const center = sketch.points.get(circle.centerId);
+    const arc = sketch.arcs.get(circleId);
+    const entity = circle ?? arc;
+    if (!entity) return;
+    const center = sketch.points.get(entity.centerId);
     if (!center) return;
 
     const sc = viewport.worldToScreen(center.x, center.y);
-    const rScreen = circle.radius * viewport.zoom;
-    const bx = sc.x + rScreen * 0.7071;
-    const by = sc.y - rScreen * 0.7071;
+    const rScreen = entity.radius * viewport.zoom;
+    let bx = sc.x + rScreen * 0.7071;
+    let by = sc.y - rScreen * 0.7071;
+
+    if (arc) {
+      const start = sketch.points.get(arc.startPointId);
+      const end = sketch.points.get(arc.endPointId);
+      if (start && end) {
+        const ss = viewport.worldToScreen(start.x, start.y);
+        const se = viewport.worldToScreen(end.x, end.y);
+        const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+        const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+        const clockwise = !!arc.clockwise;
+
+        let sweepAngle = 0;
+        if (clockwise) {
+          sweepAngle = (ae - as) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          const midAngle = as + sweepAngle / 2;
+          bx = sc.x + Math.cos(midAngle) * rScreen;
+          by = sc.y + Math.sin(midAngle) * rScreen;
+        } else {
+          sweepAngle = (as - ae) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          const midAngle = as - sweepAngle / 2;
+          bx = sc.x + Math.cos(midAngle) * rScreen;
+          by = sc.y + Math.sin(midAngle) * rScreen;
+        }
+      }
+    }
 
     this.renderConstraintBadge(constraintId, bx, by, label, isSelected);
   }

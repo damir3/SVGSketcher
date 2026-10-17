@@ -573,10 +573,26 @@ export class SketchDocument {
   }
 
   addRadiusConstraint(circleOrArcId: string, targetRadius?: number): RadiusConstraint | null {
-    const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
-    if (!circle) return null;
+    const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
+    if (!entity) return null;
 
-    const r = targetRadius ?? Math.max(1, Math.round(circle.radius));
+    // Check if a radius constraint already exists on this circle or arc
+    const existing = [...this.constraints.values()].find(
+      c => c instanceof RadiusConstraint && c.circleId === circleOrArcId
+    ) as RadiusConstraint | undefined;
+
+    if (existing) {
+      if (targetRadius !== undefined) {
+        this.pushHistory();
+        existing.targetRadius = targetRadius;
+        existing.value = targetRadius;
+        existing.name = `Radius (${targetRadius.toFixed(1)})`;
+        this.solve();
+      }
+      return existing;
+    }
+
+    const r = targetRadius ?? Math.max(1, Math.round(entity.radius));
     const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r);
     this.addConstraint(c);
     return c;
@@ -903,13 +919,13 @@ export class SketchDocument {
   }
 
   dragCircleRadius(
-    circleId: string,
+    circleOrArcId: string,
     targetRadius: number
   ): SolverResult {
-    const circle = this.circles.get(circleId);
-    if (!circle) return this.solve();
+    const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
+    if (!entity) return this.solve();
 
-    circle.radius = Math.max(1, targetRadius);
+    entity.radius = Math.max(1, targetRadius);
     return this.solve();
   }
 

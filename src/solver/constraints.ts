@@ -251,11 +251,13 @@ export class DistanceConstraint extends BaseConstraint {
 export class RadiusConstraint extends BaseConstraint {
   readonly circleId: string;
   targetRadius: number;
+  leaderAngle?: number;
 
-  constructor(id: string, circleId: string, targetRadius: number, weight = 1.0) {
+  constructor(id: string, circleId: string, targetRadius: number, weight = 1.0, leaderAngle?: number) {
     super(id, 'radius', `Radius (${targetRadius.toFixed(1)})`, [circleId], weight, false, true, targetRadius);
     this.circleId = circleId;
     this.targetRadius = targetRadius;
+    this.leaderAngle = leaderAngle;
   }
 
   override getEquationsCount(): number {
