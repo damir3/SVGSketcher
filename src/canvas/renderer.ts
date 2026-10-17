@@ -388,7 +388,217 @@ export class SVGRenderer {
       this.geometryGroup.appendChild(arcG);
     }
 
-    // 4. Render Points (Vertices)
+    // 4. Render Ellipses
+    for (const ellipse of sketch.ellipses.values()) {
+      const center = sketch.points.get(ellipse.centerId);
+      const majorPt = sketch.points.get(ellipse.majorAxisPointId);
+      const minorPt = sketch.points.get(ellipse.minorAxisPointId);
+      if (!center || !majorPt || !minorPt) continue;
+
+      const sc = viewport.worldToScreen(center.x, center.y);
+      const smaj = viewport.worldToScreen(majorPt.x, majorPt.y);
+      const smin = viewport.worldToScreen(minorPt.x, minorPt.y);
+
+      const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+      const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+      if (rx < 0.1 || ry < 0.1) continue;
+
+      const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+      const isSelected = sketch.selection.ellipseIds.has(ellipse.id);
+
+      const ellipseG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      ellipseG.setAttribute('data-id', ellipse.id);
+      ellipseG.setAttribute('data-type', 'ellipse');
+      ellipseG.style.cursor = isSelected ? 'grab' : 'pointer';
+
+      // Invisible generous hit target (18px stroke)
+      const hitEllipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      hitEllipse.setAttribute('cx', sc.x.toFixed(1));
+      hitEllipse.setAttribute('cy', sc.y.toFixed(1));
+      hitEllipse.setAttribute('rx', rx.toFixed(1));
+      hitEllipse.setAttribute('ry', ry.toFixed(1));
+      hitEllipse.setAttribute('transform', `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`);
+      hitEllipse.setAttribute('fill', 'none');
+      hitEllipse.setAttribute('stroke', 'rgba(0, 0, 0, 0.001)');
+      hitEllipse.setAttribute('stroke-width', '18');
+      hitEllipse.setAttribute('pointer-events', 'stroke');
+      hitEllipse.style.pointerEvents = 'stroke';
+      ellipseG.appendChild(hitEllipse);
+
+      // Visible ellipse
+      const ellipseEl = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ellipseEl.setAttribute('cx', sc.x.toFixed(1));
+      ellipseEl.setAttribute('cy', sc.y.toFixed(1));
+      ellipseEl.setAttribute('rx', rx.toFixed(1));
+      ellipseEl.setAttribute('ry', ry.toFixed(1));
+      ellipseEl.setAttribute('transform', `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`);
+      ellipseEl.setAttribute('fill', 'none');
+      ellipseEl.setAttribute('stroke', isSelected ? selectedColor : ellipse.isConstruction ? '#64748b' : baseColor);
+      ellipseEl.setAttribute('stroke-width', isSelected ? '3.5' : '2');
+      ellipseEl.setAttribute('pointer-events', 'stroke');
+      ellipseEl.style.pointerEvents = 'stroke';
+
+      if (ellipse.isConstruction) {
+        ellipseEl.setAttribute('stroke-dasharray', '6,6');
+      }
+      ellipseG.appendChild(ellipseEl);
+
+      // Subtle dashed conjugate axes if selected
+      if (isSelected) {
+        const ax1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        ax1.setAttribute('x1', sc.x.toFixed(1));
+        ax1.setAttribute('y1', sc.y.toFixed(1));
+        ax1.setAttribute('x2', smaj.x.toFixed(1));
+        ax1.setAttribute('y2', smaj.y.toFixed(1));
+        ax1.setAttribute('stroke', '#0284c7');
+        ax1.setAttribute('stroke-width', '1');
+        ax1.setAttribute('stroke-dasharray', '3,3');
+        ellipseG.appendChild(ax1);
+
+        const ax2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        ax2.setAttribute('x1', sc.x.toFixed(1));
+        ax2.setAttribute('y1', sc.y.toFixed(1));
+        ax2.setAttribute('x2', smin.x.toFixed(1));
+        ax2.setAttribute('y2', smin.y.toFixed(1));
+        ax2.setAttribute('stroke', '#0284c7');
+        ax2.setAttribute('stroke-width', '1');
+        ax2.setAttribute('stroke-dasharray', '3,3');
+        ellipseG.appendChild(ax2);
+      }
+
+      this.geometryGroup.appendChild(ellipseG);
+    }
+
+    // 5. Render Elliptical Arcs
+    for (const arc of sketch.ellipticalArcs.values()) {
+      const center = sketch.points.get(arc.centerId);
+      const majorPt = sketch.points.get(arc.majorAxisPointId);
+      const minorPt = sketch.points.get(arc.minorAxisPointId);
+      const startPt = sketch.points.get(arc.startPointId);
+      const endPt = sketch.points.get(arc.endPointId);
+      if (!center || !majorPt || !minorPt || !startPt || !endPt) continue;
+
+      const sc = viewport.worldToScreen(center.x, center.y);
+      const smaj = viewport.worldToScreen(majorPt.x, majorPt.y);
+      const smin = viewport.worldToScreen(minorPt.x, minorPt.y);
+      const ss = viewport.worldToScreen(startPt.x, startPt.y);
+      const se = viewport.worldToScreen(endPt.x, endPt.y);
+
+      const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+      const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+      if (rx < 0.1 || ry < 0.1) continue;
+
+      const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+      const thetaDeg = (theta * 180) / Math.PI;
+
+      const ux = Math.cos(theta);
+      const uy = Math.sin(theta);
+      const vx = -Math.sin(theta);
+      const vy = Math.cos(theta);
+
+      const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+      const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+      const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+      const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+
+      const ts = Math.atan2(vs / ry, us / rx);
+      const te = Math.atan2(ve / ry, ue / rx);
+
+      const clockwise = !!arc.clockwise;
+      let sweepAngle = 0;
+      let sweepFlag = 0;
+      if (clockwise) {
+        sweepAngle = (te - ts) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        sweepFlag = 1;
+      } else {
+        sweepAngle = (ts - te) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        sweepFlag = 0;
+      }
+      const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
+
+      const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} ${thetaDeg.toFixed(2)} ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+      const isSelected = sketch.selection.ellipticalArcIds.has(arc.id);
+
+      const arcG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      arcG.setAttribute('data-id', arc.id);
+      arcG.setAttribute('data-type', 'elliptical_arc');
+      arcG.style.cursor = isSelected ? 'grab' : 'pointer';
+
+      // Invisible generous hit target (18px stroke)
+      const hitArc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitArc.setAttribute('d', d);
+      hitArc.setAttribute('fill', 'none');
+      hitArc.setAttribute('stroke', 'rgba(0, 0, 0, 0.001)');
+      hitArc.setAttribute('stroke-width', '18');
+      hitArc.setAttribute('stroke-linecap', 'round');
+      hitArc.setAttribute('pointer-events', 'stroke');
+      hitArc.style.pointerEvents = 'stroke';
+      arcG.appendChild(hitArc);
+
+      // Visible arc path
+      const arcEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcEl.setAttribute('d', d);
+      arcEl.setAttribute('fill', 'none');
+      arcEl.setAttribute('stroke', isSelected ? selectedColor : arc.isConstruction ? '#64748b' : baseColor);
+      arcEl.setAttribute('stroke-width', isSelected ? '3.5' : '2');
+      arcEl.setAttribute('stroke-linecap', 'round');
+      arcEl.setAttribute('pointer-events', 'stroke');
+      arcEl.style.pointerEvents = 'stroke';
+
+      if (arc.isConstruction) {
+        arcEl.setAttribute('stroke-dasharray', '6,6');
+      }
+      arcG.appendChild(arcEl);
+
+      // Light dashed radial lines to center and axes if selected
+      if (isSelected) {
+        const rad1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rad1.setAttribute('x1', sc.x.toFixed(1));
+        rad1.setAttribute('y1', sc.y.toFixed(1));
+        rad1.setAttribute('x2', ss.x.toFixed(1));
+        rad1.setAttribute('y2', ss.y.toFixed(1));
+        rad1.setAttribute('stroke', '#0284c7');
+        rad1.setAttribute('stroke-width', '1');
+        rad1.setAttribute('stroke-dasharray', '3,3');
+        arcG.appendChild(rad1);
+
+        const rad2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        rad2.setAttribute('x1', sc.x.toFixed(1));
+        rad2.setAttribute('y1', sc.y.toFixed(1));
+        rad2.setAttribute('x2', se.x.toFixed(1));
+        rad2.setAttribute('y2', se.y.toFixed(1));
+        rad2.setAttribute('stroke', '#0284c7');
+        rad2.setAttribute('stroke-width', '1');
+        rad2.setAttribute('stroke-dasharray', '3,3');
+        arcG.appendChild(rad2);
+
+        const ax1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        ax1.setAttribute('x1', sc.x.toFixed(1));
+        ax1.setAttribute('y1', sc.y.toFixed(1));
+        ax1.setAttribute('x2', smaj.x.toFixed(1));
+        ax1.setAttribute('y2', smaj.y.toFixed(1));
+        ax1.setAttribute('stroke', '#0284c7');
+        ax1.setAttribute('stroke-width', '1');
+        ax1.setAttribute('stroke-dasharray', '2,2');
+        arcG.appendChild(ax1);
+
+        const ax2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        ax2.setAttribute('x1', sc.x.toFixed(1));
+        ax2.setAttribute('y1', sc.y.toFixed(1));
+        ax2.setAttribute('x2', smin.x.toFixed(1));
+        ax2.setAttribute('y2', smin.y.toFixed(1));
+        ax2.setAttribute('stroke', '#0284c7');
+        ax2.setAttribute('stroke-width', '1');
+        ax2.setAttribute('stroke-dasharray', '2,2');
+        arcG.appendChild(ax2);
+      }
+
+      this.geometryGroup.appendChild(arcG);
+    }
+
+    // 6. Render Points (Vertices)
     for (const pt of sketch.points.values()) {
       const s = viewport.worldToScreen(pt.x, pt.y);
       const isSelected = sketch.selection.pointIds.has(pt.id);
@@ -1231,6 +1441,209 @@ export class SVGRenderer {
     this.previewGroup.appendChild(rect);
 
     this.renderTooltip(s2.x + 12, s2.y - 12, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
+  }
+
+  renderEllipseMajorAxisPreview(sc: Vec2, current: Vec2, radiusVal: number): void {
+    this.previewGroup.innerHTML = '';
+
+    const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    axisLine.setAttribute('x1', sc.x.toFixed(1));
+    axisLine.setAttribute('y1', sc.y.toFixed(1));
+    axisLine.setAttribute('x2', current.x.toFixed(1));
+    axisLine.setAttribute('y2', current.y.toFixed(1));
+    axisLine.setAttribute('stroke', '#0284c7');
+    axisLine.setAttribute('stroke-width', '1.5');
+    axisLine.setAttribute('stroke-dasharray', '3,3');
+    this.previewGroup.appendChild(axisLine);
+
+    const deg = (Math.atan2(current.y - sc.y, current.x - sc.x) * 180) / Math.PI;
+    this.renderTooltip(current.x + 12, current.y - 12, `Rx ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
+  }
+
+  renderEllipsePreview(
+    sc: Vec2,
+    smaj: Vec2,
+    smin: Vec2,
+    rxVal: number,
+    ryVal: number
+  ): void {
+    this.previewGroup.innerHTML = '';
+
+    const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+    const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+    const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+
+    const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    ellipse.setAttribute('cx', sc.x.toFixed(1));
+    ellipse.setAttribute('cy', sc.y.toFixed(1));
+    ellipse.setAttribute('rx', rx.toFixed(1));
+    ellipse.setAttribute('ry', ry.toFixed(1));
+    ellipse.setAttribute('transform', `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`);
+    ellipse.setAttribute('stroke', '#0284c7');
+    ellipse.setAttribute('stroke-width', '2');
+    ellipse.setAttribute('stroke-dasharray', '4,4');
+    ellipse.setAttribute('fill', 'none');
+    this.previewGroup.appendChild(ellipse);
+
+    const lmaj = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    lmaj.setAttribute('x1', sc.x.toFixed(1));
+    lmaj.setAttribute('y1', sc.y.toFixed(1));
+    lmaj.setAttribute('x2', smaj.x.toFixed(1));
+    lmaj.setAttribute('y2', smaj.y.toFixed(1));
+    lmaj.setAttribute('stroke', '#0284c7');
+    lmaj.setAttribute('stroke-width', '1');
+    lmaj.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(lmaj);
+
+    const lmin = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    lmin.setAttribute('x1', sc.x.toFixed(1));
+    lmin.setAttribute('y1', sc.y.toFixed(1));
+    lmin.setAttribute('x2', smin.x.toFixed(1));
+    lmin.setAttribute('y2', smin.y.toFixed(1));
+    lmin.setAttribute('stroke', '#0284c7');
+    lmin.setAttribute('stroke-width', '1');
+    lmin.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(lmin);
+
+    this.renderTooltip(smin.x + 12, smin.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm`);
+  }
+
+  renderEllipticalArcStartPreview(
+    sc: Vec2,
+    smaj: Vec2,
+    smin: Vec2,
+    ss: Vec2,
+    rxVal: number,
+    ryVal: number
+  ): void {
+    this.previewGroup.innerHTML = '';
+
+    const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+    const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+    const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+
+    const ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    ellipse.setAttribute('cx', sc.x.toFixed(1));
+    ellipse.setAttribute('cy', sc.y.toFixed(1));
+    ellipse.setAttribute('rx', rx.toFixed(1));
+    ellipse.setAttribute('ry', ry.toFixed(1));
+    ellipse.setAttribute('transform', `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`);
+    ellipse.setAttribute('stroke', 'rgba(2, 132, 199, 0.3)');
+    ellipse.setAttribute('stroke-width', '1.5');
+    ellipse.setAttribute('stroke-dasharray', '3,3');
+    ellipse.setAttribute('fill', 'none');
+    this.previewGroup.appendChild(ellipse);
+
+    const r1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    r1.setAttribute('x1', sc.x.toFixed(1));
+    r1.setAttribute('y1', sc.y.toFixed(1));
+    r1.setAttribute('x2', ss.x.toFixed(1));
+    r1.setAttribute('y2', ss.y.toFixed(1));
+    r1.setAttribute('stroke', '#0284c7');
+    r1.setAttribute('stroke-width', '1');
+    r1.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(r1);
+
+    const ptMarker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ptMarker.setAttribute('cx', ss.x.toFixed(1));
+    ptMarker.setAttribute('cy', ss.y.toFixed(1));
+    ptMarker.setAttribute('r', '4');
+    ptMarker.setAttribute('fill', '#0284c7');
+    this.previewGroup.appendChild(ptMarker);
+
+    this.renderTooltip(ss.x + 12, ss.y - 12, `Start Angle | Rx ${rxVal.toFixed(1)} Ry ${ryVal.toFixed(1)}`);
+  }
+
+  renderEllipticalArcPreview(
+    sc: Vec2,
+    smaj: Vec2,
+    smin: Vec2,
+    ss: Vec2,
+    se: Vec2,
+    rxVal: number,
+    ryVal: number,
+    clockwise: boolean
+  ): void {
+    this.previewGroup.innerHTML = '';
+
+    const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+    const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+    if (rx < 0.1 || ry < 0.1) return;
+
+    const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+    const thetaDeg = (theta * 180) / Math.PI;
+
+    // Faint guide ellipse
+    const guideEllipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    guideEllipse.setAttribute('cx', sc.x.toFixed(1));
+    guideEllipse.setAttribute('cy', sc.y.toFixed(1));
+    guideEllipse.setAttribute('rx', rx.toFixed(1));
+    guideEllipse.setAttribute('ry', ry.toFixed(1));
+    guideEllipse.setAttribute('transform', `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`);
+    guideEllipse.setAttribute('stroke', 'rgba(2, 132, 199, 0.25)');
+    guideEllipse.setAttribute('stroke-width', '1');
+    guideEllipse.setAttribute('stroke-dasharray', '2,4');
+    guideEllipse.setAttribute('fill', 'none');
+    this.previewGroup.appendChild(guideEllipse);
+
+    const ux = Math.cos(theta);
+    const uy = Math.sin(theta);
+    const vx = -Math.sin(theta);
+    const vy = Math.cos(theta);
+
+    const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+    const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+    const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+    const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+
+    const ts = Math.atan2(vs / ry, us / rx);
+    const te = Math.atan2(ve / ry, ue / rx);
+
+    let sweepAngle = 0;
+    let sweepFlag = 0;
+    if (clockwise) {
+      sweepAngle = (te - ts) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+      sweepFlag = 1;
+    } else {
+      sweepAngle = (ts - te) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+      sweepFlag = 0;
+    }
+    const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
+
+    const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} ${thetaDeg.toFixed(2)} ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+
+    const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arc.setAttribute('d', d);
+    arc.setAttribute('stroke', '#0284c7');
+    arc.setAttribute('stroke-width', '2');
+    arc.setAttribute('stroke-dasharray', '4,4');
+    arc.setAttribute('fill', 'none');
+    this.previewGroup.appendChild(arc);
+
+    const r1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    r1.setAttribute('x1', sc.x.toFixed(1));
+    r1.setAttribute('y1', sc.y.toFixed(1));
+    r1.setAttribute('x2', ss.x.toFixed(1));
+    r1.setAttribute('y2', ss.y.toFixed(1));
+    r1.setAttribute('stroke', '#0284c7');
+    r1.setAttribute('stroke-width', '1');
+    r1.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(r1);
+
+    const r2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    r2.setAttribute('x1', sc.x.toFixed(1));
+    r2.setAttribute('y1', sc.y.toFixed(1));
+    r2.setAttribute('x2', se.x.toFixed(1));
+    r2.setAttribute('y2', se.y.toFixed(1));
+    r2.setAttribute('stroke', '#0284c7');
+    r2.setAttribute('stroke-width', '1');
+    r2.setAttribute('stroke-dasharray', '2,2');
+    this.previewGroup.appendChild(r2);
+
+    const sweepDeg = (sweepAngle * 180) / Math.PI;
+    this.renderTooltip(se.x + 12, se.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
   }
 
   renderSnapIndicator(s: Vec2): void {

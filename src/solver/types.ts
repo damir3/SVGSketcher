@@ -15,7 +15,9 @@ export type ConstraintType =
   | 'midpoint'
   | 'drag_point'
   | 'angle'
-  | 'arc_endpoints';
+  | 'arc_endpoints'
+  | 'ellipse_axis'
+  | 'elliptical_arc_endpoints';
 
 export interface ParamRef {
   id: string;

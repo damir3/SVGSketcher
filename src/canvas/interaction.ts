@@ -4,7 +4,7 @@ import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
 import { dist, vec, projectPointOntoSegment, getCircumcircle, type Vec2 } from '../math/vector';
 import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
-import type { SketchLine, SketchCircle, SketchArc } from '../model/types';
+import type { SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
 
 export type ConstraintToolType =
@@ -53,6 +53,8 @@ export type ToolType =
   | 'arc'
   | 'arc_center'
   | 'rectangle'
+  | 'ellipse'
+  | 'elliptical_arc'
   | ConstraintToolType;
 
 export class CanvasInteraction {
@@ -70,6 +72,10 @@ export class CanvasInteraction {
   private startWorldPos: Vec2 | null = null;
   private arcPoint2Id: string | null = null;
   private arcPoint2WorldPos: Vec2 | null = null;
+  private ellipsePoint3Id: string | null = null;
+  private ellipsePoint3WorldPos: Vec2 | null = null;
+  private ellipseStartPointId: string | null = null;
+  private ellipseStartPointWorldPos: Vec2 | null = null;
 
   // Dragging point state
   private isDraggingPoint = false;
@@ -96,6 +102,24 @@ export class CanvasInteraction {
   private arcCenterStart: Vec2 | null = null;
   private arcStartPointStart: Vec2 | null = null;
   private arcEndPointStart: Vec2 | null = null;
+
+  // Dragging ellipse state
+  private isDraggingEllipse = false;
+  private draggedEllipseId: string | null = null;
+  private dragEllipseStartWorld: Vec2 | null = null;
+  private ellipseCenterStart: Vec2 | null = null;
+  private ellipseMajorPointStart: Vec2 | null = null;
+  private ellipseMinorPointStart: Vec2 | null = null;
+
+  // Dragging elliptical arc state
+  private isDraggingEllipticalArc = false;
+  private draggedEllipticalArcId: string | null = null;
+  private dragEllipticalArcStartWorld: Vec2 | null = null;
+  private ellipticalArcCenterStart: Vec2 | null = null;
+  private ellipticalArcMajorPointStart: Vec2 | null = null;
+  private ellipticalArcMinorPointStart: Vec2 | null = null;
+  private ellipticalArcStartPointStart: Vec2 | null = null;
+  private ellipticalArcEndPointStart: Vec2 | null = null;
 
   // Dragging constraint state
   private isDraggingConstraint = false;
@@ -180,6 +204,8 @@ export class CanvasInteraction {
       this.sketch.selection.lineIds.size > 0 ||
       this.sketch.selection.circleIds.size > 0 ||
       this.sketch.selection.arcIds.size > 0 ||
+      this.sketch.selection.ellipseIds.size > 0 ||
+      this.sketch.selection.ellipticalArcIds.size > 0 ||
       this.sketch.selection.pointIds.size > 0;
 
     if (hasSelection) {
@@ -192,6 +218,12 @@ export class CanvasInteraction {
       }
       for (const aid of this.sketch.selection.arcIds) {
         this.sketch.toggleConstruction(aid);
+      }
+      for (const eid of this.sketch.selection.ellipseIds) {
+        this.sketch.toggleConstruction(eid);
+      }
+      for (const eaid of this.sketch.selection.ellipticalArcIds) {
+        this.sketch.toggleConstruction(eaid);
       }
       for (const pid of this.sketch.selection.pointIds) {
         this.sketch.toggleConstruction(pid);
@@ -211,6 +243,10 @@ export class CanvasInteraction {
     this.startWorldPos = null;
     this.arcPoint2Id = null;
     this.arcPoint2WorldPos = null;
+    this.ellipsePoint3Id = null;
+    this.ellipsePoint3WorldPos = null;
+    this.ellipseStartPointId = null;
+    this.ellipseStartPointWorldPos = null;
 
     this.isDraggingPoint = false;
     this.draggedPointId = null;
@@ -233,6 +269,22 @@ export class CanvasInteraction {
     this.arcCenterStart = null;
     this.arcStartPointStart = null;
     this.arcEndPointStart = null;
+
+    this.isDraggingEllipse = false;
+    this.draggedEllipseId = null;
+    this.dragEllipseStartWorld = null;
+    this.ellipseCenterStart = null;
+    this.ellipseMajorPointStart = null;
+    this.ellipseMinorPointStart = null;
+
+    this.isDraggingEllipticalArc = false;
+    this.draggedEllipticalArcId = null;
+    this.dragEllipticalArcStartWorld = null;
+    this.ellipticalArcCenterStart = null;
+    this.ellipticalArcMajorPointStart = null;
+    this.ellipticalArcMinorPointStart = null;
+    this.ellipticalArcStartPointStart = null;
+    this.ellipticalArcEndPointStart = null;
 
     this.isDraggingConstraint = false;
     this.draggedConstraintId = null;
@@ -303,6 +355,8 @@ export class CanvasInteraction {
         this.setTool('rectangle');
       } else if (e.key === 'p' || e.key === 'P' || e.key === 'з' || e.key === 'З') {
         this.setTool('point');
+      } else if (e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') {
+        this.setTool('ellipse');
       } else if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
         this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
       } else if (e.key === 'd' || e.key === 'D' || e.key === 'в' || e.key === 'В') {
@@ -373,6 +427,7 @@ export class CanvasInteraction {
       const sr = circle.radius * this.viewport.zoom;
       const dToCenter = dist(screen, sc);
       const dToPerimeter = Math.abs(dToCenter - sr);
+
       if (dToPerimeter < closestDist) {
         closestDist = dToPerimeter;
         foundCircle = circle;
@@ -447,6 +502,122 @@ export class CanvasInteraction {
     return foundArc;
   }
 
+  private findEllipseNearScreen(screen: Vec2, thresholdPx = 18): SketchEllipse | null {
+    let closestDist = thresholdPx;
+    let foundEllipse: SketchEllipse | null = null;
+
+    for (const ellipse of this.sketch.ellipses.values()) {
+      const center = this.sketch.points.get(ellipse.centerId);
+      const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+      const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+      if (!center || !majorPt || !minorPt) continue;
+
+      const sc = this.viewport.worldToScreen(center.x, center.y);
+      const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
+      const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+
+      const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+      const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+      if (rx < 0.1 || ry < 0.1) continue;
+
+      const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+      const ux = Math.cos(theta);
+      const uy = Math.sin(theta);
+      const vx = -Math.sin(theta);
+      const vy = Math.cos(theta);
+
+      const dx = screen.x - sc.x;
+      const dy = screen.y - sc.y;
+      const u = dx * ux + dy * uy;
+      const v = dx * vx + dy * vy;
+
+      const t = Math.atan2(v / ry, u / rx);
+      const ex = rx * Math.cos(t) * ux + ry * Math.sin(t) * vx;
+      const ey = rx * Math.cos(t) * uy + ry * Math.sin(t) * vy;
+
+      const dPerimeter = Math.hypot(dx - ex, dy - ey);
+      if (dPerimeter < closestDist) {
+        closestDist = dPerimeter;
+        foundEllipse = ellipse;
+      }
+    }
+
+    return foundEllipse;
+  }
+
+  private findEllipticalArcNearScreen(screen: Vec2, thresholdPx = 18): SketchEllipticalArc | null {
+    let closestDist = thresholdPx;
+    let foundArc: SketchEllipticalArc | null = null;
+
+    for (const arc of this.sketch.ellipticalArcs.values()) {
+      const center = this.sketch.points.get(arc.centerId);
+      const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+      const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+      const startPt = this.sketch.points.get(arc.startPointId);
+      const endPt = this.sketch.points.get(arc.endPointId);
+      if (!center || !majorPt || !minorPt || !startPt || !endPt) continue;
+
+      const sc = this.viewport.worldToScreen(center.x, center.y);
+      const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
+      const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+      const ss = this.viewport.worldToScreen(startPt.x, startPt.y);
+      const se = this.viewport.worldToScreen(endPt.x, endPt.y);
+
+      const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+      const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+      if (rx < 0.1 || ry < 0.1) continue;
+
+      const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+      const ux = Math.cos(theta);
+      const uy = Math.sin(theta);
+      const vx = -Math.sin(theta);
+      const vy = Math.cos(theta);
+
+      const dx = screen.x - sc.x;
+      const dy = screen.y - sc.y;
+      const u = dx * ux + dy * uy;
+      const v = dx * vx + dy * vy;
+
+      const t = Math.atan2(v / ry, u / rx);
+      const ex = rx * Math.cos(t) * ux + ry * Math.sin(t) * vx;
+      const ey = rx * Math.cos(t) * uy + ry * Math.sin(t) * vy;
+
+      const dPerimeter = Math.hypot(dx - ex, dy - ey);
+      if (dPerimeter > closestDist) continue;
+
+      const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+      const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+      const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+      const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+
+      const ts = Math.atan2(vs / ry, us / rx);
+      const te = Math.atan2(ve / ry, ue / rx);
+
+      const clockwise = !!arc.clockwise;
+      let sweepAngle = 0;
+      let pAngle = 0;
+      if (clockwise) {
+        sweepAngle = (te - ts) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        pAngle = (t - ts) % (2 * Math.PI);
+        if (pAngle < 0) pAngle += 2 * Math.PI;
+      } else {
+        sweepAngle = (ts - te) % (2 * Math.PI);
+        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+        pAngle = (ts - t) % (2 * Math.PI);
+        if (pAngle < 0) pAngle += 2 * Math.PI;
+      }
+
+      const angTolerance = thresholdPx / Math.max(Math.min(rx, ry), 1);
+      if (pAngle <= sweepAngle + angTolerance || pAngle >= 2 * Math.PI - angTolerance) {
+        closestDist = dPerimeter;
+        foundArc = arc;
+      }
+    }
+
+    return foundArc;
+  }
+
   private handleMouseDown(e: MouseEvent): void {
     const screen = this.getScreenPos(e);
     const clientPos = vec(e.clientX, e.clientY);
@@ -490,10 +661,10 @@ export class CanvasInteraction {
       const target = e.target as SVGElement;
       const targetG = target.closest('[data-id]') as SVGElement | null;
       let id = targetG?.getAttribute('data-id');
-      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | undefined;
+      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | undefined;
 
-      // Fallback geometric hit test if clicking close to point, line, circle or arc
-      if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc')) {
+      // Fallback geometric hit test if clicking close to point, line, circle, arc, ellipse, or elliptical arc
+      if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'ellipse' && type !== 'elliptical_arc')) {
         if (snap) {
           id = snap.id;
           type = 'point';
@@ -512,6 +683,18 @@ export class CanvasInteraction {
               if (hitArc) {
                 id = hitArc.id;
                 type = 'arc';
+              } else {
+                const hitEllipse = this.findEllipseNearScreen(screen, 18);
+                if (hitEllipse) {
+                  id = hitEllipse.id;
+                  type = 'ellipse';
+                } else {
+                  const hitEllipticalArc = this.findEllipticalArcNearScreen(screen, 18);
+                  if (hitEllipticalArc) {
+                    id = hitEllipticalArc.id;
+                    type = 'elliptical_arc';
+                  }
+                }
               }
             }
           }
@@ -533,9 +716,9 @@ export class CanvasInteraction {
       const target = e.target as SVGElement;
       const targetG = target.closest('[data-id]') as SVGElement | null;
       let id = targetG?.getAttribute('data-id');
-      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
+      let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint' | undefined;
 
-      // Fallback geometric hit test if clicking close to point, line, circle or arc
+      // Fallback geometric hit test if clicking close to point, line, circle, arc, ellipse, or elliptical arc
       if (!type) {
         if (snap) {
           id = snap.id;
@@ -555,6 +738,18 @@ export class CanvasInteraction {
               if (hitArc) {
                 id = hitArc.id;
                 type = 'arc';
+              } else {
+                const hitEllipse = this.findEllipseNearScreen(screen, 18);
+                if (hitEllipse) {
+                  id = hitEllipse.id;
+                  type = 'ellipse';
+                } else {
+                  const hitEllipticalArc = this.findEllipticalArcNearScreen(screen, 18);
+                  if (hitEllipticalArc) {
+                    id = hitEllipticalArc.id;
+                    type = 'elliptical_arc';
+                  }
+                }
               }
             }
           }
@@ -617,6 +812,44 @@ export class CanvasInteraction {
               this.arcCenterStart = vec(center.x, center.y);
               this.arcStartPointStart = vec(start.x, start.y);
               this.arcEndPointStart = vec(end.x, end.y);
+            }
+          }
+        } else if (type === 'ellipse') {
+          const ellipse = this.sketch.ellipses.get(id);
+          if (ellipse) {
+            const center = this.sketch.points.get(ellipse.centerId);
+            const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+            const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+            if (center && majorPt && minorPt) {
+              this.isDraggingEllipse = true;
+              this.draggedEllipseId = id;
+              this.preDragSnapshot = this.sketch.takeSnapshot();
+              this.hasDragged = false;
+              this.dragEllipseStartWorld = world;
+              this.ellipseCenterStart = vec(center.x, center.y);
+              this.ellipseMajorPointStart = vec(majorPt.x, majorPt.y);
+              this.ellipseMinorPointStart = vec(minorPt.x, minorPt.y);
+            }
+          }
+        } else if (type === 'elliptical_arc') {
+          const arc = this.sketch.ellipticalArcs.get(id);
+          if (arc) {
+            const center = this.sketch.points.get(arc.centerId);
+            const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+            const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+            const start = this.sketch.points.get(arc.startPointId);
+            const end = this.sketch.points.get(arc.endPointId);
+            if (center && majorPt && minorPt && start && end) {
+              this.isDraggingEllipticalArc = true;
+              this.draggedEllipticalArcId = id;
+              this.preDragSnapshot = this.sketch.takeSnapshot();
+              this.hasDragged = false;
+              this.dragEllipticalArcStartWorld = world;
+              this.ellipticalArcCenterStart = vec(center.x, center.y);
+              this.ellipticalArcMajorPointStart = vec(majorPt.x, majorPt.y);
+              this.ellipticalArcMinorPointStart = vec(minorPt.x, minorPt.y);
+              this.ellipticalArcStartPointStart = vec(start.x, start.y);
+              this.ellipticalArcEndPointStart = vec(end.x, end.y);
             }
           }
         } else if (type === 'constraint') {
@@ -913,6 +1146,268 @@ export class CanvasInteraction {
       }
       return;
     }
+
+    // --- TOOL: ELLIPSE (3 clicks: Center -> Major axis -> Minor axis) ---
+    if (this.activeTool === 'ellipse') {
+      if (this.drawingStep === 0) {
+        this.sketch.beginTransaction();
+        let cId: string;
+        if (snap) {
+          cId = snap.id;
+          this.startWorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(world.x, world.y, false, this.isConstructionMode);
+          cId = pt.id;
+          this.startWorldPos = vec(pt.x, pt.y);
+        }
+        this.startPointId = cId;
+        this.drawingStep = 1;
+        this.render();
+      } else if (this.drawingStep === 1) {
+        const centerWorld = this.startWorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+        if (dist(centerWorld, effectiveWorld) < 2) {
+          return;
+        }
+
+        let p1Id: string;
+        if (snap && snap.id !== this.startPointId) {
+          p1Id = snap.id;
+          this.arcPoint2WorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+          p1Id = pt.id;
+          this.arcPoint2WorldPos = vec(pt.x, pt.y);
+        }
+        this.arcPoint2Id = p1Id;
+        this.drawingStep = 2;
+        this.render();
+      } else if (this.drawingStep === 2) {
+        const centerWorld = this.startWorldPos!;
+        const majWorld = this.arcPoint2WorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+
+        const majLen = dist(centerWorld, majWorld);
+        if (majLen < 0.1) return;
+
+        const ux = (majWorld.x - centerWorld.x) / majLen;
+        const uy = (majWorld.y - centerWorld.y) / majLen;
+        const vx = -uy;
+        const vy = ux;
+
+        const dx = effectiveWorld.x - centerWorld.x;
+        const dy = effectiveWorld.y - centerWorld.y;
+        let ryVal = Math.abs(dx * vx + dy * vy);
+        if (ryVal < 1) ryVal = 1;
+        const sign = dx * vx + dy * vy < 0 ? -1 : 1;
+
+        const minX = centerWorld.x + sign * ryVal * vx;
+        const minY = centerWorld.y + sign * ryVal * vy;
+
+        let p2Id: string;
+        if (snap && snap.id !== this.startPointId && snap.id !== this.arcPoint2Id) {
+          p2Id = snap.id;
+        } else {
+          const pt = this.sketch.addPoint(minX, minY, false, this.isConstructionMode);
+          p2Id = pt.id;
+        }
+
+        this.sketch.addEllipse(
+          this.startPointId!,
+          this.arcPoint2Id!,
+          p2Id,
+          this.isConstructionMode
+        );
+        this.sketch.commitTransaction();
+        this.cancelDrawing();
+        this.render();
+        showToast('Ellipse created');
+      }
+      return;
+    }
+
+    // --- TOOL: ELLIPTICAL_ARC (5 clicks: Center -> Major -> Minor -> Arc Start -> Arc End) ---
+    if (this.activeTool === 'elliptical_arc') {
+      if (this.drawingStep === 0) {
+        this.sketch.beginTransaction();
+        let cId: string;
+        if (snap) {
+          cId = snap.id;
+          this.startWorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(world.x, world.y, false, this.isConstructionMode);
+          cId = pt.id;
+          this.startWorldPos = vec(pt.x, pt.y);
+        }
+        this.startPointId = cId;
+        this.drawingStep = 1;
+        this.render();
+      } else if (this.drawingStep === 1) {
+        const centerWorld = this.startWorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+        if (dist(centerWorld, effectiveWorld) < 2) return;
+
+        let p1Id: string;
+        if (snap && snap.id !== this.startPointId) {
+          p1Id = snap.id;
+          this.arcPoint2WorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+          p1Id = pt.id;
+          this.arcPoint2WorldPos = vec(pt.x, pt.y);
+        }
+        this.arcPoint2Id = p1Id;
+        this.drawingStep = 2;
+        this.render();
+      } else if (this.drawingStep === 2) {
+        const centerWorld = this.startWorldPos!;
+        const majWorld = this.arcPoint2WorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+
+        const majLen = dist(centerWorld, majWorld);
+        if (majLen < 0.1) return;
+
+        const ux = (majWorld.x - centerWorld.x) / majLen;
+        const uy = (majWorld.y - centerWorld.y) / majLen;
+        const vx = -uy;
+        const vy = ux;
+
+        const dx = effectiveWorld.x - centerWorld.x;
+        const dy = effectiveWorld.y - centerWorld.y;
+        let ryVal = Math.abs(dx * vx + dy * vy);
+        if (ryVal < 1) ryVal = 1;
+        const sign = dx * vx + dy * vy < 0 ? -1 : 1;
+
+        const minX = centerWorld.x + sign * ryVal * vx;
+        const minY = centerWorld.y + sign * ryVal * vy;
+
+        let p2Id: string;
+        if (snap && snap.id !== this.startPointId && snap.id !== this.arcPoint2Id) {
+          p2Id = snap.id;
+          this.ellipsePoint3WorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(minX, minY, false, this.isConstructionMode);
+          p2Id = pt.id;
+          this.ellipsePoint3WorldPos = vec(pt.x, pt.y);
+        }
+        this.ellipsePoint3Id = p2Id;
+        this.drawingStep = 3;
+        this.render();
+      } else if (this.drawingStep === 3) {
+        const centerWorld = this.startWorldPos!;
+        const majWorld = this.arcPoint2WorldPos!;
+        const minWorld = this.ellipsePoint3WorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+
+        const rxVal = dist(centerWorld, majWorld);
+        const ryVal = dist(centerWorld, minWorld);
+        if (rxVal < 0.1 || ryVal < 0.1) return;
+
+        const ux = (majWorld.x - centerWorld.x) / rxVal;
+        const uy = (majWorld.y - centerWorld.y) / rxVal;
+        const vx = (minWorld.x - centerWorld.x) / ryVal;
+        const vy = (minWorld.y - centerWorld.y) / ryVal;
+
+        const dx = effectiveWorld.x - centerWorld.x;
+        const dy = effectiveWorld.y - centerWorld.y;
+        const u = dx * ux + dy * uy;
+        const v = dx * vx + dy * vy;
+        const t = Math.atan2(v / ryVal, u / rxVal);
+
+        const projX = centerWorld.x + rxVal * Math.cos(t) * ux + ryVal * Math.sin(t) * vx;
+        const projY = centerWorld.y + rxVal * Math.cos(t) * uy + ryVal * Math.sin(t) * vy;
+
+        let startPtId: string;
+        if (snap && snap.id !== this.startPointId && snap.id !== this.arcPoint2Id && snap.id !== this.ellipsePoint3Id) {
+          startPtId = snap.id;
+          this.ellipseStartPointWorldPos = snap.worldPos;
+        } else {
+          const pt = this.sketch.addPoint(projX, projY, false, this.isConstructionMode);
+          startPtId = pt.id;
+          this.ellipseStartPointWorldPos = vec(pt.x, pt.y);
+        }
+        this.ellipseStartPointId = startPtId;
+        this.drawingStep = 4;
+        this.render();
+      } else if (this.drawingStep === 4) {
+        const centerWorld = this.startWorldPos!;
+        const majWorld = this.arcPoint2WorldPos!;
+        const minWorld = this.ellipsePoint3WorldPos!;
+        const startWorld = this.ellipseStartPointWorldPos!;
+        const effectiveWorld = snap ? snap.worldPos : world;
+
+        const rxVal = dist(centerWorld, majWorld);
+        const ryVal = dist(centerWorld, minWorld);
+        if (rxVal < 0.1 || ryVal < 0.1) return;
+
+        const ux = (majWorld.x - centerWorld.x) / rxVal;
+        const uy = (majWorld.y - centerWorld.y) / rxVal;
+        const vx = (minWorld.x - centerWorld.x) / ryVal;
+        const vy = (minWorld.y - centerWorld.y) / ryVal;
+
+        const dx = effectiveWorld.x - centerWorld.x;
+        const dy = effectiveWorld.y - centerWorld.y;
+        const u = dx * ux + dy * uy;
+        const v = dx * vx + dy * vy;
+        const te = Math.atan2(v / ryVal, u / rxVal);
+
+        const projX = centerWorld.x + rxVal * Math.cos(te) * ux + ryVal * Math.sin(te) * vx;
+        const projY = centerWorld.y + rxVal * Math.cos(te) * uy + ryVal * Math.sin(te) * vy;
+
+        // Screen orientation calculation for clockwise flag
+        const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+        const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
+        const sStart = this.viewport.worldToScreen(startWorld.x, startWorld.y);
+        const sCur = this.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+
+        const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
+        const ux_s = Math.cos(theta);
+        const uy_s = Math.sin(theta);
+        const vx_s = -Math.sin(theta);
+        const vy_s = Math.cos(theta);
+
+        const us = (sStart.x - sCenter.x) * ux_s + (sStart.y - sCenter.y) * uy_s;
+        const vs = (sStart.x - sCenter.x) * vx_s + (sStart.y - sCenter.y) * vy_s;
+        const ue = (sCur.x - sCenter.x) * ux_s + (sCur.y - sCenter.y) * uy_s;
+        const ve = (sCur.x - sCenter.x) * vx_s + (sCur.y - sCenter.y) * vy_s;
+
+        const ts_sc = Math.atan2(vs, us);
+        const te_sc = Math.atan2(ve, ue);
+        let delta = te_sc - ts_sc;
+        while (delta > Math.PI) delta -= 2 * Math.PI;
+        while (delta < -Math.PI) delta += 2 * Math.PI;
+        const clockwise = delta >= 0;
+
+        let endPtId: string;
+        if (
+          snap &&
+          snap.id !== this.startPointId &&
+          snap.id !== this.arcPoint2Id &&
+          snap.id !== this.ellipsePoint3Id &&
+          snap.id !== this.ellipseStartPointId
+        ) {
+          endPtId = snap.id;
+        } else {
+          const pt = this.sketch.addPoint(projX, projY, false, this.isConstructionMode);
+          endPtId = pt.id;
+        }
+
+        this.sketch.addEllipticalArc(
+          this.startPointId!,
+          this.arcPoint2Id!,
+          this.ellipsePoint3Id!,
+          this.ellipseStartPointId!,
+          endPtId,
+          clockwise,
+          this.isConstructionMode
+        );
+        this.sketch.commitTransaction();
+        this.cancelDrawing();
+        this.render();
+        showToast('Elliptical arc created');
+      }
+      return;
+    }
   }
 
   private handleMouseMove(e: MouseEvent): void {
@@ -1100,6 +1595,92 @@ export class CanvasInteraction {
       return;
     }
 
+    // Drag ellipse handling (Translates center, major axis point, and minor axis point simultaneously)
+    if (
+      this.isDraggingEllipse &&
+      this.draggedEllipseId &&
+      this.dragEllipseStartWorld &&
+      this.ellipseCenterStart &&
+      this.ellipseMajorPointStart &&
+      this.ellipseMinorPointStart
+    ) {
+      this.hasDragged = true;
+      this.svg.style.cursor = 'grabbing';
+      const dx = world.x - this.dragEllipseStartWorld.x;
+      const dy = world.y - this.dragEllipseStartWorld.y;
+
+      const ellipse = this.sketch.ellipses.get(this.draggedEllipseId);
+      if (ellipse) {
+        const center = this.sketch.points.get(ellipse.centerId);
+        const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+        const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+        if (center && !center.fixed) {
+          center.x = this.ellipseCenterStart.x + dx;
+          center.y = this.ellipseCenterStart.y + dy;
+        }
+        if (majorPt && !majorPt.fixed) {
+          majorPt.x = this.ellipseMajorPointStart.x + dx;
+          majorPt.y = this.ellipseMajorPointStart.y + dy;
+        }
+        if (minorPt && !minorPt.fixed) {
+          minorPt.x = this.ellipseMinorPointStart.x + dx;
+          minorPt.y = this.ellipseMinorPointStart.y + dy;
+        }
+        this.sketch.solve();
+        this.render();
+      }
+      return;
+    }
+
+    // Drag elliptical arc handling (Translates center, major, minor, start, and end points)
+    if (
+      this.isDraggingEllipticalArc &&
+      this.draggedEllipticalArcId &&
+      this.dragEllipticalArcStartWorld &&
+      this.ellipticalArcCenterStart &&
+      this.ellipticalArcMajorPointStart &&
+      this.ellipticalArcMinorPointStart &&
+      this.ellipticalArcStartPointStart &&
+      this.ellipticalArcEndPointStart
+    ) {
+      this.hasDragged = true;
+      this.svg.style.cursor = 'grabbing';
+      const dx = world.x - this.dragEllipticalArcStartWorld.x;
+      const dy = world.y - this.dragEllipticalArcStartWorld.y;
+
+      const arc = this.sketch.ellipticalArcs.get(this.draggedEllipticalArcId);
+      if (arc) {
+        const center = this.sketch.points.get(arc.centerId);
+        const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+        const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+        const start = this.sketch.points.get(arc.startPointId);
+        const end = this.sketch.points.get(arc.endPointId);
+        if (center && !center.fixed) {
+          center.x = this.ellipticalArcCenterStart.x + dx;
+          center.y = this.ellipticalArcCenterStart.y + dy;
+        }
+        if (majorPt && !majorPt.fixed) {
+          majorPt.x = this.ellipticalArcMajorPointStart.x + dx;
+          majorPt.y = this.ellipticalArcMajorPointStart.y + dy;
+        }
+        if (minorPt && !minorPt.fixed) {
+          minorPt.x = this.ellipticalArcMinorPointStart.x + dx;
+          minorPt.y = this.ellipticalArcMinorPointStart.y + dy;
+        }
+        if (start && !start.fixed) {
+          start.x = this.ellipticalArcStartPointStart.x + dx;
+          start.y = this.ellipticalArcStartPointStart.y + dy;
+        }
+        if (end && !end.fixed) {
+          end.x = this.ellipticalArcEndPointStart.x + dx;
+          end.y = this.ellipticalArcEndPointStart.y + dy;
+        }
+        this.sketch.solve();
+        this.render();
+      }
+      return;
+    }
+
     // Snapping update during active drawing tools or constraint mode
     const isDrawingTool =
       this.activeTool === 'point' ||
@@ -1107,7 +1688,9 @@ export class CanvasInteraction {
       this.activeTool === 'circle' ||
       this.activeTool === 'arc' ||
       this.activeTool === 'arc_center' ||
-      this.activeTool === 'rectangle';
+      this.activeTool === 'rectangle' ||
+      this.activeTool === 'ellipse' ||
+      this.activeTool === 'elliptical_arc';
     const isConstraintWithPoints =
       isConstraintTool(this.activeTool) &&
       ['fixed', 'coincident', 'horizontal_vertical', 'horizontal', 'vertical', 'dimension', 'distance', 'point_on_line', 'midpoint'].includes(
@@ -1116,7 +1699,15 @@ export class CanvasInteraction {
     const snap = isDrawingTool || isConstraintWithPoints
       ? this.findSnappedPoint(screen, this.startPointId ?? undefined)
       : null;
-    if (snap && !this.isDraggingPoint && !this.isDraggingLine && !this.isDraggingCircle && !this.isDraggingArc) {
+    if (
+      snap &&
+      !this.isDraggingPoint &&
+      !this.isDraggingLine &&
+      !this.isDraggingCircle &&
+      !this.isDraggingArc &&
+      !this.isDraggingEllipse &&
+      !this.isDraggingEllipticalArc
+    ) {
       const snapScreen = this.viewport.worldToScreen(snap.worldPos.x, snap.worldPos.y);
       this.renderer.renderSnapIndicator(snapScreen);
     } else {
@@ -1142,10 +1733,13 @@ export class CanvasInteraction {
         const w = Math.abs(effectiveWorld.x - this.startWorldPos.x);
         const h = Math.abs(effectiveWorld.y - this.startWorldPos.y);
         this.renderer.renderRectanglePreview(s1, s2, w, h);
+      } else if (this.activeTool === 'ellipse' || this.activeTool === 'elliptical_arc') {
+        const rx = dist(this.startWorldPos, effectiveWorld);
+        this.renderer.renderEllipseMajorAxisPreview(s1, s2, rx);
       }
     }
 
-    // Active tool drawing preview: Step 2 (Arcs)
+    // Active tool drawing preview: Step 2 (Arcs & Ellipses)
     if (this.drawingStep === 2 && this.startWorldPos && this.arcPoint2WorldPos) {
       const effectiveWorld = snap ? snap.worldPos : world;
 
@@ -1212,6 +1806,137 @@ export class CanvasInteraction {
           clockwise,
           radius,
           (Math.abs(delta) * 180) / Math.PI
+        );
+      } else if (this.activeTool === 'ellipse' || this.activeTool === 'elliptical_arc') {
+        const centerWorld = this.startWorldPos;
+        const majWorld = this.arcPoint2WorldPos;
+        const majLen = dist(centerWorld, majWorld);
+        if (majLen > 0.01) {
+          const ux = (majWorld.x - centerWorld.x) / majLen;
+          const uy = (majWorld.y - centerWorld.y) / majLen;
+          const vx = -uy;
+          const vy = ux;
+          const dx = effectiveWorld.x - centerWorld.x;
+          const dy = effectiveWorld.y - centerWorld.y;
+          let ryVal = Math.abs(dx * vx + dy * vy);
+          if (ryVal < 1) ryVal = 1;
+          const sign = dx * vx + dy * vy < 0 ? -1 : 1;
+          const minWorld = vec(centerWorld.x + sign * ryVal * vx, centerWorld.y + sign * ryVal * vy);
+          const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+          const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
+          const sMin = this.viewport.worldToScreen(minWorld.x, minWorld.y);
+          this.renderer.renderEllipsePreview(sCenter, sMaj, sMin, majLen, ryVal);
+        }
+      }
+    }
+
+    // Active tool drawing preview: Step 3 (Elliptical Arc start point)
+    if (
+      this.drawingStep === 3 &&
+      this.activeTool === 'elliptical_arc' &&
+      this.startWorldPos &&
+      this.arcPoint2WorldPos &&
+      this.ellipsePoint3WorldPos
+    ) {
+      const effectiveWorld = snap ? snap.worldPos : world;
+      const centerWorld = this.startWorldPos;
+      const majWorld = this.arcPoint2WorldPos;
+      const minWorld = this.ellipsePoint3WorldPos;
+
+      const rxVal = dist(centerWorld, majWorld);
+      const ryVal = dist(centerWorld, minWorld);
+      if (rxVal > 0.1 && ryVal > 0.1) {
+        const ux = (majWorld.x - centerWorld.x) / rxVal;
+        const uy = (majWorld.y - centerWorld.y) / rxVal;
+        const vx = (minWorld.x - centerWorld.x) / ryVal;
+        const vy = (minWorld.y - centerWorld.y) / ryVal;
+
+        const dx = effectiveWorld.x - centerWorld.x;
+        const dy = effectiveWorld.y - centerWorld.y;
+        const u = dx * ux + dy * uy;
+        const v = dx * vx + dy * vy;
+        const t = Math.atan2(v / ryVal, u / rxVal);
+
+        const startWorld = vec(
+          centerWorld.x + rxVal * Math.cos(t) * ux + ryVal * Math.sin(t) * vx,
+          centerWorld.y + rxVal * Math.cos(t) * uy + ryVal * Math.sin(t) * vy
+        );
+
+        const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+        const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
+        const sMin = this.viewport.worldToScreen(minWorld.x, minWorld.y);
+        const sStart = this.viewport.worldToScreen(startWorld.x, startWorld.y);
+        this.renderer.renderEllipticalArcStartPreview(sCenter, sMaj, sMin, sStart, rxVal, ryVal);
+      }
+    }
+
+    // Active tool drawing preview: Step 4 (Elliptical Arc end point)
+    if (
+      this.drawingStep === 4 &&
+      this.activeTool === 'elliptical_arc' &&
+      this.startWorldPos &&
+      this.arcPoint2WorldPos &&
+      this.ellipsePoint3WorldPos &&
+      this.ellipseStartPointWorldPos
+    ) {
+      const effectiveWorld = snap ? snap.worldPos : world;
+      const centerWorld = this.startWorldPos;
+      const majWorld = this.arcPoint2WorldPos;
+      const minWorld = this.ellipsePoint3WorldPos;
+      const startWorld = this.ellipseStartPointWorldPos;
+
+      const rxVal = dist(centerWorld, majWorld);
+      const ryVal = dist(centerWorld, minWorld);
+      if (rxVal > 0.1 && ryVal > 0.1) {
+        const ux = (majWorld.x - centerWorld.x) / rxVal;
+        const uy = (majWorld.y - centerWorld.y) / rxVal;
+        const vx = (minWorld.x - centerWorld.x) / ryVal;
+        const vy = (minWorld.y - centerWorld.y) / ryVal;
+
+        const dx = effectiveWorld.x - centerWorld.x;
+        const dy = effectiveWorld.y - centerWorld.y;
+        const u = dx * ux + dy * uy;
+        const v = dx * vx + dy * vy;
+        const te = Math.atan2(v / ryVal, u / rxVal);
+
+        const endWorld = vec(
+          centerWorld.x + rxVal * Math.cos(te) * ux + ryVal * Math.sin(te) * vx,
+          centerWorld.y + rxVal * Math.cos(te) * uy + ryVal * Math.sin(te) * vy
+        );
+
+        const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+        const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
+        const sMin = this.viewport.worldToScreen(minWorld.x, minWorld.y);
+        const sStart = this.viewport.worldToScreen(startWorld.x, startWorld.y);
+        const sEnd = this.viewport.worldToScreen(endWorld.x, endWorld.y);
+
+        const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
+        const ux_s = Math.cos(theta);
+        const uy_s = Math.sin(theta);
+        const vx_s = -Math.sin(theta);
+        const vy_s = Math.cos(theta);
+
+        const us = (sStart.x - sCenter.x) * ux_s + (sStart.y - sCenter.y) * uy_s;
+        const vs = (sStart.x - sCenter.x) * vx_s + (sStart.y - sCenter.y) * vy_s;
+        const ue = (sEnd.x - sCenter.x) * ux_s + (sEnd.y - sCenter.y) * uy_s;
+        const ve = (sEnd.x - sCenter.x) * vx_s + (sEnd.y - sCenter.y) * vy_s;
+
+        const ts_sc = Math.atan2(vs, us);
+        const te_sc = Math.atan2(ve, ue);
+        let delta = te_sc - ts_sc;
+        while (delta > Math.PI) delta -= 2 * Math.PI;
+        while (delta < -Math.PI) delta += 2 * Math.PI;
+        const clockwise = delta >= 0;
+
+        this.renderer.renderEllipticalArcPreview(
+          sCenter,
+          sMaj,
+          sMin,
+          sStart,
+          sEnd,
+          rxVal,
+          ryVal,
+          clockwise
         );
       }
     }
@@ -1318,6 +2043,46 @@ export class CanvasInteraction {
       this.arcCenterStart = null;
       this.arcStartPointStart = null;
       this.arcEndPointStart = null;
+      this.renderer.clearPreviews();
+      if (this.hasDragged) {
+        this.sketch.solve();
+        this.render();
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
+      }
+      this.preDragSnapshot = null;
+      this.hasDragged = false;
+      this.updateCursor();
+    }
+    if (this.isDraggingEllipse) {
+      this.isDraggingEllipse = false;
+      this.draggedEllipseId = null;
+      this.dragEllipseStartWorld = null;
+      this.ellipseCenterStart = null;
+      this.ellipseMajorPointStart = null;
+      this.ellipseMinorPointStart = null;
+      this.renderer.clearPreviews();
+      if (this.hasDragged) {
+        this.sketch.solve();
+        this.render();
+        if (this.preDragSnapshot) {
+          this.sketch.pushSnapshot(this.preDragSnapshot);
+        }
+      }
+      this.preDragSnapshot = null;
+      this.hasDragged = false;
+      this.updateCursor();
+    }
+    if (this.isDraggingEllipticalArc) {
+      this.isDraggingEllipticalArc = false;
+      this.draggedEllipticalArcId = null;
+      this.dragEllipticalArcStartWorld = null;
+      this.ellipticalArcCenterStart = null;
+      this.ellipticalArcMajorPointStart = null;
+      this.ellipticalArcMinorPointStart = null;
+      this.ellipticalArcStartPointStart = null;
+      this.ellipticalArcEndPointStart = null;
       this.renderer.clearPreviews();
       if (this.hasDragged) {
         this.sketch.solve();
@@ -1675,6 +2440,8 @@ export class CanvasInteraction {
         break;
       }
     }
+    sel.ellipseIds.clear();
+    sel.ellipticalArcIds.clear();
     // Clean up constraintIds
     sel.constraintIds.clear();
     for (const pid of sel.pointIds) {
@@ -1697,11 +2464,21 @@ export class CanvasInteraction {
         sel.constraintIds.add(c.id);
       }
     }
+    for (const eid of sel.ellipseIds) {
+      for (const c of this.sketch.getConstraintsForEntity('ellipse', eid)) {
+        sel.constraintIds.add(c.id);
+      }
+    }
+    for (const eaid of sel.ellipticalArcIds) {
+      for (const c of this.sketch.getConstraintsForEntity('elliptical_arc', eaid)) {
+        sel.constraintIds.add(c.id);
+      }
+    }
   }
 
   isEntityCompatibleWithConstraint(
     constraintType: string,
-    entityType: 'point' | 'line' | 'circle' | 'arc'
+    entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'
   ): boolean {
     switch (constraintType) {
       case 'fixed':
@@ -1990,7 +2767,7 @@ export class CanvasInteraction {
     return applied;
   }
 
-  deselectEntity(id: string, type: 'point' | 'line' | 'circle' | 'arc'): void {
+  deselectEntity(id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'): void {
     if (type === 'point') {
       this.sketch.selection.pointIds.delete(id);
     } else if (type === 'line') {
@@ -1999,6 +2776,10 @@ export class CanvasInteraction {
       this.sketch.selection.circleIds.delete(id);
     } else if (type === 'arc') {
       this.sketch.selection.arcIds.delete(id);
+    } else if (type === 'ellipse') {
+      this.sketch.selection.ellipseIds.delete(id);
+    } else if (type === 'elliptical_arc') {
+      this.sketch.selection.ellipticalArcIds.delete(id);
     }
     this.sketch.selection.constraintIds.clear();
     for (const pid of this.sketch.selection.pointIds) {
@@ -2021,10 +2802,23 @@ export class CanvasInteraction {
         this.sketch.selection.constraintIds.add(c.id);
       }
     }
+    for (const eid of this.sketch.selection.ellipseIds) {
+      for (const c of this.sketch.getConstraintsForEntity('ellipse', eid)) {
+        this.sketch.selection.constraintIds.add(c.id);
+      }
+    }
+    for (const eaid of this.sketch.selection.ellipticalArcIds) {
+      for (const c of this.sketch.getConstraintsForEntity('elliptical_arc', eaid)) {
+        this.sketch.selection.constraintIds.add(c.id);
+      }
+    }
     this.sketch.notify();
   }
 
-  private handleConstraintEntityClick(id: string, type: 'point' | 'line' | 'circle' | 'arc'): void {
+  private handleConstraintEntityClick(
+    id: string,
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'
+  ): void {
     if (!isConstraintTool(this.activeTool)) return;
     const constraintType = this.activeTool;
 
@@ -2037,7 +2831,9 @@ export class CanvasInteraction {
       (type === 'point' && sel.pointIds.has(id)) ||
       (type === 'line' && sel.lineIds.has(id)) ||
       (type === 'circle' && sel.circleIds.has(id)) ||
-      (type === 'arc' && sel.arcIds.has(id));
+      (type === 'arc' && sel.arcIds.has(id)) ||
+      (type === 'ellipse' && sel.ellipseIds.has(id)) ||
+      (type === 'elliptical_arc' && sel.ellipticalArcIds.has(id));
 
     if (isAlreadySelected) {
       this.deselectEntity(id, type);

@@ -1,5 +1,5 @@
 import type { IConstraint, ConstraintType } from '../solver/types';
-import type { SketchPoint, SketchLine, SketchCircle, SketchArc } from './types';
+import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from './types';
 import {
   FixedConstraint,
   CoincidentConstraint,
@@ -17,6 +17,8 @@ import {
   MidpointConstraint,
   AngleConstraint,
   ArcEndpointsConstraint,
+  EllipseAxisConstraint,
+  EllipticalArcEndpointsConstraint,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -75,6 +77,10 @@ export interface SerializedConstraint {
   centerId?: string;
   startPointId?: string;
   endPointId?: string;
+
+  ellipseId?: string;
+  majorAxisPointId?: string;
+  minorAxisPointId?: string;
 }
 
 export interface SketchSnapshot {
@@ -82,6 +88,8 @@ export interface SketchSnapshot {
   lines: SketchLine[];
   circles: SketchCircle[];
   arcs: SketchArc[];
+  ellipses: SketchEllipse[];
+  ellipticalArcs: SketchEllipticalArc[];
   constraints: SerializedConstraint[];
   idCounter: number;
 }
@@ -171,6 +179,18 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
     base.centerId = c.centerId;
     base.startPointId = c.startPointId;
     base.endPointId = c.endPointId;
+  } else if (c instanceof EllipseAxisConstraint) {
+    base.ellipseId = c.ellipseId;
+    base.centerId = c.centerId;
+    base.majorAxisPointId = c.majorAxisPointId;
+    base.minorAxisPointId = c.minorAxisPointId;
+  } else if (c instanceof EllipticalArcEndpointsConstraint) {
+    base.arcId = c.arcId;
+    base.centerId = c.centerId;
+    base.majorAxisPointId = c.majorAxisPointId;
+    base.minorAxisPointId = c.minorAxisPointId;
+    base.startPointId = c.startPointId;
+    base.endPointId = c.endPointId;
   }
 
   return base;
@@ -251,6 +271,28 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
         d.id,
         d.arcId!,
         d.centerId!,
+        d.startPointId!,
+        d.endPointId!,
+        d.weight
+      );
+      break;
+    case 'ellipse_axis':
+      c = new EllipseAxisConstraint(
+        d.id,
+        d.ellipseId ?? d.entityIds[0],
+        d.centerId!,
+        d.majorAxisPointId!,
+        d.minorAxisPointId!,
+        d.weight
+      );
+      break;
+    case 'elliptical_arc_endpoints':
+      c = new EllipticalArcEndpointsConstraint(
+        d.id,
+        d.arcId ?? d.entityIds[0],
+        d.centerId!,
+        d.majorAxisPointId!,
+        d.minorAxisPointId!,
         d.startPointId!,
         d.endPointId!,
         d.weight

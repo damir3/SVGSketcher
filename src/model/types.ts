@@ -32,11 +32,32 @@ export interface SketchArc {
   isConstruction?: boolean;
 }
 
+export interface SketchEllipse {
+  id: string;
+  centerId: string;
+  majorAxisPointId: string;
+  minorAxisPointId: string;
+  isConstruction?: boolean;
+}
+
+export interface SketchEllipticalArc {
+  id: string;
+  centerId: string;
+  majorAxisPointId: string;
+  minorAxisPointId: string;
+  startPointId: string;
+  endPointId: string;
+  clockwise?: boolean;
+  isConstruction?: boolean;
+}
+
 export type SketchEntity =
   | { type: 'point'; entity: SketchPoint }
   | { type: 'line'; entity: SketchLine }
   | { type: 'circle'; entity: SketchCircle }
   | { type: 'arc'; entity: SketchArc }
+  | { type: 'ellipse'; entity: SketchEllipse }
+  | { type: 'elliptical_arc'; entity: SketchEllipticalArc }
   | { type: 'constraint'; entity: IConstraint };
 
 export interface SelectionState {
@@ -44,5 +65,7 @@ export interface SelectionState {
   lineIds: Set<string>;
   circleIds: Set<string>;
   arcIds: Set<string>;
+  ellipseIds: Set<string>;
+  ellipticalArcIds: Set<string>;
   constraintIds: Set<string>;
 }

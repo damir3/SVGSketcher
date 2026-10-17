@@ -37,6 +37,15 @@ export class Sidebar {
     const lines = [...this.sketch.lines.values()];
     const circles = [...this.sketch.circles.values()];
     const arcs = [...this.sketch.arcs.values()];
+    const ellipses = [...this.sketch.ellipses.values()];
+    const ellipticalArcs = [...this.sketch.ellipticalArcs.values()];
+    const totalPrimitives =
+      points.length +
+      lines.length +
+      circles.length +
+      arcs.length +
+      ellipses.length +
+      ellipticalArcs.length;
 
     this.container.innerHTML = `
       <div class="sidebar-header">
@@ -54,14 +63,16 @@ export class Sidebar {
         <!-- Primitives Tree -->
         <div class="tree-group">
           <div class="tree-header">
-            <span class="tree-title">Primitives (${points.length + lines.length + circles.length + arcs.length})</span>
+            <span class="tree-title">Primitives (${totalPrimitives})</span>
           </div>
           <div class="tree-list">
             ${lines.map(l => this.renderLineItem(l)).join('')}
             ${circles.map(c => this.renderCircleItem(c)).join('')}
             ${arcs.map(a => this.renderArcItem(a)).join('')}
+            ${ellipses.map(e => this.renderEllipseItem(e)).join('')}
+            ${ellipticalArcs.map(ea => this.renderEllipticalArcItem(ea)).join('')}
             ${points.map(p => this.renderPointItem(p)).join('')}
-            ${points.length === 0 && lines.length === 0 && circles.length === 0 && arcs.length === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
+            ${totalPrimitives === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
           </div>
         </div>
       </div>
@@ -77,6 +88,8 @@ export class Sidebar {
       sel.lineIds.size > 0 ||
       sel.circleIds.size > 0 ||
       sel.arcIds.size > 0 ||
+      sel.ellipseIds.size > 0 ||
+      sel.ellipticalArcIds.size > 0 ||
       sel.constraintIds.size > 0;
 
     if (!hasSelection) {
@@ -85,7 +98,14 @@ export class Sidebar {
 
     let detailsHtml = '';
 
-    if (sel.pointIds.size === 1 && sel.lineIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
+    if (
+      sel.pointIds.size === 1 &&
+      sel.lineIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const pid = [...sel.pointIds][0];
       const pt = this.sketch.points.get(pid);
       if (pt) {
@@ -105,7 +125,14 @@ export class Sidebar {
           </div>
         `;
       }
-    } else if (sel.lineIds.size === 1 && sel.pointIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.lineIds.size === 1 &&
+      sel.pointIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const lid = [...sel.lineIds][0];
       const line = this.sketch.lines.get(lid);
       if (line) {
@@ -125,7 +152,14 @@ export class Sidebar {
           </div>
         `;
       }
-    } else if (sel.circleIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.circleIds.size === 1 &&
+      sel.pointIds.size === 0 &&
+      sel.lineIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const cid = [...sel.circleIds][0];
       const circ = this.sketch.circles.get(cid);
       if (circ) {
@@ -143,7 +177,14 @@ export class Sidebar {
           </div>
         `;
       }
-    } else if (sel.arcIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.circleIds.size === 0) {
+    } else if (
+      sel.arcIds.size === 1 &&
+      sel.pointIds.size === 0 &&
+      sel.lineIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const aid = [...sel.arcIds][0];
       const arc = this.sketch.arcs.get(aid);
       if (arc) {
@@ -173,7 +214,91 @@ export class Sidebar {
           </div>
         `;
       }
-    } else if (sel.pointIds.size === 2 && sel.lineIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.ellipseIds.size === 1 &&
+      sel.pointIds.size === 0 &&
+      sel.lineIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
+      const eid = [...sel.ellipseIds][0];
+      const ellipse = this.sketch.ellipses.get(eid);
+      if (ellipse) {
+        const center = this.sketch.points.get(ellipse.centerId);
+        const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+        const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+        let rxStr = '?';
+        let ryStr = '?';
+        let rotStr = '?';
+        if (center && majorPt && minorPt) {
+          rxStr = dist(center, majorPt).toFixed(1);
+          ryStr = dist(center, minorPt).toFixed(1);
+          const angleDeg = (Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI;
+          rotStr = `${angleDeg.toFixed(1)}°`;
+        }
+        const relatedConstraints = this.sketch.getConstraintsForEntity('ellipse', ellipse.id);
+        detailsHtml = `
+          <div class="inspector-card">
+            <div class="inspector-card-title">Ellipse: ${ellipse.id}</div>
+            <div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
+            <div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
+            <div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
+            <div class="inspector-row"><span>Type:</span> <strong>${ellipse.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+            <div class="inspector-actions">
+              <button class="btn-sm" data-action="toggle-const" data-id="${ellipse.id}">${ellipse.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
+            </div>
+            ${this.renderConstraintsSublist(relatedConstraints, 'this ellipse')}
+          </div>
+        `;
+      }
+    } else if (
+      sel.ellipticalArcIds.size === 1 &&
+      sel.pointIds.size === 0 &&
+      sel.lineIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0
+    ) {
+      const eaid = [...sel.ellipticalArcIds][0];
+      const arc = this.sketch.ellipticalArcs.get(eaid);
+      if (arc) {
+        const center = this.sketch.points.get(arc.centerId);
+        const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+        const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+        let rxStr = '?';
+        let ryStr = '?';
+        let rotStr = '?';
+        if (center && majorPt && minorPt) {
+          rxStr = dist(center, majorPt).toFixed(1);
+          ryStr = dist(center, minorPt).toFixed(1);
+          const angleDeg = (Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI;
+          rotStr = `${angleDeg.toFixed(1)}°`;
+        }
+        const relatedConstraints = this.sketch.getConstraintsForEntity('elliptical_arc', arc.id);
+        detailsHtml = `
+          <div class="inspector-card">
+            <div class="inspector-card-title">Elliptical Arc: ${arc.id}</div>
+            <div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
+            <div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
+            <div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
+            <div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
+            <div class="inspector-row"><span>Type:</span> <strong>${arc.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+            <div class="inspector-actions">
+              <button class="btn-sm" data-action="toggle-const" data-id="${arc.id}">${arc.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
+            </div>
+            ${this.renderConstraintsSublist(relatedConstraints, 'this elliptical arc')}
+          </div>
+        `;
+      }
+    } else if (
+      sel.pointIds.size === 2 &&
+      sel.lineIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const pIds = [...sel.pointIds];
       const related = [...new Set([
         ...this.sketch.getConstraintsForEntity('point', pIds[0]),
@@ -185,7 +310,14 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected points')}
         </div>
       `;
-    } else if (sel.lineIds.size === 2 && sel.pointIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.lineIds.size === 2 &&
+      sel.pointIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const lIds = [...sel.lineIds];
       const related = [...new Set([
         ...this.sketch.getConstraintsForEntity('line', lIds[0]),
@@ -197,7 +329,14 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected lines')}
         </div>
       `;
-    } else if (sel.lineIds.size === 1 && sel.circleIds.size === 1 && sel.arcIds.size === 0 && sel.pointIds.size === 0) {
+    } else if (
+      sel.lineIds.size === 1 &&
+      sel.circleIds.size === 1 &&
+      sel.arcIds.size === 0 &&
+      sel.pointIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const lid = [...sel.lineIds][0];
       const cid = [...sel.circleIds][0];
       const related = [...new Set([
@@ -210,7 +349,14 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
-    } else if (sel.circleIds.size === 2 && sel.lineIds.size === 0 && sel.pointIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.circleIds.size === 2 &&
+      sel.lineIds.size === 0 &&
+      sel.pointIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const cIds = [...sel.circleIds];
       const related = [...new Set([
         ...this.sketch.getConstraintsForEntity('circle', cIds[0]),
@@ -222,7 +368,14 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected circles')}
         </div>
       `;
-    } else if (sel.pointIds.size === 1 && sel.lineIds.size === 1 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.pointIds.size === 1 &&
+      sel.lineIds.size === 1 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const pid = [...sel.pointIds][0];
       const lid = [...sel.lineIds][0];
       const related = [...new Set([
@@ -235,7 +388,15 @@ export class Sidebar {
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
-    } else if (sel.constraintIds.size === 1 && sel.pointIds.size === 0 && sel.lineIds.size === 0 && sel.circleIds.size === 0 && sel.arcIds.size === 0) {
+    } else if (
+      sel.constraintIds.size === 1 &&
+      sel.pointIds.size === 0 &&
+      sel.lineIds.size === 0 &&
+      sel.circleIds.size === 0 &&
+      sel.arcIds.size === 0 &&
+      sel.ellipseIds.size === 0 &&
+      sel.ellipticalArcIds.size === 0
+    ) {
       const cid = [...sel.constraintIds][0];
       const c = this.sketch.constraints.get(cid);
       if (c) {
@@ -308,6 +469,44 @@ export class Sidebar {
           <span class="tree-icon">${ICONS.arc}</span>
           <span class="tree-name">${arc.id}</span>
           <span class="tree-meta">R ${arc.radius.toFixed(1)} mm ${arc.isConstruction ? '(aux)' : ''}</span>
+        </div>
+        <button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>
+      </div>
+    `;
+  }
+
+  private renderEllipseItem(ellipse: any): string {
+    const isSelected = this.sketch.selection.ellipseIds.has(ellipse.id);
+    const center = this.sketch.points.get(ellipse.centerId);
+    const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+    const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+    const rx = center && majorPt ? dist(center, majorPt).toFixed(1) : '?';
+    const ry = center && minorPt ? dist(center, minorPt).toFixed(1) : '?';
+    return `
+      <div class="tree-item ${isSelected ? 'selected' : ''}" data-type="ellipse" data-id="${ellipse.id}">
+        <div class="tree-item-info">
+          <span class="tree-icon">${ICONS.ellipse}</span>
+          <span class="tree-name">${ellipse.id}</span>
+          <span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${ellipse.isConstruction ? '(aux)' : ''}</span>
+        </div>
+        <button class="tree-delete-btn" data-delete-id="${ellipse.id}" title="Delete">${ICONS.delete}</button>
+      </div>
+    `;
+  }
+
+  private renderEllipticalArcItem(arc: any): string {
+    const isSelected = this.sketch.selection.ellipticalArcIds.has(arc.id);
+    const center = this.sketch.points.get(arc.centerId);
+    const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+    const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+    const rx = center && majorPt ? dist(center, majorPt).toFixed(1) : '?';
+    const ry = center && minorPt ? dist(center, minorPt).toFixed(1) : '?';
+    return `
+      <div class="tree-item ${isSelected ? 'selected' : ''}" data-type="elliptical_arc" data-id="${arc.id}">
+        <div class="tree-item-info">
+          <span class="tree-icon">${ICONS.elliptical_arc}</span>
+          <span class="tree-name">${arc.id}</span>
+          <span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${arc.isConstruction ? '(aux)' : ''}</span>
         </div>
         <button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>
       </div>
@@ -448,6 +647,10 @@ export class Sidebar {
               this.onEditDimension?.(radConstraint);
             }
           }
+        } else if (type === 'ellipse') {
+          this.sketch.selectEntity(id, 'ellipse', false);
+        } else if (type === 'elliptical_arc') {
+          this.sketch.selectEntity(id, 'elliptical_arc', false);
         } else if (type === 'constraint') {
           const c = this.sketch.constraints.get(id);
           if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {

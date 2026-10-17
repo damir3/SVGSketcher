@@ -57,6 +57,14 @@ export class Toolbar {
             ${ICONS.rectangle}
             <span class="btn-tooltip">Rectangle (R)</span>
           </button>
+          <button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
+            ${ICONS.ellipse}
+            <span class="btn-tooltip">Ellipse (E)</span>
+          </button>
+          <button class="tool-btn" data-tool="elliptical_arc" title="Elliptical Arc">
+            ${ICONS.elliptical_arc}
+            <span class="btn-tooltip">Elliptical Arc</span>
+          </button>
           <button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
             ${ICONS.construction}
             <span class="btn-tooltip">Construction (X)</span>

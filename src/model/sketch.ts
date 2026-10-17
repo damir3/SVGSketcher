@@ -18,8 +18,10 @@ import {
   DragPointConstraint,
   AngleConstraint,
   ArcEndpointsConstraint,
+  EllipseAxisConstraint,
+  EllipticalArcEndpointsConstraint,
 } from '../solver/constraints';
-import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SelectionState } from './types';
+import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SelectionState } from './types';
 import { dist } from '../math/vector';
 import {
   HistoryManager,
@@ -33,6 +35,8 @@ export class SketchDocument {
   lines = new Map<string, SketchLine>();
   circles = new Map<string, SketchCircle>();
   arcs = new Map<string, SketchArc>();
+  ellipses = new Map<string, SketchEllipse>();
+  ellipticalArcs = new Map<string, SketchEllipticalArc>();
   constraints = new Map<string, IConstraint>();
 
   selection: SelectionState = {
@@ -40,6 +44,8 @@ export class SketchDocument {
     lineIds: new Set(),
     circleIds: new Set(),
     arcIds: new Set(),
+    ellipseIds: new Set(),
+    ellipticalArcIds: new Set(),
     constraintIds: new Set(),
   };
 
@@ -161,6 +167,8 @@ export class SketchDocument {
       lines: Array.from(this.lines.values()).map(l => ({ ...l })),
       circles: Array.from(this.circles.values()).map(c => ({ ...c })),
       arcs: Array.from(this.arcs.values()).map(a => ({ ...a })),
+      ellipses: Array.from(this.ellipses.values()).map(e => ({ ...e })),
+      ellipticalArcs: Array.from(this.ellipticalArcs.values()).map(a => ({ ...a })),
       constraints: Array.from(this.constraints.values()).map(c => serializeConstraint(c)),
       idCounter: this.idCounter,
     };
@@ -185,6 +193,16 @@ export class SketchDocument {
     this.arcs.clear();
     for (const a of snapshot.arcs) {
       this.arcs.set(a.id, { ...a });
+    }
+
+    this.ellipses.clear();
+    for (const e of snapshot.ellipses ?? []) {
+      this.ellipses.set(e.id, { ...e });
+    }
+
+    this.ellipticalArcs.clear();
+    for (const a of snapshot.ellipticalArcs ?? []) {
+      this.ellipticalArcs.set(a.id, { ...a });
     }
 
     this.constraints.clear();
@@ -261,6 +279,82 @@ export class SketchDocument {
       endPointId
     );
     this.constraints.set(c.id, c);
+    this.solve();
+    return arc;
+  }
+
+  // --- Ellipse methods ---
+  addEllipse(
+    centerId: string,
+    majorAxisPointId: string,
+    minorAxisPointId: string,
+    isConstruction = false
+  ): SketchEllipse {
+    this.pushHistory();
+    const id = this.nextId('el');
+    const ellipse: SketchEllipse = {
+      id,
+      centerId,
+      majorAxisPointId,
+      minorAxisPointId,
+      isConstruction,
+    };
+    this.ellipses.set(id, ellipse);
+    this.rebuildParamManager();
+    const c = new EllipseAxisConstraint(
+      this.nextId('c_elaxis'),
+      id,
+      centerId,
+      majorAxisPointId,
+      minorAxisPointId
+    );
+    this.constraints.set(c.id, c);
+    this.solve();
+    return ellipse;
+  }
+
+  // --- Elliptical Arc methods ---
+  addEllipticalArc(
+    centerId: string,
+    majorAxisPointId: string,
+    minorAxisPointId: string,
+    startPointId: string,
+    endPointId: string,
+    clockwise = false,
+    isConstruction = false
+  ): SketchEllipticalArc {
+    this.pushHistory();
+    const id = this.nextId('elarc');
+    const arc: SketchEllipticalArc = {
+      id,
+      centerId,
+      majorAxisPointId,
+      minorAxisPointId,
+      startPointId,
+      endPointId,
+      clockwise,
+      isConstruction,
+    };
+    this.ellipticalArcs.set(id, arc);
+    this.rebuildParamManager();
+    const cAxis = new EllipseAxisConstraint(
+      this.nextId('c_elaxis'),
+      id,
+      centerId,
+      majorAxisPointId,
+      minorAxisPointId
+    );
+    this.constraints.set(cAxis.id, cAxis);
+    const cEndpoints = new EllipticalArcEndpointsConstraint(
+      this.nextId('c_elarcept'),
+      id,
+      centerId,
+      majorAxisPointId,
+      minorAxisPointId,
+      startPointId,
+      endPointId
+    );
+    this.constraints.set(cEndpoints.id, cEndpoints);
     this.solve();
     return arc;
   }
@@ -584,7 +678,9 @@ export class SketchDocument {
       !this.points.has(id) &&
       !this.lines.has(id) &&
       !this.circles.has(id) &&
-      !this.arcs.has(id)
+      !this.arcs.has(id) &&
+      !this.ellipses.has(id) &&
+      !this.ellipticalArcs.has(id)
     ) {
       return;
     }
@@ -615,6 +711,26 @@ export class SketchDocument {
           this.selection.arcIds.delete(aid);
         }
       }
+      // Remove ellipses referencing this point
+      for (const [eid, el] of this.ellipses.entries()) {
+        if (el.centerId === id || el.majorAxisPointId === id || el.minorAxisPointId === id) {
+          this.ellipses.delete(eid);
+          this.selection.ellipseIds.delete(eid);
+        }
+      }
+      // Remove elliptical arcs referencing this point
+      for (const [eaid, elarc] of this.ellipticalArcs.entries()) {
+        if (
+          elarc.centerId === id ||
+          elarc.majorAxisPointId === id ||
+          elarc.minorAxisPointId === id ||
+          elarc.startPointId === id ||
+          elarc.endPointId === id
+        ) {
+          this.ellipticalArcs.delete(eaid);
+          this.selection.ellipticalArcIds.delete(eaid);
+        }
+      }
     } else if (this.lines.has(id)) {
       this.lines.delete(id);
       this.selection.lineIds.delete(id);
@@ -624,6 +740,12 @@ export class SketchDocument {
     } else if (this.arcs.has(id)) {
       this.arcs.delete(id);
       this.selection.arcIds.delete(id);
+    } else if (this.ellipses.has(id)) {
+      this.ellipses.delete(id);
+      this.selection.ellipseIds.delete(id);
+    } else if (this.ellipticalArcs.has(id)) {
+      this.ellipticalArcs.delete(id);
+      this.selection.ellipticalArcIds.delete(id);
     }
 
     // Clean up orphan constraints
@@ -633,7 +755,9 @@ export class SketchDocument {
           !this.points.has(entId) &&
           !this.lines.has(entId) &&
           !this.circles.has(entId) &&
-          !this.arcs.has(entId)
+          !this.arcs.has(entId) &&
+          !this.ellipses.has(entId) &&
+          !this.ellipticalArcs.has(entId)
       );
       if (hasMissingEntity) {
         this.constraints.delete(cid);
@@ -669,6 +793,18 @@ export class SketchDocument {
     const arc = this.arcs.get(id);
     if (arc) {
       arc.isConstruction = !arc.isConstruction;
+      this.notify();
+      return;
+    }
+    const el = this.ellipses.get(id);
+    if (el) {
+      el.isConstruction = !el.isConstruction;
+      this.notify();
+      return;
+    }
+    const elarc = this.ellipticalArcs.get(id);
+    if (elarc) {
+      elarc.isConstruction = !elarc.isConstruction;
       this.notify();
       return;
     }
@@ -813,7 +949,10 @@ export class SketchDocument {
     return undefined;
   }
 
-  getConstraintsForEntity(type: 'point' | 'line' | 'circle' | 'arc', id: string): IConstraint[] {
+  getConstraintsForEntity(
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc',
+    id: string
+  ): IConstraint[] {
     const res: IConstraint[] = [];
     if (type === 'point') {
       for (const c of this.constraints.values()) {
@@ -920,13 +1059,31 @@ export class SketchDocument {
           res.push(c);
         }
       }
+    } else if (type === 'ellipse') {
+      const el = this.ellipses.get(id);
+      if (!el) return [];
+      for (const c of this.constraints.values()) {
+        const anyC = c as any;
+        if (anyC.ellipseId === id || c.entityIds.includes(id)) {
+          res.push(c);
+        }
+      }
+    } else if (type === 'elliptical_arc') {
+      const elarc = this.ellipticalArcs.get(id);
+      if (!elarc) return [];
+      for (const c of this.constraints.values()) {
+        const anyC = c as any;
+        if (anyC.arcId === id || anyC.ellipseId === id || c.entityIds.includes(id)) {
+          res.push(c);
+        }
+      }
     }
     return res;
   }
 
   selectEntity(
     id: string,
-    type: 'point' | 'line' | 'circle' | 'arc' | 'constraint',
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint',
     multiSelect = false
   ): void {
     if (!multiSelect) {
@@ -953,6 +1110,16 @@ export class SketchDocument {
       for (const c of this.getConstraintsForEntity('arc', id)) {
         this.selection.constraintIds.add(c.id);
       }
+    } else if (type === 'ellipse') {
+      this.selection.ellipseIds.add(id);
+      for (const c of this.getConstraintsForEntity('ellipse', id)) {
+        this.selection.constraintIds.add(c.id);
+      }
+    } else if (type === 'elliptical_arc') {
+      this.selection.ellipticalArcIds.add(id);
+      for (const c of this.getConstraintsForEntity('elliptical_arc', id)) {
+        this.selection.constraintIds.add(c.id);
+      }
     } else if (type === 'constraint') {
       this.selection.constraintIds.add(id);
     }
@@ -966,11 +1133,15 @@ export class SketchDocument {
     this.lines.clear();
     this.circles.clear();
     this.arcs.clear();
+    this.ellipses.clear();
+    this.ellipticalArcs.clear();
     this.constraints.clear();
     this.selection.pointIds.clear();
     this.selection.lineIds.clear();
     this.selection.circleIds.clear();
     this.selection.arcIds.clear();
+    this.selection.ellipseIds.clear();
+    this.selection.ellipticalArcIds.clear();
     this.selection.constraintIds.clear();
     this.rebuildParamManager();
     this.solve();
@@ -981,6 +1152,8 @@ export class SketchDocument {
     this.selection.lineIds.clear();
     this.selection.circleIds.clear();
     this.selection.arcIds.clear();
+    this.selection.ellipseIds.clear();
+    this.selection.ellipticalArcIds.clear();
     this.selection.constraintIds.clear();
     this.notify();
   }
@@ -991,6 +1164,8 @@ export class SketchDocument {
       this.selection.lineIds.size > 0 ||
       this.selection.circleIds.size > 0 ||
       this.selection.arcIds.size > 0 ||
+      this.selection.ellipseIds.size > 0 ||
+      this.selection.ellipticalArcIds.size > 0 ||
       this.selection.constraintIds.size > 0;
 
     if (!hasSelection) return;
@@ -1000,12 +1175,16 @@ export class SketchDocument {
     const selectedLines = [...this.selection.lineIds];
     const selectedCircles = [...this.selection.circleIds];
     const selectedArcs = [...this.selection.arcIds];
+    const selectedEllipses = [...this.selection.ellipseIds];
+    const selectedEllipticalArcs = [...this.selection.ellipticalArcIds];
     const selectedConstraints = [...this.selection.constraintIds];
 
     for (const id of selectedConstraints) this.removeConstraint(id);
     for (const id of selectedLines) this.removeEntity(id);
     for (const id of selectedCircles) this.removeEntity(id);
     for (const id of selectedArcs) this.removeEntity(id);
+    for (const id of selectedEllipses) this.removeEntity(id);
+    for (const id of selectedEllipticalArcs) this.removeEntity(id);
     for (const id of selectedPoints) this.removeEntity(id);
 
     this.clearSelection();
@@ -1049,6 +1228,51 @@ export class SketchDocument {
         const dash = arc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
           `<path d="M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${end.x.toFixed(2)} ${end.y.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
+        );
+      }
+    }
+    for (const el of this.ellipses.values()) {
+      const center = this.points.get(el.centerId);
+      const maj = this.points.get(el.majorAxisPointId);
+      const min = this.points.get(el.minorAxisPointId);
+      if (center && maj && min) {
+        const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
+        const ry = Math.hypot(min.x - center.x, min.y - center.y);
+        const deg = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
+        const dash = el.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+        elements.push(
+          `<ellipse cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${center.x.toFixed(2)} ${center.y.toFixed(2)})"${dash} stroke-width="2" fill="none" />`
+        );
+      }
+    }
+    for (const elarc of this.ellipticalArcs.values()) {
+      const center = this.points.get(elarc.centerId);
+      const maj = this.points.get(elarc.majorAxisPointId);
+      const min = this.points.get(elarc.minorAxisPointId);
+      const start = this.points.get(elarc.startPointId);
+      const end = this.points.get(elarc.endPointId);
+      if (center && maj && min && start && end) {
+        const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
+        const ry = Math.hypot(min.x - center.x, min.y - center.y);
+        const phi = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
+        const ux = (maj.x - center.x) / rx;
+        const uy = (maj.y - center.y) / rx;
+        const vx = (min.x - center.x) / ry;
+        const vy = (min.y - center.y) / ry;
+        const us = (start.x - center.x) * ux + (start.y - center.y) * uy;
+        const vs = (start.x - center.x) * vx + (start.y - center.y) * vy;
+        const ue = (end.x - center.x) * ux + (end.y - center.y) * uy;
+        const ve = (end.x - center.x) * vx + (end.y - center.y) * vy;
+        const ts = Math.atan2(vs / ry, us / rx);
+        const te = Math.atan2(ve / ry, ue / rx);
+        const clockwise = !!elarc.clockwise;
+        let sweep = clockwise ? (ts - te) % (2 * Math.PI) : (te - ts) % (2 * Math.PI);
+        if (sweep < 0) sweep += 2 * Math.PI;
+        const largeArc = sweep > Math.PI ? 1 : 0;
+        const sweepFlag = clockwise ? 0 : 1;
+        const dash = elarc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+        elements.push(
+          `<path d="M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${phi.toFixed(2)} ${largeArc} ${sweepFlag} ${end.x.toFixed(2)} ${end.y.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
         );
       }
     }
