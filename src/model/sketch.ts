@@ -87,6 +87,13 @@ export class SketchDocument {
     }
   }
 
+  beginTransactionWithSnapshot(snapshot: SketchSnapshot): void {
+    this.batchDepth++;
+    if (this.batchDepth === 1) {
+      this.batchSnapshot = snapshot;
+    }
+  }
+
   commitTransaction(): void {
     if (this.batchDepth <= 0) return;
     this.batchDepth--;
@@ -643,6 +650,19 @@ export class SketchDocument {
   addPointOnLineConstraint(pointId: string, lineId: string): PointOnLineConstraint | null {
     const line = this.lines.get(lineId);
     if (!line) return null;
+
+    // Do not constrain an endpoint of the line to the line itself
+    if (pointId === line.p1Id || pointId === line.p2Id) return null;
+
+    // Check if constraint already exists
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof PointOnLineConstraint &&
+        c.pointId === pointId &&
+        ((c.lineP1Id === line.p1Id && c.lineP2Id === line.p2Id) ||
+         (c.lineP1Id === line.p2Id && c.lineP2Id === line.p1Id))
+    );
+    if (existing) return null;
 
     const c = new PointOnLineConstraint(this.nextId('c_ptline'), pointId, line.p1Id, line.p2Id);
     this.addConstraint(c);

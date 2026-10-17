@@ -49,6 +49,9 @@ function initApp(): void {
           ${ICONS.redo} Redo
         </button>
         <div class="header-divider"></div>
+        <button class="btn-header active" id="btn-snap-header" title="Toggle Snapping (S)">
+          ${ICONS.snap} Snap
+        </button>
         <button class="btn-header" id="btn-fit-view" title="Fit to View (Z)">
           ${ICONS.fitView} Fit to View
         </button>
@@ -131,6 +134,12 @@ function initApp(): void {
     toolbar.setConstructionActive(active);
   };
 
+  interaction.onSnappingChange = active => {
+    toolbar.setSnappingActive(active);
+    const btnSnapHeader = document.getElementById('btn-snap-header');
+    btnSnapHeader?.classList.toggle('active', active);
+  };
+
   // Resize handling
   function handleResize(): void {
     const rect = svg.getBoundingClientRect();
@@ -208,6 +217,11 @@ function initApp(): void {
   }
 
   btnFitView.addEventListener('click', fitToView);
+
+  const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
+  btnSnapHeader?.addEventListener('click', () => {
+    interaction.toggleSnapping();
+  });
 
   btnClear.addEventListener('click', () => {
     if (confirm('Clear sketch canvas?')) {

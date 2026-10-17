@@ -150,6 +150,13 @@ html, body {
   color: #fff;
 }
 
+.btn-header.active {
+  background-color: #e0f2fe;
+  border-color: #0284c7;
+  color: #0284c7;
+  box-shadow: 0 0 0 1px #0284c7;
+}
+
 .btn-header.primary:hover {
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 }

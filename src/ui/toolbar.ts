@@ -25,6 +25,10 @@ export class Toolbar {
             ${ICONS.select}
             <span class="btn-tooltip">Select (V)</span>
           </button>
+          <button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
+            ${ICONS.snap}
+            <span class="btn-tooltip">Snap (S)</span>
+          </button>
         </div>
       </div>
 
@@ -152,6 +156,12 @@ export class Toolbar {
       this.interaction.toggleConstructionMode();
     });
 
+    // Snap toggle
+    const snapBtn = this.container.querySelector('#btn-snap');
+    snapBtn?.addEventListener('click', () => {
+      this.interaction.toggleSnapping();
+    });
+
     // Constraint buttons
     this.container.querySelectorAll<HTMLButtonElement>('[data-constraint]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -188,6 +198,11 @@ export class Toolbar {
   setConstructionActive(active: boolean): void {
     const constrBtn = this.container.querySelector('#btn-construction');
     constrBtn?.classList.toggle('active', active);
+  }
+
+  setSnappingActive(active: boolean): void {
+    const snapBtn = this.container.querySelector('#btn-snap');
+    snapBtn?.classList.toggle('active', active);
   }
 
   setActiveToolButton(tool: ToolType): void {

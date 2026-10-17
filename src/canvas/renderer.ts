@@ -1741,18 +1741,53 @@ export class SVGRenderer {
     this.renderTooltip(se.x + 12, se.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
   }
 
-  renderSnapIndicator(s: Vec2): void {
-    this.overlayGroup.innerHTML = '';
-    const snapRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    snapRing.setAttribute('cx', s.x.toFixed(1));
-    snapRing.setAttribute('cy', s.y.toFixed(1));
-    snapRing.setAttribute('r', '8');
-    snapRing.setAttribute('fill', 'rgba(2, 132, 199, 0.12)');
-    snapRing.setAttribute('stroke', '#0284c7');
-    snapRing.setAttribute('stroke-width', '2');
-    snapRing.setAttribute('pointer-events', 'none');
-    snapRing.style.pointerEvents = 'none';
-    this.overlayGroup.appendChild(snapRing);
+  renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'grid' = 'point', clearFirst = true): void {
+    if (clearFirst) {
+      this.overlayGroup.innerHTML = '';
+    }
+
+    if (type === 'line') {
+      // Emerald diamond on line
+      const diamond = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      const d = 7;
+      diamond.setAttribute(
+        'points',
+        `${s.x.toFixed(1)},${(s.y - d).toFixed(1)} ${(s.x + d).toFixed(1)},${s.y.toFixed(1)} ${s.x.toFixed(1)},${(s.y + d).toFixed(1)} ${(s.x - d).toFixed(1)},${s.y.toFixed(1)}`
+      );
+      diamond.setAttribute('fill', 'rgba(16, 185, 129, 0.2)');
+      diamond.setAttribute('stroke', '#10b981');
+      diamond.setAttribute('stroke-width', '2');
+      diamond.setAttribute('pointer-events', 'none');
+      diamond.style.pointerEvents = 'none';
+      this.overlayGroup.appendChild(diamond);
+    } else if (type === 'grid') {
+      // Indigo square at grid intersection
+      const size = 6;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', (s.x - size).toFixed(1));
+      rect.setAttribute('y', (s.y - size).toFixed(1));
+      rect.setAttribute('width', (size * 2).toString());
+      rect.setAttribute('height', (size * 2).toString());
+      rect.setAttribute('fill', 'rgba(99, 102, 241, 0.15)');
+      rect.setAttribute('stroke', '#6366f1');
+      rect.setAttribute('stroke-width', '1.5');
+      rect.setAttribute('rx', '1');
+      rect.setAttribute('pointer-events', 'none');
+      rect.style.pointerEvents = 'none';
+      this.overlayGroup.appendChild(rect);
+    } else {
+      // Circular blue ring for point
+      const snapRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      snapRing.setAttribute('cx', s.x.toFixed(1));
+      snapRing.setAttribute('cy', s.y.toFixed(1));
+      snapRing.setAttribute('r', '8');
+      snapRing.setAttribute('fill', 'rgba(2, 132, 199, 0.15)');
+      snapRing.setAttribute('stroke', '#0284c7');
+      snapRing.setAttribute('stroke-width', '2');
+      snapRing.setAttribute('pointer-events', 'none');
+      snapRing.style.pointerEvents = 'none';
+      this.overlayGroup.appendChild(snapRing);
+    }
   }
 
   renderDragLine(s1: Vec2, s2: Vec2): void {
