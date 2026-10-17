@@ -198,7 +198,7 @@ export class DistanceConstraint extends BaseConstraint {
   offset?: number;
 
   constructor(id: string, p1Id: string, p2Id: string, targetDistance: number, weight = 1.0, offset?: number) {
-    super(id, 'distance', `Distance (${targetDistance.toFixed(1)})`, [p1Id, p2Id], weight, false, true, targetDistance);
+    super(id, 'distance', `Distance (${Number(targetDistance.toFixed(2))})`, [p1Id, p2Id], weight, false, true, targetDistance);
     this.p1Id = p1Id;
     this.p2Id = p2Id;
     this.targetDistance = targetDistance;
@@ -252,12 +252,27 @@ export class RadiusConstraint extends BaseConstraint {
   readonly circleId: string;
   targetRadius: number;
   leaderAngle?: number;
+  displayMode: 'radius' | 'diameter';
 
-  constructor(id: string, circleId: string, targetRadius: number, weight = 1.0, leaderAngle?: number) {
-    super(id, 'radius', `Radius (${targetRadius.toFixed(1)})`, [circleId], weight, false, true, targetRadius);
+  constructor(
+    id: string,
+    circleId: string,
+    targetRadius: number,
+    weight = 1.0,
+    leaderAngle?: number,
+    displayMode: 'radius' | 'diameter' = 'radius'
+  ) {
+    const valStr = displayMode === 'diameter'
+      ? Number((targetRadius * 2).toFixed(2))
+      : Number(targetRadius.toFixed(2));
+    const label = displayMode === 'diameter'
+      ? `Diameter (${valStr})`
+      : `Radius (${valStr})`;
+    super(id, 'radius', label, [circleId], weight, false, true, targetRadius);
     this.circleId = circleId;
     this.targetRadius = targetRadius;
     this.leaderAngle = leaderAngle;
+    this.displayMode = displayMode;
   }
 
   override getEquationsCount(): number {

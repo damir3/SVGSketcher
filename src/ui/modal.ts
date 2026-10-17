@@ -6,6 +6,8 @@ export class DimensionModal {
   private modalEl: HTMLElement;
   private sketch: SketchDocument;
   private currentConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | null = null;
+  private currentMode: 'radius' | 'diameter' = 'radius';
+  private openedTime = 0;
 
   constructor(sketch: SketchDocument) {
     this.sketch = sketch;
@@ -19,30 +21,45 @@ export class DimensionModal {
 
   open(constraint: DistanceConstraint | RadiusConstraint | AngleConstraint, screenPos?: Vec2): void {
     this.currentConstraint = constraint;
+    this.openedTime = performance.now();
+
     const isDistance = 'targetDistance' in constraint;
     const isAngle = 'targetAngle' in constraint;
+    const isRadius = !isDistance && !isAngle;
+
+    if (isRadius) {
+      const radConstraint = constraint as RadiusConstraint;
+      const isCircle = this.sketch.circles.has(radConstraint.circleId);
+      // Default to diameter for circle, radius for arc if not yet set
+      this.currentMode = radConstraint.displayMode ?? (isCircle ? 'diameter' : 'radius');
+      radConstraint.displayMode = this.currentMode;
+    }
+
     const curVal = isDistance
       ? constraint.targetDistance
       : isAngle
       ? constraint.targetAngle
-      : constraint.targetRadius;
-    const title = isDistance ? 'Modify Distance' : isAngle ? 'Modify Angle' : 'Modify Radius';
+      : this.currentMode === 'diameter'
+      ? (constraint as RadiusConstraint).targetRadius * 2
+      : (constraint as RadiusConstraint).targetRadius;
+
     const unit = isAngle ? '°' : 'mm';
-    const step = isAngle ? '0.5' : '1';
-    const minVal = isAngle ? '0.1' : '1';
-    const maxAttr = isAngle ? 'max="179.9"' : '';
+    const displayVal = Number(curVal.toFixed(2)).toString();
 
     this.modalEl.innerHTML = `
-      <div class="dim-popup-title">${title}</div>
-      <div class="dim-popup-body">
-        <div class="dim-input-wrapper">
-          <input type="number" step="${step}" min="${minVal}" ${maxAttr} id="dim-input-val" value="${curVal.toFixed(1)}" autofocus />
-          <span class="dim-unit">${unit}</span>
+      ${
+        isRadius
+          ? `
+        <div class="dim-mode-switch-compact" role="group" aria-label="Dimension mode">
+          <button type="button" class="btn-dim-mode-compact ${this.currentMode === 'radius' ? 'active' : ''}" id="btn-mode-radius" title="Radius (R)">R</button>
+          <button type="button" class="btn-dim-mode-compact ${this.currentMode === 'diameter' ? 'active' : ''}" id="btn-mode-diameter" title="Diameter (Ø)">Ø</button>
         </div>
-        <div class="dim-popup-actions">
-          <button class="btn-dim-action" id="btn-dim-cancel">Cancel</button>
-          <button class="btn-dim-action btn-dim-save" id="btn-dim-save">Apply (Enter)</button>
-        </div>
+      `
+          : ''
+      }
+      <div class="dim-input-wrapper">
+        <input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="dim-input-val" value="${displayVal}" autofocus />
+        <span class="dim-unit">${unit}</span>
       </div>
     `;
 
@@ -50,8 +67,8 @@ export class DimensionModal {
 
     // Position near click or center
     if (screenPos) {
-      const left = Math.min(Math.max(screenPos.x, 20), window.innerWidth - 240);
-      const top = Math.min(Math.max(screenPos.y, 20), window.innerHeight - 140);
+      const left = Math.min(Math.max(screenPos.x, 20), window.innerWidth - 200);
+      const top = Math.min(Math.max(screenPos.y, 20), window.innerHeight - 80);
       this.modalEl.style.left = `${left}px`;
       this.modalEl.style.top = `${top}px`;
       this.modalEl.style.transform = 'none';
@@ -62,10 +79,80 @@ export class DimensionModal {
     }
 
     const input = this.modalEl.querySelector<HTMLInputElement>('#dim-input-val');
-    input?.focus();
-    input?.select();
+    if (input) {
+      input.addEventListener('focus', () => {
+        setTimeout(() => this.focusAndSelect(), 0);
+      });
 
-    this.bindInnerButtons();
+      input.addEventListener('keydown', e => {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          e.preventDefault();
+          const stepVal = isAngle ? 0.5 : 0.1;
+          const delta = (e.key === 'ArrowUp' ? 1 : -1) * stepVal;
+          const cur = parseFloat(input.value.trim().replace(',', '.')) || 0;
+          const min = isAngle ? 0.1 : 0.01;
+          const max = isAngle ? 179.9 : Infinity;
+          const nextVal = Math.min(max, Math.max(min, Number((cur + delta).toFixed(2))));
+          input.value = nextVal.toString();
+          this.focusAndSelect();
+        }
+      });
+    }
+
+    this.focusAndSelect();
+    requestAnimationFrame(() => this.focusAndSelect());
+    setTimeout(() => this.focusAndSelect(), 25);
+    setTimeout(() => this.focusAndSelect(), 80);
+
+    // If mouse was still pressed down when opening, ensure selection upon mouse release
+    const onMouseUp = () => {
+      window.removeEventListener('mouseup', onMouseUp);
+      if (!this.modalEl.classList.contains('hidden')) {
+        this.focusAndSelect();
+      }
+    };
+    window.addEventListener('mouseup', onMouseUp);
+
+    this.bindInnerButtons(isRadius);
+  }
+
+  private focusAndSelect(): void {
+    if (this.modalEl.classList.contains('hidden')) return;
+    const input = this.modalEl.querySelector<HTMLInputElement>('#dim-input-val');
+    if (!input) return;
+
+    input.focus();
+    input.select();
+    try {
+      input.setSelectionRange(0, input.value.length);
+    } catch {
+      // ignore
+    }
+  }
+
+  private setMode(newMode: 'radius' | 'diameter'): void {
+    if (this.currentMode === newMode) return;
+    this.currentMode = newMode;
+
+    const btnRad = this.modalEl.querySelector<HTMLElement>('#btn-mode-radius');
+    const btnDia = this.modalEl.querySelector<HTMLElement>('#btn-mode-diameter');
+    if (btnRad && btnDia) {
+      btnRad.classList.toggle('active', newMode === 'radius');
+      btnDia.classList.toggle('active', newMode === 'diameter');
+    }
+
+    const input = this.modalEl.querySelector<HTMLInputElement>('#dim-input-val');
+    if (input) {
+      const val = parseFloat(input.value.trim().replace(',', '.'));
+      if (!isNaN(val) && val > 0) {
+        if (newMode === 'diameter') {
+          input.value = Number((val * 2).toFixed(2)).toString();
+        } else {
+          input.value = Number((val / 2).toFixed(2)).toString();
+        }
+      }
+      this.focusAndSelect();
+    }
   }
 
   close(): void {
@@ -79,22 +166,28 @@ export class DimensionModal {
     const input = this.modalEl.querySelector<HTMLInputElement>('#dim-input-val');
     if (!input) return;
 
-    const newVal = parseFloat(input.value);
+    const newVal = parseFloat(input.value.trim().replace(',', '.'));
     if (!isNaN(newVal) && newVal > 0) {
       this.sketch.pushHistory();
       if ('targetDistance' in this.currentConstraint) {
         this.currentConstraint.targetDistance = newVal;
         this.currentConstraint.value = newVal;
-        this.currentConstraint.name = `Distance (${newVal.toFixed(1)})`;
+        this.currentConstraint.name = `Distance (${Number(newVal.toFixed(2))})`;
       } else if ('targetAngle' in this.currentConstraint) {
         const clampedAngle = Math.min(179.9, Math.max(0.1, newVal));
         this.currentConstraint.targetAngle = clampedAngle;
         this.currentConstraint.value = clampedAngle;
-        this.currentConstraint.name = `Angle (${clampedAngle.toFixed(1)}°)`;
+        this.currentConstraint.name = `Angle (${Number(clampedAngle.toFixed(2))}°)`;
       } else {
-        this.currentConstraint.targetRadius = newVal;
-        this.currentConstraint.value = newVal;
-        this.currentConstraint.name = `Radius (${newVal.toFixed(1)})`;
+        const radConstraint = this.currentConstraint as RadiusConstraint;
+        const targetRad = this.currentMode === 'diameter' ? newVal / 2 : newVal;
+        radConstraint.targetRadius = targetRad;
+        radConstraint.value = targetRad;
+        radConstraint.displayMode = this.currentMode;
+        radConstraint.name =
+          this.currentMode === 'diameter'
+            ? `Diameter (${Number(newVal.toFixed(2))})`
+            : `Radius (${Number(targetRad.toFixed(2))})`;
       }
       this.sketch.solve();
     }
@@ -102,9 +195,19 @@ export class DimensionModal {
     this.close();
   }
 
-  private bindInnerButtons(): void {
-    this.modalEl.querySelector('#btn-dim-save')?.addEventListener('click', () => this.apply());
-    this.modalEl.querySelector('#btn-dim-cancel')?.addEventListener('click', () => this.close());
+  private bindInnerButtons(isRadius: boolean): void {
+    if (isRadius) {
+      this.modalEl.querySelector('#btn-mode-radius')?.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.setMode('radius');
+      });
+      this.modalEl.querySelector('#btn-mode-diameter')?.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.setMode('diameter');
+      });
+    }
   }
 
   private bindEvents(): void {
@@ -116,6 +219,15 @@ export class DimensionModal {
         this.apply();
       } else if (e.key === 'Escape') {
         this.close();
+      }
+    });
+
+    window.addEventListener('mousedown', e => {
+      if (this.modalEl.classList.contains('hidden')) return;
+      if (!this.modalEl.contains(e.target as Node)) {
+        if (performance.now() - this.openedTime > 150) {
+          this.apply();
+        }
       }
     });
   }

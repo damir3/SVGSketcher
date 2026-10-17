@@ -427,7 +427,7 @@ export class SketchDocument {
     const p2 = this.points.get(p2Id);
     if (!p1 || !p2) return null;
 
-    const currentDist = targetDist ?? Math.max(1, Math.round(dist(p1, p2)));
+    const currentDist = targetDist ?? Math.max(0.01, Number(dist(p1, p2).toFixed(2)));
     const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset);
     this.addConstraint(c);
     return c;
@@ -579,9 +579,16 @@ export class SketchDocument {
     return c;
   }
 
-  addRadiusConstraint(circleOrArcId: string, targetRadius?: number): RadiusConstraint | null {
+  addRadiusConstraint(
+    circleOrArcId: string,
+    targetRadius?: number,
+    displayMode?: 'radius' | 'diameter'
+  ): RadiusConstraint | null {
+    const isCircle = this.circles.has(circleOrArcId);
     const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
     if (!entity) return null;
+
+    const defaultMode: 'radius' | 'diameter' = displayMode ?? (isCircle ? 'diameter' : 'radius');
 
     // Check if a radius constraint already exists on this circle or arc
     const existing = [...this.constraints.values()].find(
@@ -589,18 +596,35 @@ export class SketchDocument {
     ) as RadiusConstraint | undefined;
 
     if (existing) {
+      if (displayMode !== undefined) {
+        existing.displayMode = displayMode;
+      } else if (!existing.displayMode) {
+        existing.displayMode = defaultMode;
+      }
+
       if (targetRadius !== undefined) {
         this.pushHistory();
         existing.targetRadius = targetRadius;
         existing.value = targetRadius;
-        existing.name = `Radius (${targetRadius.toFixed(1)})`;
+        const mode = existing.displayMode ?? defaultMode;
+        const valStr = mode === 'diameter' ? Number((targetRadius * 2).toFixed(2)) : Number(targetRadius.toFixed(2));
+        existing.name = mode === 'diameter'
+          ? `Diameter (${valStr})`
+          : `Radius (${valStr})`;
         this.solve();
       }
       return existing;
     }
 
-    const r = targetRadius ?? Math.max(1, Math.round(entity.radius));
-    const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r);
+    const r = targetRadius ?? Math.max(0.01, Number(entity.radius.toFixed(2)));
+    const c = new RadiusConstraint(
+      this.nextId('c_rad'),
+      circleOrArcId,
+      r,
+      1.0,
+      undefined,
+      defaultMode
+    );
     this.addConstraint(c);
     return c;
   }

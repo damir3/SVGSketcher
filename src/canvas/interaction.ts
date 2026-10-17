@@ -134,7 +134,6 @@ export class CanvasInteraction {
   private isDraggingConstraint = false;
   private draggedConstraintId: string | null = null;
   private dragConstraintStartScreen: Vec2 | null = null;
-  private dragConstraintClientPos: Vec2 | null = null;
 
   // Dragging history snapshot
   private preDragSnapshot: SketchSnapshot | null = null;
@@ -158,6 +157,7 @@ export class CanvasInteraction {
   // Double click tracking
   private lastClickTime = 0;
   private lastClickPos: Vec2 = { x: 0, y: 0 };
+  private lastDoubleClickedTime = 0;
 
   // Dimension edit callback
   onEditDimension?: (
@@ -327,7 +327,6 @@ export class CanvasInteraction {
     this.isDraggingConstraint = false;
     this.draggedConstraintId = null;
     this.dragConstraintStartScreen = null;
-    this.dragConstraintClientPos = null;
 
     this.preDragSnapshot = null;
     this.hasDragged = false;
@@ -644,6 +643,111 @@ export class CanvasInteraction {
     return foundArc;
   }
 
+  private findConstraintNearScreen(
+    screen: Vec2,
+    thresholdPx = 18
+  ): DistanceConstraint | RadiusConstraint | AngleConstraint | null {
+    let closestDist = thresholdPx;
+    let foundConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | null = null;
+
+    for (const constraint of this.sketch.constraints.values()) {
+      if (constraint instanceof DistanceConstraint) {
+        const p1 = this.sketch.points.get(constraint.p1Id);
+        const p2 = this.sketch.points.get(constraint.p2Id);
+        if (!p1 || !p2) continue;
+
+        const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+        const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+        const dx = s2.x - s1.x;
+        const dy = s2.y - s1.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-4) continue;
+
+        const nx = -dy / len;
+        const ny = dx / len;
+        const screenOffset = constraint.offset !== undefined ? constraint.offset * this.viewport.zoom : 32;
+
+        const d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
+        const d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
+        const proj = projectPointOntoSegment(screen, d1, d2);
+        if (proj.dist < closestDist) {
+          closestDist = proj.dist;
+          foundConstraint = constraint;
+        }
+      } else if (constraint instanceof RadiusConstraint) {
+        const circle = this.sketch.circles.get(constraint.circleId);
+        const arc = this.sketch.arcs.get(constraint.circleId);
+        const entity = circle ?? arc;
+        if (!entity) continue;
+        const center = this.sketch.points.get(entity.centerId);
+        if (!center) continue;
+
+        const sc = this.viewport.worldToScreen(center.x, center.y);
+        const sr = entity.radius * this.viewport.zoom;
+
+        let screenAngle = -Math.PI / 4;
+        if (arc) {
+          const start = this.sketch.points.get(arc.startPointId);
+          const end = this.sketch.points.get(arc.endPointId);
+          if (start && end) {
+            const ss = this.viewport.worldToScreen(start.x, start.y);
+            const se = this.viewport.worldToScreen(end.x, end.y);
+            const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+            const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+            const clockwise = !!arc.clockwise;
+            let sweepAngle = 0;
+            if (clockwise) {
+              sweepAngle = (ae - as) % (2 * Math.PI);
+              if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+              if (constraint.leaderAngle !== undefined) {
+                let rel = (constraint.leaderAngle - as) % (2 * Math.PI);
+                if (rel < 0) rel += 2 * Math.PI;
+                if (rel > sweepAngle) rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
+                screenAngle = as + rel;
+              } else {
+                screenAngle = as + sweepAngle / 2;
+              }
+            } else {
+              sweepAngle = (as - ae) % (2 * Math.PI);
+              if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+              if (constraint.leaderAngle !== undefined) {
+                let rel = (as - constraint.leaderAngle) % (2 * Math.PI);
+                if (rel < 0) rel += 2 * Math.PI;
+                if (rel > sweepAngle) rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
+                screenAngle = as - rel;
+              } else {
+                screenAngle = as - sweepAngle / 2;
+              }
+            }
+          }
+        } else {
+          if (constraint.leaderAngle !== undefined) {
+            screenAngle = constraint.leaderAngle;
+          }
+        }
+
+        const cosA = Math.cos(screenAngle);
+        const sinA = Math.sin(screenAngle);
+        const edge = { x: sc.x + cosA * sr, y: sc.y + sinA * sr };
+        const dirX = cosA >= 0 ? 1 : -1;
+        const dirY = sinA >= 0 ? 1 : -1;
+        const tip = { x: edge.x + dirX * 30, y: edge.y + dirY * 20 };
+
+        const dTip = dist(screen, tip);
+        const dShelf = projectPointOntoSegment(screen, edge, tip).dist;
+        const dRadial = projectPointOntoSegment(screen, sc, edge).dist;
+        const minD = Math.min(dTip, dShelf, dRadial);
+
+        if (minD < closestDist) {
+          closestDist = minD;
+          foundConstraint = constraint;
+        }
+      }
+    }
+
+    return foundConstraint;
+  }
+
   private findEllipseNearScreen(screen: Vec2, thresholdPx = 18): SketchEllipse | null {
     let closestDist = thresholdPx;
     let foundEllipse: SketchEllipse | null = null;
@@ -780,9 +884,12 @@ export class CanvasInteraction {
     const timeDelta = now - this.lastClickTime;
     const distanceDelta = dist(screen, this.lastClickPos);
 
-    if (timeDelta > 40 && timeDelta < 350 && distanceDelta < 28) {
+    if (timeDelta > 10 && timeDelta < 500 && distanceDelta < 30) {
       this.lastClickTime = 0;
       if (this.triggerDimensionEditAt(e, screen, clientPos)) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.lastDoubleClickedTime = now;
         this.cancelDrawing();
         return;
       }
@@ -1007,7 +1114,6 @@ export class CanvasInteraction {
             this.preDragSnapshot = this.sketch.takeSnapshot();
             this.hasDragged = false;
             this.dragConstraintStartScreen = screen;
-            this.dragConstraintClientPos = clientPos;
           }
         }
 
@@ -2376,14 +2482,11 @@ export class CanvasInteraction {
       this.updateCursor();
     }
     if (this.isDraggingConstraint) {
-      const constraintId = this.draggedConstraintId;
-      const clientPos = this.dragConstraintClientPos;
       const hadDragged = this.hasDragged;
 
       this.isDraggingConstraint = false;
       this.draggedConstraintId = null;
       this.dragConstraintStartScreen = null;
-      this.dragConstraintClientPos = null;
 
       if (hadDragged) {
         if (this.preDragSnapshot) {
@@ -2395,12 +2498,6 @@ export class CanvasInteraction {
       } else {
         this.preDragSnapshot = null;
         this.hasDragged = false;
-        if (constraintId && clientPos && this.onEditDimension) {
-          const c = this.sketch.constraints.get(constraintId);
-          if (c instanceof DistanceConstraint || c instanceof AngleConstraint || c instanceof RadiusConstraint) {
-            this.onEditDimension(c, clientPos);
-          }
-        }
       }
       this.updateCursor();
     }
@@ -2423,20 +2520,26 @@ export class CanvasInteraction {
 
     // If target didn't resolve to a line, circle, arc, or constraint, use geometric hit test
     if (!type || (type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'constraint')) {
-      const hitLine = this.findLineNearScreen(screen, 16);
-      if (hitLine) {
-        id = hitLine.id;
-        type = 'line';
+      const hitConstraint = this.findConstraintNearScreen(screen, 18);
+      if (hitConstraint) {
+        id = hitConstraint.id;
+        type = 'constraint';
       } else {
-        const hitCircle = this.findCircleNearScreen(screen, 16);
-        if (hitCircle) {
-          id = hitCircle.id;
-          type = 'circle';
+        const hitLine = this.findLineNearScreen(screen, 18);
+        if (hitLine) {
+          id = hitLine.id;
+          type = 'line';
         } else {
-          const hitArc = this.findArcNearScreen(screen, 16);
-          if (hitArc) {
-            id = hitArc.id;
-            type = 'arc';
+          const hitCircle = this.findCircleNearScreen(screen, 18);
+          if (hitCircle) {
+            id = hitCircle.id;
+            type = 'circle';
+          } else {
+            const hitArc = this.findArcNearScreen(screen, 18);
+            if (hitArc) {
+              id = hitArc.id;
+              type = 'arc';
+            }
           }
         }
       }
@@ -2479,6 +2582,7 @@ export class CanvasInteraction {
         }
       }
     } else if (type === 'circle' || type === 'arc') {
+      const isCircle = this.sketch.circles.has(id);
       const entity = this.sketch.circles.get(id) ?? this.sketch.arcs.get(id);
       if (entity) {
         let radConstraint = [...this.sketch.constraints.values()].find(
@@ -2486,7 +2590,10 @@ export class CanvasInteraction {
         ) as RadiusConstraint | undefined;
 
         if (!radConstraint) {
-          radConstraint = this.sketch.addRadiusConstraint(entity.id) ?? undefined;
+          // Circle defaults to diameter, arc defaults to radius
+          radConstraint =
+            this.sketch.addRadiusConstraint(entity.id, undefined, isCircle ? 'diameter' : 'radius') ??
+            undefined;
         }
 
         if (radConstraint && this.onEditDimension) {
@@ -2502,10 +2609,19 @@ export class CanvasInteraction {
   }
 
   private handleDoubleClick(e: MouseEvent): void {
+    const now = performance.now();
+    if (now - this.lastDoubleClickedTime < 600) {
+      return;
+    }
     this.isSnapModifierPressed = this.isSnapModifier(e);
     const screen = this.getScreenPos(e);
     const clientPos = vec(e.clientX, e.clientY);
-    this.triggerDimensionEditAt(e, screen, clientPos);
+    if (this.triggerDimensionEditAt(e, screen, clientPos)) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.lastDoubleClickedTime = now;
+      this.cancelDrawing();
+    }
   }
 
   private handleDimensionClick(e: MouseEvent, screen: Vec2, clientPos: Vec2): void {

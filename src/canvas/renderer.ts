@@ -765,7 +765,9 @@ export class SVGRenderer {
     g.appendChild(dimLine);
 
     // Text label badge with background
-    const textVal = `${constraint.targetDistance.toFixed(1)}`;
+    const textVal = Number.isInteger(constraint.targetDistance)
+      ? constraint.targetDistance.toFixed(1)
+      : Number(constraint.targetDistance.toFixed(2)).toString();
     const textLen = textVal.length * 8 + 14;
 
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
@@ -1067,7 +1069,10 @@ export class SVGRenderer {
     shelf.setAttribute('stroke-width', '1.5');
     g.appendChild(shelf);
 
-    const textVal = `R ${constraint.targetRadius.toFixed(1)}`;
+    const isDiameter = constraint.displayMode === 'diameter';
+    const num = isDiameter ? constraint.targetRadius * 2 : constraint.targetRadius;
+    const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
+    const textVal = isDiameter ? `Ø ${numStr}` : `R ${numStr}`;
     const textLen = textVal.length * 8 + 14;
 
     const rectX = dirX > 0 ? tip.x : tip.x - textLen;
