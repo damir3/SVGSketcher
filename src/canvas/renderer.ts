@@ -223,10 +223,11 @@ export class SVGRenderer {
       const lineG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       lineG.setAttribute('data-id', line.id);
       lineG.setAttribute('data-type', 'line');
-      lineG.style.cursor = isSelected ? 'grab' : 'pointer';
+      lineG.setAttribute('class', `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''}`);
 
       // Invisible generous hit target (18px wide)
       const hitLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      hitLine.setAttribute('class', 'hit-area');
       hitLine.setAttribute('x1', s1.x.toFixed(1));
       hitLine.setAttribute('y1', s1.y.toFixed(1));
       hitLine.setAttribute('x2', s2.x.toFixed(1));
@@ -240,6 +241,7 @@ export class SVGRenderer {
 
       // Visible line
       const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      lineEl.setAttribute('class', 'entity-visible visible-primitive');
       lineEl.setAttribute('x1', s1.x.toFixed(1));
       lineEl.setAttribute('y1', s1.y.toFixed(1));
       lineEl.setAttribute('x2', s2.x.toFixed(1));
@@ -270,10 +272,11 @@ export class SVGRenderer {
       const circleG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       circleG.setAttribute('data-id', circle.id);
       circleG.setAttribute('data-type', 'circle');
-      circleG.style.cursor = isSelected ? 'grab' : 'pointer';
+      circleG.setAttribute('class', `sketch-entity sketch-circle ${isSelected ? 'is-selected' : ''}`);
 
       // Invisible generous hit target (18px stroke ring)
       const hitCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      hitCircle.setAttribute('class', 'hit-area');
       hitCircle.setAttribute('cx', sc.x.toFixed(1));
       hitCircle.setAttribute('cy', sc.y.toFixed(1));
       hitCircle.setAttribute('r', sr.toFixed(1));
@@ -286,6 +289,7 @@ export class SVGRenderer {
 
       // Visible circle
       const circleEl = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circleEl.setAttribute('class', 'entity-visible visible-primitive');
       circleEl.setAttribute('cx', sc.x.toFixed(1));
       circleEl.setAttribute('cy', sc.y.toFixed(1));
       circleEl.setAttribute('r', sr.toFixed(1));
@@ -338,10 +342,11 @@ export class SVGRenderer {
       const arcG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       arcG.setAttribute('data-id', arc.id);
       arcG.setAttribute('data-type', 'arc');
-      arcG.style.cursor = isSelected ? 'grab' : 'pointer';
+      arcG.setAttribute('class', `sketch-entity sketch-arc ${isSelected ? 'is-selected' : ''}`);
 
       // Invisible generous hit target (18px stroke)
       const hitArc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitArc.setAttribute('class', 'hit-area');
       hitArc.setAttribute('d', d);
       hitArc.setAttribute('fill', 'none');
       hitArc.setAttribute('stroke', 'rgba(0, 0, 0, 0.001)');
@@ -353,6 +358,7 @@ export class SVGRenderer {
 
       // Visible arc path
       const arcEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcEl.setAttribute('class', 'entity-visible visible-primitive');
       arcEl.setAttribute('d', d);
       arcEl.setAttribute('fill', 'none');
       arcEl.setAttribute('stroke', isSelected ? selectedColor : arc.isConstruction ? '#64748b' : baseColor);
@@ -413,10 +419,11 @@ export class SVGRenderer {
       const ellipseG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       ellipseG.setAttribute('data-id', ellipse.id);
       ellipseG.setAttribute('data-type', 'ellipse');
-      ellipseG.style.cursor = isSelected ? 'grab' : 'pointer';
+      ellipseG.setAttribute('class', `sketch-entity sketch-ellipse ${isSelected ? 'is-selected' : ''}`);
 
       // Invisible generous hit target (18px stroke)
       const hitEllipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      hitEllipse.setAttribute('class', 'hit-area');
       hitEllipse.setAttribute('cx', sc.x.toFixed(1));
       hitEllipse.setAttribute('cy', sc.y.toFixed(1));
       hitEllipse.setAttribute('rx', rx.toFixed(1));
@@ -431,6 +438,7 @@ export class SVGRenderer {
 
       // Visible ellipse
       const ellipseEl = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+      ellipseEl.setAttribute('class', 'entity-visible visible-primitive');
       ellipseEl.setAttribute('cx', sc.x.toFixed(1));
       ellipseEl.setAttribute('cy', sc.y.toFixed(1));
       ellipseEl.setAttribute('rx', rx.toFixed(1));
@@ -528,10 +536,11 @@ export class SVGRenderer {
       const arcG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       arcG.setAttribute('data-id', arc.id);
       arcG.setAttribute('data-type', 'elliptical_arc');
-      arcG.style.cursor = isSelected ? 'grab' : 'pointer';
+      arcG.setAttribute('class', `sketch-entity sketch-elliptical-arc ${isSelected ? 'is-selected' : ''}`);
 
       // Invisible generous hit target (18px stroke)
       const hitArc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      hitArc.setAttribute('class', 'hit-area');
       hitArc.setAttribute('d', d);
       hitArc.setAttribute('fill', 'none');
       hitArc.setAttribute('stroke', 'rgba(0, 0, 0, 0.001)');
@@ -543,6 +552,7 @@ export class SVGRenderer {
 
       // Visible arc path
       const arcEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      arcEl.setAttribute('class', 'entity-visible visible-primitive');
       arcEl.setAttribute('d', d);
       arcEl.setAttribute('fill', 'none');
       arcEl.setAttribute('stroke', isSelected ? selectedColor : arc.isConstruction ? '#64748b' : baseColor);
@@ -610,27 +620,27 @@ export class SVGRenderer {
       const ptG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       ptG.setAttribute('data-id', pt.id);
       ptG.setAttribute('data-type', 'point');
-      ptG.style.cursor = isSelected ? 'grab' : 'pointer';
+      ptG.setAttribute('class', `sketch-entity sketch-point ${isSelected ? 'is-selected' : ''}`);
 
       // Invisible larger hit target for easy clicking
       const hitTarget = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      hitTarget.setAttribute('class', 'hit-area');
       hitTarget.setAttribute('cx', s.x.toFixed(1));
       hitTarget.setAttribute('cy', s.y.toFixed(1));
       hitTarget.setAttribute('r', '14');
       hitTarget.setAttribute('fill', 'rgba(0, 0, 0, 0.001)');
       hitTarget.setAttribute('pointer-events', 'all');
       hitTarget.style.pointerEvents = 'all';
-      hitTarget.style.cursor = isSelected ? 'grab' : 'pointer';
       ptG.appendChild(hitTarget);
 
       // Visible point handle
       const pointEl = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      pointEl.setAttribute('class', 'entity-visible visible-point');
       pointEl.setAttribute('cx', s.x.toFixed(1));
       pointEl.setAttribute('cy', s.y.toFixed(1));
       pointEl.setAttribute('r', isSelected ? '6' : '4.5');
       pointEl.setAttribute('pointer-events', 'all');
       pointEl.style.pointerEvents = 'all';
-      pointEl.style.cursor = isSelected ? 'grab' : 'pointer';
 
       let fillColor = '#0284c7'; // Default interactive CAD vertex color
       let strokeColor = '#ffffff';
@@ -760,7 +770,6 @@ export class SVGRenderer {
     g.setAttribute('class', 'dimension-item');
     g.setAttribute('data-id', constraint.id);
     g.setAttribute('data-type', 'constraint');
-    g.style.cursor = 'pointer';
 
     const color = isSelected ? '#0ea5e9' : '#0284c7';
 
@@ -940,7 +949,6 @@ export class SVGRenderer {
     g.setAttribute('class', 'dimension-item');
     g.setAttribute('data-id', constraint.id);
     g.setAttribute('data-type', 'constraint');
-    g.style.cursor = 'pointer';
 
     const color = isSelected ? '#0ea5e9' : '#0284c7';
 
@@ -1078,7 +1086,6 @@ export class SVGRenderer {
     g.setAttribute('class', 'dimension-item');
     g.setAttribute('data-id', constraint.id);
     g.setAttribute('data-type', 'constraint');
-    g.style.cursor = 'pointer';
 
     const color = isSelected ? '#0ea5e9' : '#0284c7';
     const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
@@ -1306,7 +1313,6 @@ export class SVGRenderer {
     g.setAttribute('class', 'constraint-badge');
     g.setAttribute('data-id', id);
     g.setAttribute('data-type', 'constraint');
-    g.style.cursor = 'pointer';
 
     const color = isSelected ? '#0284c7' : customColor ?? '#475569';
     const width = Math.max(18, label.length * 8 + 8);
@@ -1865,33 +1871,9 @@ export class SVGRenderer {
     }
   }
 
-  renderDragLine(s1: Vec2, s2: Vec2): void {
+  renderDragLine(_s1: Vec2, _s2: Vec2): void {
+    // Disabled: user requested not to display dashed displacement line or old ghost anchor dot
     this.overlayGroup.innerHTML = '';
-
-    // Initial origin anchor dot
-    const anchor = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    anchor.setAttribute('cx', s1.x.toFixed(1));
-    anchor.setAttribute('cy', s1.y.toFixed(1));
-    anchor.setAttribute('r', '4');
-    anchor.setAttribute('fill', '#0284c7');
-    anchor.setAttribute('stroke', '#ffffff');
-    anchor.setAttribute('stroke-width', '1.5');
-    anchor.setAttribute('pointer-events', 'none');
-    anchor.style.pointerEvents = 'none';
-    this.overlayGroup.appendChild(anchor);
-
-    // Dashed displacement line
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', s1.x.toFixed(1));
-    line.setAttribute('y1', s1.y.toFixed(1));
-    line.setAttribute('x2', s2.x.toFixed(1));
-    line.setAttribute('y2', s2.y.toFixed(1));
-    line.setAttribute('stroke', '#0284c7');
-    line.setAttribute('stroke-width', '1.5');
-    line.setAttribute('stroke-dasharray', '4,4');
-    line.setAttribute('pointer-events', 'none');
-    line.style.pointerEvents = 'none';
-    this.overlayGroup.appendChild(line);
   }
 
   clearPreviews(): void {

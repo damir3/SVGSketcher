@@ -436,6 +436,7 @@ export class CanvasInteraction {
 
     this.preDragSnapshot = null;
     this.hasDragged = false;
+    this.svg.classList.remove('is-dragging');
 
     this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 
@@ -1154,6 +1155,7 @@ export class CanvasInteraction {
         this.sketch.selectEntity(id, type, e.shiftKey);
 
         if (type === 'point') {
+          this.renderer.clearPreviews();
           this.isDraggingPoint = true;
           this.draggedPointId = id;
           this.preDragSnapshot = this.sketch.takeSnapshot();
@@ -1260,6 +1262,7 @@ export class CanvasInteraction {
           }
         }
 
+        this.svg.classList.add('is-dragging');
         this.render();
       } else {
         // Clicked background -> clear selection
@@ -1919,7 +1922,6 @@ export class CanvasInteraction {
         this.hasDragged = true;
       }
       if (this.hasDragged) {
-        this.svg.style.cursor = 'grabbing';
         const constraint = this.sketch.constraints.get(this.draggedConstraintId);
         if (constraint instanceof DistanceConstraint) {
           const p1 = this.sketch.points.get(constraint.p1Id);
@@ -1995,18 +1997,14 @@ export class CanvasInteraction {
     // Drag point handling (Live solver calculation!)
     if (this.isDraggingPoint && this.draggedPointId && this.dragPointStartWorld) {
       this.hasDragged = true;
-      this.svg.style.cursor = 'grabbing';
       const snap = this.findSnap(screen, this.draggedPointId);
       const targetWorld = snap ? snap.worldPos : world;
       this.sketch.dragPoint(this.draggedPointId, targetWorld.x, targetWorld.y);
       this.render();
-      const pt = this.sketch.points.get(this.draggedPointId);
-      const s1 = this.viewport.worldToScreen(this.dragPointStartWorld.x, this.dragPointStartWorld.y);
-      const s2 = this.viewport.worldToScreen(pt ? pt.x : targetWorld.x, pt ? pt.y : targetWorld.y);
-      // Draw dashed line from original point to current dragged position
-      this.renderer.renderDragLine(s1, s2);
       if (snap) {
-        this.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
+        this.renderer.renderSnapIndicator(snap.screenPos, snap.type, true);
+      } else {
+        this.renderer.clearPreviews();
       }
       return;
     }
@@ -2020,7 +2018,6 @@ export class CanvasInteraction {
       this.lineP2Start
     ) {
       this.hasDragged = true;
-      this.svg.style.cursor = 'grabbing';
       const dx = world.x - this.dragLineStartWorld.x;
       const dy = world.y - this.dragLineStartWorld.y;
       this.sketch.dragLine(
@@ -2042,7 +2039,6 @@ export class CanvasInteraction {
       this.circleCenterStart
     ) {
       this.hasDragged = true;
-      this.svg.style.cursor = 'grabbing';
       const circle = this.sketch.circles.get(this.draggedCircleId);
       const center = circle ? this.sketch.points.get(circle.centerId) : null;
       const isFixed = center ? this.sketch.isPointFixed(center.id) : false;
@@ -2062,12 +2058,6 @@ export class CanvasInteraction {
           this.circleCenterStart.y + dy
         );
         this.render();
-
-        if (center) {
-          const s1 = this.viewport.worldToScreen(this.circleCenterStart.x, this.circleCenterStart.y);
-          const s2 = this.viewport.worldToScreen(center.x, center.y);
-          this.renderer.renderDragLine(s1, s2);
-        }
       }
       return;
     }
@@ -2082,7 +2072,6 @@ export class CanvasInteraction {
       this.arcEndPointStart
     ) {
       this.hasDragged = true;
-      this.svg.style.cursor = 'grabbing';
       const dx = world.x - this.dragArcStartWorld.x;
       const dy = world.y - this.dragArcStartWorld.y;
 
@@ -2119,7 +2108,6 @@ export class CanvasInteraction {
       this.ellipseMinorPointStart
     ) {
       this.hasDragged = true;
-      this.svg.style.cursor = 'grabbing';
       const dx = world.x - this.dragEllipseStartWorld.x;
       const dy = world.y - this.dragEllipseStartWorld.y;
 
@@ -2158,7 +2146,6 @@ export class CanvasInteraction {
       this.ellipticalArcEndPointStart
     ) {
       this.hasDragged = true;
-      this.svg.style.cursor = 'grabbing';
       const dx = world.x - this.dragEllipticalArcStartWorld.x;
       const dy = world.y - this.dragEllipticalArcStartWorld.y;
 
@@ -2524,6 +2511,7 @@ export class CanvasInteraction {
     if (e) {
       this.isSnapModifierPressed = this.isSnapModifier(e);
     }
+    this.svg.classList.remove('is-dragging');
     if (this.isPanning) {
       this.isPanning = false;
       this.updateCursor();

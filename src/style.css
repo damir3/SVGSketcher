@@ -309,6 +309,68 @@ html, body {
   height: 100%;
   display: block;
   background-color: #ffffff;
+  cursor: default;
+}
+
+/* CAD Canvas Primitives Cursor & Highlighting */
+#cad-svg .sketch-entity,
+#cad-svg .dimension-item,
+#cad-svg .constraint-badge {
+  cursor: default;
+}
+
+#cad-svg .visible-primitive {
+  transition: stroke 0.08s ease, stroke-width 0.08s ease;
+}
+
+#cad-svg .visible-point {
+  transition: fill 0.08s ease, stroke 0.08s ease, r 0.08s ease;
+}
+
+/* Hover highlighting on unselected primitives when not dragging */
+#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected):hover .visible-primitive {
+  stroke: #0ea5e9 !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45));
+}
+
+/* Hover highlighting on unselected points */
+#cad-svg:not(.is-dragging) .sketch-point:not(.is-selected):hover .visible-point {
+  fill: #38bdf8 !important;
+  stroke: #ffffff !important;
+  r: 6.5px !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.8));
+}
+
+/* Hover highlighting on already selected primitives */
+#cad-svg:not(.is-dragging) .sketch-entity.is-selected:hover .visible-primitive {
+  stroke: #38bdf8 !important;
+  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
+}
+
+#cad-svg:not(.is-dragging) .sketch-point.is-selected:hover .visible-point {
+  fill: #7dd3fc !important;
+  r: 7.5px !important;
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9));
+}
+
+/* Hover highlighting on dimension annotations */
+#cad-svg:not(.is-dragging) .dimension-item:hover line {
+  stroke: #0ea5e9 !important;
+}
+
+#cad-svg:not(.is-dragging) .dimension-item:hover rect {
+  stroke: #0ea5e9 !important;
+  filter: drop-shadow(0 0 2px rgba(14, 165, 233, 0.4));
+}
+
+#cad-svg:not(.is-dragging) .dimension-item:hover text {
+  fill: #0ea5e9 !important;
+}
+
+#cad-svg:not(.is-dragging) .constraint-badge:hover rect {
+  stroke: #0ea5e9 !important;
+  filter: drop-shadow(0 0 2px rgba(14, 165, 233, 0.4));
 }
 
 /* --- RIGHT SIDEBAR --- */
