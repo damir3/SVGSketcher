@@ -4,7 +4,7 @@ import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
 import { dist, vec, projectPointOntoSegment, getCircumcircle, type Vec2 } from '../math/vector';
 import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
-import type { SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
+import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
 
 export type ConstraintToolType =
@@ -63,6 +63,88 @@ export interface SnapResult {
   lineId?: string;
   worldPos: Vec2;
   screenPos: Vec2;
+}
+
+export function determineDistanceOrientation(
+  s1: Vec2,
+  s2: Vec2,
+  cursor: Vec2
+): {
+  orientation: 'aligned' | 'horizontal' | 'vertical';
+  offsetScreen: number;
+} {
+  const dx = s2.x - s1.x;
+  const dy = s2.y - s1.y;
+  const len = Math.hypot(dx, dy);
+
+  const midX = (s1.x + s2.x) * 0.5;
+  const midY = (s1.y + s2.y) * 0.5;
+  const vx = cursor.x - midX;
+  const vy = cursor.y - midY;
+
+  // If points are nearly horizontal (|dy| < 5px), only horizontal makes sense
+  if (Math.abs(dy) < 5) {
+    return {
+      orientation: 'horizontal',
+      offsetScreen: vy,
+    };
+  }
+
+  // If points are nearly vertical (|dx| < 5px), only vertical makes sense
+  if (Math.abs(dx) < 5) {
+    return {
+      orientation: 'vertical',
+      offsetScreen: vx,
+    };
+  }
+
+  if (len < 1e-4) {
+    return { orientation: 'aligned', offsetScreen: 0 };
+  }
+
+  const nx = -dy / len;
+  const ny = dx / len;
+  const normalOffset = vx * nx + vy * ny;
+
+  // Angle of cursor from midpoint in degrees (-180 to 180)
+  // -90° is UP, +90° is DOWN, 0° is RIGHT, ±180° is LEFT
+  const theta = (Math.atan2(vy, vx) * 180) / Math.PI;
+
+  // Angle of line and line normal in degrees
+  const lineAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const norm1 = lineAngle + 90;
+  const norm2 = lineAngle - 90;
+
+  const angleDiff = (a: number, b: number): number => {
+    let d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
+  };
+
+  const diffNormal = Math.min(angleDiff(theta, norm1), angleDiff(theta, norm2));
+  const diffVertical = Math.min(angleDiff(theta, 90), angleDiff(theta, -90));
+  const diffHorizontal = Math.min(angleDiff(theta, 0), angleDiff(theta, 180));
+
+  // If cursor is pulled close to perpendicular to the line (within ±22°), it's aligned
+  if (diffNormal < 22) {
+    return {
+      orientation: 'aligned',
+      offsetScreen: normalOffset,
+    };
+  }
+
+  // Compare whether cursor is pulled more towards vertical (UP/DOWN => horizontal dimension)
+  // or horizontal (LEFT/RIGHT => vertical dimension)
+  if (diffVertical < diffHorizontal) {
+    return {
+      orientation: 'horizontal',
+      offsetScreen: vy,
+    };
+  } else {
+    return {
+      orientation: 'vertical',
+      offsetScreen: vx,
+    };
+  }
 }
 
 export class CanvasInteraction {
@@ -169,12 +251,14 @@ export class CanvasInteraction {
   isSnappingEnabled = true;
   onSnappingChange?: (active: boolean) => void;
 
-  // Dimension tool multi-step state: 0 = pick line 1, 1 = pick offset or line 2, 2 = pick angle arc radius
+  // Dimension tool multi-step state: 0 = pick first entity, 1 = pick second entity / offset, 2 = place dimension / pick angle radius
   private dimensionState: {
     step: 0 | 1 | 2;
     line1Id: string | null;
     line2Id: string | null;
-  } = { step: 0, line1Id: null, line2Id: null };
+    point1Id: string | null;
+    point2Id: string | null;
+  } = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 
   constructor(
     svg: SVGSVGElement,
@@ -199,6 +283,8 @@ export class CanvasInteraction {
           step: 1,
           line1Id: [...this.sketch.selection.lineIds][0],
           line2Id: null,
+          point1Id: null,
+          point2Id: null,
         };
       } else if (this.sketch.selection.lineIds.size === 2) {
         const [l1, l2] = [...this.sketch.selection.lineIds];
@@ -206,9 +292,29 @@ export class CanvasInteraction {
           step: 2,
           line1Id: l1,
           line2Id: l2,
+          point1Id: null,
+          point2Id: null,
+        };
+      } else if (this.sketch.selection.pointIds.size === 2) {
+        const [p1, p2] = [...this.sketch.selection.pointIds];
+        this.dimensionState = {
+          step: 2,
+          line1Id: null,
+          line2Id: null,
+          point1Id: p1,
+          point2Id: p2,
+        };
+      } else if (this.sketch.selection.pointIds.size === 1) {
+        const [p1] = [...this.sketch.selection.pointIds];
+        this.dimensionState = {
+          step: 1,
+          line1Id: null,
+          line2Id: null,
+          point1Id: p1,
+          point2Id: null,
         };
       } else {
-        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
       }
     }
     if (isConstraintTool(tool)) {
@@ -331,7 +437,7 @@ export class CanvasInteraction {
     this.preDragSnapshot = null;
     this.hasDragged = false;
 
-    this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+    this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 
     this.renderer.clearPreviews();
   }
@@ -370,7 +476,7 @@ export class CanvasInteraction {
       }
       if (e.key === 'Escape') {
         if (this.activeTool === 'dimension' && this.dimensionState.step > 0) {
-          this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+          this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
           this.sketch.clearSelection();
           this.renderer.clearPreviews();
           this.render();
@@ -430,10 +536,10 @@ export class CanvasInteraction {
     return vec(e.clientX - rect.left, e.clientY - rect.top);
   }
 
-  private findSnappedPoint(screenPos: Vec2, excludePointId?: string): { id: string; worldPos: Vec2 } | null {
+  private findSnappedPoint(screenPos: Vec2, excludePointId?: string): { id: string; worldPos: Vec2; screenPos: Vec2 } | null {
     const snap = this.findSnap(screenPos, excludePointId);
     if (snap && snap.type === 'point' && snap.id) {
-      return { id: snap.id, worldPos: snap.worldPos };
+      return { id: snap.id, worldPos: snap.worldPos, screenPos: snap.screenPos };
     }
     return null;
   }
@@ -533,6 +639,22 @@ export class CanvasInteraction {
     }
 
     return null;
+  }
+
+  private findPointNearScreen(screen: Vec2, thresholdPx = 16): SketchPoint | null {
+    let closestDist = thresholdPx;
+    let foundPoint: SketchPoint | null = null;
+
+    for (const pt of this.sketch.points.values()) {
+      const s = this.viewport.worldToScreen(pt.x, pt.y);
+      const d = dist(screen, s);
+      if (d < closestDist) {
+        closestDist = d;
+        foundPoint = pt;
+      }
+    }
+
+    return foundPoint;
   }
 
   private findLineNearScreen(screen: Vec2, thresholdPx = 16): SketchLine | null {
@@ -658,17 +780,30 @@ export class CanvasInteraction {
 
         const s1 = this.viewport.worldToScreen(p1.x, p1.y);
         const s2 = this.viewport.worldToScreen(p2.x, p2.y);
-        const dx = s2.x - s1.x;
-        const dy = s2.y - s1.y;
-        const len = Math.hypot(dx, dy);
-        if (len < 1e-4) continue;
-
-        const nx = -dy / len;
-        const ny = dx / len;
         const screenOffset = constraint.offset !== undefined ? constraint.offset * this.viewport.zoom : 32;
 
-        const d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
-        const d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
+        let d1: Vec2;
+        let d2: Vec2;
+        if (constraint.orientation === 'horizontal') {
+          const midY = (s1.y + s2.y) * 0.5;
+          d1 = { x: s1.x, y: midY + screenOffset };
+          d2 = { x: s2.x, y: midY + screenOffset };
+        } else if (constraint.orientation === 'vertical') {
+          const midX = (s1.x + s2.x) * 0.5;
+          d1 = { x: midX + screenOffset, y: s1.y };
+          d2 = { x: midX + screenOffset, y: s2.y };
+        } else {
+          const dx = s2.x - s1.x;
+          const dy = s2.y - s1.y;
+          const len = Math.hypot(dx, dy);
+          if (len < 1e-4) continue;
+
+          const nx = -dy / len;
+          const ny = dx / len;
+          d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
+          d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
+        }
+
         const proj = projectPointOntoSegment(screen, d1, d2);
         if (proj.dist < closestDist) {
           closestDist = proj.dist;
@@ -913,8 +1048,12 @@ export class CanvasInteraction {
       let id = targetG?.getAttribute('data-id');
       let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | undefined;
 
-      // Fallback geometric hit test if clicking close to point, line, circle, arc, ellipse, or elliptical arc
-      if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'ellipse' && type !== 'elliptical_arc')) {
+      // Priority 1: Points ALWAYS have top priority when clicking near a point!
+      const nearPoint = this.findPointNearScreen(screen, 16);
+      if (nearPoint) {
+        id = nearPoint.id;
+        type = 'point';
+      } else if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'ellipse' && type !== 'elliptical_arc')) {
         if (snap && snap.type === 'point' && snap.id) {
           id = snap.id;
           type = 'point';
@@ -968,8 +1107,12 @@ export class CanvasInteraction {
       let id = targetG?.getAttribute('data-id');
       let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint' | undefined;
 
-      // Fallback geometric hit test if clicking close to point, line, circle, arc, ellipse, or elliptical arc
-      if (!type) {
+      // Priority 1: Points ALWAYS have top priority! If cursor is near any point, select & drag the point!
+      const nearPoint = this.findPointNearScreen(screen, 16);
+      if (nearPoint) {
+        id = nearPoint.id;
+        type = 'point';
+      } else if (!type) {
         if (snap && snap.type === 'point' && snap.id) {
           id = snap.id;
           type = 'point';
@@ -1784,17 +1927,27 @@ export class CanvasInteraction {
           if (p1 && p2) {
             const s1 = this.viewport.worldToScreen(p1.x, p1.y);
             const s2 = this.viewport.worldToScreen(p2.x, p2.y);
-            const dx = s2.x - s1.x;
-            const dy = s2.y - s1.y;
-            const len = Math.hypot(dx, dy);
-            if (len > 1e-4) {
-              const nx = -dy / len;
-              const ny = dx / len;
-              const midX = (s1.x + s2.x) * 0.5;
-              const midY = (s1.y + s2.y) * 0.5;
-              const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
+            const midX = (s1.x + s2.x) * 0.5;
+            const midY = (s1.y + s2.y) * 0.5;
+            if (constraint.orientation === 'horizontal') {
+              const screenOffset = screen.y - midY;
               constraint.offset = screenOffset / this.viewport.zoom;
               this.render();
+            } else if (constraint.orientation === 'vertical') {
+              const screenOffset = screen.x - midX;
+              constraint.offset = screenOffset / this.viewport.zoom;
+              this.render();
+            } else {
+              const dx = s2.x - s1.x;
+              const dy = s2.y - s1.y;
+              const len = Math.hypot(dx, dy);
+              if (len > 1e-4) {
+                const nx = -dy / len;
+                const ny = dx / len;
+                const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
+                constraint.offset = screenOffset / this.viewport.zoom;
+                this.render();
+              }
             }
           }
         } else if (constraint instanceof AngleConstraint) {
@@ -2303,17 +2456,45 @@ export class CanvasInteraction {
 
     // Dimension tool live preview
     if (this.activeTool === 'dimension') {
+      let p1Id: string | null = null;
+      let p2Id: string | null = null;
+
       if (this.dimensionState.step === 1 && this.dimensionState.line1Id) {
         const l1 = this.sketch.lines.get(this.dimensionState.line1Id);
         if (l1) {
-          const p1 = this.sketch.points.get(l1.p1Id);
-          const p2 = this.sketch.points.get(l1.p2Id);
-          if (p1 && p2) {
-            const s1 = this.viewport.worldToScreen(p1.x, p1.y);
-            const s2 = this.viewport.worldToScreen(p2.x, p2.y);
-            const currentDist = dist(p1, p2);
-            this.renderer.renderDistancePreview(s1, s2, screen, currentDist);
+          p1Id = l1.p1Id;
+          p2Id = l1.p2Id;
+        }
+      } else if (this.dimensionState.step === 2 && this.dimensionState.point1Id && this.dimensionState.point2Id) {
+        p1Id = this.dimensionState.point1Id;
+        p2Id = this.dimensionState.point2Id;
+      } else if (this.dimensionState.step === 1 && this.dimensionState.point1Id) {
+        const p1 = this.sketch.points.get(this.dimensionState.point1Id);
+        if (p1) {
+          const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+          const snapPt = this.findSnappedPoint(screen, this.dimensionState.point1Id);
+          const targetScreen = snapPt ? snapPt.screenPos : screen;
+          const targetWorld = snapPt ? snapPt.worldPos : world;
+          const currentDist = dist(p1, targetWorld);
+          const angleDeg = ((Math.atan2(targetWorld.y - p1.y, targetWorld.x - p1.x) * 180) / Math.PI + 360) % 360;
+          this.renderer.renderLinePreview(s1, targetScreen, currentDist, angleDeg);
+        }
+      }
+
+      if (p1Id && p2Id) {
+        const p1 = this.sketch.points.get(p1Id);
+        const p2 = this.sketch.points.get(p2Id);
+        if (p1 && p2) {
+          const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+          const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+          const { orientation } = determineDistanceOrientation(s1, s2, screen);
+          let currentDist = dist(p1, p2);
+          if (orientation === 'horizontal') {
+            currentDist = Math.abs(p2.x - p1.x);
+          } else if (orientation === 'vertical') {
+            currentDist = Math.abs(p2.y - p1.y);
           }
+          this.renderer.renderDistancePreview(s1, s2, screen, currentDist, orientation);
         }
       } else if (this.dimensionState.step === 2 && this.dimensionState.line1Id && this.dimensionState.line2Id) {
         const l1 = this.sketch.lines.get(this.dimensionState.line1Id);
@@ -2633,6 +2814,15 @@ export class CanvasInteraction {
     let id = targetG?.getAttribute('data-id');
     let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
 
+    // Priority 1: When selecting points in step 0 or step 1, points ALWAYS have top priority!
+    if (this.dimensionState.step === 0 || this.dimensionState.step === 1) {
+      const nearPoint = this.findPointNearScreen(screen, 16);
+      if (nearPoint) {
+        id = nearPoint.id;
+        type = 'point';
+      }
+    }
+
     // Geometric hit test fallback if not clicking directly on entity
     if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc')) {
       if (snap) {
@@ -2659,12 +2849,25 @@ export class CanvasInteraction {
       }
     }
 
-    // STEP 0: Select first line or circle/arc
+    // If waiting for second point in step 1, snap to point has priority
+    if (this.dimensionState.step === 1 && this.dimensionState.point1Id) {
+      if (snap && snap.id !== this.dimensionState.point1Id) {
+        id = snap.id;
+        type = 'point';
+      }
+    }
+
+    // STEP 0: Select first entity (point, line, or circle/arc)
     if (this.dimensionState.step === 0) {
-      if (type === 'line' && id) {
+      if (type === 'point' && id) {
+        this.sketch.clearSelection();
+        this.sketch.selectEntity(id, 'point', false);
+        this.dimensionState = { step: 1, line1Id: null, line2Id: null, point1Id: id, point2Id: null };
+        this.render();
+      } else if (type === 'line' && id) {
         this.sketch.clearSelection();
         this.sketch.selectEntity(id, 'line', false);
-        this.dimensionState = { step: 1, line1Id: id, line2Id: null };
+        this.dimensionState = { step: 1, line1Id: id, line2Id: null, point1Id: null, point2Id: null };
         this.render();
       } else if ((type === 'circle' || type === 'arc') && id) {
         const existed = this.sketch.hasRadiusConstraint(id);
@@ -2680,20 +2883,35 @@ export class CanvasInteraction {
         }
       } else {
         this.sketch.clearSelection();
-        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
         this.renderer.clearPreviews();
         this.render();
       }
       return;
     }
 
-    // STEP 1: First line was selected.
-    // If 2nd click on another line -> Angle constraint mode (step 2)
-    // If 2nd click in empty space/near line -> Distance constraint with offset!
+    // STEP 1: First point OR first line was selected
     if (this.dimensionState.step === 1) {
+      // Subcase 1: First point was selected. Now picking second point!
+      if (this.dimensionState.point1Id) {
+        if (type === 'point' && id && id !== this.dimensionState.point1Id) {
+          this.sketch.selectEntity(id, 'point', true);
+          this.dimensionState = {
+            step: 2,
+            line1Id: null,
+            line2Id: null,
+            point1Id: this.dimensionState.point1Id,
+            point2Id: id,
+          };
+          this.render();
+        }
+        return;
+      }
+
+      // Subcase 2: First line was selected.
       const l1 = this.dimensionState.line1Id ? this.sketch.lines.get(this.dimensionState.line1Id) : null;
       if (!l1) {
-        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
         this.renderer.clearPreviews();
         this.render();
         return;
@@ -2702,34 +2920,30 @@ export class CanvasInteraction {
       // If clicked on another line -> switch to Angle constraint mode!
       if (type === 'line' && id && id !== l1.id) {
         this.sketch.selectEntity(id, 'line', true);
-        this.dimensionState = { step: 2, line1Id: l1.id, line2Id: id };
+        this.dimensionState = { step: 2, line1Id: l1.id, line2Id: id, point1Id: null, point2Id: null };
         this.render();
         return;
       }
 
-      // Second click sets perpendicular offset for distance constraint
+      // Second click sets offset & orientation for line distance constraint
       const p1 = this.sketch.points.get(l1.p1Id);
       const p2 = this.sketch.points.get(l1.p2Id);
       if (p1 && p2) {
         const s1 = this.viewport.worldToScreen(p1.x, p1.y);
         const s2 = this.viewport.worldToScreen(p2.x, p2.y);
-        const dx = s2.x - s1.x;
-        const dy = s2.y - s1.y;
-        const len = Math.hypot(dx, dy);
-        let offsetWorld = 20;
-        if (len > 1e-4) {
-          const nx = -dy / len;
-          const ny = dx / len;
-          const midX = (s1.x + s2.x) * 0.5;
-          const midY = (s1.y + s2.y) * 0.5;
-          const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
-          offsetWorld = screenOffset / this.viewport.zoom;
-        }
+        const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
+        const offsetWorld = offsetScreen / this.viewport.zoom;
 
-        const c = this.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld);
+        const c = this.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld, orientation);
         if (c) {
-          showToast('Distance constraint applied');
-          this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+          const toastMsg =
+            orientation === 'horizontal'
+              ? 'Horizontal distance constraint applied'
+              : orientation === 'vertical'
+              ? 'Vertical distance constraint applied'
+              : 'Distance constraint applied';
+          showToast(toastMsg);
+          this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
           this.renderer.clearPreviews();
           this.sketch.clearSelection();
           this.render();
@@ -2741,12 +2955,50 @@ export class CanvasInteraction {
       return;
     }
 
-    // STEP 2: Two lines selected. 3rd click specifies the display radius for angle constraint!
+    // STEP 2: Either two points were selected OR two lines were selected
     if (this.dimensionState.step === 2) {
+      // Subcase 1: Two points selected! 3rd click sets offset & places distance constraint!
+      if (this.dimensionState.point1Id && this.dimensionState.point2Id) {
+        const p1 = this.sketch.points.get(this.dimensionState.point1Id);
+        const p2 = this.sketch.points.get(this.dimensionState.point2Id);
+        if (p1 && p2) {
+          const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+          const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+          const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
+          const offsetWorld = offsetScreen / this.viewport.zoom;
+
+          const c = this.sketch.addDistanceConstraint(
+            this.dimensionState.point1Id,
+            this.dimensionState.point2Id,
+            undefined,
+            offsetWorld,
+            orientation
+          );
+          if (c) {
+            const toastMsg =
+              orientation === 'horizontal'
+                ? 'Horizontal distance constraint applied'
+                : orientation === 'vertical'
+                ? 'Vertical distance constraint applied'
+                : 'Distance constraint applied';
+            showToast(toastMsg);
+            this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+            this.renderer.clearPreviews();
+            this.sketch.clearSelection();
+            this.render();
+            if (this.onEditDimension) {
+              this.onEditDimension(c, clientPos);
+            }
+          }
+        }
+        return;
+      }
+
+      // Subcase 2: Two lines selected (Angle mode)
       const l1 = this.dimensionState.line1Id ? this.sketch.lines.get(this.dimensionState.line1Id) : null;
       const l2 = this.dimensionState.line2Id ? this.sketch.lines.get(this.dimensionState.line2Id) : null;
       if (!l1 || !l2) {
-        this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+        this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
         this.renderer.clearPreviews();
         this.render();
         return;
@@ -2762,7 +3014,7 @@ export class CanvasInteraction {
         const c = this.sketch.addAngleConstraint(l1.id, l2.id, undefined, arcRadiusWorld, world);
         if (c) {
           showToast('Angle constraint applied');
-          this.dimensionState = { step: 0, line1Id: null, line2Id: null };
+          this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
           this.renderer.clearPreviews();
           this.sketch.clearSelection();
           this.render();

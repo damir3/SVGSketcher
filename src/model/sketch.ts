@@ -421,14 +421,22 @@ export class SketchDocument {
     p1Id: string,
     p2Id: string,
     targetDist?: number,
-    offset?: number
+    offset?: number,
+    orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned'
   ): DistanceConstraint | null {
     const p1 = this.points.get(p1Id);
     const p2 = this.points.get(p2Id);
     if (!p1 || !p2) return null;
 
-    const currentDist = targetDist ?? Math.max(0.01, Number(dist(p1, p2).toFixed(2)));
-    const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset);
+    let measured = dist(p1, p2);
+    if (orientation === 'horizontal') {
+      measured = Math.abs(p2.x - p1.x);
+    } else if (orientation === 'vertical') {
+      measured = Math.abs(p2.y - p1.y);
+    }
+
+    const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
+    const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset, orientation);
     this.addConstraint(c);
     return c;
   }

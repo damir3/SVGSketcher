@@ -31,6 +31,7 @@ export class SVGRenderer {
   private gridGroup: SVGGElement;
   private geometryGroup: SVGGElement;
   private constraintGroup: SVGGElement;
+  private pointGroup: SVGGElement;
   private previewGroup: SVGGElement;
   private overlayGroup: SVGGElement;
 
@@ -48,6 +49,7 @@ export class SVGRenderer {
 
     this.geometryGroup = this.createGroup('geometry-layer');
     this.constraintGroup = this.createGroup('constraint-layer');
+    this.pointGroup = this.createGroup('point-layer');
 
     this.previewGroup = this.createGroup('preview-layer');
     this.previewGroup.style.pointerEvents = 'none';
@@ -58,6 +60,7 @@ export class SVGRenderer {
     this.svg.appendChild(this.gridGroup);
     this.svg.appendChild(this.geometryGroup);
     this.svg.appendChild(this.constraintGroup);
+    this.svg.appendChild(this.pointGroup);
     this.svg.appendChild(this.previewGroup);
     this.svg.appendChild(this.overlayGroup);
   }
@@ -198,6 +201,7 @@ export class SVGRenderer {
 
   private renderGeometry(sketch: SketchDocument, viewport: Viewport): void {
     this.geometryGroup.innerHTML = '';
+    this.pointGroup.innerHTML = '';
 
     const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
     const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
@@ -647,7 +651,7 @@ export class SVGRenderer {
       pointEl.setAttribute('stroke-width', '2');
       ptG.appendChild(pointEl);
 
-      this.geometryGroup.appendChild(ptG);
+      this.pointGroup.appendChild(ptG);
     }
   }
 
@@ -710,19 +714,47 @@ export class SVGRenderer {
     const s1 = viewport.worldToScreen(p1.x, p1.y);
     const s2 = viewport.worldToScreen(p2.x, p2.y);
 
-    const dx = s2.x - s1.x;
-    const dy = s2.y - s1.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-4) return;
-
-    // Normal vector perpendicular to the line (offset dimension line)
-    const nx = -dy / len;
-    const ny = dx / len;
+    const orientation = constraint.orientation ?? 'aligned';
     const screenOffset = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 32;
 
-    const d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
-    const d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
-    const mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
+    let d1: Vec2;
+    let d2: Vec2;
+    let extEnd1: Vec2;
+    let extEnd2: Vec2;
+    let mid: Vec2;
+
+    if (orientation === 'horizontal') {
+      const midY = (s1.y + s2.y) * 0.5;
+      const dimY = midY + screenOffset;
+      d1 = { x: s1.x, y: dimY };
+      d2 = { x: s2.x, y: dimY };
+      const extDir = screenOffset >= 0 ? 1 : -1;
+      extEnd1 = { x: s1.x, y: dimY + extDir * 5 };
+      extEnd2 = { x: s2.x, y: dimY + extDir * 5 };
+      mid = { x: (d1.x + d2.x) * 0.5, y: dimY };
+    } else if (orientation === 'vertical') {
+      const midX = (s1.x + s2.x) * 0.5;
+      const dimX = midX + screenOffset;
+      d1 = { x: dimX, y: s1.y };
+      d2 = { x: dimX, y: s2.y };
+      const extDir = screenOffset >= 0 ? 1 : -1;
+      extEnd1 = { x: dimX + extDir * 5, y: s1.y };
+      extEnd2 = { x: dimX + extDir * 5, y: s2.y };
+      mid = { x: dimX, y: (d1.y + d2.y) * 0.5 };
+    } else {
+      const dx = s2.x - s1.x;
+      const dy = s2.y - s1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-4) return;
+
+      const nx = -dy / len;
+      const ny = dx / len;
+      d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
+      d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
+      extEnd1 = { x: d1.x + nx * 5, y: d1.y + ny * 5 };
+      extEnd2 = { x: d2.x + nx * 5, y: d2.y + ny * 5 };
+      mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
+    }
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.setAttribute('class', 'dimension-item');
@@ -736,19 +768,21 @@ export class SVGRenderer {
     const extLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     extLine1.setAttribute('x1', s1.x.toFixed(1));
     extLine1.setAttribute('y1', s1.y.toFixed(1));
-    extLine1.setAttribute('x2', (d1.x + nx * 5).toFixed(1));
-    extLine1.setAttribute('y2', (d1.y + ny * 5).toFixed(1));
+    extLine1.setAttribute('x2', extEnd1.x.toFixed(1));
+    extLine1.setAttribute('y2', extEnd1.y.toFixed(1));
     extLine1.setAttribute('stroke', 'rgba(2, 132, 199, 0.45)');
     extLine1.setAttribute('stroke-width', '1');
+    extLine1.style.pointerEvents = 'none';
     g.appendChild(extLine1);
 
     const extLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     extLine2.setAttribute('x1', s2.x.toFixed(1));
     extLine2.setAttribute('y1', s2.y.toFixed(1));
-    extLine2.setAttribute('x2', (d2.x + nx * 5).toFixed(1));
-    extLine2.setAttribute('y2', (d2.y + ny * 5).toFixed(1));
+    extLine2.setAttribute('x2', extEnd2.x.toFixed(1));
+    extLine2.setAttribute('y2', extEnd2.y.toFixed(1));
     extLine2.setAttribute('stroke', 'rgba(2, 132, 199, 0.45)');
     extLine2.setAttribute('stroke-width', '1');
+    extLine2.style.pointerEvents = 'none';
     g.appendChild(extLine2);
 
     // Dimension line with arrowheads
@@ -844,6 +878,7 @@ export class SVGRenderer {
       extLine.setAttribute('stroke', color);
       extLine.setAttribute('stroke-width', '1.2');
       extLine.setAttribute('stroke-dasharray', '4,4');
+      extLine.style.pointerEvents = 'none';
       parentG.appendChild(extLine);
     }
   }
@@ -1321,29 +1356,63 @@ export class SVGRenderer {
     this.renderTooltip(mid.x, mid.y, label);
   }
 
-  renderDistancePreview(s1: Vec2, s2: Vec2, cursor: Vec2, distVal: number): void {
+  renderDistancePreview(
+    s1: Vec2,
+    s2: Vec2,
+    cursor: Vec2,
+    distVal: number,
+    orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned'
+  ): void {
     this.previewGroup.innerHTML = '';
 
-    const dx = s2.x - s1.x;
-    const dy = s2.y - s1.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 1e-4) return;
+    let d1: Vec2;
+    let d2: Vec2;
+    let extEnd1: Vec2;
+    let extEnd2: Vec2;
+    let mid: Vec2;
 
-    const nx = -dy / len;
-    const ny = dx / len;
-    const midX = (s1.x + s2.x) * 0.5;
-    const midY = (s1.y + s2.y) * 0.5;
-    const offset = (cursor.x - midX) * nx + (cursor.y - midY) * ny;
+    if (orientation === 'horizontal') {
+      const dimY = cursor.y;
+      d1 = { x: s1.x, y: dimY };
+      d2 = { x: s2.x, y: dimY };
+      const midY = (s1.y + s2.y) * 0.5;
+      const extDir = dimY >= midY ? 1 : -1;
+      extEnd1 = { x: s1.x, y: dimY + extDir * 4 };
+      extEnd2 = { x: s2.x, y: dimY + extDir * 4 };
+      mid = { x: (d1.x + d2.x) * 0.5, y: dimY };
+    } else if (orientation === 'vertical') {
+      const dimX = cursor.x;
+      d1 = { x: dimX, y: s1.y };
+      d2 = { x: dimX, y: s2.y };
+      const midX = (s1.x + s2.x) * 0.5;
+      const extDir = dimX >= midX ? 1 : -1;
+      extEnd1 = { x: dimX + extDir * 4, y: s1.y };
+      extEnd2 = { x: dimX + extDir * 4, y: s2.y };
+      mid = { x: dimX, y: (d1.y + d2.y) * 0.5 };
+    } else {
+      const dx = s2.x - s1.x;
+      const dy = s2.y - s1.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1e-4) return;
 
-    const d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
-    const d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
-    const mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
+      const nx = -dy / len;
+      const ny = dx / len;
+      const midX = (s1.x + s2.x) * 0.5;
+      const midY = (s1.y + s2.y) * 0.5;
+      const offset = (cursor.x - midX) * nx + (cursor.y - midY) * ny;
+
+      d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
+      d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
+      extEnd1 = { x: d1.x + nx * 4, y: d1.y + ny * 4 };
+      extEnd2 = { x: d2.x + nx * 4, y: d2.y + ny * 4 };
+      mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
+    }
 
     const ext1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     ext1.setAttribute('x1', s1.x.toFixed(1));
     ext1.setAttribute('y1', s1.y.toFixed(1));
-    ext1.setAttribute('x2', (d1.x + nx * 4).toFixed(1));
-    ext1.setAttribute('y2', (d1.y + ny * 4).toFixed(1));
+    ext1.setAttribute('x2', extEnd1.x.toFixed(1));
+    ext1.setAttribute('y2', extEnd1.y.toFixed(1));
     ext1.setAttribute('stroke', '#0284c7');
     ext1.setAttribute('stroke-width', '1');
     ext1.setAttribute('stroke-dasharray', '2,2');
@@ -1352,8 +1421,8 @@ export class SVGRenderer {
     const ext2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     ext2.setAttribute('x1', s2.x.toFixed(1));
     ext2.setAttribute('y1', s2.y.toFixed(1));
-    ext2.setAttribute('x2', (d2.x + nx * 4).toFixed(1));
-    ext2.setAttribute('y2', (d2.y + ny * 4).toFixed(1));
+    ext2.setAttribute('x2', extEnd2.x.toFixed(1));
+    ext2.setAttribute('y2', extEnd2.y.toFixed(1));
     ext2.setAttribute('stroke', '#0284c7');
     ext2.setAttribute('stroke-width', '1');
     ext2.setAttribute('stroke-dasharray', '2,2');
@@ -1370,7 +1439,8 @@ export class SVGRenderer {
     dimLine.setAttribute('marker-end', 'url(#dim-arrow)');
     this.previewGroup.appendChild(dimLine);
 
-    this.renderTooltip(mid.x, mid.y, `${distVal.toFixed(1)} mm`);
+    const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
+    this.renderTooltip(mid.x, mid.y, `${labelPrefix}${distVal.toFixed(1)} mm`);
   }
 
   renderAnglePreview(

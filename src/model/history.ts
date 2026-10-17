@@ -40,6 +40,7 @@ export interface SerializedConstraint {
   p2Id?: string;
   targetDistance?: number;
   offset?: number;
+  orientation?: 'aligned' | 'horizontal' | 'vertical';
   targetAngle?: number;
   arcRadius?: number;
   line1Id?: string;
@@ -126,6 +127,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
     base.p2Id = c.p2Id;
     base.targetDistance = c.targetDistance;
     base.offset = c.offset;
+    base.orientation = c.orientation;
   } else if (c instanceof AngleConstraint) {
     base.line1Id = c.line1Id;
     base.line2Id = c.line2Id;
@@ -216,7 +218,15 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
       c = new VerticalConstraint(d.id, d.p1Id!, d.p2Id!, d.weight);
       break;
     case 'distance':
-      c = new DistanceConstraint(d.id, d.p1Id!, d.p2Id!, d.targetDistance ?? d.value ?? 10, d.weight, d.offset);
+      c = new DistanceConstraint(
+        d.id,
+        d.p1Id!,
+        d.p2Id!,
+        d.targetDistance ?? d.value ?? 10,
+        d.weight,
+        d.offset,
+        d.orientation ?? 'aligned'
+      );
       break;
     case 'angle':
       c = new AngleConstraint(

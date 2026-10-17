@@ -172,7 +172,13 @@ export class DimensionModal {
       if ('targetDistance' in this.currentConstraint) {
         this.currentConstraint.targetDistance = newVal;
         this.currentConstraint.value = newVal;
-        this.currentConstraint.name = `Distance (${Number(newVal.toFixed(2))})`;
+        const prefix =
+          this.currentConstraint.orientation === 'horizontal'
+            ? 'Horizontal Distance'
+            : this.currentConstraint.orientation === 'vertical'
+            ? 'Vertical Distance'
+            : 'Distance';
+        this.currentConstraint.name = `${prefix} (${Number(newVal.toFixed(2))})`;
       } else if ('targetAngle' in this.currentConstraint) {
         const clampedAngle = Math.min(179.9, Math.max(0.1, newVal));
         this.currentConstraint.targetAngle = clampedAngle;

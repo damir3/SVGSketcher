@@ -196,13 +196,38 @@ export class DistanceConstraint extends BaseConstraint {
   readonly p2Id: string;
   targetDistance: number;
   offset?: number;
+  orientation: 'aligned' | 'horizontal' | 'vertical';
 
-  constructor(id: string, p1Id: string, p2Id: string, targetDistance: number, weight = 1.0, offset?: number) {
-    super(id, 'distance', `Distance (${Number(targetDistance.toFixed(2))})`, [p1Id, p2Id], weight, false, true, targetDistance);
+  constructor(
+    id: string,
+    p1Id: string,
+    p2Id: string,
+    targetDistance: number,
+    weight = 1.0,
+    offset?: number,
+    orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned'
+  ) {
+    const prefix =
+      orientation === 'horizontal'
+        ? 'Horizontal Distance'
+        : orientation === 'vertical'
+        ? 'Vertical Distance'
+        : 'Distance';
+    super(
+      id,
+      'distance',
+      `${prefix} (${Number(targetDistance.toFixed(2))})`,
+      [p1Id, p2Id],
+      weight,
+      false,
+      true,
+      targetDistance
+    );
     this.p1Id = p1Id;
     this.p2Id = p2Id;
     this.targetDistance = targetDistance;
     this.offset = offset;
+    this.orientation = orientation;
   }
 
   override getEquationsCount(): number {
@@ -214,6 +239,18 @@ export class DistanceConstraint extends BaseConstraint {
     const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
     const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
     const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+
+    if (this.orientation === 'horizontal') {
+      const dx = p2x - p1x;
+      const sign = dx >= 0 ? 1 : -1;
+      return [(dx * sign - this.targetDistance) * this.weight];
+    }
+
+    if (this.orientation === 'vertical') {
+      const dy = p2y - p1y;
+      const sign = dy >= 0 ? 1 : -1;
+      return [(dy * sign - this.targetDistance) * this.weight];
+    }
 
     const dx = p2x - p1x;
     const dy = p2y - p1y;
@@ -228,6 +265,22 @@ export class DistanceConstraint extends BaseConstraint {
     const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
     const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
     const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+
+    if (this.orientation === 'horizontal') {
+      const dx = p2x - p1x;
+      const sign = dx >= 0 ? 1 : -1;
+      this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -sign * this.weight);
+      this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, sign * this.weight);
+      return res;
+    }
+
+    if (this.orientation === 'vertical') {
+      const dy = p2y - p1y;
+      const sign = dy >= 0 ? 1 : -1;
+      this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -sign * this.weight);
+      this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, sign * this.weight);
+      return res;
+    }
 
     const dx = p2x - p1x;
     const dy = p2y - p1y;

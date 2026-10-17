@@ -404,7 +404,7 @@ export class Sidebar {
           <div class="inspector-card">
             <div class="inspector-card-title">${c.name}</div>
             <div class="inspector-row"><span>Type:</span> <strong>${c.type}</strong></div>
-            ${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>Distance:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
+            ${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
             ${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
           </div>
         `;
