@@ -112,7 +112,7 @@ export class Sidebar {
         const relatedConstraints = this.sketch.getConstraintsForEntity('point', pt.id);
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">Point: ${pt.id}</div>
+            <div class="inspector-card-title">${pt.id}</div>
             <div class="inspector-row"><span>X:</span> <strong>${pt.x.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Y:</span> <strong>${pt.y.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Fixed:</span> <strong>${pt.fixed ? 'Yes' : 'No'}</strong></div>
@@ -142,7 +142,7 @@ export class Sidebar {
         const relatedConstraints = this.sketch.getConstraintsForEntity('line', line.id);
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">Line: ${line.id}</div>
+            <div class="inspector-card-title">${line.id}</div>
             <div class="inspector-row"><span>Length:</span> <strong>${length} mm</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${line.isConstruction ? 'Construction' : 'Solid'}</strong></div>
             <div class="inspector-actions">
@@ -166,7 +166,7 @@ export class Sidebar {
         const relatedConstraints = this.sketch.getConstraintsForEntity('circle', circ.id);
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">Circle: ${circ.id}</div>
+            <div class="inspector-card-title">${circ.id}</div>
             <div class="inspector-row"><span>Radius:</span> <strong>${circ.radius.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Diameter:</span> <strong>${(circ.radius * 2).toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${circ.isConstruction ? 'Construction' : 'Solid'}</strong></div>
@@ -202,7 +202,7 @@ export class Sidebar {
         const relatedConstraints = this.sketch.getConstraintsForEntity('arc', arc.id);
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">Arc: ${arc.id}</div>
+            <div class="inspector-card-title">${arc.id}</div>
             <div class="inspector-row"><span>Radius:</span> <strong>${arc.radius.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Length:</span> <strong>${arcLen} mm</strong></div>
             <div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
@@ -240,7 +240,7 @@ export class Sidebar {
         const relatedConstraints = this.sketch.getConstraintsForEntity('ellipse', ellipse.id);
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">Ellipse: ${ellipse.id}</div>
+            <div class="inspector-card-title">${ellipse.id}</div>
             <div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
             <div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
             <div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
@@ -278,7 +278,7 @@ export class Sidebar {
         const relatedConstraints = this.sketch.getConstraintsForEntity('elliptical_arc', arc.id);
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">Elliptical Arc: ${arc.id}</div>
+            <div class="inspector-card-title">${arc.id}</div>
             <div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
             <div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
             <div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>

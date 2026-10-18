@@ -76,8 +76,25 @@ export class SketchDocument {
     }
   }
 
+  private counters: Map<string, number> = new Map();
+
   nextId(prefix: string): string {
-    return `${prefix}_${this.idCounter++}`;
+    const isTaken = (id: string) =>
+      this.points.has(id) ||
+      this.lines.has(id) ||
+      this.circles.has(id) ||
+      this.arcs.has(id) ||
+      this.ellipses.has(id) ||
+      this.ellipticalArcs.has(id) ||
+      this.constraints.has(id);
+
+    let next = (this.counters.get(prefix) ?? 0) + 1;
+    while (isTaken(`${prefix}-${next}`)) {
+      next++;
+    }
+    this.counters.set(prefix, next);
+    this.idCounter++;
+    return `${prefix}-${next}`;
   }
 
   // --- Transaction & History Management ---
@@ -221,6 +238,28 @@ export class SketchDocument {
       }
     }
 
+    this.counters.clear();
+    const allIds = [
+      ...snapshot.points.map(p => p.id),
+      ...snapshot.lines.map(l => l.id),
+      ...snapshot.circles.map(c => c.id),
+      ...snapshot.arcs.map(a => a.id),
+      ...(snapshot.ellipses ?? []).map(e => e.id),
+      ...(snapshot.ellipticalArcs ?? []).map(a => a.id),
+      ...snapshot.constraints.map(c => c.id),
+    ];
+    for (const id of allIds) {
+      const match = id.match(/^([A-Za-z0-9_]+)[-_](\d+)$/);
+      if (match) {
+        const prefix = match[1];
+        const num = parseInt(match[2], 10);
+        const cur = this.counters.get(prefix) ?? 0;
+        if (num > cur) {
+          this.counters.set(prefix, num);
+        }
+      }
+    }
+
     this.idCounter = snapshot.idCounter;
     this.clearSelection();
     this.rebuildParamManager();
@@ -231,7 +270,7 @@ export class SketchDocument {
   // --- Point methods ---
   addPoint(x: number, y: number, fixed = false, isConstruction = false): SketchPoint {
     this.pushHistory();
-    const id = this.nextId('pt');
+    const id = this.nextId('Point');
     const pt: SketchPoint = { id, x, y, fixed, isConstruction };
     this.points.set(id, pt);
     this.rebuildParamManager();
@@ -246,7 +285,7 @@ export class SketchDocument {
   // --- Line methods ---
   addLine(p1Id: string, p2Id: string, isConstruction = false): SketchLine {
     this.pushHistory();
-    const id = this.nextId('line');
+    const id = this.nextId('Line');
     const line: SketchLine = { id, p1Id, p2Id, isConstruction };
     this.lines.set(id, line);
     this.rebuildParamManager();
@@ -257,7 +296,7 @@ export class SketchDocument {
   // --- Circle methods ---
   addCircle(centerId: string, radius: number, isConstruction = false): SketchCircle {
     this.pushHistory();
-    const id = this.nextId('circ');
+    const id = this.nextId('Circle');
     const circle: SketchCircle = { id, centerId, radius, isConstruction };
     this.circles.set(id, circle);
     this.rebuildParamManager();
@@ -275,7 +314,7 @@ export class SketchDocument {
     isConstruction = false
   ): SketchArc {
     this.pushHistory();
-    const id = this.nextId('arc');
+    const id = this.nextId('Arc');
     const arc: SketchArc = { id, centerId, startPointId, endPointId, radius, clockwise, isConstruction };
     this.arcs.set(id, arc);
     this.rebuildParamManager();
@@ -299,7 +338,7 @@ export class SketchDocument {
     isConstruction = false
   ): SketchEllipse {
     this.pushHistory();
-    const id = this.nextId('el');
+    const id = this.nextId('Ellipse');
     const ellipse: SketchEllipse = {
       id,
       centerId,
@@ -332,7 +371,7 @@ export class SketchDocument {
     isConstruction = false
   ): SketchEllipticalArc {
     this.pushHistory();
-    const id = this.nextId('elarc');
+    const id = this.nextId('EllipticalArc');
     const arc: SketchEllipticalArc = {
       id,
       centerId,
@@ -1336,6 +1375,7 @@ export class SketchDocument {
     this.selection.ellipseIds.clear();
     this.selection.ellipticalArcIds.clear();
     this.selection.constraintIds.clear();
+    this.counters.clear();
     this.rebuildParamManager();
     this.solve();
   }
