@@ -86,9 +86,9 @@ export class Toolbar {
             ${ICONS.coincident}
             <span class="btn-tooltip">Coincident (I)</span>
           </button>
-          <button class="tool-btn" data-constraint="fixed" title="Fix Point">
+          <button class="tool-btn" data-constraint="fixed" title="Fix Point (F)">
             ${ICONS.fixed}
-            <span class="btn-tooltip">Fix Point</span>
+            <span class="btn-tooltip">Fix Point (F)</span>
           </button>
           <button class="tool-btn" data-constraint="horizontal_vertical" title="Horizontal / Vertical (H)">
             ${ICONS.horizontalVertical}
@@ -164,21 +164,21 @@ export class Toolbar {
       btn.addEventListener('click', () => {
         const constraintType = btn.getAttribute('data-constraint') as ConstraintToolType;
 
-        // 1. If required primitives are ALREADY selected, immediately apply constraint (except dimension which needs offset placement)!
+        // 1. Toggle off if already active
+        if (this.interaction.activeTool === constraintType) {
+          this.interaction.setTool('select');
+          return;
+        }
+
+        // 2. If required primitives are ALREADY selected, immediately apply constraint (except dimension which needs offset placement)!
         if (constraintType !== 'dimension' && this.interaction.canApplyConstraint(constraintType)) {
           this.interaction.applyConstraint(constraintType);
           this.interaction.setTool('select');
           return;
         }
 
-        // 2. Toggle constraint tool
-        if (this.interaction.activeTool === constraintType) {
-          // Toggle off -> revert to select
-          this.interaction.setTool('select');
-        } else {
-          // Toggle on
-          this.interaction.setTool(constraintType);
-        }
+        // 3. Toggle constraint tool on
+        this.interaction.setTool(constraintType);
       });
     });
   }

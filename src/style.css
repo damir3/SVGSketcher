@@ -315,8 +315,9 @@ html, body {
 /* CAD Canvas Primitives Cursor & Highlighting */
 #cad-svg .sketch-entity,
 #cad-svg .dimension-item,
-#cad-svg .constraint-badge {
-  cursor: default;
+#cad-svg .constraint-badge,
+#cad-svg * {
+  cursor: inherit;
 }
 
 #cad-svg .visible-primitive {

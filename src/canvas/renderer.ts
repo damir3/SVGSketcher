@@ -19,6 +19,7 @@ import {
   AngleConstraint,
 } from '../solver/constraints';
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
+import { getBadgeIcon } from './badgeIcons';
 
 export interface RenderOptions {
   showGrid?: boolean;
@@ -1364,7 +1365,7 @@ export class SVGRenderer {
     const pt = sketch.points.get(constraint.pointId);
     if (!pt) return;
     const s = viewport.worldToScreen(pt.x, pt.y);
-    this.renderConstraintBadge(constraint.id, s.x + 12, s.y - 12, '⚓', isSelected, '#d97706');
+    this.renderConstraintBadge(constraint.id, s.x + 12, s.y - 12, 'fixed', isSelected, '#d97706');
   }
 
   private renderCoincidentBadge(
@@ -1393,7 +1394,8 @@ export class SVGRenderer {
     g.setAttribute('data-type', 'constraint');
 
     const color = isSelected ? '#0284c7' : customColor ?? '#475569';
-    const width = Math.max(18, label.length * 8 + 8);
+    const icon = getBadgeIcon(label, x, y, color);
+    const width = icon ? 18 : Math.max(18, label.length * 8 + 8);
 
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     rect.setAttribute('x', (x - width * 0.5).toFixed(1));
@@ -1406,16 +1408,20 @@ export class SVGRenderer {
     rect.setAttribute('stroke-width', isSelected ? '1.5' : '1');
     g.appendChild(rect);
 
-    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.setAttribute('x', x.toFixed(1));
-    text.setAttribute('y', (y + 4).toFixed(1));
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('fill', isSelected ? '#0284c7' : color);
-    text.setAttribute('font-size', '10');
-    text.setAttribute('font-weight', '700');
-    text.setAttribute('font-family', 'sans-serif');
-    text.textContent = label;
-    g.appendChild(text);
+    if (icon) {
+      g.appendChild(icon);
+    } else {
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', x.toFixed(1));
+      text.setAttribute('y', (y + 4).toFixed(1));
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('fill', color);
+      text.setAttribute('font-size', '10');
+      text.setAttribute('font-weight', '700');
+      text.setAttribute('font-family', 'sans-serif');
+      text.textContent = label;
+      g.appendChild(text);
+    }
 
     this.constraintGroup.appendChild(g);
   }

@@ -578,7 +578,7 @@ export class Sidebar {
         <div class="tree-item-info">
           <span class="tree-icon">${ICONS.point}</span>
           <span class="tree-name">${pt.id}</span>
-          <span class="tree-meta">(${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}) ${pt.fixed ? '⚓' : ''}</span>
+          <span class="tree-meta">(${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}) ${pt.fixed ? '🔒' : ''}</span>
         </div>
         <button class="tree-delete-btn" data-delete-id="${pt.id}" title="Delete">${ICONS.delete}</button>
       </div>

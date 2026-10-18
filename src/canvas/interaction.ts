@@ -508,6 +508,12 @@ export class CanvasInteraction {
         this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
       } else if (e.key === 'i' || e.key === 'I') {
         this.setTool(this.activeTool === 'coincident' ? 'select' : 'coincident');
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (this.sketch.selection.pointIds.size > 0) {
+          this.applyConstraint('fixed');
+        } else {
+          this.setTool(this.activeTool === 'fixed' ? 'select' : 'fixed');
+        }
       } else if (e.key === 's' || e.key === 'S') {
         if (!e.ctrlKey && !e.metaKey) {
           this.toggleSnapping();
@@ -1143,7 +1149,7 @@ export class CanvasInteraction {
     const timeDelta = now - this.lastClickTime;
     const distanceDelta = dist(screen, this.lastClickPos);
 
-    if (timeDelta > 10 && timeDelta < 500 && distanceDelta < 30) {
+    if (this.activeTool === 'select' && timeDelta >= 50 && timeDelta <= 350 && distanceDelta < 30) {
       this.lastClickTime = 0;
       if (this.triggerDimensionEditAt(e, screen, clientPos)) {
         e.preventDefault();
@@ -1164,6 +1170,19 @@ export class CanvasInteraction {
     if (isConstraintTool(this.activeTool)) {
       if (this.activeTool === 'dimension') {
         this.handleDimensionClick(e, screen, clientPos);
+        return;
+      }
+
+      if (this.activeTool === 'fixed') {
+        const nearPoint = this.findPointNearScreen(screen, 20);
+        if (nearPoint) {
+          const isNowFixed = this.sketch.toggleFixedConstraint(nearPoint.id);
+          showToast(isNowFixed ? 'Fixed constraint applied' : 'Fixed constraint removed');
+          this.render();
+        } else {
+          this.sketch.clearSelection();
+          this.render();
+        }
         return;
       }
 
@@ -2881,6 +2900,7 @@ export class CanvasInteraction {
   }
 
   private handleDoubleClick(e: MouseEvent): void {
+    if (this.activeTool !== 'select') return;
     const now = performance.now();
     if (now - this.lastDoubleClickedTime < 600) {
       return;
@@ -3271,7 +3291,7 @@ export class CanvasInteraction {
 
     switch (type) {
       case 'fixed':
-        return pCount >= 1 && lCount === 0 && cCount === 0;
+        return pCount >= 1;
       case 'coincident':
         return (
           (pCount === 2 && lCount === 0 && cCount === 0) ||
@@ -3319,9 +3339,9 @@ export class CanvasInteraction {
     switch (type) {
       case 'fixed': {
         if (pIds.length >= 1) {
-          for (const pid of pIds) this.sketch.addFixedConstraint(pid);
+          const appliedNow = this.sketch.toggleFixedConstraints(pIds);
           applied = true;
-          toastMsg = 'Fixed constraint applied';
+          toastMsg = appliedNow ? 'Fixed constraint applied' : 'Fixed constraint removed';
         }
         break;
       }
@@ -3603,6 +3623,15 @@ export class CanvasInteraction {
     const constraintType = this.activeTool;
 
     if (!this.isEntityCompatibleWithConstraint(constraintType, type)) {
+      return;
+    }
+
+    if (constraintType === 'fixed') {
+      if (type === 'point') {
+        const isNowFixed = this.sketch.toggleFixedConstraint(id);
+        showToast(isNowFixed ? 'Fixed constraint applied' : 'Fixed constraint removed');
+        this.render();
+      }
       return;
     }
 

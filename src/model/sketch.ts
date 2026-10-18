@@ -430,6 +430,12 @@ export class SketchDocument {
   addFixedConstraint(pointId: string): FixedConstraint | null {
     const pt = this.points.get(pointId);
     if (!pt) return null;
+    for (const c of this.constraints.values()) {
+      if (c instanceof FixedConstraint && c.pointId === pointId) {
+        pt.fixed = true;
+        return c;
+      }
+    }
     this.pushHistory();
     pt.fixed = true;
     const c = new FixedConstraint(this.nextId('c_fix'), pointId, pt.x, pt.y);
@@ -437,6 +443,65 @@ export class SketchDocument {
     this.rebuildParamManager();
     this.solve();
     return c;
+  }
+
+  removeFixedConstraint(pointId: string): boolean {
+    const pt = this.points.get(pointId);
+    let hasFix = false;
+    for (const c of this.constraints.values()) {
+      if (c instanceof FixedConstraint && c.pointId === pointId) {
+        hasFix = true;
+        break;
+      }
+    }
+    if (!hasFix && (!pt || !pt.fixed)) {
+      return false;
+    }
+
+    this.pushHistory();
+    for (const [id, c] of [...this.constraints.entries()]) {
+      if (c instanceof FixedConstraint && c.pointId === pointId) {
+        this.constraints.delete(id);
+        this.selection.constraintIds.delete(id);
+      }
+    }
+    if (pt) {
+      pt.fixed = false;
+    }
+    this.rebuildParamManager();
+    this.solve();
+    return true;
+  }
+
+  toggleFixedConstraint(pointId: string): boolean {
+    if (this.isPointFixed(pointId)) {
+      this.removeFixedConstraint(pointId);
+      return false;
+    } else {
+      this.addFixedConstraint(pointId);
+      return true;
+    }
+  }
+
+  toggleFixedConstraints(pointIds: string[]): boolean {
+    const validPointIds = pointIds.filter(pid => this.points.has(pid));
+    if (validPointIds.length === 0) return false;
+
+    this.beginTransaction();
+    const allFixed = validPointIds.every(pid => this.isPointFixed(pid));
+    if (allFixed) {
+      for (const pid of validPointIds) {
+        this.removeFixedConstraint(pid);
+      }
+    } else {
+      for (const pid of validPointIds) {
+        if (!this.isPointFixed(pid)) {
+          this.addFixedConstraint(pid);
+        }
+      }
+    }
+    this.commitTransaction();
+    return !allFixed;
   }
 
   addCoincidentConstraint(p1Id: string, p2Id: string): CoincidentConstraint | null {
