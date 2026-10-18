@@ -1440,11 +1440,24 @@ export class CanvasInteraction {
         this.sketch.addLine(this.startPointId!, p2Id, this.isConstructionMode);
         this.sketch.commitTransaction();
 
-        // Chain to next line
-        this.sketch.beginTransaction();
-        this.startPointId = p2Id;
-        const p2 = this.sketch.getPoint(p2Id);
-        this.startWorldPos = p2 ? vec(p2.x, p2.y) : (snap ? snap.worldPos : world);
+        const hitPrimitive =
+          snap !== null &&
+          ((snap.type === 'point' && snap.id !== undefined && snap.id !== this.startPointId) ||
+            snap.type === 'line' ||
+            snap.type === 'circle');
+
+        if (hitPrimitive) {
+          this.drawingStep = 0;
+          this.startPointId = null;
+          this.startWorldPos = null;
+          this.renderer.clearPreviews();
+        } else {
+          // Chain to next line
+          this.sketch.beginTransaction();
+          this.startPointId = p2Id;
+          const p2 = this.sketch.getPoint(p2Id);
+          this.startWorldPos = p2 ? vec(p2.x, p2.y) : (snap ? snap.worldPos : world);
+        }
         this.render();
       }
       return;
