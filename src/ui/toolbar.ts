@@ -53,13 +53,13 @@ export class Toolbar {
             ${ICONS.circle}
             <span class="btn-tooltip">Circle (C)</span>
           </button>
-          <button class="tool-btn" data-tool="arc_center" title="Centerpoint Arc">
+          <button class="tool-btn" data-tool="arc_center" title="Centerpoint Arc (A)">
             ${ICONS.arc_center}
-            <span class="btn-tooltip">Center Arc</span>
+            <span class="btn-tooltip">Center Arc (A)</span>
           </button>
-          <button class="tool-btn" data-tool="arc" title="3-Point Arc (A)">
+          <button class="tool-btn" data-tool="arc" title="3-Point Arc">
             ${ICONS.arc}
-            <span class="btn-tooltip">3-Pt Arc (A)</span>
+            <span class="btn-tooltip">3-Point Arc</span>
           </button>
           <button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
             ${ICONS.ellipse}

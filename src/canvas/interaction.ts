@@ -493,29 +493,29 @@ export class CanvasInteraction {
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         this.sketch.deleteSelected();
         this.render();
-      } else if (e.key === 'x' || e.key === 'X' || e.key === 'ч' || e.key === 'Ч') {
+      } else if (e.key === 'x' || e.key === 'X') {
         this.toggleConstructionMode();
-      } else if (e.key === 'v' || e.key === 'V' || e.key === 'м' || e.key === 'М') {
+      } else if (e.key === 'v' || e.key === 'V') {
         this.setTool('select');
-      } else if (e.key === 'l' || e.key === 'L' || e.key === 'д' || e.key === 'Д') {
+      } else if (e.key === 'l' || e.key === 'L') {
         this.setTool('line');
-      } else if (e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') {
+      } else if (e.key === 'c' || e.key === 'C') {
         this.setTool('circle');
-      } else if (e.key === 'a' || e.key === 'A' || e.key === 'ф' || e.key === 'Ф') {
-        this.setTool('arc');
-      } else if (e.key === 'r' || e.key === 'R' || e.key === 'к' || e.key === 'К') {
+      } else if (e.key === 'a' || e.key === 'A') {
+        this.setTool('arc_center');
+      } else if (e.key === 'r' || e.key === 'R') {
         this.setTool('rectangle');
-      } else if (e.key === 'p' || e.key === 'P' || e.key === 'з' || e.key === 'З') {
+      } else if (e.key === 'p' || e.key === 'P') {
         this.setTool('point');
-      } else if (e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') {
+      } else if (e.key === 'e' || e.key === 'E') {
         this.setTool('ellipse');
-      } else if (e.key === 'h' || e.key === 'H' || e.key === 'р' || e.key === 'Р') {
+      } else if (e.key === 'h' || e.key === 'H') {
         this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
-      } else if (e.key === 'd' || e.key === 'D' || e.key === 'в' || e.key === 'В') {
+      } else if (e.key === 'd' || e.key === 'D') {
         this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
-      } else if (e.key === 'i' || e.key === 'I' || e.key === 'ш' || e.key === 'Ш') {
+      } else if (e.key === 'i' || e.key === 'I') {
         this.setTool(this.activeTool === 'coincident' ? 'select' : 'coincident');
-      } else if (e.key === 's' || e.key === 'S' || e.key === 'ы' || e.key === 'Ы') {
+      } else if (e.key === 's' || e.key === 'S') {
         if (!e.ctrlKey && !e.metaKey) {
           this.toggleSnapping();
         }

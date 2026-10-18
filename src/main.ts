@@ -254,7 +254,7 @@ function initApp(): void {
     if (isCtrlOrCmd) {
       // Undo: Ctrl+Z / Cmd+Z (without Shift)
       if (
-        (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я' || e.code === 'KeyZ') &&
+        (e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') &&
         !e.shiftKey
       ) {
         e.preventDefault();
@@ -267,10 +267,10 @@ function initApp(): void {
 
       // Redo: Ctrl+Y / Cmd+Y OR Ctrl+Shift+Z / Cmd+Shift+Z
       const isRedoZ =
-        (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я' || e.code === 'KeyZ') &&
+        (e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') &&
         e.shiftKey;
       const isRedoY =
-        e.key === 'y' || e.key === 'Y' || e.key === 'н' || e.key === 'Н' || e.code === 'KeyY';
+        e.key === 'y' || e.key === 'Y' || e.code === 'KeyY';
       if (isRedoZ || isRedoY) {
         e.preventDefault();
         if (sketch.redo()) {
@@ -281,7 +281,7 @@ function initApp(): void {
       }
     }
 
-    if (e.key === 'z' || e.key === 'Z' || e.key === 'я' || e.key === 'Я') {
+    if (e.key === 'z' || e.key === 'Z') {
       if (!isCtrlOrCmd) {
         fitToView();
       }
