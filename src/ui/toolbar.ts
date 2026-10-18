@@ -14,6 +14,7 @@ export class Toolbar {
 
     this.render();
     this.setupListeners();
+    this.setConstructionActive(this.interaction.getEffectiveConstructionState());
   }
 
   render(): void {
@@ -24,6 +25,10 @@ export class Toolbar {
           <button class="tool-btn active" data-tool="select" title="Select & Drag (V)">
             ${ICONS.select}
             <span class="btn-tooltip">Select (V)</span>
+          </button>
+          <button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
+            ${ICONS.construction}
+            <span class="btn-tooltip">Construction (X)</span>
           </button>
           <button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
             ${ICONS.snap}
@@ -68,10 +73,6 @@ export class Toolbar {
           <button class="tool-btn" data-tool="elliptical_arc" title="Elliptical Arc">
             ${ICONS.elliptical_arc}
             <span class="btn-tooltip">Elliptical Arc</span>
-          </button>
-          <button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
-            ${ICONS.construction}
-            <span class="btn-tooltip">Construction (X)</span>
           </button>
         </div>
       </div>

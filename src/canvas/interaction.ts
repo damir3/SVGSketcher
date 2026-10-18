@@ -274,6 +274,9 @@ export class CanvasInteraction {
     this.renderer = renderer;
 
     this.bindEvents();
+    this.sketch.onChange(() => {
+      this.updateConstructionState();
+    });
   }
 
   setTool(tool: ToolType): void {
@@ -328,39 +331,31 @@ export class CanvasInteraction {
   }
 
   toggleConstructionMode(): void {
-    this.isConstructionMode = !this.isConstructionMode;
-    const hasSelection =
-      this.sketch.selection.lineIds.size > 0 ||
-      this.sketch.selection.circleIds.size > 0 ||
-      this.sketch.selection.arcIds.size > 0 ||
-      this.sketch.selection.ellipseIds.size > 0 ||
-      this.sketch.selection.ellipticalArcIds.size > 0 ||
-      this.sketch.selection.pointIds.size > 0;
-
-    if (hasSelection) {
+    const selected = this.sketch.getSelectedPrimitives();
+    if (selected.length > 0) {
       this.sketch.beginTransaction();
-      for (const lid of this.sketch.selection.lineIds) {
-        this.sketch.toggleConstruction(lid);
-      }
-      for (const cid of this.sketch.selection.circleIds) {
-        this.sketch.toggleConstruction(cid);
-      }
-      for (const aid of this.sketch.selection.arcIds) {
-        this.sketch.toggleConstruction(aid);
-      }
-      for (const eid of this.sketch.selection.ellipseIds) {
-        this.sketch.toggleConstruction(eid);
-      }
-      for (const eaid of this.sketch.selection.ellipticalArcIds) {
-        this.sketch.toggleConstruction(eaid);
-      }
-      for (const pid of this.sketch.selection.pointIds) {
-        this.sketch.toggleConstruction(pid);
+      for (const p of selected) {
+        this.sketch.toggleConstruction(p.id);
       }
       this.sketch.commitTransaction();
+      this.updateConstructionState();
+    } else {
+      this.isConstructionMode = !this.isConstructionMode;
+      this.updateConstructionState();
     }
-    this.onConstructionChange?.(this.isConstructionMode);
     this.render();
+  }
+
+  getEffectiveConstructionState(): boolean {
+    const selectedState = this.sketch.getSelectedConstructionState();
+    if (selectedState !== null) {
+      return selectedState;
+    }
+    return this.isConstructionMode;
+  }
+
+  updateConstructionState(): void {
+    this.onConstructionChange?.(this.getEffectiveConstructionState());
   }
 
   toggleSnapping(): void {

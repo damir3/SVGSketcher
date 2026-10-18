@@ -1391,6 +1391,41 @@ export class SketchDocument {
     this.notify();
   }
 
+  getSelectedPrimitives(): Array<{ id: string; isConstruction?: boolean }> {
+    const list: Array<{ id: string; isConstruction?: boolean }> = [];
+    for (const id of this.selection.lineIds) {
+      const l = this.lines.get(id);
+      if (l) list.push(l);
+    }
+    for (const id of this.selection.circleIds) {
+      const c = this.circles.get(id);
+      if (c) list.push(c);
+    }
+    for (const id of this.selection.arcIds) {
+      const a = this.arcs.get(id);
+      if (a) list.push(a);
+    }
+    for (const id of this.selection.ellipseIds) {
+      const el = this.ellipses.get(id);
+      if (el) list.push(el);
+    }
+    for (const id of this.selection.ellipticalArcIds) {
+      const ea = this.ellipticalArcs.get(id);
+      if (ea) list.push(ea);
+    }
+    for (const id of this.selection.pointIds) {
+      const p = this.points.get(id);
+      if (p) list.push(p);
+    }
+    return list;
+  }
+
+  getSelectedConstructionState(): boolean | null {
+    const primitives = this.getSelectedPrimitives();
+    if (primitives.length === 0) return null;
+    return primitives.every(p => !!p.isConstruction);
+  }
+
   deleteSelected(): void {
     const hasSelection =
       this.selection.pointIds.size > 0 ||

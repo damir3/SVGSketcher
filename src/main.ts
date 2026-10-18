@@ -133,6 +133,7 @@ function initApp(): void {
   interaction.onConstructionChange = active => {
     toolbar.setConstructionActive(active);
   };
+  interaction.updateConstructionState();
 
   interaction.onSnappingChange = active => {
     toolbar.setSnappingActive(active);
