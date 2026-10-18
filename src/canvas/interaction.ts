@@ -2270,24 +2270,22 @@ export class CanvasInteraction {
       return;
     }
 
-    // Snapping update during active drawing tools or constraint mode
-    const isDrawingTool =
-      this.activeTool === 'point' ||
-      this.activeTool === 'line' ||
-      this.activeTool === 'circle' ||
-      this.activeTool === 'arc' ||
-      this.activeTool === 'arc_center' ||
-      this.activeTool === 'rectangle' ||
-      this.activeTool === 'ellipse' ||
-      this.activeTool === 'elliptical_arc';
-    const isConstraintWithPoints =
-      isConstraintTool(this.activeTool) &&
-      ['fixed', 'coincident', 'horizontal_vertical', 'horizontal', 'vertical', 'dimension', 'distance', 'point_on_line', 'midpoint'].includes(
-        this.activeTool
-      );
-    const snap = isDrawingTool || isConstraintWithPoints
+    // Snapping indicator is only shown during primitive creation when placing subsequent points (drawingStep > 0)
+    // or when dragging points (handled in point drag block above).
+    const isDrawingPrimitiveNextPoint =
+      this.drawingStep > 0 &&
+      (this.activeTool === 'line' ||
+        this.activeTool === 'circle' ||
+        this.activeTool === 'arc' ||
+        this.activeTool === 'arc_center' ||
+        this.activeTool === 'rectangle' ||
+        this.activeTool === 'ellipse' ||
+        this.activeTool === 'elliptical_arc');
+
+    const snap = isDrawingPrimitiveNextPoint
       ? this.findSnap(screen, this.startPointId ?? undefined)
       : null;
+
     if (
       snap &&
       !this.isDraggingPoint &&
