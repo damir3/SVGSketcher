@@ -2061,7 +2061,7 @@ export class CanvasInteraction {
                 const newAngle = Math.round(geom.initialAngleDeg * 10) / 10;
                 constraint.targetAngle = newAngle;
                 constraint.value = newAngle;
-                constraint.name = `Angle (${newAngle.toFixed(1)}°)`;
+                constraint.name = 'Angle';
                 this.sketch.solve();
               }
               this.render();

@@ -18,7 +18,7 @@ import {
   CoincidentConstraint,
   AngleConstraint,
 } from '../solver/constraints';
-import type { Vec2 } from '../math/vector';
+import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 
 export interface RenderOptions {
   showGrid?: boolean;
@@ -685,8 +685,7 @@ export class SVGRenderer {
         this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
         this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
       } else if (constraint instanceof PerpendicularConstraint) {
-        this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
-        this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
+        this.renderPerpendicularBadge(constraint, sketch, viewport, isSelected, lineBadgeCounts);
       } else if (constraint instanceof EqualLengthConstraint) {
         this.renderBadgeOnSegment(constraint.id, constraint.line1P1, constraint.line1P2, sketch, viewport, '=', isSelected, lineBadgeCounts);
         this.renderBadgeOnSegment(constraint.id, constraint.line2P1, constraint.line2P2, sketch, viewport, '=', isSelected, lineBadgeCounts);
@@ -1144,6 +1143,70 @@ export class SVGRenderer {
     g.appendChild(text);
 
     this.constraintGroup.appendChild(g);
+  }
+
+  private renderPerpendicularBadge(
+    constraint: PerpendicularConstraint,
+    sketch: SketchDocument,
+    viewport: Viewport,
+    isSelected: boolean,
+    lineBadgeCounts: Map<string, number>
+  ): void {
+    const p1 = sketch.points.get(constraint.l1P1);
+    const p2 = sketch.points.get(constraint.l1P2);
+    const p3 = sketch.points.get(constraint.l2P1);
+    const p4 = sketch.points.get(constraint.l2P2);
+    if (!p1 || !p2 || !p3 || !p4) return;
+
+    const isSharedPoint =
+      p1.id === p3.id ||
+      p1.id === p4.id ||
+      p2.id === p3.id ||
+      p2.id === p4.id ||
+      dist(p1, p3) < 1e-3 ||
+      dist(p1, p4) < 1e-3 ||
+      dist(p2, p3) < 1e-3 ||
+      dist(p2, p4) < 1e-3;
+
+    const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+
+    const distToSeg1 = projectPointOntoSegment(geom.pInt, p1, p2).dist;
+    const distToSeg2 = projectPointOntoSegment(geom.pInt, p3, p4).dist;
+    const isNearSegments = distToSeg1 < 30 && distToSeg2 < 30;
+
+    if (isSharedPoint || isNearSegments) {
+      const sCenter = viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
+      const sRay1 = viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
+      const sRay2 = viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+
+      const d1 = { x: sRay1.x - sCenter.x, y: sRay1.y - sCenter.y };
+      const d2 = { x: sRay2.x - sCenter.x, y: sRay2.y - sCenter.y };
+      const l1 = Math.hypot(d1.x, d1.y);
+      const l2 = Math.hypot(d2.x, d2.y);
+
+      let dir = { x: 1, y: -1 };
+      if (l1 > 1e-4 && l2 > 1e-4) {
+        const u1 = { x: d1.x / l1, y: d1.y / l1 };
+        const u2 = { x: d2.x / l2, y: d2.y / l2 };
+        const bis = { x: u1.x + u2.x, y: u1.y + u2.y };
+        const bisLen = Math.hypot(bis.x, bis.y);
+        if (bisLen > 1e-3) {
+          dir = { x: bis.x / bisLen, y: bis.y / bisLen };
+        } else {
+          dir = { x: -u1.y, y: u1.x };
+        }
+      }
+
+      const offset = 18;
+      const badgeX = sCenter.x + dir.x * offset;
+      const badgeY = sCenter.y + dir.y * offset;
+      this.renderConstraintBadge(constraint.id, badgeX, badgeY, '⊥', isSelected);
+      return;
+    }
+
+    // Fallback if segments are completely disconnected and far apart
+    this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
+    this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
   }
 
   private renderBadgeOnSegment(

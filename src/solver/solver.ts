@@ -164,7 +164,9 @@ export class NumericalSolver {
 
         const entries = c.jacobian(paramIndices, eqOffset, paramMap);
         for (const entry of entries) {
-          J.set(entry.row, entry.col, entry.val);
+          // Accumulate: a constraint may reference the same parameter more than once
+          // (e.g. equal length of two lines sharing an endpoint)
+          J.addAt(entry.row, entry.col, entry.val);
         }
 
         eqOffset += c.getEquationsCount();
@@ -284,7 +286,7 @@ export class NumericalSolver {
     for (const c of hardConstraints) {
       const entries = c.jacobian(paramIndices, eqOffset, paramMap);
       for (const entry of entries) {
-        J.set(entry.row, entry.col, entry.val);
+        J.addAt(entry.row, entry.col, entry.val);
       }
       eqOffset += c.getEquationsCount();
     }

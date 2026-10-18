@@ -216,7 +216,7 @@ export class DistanceConstraint extends BaseConstraint {
     super(
       id,
       'distance',
-      `${prefix} (${Number(targetDistance.toFixed(2))})`,
+      prefix,
       [p1Id, p2Id],
       weight,
       false,
@@ -557,7 +557,7 @@ export class AngleConstraint extends BaseConstraint {
     super(
       id,
       'angle',
-      `Angle (${targetAngle.toFixed(1)}°)`,
+      'Angle',
       [line1Id, line2Id, l1P1, l1P2, l2P1, l2P2],
       weight,
       false,
@@ -920,7 +920,7 @@ function computeNumericJacobianForEquation(
     // Check if this param is actually relevant to this constraint
     let isRelevant = false;
     for (const ent of constraint.entityIds) {
-      if (paramId.startsWith(ent)) {
+      if (paramId.startsWith(`${ent}.`)) {
         isRelevant = true;
         break;
       }

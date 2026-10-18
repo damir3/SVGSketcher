@@ -117,10 +117,6 @@ export class Sidebar {
             <div class="inspector-row"><span>Y:</span> <strong>${pt.y.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Fixed:</span> <strong>${pt.fixed ? 'Yes' : 'No'}</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${pt.isConstruction ? 'Construction' : 'Solid'}</strong></div>
-            <div class="inspector-actions">
-              <button class="btn-sm" data-action="toggle-fix" data-id="${pt.id}">${pt.fixed ? 'Unfix' : 'Fix Point'}</button>
-              <button class="btn-sm" data-action="toggle-const" data-id="${pt.id}">${pt.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
-            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this point')}
           </div>
         `;
@@ -145,9 +141,6 @@ export class Sidebar {
             <div class="inspector-card-title">${line.id}</div>
             <div class="inspector-row"><span>Length:</span> <strong>${length} mm</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${line.isConstruction ? 'Construction' : 'Solid'}</strong></div>
-            <div class="inspector-actions">
-              <button class="btn-sm" data-action="toggle-const" data-id="${line.id}">${line.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
-            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this line')}
           </div>
         `;
@@ -170,9 +163,6 @@ export class Sidebar {
             <div class="inspector-row"><span>Radius:</span> <strong>${circ.radius.toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Diameter:</span> <strong>${(circ.radius * 2).toFixed(1)} mm</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${circ.isConstruction ? 'Construction' : 'Solid'}</strong></div>
-            <div class="inspector-actions">
-              <button class="btn-sm" data-action="toggle-const" data-id="${circ.id}">${circ.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
-            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this circle')}
           </div>
         `;
@@ -207,9 +197,6 @@ export class Sidebar {
             <div class="inspector-row"><span>Length:</span> <strong>${arcLen} mm</strong></div>
             <div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${arc.isConstruction ? 'Construction' : 'Solid'}</strong></div>
-            <div class="inspector-actions">
-              <button class="btn-sm" data-action="toggle-const" data-id="${arc.id}">${arc.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
-            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this arc')}
           </div>
         `;
@@ -245,9 +232,6 @@ export class Sidebar {
             <div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
             <div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${ellipse.isConstruction ? 'Construction' : 'Solid'}</strong></div>
-            <div class="inspector-actions">
-              <button class="btn-sm" data-action="toggle-const" data-id="${ellipse.id}">${ellipse.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
-            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this ellipse')}
           </div>
         `;
@@ -284,9 +268,6 @@ export class Sidebar {
             <div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
             <div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
             <div class="inspector-row"><span>Type:</span> <strong>${arc.isConstruction ? 'Construction' : 'Solid'}</strong></div>
-            <div class="inspector-actions">
-              <button class="btn-sm" data-action="toggle-const" data-id="${arc.id}">${arc.isConstruction ? 'Make Solid' : 'Make Construction'}</button>
-            </div>
             ${this.renderConstraintsSublist(relatedConstraints, 'this elliptical arc')}
           </div>
         `;
@@ -307,12 +288,6 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: 2 Points (${pIds.join(', ')})</div>
-          <div class="inspector-actions">
-            <button class="btn-sm" data-multi-action="coincident">Coincident</button>
-            <button class="btn-sm" data-multi-action="dist-points">Distance</button>
-            <button class="btn-sm" data-multi-action="horiz-points">Horizontal</button>
-            <button class="btn-sm" data-multi-action="vert-points">Vertical</button>
-          </div>
           ${this.renderConstraintsSublist(related, 'selected points')}
         </div>
       `;
@@ -332,11 +307,6 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: 2 Lines (${lIds.join(', ')})</div>
-          <div class="inspector-actions">
-            <button class="btn-sm" data-multi-action="parallel">Parallel</button>
-            <button class="btn-sm" data-multi-action="perpendicular">Perpendicular</button>
-            <button class="btn-sm" data-multi-action="equal-length">Equal Length</button>
-          </div>
           ${this.renderConstraintsSublist(related, 'selected lines')}
         </div>
       `;
@@ -357,9 +327,6 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: Line & Circle</div>
-          <div class="inspector-actions">
-            <button class="btn-sm" data-multi-action="tangent">Tangent</button>
-          </div>
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
@@ -379,10 +346,6 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: 2 Circles (${cIds.join(', ')})</div>
-          <div class="inspector-actions">
-            <button class="btn-sm" data-multi-action="concentric">Concentric</button>
-            <button class="btn-sm" data-multi-action="equal-radius">Equal Radius</button>
-          </div>
           ${this.renderConstraintsSublist(related, 'selected circles')}
         </div>
       `;
@@ -403,10 +366,6 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: Point & Line</div>
-          <div class="inspector-actions">
-            <button class="btn-sm" data-multi-action="coincident">Coincident</button>
-            <button class="btn-sm" data-multi-action="midpoint">Midpoint</button>
-          </div>
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
@@ -427,9 +386,6 @@ export class Sidebar {
       detailsHtml = `
         <div class="inspector-card">
           <div class="inspector-card-title">Selected: Point & ${isArc ? 'Arc' : 'Circle'}</div>
-          <div class="inspector-actions">
-            <button class="btn-sm" data-multi-action="coincident">Coincident</button>
-          </div>
           ${this.renderConstraintsSublist(related, 'selected entities')}
         </div>
       `;
@@ -447,9 +403,10 @@ export class Sidebar {
       if (c) {
         detailsHtml = `
           <div class="inspector-card">
-            <div class="inspector-card-title">${c.name}</div>
+            <div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
             <div class="inspector-row"><span>Type:</span> <strong>${c.type}</strong></div>
             ${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
+            ${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
             ${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
           </div>
         `;
@@ -575,20 +532,30 @@ export class Sidebar {
   private renderConstraintItem(c: any): string {
     const isSelected = this.sketch.selection.constraintIds.has(c.id);
     let valBadge = '';
+    let name = c.name;
 
     if (c instanceof DistanceConstraint) {
       valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+      name = c.orientation === 'horizontal'
+        ? 'Horizontal Distance'
+        : c.orientation === 'vertical'
+        ? 'Vertical Distance'
+        : 'Distance';
+    } else if (c instanceof AngleConstraint) {
+      valBadge = `<span class="val-badge">${c.targetAngle.toFixed(1)}°</span>`;
+      name = 'Angle';
     } else if (c instanceof RadiusConstraint) {
       valBadge = c.displayMode === 'diameter'
         ? `<span class="val-badge">Ø ${(c.targetRadius * 2).toFixed(1)} mm</span>`
         : `<span class="val-badge">R ${c.targetRadius.toFixed(1)} mm</span>`;
+      name = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
     }
 
     return `
       <div class="tree-item constraint-item ${isSelected ? 'selected' : ''}" data-type="constraint" data-id="${c.id}">
         <div class="tree-item-info">
           <span class="tree-icon">${this.getConstraintIcon(c.type)}</span>
-          <span class="tree-name">${c.name}</span>
+          <span class="tree-name">${name}</span>
           ${valBadge}
         </div>
         <button class="tree-delete-btn" data-delete-id="${c.id}" title="Delete">${ICONS.delete}</button>
@@ -717,85 +684,6 @@ export class Sidebar {
         this.sketch.removeEntity(id);
       });
     });
-
-    // Inspector quick actions
-    this.container.querySelectorAll<HTMLButtonElement>('[data-action]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const action = btn.getAttribute('data-action');
-        const id = btn.getAttribute('data-id')!;
-
-        if (action === 'toggle-fix') {
-          const pt = this.sketch.points.get(id);
-          if (pt) {
-            pt.fixed = !pt.fixed;
-            this.sketch.rebuildParamManager();
-            this.sketch.solve();
-          }
-        } else if (action === 'toggle-const') {
-          this.sketch.toggleConstruction(id);
-        } else if (action === 'make-horiz') {
-          const line = this.sketch.lines.get(id);
-          if (line) this.sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
-        } else if (action === 'make-vert') {
-          const line = this.sketch.lines.get(id);
-          if (line) this.sketch.addVerticalConstraint(line.p1Id, line.p2Id);
-        } else if (action === 'add-dist') {
-          const line = this.sketch.lines.get(id);
-          if (line) this.sketch.addDistanceConstraint(line.p1Id, line.p2Id);
-        } else if (action === 'add-rad') {
-          this.sketch.addRadiusConstraint(id);
-        } else if (action === 'edit-dim') {
-          const c = this.sketch.constraints.get(id);
-          if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {
-            this.onEditDimension?.(c);
-          }
-        } else if (action === 'delete-c') {
-          this.sketch.removeEntity(id);
-        }
-      });
-    });
-
-    // Multi-selection constraint actions
-    this.container.querySelectorAll<HTMLButtonElement>('[data-multi-action]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const action = btn.getAttribute('data-multi-action');
-        const sel = this.sketch.selection;
-        const pIds = [...sel.pointIds];
-        const lIds = [...sel.lineIds];
-        const cIds = [...sel.circleIds, ...sel.arcIds];
-
-        if (action === 'coincident') {
-          if (pIds.length === 2) {
-            this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
-          } else if (pIds.length === 1 && lIds.length === 1) {
-            this.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-          } else if (pIds.length === 1 && cIds.length === 1) {
-            this.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
-          }
-        } else if (action === 'dist-points' && pIds.length === 2) {
-          this.sketch.addDistanceConstraint(pIds[0], pIds[1]);
-        } else if (action === 'horiz-points' && pIds.length === 2) {
-          this.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
-        } else if (action === 'vert-points' && pIds.length === 2) {
-          this.sketch.addVerticalConstraint(pIds[0], pIds[1]);
-        } else if (action === 'parallel' && lIds.length === 2) {
-          this.sketch.addParallelConstraint(lIds[0], lIds[1]);
-        } else if (action === 'perpendicular' && lIds.length === 2) {
-          this.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
-        } else if (action === 'equal-length' && lIds.length === 2) {
-          this.sketch.addEqualLengthConstraint(lIds[0], lIds[1]);
-        } else if (action === 'tangent' && lIds.length === 1 && cIds.length === 1) {
-          this.sketch.addTangentConstraint(lIds[0], cIds[0]);
-        } else if (action === 'concentric' && cIds.length === 2) {
-          this.sketch.addConcentricConstraint(cIds[0], cIds[1]);
-        } else if (action === 'equal-radius' && cIds.length === 2) {
-          this.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
-        } else if (action === 'point-on-line' && pIds.length === 1 && lIds.length === 1) {
-          this.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-        } else if (action === 'midpoint' && pIds.length === 1 && lIds.length === 1) {
-          this.sketch.addMidpointConstraint(pIds[0], lIds[0]);
-        }
-      });
-    });
   }
 }
+
