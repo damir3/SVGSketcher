@@ -27,7 +27,7 @@ function initApp(): void {
             <polygon points="12 2 2 22 22 22"/>
           </svg>
         </div>
-        <div class="brand-title">Sketcher CAD</div>
+        <div class="brand-title">SVG Sketcher</div>
         <div class="brand-badge">Parametric 2D</div>
       </div>
 
@@ -87,7 +87,6 @@ function initApp(): void {
       </div>
       <div class="footer-status">
         <span>Solver: <strong id="solver-time">0.0 ms</strong></span>
-        <span>TypeScript Levenberg-Marquardt Engine</span>
       </div>
     </footer>
   `;
