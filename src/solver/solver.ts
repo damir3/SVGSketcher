@@ -1,5 +1,5 @@
 import { Matrix, solveLinearSystem, computeRank } from '../math/matrix';
-import type { IConstraint, ParamRef, SolverOptions, SolverResult, SolverStatus } from './types';
+import type { IConstraint, ParamRef, SolveCallOptions, SolverOptions, SolverResult, SolverStatus } from './types';
 
 export class ParamManager {
   private params = new Map<string, ParamRef>();
@@ -20,15 +20,26 @@ export class ParamManager {
     this.paramIndices.clear();
   }
 
-  prepare(): void {
+  prepare(lockedParams?: Set<string>): void {
     this.freeParams = [];
     this.paramIndices.clear();
 
     for (const [id, param] of this.params.entries()) {
-      if (!param.isFixed) {
+      if (!param.isFixed && !lockedParams?.has(id)) {
         this.paramIndices.set(id, this.freeParams.length);
         this.freeParams.push(param);
       }
+    }
+  }
+
+  getFreeParams(): readonly ParamRef[] {
+    return this.freeParams;
+  }
+
+  /** Restores parameter values previously captured via getCurrentValues() */
+  restoreValues(values: Map<string, number>): void {
+    for (const [id, val] of values.entries()) {
+      this.params.get(id)?.set(val);
     }
   }
 
@@ -83,10 +94,21 @@ export class NumericalSolver {
     };
   }
 
-  solve(paramMgr: ParamManager, constraints: IConstraint[]): SolverResult {
-    paramMgr.prepare();
+  solve(paramMgr: ParamManager, constraints: IConstraint[], callOptions: SolveCallOptions = {}): SolverResult {
+    paramMgr.prepare(callOptions.lockedParams);
     const n = paramMgr.getFreeCount();
     const paramIndices = paramMgr.getIndices();
+    const freeParams = paramMgr.getFreeParams();
+
+    // Per-parameter damping scale and lower bounds
+    const stiffness = new Float64Array(n);
+    const lowerBounds = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      stiffness[i] = callOptions.paramStiffness?.get(freeParams[i].id) ?? 1;
+      lowerBounds[i] = freeParams[i].min ?? -Infinity;
+    }
+    const dofOf = (map: Map<string, number>): number =>
+      callOptions.skipDoF ? 0 : this.computeDoF(paramMgr, constraints, map);
 
     // Calculate total equations
     let totalEquations = 0;
@@ -113,7 +135,7 @@ export class NumericalSolver {
     const initialError = currentError;
 
     if (currentError < this.options.tolerance * this.options.tolerance) {
-      const dof = this.computeDoF(paramMgr, constraints, paramMap);
+      const dof = dofOf(paramMap);
       return {
         status: dof === 0 ? 'CONVERGED' : 'UNDER_CONSTRAINED',
         iterations: 0,
@@ -161,10 +183,12 @@ export class NumericalSolver {
       }
 
       // Add Levenberg-Marquardt damping: (A + lambda * diag(A + I)) * delta = -g
+      // Stiffer parameters get proportionally more damping, so the solver prefers
+      // moving the other parameters first.
       const H = A.clone();
       for (let i = 0; i < n; i++) {
         const diagVal = Math.max(Math.abs(A.get(i, i)), 1.0);
-        H.addAt(i, i, lambda * diagVal);
+        H.addAt(i, i, lambda * diagVal * stiffness[i]);
       }
 
       const negG = new Float64Array(n);
@@ -181,8 +205,10 @@ export class NumericalSolver {
       const candidateX = new Float64Array(n);
       let stepNormSq = 0;
       for (let i = 0; i < n; i++) {
-        candidateX[i] = x[i] + deltaX[i];
-        stepNormSq += deltaX[i] * deltaX[i];
+        // Projected step: respect parameter lower bounds
+        candidateX[i] = Math.max(lowerBounds[i], x[i] + deltaX[i]);
+        const d = candidateX[i] - x[i];
+        stepNormSq += d * d;
       }
 
       paramMgr.applyToMap(paramMap, candidateX);
@@ -208,7 +234,7 @@ export class NumericalSolver {
 
     const hardConstraints = constraints.filter(c => !c.isSoft);
     const hardError = this.evaluateError(hardConstraints, paramMap);
-    const degreesOfFreedom = this.computeDoF(paramMgr, constraints, paramMap);
+    const degreesOfFreedom = dofOf(paramMap);
     let status: SolverStatus;
 
     if (hardError > 1e-2) {

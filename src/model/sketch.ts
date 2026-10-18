@@ -757,10 +757,27 @@ export class SketchDocument {
       line.p1Id,
       line.p2Id,
       circle.centerId,
-      circleOrArcId
+      circleOrArcId,
+      this.getTangentSide(line, circle.centerId)
     );
     this.addConstraint(c);
     return c;
+  }
+
+  /**
+   * Returns on which side (+1 / -1) of the directed line p1->p2 the given center
+   * currently lies, using the same sign convention as TangentLineCircleConstraint.
+   * This keeps the circle on its current side when the tangent constraint is applied.
+   */
+  private getTangentSide(line: SketchLine, centerId: string): number {
+    const p1 = this.points.get(line.p1Id);
+    const p2 = this.points.get(line.p2Id);
+    const center = this.points.get(centerId);
+    if (!p1 || !p2 || !center) return 1;
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const cross = (center.x - p1.x) * dy - (center.y - p1.y) * dx;
+    return cross >= 0 ? 1 : -1;
   }
 
   addConcentricConstraint(c1Id: string, c2Id: string): ConcentricConstraint | null {
@@ -955,6 +972,7 @@ export class SketchDocument {
           circle.radius = Math.max(1, val);
         },
         isFixed: false,
+        min: 1,
       });
     }
 
@@ -966,13 +984,68 @@ export class SketchDocument {
           arc.radius = Math.max(1, val);
         },
         isFixed: false,
+        min: 1,
       });
     }
   }
 
+  /**
+   * Radii driven by a radius/diameter constraint are applied directly and locked,
+   * so the solver never changes them to satisfy other constraints.
+   */
+  private collectDrivenRadii(): Set<string> {
+    const locked = new Set<string>();
+    for (const c of this.constraints.values()) {
+      if (!(c instanceof RadiusConstraint)) continue;
+      const entity = this.circles.get(c.circleId) ?? this.arcs.get(c.circleId);
+      if (!entity) continue;
+      entity.radius = Math.max(1, c.targetRadius);
+      locked.add(`${c.circleId}.r`);
+    }
+    return locked;
+  }
+
   solve(extraConstraints: IConstraint[] = []): SolverResult {
     const activeConstraints = [...this.constraints.values(), ...extraConstraints];
-    const res = this.solver.solve(this.paramManager, activeConstraints);
+    const drivenRadii = this.collectDrivenRadii();
+
+    // Interactive drags keep the regular behaviour (radius may follow the drag)
+    if (extraConstraints.length > 0) {
+      const res = this.solver.solve(this.paramManager, activeConstraints, { lockedParams: drivenRadii });
+      this.lastSolverResult = res;
+      this.notify();
+      return res;
+    }
+
+    // Radii are changed only as a last resort:
+    // Stage 1: try to satisfy all constraints with every radius locked.
+    const allRadii = new Set<string>(drivenRadii);
+    for (const id of this.circles.keys()) allRadii.add(`${id}.r`);
+    for (const id of this.arcs.keys()) allRadii.add(`${id}.r`);
+
+    let stage1Ok = false;
+    if (allRadii.size > drivenRadii.size) {
+      const initialValues = this.paramManager.getCurrentValues();
+      const stage1 = this.solver.solve(this.paramManager, activeConstraints, {
+        lockedParams: allRadii,
+        skipDoF: true,
+      });
+      stage1Ok = stage1.status !== 'OVER_CONSTRAINED' && stage1.finalError < 1e-8;
+      if (!stage1Ok) {
+        // Discard the least-squares compromise and start over from the original state
+        this.paramManager.restoreValues(initialValues);
+      }
+    }
+
+    // Stage 2: free (non-driven) radii, but make them much stiffer than positions so
+    // that the solver prefers moving geometry over resizing circles. When stage 1
+    // succeeded this is a no-op / polish step that also computes the DoF.
+    const stiffness = new Map<string, number>();
+    for (const id of allRadii) stiffness.set(id, 1000);
+    const res = this.solver.solve(this.paramManager, activeConstraints, {
+      lockedParams: drivenRadii,
+      paramStiffness: stiffness,
+    });
     this.lastSolverResult = res;
     this.notify();
     return res;

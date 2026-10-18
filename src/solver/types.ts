@@ -25,6 +25,21 @@ export interface ParamRef {
   get(): number;
   set(val: number): void;
   isFixed?: boolean;
+  /** Optional lower bound enforced inside the solver iterations (e.g. radius >= 1) */
+  min?: number;
+}
+
+/** Per-call options for NumericalSolver.solve */
+export interface SolveCallOptions {
+  /** Parameters treated as fixed for this solve call only */
+  lockedParams?: Set<string>;
+  /**
+   * Relative "stiffness" of parameters in the LM damping term. Values > 1 make the
+   * solver prefer changing other parameters first (parameter changes last).
+   */
+  paramStiffness?: Map<string, number>;
+  /** Skip the (expensive) degrees-of-freedom rank computation */
+  skipDoF?: boolean;
 }
 
 export interface JacobianEntry {
