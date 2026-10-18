@@ -488,19 +488,22 @@ html, body {
   margin: 6px 0;
 }
 
-.inspector-constraints-section {
+.inspector-constraints-section,
+.inspector-primitives-section {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.inspector-constraints-header {
+.inspector-constraints-header,
+.inspector-primitives-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.inspector-constraints-title {
+.inspector-constraints-title,
+.inspector-primitives-title {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -508,13 +511,15 @@ html, body {
   color: var(--text-muted);
 }
 
-.inspector-constraints-list {
+.inspector-constraints-list,
+.inspector-primitives-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.inspector-empty-constraints {
+.inspector-empty-constraints,
+.inspector-empty-primitives {
   font-size: 11px;
   color: var(--text-muted);
   font-style: italic;

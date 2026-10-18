@@ -1204,7 +1204,8 @@ export class SketchDocument {
           c.type !== 'equal_length' &&
           c.type !== 'parallel' &&
           c.type !== 'perpendicular' &&
-          c.type !== 'tangent_line_circle'
+          c.type !== 'tangent_line_circle' &&
+          c.type !== 'angle'
         ) {
           if (c.entityIds.includes(id)) {
             res.push(c);
@@ -1245,6 +1246,15 @@ export class SketchDocument {
           }
         } else if (c.type === 'midpoint') {
           if (this.matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
+            res.push(c);
+          }
+        } else if (c.type === 'angle') {
+          if (
+            anyC.line1Id === id ||
+            anyC.line2Id === id ||
+            this.matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) ||
+            this.matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)
+          ) {
             res.push(c);
           }
         }
@@ -1310,6 +1320,151 @@ export class SketchDocument {
         }
       }
     }
+    return res;
+  }
+
+  getEntitiesForConstraint(c: IConstraint): Array<{
+    id: string;
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+  }> {
+    const res: Array<{
+      id: string;
+      type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+    }> = [];
+    const seen = new Set<string>();
+
+    const add = (id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc') => {
+      const key = `${type}:${id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        res.push({ id, type });
+      }
+    };
+
+    const anyC = c as any;
+
+    if (c.type === 'fixed') {
+      if (anyC.pointId && this.points.has(anyC.pointId)) {
+        add(anyC.pointId, 'point');
+      }
+    } else if (c.type === 'coincident') {
+      if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
+      if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
+    } else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
+      const line = this.getLineBetween(anyC.p1Id, anyC.p2Id);
+      if (line) {
+        add(line.id, 'line');
+      } else {
+        if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
+        if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
+      }
+    } else if (c.type === 'radius') {
+      const cid = anyC.circleId;
+      if (this.circles.has(cid)) add(cid, 'circle');
+      else if (this.arcs.has(cid)) add(cid, 'arc');
+    } else if (c.type === 'equal_radius') {
+      const c1 = anyC.circle1Id;
+      const c2 = anyC.circle2Id;
+      if (this.circles.has(c1)) add(c1, 'circle');
+      else if (this.arcs.has(c1)) add(c1, 'arc');
+      if (this.circles.has(c2)) add(c2, 'circle');
+      else if (this.arcs.has(c2)) add(c2, 'arc');
+    } else if (c.type === 'equal_length') {
+      const l1 = this.getLineBetween(anyC.line1P1, anyC.line1P2);
+      const l2 = this.getLineBetween(anyC.line2P1, anyC.line2P2);
+      if (l1) add(l1.id, 'line');
+      if (l2) add(l2.id, 'line');
+    } else if (c.type === 'parallel' || c.type === 'perpendicular') {
+      const l1 = this.getLineBetween(anyC.l1P1, anyC.l1P2);
+      const l2 = this.getLineBetween(anyC.l2P1, anyC.l2P2);
+      if (l1) add(l1.id, 'line');
+      if (l2) add(l2.id, 'line');
+    } else if (c.type === 'angle') {
+      if (anyC.line1Id && this.lines.has(anyC.line1Id)) {
+        add(anyC.line1Id, 'line');
+      } else {
+        const l1 = this.getLineBetween(anyC.l1P1, anyC.l1P2);
+        if (l1) add(l1.id, 'line');
+      }
+      if (anyC.line2Id && this.lines.has(anyC.line2Id)) {
+        add(anyC.line2Id, 'line');
+      } else {
+        const l2 = this.getLineBetween(anyC.l2P1, anyC.l2P2);
+        if (l2) add(l2.id, 'line');
+      }
+    } else if (c.type === 'point_on_line') {
+      if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
+      const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
+      if (line) add(line.id, 'line');
+    } else if (c.type === 'point_on_circle') {
+      if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
+      const cid = anyC.circleId;
+      if (this.circles.has(cid)) add(cid, 'circle');
+      else if (this.arcs.has(cid)) add(cid, 'arc');
+    } else if (c.type === 'tangent_line_circle') {
+      const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
+      if (line) add(line.id, 'line');
+      const cid = anyC.circleId;
+      if (this.circles.has(cid)) add(cid, 'circle');
+      else if (this.arcs.has(cid)) add(cid, 'arc');
+    } else if (c.type === 'concentric') {
+      const e1 =
+        [...this.circles.values()].find(circ => circ.centerId === anyC.c1CenterId) ??
+        [...this.arcs.values()].find(arc => arc.centerId === anyC.c1CenterId);
+      if (e1) {
+        add(e1.id, this.circles.has(e1.id) ? 'circle' : 'arc');
+      } else if (anyC.c1CenterId && this.points.has(anyC.c1CenterId)) {
+        add(anyC.c1CenterId, 'point');
+      }
+
+      const e2 =
+        [...this.circles.values()].find(circ => circ.centerId === anyC.c2CenterId) ??
+        [...this.arcs.values()].find(arc => arc.centerId === anyC.c2CenterId);
+      if (e2) {
+        add(e2.id, this.circles.has(e2.id) ? 'circle' : 'arc');
+      } else if (anyC.c2CenterId && this.points.has(anyC.c2CenterId)) {
+        add(anyC.c2CenterId, 'point');
+      }
+    } else if (c.type === 'midpoint') {
+      if (anyC.midId && this.points.has(anyC.midId)) add(anyC.midId, 'point');
+      const line = this.getLineBetween(anyC.p1Id, anyC.p2Id);
+      if (line) {
+        add(line.id, 'line');
+      } else {
+        if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
+        if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
+      }
+    } else if (c.type === 'ellipse_axis') {
+      if (anyC.ellipseId) {
+        if (this.ellipses.has(anyC.ellipseId)) add(anyC.ellipseId, 'ellipse');
+        else if (this.ellipticalArcs.has(anyC.ellipseId)) add(anyC.ellipseId, 'elliptical_arc');
+      }
+    } else if (c.type === 'elliptical_arc_endpoints') {
+      if (anyC.arcId && this.ellipticalArcs.has(anyC.arcId)) {
+        add(anyC.arcId, 'elliptical_arc');
+      }
+    }
+
+    // Safety net: check if any primitive in the sketch considers this constraint related
+    for (const l of this.lines.values()) {
+      if (this.getConstraintsForEntity('line', l.id).some(sc => sc.id === c.id)) add(l.id, 'line');
+    }
+    for (const circ of this.circles.values()) {
+      if (this.getConstraintsForEntity('circle', circ.id).some(sc => sc.id === c.id)) add(circ.id, 'circle');
+    }
+    for (const a of this.arcs.values()) {
+      if (this.getConstraintsForEntity('arc', a.id).some(sc => sc.id === c.id)) add(a.id, 'arc');
+    }
+    for (const el of this.ellipses.values()) {
+      if (this.getConstraintsForEntity('ellipse', el.id).some(sc => sc.id === c.id)) add(el.id, 'ellipse');
+    }
+    for (const ea of this.ellipticalArcs.values()) {
+      if (this.getConstraintsForEntity('elliptical_arc', ea.id).some(sc => sc.id === c.id)) add(ea.id, 'elliptical_arc');
+    }
+    for (const pt of this.points.values()) {
+      if (this.getConstraintsForEntity('point', pt.id).some(sc => sc.id === c.id)) add(pt.id, 'point');
+    }
+
     return res;
   }
 

@@ -401,6 +401,7 @@ export class Sidebar {
       const cid = [...sel.constraintIds][0];
       const c = this.sketch.constraints.get(cid);
       if (c) {
+        const relatedPrimitives = this.sketch.getEntitiesForConstraint(c);
         detailsHtml = `
           <div class="inspector-card">
             <div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
@@ -408,12 +409,67 @@ export class Sidebar {
             ${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
             ${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
             ${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
+            ${this.renderPrimitivesSublist(relatedPrimitives)}
           </div>
         `;
       }
     }
 
     return detailsHtml;
+  }
+
+  private renderPrimitivesSublist(
+    primitives: Array<{
+      id: string;
+      type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+    }>
+  ): string {
+    return `
+      <div class="inspector-divider"></div>
+      <div class="inspector-primitives-section">
+        <div class="inspector-primitives-header">
+          <span class="inspector-primitives-title">Primitives (${primitives.length})</span>
+        </div>
+        <div class="inspector-primitives-list">
+          ${primitives.map(p => this.renderPrimitiveSublistItem(p)).join('')}
+          ${primitives.length === 0 ? `<div class="inspector-empty-primitives">No primitives linked</div>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderPrimitiveSublistItem(entityRef: {
+    id: string;
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+  }): string {
+    switch (entityRef.type) {
+      case 'line': {
+        const line = this.sketch.lines.get(entityRef.id);
+        return line ? this.renderLineItem(line) : '';
+      }
+      case 'circle': {
+        const circle = this.sketch.circles.get(entityRef.id);
+        return circle ? this.renderCircleItem(circle) : '';
+      }
+      case 'arc': {
+        const arc = this.sketch.arcs.get(entityRef.id);
+        return arc ? this.renderArcItem(arc) : '';
+      }
+      case 'ellipse': {
+        const ellipse = this.sketch.ellipses.get(entityRef.id);
+        return ellipse ? this.renderEllipseItem(ellipse) : '';
+      }
+      case 'elliptical_arc': {
+        const elArc = this.sketch.ellipticalArcs.get(entityRef.id);
+        return elArc ? this.renderEllipticalArcItem(elArc) : '';
+      }
+      case 'point': {
+        const pt = this.sketch.points.get(entityRef.id);
+        return pt ? this.renderPointItem(pt) : '';
+      }
+      default:
+        return '';
+    }
   }
 
   private renderConstraintsSublist(constraints: any[], entityName: string): string {
@@ -592,7 +648,14 @@ export class Sidebar {
         if ((e.target as HTMLElement).closest('.tree-delete-btn')) return;
 
         const id = item.getAttribute('data-id')!;
-        const type = item.getAttribute('data-type')! as 'point' | 'line' | 'circle' | 'arc' | 'constraint';
+        const type = item.getAttribute('data-type')! as
+          | 'point'
+          | 'line'
+          | 'circle'
+          | 'arc'
+          | 'ellipse'
+          | 'elliptical_arc'
+          | 'constraint';
 
         this.sketch.selectEntity(id, type, false);
 
