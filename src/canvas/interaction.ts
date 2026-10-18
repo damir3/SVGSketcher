@@ -3,7 +3,13 @@ import type { SketchSnapshot } from '../model/history';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
 import { dist, vec, projectPointOntoSegment, getCircumcircle, type Vec2 } from '../math/vector';
-import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
+import {
+  DistanceConstraint,
+  RadiusConstraint,
+  AngleConstraint,
+  HorizontalConstraint,
+  VerticalConstraint,
+} from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
 
@@ -771,6 +777,86 @@ export class CanvasInteraction {
     }
   }
 
+  private applyAutoOrientationConstraint(p1Id: string, p2Id: string): void {
+    const p1 = this.sketch.getPoint(p1Id);
+    const p2 = this.sketch.getPoint(p2Id);
+    if (!p1 || !p2) return;
+
+    const dx = Math.abs(p2.x - p1.x);
+    const dy = Math.abs(p2.y - p1.y);
+    if (dx < 1e-6 && dy < 1e-6) return;
+
+    // Angle relative to X axis in degrees: [0, 90]
+    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+    // Horizontal check: deviation from horizontal < 1 degree
+    if (angleDeg < 1.0) {
+      const alreadyHoriz = [...this.sketch.constraints.values()].some(
+        c =>
+          c instanceof HorizontalConstraint &&
+          ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+      );
+      if (!alreadyHoriz) {
+        this.sketch.addHorizontalConstraint(p1Id, p2Id);
+        showToast('Horizontal constraint applied');
+      }
+      return;
+    }
+
+    // Vertical check: deviation from vertical < 1 degree
+    if (90 - angleDeg < 1.0) {
+      const alreadyVert = [...this.sketch.constraints.values()].some(
+        c =>
+          c instanceof VerticalConstraint &&
+          ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+      );
+      if (!alreadyVert) {
+        this.sketch.addVerticalConstraint(p1Id, p2Id);
+        showToast('Vertical constraint applied');
+      }
+      return;
+    }
+  }
+
+  private getAxisSnappedWorldPos(
+    startPos: Vec2,
+    targetPos: Vec2,
+    snap: SnapResult | null
+  ): { pos: Vec2; axis: 'horizontal' | 'vertical' | null } {
+    if (this.isSnapModifierPressed) {
+      return { pos: targetPos, axis: null };
+    }
+    if (snap && (snap.type === 'point' || snap.type === 'line' || snap.type === 'circle')) {
+      return { pos: targetPos, axis: null };
+    }
+
+    const dx = Math.abs(targetPos.x - startPos.x);
+    const dy = Math.abs(targetPos.y - startPos.y);
+    if (dx < 1e-6 && dy < 1e-6) {
+      return { pos: targetPos, axis: null };
+    }
+
+    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+
+    // Deviation from horizontal < 1 degree
+    if (angleDeg < 1.0) {
+      return {
+        pos: vec(targetPos.x, startPos.y),
+        axis: 'horizontal',
+      };
+    }
+
+    // Deviation from vertical < 1 degree
+    if (90 - angleDeg < 1.0) {
+      return {
+        pos: vec(startPos.x, targetPos.y),
+        axis: 'vertical',
+      };
+    }
+
+    return { pos: targetPos, axis: null };
+  }
+
   private findPointNearScreen(screen: Vec2, thresholdPx = 16): SketchPoint | null {
     let closestDist = thresholdPx;
     let foundPoint: SketchPoint | null = null;
@@ -1450,13 +1536,18 @@ export class CanvasInteraction {
         if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId) {
           p2Id = snap.id;
         } else {
-          const ptPos = snap ? snap.worldPos : world;
+          let ptPos = snap ? snap.worldPos : world;
+          if (this.startWorldPos) {
+            const axisSnap = this.getAxisSnappedWorldPos(this.startWorldPos, ptPos, snap);
+            ptPos = axisSnap.pos;
+          }
           const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
           p2Id = pt.id;
           this.applySnapConstraintIfNeeded(pt.id, snap);
         }
 
         this.sketch.addLine(this.startPointId!, p2Id, this.isConstructionMode);
+        this.applyAutoOrientationConstraint(this.startPointId!, p2Id);
         this.sketch.commitTransaction();
 
         const hitPrimitive =
@@ -2318,7 +2409,14 @@ export class CanvasInteraction {
     // Active tool drawing preview: Step 1
     if (this.drawingStep === 1 && this.startWorldPos) {
       const s1 = this.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
-      const effectiveWorld = snap ? snap.worldPos : world;
+      let effectiveWorld = snap ? snap.worldPos : world;
+      let axisBadge: 'H' | 'V' | undefined;
+
+      if (this.activeTool === 'line') {
+        const axisSnap = this.getAxisSnappedWorldPos(this.startWorldPos, effectiveWorld, snap);
+        effectiveWorld = axisSnap.pos;
+        axisBadge = axisSnap.axis === 'horizontal' ? 'H' : axisSnap.axis === 'vertical' ? 'V' : undefined;
+      }
       const s2 = this.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 
       if (this.activeTool === 'line' || this.activeTool === 'arc') {
@@ -2326,7 +2424,7 @@ export class CanvasInteraction {
         const angleDeg =
           (Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
           Math.PI;
-        this.renderer.renderLinePreview(s1, s2, length, angleDeg, this.isConstructionMode);
+        this.renderer.renderLinePreview(s1, s2, length, angleDeg, this.isConstructionMode, axisBadge);
       } else if (this.activeTool === 'circle' || this.activeTool === 'arc_center') {
         const radius = dist(this.startWorldPos, effectiveWorld);
         const isGuide = this.activeTool === 'arc_center';

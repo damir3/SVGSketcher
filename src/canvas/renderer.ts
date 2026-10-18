@@ -1488,7 +1488,14 @@ export class SVGRenderer {
   }
 
   // Live drawing previews
-  renderLinePreview(s1: Vec2, s2: Vec2, len: number, angleDeg: number, isConstruction = false): void {
+  renderLinePreview(
+    s1: Vec2,
+    s2: Vec2,
+    len: number,
+    angleDeg: number,
+    isConstruction = false,
+    axisBadge?: 'H' | 'V'
+  ): void {
     this.previewGroup.innerHTML = '';
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1506,7 +1513,8 @@ export class SVGRenderer {
 
     // Length & Angle Tooltip
     const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 - 16 };
-    const label = `${len.toFixed(1)} mm | ${angleDeg.toFixed(1)}°`;
+    const badgeText = axisBadge ? ` [${axisBadge}]` : '';
+    const label = `${len.toFixed(1)} mm | ${angleDeg.toFixed(1)}°${badgeText}`;
     this.renderTooltip(mid.x, mid.y, label);
   }
 
