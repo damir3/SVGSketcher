@@ -3143,14 +3143,16 @@ export class CanvasInteraction {
         const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
         const offsetWorld = offsetScreen / this.viewport.zoom;
 
+        const existed = this.sketch.hasDistanceConstraint(l1.p1Id, l1.p2Id, orientation);
         const c = this.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld, orientation);
         if (c) {
-          const toastMsg =
-            orientation === 'horizontal'
-              ? 'Horizontal distance constraint applied'
-              : orientation === 'vertical'
-              ? 'Vertical distance constraint applied'
-              : 'Distance constraint applied';
+          const toastMsg = existed
+            ? 'Editing distance constraint'
+            : orientation === 'horizontal'
+            ? 'Horizontal distance constraint applied'
+            : orientation === 'vertical'
+            ? 'Vertical distance constraint applied'
+            : 'Distance constraint applied';
           showToast(toastMsg);
           this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
           this.renderer.clearPreviews();
@@ -3176,6 +3178,11 @@ export class CanvasInteraction {
           const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
           const offsetWorld = offsetScreen / this.viewport.zoom;
 
+          const existed = this.sketch.hasDistanceConstraint(
+            this.dimensionState.point1Id,
+            this.dimensionState.point2Id,
+            orientation
+          );
           const c = this.sketch.addDistanceConstraint(
             this.dimensionState.point1Id,
             this.dimensionState.point2Id,
@@ -3184,12 +3191,13 @@ export class CanvasInteraction {
             orientation
           );
           if (c) {
-            const toastMsg =
-              orientation === 'horizontal'
-                ? 'Horizontal distance constraint applied'
-                : orientation === 'vertical'
-                ? 'Vertical distance constraint applied'
-                : 'Distance constraint applied';
+            const toastMsg = existed
+              ? 'Editing distance constraint'
+              : orientation === 'horizontal'
+              ? 'Horizontal distance constraint applied'
+              : orientation === 'vertical'
+              ? 'Vertical distance constraint applied'
+              : 'Distance constraint applied';
             showToast(toastMsg);
             this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
             this.renderer.clearPreviews();
@@ -3220,9 +3228,10 @@ export class CanvasInteraction {
       if (p1 && p2 && p3 && p4) {
         const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world);
         const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
+        const existed = this.sketch.hasAngleConstraint(l1.id, l2.id);
         const c = this.sketch.addAngleConstraint(l1.id, l2.id, undefined, arcRadiusWorld, world);
         if (c) {
-          showToast('Angle constraint applied');
+          showToast(existed ? 'Editing angle constraint' : 'Angle constraint applied');
           this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
           this.renderer.clearPreviews();
           this.sketch.clearSelection();
@@ -3534,9 +3543,10 @@ export class CanvasInteraction {
       case 'distance': {
         if (lIds.length === 1) {
           const l = this.sketch.lines.get(lIds[0])!;
+          const existed = this.sketch.hasDistanceConstraint(l.p1Id, l.p2Id);
           const c = this.sketch.addDistanceConstraint(l.p1Id, l.p2Id);
           applied = true;
-          toastMsg = 'Distance constraint applied';
+          toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
           if (c && this.onEditDimension) {
             const p1 = this.sketch.points.get(l.p1Id);
             const p2 = this.sketch.points.get(l.p2Id);
@@ -3547,9 +3557,10 @@ export class CanvasInteraction {
             this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
           }
         } else if (lIds.length === 2) {
+          const existed = this.sketch.hasAngleConstraint(lIds[0], lIds[1]);
           const c = this.sketch.addAngleConstraint(lIds[0], lIds[1]);
           applied = true;
-          toastMsg = 'Angle constraint applied';
+          toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
           if (c && this.onEditDimension) {
             const l1 = this.sketch.lines.get(lIds[0])!;
             const l2 = this.sketch.lines.get(lIds[1])!;
@@ -3563,9 +3574,10 @@ export class CanvasInteraction {
             this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
           }
         } else if (pIds.length === 2) {
+          const existed = this.sketch.hasDistanceConstraint(pIds[0], pIds[1]);
           const c = this.sketch.addDistanceConstraint(pIds[0], pIds[1]);
           applied = true;
-          toastMsg = 'Distance constraint applied';
+          toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
           if (c && this.onEditDimension) {
             const p1 = this.sketch.points.get(pIds[0]);
             const p2 = this.sketch.points.get(pIds[1]);

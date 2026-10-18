@@ -528,15 +528,55 @@ export class SketchDocument {
   }
 
   addHorizontalConstraint(p1Id: string, p2Id: string): HorizontalConstraint {
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof HorizontalConstraint &&
+        ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+    );
+    if (existing) return existing as HorizontalConstraint;
+
     const c = new HorizontalConstraint(this.nextId('c_horiz'), p1Id, p2Id);
     this.addConstraint(c);
     return c;
   }
 
   addVerticalConstraint(p1Id: string, p2Id: string): VerticalConstraint {
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof VerticalConstraint &&
+        ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+    );
+    if (existing) return existing as VerticalConstraint;
+
     const c = new VerticalConstraint(this.nextId('c_vert'), p1Id, p2Id);
     this.addConstraint(c);
     return c;
+  }
+
+  getDistanceConstraint(
+    p1Id: string,
+    p2Id: string,
+    orientation?: 'aligned' | 'horizontal' | 'vertical'
+  ): DistanceConstraint | undefined {
+    for (const c of this.constraints.values()) {
+      if (
+        c instanceof DistanceConstraint &&
+        ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+      ) {
+        if (!orientation || (c.orientation ?? 'aligned') === orientation) {
+          return c;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  hasDistanceConstraint(
+    p1Id: string,
+    p2Id: string,
+    orientation?: 'aligned' | 'horizontal' | 'vertical'
+  ): boolean {
+    return this.getDistanceConstraint(p1Id, p2Id, orientation) !== undefined;
   }
 
   addDistanceConstraint(
@@ -550,15 +590,36 @@ export class SketchDocument {
     const p2 = this.points.get(p2Id);
     if (!p1 || !p2) return null;
 
+    const effectiveOrientation = orientation ?? 'aligned';
+
+    // Prevent duplicate identical distance constraints
+    const existing = this.getDistanceConstraint(p1Id, p2Id, effectiveOrientation);
+    if (existing) {
+      let changed = false;
+      if (offset !== undefined && existing.offset !== offset) {
+        existing.offset = offset;
+      }
+      if (targetDist !== undefined && existing.targetDistance !== targetDist) {
+        this.pushHistory();
+        existing.targetDistance = targetDist;
+        existing.value = targetDist;
+        changed = true;
+      }
+      if (changed) {
+        this.solve();
+      }
+      return existing;
+    }
+
     let measured = dist(p1, p2);
-    if (orientation === 'horizontal') {
+    if (effectiveOrientation === 'horizontal') {
       measured = Math.abs(p2.x - p1.x);
-    } else if (orientation === 'vertical') {
+    } else if (effectiveOrientation === 'vertical') {
       measured = Math.abs(p2.y - p1.y);
     }
 
     const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
-    const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset, orientation);
+    const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset, effectiveOrientation);
     this.addConstraint(c);
     return c;
   }
@@ -680,6 +741,25 @@ export class SketchDocument {
     const p4 = this.points.get(l2.p2Id);
     if (!p1 || !p2 || !p3 || !p4) return null;
 
+    // Check if an angle constraint already exists between these two lines
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof AngleConstraint &&
+        ((c.line1Id === line1Id && c.line2Id === line2Id) || (c.line1Id === line2Id && c.line2Id === line1Id))
+    ) as AngleConstraint | undefined;
+    if (existing) {
+      if (arcRadius !== undefined && existing.arcRadius !== arcRadius) {
+        existing.arcRadius = arcRadius;
+      }
+      if (targetAngleDeg !== undefined && existing.targetAngle !== targetAngleDeg) {
+        this.pushHistory();
+        existing.targetAngle = targetAngleDeg;
+        existing.value = targetAngleDeg;
+        this.solve();
+      }
+      return existing;
+    }
+
     const cursorPos = typeof cursorPosOrS1 === 'object' && cursorPosOrS1 !== null ? cursorPosOrS1 : undefined;
     const geom = this.calculateLinesAngleGeometry(p1, p2, p3, p4, cursorPos);
 
@@ -764,6 +844,14 @@ export class SketchDocument {
     const l2 = this.lines.get(line2Id);
     if (!l1 || !l2) return null;
 
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof EqualLengthConstraint &&
+        ((this.matchesEndpoints(c.line1P1, c.line1P2, l1.p1Id, l1.p2Id) && this.matchesEndpoints(c.line2P1, c.line2P2, l2.p1Id, l2.p2Id)) ||
+          (this.matchesEndpoints(c.line1P1, c.line1P2, l2.p1Id, l2.p2Id) && this.matchesEndpoints(c.line2P1, c.line2P2, l1.p1Id, l1.p2Id)))
+    );
+    if (existing) return existing as EqualLengthConstraint;
+
     const c = new EqualLengthConstraint(
       this.nextId('c_eqlen'),
       l1.p1Id,
@@ -776,6 +864,14 @@ export class SketchDocument {
   }
 
   addEqualRadiusConstraint(circle1Id: string, circle2Id: string): EqualRadiusConstraint {
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof EqualRadiusConstraint &&
+        ((c.circle1Id === circle1Id && c.circle2Id === circle2Id) ||
+          (c.circle1Id === circle2Id && c.circle2Id === circle1Id))
+    );
+    if (existing) return existing as EqualRadiusConstraint;
+
     const c = new EqualRadiusConstraint(this.nextId('c_eqrad'), circle1Id, circle2Id);
     this.addConstraint(c);
     return c;
@@ -786,6 +882,14 @@ export class SketchDocument {
     const l2 = this.lines.get(line2Id);
     if (!l1 || !l2) return null;
 
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof ParallelConstraint &&
+        ((this.matchesEndpoints(c.l1P1, c.l1P2, l1.p1Id, l1.p2Id) && this.matchesEndpoints(c.l2P1, c.l2P2, l2.p1Id, l2.p2Id)) ||
+          (this.matchesEndpoints(c.l1P1, c.l1P2, l2.p1Id, l2.p2Id) && this.matchesEndpoints(c.l2P1, c.l2P2, l1.p1Id, l1.p2Id)))
+    );
+    if (existing) return existing as ParallelConstraint;
+
     const c = new ParallelConstraint(this.nextId('c_par'), l1.p1Id, l1.p2Id, l2.p1Id, l2.p2Id);
     this.addConstraint(c);
     return c;
@@ -795,6 +899,14 @@ export class SketchDocument {
     const l1 = this.lines.get(line1Id);
     const l2 = this.lines.get(line2Id);
     if (!l1 || !l2) return null;
+
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof PerpendicularConstraint &&
+        ((this.matchesEndpoints(c.l1P1, c.l1P2, l1.p1Id, l1.p2Id) && this.matchesEndpoints(c.l2P1, c.l2P2, l2.p1Id, l2.p2Id)) ||
+          (this.matchesEndpoints(c.l1P1, c.l1P2, l2.p1Id, l2.p2Id) && this.matchesEndpoints(c.l2P1, c.l2P2, l1.p1Id, l1.p2Id)))
+    );
+    if (existing) return existing as PerpendicularConstraint;
 
     const c = new PerpendicularConstraint(this.nextId('c_perp'), l1.p1Id, l1.p2Id, l2.p1Id, l2.p2Id);
     this.addConstraint(c);
@@ -855,6 +967,14 @@ export class SketchDocument {
     const line = this.lines.get(lineId);
     const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
     if (!line || !circle) return null;
+
+    const existing = [...this.constraints.values()].find(
+      c =>
+        c instanceof TangentLineCircleConstraint &&
+        c.circleId === circleOrArcId &&
+        this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)
+    );
+    if (existing) return existing as TangentLineCircleConstraint;
 
     const c = new TangentLineCircleConstraint(
       this.nextId('c_tang'),
@@ -1212,6 +1332,19 @@ export class SketchDocument {
     }
     return false;
   }
+
+  hasAngleConstraint(line1Id: string, line2Id: string): boolean {
+    for (const c of this.constraints.values()) {
+      if (
+        c instanceof AngleConstraint &&
+        ((c.line1Id === line1Id && c.line2Id === line2Id) || (c.line1Id === line2Id && c.line2Id === line1Id))
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
 
   isPointFixed(pointId: string): boolean {
     const pt = this.points.get(pointId);
