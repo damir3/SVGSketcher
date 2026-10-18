@@ -1615,91 +1615,173 @@ export class SketchDocument {
   }
 
   exportSVG(): string {
-    // Generate clean SVG markup for CAD export
+    // Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
     const elements: string[] = [];
+
+    const usedPoints = new Set<string>();
+
     for (const line of this.lines.values()) {
+      usedPoints.add(line.p1Id);
+      usedPoints.add(line.p2Id);
       const p1 = this.points.get(line.p1Id);
       const p2 = this.points.get(line.p2Id);
       if (p1 && p2) {
         const dash = line.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
-          `<line x1="${p1.x.toFixed(2)}" y1="${p1.y.toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${p2.y.toFixed(2)}"${dash} stroke-width="2" />`
+          `<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" />`
         );
       }
     }
+
     for (const circ of this.circles.values()) {
+      usedPoints.add(circ.centerId);
       const center = this.points.get(circ.centerId);
       if (center) {
         const dash = circ.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
-          `<circle cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
+          `<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
         );
       }
     }
+
     for (const arc of this.arcs.values()) {
+      usedPoints.add(arc.centerId);
+      usedPoints.add(arc.startPointId);
+      usedPoints.add(arc.endPointId);
       const center = this.points.get(arc.centerId);
       const start = this.points.get(arc.startPointId);
       const end = this.points.get(arc.endPointId);
       if (center && start && end) {
-        const as = Math.atan2(start.y - center.y, start.x - center.x);
-        const ae = Math.atan2(end.y - center.y, end.x - center.x);
+        // Convert to SVG coordinates (Y-down)
+        const sc = { x: center.x, y: -center.y };
+        const ss = { x: start.x, y: -start.y };
+        const se = { x: end.x, y: -end.y };
+
+        const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+        const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
         const clockwise = !!arc.clockwise;
-        let sweepAngle = clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
-        if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+
+        let sweepAngle = 0;
+        let sweepFlag = 0;
+        if (clockwise) {
+          sweepAngle = (ae - as) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          sweepFlag = 1;
+        } else {
+          sweepAngle = (as - ae) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          sweepFlag = 0;
+        }
         const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
-        const sweepFlag = clockwise ? 1 : 0;
         const dash = arc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
-          `<path d="M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${end.x.toFixed(2)} ${end.y.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
+          `<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
         );
       }
     }
+
     for (const el of this.ellipses.values()) {
+      usedPoints.add(el.centerId);
+      usedPoints.add(el.majorAxisPointId);
+      usedPoints.add(el.minorAxisPointId);
       const center = this.points.get(el.centerId);
       const maj = this.points.get(el.majorAxisPointId);
       const min = this.points.get(el.minorAxisPointId);
       if (center && maj && min) {
-        const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
-        const ry = Math.hypot(min.x - center.x, min.y - center.y);
-        const deg = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
+        const sc = { x: center.x, y: -center.y };
+        const smaj = { x: maj.x, y: -maj.y };
+        const smin = { x: min.x, y: -min.y };
+        const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+        const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+        const deg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
         const dash = el.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
-          `<ellipse cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${center.x.toFixed(2)} ${center.y.toFixed(2)})"${dash} stroke-width="2" fill="none" />`
+          `<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="2" fill="none" />`
         );
       }
     }
+
     for (const elarc of this.ellipticalArcs.values()) {
+      usedPoints.add(elarc.centerId);
+      usedPoints.add(elarc.majorAxisPointId);
+      usedPoints.add(elarc.minorAxisPointId);
+      usedPoints.add(elarc.startPointId);
+      usedPoints.add(elarc.endPointId);
       const center = this.points.get(elarc.centerId);
       const maj = this.points.get(elarc.majorAxisPointId);
       const min = this.points.get(elarc.minorAxisPointId);
       const start = this.points.get(elarc.startPointId);
       const end = this.points.get(elarc.endPointId);
       if (center && maj && min && start && end) {
-        const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
-        const ry = Math.hypot(min.x - center.x, min.y - center.y);
-        const phi = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
-        const ux = (maj.x - center.x) / rx;
-        const uy = (maj.y - center.y) / rx;
-        const vx = (min.x - center.x) / ry;
-        const vy = (min.y - center.y) / ry;
-        const us = (start.x - center.x) * ux + (start.y - center.y) * uy;
-        const vs = (start.x - center.x) * vx + (start.y - center.y) * vy;
-        const ue = (end.x - center.x) * ux + (end.y - center.y) * uy;
-        const ve = (end.x - center.x) * vx + (end.y - center.y) * vy;
+        const sc = { x: center.x, y: -center.y };
+        const smaj = { x: maj.x, y: -maj.y };
+        const smin = { x: min.x, y: -min.y };
+        const ss = { x: start.x, y: -start.y };
+        const se = { x: end.x, y: -end.y };
+
+        const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+        const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+        const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+        const thetaDeg = (theta * 180) / Math.PI;
+
+        const ux = Math.cos(theta);
+        const uy = Math.sin(theta);
+        const vx = -Math.sin(theta);
+        const vy = Math.cos(theta);
+
+        const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+        const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+        const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+        const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+
         const ts = Math.atan2(vs / ry, us / rx);
         const te = Math.atan2(ve / ry, ue / rx);
+
         const clockwise = !!elarc.clockwise;
-        let sweep = clockwise ? (ts - te) % (2 * Math.PI) : (te - ts) % (2 * Math.PI);
-        if (sweep < 0) sweep += 2 * Math.PI;
-        const largeArc = sweep > Math.PI ? 1 : 0;
-        const sweepFlag = clockwise ? 0 : 1;
+        let sweepAngle = 0;
+        let sweepFlag = 0;
+        if (clockwise) {
+          sweepAngle = (te - ts) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          sweepFlag = 1;
+        } else {
+          sweepAngle = (ts - te) % (2 * Math.PI);
+          if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+          sweepFlag = 0;
+        }
+        const largeArc = sweepAngle > Math.PI ? 1 : 0;
         const dash = elarc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
         elements.push(
-          `<path d="M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${phi.toFixed(2)} ${largeArc} ${sweepFlag} ${end.x.toFixed(2)} ${end.y.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
+          `<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
         );
       }
     }
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="-500 -500 1000 1000">\n  ${elements.join('\n  ')}\n</svg>`;
+
+    // Export isolated points
+    for (const pt of this.points.values()) {
+      if (!usedPoints.has(pt.id)) {
+        const fill = pt.isConstruction ? '#64748b' : '#0f172a';
+        elements.push(
+          `<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`
+        );
+      }
+    }
+
+    const bbox = this.getBoundingBox();
+    let viewBox = '-500 -500 1000 1000';
+
+    if (bbox) {
+      const w = bbox.maxX - bbox.minX;
+      const h = bbox.maxY - bbox.minY;
+      const padding = Math.max(10, Math.max(w, h) * 0.05);
+      const minX = bbox.minX - padding;
+      const minY = -bbox.maxY - padding;
+      const vbWidth = Math.max(w + padding * 2, 20);
+      const vbHeight = Math.max(h + padding * 2, 20);
+      viewBox = `${minX.toFixed(2)} ${minY.toFixed(2)} ${vbWidth.toFixed(2)} ${vbHeight.toFixed(2)}`;
+    }
+
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  ${elements.join('\n  ')}\n</svg>`;
   }
 
   getBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
@@ -1733,6 +1815,36 @@ export class SketchDocument {
         if (center.x + a.radius > maxX) maxX = center.x + a.radius;
         if (center.y - a.radius < minY) minY = center.y - a.radius;
         if (center.y + a.radius > maxY) maxY = center.y + a.radius;
+      }
+    }
+
+    for (const e of this.ellipses.values()) {
+      const center = this.points.get(e.centerId);
+      const maj = this.points.get(e.majorAxisPointId);
+      const min = this.points.get(e.minorAxisPointId);
+      if (center && maj && min) {
+        const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
+        const ry = Math.hypot(min.x - center.x, min.y - center.y);
+        const rMax = Math.max(rx, ry);
+        if (center.x - rMax < minX) minX = center.x - rMax;
+        if (center.x + rMax > maxX) maxX = center.x + rMax;
+        if (center.y - rMax < minY) minY = center.y - rMax;
+        if (center.y + rMax > maxY) maxY = center.y + rMax;
+      }
+    }
+
+    for (const ea of this.ellipticalArcs.values()) {
+      const center = this.points.get(ea.centerId);
+      const maj = this.points.get(ea.majorAxisPointId);
+      const min = this.points.get(ea.minorAxisPointId);
+      if (center && maj && min) {
+        const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
+        const ry = Math.hypot(min.x - center.x, min.y - center.y);
+        const rMax = Math.max(rx, ry);
+        if (center.x - rMax < minX) minX = center.x - rMax;
+        if (center.x + rMax > maxX) maxX = center.x + rMax;
+        if (center.y - rMax < minY) minY = center.y - rMax;
+        if (center.y + rMax > maxY) maxY = center.y + rMax;
       }
     }
 
