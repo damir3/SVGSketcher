@@ -1759,51 +1759,138 @@ export class SketchDocument {
     return res;
   }
 
+  isEntitySelected(
+    id: string,
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint'
+  ): boolean {
+    switch (type) {
+      case 'point': return this.selection.pointIds.has(id);
+      case 'line': return this.selection.lineIds.has(id);
+      case 'circle': return this.selection.circleIds.has(id);
+      case 'arc': return this.selection.arcIds.has(id);
+      case 'ellipse': return this.selection.ellipseIds.has(id);
+      case 'elliptical_arc': return this.selection.ellipticalArcIds.has(id);
+      case 'constraint': return this.selection.constraintIds.has(id);
+      default: return false;
+    }
+  }
+
+  deselectEntity(
+    id: string,
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint'
+  ): void {
+    switch (type) {
+      case 'point':
+        this.selection.pointIds.delete(id);
+        break;
+      case 'line':
+        this.selection.lineIds.delete(id);
+        break;
+      case 'circle':
+        this.selection.circleIds.delete(id);
+        break;
+      case 'arc':
+        this.selection.arcIds.delete(id);
+        break;
+      case 'ellipse':
+        this.selection.ellipseIds.delete(id);
+        break;
+      case 'elliptical_arc':
+        this.selection.ellipticalArcIds.delete(id);
+        break;
+      case 'constraint':
+        this.selection.constraintIds.delete(id);
+        break;
+    }
+
+    if (type !== 'constraint') {
+      for (const c of this.getConstraintsForEntity(type, id)) {
+        const otherEntities = this.getEntitiesForConstraint(c);
+        const stillSelected = otherEntities.some(ent => this.isEntitySelected(ent.id, ent.type));
+        if (!stillSelected) {
+          this.selection.constraintIds.delete(c.id);
+        }
+      }
+    }
+
+    this.notify();
+  }
+
+  toggleEntitySelection(
+    id: string,
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint'
+  ): void {
+    if (this.isEntitySelected(id, type)) {
+      this.deselectEntity(id, type);
+    } else {
+      this.selectEntity(id, type, true);
+    }
+  }
+
+  selectEntities(
+    items: Array<{
+      id: string;
+      type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint';
+    }>,
+    multiSelect = false
+  ): void {
+    if (!multiSelect) {
+      this.selection.pointIds.clear();
+      this.selection.lineIds.clear();
+      this.selection.circleIds.clear();
+      this.selection.arcIds.clear();
+      this.selection.ellipseIds.clear();
+      this.selection.ellipticalArcIds.clear();
+      this.selection.constraintIds.clear();
+    }
+
+    for (const item of items) {
+      if (item.type === 'point') {
+        this.selection.pointIds.add(item.id);
+        for (const c of this.getConstraintsForEntity('point', item.id)) {
+          this.selection.constraintIds.add(c.id);
+        }
+      } else if (item.type === 'line') {
+        this.selection.lineIds.add(item.id);
+        for (const c of this.getConstraintsForEntity('line', item.id)) {
+          this.selection.constraintIds.add(c.id);
+        }
+      } else if (item.type === 'circle') {
+        this.selection.circleIds.add(item.id);
+        for (const c of this.getConstraintsForEntity('circle', item.id)) {
+          this.selection.constraintIds.add(c.id);
+        }
+      } else if (item.type === 'arc') {
+        this.selection.arcIds.add(item.id);
+        for (const c of this.getConstraintsForEntity('arc', item.id)) {
+          this.selection.constraintIds.add(c.id);
+        }
+      } else if (item.type === 'ellipse') {
+        this.selection.ellipseIds.add(item.id);
+        for (const c of this.getConstraintsForEntity('ellipse', item.id)) {
+          this.selection.constraintIds.add(c.id);
+        }
+      } else if (item.type === 'elliptical_arc') {
+        this.selection.ellipticalArcIds.add(item.id);
+        for (const c of this.getConstraintsForEntity('elliptical_arc', item.id)) {
+          this.selection.constraintIds.add(c.id);
+        }
+      } else if (item.type === 'constraint') {
+        this.selection.constraintIds.add(item.id);
+      }
+    }
+
+    this.notify();
+  }
+
   selectEntity(
     id: string,
     type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint',
     multiSelect = false
   ): void {
-    if (!multiSelect) {
-      this.clearSelection();
-    }
-
-    if (type === 'point') {
-      this.selection.pointIds.add(id);
-      for (const c of this.getConstraintsForEntity('point', id)) {
-        this.selection.constraintIds.add(c.id);
-      }
-    } else if (type === 'line') {
-      this.selection.lineIds.add(id);
-      for (const c of this.getConstraintsForEntity('line', id)) {
-        this.selection.constraintIds.add(c.id);
-      }
-    } else if (type === 'circle') {
-      this.selection.circleIds.add(id);
-      for (const c of this.getConstraintsForEntity('circle', id)) {
-        this.selection.constraintIds.add(c.id);
-      }
-    } else if (type === 'arc') {
-      this.selection.arcIds.add(id);
-      for (const c of this.getConstraintsForEntity('arc', id)) {
-        this.selection.constraintIds.add(c.id);
-      }
-    } else if (type === 'ellipse') {
-      this.selection.ellipseIds.add(id);
-      for (const c of this.getConstraintsForEntity('ellipse', id)) {
-        this.selection.constraintIds.add(c.id);
-      }
-    } else if (type === 'elliptical_arc') {
-      this.selection.ellipticalArcIds.add(id);
-      for (const c of this.getConstraintsForEntity('elliptical_arc', id)) {
-        this.selection.constraintIds.add(c.id);
-      }
-    } else if (type === 'constraint') {
-      this.selection.constraintIds.add(id);
-    }
-
-    this.notify();
+    this.selectEntities([{ id, type }], multiSelect);
   }
+
 
   clear(): void {
     this.pushHistory();

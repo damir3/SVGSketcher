@@ -223,6 +223,16 @@ export class CanvasInteraction {
   private draggedConstraintId: string | null = null;
   private dragConstraintStartScreen: Vec2 | null = null;
 
+  // Box selection state
+  private isBoxSelecting = false;
+  private boxSelectStartScreen: Vec2 | null = null;
+  private boxSelectCurrentScreen: Vec2 | null = null;
+  private boxSelectShift = false;
+  private pendingExclusiveSelection: {
+    id: string;
+    type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint';
+  } | null = null;
+
   // Dragging history snapshot
   private preDragSnapshot: SketchSnapshot | null = null;
   private hasDragged = false;
@@ -439,6 +449,12 @@ export class CanvasInteraction {
     this.preDragSnapshot = null;
     this.hasDragged = false;
     this.svg.classList.remove('is-dragging');
+
+    this.isBoxSelecting = false;
+    this.boxSelectStartScreen = null;
+    this.boxSelectCurrentScreen = null;
+    this.boxSelectShift = false;
+    this.pendingExclusiveSelection = null;
 
     this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 
@@ -913,25 +929,9 @@ export class CanvasInteraction {
       }
     }
 
-    // Fallback: click inside circle area if nothing on perimeter
-    if (!foundCircle) {
-      let minRadius = Infinity;
-      for (const circle of this.sketch.circles.values()) {
-        const center = this.sketch.points.get(circle.centerId);
-        if (!center) continue;
-
-        const sc = this.viewport.worldToScreen(center.x, center.y);
-        const sr = circle.radius * this.viewport.zoom;
-        const dToCenter = dist(screen, sc);
-        if (dToCenter < sr && sr < minRadius) {
-          minRadius = sr;
-          foundCircle = circle;
-        }
-      }
-    }
-
     return foundCircle;
   }
+
 
   private findArcNearScreen(screen: Vec2, thresholdPx = 18): SketchArc | null {
     let closestDist = thresholdPx;
@@ -1379,8 +1379,21 @@ export class CanvasInteraction {
       }
 
       if (id && type) {
-        // Select entity immediately and select its associated constraints
-        this.sketch.selectEntity(id, type, e.shiftKey);
+        const isToggle = e.metaKey || e.ctrlKey;
+        if (isToggle) {
+          this.sketch.toggleEntitySelection(id, type);
+          this.render();
+          return;
+        }
+
+        const wasAlreadySelected = this.sketch.isEntitySelected(id, type);
+        if (e.shiftKey) {
+          this.sketch.selectEntity(id, type, true);
+        } else if (!wasAlreadySelected) {
+          this.sketch.selectEntity(id, type, false);
+        } else {
+          this.pendingExclusiveSelection = { id, type };
+        }
 
         if (type === 'point') {
           this.renderer.clearPreviews();
@@ -1493,9 +1506,15 @@ export class CanvasInteraction {
         this.svg.classList.add('is-dragging');
         this.render();
       } else {
-        // Clicked background -> clear selection
-        this.sketch.clearSelection();
-        this.render();
+        // Clicked background -> start rectangular box selection
+        this.isBoxSelecting = true;
+        this.boxSelectStartScreen = screen;
+        this.boxSelectCurrentScreen = screen;
+        this.boxSelectShift = e.shiftKey;
+        if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
+          this.sketch.clearSelection();
+          this.render();
+        }
       }
       return;
     }
@@ -2117,6 +2136,13 @@ export class CanvasInteraction {
       this.viewport.pan(dx, dy);
       this.lastMouseScreen = screen;
       this.render();
+      return;
+    }
+
+    // Box selection handling
+    if (this.isBoxSelecting && this.boxSelectStartScreen) {
+      this.boxSelectCurrentScreen = screen;
+      this.renderer.renderSelectionBox(this.boxSelectStartScreen, this.boxSelectCurrentScreen);
       return;
     }
 
@@ -2890,6 +2916,33 @@ export class CanvasInteraction {
       }
       this.updateCursor();
     }
+
+    if (this.isBoxSelecting) {
+      const startScreen = this.boxSelectStartScreen;
+      const endScreen = e ? this.getScreenPos(e) : (this.boxSelectCurrentScreen ?? startScreen);
+      const isShift = this.boxSelectShift || (e ? e.shiftKey : false);
+
+      this.isBoxSelecting = false;
+      this.boxSelectStartScreen = null;
+      this.boxSelectCurrentScreen = null;
+      this.boxSelectShift = false;
+      this.renderer.clearPreviews();
+
+      if (startScreen && endScreen && dist(startScreen, endScreen) > 4) {
+        this.finishBoxSelection(startScreen, endScreen, isShift);
+      }
+      this.render();
+    }
+
+    if (!this.hasDragged && this.pendingExclusiveSelection) {
+      this.sketch.selectEntity(
+        this.pendingExclusiveSelection.id,
+        this.pendingExclusiveSelection.type,
+        false
+      );
+      this.render();
+    }
+    this.pendingExclusiveSelection = null;
   }
 
   private handleWheel(e: WheelEvent): void {
@@ -3896,6 +3949,308 @@ export class CanvasInteraction {
     }
 
     this.render();
+  }
+
+  private finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {
+    const minScreenX = Math.min(s1.x, s2.x);
+    const maxScreenX = Math.max(s1.x, s2.x);
+    const minScreenY = Math.min(s1.y, s2.y);
+    const maxScreenY = Math.max(s1.y, s2.y);
+
+    const w1 = this.viewport.screenToWorld(minScreenX, minScreenY);
+    const w2 = this.viewport.screenToWorld(maxScreenX, maxScreenY);
+
+    const minX = Math.min(w1.x, w2.x);
+    const maxX = Math.max(w1.x, w2.x);
+    const minY = Math.min(w1.y, w2.y);
+    const maxY = Math.max(w1.y, w2.y);
+
+    const itemsToSelect: Array<{
+      id: string;
+      type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint';
+    }> = [];
+
+    // 1. Points
+    for (const pt of this.sketch.points.values()) {
+      if (pt.x >= minX && pt.x <= maxX && pt.y >= minY && pt.y <= maxY) {
+        itemsToSelect.push({ id: pt.id, type: 'point' });
+      }
+    }
+
+    // 2. Lines
+    for (const line of this.sketch.lines.values()) {
+      const p1 = this.sketch.points.get(line.p1Id);
+      const p2 = this.sketch.points.get(line.p2Id);
+      if (p1 && p2) {
+        if (this.segmentIntersectsAABB(p1.x, p1.y, p2.x, p2.y, minX, minY, maxX, maxY)) {
+          itemsToSelect.push({ id: line.id, type: 'line' });
+        }
+      }
+    }
+
+    // 3. Circles
+    for (const circle of this.sketch.circles.values()) {
+      const center = this.sketch.points.get(circle.centerId);
+      if (center) {
+        if (this.circleIntersectsAABB(center.x, center.y, circle.radius, minX, minY, maxX, maxY)) {
+          itemsToSelect.push({ id: circle.id, type: 'circle' });
+        }
+      }
+    }
+
+    // 4. Arcs
+    for (const arc of this.sketch.arcs.values()) {
+      if (this.arcIntersectsAABB(arc, minX, minY, maxX, maxY)) {
+        itemsToSelect.push({ id: arc.id, type: 'arc' });
+      }
+    }
+
+    // 5. Ellipses
+    for (const ellipse of this.sketch.ellipses.values()) {
+      if (this.ellipseIntersectsAABB(ellipse, minX, minY, maxX, maxY)) {
+        itemsToSelect.push({ id: ellipse.id, type: 'ellipse' });
+      }
+    }
+
+    // 6. Elliptical Arcs
+    for (const elArc of this.sketch.ellipticalArcs.values()) {
+      if (this.ellipticalArcIntersectsAABB(elArc, minX, minY, maxX, maxY)) {
+        itemsToSelect.push({ id: elArc.id, type: 'elliptical_arc' });
+      }
+    }
+
+    this.sketch.selectEntities(itemsToSelect, shiftKey);
+  }
+
+  private segmentIntersectsAABB(
+    p1x: number,
+    p1y: number,
+    p2x: number,
+    p2y: number,
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+  ): boolean {
+    if (p1x >= minX && p1x <= maxX && p1y >= minY && p1y <= maxY) return true;
+    if (p2x >= minX && p2x <= maxX && p2y >= minY && p2y <= maxY) return true;
+
+    if (Math.max(p1x, p2x) < minX || Math.min(p1x, p2x) > maxX) return false;
+    if (Math.max(p1y, p2y) < minY || Math.min(p1y, p2y) > maxY) return false;
+
+    const dx = p2x - p1x;
+    const dy = p2y - p1y;
+    let t0 = 0.0;
+    let t1 = 1.0;
+
+    const p = [-dx, dx, -dy, dy];
+    const q = [p1x - minX, maxX - p1x, p1y - minY, maxY - p1y];
+
+    for (let i = 0; i < 4; i++) {
+      if (p[i] === 0) {
+        if (q[i] < 0) return false;
+      } else {
+        const t = q[i] / p[i];
+        if (p[i] < 0) {
+          if (t > t1) return false;
+          if (t > t0) t0 = t;
+        } else {
+          if (t < t0) return false;
+          if (t < t1) t1 = t;
+        }
+      }
+    }
+    return t0 <= t1;
+  }
+
+  private circleIntersectsAABB(
+    cx: number,
+    cy: number,
+    r: number,
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+  ): boolean {
+    if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return true;
+
+    const closestX = Math.max(minX, Math.min(cx, maxX));
+    const closestY = Math.max(minY, Math.min(cy, maxY));
+    const distSq = (cx - closestX) ** 2 + (cy - closestY) ** 2;
+
+    if (distSq > r * r) return false;
+
+    const maxDx = Math.max(Math.abs(cx - minX), Math.abs(cx - maxX));
+    const maxDy = Math.max(Math.abs(cy - minY), Math.abs(cy - maxY));
+    const furthestDistSq = maxDx * maxDx + maxDy * maxDy;
+
+    if (furthestDistSq < r * r) return false;
+
+    return true;
+  }
+
+  private arcIntersectsAABB(
+    arc: SketchArc,
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+  ): boolean {
+    const center = this.sketch.points.get(arc.centerId);
+    const start = this.sketch.points.get(arc.startPointId);
+    const end = this.sketch.points.get(arc.endPointId);
+    if (!center || !start || !end) return false;
+
+    if (start.x >= minX && start.x <= maxX && start.y >= minY && start.y <= maxY) return true;
+    if (end.x >= minX && end.x <= maxX && end.y >= minY && end.y <= maxY) return true;
+    if (center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY) return true;
+
+    const as = Math.atan2(start.y - center.y, start.x - center.x);
+    const ae = Math.atan2(end.y - center.y, end.x - center.x);
+    const clockwise = !!arc.clockwise;
+
+    let sweepAngle = 0;
+    if (clockwise) {
+      sweepAngle = (ae - as) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+    } else {
+      sweepAngle = (as - ae) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+    }
+
+    const steps = 32;
+    let prevX = start.x;
+    let prevY = start.y;
+
+    for (let i = 1; i <= steps; i++) {
+      const frac = i / steps;
+      const angle = clockwise ? as + frac * sweepAngle : as - frac * sweepAngle;
+      const currX = center.x + arc.radius * Math.cos(angle);
+      const currY = center.y + arc.radius * Math.sin(angle);
+
+      if (currX >= minX && currX <= maxX && currY >= minY && currY <= maxY) return true;
+      if (this.segmentIntersectsAABB(prevX, prevY, currX, currY, minX, minY, maxX, maxY)) return true;
+
+      prevX = currX;
+      prevY = currY;
+    }
+
+    return false;
+  }
+
+  private ellipseIntersectsAABB(
+    ellipse: SketchEllipse,
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+  ): boolean {
+    const center = this.sketch.points.get(ellipse.centerId);
+    const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+    const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+    if (!center || !majorPt || !minorPt) return false;
+
+    if (center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY) return true;
+    if (majorPt.x >= minX && majorPt.x <= maxX && majorPt.y >= minY && majorPt.y <= maxY) return true;
+    if (minorPt.x >= minX && minorPt.x <= maxX && minorPt.y >= minY && minorPt.y <= maxY) return true;
+
+    const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
+    const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
+    if (rx < 0.01 || ry < 0.01) return false;
+
+    const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
+    const ux = Math.cos(theta);
+    const uy = Math.sin(theta);
+    const vx = -Math.sin(theta);
+    const vy = Math.cos(theta);
+
+    const steps = 36;
+    let prevX = center.x + rx * ux;
+    let prevY = center.y + rx * uy;
+
+    for (let i = 1; i <= steps; i++) {
+      const t = (i / steps) * 2 * Math.PI;
+      const cosT = Math.cos(t);
+      const sinT = Math.sin(t);
+      const currX = center.x + rx * cosT * ux + ry * sinT * vx;
+      const currY = center.y + rx * cosT * uy + ry * sinT * vy;
+
+      if (currX >= minX && currX <= maxX && currY >= minY && currY <= maxY) return true;
+      if (this.segmentIntersectsAABB(prevX, prevY, currX, currY, minX, minY, maxX, maxY)) return true;
+
+      prevX = currX;
+      prevY = currY;
+    }
+
+    return false;
+  }
+
+  private ellipticalArcIntersectsAABB(
+    arc: SketchEllipticalArc,
+    minX: number,
+    minY: number,
+    maxX: number,
+    maxY: number
+  ): boolean {
+    const center = this.sketch.points.get(arc.centerId);
+    const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+    const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+    const startPt = this.sketch.points.get(arc.startPointId);
+    const endPt = this.sketch.points.get(arc.endPointId);
+    if (!center || !majorPt || !minorPt || !startPt || !endPt) return false;
+
+    if (center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY) return true;
+    if (startPt.x >= minX && startPt.x <= maxX && startPt.y >= minY && startPt.y <= maxY) return true;
+    if (endPt.x >= minX && endPt.x <= maxX && endPt.y >= minY && endPt.y <= maxY) return true;
+
+    const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
+    const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
+    if (rx < 0.01 || ry < 0.01) return false;
+
+    const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
+    const ux = Math.cos(theta);
+    const uy = Math.sin(theta);
+    const vx = -Math.sin(theta);
+    const vy = Math.cos(theta);
+
+    const us = (startPt.x - center.x) * ux + (startPt.y - center.y) * uy;
+    const vs = (startPt.x - center.x) * vx + (startPt.y - center.y) * vy;
+    const ue = (endPt.x - center.x) * ux + (endPt.y - center.y) * uy;
+    const ve = (endPt.x - center.x) * vx + (endPt.y - center.y) * vy;
+
+    const ts = Math.atan2(vs / ry, us / rx);
+    const te = Math.atan2(ve / ry, ue / rx);
+
+    const clockwise = !!arc.clockwise;
+    let sweepAngle = 0;
+    if (clockwise) {
+      sweepAngle = (te - ts) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+    } else {
+      sweepAngle = (ts - te) % (2 * Math.PI);
+      if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+    }
+
+    const steps = 36;
+    let prevX = startPt.x;
+    let prevY = startPt.y;
+
+    for (let i = 1; i <= steps; i++) {
+      const frac = i / steps;
+      const t = clockwise ? ts + frac * sweepAngle : ts - frac * sweepAngle;
+      const cosT = Math.cos(t);
+      const sinT = Math.sin(t);
+      const currX = center.x + rx * cosT * ux + ry * sinT * vx;
+      const currY = center.y + rx * cosT * uy + ry * sinT * vy;
+
+      if (currX >= minX && currX <= maxX && currY >= minY && currY <= maxY) return true;
+      if (this.segmentIntersectsAABB(prevX, prevY, currX, currY, minX, minY, maxX, maxY)) return true;
+
+      prevX = currX;
+      prevY = currY;
+    }
+
+    return false;
   }
 }
 

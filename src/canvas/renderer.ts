@@ -2078,6 +2078,28 @@ export class SVGRenderer {
     this.overlayGroup.innerHTML = '';
   }
 
+  renderSelectionBox(s1: Vec2, s2: Vec2): void {
+    this.overlayGroup.innerHTML = '';
+    const minX = Math.min(s1.x, s2.x);
+    const minY = Math.min(s1.y, s2.y);
+    const width = Math.abs(s2.x - s1.x);
+    const height = Math.abs(s2.y - s1.y);
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', minX.toFixed(1));
+    rect.setAttribute('y', minY.toFixed(1));
+    rect.setAttribute('width', width.toFixed(1));
+    rect.setAttribute('height', height.toFixed(1));
+    rect.setAttribute('fill', 'rgba(14, 165, 233, 0.12)');
+    rect.setAttribute('stroke', '#0ea5e9');
+    rect.setAttribute('stroke-width', '1');
+    rect.setAttribute('stroke-dasharray', '4 3');
+    rect.setAttribute('pointer-events', 'none');
+    rect.style.pointerEvents = 'none';
+
+    this.overlayGroup.appendChild(rect);
+  }
+
   clearPreviews(): void {
     this.previewGroup.innerHTML = '';
     this.overlayGroup.innerHTML = '';
