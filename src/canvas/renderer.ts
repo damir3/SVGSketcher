@@ -1421,7 +1421,7 @@ export class SVGRenderer {
   }
 
   // Live drawing previews
-  renderLinePreview(s1: Vec2, s2: Vec2, len: number, angleDeg: number): void {
+  renderLinePreview(s1: Vec2, s2: Vec2, len: number, angleDeg: number, isConstruction = false): void {
     this.previewGroup.innerHTML = '';
 
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1429,9 +1429,12 @@ export class SVGRenderer {
     line.setAttribute('y1', s1.y.toFixed(1));
     line.setAttribute('x2', s2.x.toFixed(1));
     line.setAttribute('y2', s2.y.toFixed(1));
-    line.setAttribute('stroke', '#0284c7');
+    line.setAttribute('stroke', isConstruction ? '#64748b' : '#1e293b');
     line.setAttribute('stroke-width', '2');
-    line.setAttribute('stroke-dasharray', '4,4');
+    line.setAttribute('stroke-linecap', 'round');
+    if (isConstruction) {
+      line.setAttribute('stroke-dasharray', '6,6');
+    }
     this.previewGroup.appendChild(line);
 
     // Length & Angle Tooltip
@@ -1581,7 +1584,13 @@ export class SVGRenderer {
     this.renderTooltip(midX, midY, `${angleDeg.toFixed(1)}°`);
   }
 
-  renderCirclePreview(center: Vec2, current: Vec2, radius: number): void {
+  renderCirclePreview(
+    center: Vec2,
+    current: Vec2,
+    radius: number,
+    isConstruction = false,
+    isGuide = false
+  ): void {
     this.previewGroup.innerHTML = '';
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1589,9 +1598,17 @@ export class SVGRenderer {
     circle.setAttribute('cy', center.y.toFixed(1));
     const rPx = Math.hypot(current.x - center.x, current.y - center.y);
     circle.setAttribute('r', rPx.toFixed(1));
-    circle.setAttribute('stroke', '#0284c7');
-    circle.setAttribute('stroke-width', '2');
-    circle.setAttribute('stroke-dasharray', '4,4');
+    if (isGuide) {
+      circle.setAttribute('stroke', '#0284c7');
+      circle.setAttribute('stroke-width', '2');
+      circle.setAttribute('stroke-dasharray', '4,4');
+    } else {
+      circle.setAttribute('stroke', isConstruction ? '#64748b' : '#1e293b');
+      circle.setAttribute('stroke-width', '2');
+      if (isConstruction) {
+        circle.setAttribute('stroke-dasharray', '6,6');
+      }
+    }
     circle.setAttribute('fill', 'none');
     this.previewGroup.appendChild(circle);
 
@@ -1615,7 +1632,8 @@ export class SVGRenderer {
     sr: number,
     clockwise: boolean,
     radiusVal: number,
-    sweepDeg?: number
+    sweepDeg?: number,
+    isConstruction = false
   ): void {
     this.previewGroup.innerHTML = '';
 
@@ -1635,13 +1653,27 @@ export class SVGRenderer {
     }
     const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
 
+    // Faint guide circle
+    const guideCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    guideCircle.setAttribute('cx', sc.x.toFixed(1));
+    guideCircle.setAttribute('cy', sc.y.toFixed(1));
+    guideCircle.setAttribute('r', sr.toFixed(1));
+    guideCircle.setAttribute('stroke', 'rgba(2, 132, 199, 0.25)');
+    guideCircle.setAttribute('stroke-width', '1');
+    guideCircle.setAttribute('stroke-dasharray', '2,4');
+    guideCircle.setAttribute('fill', 'none');
+    this.previewGroup.appendChild(guideCircle);
+
     const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${sr.toFixed(1)} ${sr.toFixed(1)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
 
     const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     arc.setAttribute('d', d);
-    arc.setAttribute('stroke', '#0284c7');
+    arc.setAttribute('stroke', isConstruction ? '#64748b' : '#1e293b');
     arc.setAttribute('stroke-width', '2');
-    arc.setAttribute('stroke-dasharray', '4,4');
+    arc.setAttribute('stroke-linecap', 'round');
+    if (isConstruction) {
+      arc.setAttribute('stroke-dasharray', '6,6');
+    }
     arc.setAttribute('fill', 'none');
     this.previewGroup.appendChild(arc);
 
@@ -1675,7 +1707,7 @@ export class SVGRenderer {
     this.renderTooltip(midX, midY, `R ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
   }
 
-  renderRectanglePreview(s1: Vec2, s2: Vec2, w: number, h: number): void {
+  renderRectanglePreview(s1: Vec2, s2: Vec2, w: number, h: number, isConstruction = false): void {
     this.previewGroup.innerHTML = '';
 
     const rx = Math.min(s1.x, s2.x);
@@ -1688,16 +1720,18 @@ export class SVGRenderer {
     rect.setAttribute('y', ry.toFixed(1));
     rect.setAttribute('width', rw.toFixed(1));
     rect.setAttribute('height', rh.toFixed(1));
-    rect.setAttribute('stroke', '#0284c7');
+    rect.setAttribute('stroke', isConstruction ? '#64748b' : '#1e293b');
     rect.setAttribute('stroke-width', '2');
-    rect.setAttribute('stroke-dasharray', '4,4');
-    rect.setAttribute('fill', 'rgba(2, 132, 199, 0.06)');
+    if (isConstruction) {
+      rect.setAttribute('stroke-dasharray', '6,6');
+    }
+    rect.setAttribute('fill', 'none');
     this.previewGroup.appendChild(rect);
 
     this.renderTooltip(s2.x + 12, s2.y - 12, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
   }
 
-  renderEllipseMajorAxisPreview(sc: Vec2, current: Vec2, radiusVal: number): void {
+  renderEllipseMajorAxisPreview(sc: Vec2, current: Vec2, radiusVal: number, _isConstruction = false): void {
     this.previewGroup.innerHTML = '';
 
     const axisLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1719,7 +1753,9 @@ export class SVGRenderer {
     smaj: Vec2,
     smin: Vec2,
     rxVal: number,
-    ryVal: number
+    ryVal: number,
+    isConstruction = false,
+    isGuide = false
   ): void {
     this.previewGroup.innerHTML = '';
 
@@ -1733,9 +1769,17 @@ export class SVGRenderer {
     ellipse.setAttribute('rx', rx.toFixed(1));
     ellipse.setAttribute('ry', ry.toFixed(1));
     ellipse.setAttribute('transform', `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`);
-    ellipse.setAttribute('stroke', '#0284c7');
-    ellipse.setAttribute('stroke-width', '2');
-    ellipse.setAttribute('stroke-dasharray', '4,4');
+    if (isGuide) {
+      ellipse.setAttribute('stroke', '#0284c7');
+      ellipse.setAttribute('stroke-width', '2');
+      ellipse.setAttribute('stroke-dasharray', '4,4');
+    } else {
+      ellipse.setAttribute('stroke', isConstruction ? '#64748b' : '#1e293b');
+      ellipse.setAttribute('stroke-width', '2');
+      if (isConstruction) {
+        ellipse.setAttribute('stroke-dasharray', '6,6');
+      }
+    }
     ellipse.setAttribute('fill', 'none');
     this.previewGroup.appendChild(ellipse);
 
@@ -1768,7 +1812,8 @@ export class SVGRenderer {
     smin: Vec2,
     ss: Vec2,
     rxVal: number,
-    ryVal: number
+    ryVal: number,
+    _isConstruction = false
   ): void {
     this.previewGroup.innerHTML = '';
 
@@ -1816,7 +1861,8 @@ export class SVGRenderer {
     se: Vec2,
     rxVal: number,
     ryVal: number,
-    clockwise: boolean
+    clockwise: boolean,
+    isConstruction = false
   ): void {
     this.previewGroup.innerHTML = '';
 
@@ -1870,9 +1916,12 @@ export class SVGRenderer {
 
     const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     arc.setAttribute('d', d);
-    arc.setAttribute('stroke', '#0284c7');
+    arc.setAttribute('stroke', isConstruction ? '#64748b' : '#1e293b');
     arc.setAttribute('stroke-width', '2');
-    arc.setAttribute('stroke-dasharray', '4,4');
+    arc.setAttribute('stroke-linecap', 'round');
+    if (isConstruction) {
+      arc.setAttribute('stroke-dasharray', '6,6');
+    }
     arc.setAttribute('fill', 'none');
     this.previewGroup.appendChild(arc);
 

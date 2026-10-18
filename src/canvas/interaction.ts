@@ -7,23 +7,18 @@ import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
 
-export type ConstraintToolType =
-  | 'coincident'
-  | 'fixed'
-  | 'horizontal_vertical'
-  | 'horizontal'
-  | 'vertical'
-  | 'dimension'
-  | 'distance'
-  | 'equal'
-  | 'parallel'
-  | 'perpendicular'
-  | 'tangent'
-  | 'concentric'
-  | 'point_on_line'
-  | 'midpoint';
+export const DRAWING_PRIMITIVE_TOOLS = [
+  'point',
+  'line',
+  'circle',
+  'arc',
+  'arc_center',
+  'rectangle',
+  'ellipse',
+  'elliptical_arc',
+] as const;
 
-export const CONSTRAINT_TOOLS: Set<string> = new Set([
+export const CONSTRAINT_TOOLS = [
   'coincident',
   'fixed',
   'horizontal_vertical',
@@ -38,23 +33,26 @@ export const CONSTRAINT_TOOLS: Set<string> = new Set([
   'concentric',
   'point_on_line',
   'midpoint',
-]);
+] as const;
+
+export type DrawingPrimitiveToolType = (typeof DRAWING_PRIMITIVE_TOOLS)[number];
+export type ConstraintToolType = (typeof CONSTRAINT_TOOLS)[number];
+
+const DRAWING_PRIMITIVE_TOOL_SET: ReadonlySet<string> = new Set(DRAWING_PRIMITIVE_TOOLS);
+const CONSTRAINT_TOOL_SET: ReadonlySet<string> = new Set(CONSTRAINT_TOOLS);
+
+export function isDrawingPrimitiveTool(tool: string): tool is DrawingPrimitiveToolType {
+  return DRAWING_PRIMITIVE_TOOL_SET.has(tool);
+}
 
 export function isConstraintTool(tool: string): tool is ConstraintToolType {
-  return CONSTRAINT_TOOLS.has(tool);
+  return CONSTRAINT_TOOL_SET.has(tool);
 }
 
 export type ToolType =
   | 'select'
   | 'pan'
-  | 'point'
-  | 'line'
-  | 'circle'
-  | 'arc'
-  | 'arc_center'
-  | 'rectangle'
-  | 'ellipse'
-  | 'elliptical_arc'
+  | DrawingPrimitiveToolType
   | ConstraintToolType;
 
 export interface SnapResult {
@@ -2265,20 +2263,10 @@ export class CanvasInteraction {
       return;
     }
 
-    // Snapping indicator is only shown during primitive creation when placing subsequent points (drawingStep > 0)
+    // Snapping indicator is shown during primitive creation (both first and subsequent points)
     // or when dragging points (handled in point drag block above).
-    const isDrawingPrimitiveNextPoint =
-      this.drawingStep > 0 &&
-      (this.activeTool === 'line' ||
-        this.activeTool === 'circle' ||
-        this.activeTool === 'arc' ||
-        this.activeTool === 'arc_center' ||
-        this.activeTool === 'rectangle' ||
-        this.activeTool === 'ellipse' ||
-        this.activeTool === 'elliptical_arc');
-
-    const snap = isDrawingPrimitiveNextPoint
-      ? this.findSnap(screen, this.startPointId ?? undefined)
+    const snap = isDrawingPrimitiveTool(this.activeTool)
+      ? this.findSnap(screen, this.drawingStep > 0 ? (this.startPointId ?? undefined) : undefined)
       : null;
 
     if (
@@ -2306,17 +2294,18 @@ export class CanvasInteraction {
         const angleDeg =
           (Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
           Math.PI;
-        this.renderer.renderLinePreview(s1, s2, length, angleDeg);
+        this.renderer.renderLinePreview(s1, s2, length, angleDeg, this.isConstructionMode);
       } else if (this.activeTool === 'circle' || this.activeTool === 'arc_center') {
         const radius = dist(this.startWorldPos, effectiveWorld);
-        this.renderer.renderCirclePreview(s1, s2, radius);
+        const isGuide = this.activeTool === 'arc_center';
+        this.renderer.renderCirclePreview(s1, s2, radius, this.isConstructionMode, isGuide);
       } else if (this.activeTool === 'rectangle') {
         const w = Math.abs(effectiveWorld.x - this.startWorldPos.x);
         const h = Math.abs(effectiveWorld.y - this.startWorldPos.y);
-        this.renderer.renderRectanglePreview(s1, s2, w, h);
+        this.renderer.renderRectanglePreview(s1, s2, w, h, this.isConstructionMode);
       } else if (this.activeTool === 'ellipse' || this.activeTool === 'elliptical_arc') {
         const rx = dist(this.startWorldPos, effectiveWorld);
-        this.renderer.renderEllipseMajorAxisPreview(s1, s2, rx);
+        this.renderer.renderEllipseMajorAxisPreview(s1, s2, rx, this.isConstructionMode);
       }
     }
 
@@ -2336,7 +2325,7 @@ export class CanvasInteraction {
         if (!circum || circum.radius < 1 || circum.radius > 50000) {
           const length = dist(p1, p2);
           const angleDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
-          this.renderer.renderLinePreview(s1, s2, length, angleDeg);
+          this.renderer.renderLinePreview(s1, s2, length, angleDeg, this.isConstructionMode);
         } else {
           const sc = this.viewport.worldToScreen(circum.center.x, circum.center.y);
           const s3 = this.viewport.worldToScreen(p3.x, p3.y);
@@ -2352,7 +2341,7 @@ export class CanvasInteraction {
           if (testCW < 0) testCW += 2 * Math.PI;
 
           const clockwise = testCW > 0 && testCW < sweepCW;
-          this.renderer.renderArcPreview(sc, s1, s2, sr, clockwise, circum.radius);
+          this.renderer.renderArcPreview(sc, s1, s2, sr, clockwise, circum.radius, undefined, this.isConstructionMode);
         }
       } else if (this.activeTool === 'arc_center') {
         const centerWorld = this.startWorldPos;
@@ -2386,7 +2375,8 @@ export class CanvasInteraction {
           sr,
           clockwise,
           radius,
-          (Math.abs(delta) * 180) / Math.PI
+          (Math.abs(delta) * 180) / Math.PI,
+          this.isConstructionMode
         );
       } else if (this.activeTool === 'ellipse' || this.activeTool === 'elliptical_arc') {
         const centerWorld = this.startWorldPos;
@@ -2406,7 +2396,8 @@ export class CanvasInteraction {
           const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
           const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
           const sMin = this.viewport.worldToScreen(minWorld.x, minWorld.y);
-          this.renderer.renderEllipsePreview(sCenter, sMaj, sMin, majLen, ryVal);
+          const isGuide = this.activeTool === 'elliptical_arc';
+          this.renderer.renderEllipsePreview(sCenter, sMaj, sMin, majLen, ryVal, this.isConstructionMode, isGuide);
         }
       }
     }
@@ -2447,7 +2438,7 @@ export class CanvasInteraction {
         const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
         const sMin = this.viewport.worldToScreen(minWorld.x, minWorld.y);
         const sStart = this.viewport.worldToScreen(startWorld.x, startWorld.y);
-        this.renderer.renderEllipticalArcStartPreview(sCenter, sMaj, sMin, sStart, rxVal, ryVal);
+        this.renderer.renderEllipticalArcStartPreview(sCenter, sMaj, sMin, sStart, rxVal, ryVal, this.isConstructionMode);
       }
     }
 
@@ -2517,7 +2508,8 @@ export class CanvasInteraction {
           sEnd,
           rxVal,
           ryVal,
-          clockwise
+          clockwise,
+          this.isConstructionMode
         );
       }
     }
