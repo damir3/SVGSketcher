@@ -1023,6 +1023,71 @@ export class SketchDocument {
     return c;
   }
 
+  // Helper: check if a point is used by any remaining primitive
+  isPointUsed(pointId: string): boolean {
+    for (const line of this.lines.values()) {
+      if (line.p1Id === pointId || line.p2Id === pointId) return true;
+    }
+    for (const circle of this.circles.values()) {
+      if (circle.centerId === pointId) return true;
+    }
+    for (const arc of this.arcs.values()) {
+      if (arc.centerId === pointId || arc.startPointId === pointId || arc.endPointId === pointId) return true;
+    }
+    for (const el of this.ellipses.values()) {
+      if (el.centerId === pointId || el.majorAxisPointId === pointId || el.minorAxisPointId === pointId) return true;
+    }
+    for (const elarc of this.ellipticalArcs.values()) {
+      if (
+        elarc.centerId === pointId ||
+        elarc.majorAxisPointId === pointId ||
+        elarc.minorAxisPointId === pointId ||
+        elarc.startPointId === pointId ||
+        elarc.endPointId === pointId
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getPrimitivePointIds(primitiveId: string): string[] {
+    const line = this.lines.get(primitiveId);
+    if (line) return [line.p1Id, line.p2Id];
+
+    const circle = this.circles.get(primitiveId);
+    if (circle) return [circle.centerId];
+
+    const arc = this.arcs.get(primitiveId);
+    if (arc) return [arc.centerId, arc.startPointId, arc.endPointId];
+
+    const el = this.ellipses.get(primitiveId);
+    if (el) return [el.centerId, el.majorAxisPointId, el.minorAxisPointId];
+
+    const elarc = this.ellipticalArcs.get(primitiveId);
+    if (elarc) return [elarc.centerId, elarc.majorAxisPointId, elarc.minorAxisPointId, elarc.startPointId, elarc.endPointId];
+
+    return [];
+  }
+
+  cleanOrphanConstraints(): void {
+    for (const [cid, constraint] of this.constraints.entries()) {
+      const hasMissingEntity = constraint.entityIds.some(
+        entId =>
+          !this.points.has(entId) &&
+          !this.lines.has(entId) &&
+          !this.circles.has(entId) &&
+          !this.arcs.has(entId) &&
+          !this.ellipses.has(entId) &&
+          !this.ellipticalArcs.has(entId)
+      );
+      if (hasMissingEntity) {
+        this.constraints.delete(cid);
+        this.selection.constraintIds.delete(cid);
+      }
+    }
+  }
+
   // --- Deletion with cascade ---
   removeEntity(id: string): void {
     if (this.constraints.has(id)) {
@@ -1042,12 +1107,16 @@ export class SketchDocument {
 
     this.beginTransaction();
 
+    const candidatePointIds = new Set<string>();
+
     if (this.points.has(id)) {
       this.points.delete(id);
       this.selection.pointIds.delete(id);
       // Remove lines referencing this point
       for (const [lid, line] of this.lines.entries()) {
         if (line.p1Id === id || line.p2Id === id) {
+          candidatePointIds.add(line.p1Id);
+          candidatePointIds.add(line.p2Id);
           this.lines.delete(lid);
           this.selection.lineIds.delete(lid);
         }
@@ -1055,6 +1124,7 @@ export class SketchDocument {
       // Remove circles referencing this center
       for (const [cid, circle] of this.circles.entries()) {
         if (circle.centerId === id) {
+          candidatePointIds.add(circle.centerId);
           this.circles.delete(cid);
           this.selection.circleIds.delete(cid);
         }
@@ -1062,6 +1132,9 @@ export class SketchDocument {
       // Remove arcs referencing this point
       for (const [aid, arc] of this.arcs.entries()) {
         if (arc.centerId === id || arc.startPointId === id || arc.endPointId === id) {
+          candidatePointIds.add(arc.centerId);
+          candidatePointIds.add(arc.startPointId);
+          candidatePointIds.add(arc.endPointId);
           this.arcs.delete(aid);
           this.selection.arcIds.delete(aid);
         }
@@ -1069,6 +1142,9 @@ export class SketchDocument {
       // Remove ellipses referencing this point
       for (const [eid, el] of this.ellipses.entries()) {
         if (el.centerId === id || el.majorAxisPointId === id || el.minorAxisPointId === id) {
+          candidatePointIds.add(el.centerId);
+          candidatePointIds.add(el.majorAxisPointId);
+          candidatePointIds.add(el.minorAxisPointId);
           this.ellipses.delete(eid);
           this.selection.ellipseIds.delete(eid);
         }
@@ -1082,43 +1158,60 @@ export class SketchDocument {
           elarc.startPointId === id ||
           elarc.endPointId === id
         ) {
+          candidatePointIds.add(elarc.centerId);
+          candidatePointIds.add(elarc.majorAxisPointId);
+          candidatePointIds.add(elarc.minorAxisPointId);
+          candidatePointIds.add(elarc.startPointId);
+          candidatePointIds.add(elarc.endPointId);
           this.ellipticalArcs.delete(eaid);
           this.selection.ellipticalArcIds.delete(eaid);
         }
       }
     } else if (this.lines.has(id)) {
+      const line = this.lines.get(id)!;
+      candidatePointIds.add(line.p1Id);
+      candidatePointIds.add(line.p2Id);
       this.lines.delete(id);
       this.selection.lineIds.delete(id);
     } else if (this.circles.has(id)) {
+      const circle = this.circles.get(id)!;
+      candidatePointIds.add(circle.centerId);
       this.circles.delete(id);
       this.selection.circleIds.delete(id);
     } else if (this.arcs.has(id)) {
+      const arc = this.arcs.get(id)!;
+      candidatePointIds.add(arc.centerId);
+      candidatePointIds.add(arc.startPointId);
+      candidatePointIds.add(arc.endPointId);
       this.arcs.delete(id);
       this.selection.arcIds.delete(id);
     } else if (this.ellipses.has(id)) {
+      const el = this.ellipses.get(id)!;
+      candidatePointIds.add(el.centerId);
+      candidatePointIds.add(el.majorAxisPointId);
+      candidatePointIds.add(el.minorAxisPointId);
       this.ellipses.delete(id);
       this.selection.ellipseIds.delete(id);
     } else if (this.ellipticalArcs.has(id)) {
+      const elarc = this.ellipticalArcs.get(id)!;
+      candidatePointIds.add(elarc.centerId);
+      candidatePointIds.add(elarc.majorAxisPointId);
+      candidatePointIds.add(elarc.minorAxisPointId);
+      candidatePointIds.add(elarc.startPointId);
+      candidatePointIds.add(elarc.endPointId);
       this.ellipticalArcs.delete(id);
       this.selection.ellipticalArcIds.delete(id);
     }
 
-    // Clean up orphan constraints
-    for (const [cid, constraint] of this.constraints.entries()) {
-      const hasMissingEntity = constraint.entityIds.some(
-        entId =>
-          !this.points.has(entId) &&
-          !this.lines.has(entId) &&
-          !this.circles.has(entId) &&
-          !this.arcs.has(entId) &&
-          !this.ellipses.has(entId) &&
-          !this.ellipticalArcs.has(entId)
-      );
-      if (hasMissingEntity) {
-        this.constraints.delete(cid);
-        this.selection.constraintIds.delete(cid);
+    // Remove candidate points if they are no longer used by any remaining primitive
+    for (const ptId of candidatePointIds) {
+      if (this.points.has(ptId) && !this.isPointUsed(ptId)) {
+        this.points.delete(ptId);
+        this.selection.pointIds.delete(ptId);
       }
     }
+
+    this.cleanOrphanConstraints();
 
     this.rebuildParamManager();
     this.solve();
@@ -1800,6 +1893,24 @@ export class SketchDocument {
     const selectedEllipticalArcs = [...this.selection.ellipticalArcIds];
     const selectedConstraints = [...this.selection.constraintIds];
 
+    // Collect all candidate points from all selected primitives before deleting
+    const candidatePointIds = new Set<string>();
+    for (const id of selectedLines) {
+      for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+    }
+    for (const id of selectedCircles) {
+      for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+    }
+    for (const id of selectedArcs) {
+      for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+    }
+    for (const id of selectedEllipses) {
+      for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+    }
+    for (const id of selectedEllipticalArcs) {
+      for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+    }
+
     for (const id of selectedConstraints) this.removeConstraint(id);
     for (const id of selectedLines) this.removeEntity(id);
     for (const id of selectedCircles) this.removeEntity(id);
@@ -1808,7 +1919,19 @@ export class SketchDocument {
     for (const id of selectedEllipticalArcs) this.removeEntity(id);
     for (const id of selectedPoints) this.removeEntity(id);
 
+    // Final sweep for any candidate points that became unused across the batch
+    for (const ptId of candidatePointIds) {
+      if (this.points.has(ptId) && !this.isPointUsed(ptId)) {
+        this.points.delete(ptId);
+        this.selection.pointIds.delete(ptId);
+      }
+    }
+
+    this.cleanOrphanConstraints();
+
     this.clearSelection();
+    this.rebuildParamManager();
+    this.solve();
     this.commitTransaction();
   }
 
