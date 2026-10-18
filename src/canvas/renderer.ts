@@ -107,7 +107,7 @@ export class SVGRenderer {
     this.gridGroup.innerHTML = '';
     if (!showGrid) return;
 
-    const { subStep } = viewport.getGridStep();
+    const { step, subStep } = viewport.getGridStep();
     const minWorld = viewport.screenToWorld(0, viewport.height);
     const maxWorld = viewport.screenToWorld(viewport.width, 0);
 
@@ -124,11 +124,39 @@ export class SVGRenderer {
     // 2. Major grid lines (every step = 5 * subStep)
     let dMajor = '';
 
+    const origin = viewport.worldToScreen(0, 0);
+    const axisY = Math.max(8, Math.min(viewport.height - 40, origin.y));
+    const axisX = Math.max(8, Math.min(viewport.width - 30, origin.x));
+
+    const labelsG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    labelsG.setAttribute('class', 'grid-labels');
+
     for (let x = startX; x <= endX; x += subStep) {
       const s = viewport.worldToScreen(x, 0);
       const isMajor = Math.abs(Math.round(x / subStep) % 5) === 0;
       if (isMajor) {
         dMajor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
+
+        const cleanVal = parseFloat((Math.round(x / step) * step).toFixed(6));
+        if (Math.abs(cleanVal) > 1e-4) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          const anchorX = s.x;
+          const anchorY = axisY + 4;
+          text.setAttribute('x', anchorX.toFixed(1));
+          text.setAttribute('y', anchorY.toFixed(1));
+          text.setAttribute('transform', `rotate(-90 ${anchorX.toFixed(1)} ${anchorY.toFixed(1)})`);
+          text.setAttribute('text-anchor', 'end');
+          text.setAttribute('dominant-baseline', 'central');
+          text.setAttribute('font-size', '11');
+          text.setAttribute('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif");
+          text.setAttribute('fill', 'rgba(0, 0, 0, 0.6)');
+          text.setAttribute('paint-order', 'stroke fill');
+          text.setAttribute('stroke', '#ffffff');
+          text.setAttribute('stroke-width', '3');
+          text.setAttribute('stroke-linejoin', 'round');
+          text.textContent = cleanVal.toString();
+          labelsG.appendChild(text);
+        }
       } else if (showSubGrid) {
         dMinor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
       }
@@ -139,6 +167,26 @@ export class SVGRenderer {
       const isMajor = Math.abs(Math.round(y / subStep) % 5) === 0;
       if (isMajor) {
         dMajor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
+
+        const cleanVal = parseFloat((Math.round(y / step) * step).toFixed(6));
+        if (Math.abs(cleanVal) > 1e-4) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          const posX = axisX + 8;
+          const posY = s.y;
+          text.setAttribute('x', posX.toFixed(1));
+          text.setAttribute('y', posY.toFixed(1));
+          text.setAttribute('text-anchor', 'start');
+          text.setAttribute('dominant-baseline', 'central');
+          text.setAttribute('font-size', '11');
+          text.setAttribute('font-family', "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif");
+          text.setAttribute('fill', 'rgba(0, 0, 0, 0.6)');
+          text.setAttribute('paint-order', 'stroke fill');
+          text.setAttribute('stroke', '#ffffff');
+          text.setAttribute('stroke-width', '3');
+          text.setAttribute('stroke-linejoin', 'round');
+          text.textContent = cleanVal.toString();
+          labelsG.appendChild(text);
+        }
       } else if (showSubGrid) {
         dMinor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
       }
@@ -164,8 +212,10 @@ export class SVGRenderer {
       this.gridGroup.appendChild(majorPath);
     }
 
+    // Coordinate labels
+    this.gridGroup.appendChild(labelsG);
+
     // Origin Axes
-    const origin = viewport.worldToScreen(0, 0);
     const originG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 
     // X Axis (Red)
@@ -188,15 +238,26 @@ export class SVGRenderer {
     yAxis.setAttribute('stroke-width', '1.5');
     originG.appendChild(yAxis);
 
-    // Origin marker ring
-    const originDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    originDot.setAttribute('cx', origin.x.toString());
-    originDot.setAttribute('cy', origin.y.toString());
-    originDot.setAttribute('r', '5');
-    originDot.setAttribute('fill', 'rgba(217, 119, 6, 0.15)');
-    originDot.setAttribute('stroke', '#d97706');
-    originDot.setAttribute('stroke-width', '2');
-    originG.appendChild(originDot);
+    // Origin marker target (CAD surveyor style matching reference image)
+    const r = 8;
+    const q1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    q1.setAttribute('d', `M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`);
+    q1.setAttribute('fill', 'rgba(100, 116, 139, 0.45)');
+    originG.appendChild(q1);
+
+    const q3 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    q3.setAttribute('d', `M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`);
+    q3.setAttribute('fill', 'rgba(100, 116, 139, 0.45)');
+    originG.appendChild(q3);
+
+    const originRing = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    originRing.setAttribute('cx', origin.x.toString());
+    originRing.setAttribute('cy', origin.y.toString());
+    originRing.setAttribute('r', r.toString());
+    originRing.setAttribute('fill', 'none');
+    originRing.setAttribute('stroke', '#64748b');
+    originRing.setAttribute('stroke-width', '1.5');
+    originG.appendChild(originRing);
 
     this.gridGroup.appendChild(originG);
   }

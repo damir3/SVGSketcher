@@ -49,9 +49,6 @@ function initApp(): void {
           ${ICONS.redo} Redo
         </button>
         <div class="header-divider"></div>
-        <button class="btn-header active" id="btn-snap-header" title="Toggle Snapping (S)">
-          ${ICONS.snap} Snap
-        </button>
         <button class="btn-header" id="btn-fit-view" title="Fit to View (Z)">
           ${ICONS.fitView} Fit to View
         </button>
