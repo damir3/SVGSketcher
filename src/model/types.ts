@@ -5,7 +5,6 @@ export interface SketchPoint {
 	x: number;
 	y: number;
 	fixed: boolean;
-	isConstruction?: boolean;
 }
 
 export interface SketchLine {

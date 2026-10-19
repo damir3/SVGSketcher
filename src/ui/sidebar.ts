@@ -115,8 +115,6 @@ export class Sidebar {
 						<div class="inspector-card-title">${pt.id}</div>
 						<div class="inspector-row"><span>X:</span> <strong>${pt.x.toFixed(1)} mm</strong></div>
 						<div class="inspector-row"><span>Y:</span> <strong>${pt.y.toFixed(1)} mm</strong></div>
-						<div class="inspector-row"><span>Fixed:</span> <strong>${pt.fixed ? 'Yes' : 'No'}</strong></div>
-						<div class="inspector-row"><span>Type:</span> <strong>${pt.isConstruction ? 'Construction' : 'Solid'}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this point')}
 					</div>
 				`;

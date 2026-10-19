@@ -268,10 +268,10 @@ export class SketchDocument {
 	}
 
 	// --- Point methods ---
-	addPoint(x: number, y: number, fixed = false, isConstruction = false): SketchPoint {
+	addPoint(x: number, y: number, fixed = false): SketchPoint {
 		this.pushHistory();
 		const id = this.nextId('Point');
-		const pt: SketchPoint = { id, x, y, fixed, isConstruction };
+		const pt: SketchPoint = { id, x, y, fixed };
 		this.points.set(id, pt);
 		this.rebuildParamManager();
 		this.solve();
@@ -1220,12 +1220,6 @@ export class SketchDocument {
 
 	toggleConstruction(id: string): void {
 		this.pushHistory();
-		const pt = this.points.get(id);
-		if (pt) {
-			pt.isConstruction = !pt.isConstruction;
-			this.notify();
-			return;
-		}
 		const line = this.lines.get(id);
 		if (line) {
 			line.isConstruction = !line.isConstruction;
@@ -2168,7 +2162,7 @@ export class SketchDocument {
 		// Export isolated points
 		for (const pt of this.points.values()) {
 			if (!usedPoints.has(pt.id)) {
-				const fill = pt.isConstruction ? '#64748b' : '#0f172a';
+				const fill = '#0f172a';
 				elements.push(
 					`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`
 				);

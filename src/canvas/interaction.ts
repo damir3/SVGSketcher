@@ -1524,7 +1524,7 @@ export class CanvasInteraction {
 			const finalX = snap ? snap.worldPos.x : world.x;
 			const finalY = snap ? snap.worldPos.y : world.y;
 			this.sketch.beginTransaction();
-			const pt = this.sketch.addPoint(finalX, finalY, false, this.isConstructionMode);
+			const pt = this.sketch.addPoint(finalX, finalY);
 			this.applySnapConstraintIfNeeded(pt.id, snap);
 			this.sketch.commitTransaction();
 			this.render();
@@ -1542,7 +1542,7 @@ export class CanvasInteraction {
 					this.startWorldPos = snap.worldPos;
 				} else {
 					const ptPos = snap ? snap.worldPos : world;
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					pId = pt.id;
 					this.startWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1560,7 +1560,7 @@ export class CanvasInteraction {
 						const axisSnap = this.getAxisSnappedWorldPos(this.startWorldPos, ptPos, snap);
 						ptPos = axisSnap.pos;
 					}
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					p2Id = pt.id;
 					this.applySnapConstraintIfNeeded(pt.id, snap);
 				}
@@ -1602,7 +1602,7 @@ export class CanvasInteraction {
 					this.startWorldPos = snap.worldPos;
 				} else {
 					const ptPos = snap ? snap.worldPos : world;
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					centerId = pt.id;
 					this.startWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1630,7 +1630,7 @@ export class CanvasInteraction {
 					this.startWorldPos = snap.worldPos;
 				} else {
 					const ptPos = snap ? snap.worldPos : world;
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					pId = pt.id;
 					this.startWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1650,7 +1650,7 @@ export class CanvasInteraction {
 					p2Id = snap.id;
 					this.arcPoint2WorldPos = snap.worldPos;
 				} else {
-					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
 					p2Id = pt.id;
 					this.arcPoint2WorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1685,7 +1685,7 @@ export class CanvasInteraction {
 
 				const clockwise = testCW > 0 && testCW < sweepCW;
 
-				const centerPt = this.sketch.addPoint(circum.center.x, circum.center.y, false, this.isConstructionMode);
+				const centerPt = this.sketch.addPoint(circum.center.x, circum.center.y);
 				this.sketch.addArc(
 					centerPt.id,
 					this.startPointId!,
@@ -1712,7 +1712,7 @@ export class CanvasInteraction {
 					this.startWorldPos = snap.worldPos;
 				} else {
 					const ptPos = snap ? snap.worldPos : world;
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					cId = pt.id;
 					this.startWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1732,7 +1732,7 @@ export class CanvasInteraction {
 					p1Id = snap.id;
 					this.arcPoint2WorldPos = snap.worldPos;
 				} else {
-					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
 					p1Id = pt.id;
 					this.arcPoint2WorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1766,7 +1766,7 @@ export class CanvasInteraction {
 				if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId && snap.id !== this.arcPoint2Id) {
 					endPointId = snap.id;
 				} else {
-					const pt = this.sketch.addPoint(endWorldX, endWorldY, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(endWorldX, endWorldY);
 					endPointId = pt.id;
 					this.applySnapConstraintIfNeeded(pt.id, snap);
 				}
@@ -1801,10 +1801,10 @@ export class CanvasInteraction {
 				this.sketch.beginTransaction();
 
 				// Create 4 corners
-				const p0 = this.sketch.addPoint(c1.x, c1.y, false, this.isConstructionMode);
-				const p1 = this.sketch.addPoint(c2.x, c1.y, false, this.isConstructionMode);
-				const p2 = this.sketch.addPoint(c2.x, c2.y, false, this.isConstructionMode);
-				const p3 = this.sketch.addPoint(c1.x, c2.y, false, this.isConstructionMode);
+				const p0 = this.sketch.addPoint(c1.x, c1.y);
+				const p1 = this.sketch.addPoint(c2.x, c1.y);
+				const p2 = this.sketch.addPoint(c2.x, c2.y);
+				const p3 = this.sketch.addPoint(c1.x, c2.y);
 
 				if (this.startSnapLineId) {
 					this.sketch.addPointOnLineConstraint(p0.id, this.startSnapLineId);
@@ -1849,7 +1849,7 @@ export class CanvasInteraction {
 					this.startWorldPos = snap.worldPos;
 				} else {
 					const ptPos = snap ? snap.worldPos : world;
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					cId = pt.id;
 					this.startWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1869,7 +1869,7 @@ export class CanvasInteraction {
 					p1Id = snap.id;
 					this.arcPoint2WorldPos = snap.worldPos;
 				} else {
-					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
 					p1Id = pt.id;
 					this.arcPoint2WorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1903,7 +1903,7 @@ export class CanvasInteraction {
 				if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId && snap.id !== this.arcPoint2Id) {
 					p2Id = snap.id;
 				} else {
-					const pt = this.sketch.addPoint(minX, minY, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(minX, minY);
 					p2Id = pt.id;
 					this.applySnapConstraintIfNeeded(pt.id, snap);
 				}
@@ -1932,7 +1932,7 @@ export class CanvasInteraction {
 					this.startWorldPos = snap.worldPos;
 				} else {
 					const ptPos = snap ? snap.worldPos : world;
-					const pt = this.sketch.addPoint(ptPos.x, ptPos.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
 					cId = pt.id;
 					this.startWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1950,7 +1950,7 @@ export class CanvasInteraction {
 					p1Id = snap.id;
 					this.arcPoint2WorldPos = snap.worldPos;
 				} else {
-					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
 					p1Id = pt.id;
 					this.arcPoint2WorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -1985,7 +1985,7 @@ export class CanvasInteraction {
 					p2Id = snap.id;
 					this.ellipsePoint3WorldPos = snap.worldPos;
 				} else {
-					const pt = this.sketch.addPoint(minX, minY, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(minX, minY);
 					p2Id = pt.id;
 					this.ellipsePoint3WorldPos = vec(pt.x, pt.y);
 					if (snap && snap.type === 'line' && snap.lineId) {
@@ -2032,7 +2032,7 @@ export class CanvasInteraction {
 					startPtId = snap.id;
 					this.ellipseStartPointWorldPos = snap.worldPos;
 				} else {
-					const pt = this.sketch.addPoint(projX, projY, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(projX, projY);
 					startPtId = pt.id;
 					this.ellipseStartPointWorldPos = vec(pt.x, pt.y);
 					this.applySnapConstraintIfNeeded(pt.id, snap);
@@ -2101,7 +2101,7 @@ export class CanvasInteraction {
 				) {
 					endPtId = snap.id;
 				} else {
-					const pt = this.sketch.addPoint(projX, projY, false, this.isConstructionMode);
+					const pt = this.sketch.addPoint(projX, projY);
 					endPtId = pt.id;
 					this.applySnapConstraintIfNeeded(pt.id, snap);
 				}
