@@ -55,6 +55,10 @@ function initApp(): void {
 				<button class="btn-header" id="btn-clear" title="Clear Sketch">
 					${ICONS.clear} Clear
 				</button>
+				<button class="btn-header" id="btn-import" title="Open SVG (with CAD metadata)">
+					${ICONS.open} Open SVG
+				</button>
+				<input type="file" id="file-input-svg" accept=".svg,image/svg+xml" style="display: none;" />
 				<button class="btn-header primary" id="btn-export" title="Export as SVG">
 					${ICONS.export} Export SVG
 				</button>
@@ -97,7 +101,10 @@ function initApp(): void {
 	const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
 	const btnFitView = document.getElementById('btn-fit-view') as HTMLButtonElement;
 	const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
+	const btnImport = document.getElementById('btn-import') as HTMLButtonElement;
+	const fileInputSvg = document.getElementById('file-input-svg') as HTMLInputElement;
 	const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
+	const canvasContainer = document.querySelector('.cad-canvas-container') as HTMLElement;
 
 	const coordX = document.getElementById('coord-x') as HTMLElement;
 	const coordY = document.getElementById('coord-y') as HTMLElement;
@@ -229,7 +236,11 @@ function initApp(): void {
 	});
 
 	btnExport.addEventListener('click', () => {
-		const svgData = sketch.exportSVG();
+		const svgData = sketch.exportSVG({
+			panX: viewport.panX,
+			panY: viewport.panY,
+			zoom: viewport.zoom,
+		});
 		const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
@@ -241,6 +252,75 @@ function initApp(): void {
 		URL.revokeObjectURL(url);
 		showToast('SVG exported successfully');
 	});
+
+	function loadSvgFile(file: File): void {
+		if (!file.name.toLowerCase().endsWith('.svg') && file.type !== 'image/svg+xml') {
+			showToast('Please select a valid .svg file');
+			return;
+		}
+
+		const reader = new FileReader();
+		reader.onload = e => {
+			const content = e.target?.result;
+			if (typeof content !== 'string') return;
+
+			const result = sketch.importSVG(content);
+			if (result.success) {
+				if (result.viewport) {
+					viewport.panX = result.viewport.panX;
+					viewport.panY = result.viewport.panY;
+					viewport.zoom = result.viewport.zoom;
+				} else {
+					fitToView();
+				}
+				renderer.render(sketch, viewport);
+				presetSelector.value = 'blank';
+				showToast(`Opened: ${file.name}`);
+			} else {
+				alert(`Failed to load SVG: ${result.error || 'Unknown error'}`);
+			}
+		};
+		reader.onerror = () => {
+			showToast('Failed to read file');
+		};
+		reader.readAsText(file);
+	}
+
+	btnImport.addEventListener('click', () => {
+		fileInputSvg.value = '';
+		fileInputSvg.click();
+	});
+
+	fileInputSvg.addEventListener('change', () => {
+		const file = fileInputSvg.files?.[0];
+		if (file) {
+			loadSvgFile(file);
+		}
+	});
+
+	if (canvasContainer) {
+		canvasContainer.addEventListener('dragover', e => {
+			e.preventDefault();
+			if (e.dataTransfer) {
+				e.dataTransfer.dropEffect = 'copy';
+			}
+			canvasContainer.classList.add('drag-over');
+		});
+
+		canvasContainer.addEventListener('dragleave', e => {
+			e.preventDefault();
+			canvasContainer.classList.remove('drag-over');
+		});
+
+		canvasContainer.addEventListener('drop', e => {
+			e.preventDefault();
+			canvasContainer.classList.remove('drag-over');
+			const file = e.dataTransfer?.files?.[0];
+			if (file) {
+				loadSvgFile(file);
+			}
+		});
+	}
 
 	// Keyboard Shortcuts
 	window.addEventListener('keydown', e => {

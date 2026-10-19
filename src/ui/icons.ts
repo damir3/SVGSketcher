@@ -33,6 +33,7 @@ import deleteIcon from '../assets/icons/delete.svg?raw';
 import clear from '../assets/icons/clear.svg?raw';
 import fitView from '../assets/icons/fit-view.svg?raw';
 import exportIcon from '../assets/icons/export.svg?raw';
+import openIcon from '../assets/icons/open.svg?raw';
 
 export const ICONS = {
 	select,
@@ -72,4 +73,5 @@ export const ICONS = {
 	clear,
 	fitView,
 	export: exportIcon,
+	open: openIcon,
 };

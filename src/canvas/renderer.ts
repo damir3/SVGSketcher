@@ -92,6 +92,7 @@ export type SvgAttrs = Record<string, string | number | boolean | undefined | nu
 
 export const HIT_AREA_STROKE_ATTRS: SvgAttrs = {
 	class: 'hit-area',
+	fill: 'none',
 	stroke: COLORS.hitTransparent,
 	'stroke-width': STROKE_WIDTH.hitArea,
 	'stroke-linecap': 'round',
@@ -151,6 +152,7 @@ export function getPrimitiveStrokeAttrs(
 ): SvgAttrs {
 	return {
 		class: 'entity-visible visible-primitive',
+		fill: 'none',
 		stroke: isSelected ? COLORS.primary : isConstruction ? COLORS.construction : baseColor,
 		'stroke-width': isSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.normal,
 		'stroke-linecap': roundCap ? 'round' : undefined,

@@ -31,6 +31,19 @@ import {
 	deserializeConstraint,
 } from './history';
 
+export interface SketchFileMetadata {
+	format: 'svg-sketcher';
+	version: number;
+	generator?: string;
+	createdAt?: string;
+	viewport?: {
+		panX: number;
+		panY: number;
+		zoom: number;
+	};
+	snapshot: SketchSnapshot;
+}
+
 export class SketchDocument {
 	points = new Map<string, SketchPoint>();
 	lines = new Map<string, SketchLine>();
@@ -2016,7 +2029,18 @@ export class SketchDocument {
 		this.commitTransaction();
 	}
 
-	exportSVG(): string {
+	exportSVG(viewportState?: { panX: number; panY: number; zoom: number }): string {
+		const metadataPayload: SketchFileMetadata = {
+			format: 'svg-sketcher',
+			version: 1,
+			generator: 'SVG Sketcher',
+			createdAt: new Date().toISOString(),
+			viewport: viewportState,
+			snapshot: this.takeSnapshot(),
+		};
+
+		const jsonString = JSON.stringify(metadataPayload, null, 2).replace(/]]>/g, ']]]]><![CDATA[>');
+
 		// Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
 		const elements: string[] = [];
 
@@ -2183,7 +2207,59 @@ export class SketchDocument {
 			viewBox = `${minX.toFixed(2)} ${minY.toFixed(2)} ${vbWidth.toFixed(2)} ${vbHeight.toFixed(2)}`;
 		}
 
-		return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  ${elements.join('\n  ')}\n</svg>`;
+		return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  <metadata id="sketcher-metadata">\n    <![CDATA[\n${jsonString}\n    ]]>\n  </metadata>\n  ${elements.join('\n  ')}\n</svg>`;
+	}
+
+	importSVG(svgString: string): {
+		success: boolean;
+		viewport?: { panX: number; panY: number; zoom: number };
+		error?: string;
+	} {
+		try {
+			const parser = new DOMParser();
+			const doc = parser.parseFromString(svgString, 'image/svg+xml');
+			const parserError = doc.querySelector('parsererror');
+			if (parserError) {
+				return { success: false, error: 'Invalid SVG XML structure' };
+			}
+
+			// Find sketcher metadata element
+			let metaEl: Element | null = doc.getElementById('sketcher-metadata') || doc.querySelector('metadata#sketcher-metadata');
+			if (!metaEl) {
+				const allMetadata = doc.querySelectorAll('metadata');
+				for (let i = 0; i < allMetadata.length; i++) {
+					const el = allMetadata[i];
+					if (el.textContent && el.textContent.includes('"format"') && el.textContent.includes('svg-sketcher')) {
+						metaEl = el;
+						break;
+					}
+				}
+			}
+
+			if (!metaEl || !metaEl.textContent) {
+				return { success: false, error: 'No parametric CAD metadata found in SVG' };
+			}
+
+			const rawText = metaEl.textContent.trim();
+			const data = JSON.parse(rawText) as SketchFileMetadata;
+
+			if (data.format !== 'svg-sketcher' || !data.snapshot) {
+				return { success: false, error: 'Unsupported sketch metadata format' };
+			}
+
+			this.restoreSnapshot(data.snapshot);
+			this.clearHistory();
+
+			return {
+				success: true,
+				viewport: data.viewport,
+			};
+		} catch (err) {
+			return {
+				success: false,
+				error: err instanceof Error ? err.message : 'Failed to parse SVG metadata',
+			};
+		}
 	}
 
 	getBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {

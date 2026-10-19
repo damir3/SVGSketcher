@@ -302,6 +302,18 @@ html, body {
   position: relative;
   background-color: #ffffff;
   overflow: hidden;
+  transition: background-color 0.15s ease;
+}
+
+.cad-canvas-container.drag-over {
+  outline: 3px dashed #0284c7;
+  outline-offset: -6px;
+  background-color: #f0f9ff;
+}
+
+.cad-canvas-container.drag-over #cad-svg {
+  opacity: 0.75;
+  pointer-events: none;
 }
 
 #cad-svg {
