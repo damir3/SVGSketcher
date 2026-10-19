@@ -1,5 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
-import { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
+import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 
@@ -7,7 +7,7 @@ export class Sidebar {
 	private container: HTMLElement;
 	private sketch: SketchDocument;
 
-	onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint) => void;
+	onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint) => void;
 
 	constructor(container: HTMLElement, sketch: SketchDocument) {
 		this.container = container;
@@ -357,6 +357,21 @@ export class Sidebar {
 		) {
 			const pid = [...sel.pointIds][0];
 			const lid = [...sel.lineIds][0];
+			const pt = this.sketch.points.get(pid);
+			const line = this.sketch.lines.get(lid);
+			let distHtml = '';
+			if (pt && line) {
+				const lp1 = this.sketch.points.get(line.p1Id);
+				const lp2 = this.sketch.points.get(line.p2Id);
+				if (lp1 && lp2) {
+					const dx = lp2.x - lp1.x;
+					const dy = lp2.y - lp1.y;
+					const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+					const cross = (pt.x - lp1.x) * dy - (pt.y - lp1.y) * dx;
+					const perpDist = Math.abs(cross) / lineLen;
+					distHtml = `<div class="inspector-row"><span>Perpendicular Distance:</span> <strong>${perpDist.toFixed(1)} mm</strong></div>`;
+				}
+			}
 			const related = [...new Set([
 				...this.sketch.getConstraintsForEntity('point', pid),
 				...this.sketch.getConstraintsForEntity('line', lid),
@@ -364,6 +379,7 @@ export class Sidebar {
 			detailsHtml = `
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: Point & Line</div>
+					${distHtml}
 					${this.renderConstraintsSublist(related, 'selected entities')}
 				</div>
 			`;
@@ -402,9 +418,10 @@ export class Sidebar {
 				const relatedPrimitives = this.sketch.getEntitiesForConstraint(c);
 				detailsHtml = `
 					<div class="inspector-card">
-						<div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
+						<div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof PointToLineDistanceConstraint ? 'Point-to-Line Distance' : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
 						<div class="inspector-row"><span>Type:</span> <strong>${c.type}</strong></div>
 						${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
+						${c instanceof PointToLineDistanceConstraint ? `<div class="inspector-row"><span>Distance:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
 						${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
 						${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
 						${this.renderPrimitivesSublist(relatedPrimitives)}
@@ -595,6 +612,9 @@ export class Sidebar {
 				: c.orientation === 'vertical'
 				? 'Vertical Distance'
 				: 'Distance';
+		} else if (c instanceof PointToLineDistanceConstraint) {
+			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+			name = 'Point-Line Distance';
 		} else if (c instanceof AngleConstraint) {
 			valBadge = `<span class="val-badge">${c.targetAngle.toFixed(1)}°</span>`;
 			name = 'Angle';
@@ -624,6 +644,7 @@ export class Sidebar {
 			case 'horizontal': return ICONS.horizontal;
 			case 'vertical': return ICONS.vertical;
 			case 'distance': return ICONS.distance;
+			case 'point_to_line_distance': return ICONS.distance;
 			case 'angle': return ICONS.angle;
 			case 'radius': return ICONS.circle;
 			case 'equal_length':
@@ -659,7 +680,7 @@ export class Sidebar {
 
 				if (type === 'constraint') {
 					const c = this.sketch.constraints.get(id);
-					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {
+					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint || c instanceof PointToLineDistanceConstraint)) {
 						this.onEditDimension?.(c);
 					}
 				}
@@ -729,7 +750,7 @@ export class Sidebar {
 					this.sketch.selectEntity(id, 'elliptical_arc', false);
 				} else if (type === 'constraint') {
 					const c = this.sketch.constraints.get(id);
-					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint)) {
+					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint || c instanceof PointToLineDistanceConstraint)) {
 						this.sketch.selectEntity(c.id, 'constraint', false);
 						this.onEditDimension?.(c);
 					}

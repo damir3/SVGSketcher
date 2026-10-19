@@ -20,6 +20,7 @@ import {
 	ArcEndpointsConstraint,
 	EllipseAxisConstraint,
 	EllipticalArcEndpointsConstraint,
+	PointToLineDistanceConstraint,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -46,6 +47,8 @@ export interface SerializedConstraint {
 	arcRadius?: number;
 	line1Id?: string;
 	line2Id?: string;
+	lineId?: string;
+	side?: number;
 	s1?: number;
 	s2?: number;
 	sign?: number;
@@ -129,6 +132,14 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.targetDistance = c.targetDistance;
 		base.offset = c.offset;
 		base.orientation = c.orientation;
+	} else if (c instanceof PointToLineDistanceConstraint) {
+		base.pointId = c.pointId;
+		base.lineId = c.lineId;
+		base.lineP1Id = c.lineP1Id;
+		base.lineP2Id = c.lineP2Id;
+		base.targetDistance = c.targetDistance;
+		base.side = c.side;
+		base.offset = c.offset;
 	} else if (c instanceof AngleConstraint) {
 		base.line1Id = c.line1Id;
 		base.line2Id = c.line2Id;
@@ -231,6 +242,19 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.weight,
 				d.offset,
 				d.orientation ?? 'aligned'
+			);
+			break;
+		case 'point_to_line_distance':
+			c = new PointToLineDistanceConstraint(
+				d.id,
+				d.pointId!,
+				d.lineId ?? d.entityIds[0],
+				d.lineP1Id ?? d.entityIds[1],
+				d.lineP2Id ?? d.entityIds[2],
+				d.targetDistance ?? d.value ?? 10,
+				d.side ?? 1,
+				d.weight,
+				d.offset
 			);
 			break;
 		case 'angle':

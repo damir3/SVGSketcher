@@ -21,6 +21,7 @@ import {
 	ArcEndpointsConstraint,
 	EllipseAxisConstraint,
 	EllipticalArcEndpointsConstraint,
+	PointToLineDistanceConstraint,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SelectionState } from './types';
 import { dist } from '../math/vector';
@@ -633,6 +634,75 @@ export class SketchDocument {
 
 		const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
 		const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset, effectiveOrientation);
+		this.addConstraint(c);
+		return c;
+	}
+
+	getPointToLineDistanceConstraint(pointId: string, lineId: string): PointToLineDistanceConstraint | undefined {
+		for (const c of this.constraints.values()) {
+			if (c instanceof PointToLineDistanceConstraint && c.pointId === pointId && c.lineId === lineId) {
+				return c;
+			}
+		}
+		return undefined;
+	}
+
+	hasPointToLineDistanceConstraint(pointId: string, lineId: string): boolean {
+		return this.getPointToLineDistanceConstraint(pointId, lineId) !== undefined;
+	}
+
+	addPointToLineDistanceConstraint(
+		pointId: string,
+		lineId: string,
+		targetDist?: number,
+		offset?: number
+	): PointToLineDistanceConstraint | null {
+		const pt = this.points.get(pointId);
+		const line = this.lines.get(lineId);
+		if (!pt || !line) return null;
+		if (pointId === line.p1Id || pointId === line.p2Id) return null;
+
+		const p1 = this.points.get(line.p1Id);
+		const p2 = this.points.get(line.p2Id);
+		if (!p1 || !p2) return null;
+
+		const existing = this.getPointToLineDistanceConstraint(pointId, lineId);
+		if (existing) {
+			let changed = false;
+			if (offset !== undefined && existing.offset !== offset) {
+				existing.offset = offset;
+			}
+			if (targetDist !== undefined && existing.targetDistance !== targetDist) {
+				this.pushHistory();
+				existing.targetDistance = targetDist;
+				existing.value = targetDist;
+				changed = true;
+			}
+			if (changed) {
+				this.solve();
+			}
+			return existing;
+		}
+
+		const dx = p2.x - p1.x;
+		const dy = p2.y - p1.y;
+		const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+		const cross = (pt.x - p1.x) * dy - (pt.y - p1.y) * dx;
+		const measured = Math.abs(cross) / lineLen;
+		const side = cross >= 0 ? 1 : -1;
+
+		const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
+		const c = new PointToLineDistanceConstraint(
+			this.nextId('c_pt_line_dist'),
+			pointId,
+			lineId,
+			line.p1Id,
+			line.p2Id,
+			currentDist,
+			side,
+			1.0,
+			offset
+		);
 		this.addConstraint(c);
 		return c;
 	}

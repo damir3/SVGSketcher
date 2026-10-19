@@ -9,6 +9,7 @@ import {
 	AngleConstraint,
 	HorizontalConstraint,
 	VerticalConstraint,
+	PointToLineDistanceConstraint,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
@@ -269,7 +270,7 @@ export class CanvasInteraction {
 
 	// Dimension edit callback
 	onEditDimension?: (
-		constraint: DistanceConstraint | RadiusConstraint | AngleConstraint,
+		constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint,
 		screenPos: Vec2
 	) => void;
 	onToolChange?: (tool: ToolType) => void;
@@ -887,11 +888,12 @@ export class CanvasInteraction {
 		return { pos: targetPos, axis: null };
 	}
 
-	private findPointNearScreen(screen: Vec2, thresholdPx = 16): SketchPoint | null {
+	private findPointNearScreen(screen: Vec2, thresholdPx = 16, excludePointId?: string): SketchPoint | null {
 		let closestDist = thresholdPx;
 		let foundPoint: SketchPoint | null = null;
 
 		for (const pt of this.sketch.points.values()) {
+			if (excludePointId && pt.id === excludePointId) continue;
 			const s = this.viewport.worldToScreen(pt.x, pt.y);
 			const d = dist(screen, s);
 			if (d < closestDist) {
@@ -998,9 +1000,9 @@ export class CanvasInteraction {
 	private findConstraintNearScreen(
 		screen: Vec2,
 		thresholdPx = 18
-	): DistanceConstraint | RadiusConstraint | AngleConstraint | null {
+	): DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | null {
 		let closestDist = thresholdPx;
-		let foundConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | null = null;
+		let foundConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | null = null;
 
 		for (const constraint of this.sketch.constraints.values()) {
 			if (constraint instanceof DistanceConstraint) {
@@ -1035,6 +1037,36 @@ export class CanvasInteraction {
 				}
 
 				const proj = projectPointOntoSegment(screen, d1, d2);
+				if (proj.dist < closestDist) {
+					closestDist = proj.dist;
+					foundConstraint = constraint;
+				}
+			} else if (constraint instanceof PointToLineDistanceConstraint) {
+				const pt = this.sketch.points.get(constraint.pointId);
+				const p1 = this.sketch.points.get(constraint.lineP1Id);
+				const p2 = this.sketch.points.get(constraint.lineP2Id);
+				if (!pt || !p1 || !p2) continue;
+
+				const sp = this.viewport.worldToScreen(pt.x, pt.y);
+				const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+				const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+
+				const dx = s2.x - s1.x;
+				const dy = s2.y - s1.y;
+				const lineLen = Math.hypot(dx, dy);
+				if (lineLen < 1e-4) continue;
+
+				const ux = dx / lineLen;
+				const uy = dy / lineLen;
+				const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
+				const tDim = tProj + (constraint.offset !== undefined ? constraint.offset * this.viewport.zoom : 0);
+
+				const dBase = { x: s1.x + ux * tDim, y: s1.y + uy * tDim };
+				const hx = sp.x - (s1.x + ux * tProj);
+				const hy = sp.y - (s1.y + uy * tProj);
+				const dTop = { x: dBase.x + hx, y: dBase.y + hy };
+
+				const proj = projectPointOntoSegment(screen, dBase, dTop);
 				if (proj.dist < closestDist) {
 					closestDist = proj.dist;
 					foundConstraint = constraint;
@@ -1506,6 +1538,7 @@ export class CanvasInteraction {
 					const constraint = this.sketch.constraints.get(id);
 					if (
 						constraint instanceof DistanceConstraint ||
+						constraint instanceof PointToLineDistanceConstraint ||
 						constraint instanceof AngleConstraint ||
 						constraint instanceof RadiusConstraint
 					) {
@@ -2234,6 +2267,26 @@ export class CanvasInteraction {
 							}
 						}
 					}
+				} else if (constraint instanceof PointToLineDistanceConstraint) {
+					const pt = this.sketch.points.get(constraint.pointId);
+					const p1 = this.sketch.points.get(constraint.lineP1Id);
+					const p2 = this.sketch.points.get(constraint.lineP2Id);
+					if (pt && p1 && p2) {
+						const sp = this.viewport.worldToScreen(pt.x, pt.y);
+						const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+						const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+						const dx = s2.x - s1.x;
+						const dy = s2.y - s1.y;
+						const lineLen = Math.hypot(dx, dy);
+						if (lineLen > 1e-4) {
+							const ux = dx / lineLen;
+							const uy = dy / lineLen;
+							const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
+							const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+							constraint.offset = (tCursor - tProj) / this.viewport.zoom;
+							this.render();
+						}
+					}
 				} else if (constraint instanceof AngleConstraint) {
 					const l1 = this.sketch.lines.get(constraint.line1Id);
 					const l2 = this.sketch.lines.get(constraint.line2Id);
@@ -2772,6 +2825,25 @@ export class CanvasInteraction {
 			if (this.dimensionState.step === 1 && this.dimensionState.line1Id) {
 				const l1 = this.sketch.lines.get(this.dimensionState.line1Id);
 				if (l1) {
+					// Check if hovering over a point (that is NOT an endpoint of line1)
+					const hitPt = this.findPointNearScreen(screen, 18);
+					if (hitPt && hitPt.id !== l1.p1Id && hitPt.id !== l1.p2Id) {
+						const p1 = this.sketch.points.get(l1.p1Id);
+						const p2 = this.sketch.points.get(l1.p2Id);
+						if (p1 && p2) {
+							const dx = p2.x - p1.x;
+							const dy = p2.y - p1.y;
+							const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+							const cross = (hitPt.x - p1.x) * dy - (hitPt.y - p1.y) * dx;
+							const perpDist = Math.abs(cross) / lineLen;
+							const sp = this.viewport.worldToScreen(hitPt.x, hitPt.y);
+							const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+							const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+							this.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, perpDist);
+							return;
+						}
+					}
+
 					p1Id = l1.p1Id;
 					p2Id = l1.p2Id;
 				}
@@ -2782,12 +2854,54 @@ export class CanvasInteraction {
 				const p1 = this.sketch.points.get(this.dimensionState.point1Id);
 				if (p1) {
 					const s1 = this.viewport.worldToScreen(p1.x, p1.y);
-					const snapPt = this.findSnappedPoint(screen, this.dimensionState.point1Id);
-					const targetScreen = snapPt ? snapPt.screenPos : screen;
-					const targetWorld = snapPt ? snapPt.worldPos : world;
-					const currentDist = dist(p1, targetWorld);
-					const angleDeg = ((Math.atan2(targetWorld.y - p1.y, targetWorld.x - p1.x) * 180) / Math.PI + 360) % 360;
-					this.renderer.renderLinePreview(s1, targetScreen, currentDist, angleDeg);
+
+					// 1. TOP PRIORITY: Snap to any other point (including points on lines, midpoints, endpoints)
+					const snapPt = this.findSnappedPoint(screen, this.dimensionState.point1Id) ??
+						(() => {
+							const pt = this.findPointNearScreen(screen, 22, p1.id);
+							if (pt) {
+								return {
+									id: pt.id,
+									worldPos: { x: pt.x, y: pt.y },
+									screenPos: this.viewport.worldToScreen(pt.x, pt.y),
+								};
+							}
+							return null;
+						})();
+
+					if (snapPt) {
+						const targetScreen = snapPt.screenPos;
+						const targetWorld = snapPt.worldPos;
+						const currentDist = dist(p1, targetWorld);
+						this.renderer.renderDistanceLinePreview(s1, targetScreen, currentDist, true);
+						return;
+					}
+
+					// 2. SECOND PRIORITY: Check if hovering over the body of a line (not near endpoints and point not on line)
+					const hitLine = this.findLineNearScreen(screen, 14);
+					if (hitLine && hitLine.p1Id !== p1.id && hitLine.p2Id !== p1.id) {
+						const lp1 = this.sketch.points.get(hitLine.p1Id);
+						const lp2 = this.sketch.points.get(hitLine.p2Id);
+						if (lp1 && lp2) {
+							const dx = lp2.x - lp1.x;
+							const dy = lp2.y - lp1.y;
+							const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+							const cross = (p1.x - lp1.x) * dy - (p1.y - lp1.y) * dx;
+							const perpDist = Math.abs(cross) / lineLen;
+							// Only activate point-to-line mode if p1 does not lie on this line
+							if (perpDist >= 0.5) {
+								const sp = this.viewport.worldToScreen(p1.x, p1.y);
+								const s1Line = this.viewport.worldToScreen(lp1.x, lp1.y);
+								const s2Line = this.viewport.worldToScreen(lp2.x, lp2.y);
+								this.renderer.renderPointToLineDistancePreview(sp, s1Line, s2Line, screen, perpDist);
+								return;
+							}
+						}
+					}
+
+					// 3. Fallback: Free cursor in empty space
+					const currentDist = dist(p1, world);
+					this.renderer.renderDistanceLinePreview(s1, screen, currentDist, false);
 				}
 			}
 
@@ -2824,6 +2938,24 @@ export class CanvasInteraction {
 						const sp3 = this.viewport.worldToScreen(p3.x, p3.y);
 						const sp4 = this.viewport.worldToScreen(p4.x, p4.y);
 						this.renderer.renderAnglePreview(sCenter, sRay1, sRay2, screen, geom.initialAngleDeg, sp1, sp2, sp3, sp4);
+					}
+				}
+			} else if (this.dimensionState.step === 2 && this.dimensionState.point1Id && this.dimensionState.line1Id) {
+				const pt = this.sketch.points.get(this.dimensionState.point1Id);
+				const l = this.sketch.lines.get(this.dimensionState.line1Id);
+				if (pt && l) {
+					const p1 = this.sketch.points.get(l.p1Id);
+					const p2 = this.sketch.points.get(l.p2Id);
+					if (p1 && p2) {
+						const sp = this.viewport.worldToScreen(pt.x, pt.y);
+						const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+						const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+						const dx = p2.x - p1.x;
+						const dy = p2.y - p1.y;
+						const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+						const cross = (pt.x - p1.x) * dy - (pt.y - p1.y) * dx;
+						const currentDist = Math.abs(cross) / lineLen;
+						this.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, currentDist);
 					}
 				}
 			}
@@ -3087,6 +3219,7 @@ export class CanvasInteraction {
 			const constraint = this.sketch.constraints.get(id);
 			if (
 				(constraint instanceof DistanceConstraint ||
+					constraint instanceof PointToLineDistanceConstraint ||
 					constraint instanceof RadiusConstraint ||
 					constraint instanceof AngleConstraint) &&
 				this.onEditDimension
@@ -3171,12 +3304,13 @@ export class CanvasInteraction {
 		let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
 
 		// Priority 1: When selecting points in step 0 or step 1, points ALWAYS have top priority!
-		if (this.dimensionState.step === 0 || this.dimensionState.step === 1) {
-			const nearPoint = this.findPointNearScreen(screen, 16);
-			if (nearPoint) {
-				id = nearPoint.id;
-				type = 'point';
-			}
+		const excludeId = (this.dimensionState.step === 1 && this.dimensionState.point1Id)
+			? this.dimensionState.point1Id
+			: undefined;
+		const nearPoint = this.findPointNearScreen(screen, 22, excludeId);
+		if (nearPoint) {
+			id = nearPoint.id;
+			type = 'point';
 		}
 
 		// Geometric hit test fallback if not clicking directly on entity
@@ -3248,7 +3382,7 @@ export class CanvasInteraction {
 
 		// STEP 1: First point OR first line was selected
 		if (this.dimensionState.step === 1) {
-			// Subcase 1: First point was selected. Now picking second point!
+			// Subcase 1: First point was selected. Now picking second point OR line!
 			if (this.dimensionState.point1Id) {
 				if (type === 'point' && id && id !== this.dimensionState.point1Id) {
 					this.sketch.selectEntity(id, 'point', true);
@@ -3260,6 +3394,58 @@ export class CanvasInteraction {
 						point2Id: id,
 					};
 					this.render();
+				} else if (type === 'line' && id) {
+					const l = this.sketch.lines.get(id);
+					// If this line contains point1 as an endpoint, user clicked along the segment -> snap to the OTHER endpoint!
+					if (l && (l.p1Id === this.dimensionState.point1Id || l.p2Id === this.dimensionState.point1Id)) {
+						const otherPtId = l.p1Id === this.dimensionState.point1Id ? l.p2Id : l.p1Id;
+						this.sketch.selectEntity(otherPtId, 'point', true);
+						this.dimensionState = {
+							step: 2,
+							line1Id: null,
+							line2Id: null,
+							point1Id: this.dimensionState.point1Id,
+							point2Id: otherPtId,
+						};
+						this.render();
+					} else if (l) {
+						const ptId = this.dimensionState.point1Id;
+						const pt = this.sketch.points.get(ptId);
+						const lp1 = this.sketch.points.get(l.p1Id);
+						const lp2 = this.sketch.points.get(l.p2Id);
+						let offsetWorld = 0;
+						if (pt && lp1 && lp2) {
+							const sp = this.viewport.worldToScreen(pt.x, pt.y);
+							const s1 = this.viewport.worldToScreen(lp1.x, lp1.y);
+							const s2 = this.viewport.worldToScreen(lp2.x, lp2.y);
+							const dx = s2.x - s1.x;
+							const dy = s2.y - s1.y;
+							const lineLen = Math.hypot(dx, dy);
+							if (lineLen > 1e-4) {
+								const ux = dx / lineLen;
+								const uy = dy / lineLen;
+								const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
+								const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+								let offsetScreen = tCursor - tProj;
+								if (Math.abs(offsetScreen) < 15) {
+									offsetScreen = (tProj < lineLen * 0.5 ? 25 : -25);
+								}
+								offsetWorld = offsetScreen / this.viewport.zoom;
+							}
+						}
+						const existed = this.sketch.hasPointToLineDistanceConstraint(ptId, id);
+						const c = this.sketch.addPointToLineDistanceConstraint(ptId, id, undefined, offsetWorld);
+						if (c) {
+							showToast(existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied');
+							this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+							this.renderer.clearPreviews();
+							this.sketch.clearSelection();
+							this.render();
+							if (this.onEditDimension) {
+								this.onEditDimension(c, clientPos);
+							}
+						}
+					}
 				}
 				return;
 			}
@@ -3278,6 +3464,46 @@ export class CanvasInteraction {
 				this.sketch.selectEntity(id, 'line', true);
 				this.dimensionState = { step: 2, line1Id: l1.id, line2Id: id, point1Id: null, point2Id: null };
 				this.render();
+				return;
+			}
+
+			// If clicked on a point (not one of line's endpoints) -> immediately apply Point-to-Line distance constraint!
+			if (type === 'point' && id && id !== l1.p1Id && id !== l1.p2Id) {
+				const pt = this.sketch.points.get(id);
+				const lp1 = this.sketch.points.get(l1.p1Id);
+				const lp2 = this.sketch.points.get(l1.p2Id);
+				let offsetWorld = 0;
+				if (pt && lp1 && lp2) {
+					const sp = this.viewport.worldToScreen(pt.x, pt.y);
+					const s1 = this.viewport.worldToScreen(lp1.x, lp1.y);
+					const s2 = this.viewport.worldToScreen(lp2.x, lp2.y);
+					const dx = s2.x - s1.x;
+					const dy = s2.y - s1.y;
+					const lineLen = Math.hypot(dx, dy);
+					if (lineLen > 1e-4) {
+						const ux = dx / lineLen;
+						const uy = dy / lineLen;
+						const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
+						const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+						let offsetScreen = tCursor - tProj;
+						if (Math.abs(offsetScreen) < 15) {
+							offsetScreen = (tProj < lineLen * 0.5 ? 25 : -25);
+						}
+						offsetWorld = offsetScreen / this.viewport.zoom;
+					}
+				}
+				const existed = this.sketch.hasPointToLineDistanceConstraint(id, l1.id);
+				const c = this.sketch.addPointToLineDistanceConstraint(id, l1.id, undefined, offsetWorld);
+				if (c) {
+					showToast(existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied');
+					this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+					this.renderer.clearPreviews();
+					this.sketch.clearSelection();
+					this.render();
+					if (this.onEditDimension) {
+						this.onEditDimension(c, clientPos);
+					}
+				}
 				return;
 			}
 
@@ -3358,7 +3584,54 @@ export class CanvasInteraction {
 				return;
 			}
 
-			// Subcase 2: Two lines selected (Angle mode)
+			// Subcase 2: Point and Line selected (Point-to-Line Distance mode)
+			if (this.dimensionState.point1Id && this.dimensionState.line1Id) {
+				const pt = this.sketch.points.get(this.dimensionState.point1Id);
+				const l = this.sketch.lines.get(this.dimensionState.line1Id);
+				if (pt && l) {
+					const p1 = this.sketch.points.get(l.p1Id);
+					const p2 = this.sketch.points.get(l.p2Id);
+					if (p1 && p2) {
+						const sp = this.viewport.worldToScreen(pt.x, pt.y);
+						const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+						const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+						const dx = s2.x - s1.x;
+						const dy = s2.y - s1.y;
+						const lineLen = Math.hypot(dx, dy);
+						if (lineLen > 1e-4) {
+							const ux = dx / lineLen;
+							const uy = dy / lineLen;
+							const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
+							const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+							const offsetWorld = (tCursor - tProj) / this.viewport.zoom;
+
+							const existed = this.sketch.hasPointToLineDistanceConstraint(
+								this.dimensionState.point1Id,
+								this.dimensionState.line1Id
+							);
+							const c = this.sketch.addPointToLineDistanceConstraint(
+								this.dimensionState.point1Id,
+								this.dimensionState.line1Id,
+								undefined,
+								offsetWorld
+							);
+							if (c) {
+								showToast(existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied');
+								this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+								this.renderer.clearPreviews();
+								this.sketch.clearSelection();
+								this.render();
+								if (this.onEditDimension) {
+									this.onEditDimension(c, clientPos);
+								}
+							}
+						}
+					}
+				}
+				return;
+			}
+
+			// Subcase 3: Two lines selected (Angle mode)
 			const l1 = this.dimensionState.line1Id ? this.sketch.lines.get(this.dimensionState.line1Id) : null;
 			const l2 = this.dimensionState.line2Id ? this.sketch.lines.get(this.dimensionState.line2Id) : null;
 			if (!l1 || !l2) {
@@ -3562,7 +3835,8 @@ export class CanvasInteraction {
 					(lCount === 1 && pCount === 0 && cCount === 0) ||
 					(lCount === 2 && pCount === 0 && cCount === 0) ||
 					(pCount === 2 && lCount === 0 && cCount === 0) ||
-					(cCount === 1 && pCount === 0 && lCount === 0)
+					(cCount === 1 && pCount === 0 && lCount === 0) ||
+					(lCount === 1 && pCount === 1 && cCount === 0)
 				);
 			case 'equal':
 				return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
@@ -3688,7 +3962,21 @@ export class CanvasInteraction {
 			}
 			case 'dimension':
 			case 'distance': {
-				if (lIds.length === 1) {
+				if (lIds.length === 1 && pIds.length === 1) {
+					const l = this.sketch.lines.get(lIds[0])!;
+					if (pIds[0] !== l.p1Id && pIds[0] !== l.p2Id) {
+						const existed = this.sketch.hasPointToLineDistanceConstraint(pIds[0], lIds[0]);
+						const c = this.sketch.addPointToLineDistanceConstraint(pIds[0], lIds[0]);
+						applied = true;
+						toastMsg = existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied';
+						if (c && this.onEditDimension) {
+							const pt = this.sketch.points.get(pIds[0])!;
+							const s = this.viewport.worldToScreen(pt.x, pt.y);
+							const rect = this.svg.getBoundingClientRect();
+							this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
+						}
+					}
+				} else if (lIds.length === 1 && pIds.length === 0) {
 					const l = this.sketch.lines.get(lIds[0])!;
 					const existed = this.sketch.hasDistanceConstraint(l.p1Id, l.p2Id);
 					const c = this.sketch.addDistanceConstraint(l.p1Id, l.p2Id);
@@ -3921,41 +4209,25 @@ export class CanvasInteraction {
 				}
 				break;
 			}
-			case 'dimension': {
-				if (type === 'line') {
-					sel.pointIds.clear();
-					sel.circleIds.clear();
-					sel.arcIds.clear();
-					if (sel.lineIds.size >= 2) sel.lineIds.clear();
-				} else if (type === 'circle' || type === 'arc') {
-					sel.pointIds.clear();
-					sel.lineIds.clear();
-					sel.circleIds.clear();
-					sel.arcIds.clear();
-				} else if (type === 'point') {
-					sel.lineIds.clear();
-					sel.circleIds.clear();
-					sel.arcIds.clear();
-					if (sel.pointIds.size >= 2) sel.pointIds.clear();
-				}
-				break;
-			}
+			case 'dimension':
 			case 'distance': {
 				if (type === 'line') {
-					sel.pointIds.clear();
 					sel.circleIds.clear();
 					sel.arcIds.clear();
-					sel.lineIds.clear();
+					if (sel.pointIds.size > 1) sel.pointIds.clear();
+					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) sel.lineIds.clear();
+					else if (sel.lineIds.size >= 2) sel.lineIds.clear();
 				} else if (type === 'circle' || type === 'arc') {
 					sel.pointIds.clear();
 					sel.lineIds.clear();
 					sel.circleIds.clear();
 					sel.arcIds.clear();
 				} else if (type === 'point') {
-					sel.lineIds.clear();
 					sel.circleIds.clear();
 					sel.arcIds.clear();
-					if (sel.pointIds.size >= 2) sel.pointIds.clear();
+					if (sel.lineIds.size > 1) sel.lineIds.clear();
+					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) sel.pointIds.clear();
+					else if (sel.pointIds.size >= 2) sel.pointIds.clear();
 				}
 				break;
 			}

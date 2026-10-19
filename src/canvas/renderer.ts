@@ -17,6 +17,7 @@ import {
 	FixedConstraint,
 	CoincidentConstraint,
 	AngleConstraint,
+	PointToLineDistanceConstraint,
 } from '../solver/constraints';
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
@@ -410,6 +411,154 @@ export function getEllipticalArcSvgPath(
 	const my = sc.y + umid * uy + vmid * vy;
 
 	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+}
+
+interface LinearDimensionGeometry {
+	d1: Vec2;
+	d2: Vec2;
+	extensionLines: Array<{ from: Vec2; to: Vec2 }>;
+}
+
+interface LinearDimensionVisualOptions {
+	d1: Vec2;
+	d2: Vec2;
+	label: string;
+	extensionLines?: Array<{ from: Vec2; to: Vec2 }>;
+	parent: SVGElement;
+	isSelected?: boolean;
+	constraintId?: string;
+	isTooltip?: boolean;
+	startPointHighlight?: Vec2;
+	targetPointSnapped?: boolean;
+}
+
+function formatDimensionValue(val: number): string {
+	return Number.isInteger(val) ? val.toFixed(1) : Number(val.toFixed(2)).toString();
+}
+
+function computeDistanceDimensionGeometry(
+	s1: Vec2,
+	s2: Vec2,
+	orientation: 'aligned' | 'horizontal' | 'vertical' | 'direct',
+	screenOffset = 0,
+	cursor?: Vec2
+): LinearDimensionGeometry | null {
+	if (orientation === 'direct') {
+		return {
+			d1: s1,
+			d2: s2,
+			extensionLines: [],
+		};
+	}
+
+	let d1: Vec2;
+	let d2: Vec2;
+	let extEnd1: Vec2;
+	let extEnd2: Vec2;
+
+	if (orientation === 'horizontal') {
+		const midY = (s1.y + s2.y) * 0.5;
+		const dimY = cursor ? cursor.y : midY + screenOffset;
+		d1 = { x: s1.x, y: dimY };
+		d2 = { x: s2.x, y: dimY };
+		const extDir = dimY >= midY ? 1 : -1;
+		extEnd1 = { x: s1.x, y: dimY + extDir * 4 };
+		extEnd2 = { x: s2.x, y: dimY + extDir * 4 };
+	} else if (orientation === 'vertical') {
+		const midX = (s1.x + s2.x) * 0.5;
+		const dimX = cursor ? cursor.x : midX + screenOffset;
+		d1 = { x: dimX, y: s1.y };
+		d2 = { x: dimX, y: s2.y };
+		const extDir = dimX >= midX ? 1 : -1;
+		extEnd1 = { x: dimX + extDir * 4, y: s1.y };
+		extEnd2 = { x: dimX + extDir * 4, y: s2.y };
+	} else {
+		const dx = s2.x - s1.x;
+		const dy = s2.y - s1.y;
+		const len = Math.hypot(dx, dy);
+		if (len < 1e-4) return null;
+
+		const nx = -dy / len;
+		const ny = dx / len;
+		const midX = (s1.x + s2.x) * 0.5;
+		const midY = (s1.y + s2.y) * 0.5;
+		const offset = cursor ? (cursor.x - midX) * nx + (cursor.y - midY) * ny : screenOffset;
+
+		d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
+		d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
+		const extDir = offset >= 0 ? 4 : -4;
+		extEnd1 = { x: d1.x + nx * extDir, y: d1.y + ny * extDir };
+		extEnd2 = { x: d2.x + nx * extDir, y: d2.y + ny * extDir };
+	}
+
+	return {
+		d1,
+		d2,
+		extensionLines: [
+			{ from: s1, to: extEnd1 },
+			{ from: s2, to: extEnd2 },
+		],
+	};
+}
+
+function computePointToLineDimensionGeometry(
+	sp: Vec2,
+	s1: Vec2,
+	s2: Vec2,
+	screenOffset = 0,
+	cursor?: Vec2
+): LinearDimensionGeometry | null {
+	const dx = s2.x - s1.x;
+	const dy = s2.y - s1.y;
+	const lineLen = Math.hypot(dx, dy);
+	if (lineLen < 1e-4) return null;
+
+	const ux = dx / lineLen;
+	const uy = dy / lineLen;
+
+	const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
+	let tDim = cursor ? (cursor.x - s1.x) * ux + (cursor.y - s1.y) * uy : tProj + screenOffset;
+
+	// Ensure there is always a visible offset / выноска if none was specified or cursor is directly at projection
+	if (Math.abs(tDim - tProj) < 2) {
+		const defaultOffset = (tProj < lineLen * 0.5 ? 25 : -25);
+		tDim = tProj + (screenOffset !== 0 ? screenOffset : defaultOffset);
+	}
+
+	const dBase = { x: s1.x + ux * tDim, y: s1.y + uy * tDim };
+	const hx = sp.x - (s1.x + ux * tProj);
+	const hy = sp.y - (s1.y + uy * tProj);
+	const dTop = { x: dBase.x + hx, y: dBase.y + hy };
+
+	const extensionLines: Array<{ from: Vec2; to: Vec2 }> = [];
+
+	// Extension line from point to dTop if offset along line
+	if (Math.abs(tDim - tProj) > 2) {
+		const extDir = tDim >= tProj ? 1 : -1;
+		extensionLines.push({
+			from: sp,
+			to: { x: dTop.x + ux * extDir * 4, y: dTop.y + uy * extDir * 4 },
+		});
+	}
+
+	// Extension line along line if dBase is beyond segment endpoints
+	if (tDim < 0) {
+		extensionLines.push({
+			from: s1,
+			to: { x: dBase.x - ux * 4, y: dBase.y - uy * 4 },
+		});
+	} else if (tDim > lineLen) {
+		extensionLines.push({
+			from: s2,
+			to: { x: dBase.x + ux * 4, y: dBase.y + uy * 4 },
+		});
+	}
+
+	return {
+		d1: dBase,
+		d2: dTop,
+		extensionLines,
+	};
 }
 
 export class SVGRenderer {
@@ -843,6 +992,8 @@ export class SVGRenderer {
 
 			if (constraint instanceof DistanceConstraint) {
 				this.renderDistanceDimension(constraint, sketch, viewport, isSelected);
+			} else if (constraint instanceof PointToLineDistanceConstraint) {
+				this.renderPointToLineDistanceDimension(constraint, sketch, viewport, isSelected);
 			} else if (constraint instanceof RadiusConstraint) {
 				this.renderRadiusDimension(constraint, sketch, viewport, isSelected);
 			} else if (constraint instanceof HorizontalConstraint) {
@@ -893,90 +1044,138 @@ export class SVGRenderer {
 
 		const s1 = viewport.worldToScreen(p1.x, p1.y);
 		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const offsetScreen = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 32;
+		const geom = computeDistanceDimensionGeometry(s1, s2, constraint.orientation ?? 'aligned', offsetScreen);
+		if (!geom) return;
 
-		const orientation = constraint.orientation ?? 'aligned';
-		const screenOffset = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 32;
+		this.renderLinearDimensionVisual({
+			d1: geom.d1,
+			d2: geom.d2,
+			label: formatDimensionValue(constraint.targetDistance),
+			extensionLines: geom.extensionLines,
+			parent: this.constraintGroup,
+			isSelected,
+			constraintId: constraint.id,
+		});
+	}
 
-		let d1: Vec2;
-		let d2: Vec2;
-		let extEnd1: Vec2;
-		let extEnd2: Vec2;
-		let mid: Vec2;
+	private renderPointToLineDistanceDimension(
+		constraint: PointToLineDistanceConstraint,
+		sketch: SketchDocument,
+		viewport: Viewport,
+		isSelected: boolean
+	): void {
+		const pt = sketch.points.get(constraint.pointId);
+		const p1 = sketch.points.get(constraint.lineP1Id);
+		const p2 = sketch.points.get(constraint.lineP2Id);
+		if (!pt || !p1 || !p2) return;
 
-		if (orientation === 'horizontal') {
-			const midY = (s1.y + s2.y) * 0.5;
-			const dimY = midY + screenOffset;
-			d1 = { x: s1.x, y: dimY };
-			d2 = { x: s2.x, y: dimY };
-			const extDir = screenOffset >= 0 ? 1 : -1;
-			extEnd1 = { x: s1.x, y: dimY + extDir * 5 };
-			extEnd2 = { x: s2.x, y: dimY + extDir * 5 };
-			mid = { x: (d1.x + d2.x) * 0.5, y: dimY };
-		} else if (orientation === 'vertical') {
-			const midX = (s1.x + s2.x) * 0.5;
-			const dimX = midX + screenOffset;
-			d1 = { x: dimX, y: s1.y };
-			d2 = { x: dimX, y: s2.y };
-			const extDir = screenOffset >= 0 ? 1 : -1;
-			extEnd1 = { x: dimX + extDir * 5, y: s1.y };
-			extEnd2 = { x: dimX + extDir * 5, y: s2.y };
-			mid = { x: dimX, y: (d1.y + d2.y) * 0.5 };
-		} else {
-			const dx = s2.x - s1.x;
-			const dy = s2.y - s1.y;
-			const len = Math.hypot(dx, dy);
-			if (len < 1e-4) return;
+		const sp = viewport.worldToScreen(pt.x, pt.y);
+		const s1 = viewport.worldToScreen(p1.x, p1.y);
+		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const offsetScreen = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 0;
+		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
+		if (!geom) return;
 
-			const nx = -dy / len;
-			const ny = dx / len;
-			d1 = { x: s1.x + nx * screenOffset, y: s1.y + ny * screenOffset };
-			d2 = { x: s2.x + nx * screenOffset, y: s2.y + ny * screenOffset };
-			extEnd1 = { x: d1.x + nx * 5, y: d1.y + ny * 5 };
-			extEnd2 = { x: d2.x + nx * 5, y: d2.y + ny * 5 };
-			mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
-		}
+		this.renderLinearDimensionVisual({
+			d1: geom.d1,
+			d2: geom.d2,
+			label: formatDimensionValue(constraint.targetDistance),
+			extensionLines: geom.extensionLines,
+			parent: this.constraintGroup,
+			isSelected,
+			constraintId: constraint.id,
+		});
+	}
 
-		const g = createSvgElement('g', {
-			class: 'dimension-item',
-			'data-id': constraint.id,
-			'data-type': 'constraint',
-		}, this.constraintGroup);
+	private renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void {
+		const {
+			d1,
+			d2,
+			label,
+			extensionLines,
+			parent,
+			isSelected = false,
+			constraintId,
+			isTooltip = false,
+			startPointHighlight,
+			targetPointSnapped = false,
+		} = opts;
+
+		const g = constraintId
+			? createSvgElement('g', {
+				class: 'dimension-item',
+				'data-id': constraintId,
+				'data-type': 'constraint',
+			}, parent)
+			: parent;
 
 		const color = isSelected ? COLORS.selected : COLORS.primary;
-
-		// Extension lines from points
-		createSvgLine(s1.x, s1.y, extEnd1.x, extEnd1.y, EXTENSION_LINE_ATTRS, g);
-		createSvgLine(s2.x, s2.y, extEnd2.x, extEnd2.y, EXTENSION_LINE_ATTRS, g);
-
-		// Dimension line with arrowheads
 		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
-		createSvgLine(d1.x, d1.y, d2.x, d2.y, {
+
+		// 1. Extension lines
+		if (extensionLines && extensionLines.length > 0) {
+			const extAttrs = isTooltip
+				? PREVIEW_EXTENSION_LINE_ATTRS
+				: isSelected
+				? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
+				: EXTENSION_LINE_ATTRS;
+			for (const ext of extensionLines) {
+				createSvgLine(ext.from.x, ext.from.y, ext.to.x, ext.to.y, extAttrs, g);
+			}
+		}
+
+		// 2. Start point highlight (origin anchor)
+		if (startPointHighlight) {
+			createSvgCircle(startPointHighlight.x, startPointHighlight.y, 4, {
+				fill: COLORS.primary,
+				stroke: COLORS.white,
+				'stroke-width': 1.5,
+			}, g);
+		}
+
+		// 3. Target point snap ring
+		if (targetPointSnapped) {
+			createSvgCircle(d2.x, d2.y, 6, {
+				fill: 'rgba(2, 132, 199, 0.25)',
+				stroke: COLORS.primary,
+				'stroke-width': 1.5,
+			}, g);
+		}
+
+		// 4. Dimension line with arrowheads
+		const screenDist = Math.hypot(d2.x - d1.x, d2.y - d1.y);
+		const lineAttrs: SvgAttrs = {
 			stroke: color,
 			'stroke-width': STROKE_WIDTH.dimension,
-			'marker-start': arrowUrl,
-			'marker-end': arrowUrl,
-		}, g);
+		};
+		if (screenDist >= 20) {
+			lineAttrs['marker-start'] = arrowUrl;
+			lineAttrs['marker-end'] = arrowUrl;
+		}
+		createSvgLine(d1.x, d1.y, d2.x, d2.y, lineAttrs, g);
 
-		// Text label badge with background
-		const textVal = Number.isInteger(constraint.targetDistance)
-			? constraint.targetDistance.toFixed(1)
-			: Number(constraint.targetDistance.toFixed(2)).toString();
-		const textLen = textVal.length * 8 + 14;
+		// 5. Label (tooltip or badge) at midpoint
+		const mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
+		if (isTooltip) {
+			this.renderTooltip(mid.x, mid.y - 12, label);
+		} else {
+			const textLen = label.length * 8 + 14;
+			createSvgRect(mid.x - textLen * 0.5, mid.y - 10, textLen, 20, {
+				rx: 4,
+				fill: COLORS.white,
+				stroke: color,
+				'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
+			}, g);
 
-		createSvgRect(mid.x - textLen * 0.5, mid.y - 10, textLen, 20, {
-			rx: 4,
-			fill: COLORS.white,
-			stroke: color,
-			'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
-		}, g);
-
-		createSvgText(mid.x, mid.y + 4, textVal, {
-			'text-anchor': 'middle',
-			fill: color,
-			'font-size': 12,
-			'font-weight': 600,
-			'font-family': 'monospace',
-		}, g);
+			createSvgText(mid.x, mid.y + 4, label, {
+				'text-anchor': 'middle',
+				fill: color,
+				'font-size': 12,
+				'font-weight': 600,
+				'font-family': 'monospace',
+			}, g);
+		}
 	}
 
 	private renderDashedExtensionLines(
@@ -1551,67 +1750,57 @@ export class SVGRenderer {
 	renderDistancePreview(
 		s1: Vec2,
 		s2: Vec2,
-		cursor: Vec2,
-		distVal: number,
-		orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned'
+		cursor?: Vec2,
+		distVal = 0,
+		orientation: 'aligned' | 'horizontal' | 'vertical' | 'direct' = 'aligned',
+		isTargetSnapped = false
 	): void {
 		this.previewGroup.innerHTML = '';
-
-		let d1: Vec2;
-		let d2: Vec2;
-		let extEnd1: Vec2;
-		let extEnd2: Vec2;
-		let mid: Vec2;
-
-		if (orientation === 'horizontal') {
-			const dimY = cursor.y;
-			d1 = { x: s1.x, y: dimY };
-			d2 = { x: s2.x, y: dimY };
-			const midY = (s1.y + s2.y) * 0.5;
-			const extDir = dimY >= midY ? 1 : -1;
-			extEnd1 = { x: s1.x, y: dimY + extDir * 4 };
-			extEnd2 = { x: s2.x, y: dimY + extDir * 4 };
-			mid = { x: (d1.x + d2.x) * 0.5, y: dimY };
-		} else if (orientation === 'vertical') {
-			const dimX = cursor.x;
-			d1 = { x: dimX, y: s1.y };
-			d2 = { x: dimX, y: s2.y };
-			const midX = (s1.x + s2.x) * 0.5;
-			const extDir = dimX >= midX ? 1 : -1;
-			extEnd1 = { x: dimX + extDir * 4, y: s1.y };
-			extEnd2 = { x: dimX + extDir * 4, y: s2.y };
-			mid = { x: dimX, y: (d1.y + d2.y) * 0.5 };
-		} else {
-			const dx = s2.x - s1.x;
-			const dy = s2.y - s1.y;
-			const len = Math.hypot(dx, dy);
-			if (len < 1e-4) return;
-
-			const nx = -dy / len;
-			const ny = dx / len;
-			const midX = (s1.x + s2.x) * 0.5;
-			const midY = (s1.y + s2.y) * 0.5;
-			const offset = (cursor.x - midX) * nx + (cursor.y - midY) * ny;
-
-			d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
-			d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
-			extEnd1 = { x: d1.x + nx * 4, y: d1.y + ny * 4 };
-			extEnd2 = { x: d2.x + nx * 4, y: d2.y + ny * 4 };
-			mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
-		}
-
-		createSvgLine(s1.x, s1.y, extEnd1.x, extEnd1.y, PREVIEW_EXTENSION_LINE_ATTRS, this.previewGroup);
-		createSvgLine(s2.x, s2.y, extEnd2.x, extEnd2.y, PREVIEW_EXTENSION_LINE_ATTRS, this.previewGroup);
-
-		createSvgLine(d1.x, d1.y, d2.x, d2.y, {
-			stroke: COLORS.primary,
-			'stroke-width': STROKE_WIDTH.dimension,
-			'marker-start': DIM_ARROWS.default,
-			'marker-end': DIM_ARROWS.default,
-		}, this.previewGroup);
+		const geom = computeDistanceDimensionGeometry(s1, s2, orientation, 0, cursor);
+		if (!geom) return;
 
 		const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
-		this.renderTooltip(mid.x, mid.y, `${labelPrefix}${distVal.toFixed(1)} mm`);
+		this.renderLinearDimensionVisual({
+			d1: geom.d1,
+			d2: geom.d2,
+			label: `${labelPrefix}${distVal.toFixed(1)} mm`,
+			extensionLines: geom.extensionLines,
+			parent: this.previewGroup,
+			isTooltip: true,
+			startPointHighlight: orientation === 'direct' ? s1 : undefined,
+			targetPointSnapped: isTargetSnapped,
+		});
+	}
+
+	renderDistanceLinePreview(
+		s1: Vec2,
+		s2: Vec2,
+		distVal: number,
+		isTargetSnapped = false
+	): void {
+		this.renderDistancePreview(s1, s2, undefined, distVal, 'direct', isTargetSnapped);
+	}
+
+	renderPointToLineDistancePreview(
+		sp: Vec2,
+		s1: Vec2,
+		s2: Vec2,
+		cursor?: Vec2,
+		distVal = 0
+	): void {
+		this.previewGroup.innerHTML = '';
+		const geom = computePointToLineDimensionGeometry(sp, s1, s2, 0, cursor);
+		if (!geom) return;
+
+		this.renderLinearDimensionVisual({
+			d1: geom.d1,
+			d2: geom.d2,
+			label: `${distVal.toFixed(1)} mm`,
+			extensionLines: geom.extensionLines,
+			parent: this.previewGroup,
+			isTooltip: true,
+			startPointHighlight: sp,
+		});
 	}
 
 	renderAnglePreview(

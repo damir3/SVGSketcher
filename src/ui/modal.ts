@@ -1,11 +1,11 @@
-import type { DistanceConstraint, RadiusConstraint, AngleConstraint } from '../solver/constraints';
+import type { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint } from '../solver/constraints';
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from '../math/vector';
 
 export class DimensionModal {
 	private modalEl: HTMLElement;
 	private sketch: SketchDocument;
-	private currentConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | null = null;
+	private currentConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | null = null;
 	private currentMode: 'radius' | 'diameter' = 'radius';
 	private openedTime = 0;
 
@@ -19,7 +19,7 @@ export class DimensionModal {
 		this.bindEvents();
 	}
 
-	open(constraint: DistanceConstraint | RadiusConstraint | AngleConstraint, screenPos?: Vec2): void {
+	open(constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint, screenPos?: Vec2): void {
 		this.currentConstraint = constraint;
 		this.openedTime = performance.now();
 
@@ -172,11 +172,15 @@ export class DimensionModal {
 			if ('targetDistance' in this.currentConstraint) {
 				this.currentConstraint.targetDistance = newVal;
 				this.currentConstraint.value = newVal;
-				this.currentConstraint.name = this.currentConstraint.orientation === 'horizontal'
-						? 'Horizontal Distance'
-						: this.currentConstraint.orientation === 'vertical'
-						? 'Vertical Distance'
-						: 'Distance';
+				if ('orientation' in this.currentConstraint) {
+					this.currentConstraint.name = (this.currentConstraint as any).orientation === 'horizontal'
+							? 'Horizontal Distance'
+							: (this.currentConstraint as any).orientation === 'vertical'
+							? 'Vertical Distance'
+							: 'Distance';
+				} else {
+					this.currentConstraint.name = 'Point-to-Line Distance';
+				}
 			} else if ('targetAngle' in this.currentConstraint) {
 				const clampedAngle = Math.min(179.9, Math.max(0.1, newVal));
 				this.currentConstraint.targetAngle = clampedAngle;
