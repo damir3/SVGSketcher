@@ -27,6 +27,87 @@ export interface RenderOptions {
 	showDimensions?: boolean;
 }
 
+export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
+	const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+	const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+
+	let sweepAngle = 0;
+	const sweepFlag = clockwise ? 1 : 0;
+	if (clockwise) {
+		sweepAngle = (ae - as) % (2 * Math.PI);
+		if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+	} else {
+		sweepAngle = (as - ae) % (2 * Math.PI);
+		if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+	}
+
+	// For arcs up to 135°, standard SVG arc command is completely stable
+	if (sweepAngle <= Math.PI * 0.75) {
+		return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	}
+
+	// For larger arcs (> 135°, including 180° and near 360°):
+	// Split at the exact geometric midpoint into two sub-arcs (each <= 180°).
+	// This avoids the SVG endpoint-to-center singularity at 180° (where endpoints are diameter-apart)
+	// and at 360° (where endpoints coincide and SVG drops the arc).
+	const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
+	const mx = sc.x + sr * Math.cos(midAngle);
+	const my = sc.y + sr * Math.sin(midAngle);
+
+	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+}
+
+export function getEllipticalArcSvgPath(
+	sc: Vec2,
+	smaj: Vec2,
+	smin: Vec2,
+	ss: Vec2,
+	se: Vec2,
+	clockwise: boolean
+): string {
+	const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+	const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+	if (rx < 0.1 || ry < 0.1) return '';
+
+	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+	const thetaDeg = (theta * 180) / Math.PI;
+
+	const ux = Math.cos(theta);
+	const uy = Math.sin(theta);
+	const vx = -Math.sin(theta);
+	const vy = Math.cos(theta);
+
+	const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+	const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+	const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+
+	const ts = Math.atan2(vs / ry, us / rx);
+	const te = Math.atan2(ve / ry, ue / rx);
+
+	let sweepAngle = 0;
+	const sweepFlag = clockwise ? 1 : 0;
+	if (clockwise) {
+		sweepAngle = (te - ts) % (2 * Math.PI);
+		if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+	} else {
+		sweepAngle = (ts - te) % (2 * Math.PI);
+		if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+	}
+
+	if (sweepAngle <= Math.PI * 0.75) {
+		return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	}
+
+	const tmid = clockwise ? ts + sweepAngle * 0.5 : ts - sweepAngle * 0.5;
+	const umid = rx * Math.cos(tmid);
+	const vmid = ry * Math.sin(tmid);
+	const mx = sc.x + umid * ux + vmid * vx;
+	const my = sc.y + umid * uy + vmid * vy;
+
+	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+}
+
 export class SVGRenderer {
 	private svg: SVGSVGElement;
 	private defsEl: SVGDefsElement;
@@ -383,24 +464,8 @@ export class SVGRenderer {
 			const sr = arc.radius * viewport.zoom;
 			const isSelected = sketch.selection.arcIds.has(arc.id);
 
-			const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-			const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
 			const clockwise = !!arc.clockwise;
-
-			let sweepAngle = 0;
-			let sweepFlag = 0;
-			if (clockwise) {
-				sweepAngle = (ae - as) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 1;
-			} else {
-				sweepAngle = (as - ae) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 0;
-			}
-			const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
-
-			const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${sr.toFixed(1)} ${sr.toFixed(1)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
 
 			const arcG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 			arcG.setAttribute('data-id', arc.id);
@@ -559,41 +624,8 @@ export class SVGRenderer {
 			const ss = viewport.worldToScreen(startPt.x, startPt.y);
 			const se = viewport.worldToScreen(endPt.x, endPt.y);
 
-			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-			if (rx < 0.1 || ry < 0.1) continue;
-
-			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-			const thetaDeg = (theta * 180) / Math.PI;
-
-			const ux = Math.cos(theta);
-			const uy = Math.sin(theta);
-			const vx = -Math.sin(theta);
-			const vy = Math.cos(theta);
-
-			const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-			const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-			const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-			const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
-
-			const ts = Math.atan2(vs / ry, us / rx);
-			const te = Math.atan2(ve / ry, ue / rx);
-
 			const clockwise = !!arc.clockwise;
-			let sweepAngle = 0;
-			let sweepFlag = 0;
-			if (clockwise) {
-				sweepAngle = (te - ts) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 1;
-			} else {
-				sweepAngle = (ts - te) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 0;
-			}
-			const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
-
-			const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} ${thetaDeg.toFixed(2)} ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+			const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
 			const isSelected = sketch.selection.ellipticalArcIds.has(arc.id);
 
 			const arcG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1716,17 +1748,13 @@ export class SVGRenderer {
 		const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
 
 		let sweepAngle = 0;
-		let sweepFlag = 0;
 		if (clockwise) {
 			sweepAngle = (ae - as) % (2 * Math.PI);
 			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-			sweepFlag = 1;
 		} else {
 			sweepAngle = (as - ae) % (2 * Math.PI);
 			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-			sweepFlag = 0;
 		}
-		const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
 
 		// Faint guide circle
 		const guideCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -1739,7 +1767,7 @@ export class SVGRenderer {
 		guideCircle.setAttribute('fill', 'none');
 		this.previewGroup.appendChild(guideCircle);
 
-		const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${sr.toFixed(1)} ${sr.toFixed(1)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+		const d = getArcSvgPath(sc, ss, se, sr, clockwise);
 
 		const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 		arc.setAttribute('d', d);
@@ -1975,19 +2003,15 @@ export class SVGRenderer {
 		const te = Math.atan2(ve / ry, ue / rx);
 
 		let sweepAngle = 0;
-		let sweepFlag = 0;
 		if (clockwise) {
 			sweepAngle = (te - ts) % (2 * Math.PI);
 			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-			sweepFlag = 1;
 		} else {
 			sweepAngle = (ts - te) % (2 * Math.PI);
 			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-			sweepFlag = 0;
 		}
-		const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
 
-		const d = `M ${ss.x.toFixed(1)} ${ss.y.toFixed(1)} A ${rx.toFixed(1)} ${ry.toFixed(1)} ${thetaDeg.toFixed(2)} ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(1)} ${se.y.toFixed(1)}`;
+		const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
 
 		const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 		arc.setAttribute('d', d);

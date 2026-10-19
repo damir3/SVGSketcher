@@ -13,6 +13,8 @@ import {
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
 
+const TWO_PI = 2 * Math.PI;
+
 export const DRAWING_PRIMITIVE_TOOLS = [
 	'point',
 	'line',
@@ -173,6 +175,14 @@ export class CanvasInteraction {
 	private ellipseStartPointWorldPos: Vec2 | null = null;
 	private startSnapLineId: string | null = null;
 	private startSnapCircleId: string | null = null;
+
+	// Centerpoint arc tracking state
+	private arcCenterPrevAngle: number | null = null;
+	private arcCenterTotalAngle = 0;
+
+	// Elliptical arc tracking state
+	private ellipticalArcPrevAngle: number | null = null;
+	private ellipticalArcTotalAngle = 0;
 
 	// Dragging point state
 	private isDraggingPoint = false;
@@ -403,6 +413,10 @@ export class CanvasInteraction {
 		this.ellipseStartPointWorldPos = null;
 		this.startSnapLineId = null;
 		this.startSnapCircleId = null;
+		this.arcCenterPrevAngle = null;
+		this.arcCenterTotalAngle = 0;
+		this.ellipticalArcPrevAngle = null;
+		this.ellipticalArcTotalAngle = 0;
 
 		this.isDraggingPoint = false;
 		this.draggedPointId = null;
@@ -697,19 +711,19 @@ export class CanvasInteraction {
 			let sweepAngle = 0;
 			let pAngle = 0;
 			if (clockwise) {
-				sweepAngle = (ae - as) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				pAngle = (ap - as) % (2 * Math.PI);
-				if (pAngle < 0) pAngle += 2 * Math.PI;
+				sweepAngle = (ae - as) % TWO_PI;
+				if (sweepAngle < 0) sweepAngle += TWO_PI;
+				pAngle = (ap - as) % TWO_PI;
+				if (pAngle < 0) pAngle += TWO_PI;
 			} else {
-				sweepAngle = (as - ae) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				pAngle = (as - ap) % (2 * Math.PI);
-				if (pAngle < 0) pAngle += 2 * Math.PI;
+				sweepAngle = (as - ae) % TWO_PI;
+				if (sweepAngle < 0) sweepAngle += TWO_PI;
+				pAngle = (as - ap) % TWO_PI;
+				if (pAngle < 0) pAngle += TWO_PI;
 			}
 
 			const angTolerance = geomSnapDistPx / Math.max(sr, 1);
-			if (pAngle <= sweepAngle + angTolerance || pAngle >= 2 * Math.PI - angTolerance) {
+			if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
 				closestGeomDist = dToPerimeter;
 				const clampedPAngle = Math.max(0, Math.min(sweepAngle, pAngle));
 				const actualAng = clockwise ? as + clampedPAngle : as - clampedPAngle;
@@ -960,19 +974,19 @@ export class CanvasInteraction {
 			let sweepAngle = 0;
 			let pAngle = 0;
 			if (clockwise) {
-				sweepAngle = (ae - as) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				pAngle = (ap - as) % (2 * Math.PI);
-				if (pAngle < 0) pAngle += 2 * Math.PI;
+				sweepAngle = (ae - as) % TWO_PI;
+				if (sweepAngle < 0) sweepAngle += TWO_PI;
+				pAngle = (ap - as) % TWO_PI;
+				if (pAngle < 0) pAngle += TWO_PI;
 			} else {
-				sweepAngle = (as - ae) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				pAngle = (as - ap) % (2 * Math.PI);
-				if (pAngle < 0) pAngle += 2 * Math.PI;
+				sweepAngle = (as - ae) % TWO_PI;
+				if (sweepAngle < 0) sweepAngle += TWO_PI;
+				pAngle = (as - ap) % TWO_PI;
+				if (pAngle < 0) pAngle += TWO_PI;
 			}
 
 			const angTolerance = thresholdPx / Math.max(sr, 1);
-			if (pAngle <= sweepAngle + angTolerance || pAngle >= 2 * Math.PI - angTolerance) {
+			if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
 				closestDist = dToPerimeter;
 				foundArc = arc;
 			}
@@ -1048,23 +1062,23 @@ export class CanvasInteraction {
 						const clockwise = !!arc.clockwise;
 						let sweepAngle = 0;
 						if (clockwise) {
-							sweepAngle = (ae - as) % (2 * Math.PI);
-							if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+							sweepAngle = (ae - as) % TWO_PI;
+							if (sweepAngle < 0) sweepAngle += TWO_PI;
 							if (constraint.leaderAngle !== undefined) {
-								let rel = (constraint.leaderAngle - as) % (2 * Math.PI);
-								if (rel < 0) rel += 2 * Math.PI;
-								if (rel > sweepAngle) rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
+								let rel = (constraint.leaderAngle - as) % TWO_PI;
+								if (rel < 0) rel += TWO_PI;
+								if (rel > sweepAngle) rel = rel - sweepAngle < TWO_PI - rel ? sweepAngle : 0;
 								screenAngle = as + rel;
 							} else {
 								screenAngle = as + sweepAngle / 2;
 							}
 						} else {
-							sweepAngle = (as - ae) % (2 * Math.PI);
-							if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+							sweepAngle = (as - ae) % TWO_PI;
+							if (sweepAngle < 0) sweepAngle += TWO_PI;
 							if (constraint.leaderAngle !== undefined) {
-								let rel = (as - constraint.leaderAngle) % (2 * Math.PI);
-								if (rel < 0) rel += 2 * Math.PI;
-								if (rel > sweepAngle) rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
+								let rel = (as - constraint.leaderAngle) % TWO_PI;
+								if (rel < 0) rel += TWO_PI;
+								if (rel > sweepAngle) rel = rel - sweepAngle < TWO_PI - rel ? sweepAngle : 0;
 								screenAngle = as - rel;
 							} else {
 								screenAngle = as - sweepAngle / 2;
@@ -1194,19 +1208,19 @@ export class CanvasInteraction {
 			let sweepAngle = 0;
 			let pAngle = 0;
 			if (clockwise) {
-				sweepAngle = (te - ts) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				pAngle = (t - ts) % (2 * Math.PI);
-				if (pAngle < 0) pAngle += 2 * Math.PI;
+				sweepAngle = (te - ts) % TWO_PI;
+				if (sweepAngle < 0) sweepAngle += TWO_PI;
+				pAngle = (t - ts) % TWO_PI;
+				if (pAngle < 0) pAngle += TWO_PI;
 			} else {
-				sweepAngle = (ts - te) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				pAngle = (ts - t) % (2 * Math.PI);
-				if (pAngle < 0) pAngle += 2 * Math.PI;
+				sweepAngle = (ts - te) % TWO_PI;
+				if (sweepAngle < 0) sweepAngle += TWO_PI;
+				pAngle = (ts - t) % TWO_PI;
+				if (pAngle < 0) pAngle += TWO_PI;
 			}
 
 			const angTolerance = thresholdPx / Math.max(Math.min(rx, ry), 1);
-			if (pAngle <= sweepAngle + angTolerance || pAngle >= 2 * Math.PI - angTolerance) {
+			if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
 				closestDist = dPerimeter;
 				foundArc = arc;
 			}
@@ -1678,10 +1692,10 @@ export class CanvasInteraction {
 				const ae = Math.atan2(s2.y - sc.y, s2.x - sc.x);
 				const a3 = Math.atan2(s3.y - sc.y, s3.x - sc.x);
 
-				let sweepCW = (ae - as) % (2 * Math.PI);
-				if (sweepCW < 0) sweepCW += 2 * Math.PI;
-				let testCW = (a3 - as) % (2 * Math.PI);
-				if (testCW < 0) testCW += 2 * Math.PI;
+				let sweepCW = (ae - as) % TWO_PI;
+				if (sweepCW < 0) sweepCW += TWO_PI;
+				let testCW = (a3 - as) % TWO_PI;
+				if (testCW < 0) testCW += TWO_PI;
 
 				const clockwise = testCW > 0 && testCW < sweepCW;
 
@@ -1738,6 +1752,10 @@ export class CanvasInteraction {
 					this.applySnapConstraintIfNeeded(pt.id, snap);
 				}
 				this.arcPoint2Id = p1Id;
+				const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+				const sStart = this.viewport.worldToScreen(this.arcPoint2WorldPos.x, this.arcPoint2WorldPos.y);
+				this.arcCenterPrevAngle = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
+				this.arcCenterTotalAngle = 0;
 				this.drawingStep = 2;
 				this.render();
 			} else if (this.drawingStep === 2) {
@@ -1753,10 +1771,22 @@ export class CanvasInteraction {
 				const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
 				const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
 
-				let delta = acur - as;
-				while (delta > Math.PI) delta -= 2 * Math.PI;
-				while (delta < -Math.PI) delta += 2 * Math.PI;
-				const clockwise = delta >= 0;
+				if (this.arcCenterPrevAngle !== null) {
+					let dAngle = acur - this.arcCenterPrevAngle;
+					while (dAngle > Math.PI) dAngle -= TWO_PI;
+					while (dAngle < -Math.PI) dAngle += TWO_PI;
+					this.arcCenterTotalAngle += dAngle;
+				}
+
+				this.arcCenterTotalAngle = this.arcCenterTotalAngle % TWO_PI;
+
+				let clockwise = this.arcCenterTotalAngle >= 0;
+				if (Math.abs(this.arcCenterTotalAngle) < 0.001) {
+					let delta = acur - as;
+					while (delta > Math.PI) delta -= TWO_PI;
+					while (delta < -Math.PI) delta += TWO_PI;
+					clockwise = delta >= 0;
+				}
 
 				const worldAngle = Math.atan2(effectiveWorld.y - centerWorld.y, effectiveWorld.x - centerWorld.x);
 				const endWorldX = centerWorld.x + radius * Math.cos(worldAngle);
@@ -2038,6 +2068,18 @@ export class CanvasInteraction {
 					this.applySnapConstraintIfNeeded(pt.id, snap);
 				}
 				this.ellipseStartPointId = startPtId;
+				const sCenter = this.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+				const sMaj = this.viewport.worldToScreen(majWorld.x, majWorld.y);
+				const sStart = this.viewport.worldToScreen(this.ellipseStartPointWorldPos.x, this.ellipseStartPointWorldPos.y);
+				const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
+				const ux_s = Math.cos(theta);
+				const uy_s = Math.sin(theta);
+				const vx_s = -Math.sin(theta);
+				const vy_s = Math.cos(theta);
+				const us = (sStart.x - sCenter.x) * ux_s + (sStart.y - sCenter.y) * uy_s;
+				const vs = (sStart.x - sCenter.x) * vx_s + (sStart.y - sCenter.y) * vy_s;
+				this.ellipticalArcPrevAngle = Math.atan2(vs, us);
+				this.ellipticalArcTotalAngle = 0;
 				this.drawingStep = 4;
 				this.render();
 			} else if (this.drawingStep === 4) {
@@ -2084,10 +2126,20 @@ export class CanvasInteraction {
 
 				const ts_sc = Math.atan2(vs, us);
 				const te_sc = Math.atan2(ve, ue);
-				let delta = te_sc - ts_sc;
-				while (delta > Math.PI) delta -= 2 * Math.PI;
-				while (delta < -Math.PI) delta += 2 * Math.PI;
-				const clockwise = delta >= 0;
+				if (this.ellipticalArcPrevAngle !== null) {
+					let dAngle = te_sc - this.ellipticalArcPrevAngle;
+					while (dAngle > Math.PI) dAngle -= TWO_PI;
+					while (dAngle < -Math.PI) dAngle += TWO_PI;
+					this.ellipticalArcTotalAngle += dAngle;
+				}
+				this.ellipticalArcTotalAngle = this.ellipticalArcTotalAngle % TWO_PI;
+				let clockwise = this.ellipticalArcTotalAngle >= 0;
+				if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {
+					let delta = te_sc - ts_sc;
+					while (delta > Math.PI) delta -= TWO_PI;
+					while (delta < -Math.PI) delta += TWO_PI;
+					clockwise = delta >= 0;
+				}
 
 				let endPtId: string;
 				if (
@@ -2491,10 +2543,10 @@ export class CanvasInteraction {
 					const ae = Math.atan2(s2.y - sc.y, s2.x - sc.x);
 					const a3 = Math.atan2(s3.y - sc.y, s3.x - sc.x);
 
-					let sweepCW = (ae - as) % (2 * Math.PI);
-					if (sweepCW < 0) sweepCW += 2 * Math.PI;
-					let testCW = (a3 - as) % (2 * Math.PI);
-					if (testCW < 0) testCW += 2 * Math.PI;
+					let sweepCW = (ae - as) % TWO_PI;
+					if (sweepCW < 0) sweepCW += TWO_PI;
+					let testCW = (a3 - as) % TWO_PI;
+					if (testCW < 0) testCW += TWO_PI;
 
 					const clockwise = testCW > 0 && testCW < sweepCW;
 					this.renderer.renderArcPreview(sc, s1, s2, sr, clockwise, circum.radius, undefined, this.isConstructionMode);
@@ -2512,10 +2564,27 @@ export class CanvasInteraction {
 				const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
 				const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
 
-				let delta = acur - as;
-				while (delta > Math.PI) delta -= 2 * Math.PI;
-				while (delta < -Math.PI) delta += 2 * Math.PI;
-				const clockwise = delta >= 0;
+				if (this.arcCenterPrevAngle === null) {
+					this.arcCenterPrevAngle = as;
+					this.arcCenterTotalAngle = 0;
+				}
+
+				let dAngle = acur - this.arcCenterPrevAngle;
+				while (dAngle > Math.PI) dAngle -= TWO_PI;
+				while (dAngle < -Math.PI) dAngle += TWO_PI;
+
+				this.arcCenterTotalAngle += dAngle;
+				this.arcCenterPrevAngle = acur;
+
+				this.arcCenterTotalAngle = this.arcCenterTotalAngle % TWO_PI;
+
+				let clockwise = this.arcCenterTotalAngle >= 0;
+				if (Math.abs(this.arcCenterTotalAngle) < 0.001) {
+					let delta = acur - as;
+					while (delta > Math.PI) delta -= TWO_PI;
+					while (delta < -Math.PI) delta += TWO_PI;
+					clockwise = delta >= 0;
+				}
 
 				const worldAngle = Math.atan2(effectiveWorld.y - centerWorld.y, effectiveWorld.x - centerWorld.x);
 				const endWorld = vec(
@@ -2524,6 +2593,16 @@ export class CanvasInteraction {
 				);
 				const sEnd = this.viewport.worldToScreen(endWorld.x, endWorld.y);
 
+				let sweepAngle = 0;
+				if (clockwise) {
+					sweepAngle = (acur - as) % TWO_PI;
+					if (sweepAngle < 0) sweepAngle += TWO_PI;
+				} else {
+					sweepAngle = (as - acur) % TWO_PI;
+					if (sweepAngle < 0) sweepAngle += TWO_PI;
+				}
+				const sweepDeg = (sweepAngle * 180) / Math.PI;
+
 				this.renderer.renderArcPreview(
 					sCenter,
 					sStart,
@@ -2531,7 +2610,7 @@ export class CanvasInteraction {
 					sr,
 					clockwise,
 					radius,
-					(Math.abs(delta) * 180) / Math.PI,
+					sweepDeg,
 					this.isConstructionMode
 				);
 			} else if (this.activeTool === 'ellipse' || this.activeTool === 'elliptical_arc') {
@@ -2651,10 +2730,25 @@ export class CanvasInteraction {
 
 				const ts_sc = Math.atan2(vs, us);
 				const te_sc = Math.atan2(ve, ue);
-				let delta = te_sc - ts_sc;
-				while (delta > Math.PI) delta -= 2 * Math.PI;
-				while (delta < -Math.PI) delta += 2 * Math.PI;
-				const clockwise = delta >= 0;
+				if (this.ellipticalArcPrevAngle === null) {
+					this.ellipticalArcPrevAngle = ts_sc;
+					this.ellipticalArcTotalAngle = 0;
+				}
+				let dAngle = te_sc - this.ellipticalArcPrevAngle;
+				while (dAngle > Math.PI) dAngle -= TWO_PI;
+				while (dAngle < -Math.PI) dAngle += TWO_PI;
+				this.ellipticalArcTotalAngle += dAngle;
+				this.ellipticalArcPrevAngle = te_sc;
+
+				this.ellipticalArcTotalAngle = this.ellipticalArcTotalAngle % TWO_PI;
+
+				let clockwise = this.ellipticalArcTotalAngle >= 0;
+				if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {
+					let delta = te_sc - ts_sc;
+					while (delta > Math.PI) delta -= TWO_PI;
+					while (delta < -Math.PI) delta += TWO_PI;
+					clockwise = delta >= 0;
+				}
 
 				this.renderer.renderEllipticalArcPreview(
 					sCenter,
@@ -4111,11 +4205,11 @@ export class CanvasInteraction {
 
 		let sweepAngle = 0;
 		if (clockwise) {
-			sweepAngle = (ae - as) % (2 * Math.PI);
-			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+			sweepAngle = (ae - as) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
 		} else {
-			sweepAngle = (as - ae) % (2 * Math.PI);
-			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+			sweepAngle = (as - ae) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
 		}
 
 		const steps = 32;
@@ -4169,7 +4263,7 @@ export class CanvasInteraction {
 		let prevY = center.y + rx * uy;
 
 		for (let i = 1; i <= steps; i++) {
-			const t = (i / steps) * 2 * Math.PI;
+			const t = (i / steps) * TWO_PI;
 			const cosT = Math.cos(t);
 			const sinT = Math.sin(t);
 			const currX = center.x + rx * cosT * ux + ry * sinT * vx;
@@ -4224,11 +4318,11 @@ export class CanvasInteraction {
 		const clockwise = !!arc.clockwise;
 		let sweepAngle = 0;
 		if (clockwise) {
-			sweepAngle = (te - ts) % (2 * Math.PI);
-			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+			sweepAngle = (te - ts) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
 		} else {
-			sweepAngle = (ts - te) % (2 * Math.PI);
-			if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+			sweepAngle = (ts - te) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
 		}
 
 		const steps = 36;
