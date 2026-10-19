@@ -24,7 +24,154 @@ import { getBadgeIcon } from './badgeIcons';
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 const TWO_PI = 2 * Math.PI;
 
+// ==========================================
+// Styling Constants & Design Tokens
+// ==========================================
+
+export const COLORS = {
+	primary: '#0284c7', // Sky-600: main active CAD color (selection, dimensions, rays)
+	selected: '#0ea5e9', // Sky-500: selected constraint/dimension/accent
+	selectedBg: '#e0f2fe', // Sky-100: selected badge fill
+	unconstrained: '#1e293b', // Slate-800: normal unconstrained geometry
+	constrained: '#16a34a', // Green-600: fully constrained geometry & vertices
+	conflict: '#dc2626', // Red-600: overconstrained error
+	construction: '#64748b', // Slate-500: construction geometry & auxiliary rings
+	fixed: '#d97706', // Amber-600: fixed points / badges
+	badgeBorder: '#cbd5e1', // Slate-300: default badge border
+	badgeText: '#475569', // Slate-600: default badge text
+	tooltipBg: '#0f172a', // Slate-900: tooltip background
+	white: '#ffffff',
+	hitTransparent: 'rgba(0, 0, 0, 0.001)',
+	guideFaint: 'rgba(2, 132, 199, 0.25)',
+	guideStartEllipse: 'rgba(2, 132, 199, 0.3)',
+	extLineDim: 'rgba(2, 132, 199, 0.45)',
+	selectionBoxFill: 'rgba(14, 165, 233, 0.12)',
+	pointSnapFill: 'rgba(2, 132, 199, 0.2)',
+	objectSnapFill: 'rgba(16, 185, 129, 0.25)',
+	objectSnapStroke: '#0e9c6d',
+	gridSnapFill: 'rgba(99, 102, 241, 0.15)',
+	gridSnapStroke: '#7cbdfa',
+	xAxis: 'rgba(220, 38, 38, 0.65)',
+	yAxis: 'rgba(22, 163, 74, 0.65)',
+	originQuarter: 'rgba(100, 116, 139, 0.45)',
+	gridMinor: 'rgba(0, 0, 0, 0.08)',
+	gridMajor: 'rgba(0, 0, 0, 0.20)',
+	gridLabel: 'rgba(0, 0, 0, 0.6)',
+} as const;
+
+export const DASH_ARRAY = {
+	construction: '6,6',
+	ray: '2,2',
+	axis: '3,3',
+	guide: '2,4',
+	guideCircle: '4,4',
+	angleExtension: '4,4',
+	selectionBox: '4 3',
+} as const;
+
+export const STROKE_WIDTH = {
+	minorGrid: 0.75,
+	thin: 1,
+	majorGrid: 1.2,
+	normal: 2,
+	selected: 3.5,
+	dimension: 1.5,
+	hitArea: 18,
+} as const;
+
+export const DIM_ARROWS = {
+	default: 'url(#dim-arrow)',
+	selected: 'url(#dim-arrow-selected)',
+} as const;
+
 export type SvgAttrs = Record<string, string | number | boolean | undefined | null>;
+
+// ==========================================
+// Reusable SvgAttrs Presets & Helpers
+// ==========================================
+
+export const HIT_AREA_STROKE_ATTRS: SvgAttrs = {
+	class: 'hit-area',
+	stroke: COLORS.hitTransparent,
+	'stroke-width': STROKE_WIDTH.hitArea,
+	'stroke-linecap': 'round',
+	'pointer-events': 'stroke',
+};
+
+export const HIT_AREA_RING_ATTRS: SvgAttrs = {
+	class: 'hit-area',
+	fill: 'none',
+	stroke: COLORS.hitTransparent,
+	'stroke-width': STROKE_WIDTH.hitArea,
+	'pointer-events': 'stroke',
+};
+
+export const HIT_AREA_POINT_ATTRS: SvgAttrs = {
+	class: 'hit-area',
+	fill: COLORS.hitTransparent,
+	'pointer-events': 'all',
+};
+
+export const AUX_RAY_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.thin,
+	'stroke-dasharray': DASH_ARRAY.ray,
+};
+
+export const AUX_AXIS_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.thin,
+	'stroke-dasharray': DASH_ARRAY.axis,
+};
+
+export const GUIDE_OUTLINE_ATTRS: SvgAttrs = {
+	stroke: COLORS.guideFaint,
+	'stroke-width': STROKE_WIDTH.thin,
+	'stroke-dasharray': DASH_ARRAY.guide,
+	fill: 'none',
+};
+
+export const EXTENSION_LINE_ATTRS: SvgAttrs = {
+	stroke: COLORS.extLineDim,
+	'stroke-width': STROKE_WIDTH.thin,
+	'pointer-events': 'none',
+};
+
+export const PREVIEW_EXTENSION_LINE_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.thin,
+	'stroke-dasharray': DASH_ARRAY.ray,
+};
+
+export function getPrimitiveStrokeAttrs(
+	isSelected: boolean,
+	isConstruction: boolean,
+	baseColor: string,
+	roundCap = false
+): SvgAttrs {
+	return {
+		class: 'entity-visible visible-primitive',
+		stroke: isSelected ? COLORS.primary : isConstruction ? COLORS.construction : baseColor,
+		'stroke-width': isSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.normal,
+		'stroke-linecap': roundCap ? 'round' : undefined,
+		'stroke-dasharray': isConstruction ? DASH_ARRAY.construction : undefined,
+		'pointer-events': 'stroke',
+	};
+}
+
+export function getPreviewStrokeAttrs(
+	isConstruction = false,
+	isGuide = false,
+	roundCap = false
+): SvgAttrs {
+	return {
+		stroke: isGuide ? COLORS.primary : isConstruction ? COLORS.construction : COLORS.unconstrained,
+		'stroke-width': STROKE_WIDTH.normal,
+		'stroke-linecap': roundCap ? 'round' : undefined,
+		'stroke-dasharray': isGuide ? DASH_ARRAY.guideCircle : isConstruction ? DASH_ARRAY.construction : undefined,
+		fill: 'none',
+	};
+}
 
 function fmtCoord(v: number | string): string {
 	return typeof v === 'number' ? (Number.isInteger(v) ? v.toString() : v.toFixed(1)) : String(v);
@@ -321,8 +468,8 @@ export class SVGRenderer {
 			createSvgPath('M 0 1.5 L 12.5 5 L 0 8.5 z', { fill: color }, marker);
 		};
 
-		createArrowMarker('dim-arrow', '#0284c7');
-		createArrowMarker('dim-arrow-selected', '#0ea5e9');
+		createArrowMarker('dim-arrow', COLORS.primary);
+		createArrowMarker('dim-arrow-selected', COLORS.selected);
 	}
 
 	render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
@@ -364,9 +511,9 @@ export class SVGRenderer {
 			'dominant-baseline': 'central',
 			'font-size': 11,
 			'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-			fill: 'rgba(0, 0, 0, 0.6)',
+			fill: COLORS.gridLabel,
 			'paint-order': 'stroke fill',
-			stroke: '#ffffff',
+			stroke: COLORS.white,
 			'stroke-width': 3,
 			'stroke-linejoin': 'round',
 		};
@@ -413,8 +560,8 @@ export class SVGRenderer {
 		// Minor grid (subStep) - light subtle lines
 		if (showSubGrid && dMinor) {
 			createSvgPath(dMinor, {
-				stroke: 'rgba(0, 0, 0, 0.08)',
-				'stroke-width': 0.75,
+				stroke: COLORS.gridMinor,
+				'stroke-width': STROKE_WIDTH.minorGrid,
 				fill: 'none',
 			}, this.gridGroup);
 		}
@@ -422,8 +569,8 @@ export class SVGRenderer {
 		// Major grid (step = 5 * subStep) - distinct darker lines
 		if (dMajor) {
 			createSvgPath(dMajor, {
-				stroke: 'rgba(0, 0, 0, 0.20)',
-				'stroke-width': 1.2,
+				stroke: COLORS.gridMajor,
+				'stroke-width': STROKE_WIDTH.majorGrid,
 				fill: 'none',
 			}, this.gridGroup);
 		}
@@ -436,30 +583,30 @@ export class SVGRenderer {
 
 		// X Axis (Red)
 		createSvgLine(0, origin.y, viewport.width, origin.y, {
-			stroke: 'rgba(220, 38, 38, 0.65)',
-			'stroke-width': 1.5,
+			stroke: COLORS.xAxis,
+			'stroke-width': STROKE_WIDTH.dimension,
 		}, originG);
 
 		// Y Axis (Green)
 		createSvgLine(origin.x, 0, origin.x, viewport.height, {
-			stroke: 'rgba(22, 163, 74, 0.65)',
-			'stroke-width': 1.5,
+			stroke: COLORS.yAxis,
+			'stroke-width': STROKE_WIDTH.dimension,
 		}, originG);
 
 		// Origin marker target (CAD surveyor style matching reference image)
 		const r = 8;
 		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`, {
-			fill: 'rgba(100, 116, 139, 0.45)',
+			fill: COLORS.originQuarter,
 		}, originG);
 
 		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`, {
-			fill: 'rgba(100, 116, 139, 0.45)',
+			fill: COLORS.originQuarter,
 		}, originG);
 
 		createSvgCircle(origin.x, origin.y, r, {
 			fill: 'none',
-			stroke: '#64748b',
-			'stroke-width': 1.5,
+			stroke: COLORS.construction,
+			'stroke-width': STROKE_WIDTH.dimension,
 		}, originG);
 	}
 
@@ -470,9 +617,8 @@ export class SVGRenderer {
 		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
 		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
 
-		// Light Theme: Unconstrained is bold slate (#1e293b), fully constrained is green (#16a34a), conflict is red (#dc2626)
-		const baseColor = hasConflict ? '#dc2626' : isFullyConstrained ? '#16a34a' : '#1e293b';
-		const selectedColor = '#0284c7';
+		// Light Theme: Unconstrained is bold slate, fully constrained is green, conflict is red
+		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
 
 		// 1. Render Lines
 		for (const line of sketch.lines.values()) {
@@ -491,23 +637,10 @@ export class SVGRenderer {
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px wide)
-			createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-				class: 'hit-area',
-				stroke: 'rgba(0, 0, 0, 0.001)',
-				'stroke-width': 18,
-				'stroke-linecap': 'round',
-				'pointer-events': 'stroke',
-			}, lineG);
+			createSvgLine(s1.x, s1.y, s2.x, s2.y, HIT_AREA_STROKE_ATTRS, lineG);
 
 			// Visible line
-			createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-				class: 'entity-visible visible-primitive',
-				stroke: isSelected ? selectedColor : line.isConstruction ? '#64748b' : baseColor,
-				'stroke-width': isSelected ? 3.5 : 2,
-				'stroke-linecap': 'round',
-				'stroke-dasharray': line.isConstruction ? '6,6' : undefined,
-				'pointer-events': 'stroke',
-			}, lineG);
+			createSvgLine(s1.x, s1.y, s2.x, s2.y, getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true), lineG);
 		}
 
 		// 2. Render Circles
@@ -526,22 +659,12 @@ export class SVGRenderer {
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px stroke ring)
-			createSvgCircle(sc.x, sc.y, sr, {
-				class: 'hit-area',
-				fill: 'none',
-				stroke: 'rgba(0, 0, 0, 0.001)',
-				'stroke-width': 18,
-				'pointer-events': 'stroke',
-			}, circleG);
+			createSvgCircle(sc.x, sc.y, sr, HIT_AREA_RING_ATTRS, circleG);
 
 			// Visible circle
 			createSvgCircle(sc.x, sc.y, sr, {
-				class: 'entity-visible visible-primitive',
 				fill: 'none',
-				stroke: isSelected ? selectedColor : circle.isConstruction ? '#64748b' : baseColor,
-				'stroke-width': isSelected ? 3.5 : 2,
-				'stroke-dasharray': circle.isConstruction ? '6,6' : undefined,
-				'pointer-events': 'stroke',
+				...getPrimitiveStrokeAttrs(isSelected, !!circle.isConstruction, baseColor),
 			}, circleG);
 		}
 
@@ -568,35 +691,18 @@ export class SVGRenderer {
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px stroke)
-			createSvgPath(d, {
-				class: 'hit-area',
-				fill: 'none',
-				stroke: 'rgba(0, 0, 0, 0.001)',
-				'stroke-width': 18,
-				'stroke-linecap': 'round',
-				'pointer-events': 'stroke',
-			}, arcG);
+			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 
 			// Visible arc path
 			createSvgPath(d, {
-				class: 'entity-visible visible-primitive',
 				fill: 'none',
-				stroke: isSelected ? selectedColor : arc.isConstruction ? '#64748b' : baseColor,
-				'stroke-width': isSelected ? 3.5 : 2,
-				'stroke-linecap': 'round',
-				'stroke-dasharray': arc.isConstruction ? '6,6' : undefined,
-				'pointer-events': 'stroke',
+				...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
 			}, arcG);
 
 			// Light dashed radial lines to center if selected
 			if (isSelected) {
-				const radAttrs: SvgAttrs = {
-					stroke: '#0284c7',
-					'stroke-width': 1,
-					'stroke-dasharray': '3,3',
-				};
-				createSvgLine(sc.x, sc.y, ss.x, ss.y, radAttrs, arcG);
-				createSvgLine(sc.x, sc.y, se.x, se.y, radAttrs, arcG);
+				createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_AXIS_ATTRS, arcG);
+				createSvgLine(sc.x, sc.y, se.x, se.y, AUX_AXIS_ATTRS, arcG);
 			}
 		}
 
@@ -626,34 +732,21 @@ export class SVGRenderer {
 
 			// Invisible generous hit target (18px stroke)
 			createSvgEllipse(sc.x, sc.y, rx, ry, {
-				class: 'hit-area',
 				transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-				fill: 'none',
-				stroke: 'rgba(0, 0, 0, 0.001)',
-				'stroke-width': 18,
-				'pointer-events': 'stroke',
+				...HIT_AREA_RING_ATTRS,
 			}, ellipseG);
 
 			// Visible ellipse
 			createSvgEllipse(sc.x, sc.y, rx, ry, {
-				class: 'entity-visible visible-primitive',
 				transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 				fill: 'none',
-				stroke: isSelected ? selectedColor : ellipse.isConstruction ? '#64748b' : baseColor,
-				'stroke-width': isSelected ? 3.5 : 2,
-				'stroke-dasharray': ellipse.isConstruction ? '6,6' : undefined,
-				'pointer-events': 'stroke',
+				...getPrimitiveStrokeAttrs(isSelected, !!ellipse.isConstruction, baseColor),
 			}, ellipseG);
 
 			// Subtle dashed conjugate axes if selected
 			if (isSelected) {
-				const axAttrs: SvgAttrs = {
-					stroke: '#0284c7',
-					'stroke-width': 1,
-					'stroke-dasharray': '3,3',
-				};
-				createSvgLine(sc.x, sc.y, smaj.x, smaj.y, axAttrs, ellipseG);
-				createSvgLine(sc.x, sc.y, smin.x, smin.y, axAttrs, ellipseG);
+				createSvgLine(sc.x, sc.y, smaj.x, smaj.y, AUX_AXIS_ATTRS, ellipseG);
+				createSvgLine(sc.x, sc.y, smin.x, smin.y, AUX_AXIS_ATTRS, ellipseG);
 			}
 		}
 
@@ -683,43 +776,20 @@ export class SVGRenderer {
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px stroke)
-			createSvgPath(d, {
-				class: 'hit-area',
-				fill: 'none',
-				stroke: 'rgba(0, 0, 0, 0.001)',
-				'stroke-width': 18,
-				'stroke-linecap': 'round',
-				'pointer-events': 'stroke',
-			}, arcG);
+			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 
 			// Visible arc path
 			createSvgPath(d, {
-				class: 'entity-visible visible-primitive',
 				fill: 'none',
-				stroke: isSelected ? selectedColor : arc.isConstruction ? '#64748b' : baseColor,
-				'stroke-width': isSelected ? 3.5 : 2,
-				'stroke-linecap': 'round',
-				'stroke-dasharray': arc.isConstruction ? '6,6' : undefined,
-				'pointer-events': 'stroke',
+				...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
 			}, arcG);
 
 			// Light dashed radial lines to center and axes if selected
 			if (isSelected) {
-				const radAttrs: SvgAttrs = {
-					stroke: '#0284c7',
-					'stroke-width': 1,
-					'stroke-dasharray': '3,3',
-				};
-				createSvgLine(sc.x, sc.y, ss.x, ss.y, radAttrs, arcG);
-				createSvgLine(sc.x, sc.y, se.x, se.y, radAttrs, arcG);
-
-				const axAttrs: SvgAttrs = {
-					stroke: '#0284c7',
-					'stroke-width': 1,
-					'stroke-dasharray': '2,2',
-				};
-				createSvgLine(sc.x, sc.y, smaj.x, smaj.y, axAttrs, arcG);
-				createSvgLine(sc.x, sc.y, smin.x, smin.y, axAttrs, arcG);
+				createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_AXIS_ATTRS, arcG);
+				createSvgLine(sc.x, sc.y, se.x, se.y, AUX_AXIS_ATTRS, arcG);
+				createSvgLine(sc.x, sc.y, smaj.x, smaj.y, AUX_RAY_ATTRS, arcG);
+				createSvgLine(sc.x, sc.y, smin.x, smin.y, AUX_RAY_ATTRS, arcG);
 			}
 		}
 
@@ -735,32 +805,28 @@ export class SVGRenderer {
 			}, this.pointGroup);
 
 			// Invisible larger hit target for easy clicking
-			createSvgCircle(s.x, s.y, 14, {
-				class: 'hit-area',
-				fill: 'rgba(0, 0, 0, 0.001)',
-				'pointer-events': 'all',
-			}, ptG);
+			createSvgCircle(s.x, s.y, 14, HIT_AREA_POINT_ATTRS, ptG);
 
 			// Visible point handle
-			let fillColor = '#0284c7'; // Default interactive CAD vertex color
-			let strokeColor = '#ffffff';
+			let fillColor: string = COLORS.primary; // Default interactive CAD vertex color
+			let strokeColor: string = COLORS.white;
 
 			if (pt.fixed) {
-				fillColor = '#d97706'; // Fixed points highlighted amber
+				fillColor = COLORS.fixed; // Fixed points highlighted amber
 			} else if (isFullyConstrained) {
-				fillColor = '#16a34a'; // Fully defined
+				fillColor = COLORS.constrained; // Fully defined
 			}
 
 			if (isSelected) {
-				fillColor = '#0ea5e9';
-				strokeColor = '#0f172a';
+				fillColor = COLORS.selected;
+				strokeColor = COLORS.tooltipBg;
 			}
 
 			createSvgCircle(s.x, s.y, isSelected ? 4.5 : 3.5, {
 				class: 'entity-visible visible-point',
 				fill: fillColor,
 				stroke: strokeColor,
-				'stroke-width': 2,
+				'stroke-width': STROKE_WIDTH.normal,
 				'pointer-events': 'all',
 			}, ptG);
 		}
@@ -874,22 +940,17 @@ export class SVGRenderer {
 			'data-type': 'constraint',
 		}, this.constraintGroup);
 
-		const color = isSelected ? '#0ea5e9' : '#0284c7';
-		const extAttrs: SvgAttrs = {
-			stroke: 'rgba(2, 132, 199, 0.45)',
-			'stroke-width': 1,
-			'pointer-events': 'none',
-		};
+		const color = isSelected ? COLORS.selected : COLORS.primary;
 
 		// Extension lines from points
-		createSvgLine(s1.x, s1.y, extEnd1.x, extEnd1.y, extAttrs, g);
-		createSvgLine(s2.x, s2.y, extEnd2.x, extEnd2.y, extAttrs, g);
+		createSvgLine(s1.x, s1.y, extEnd1.x, extEnd1.y, EXTENSION_LINE_ATTRS, g);
+		createSvgLine(s2.x, s2.y, extEnd2.x, extEnd2.y, EXTENSION_LINE_ATTRS, g);
 
 		// Dimension line with arrowheads
-		const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
+		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 		createSvgLine(d1.x, d1.y, d2.x, d2.y, {
 			stroke: color,
-			'stroke-width': 1.5,
+			'stroke-width': STROKE_WIDTH.dimension,
 			'marker-start': arrowUrl,
 			'marker-end': arrowUrl,
 		}, g);
@@ -902,9 +963,9 @@ export class SVGRenderer {
 
 		createSvgRect(mid.x - textLen * 0.5, mid.y - 10, textLen, 20, {
 			rx: 4,
-			fill: '#ffffff',
+			fill: COLORS.white,
 			stroke: color,
-			'stroke-width': isSelected ? 2 : 1,
+			'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
 		}, g);
 
 		createSvgText(mid.x, mid.y + 4, textVal, {
@@ -959,8 +1020,8 @@ export class SVGRenderer {
 
 			createSvgLine(x1, y1, x2, y2, {
 				stroke: color,
-				'stroke-width': 1.2,
-				'stroke-dasharray': '4,4',
+				'stroke-width': STROKE_WIDTH.majorGrid,
+				'stroke-dasharray': DASH_ARRAY.angleExtension,
 				'pointer-events': 'none',
 			}, parentG);
 		}
@@ -1025,7 +1086,7 @@ export class SVGRenderer {
 			'data-type': 'constraint',
 		}, this.constraintGroup);
 
-		const color = isSelected ? '#0ea5e9' : '#0284c7';
+		const color = isSelected ? COLORS.selected : COLORS.primary;
 
 		// Dashed extension lines if arc points extend beyond the physical line segments
 		const sp1 = viewport.worldToScreen(p1.x, p1.y);
@@ -1037,13 +1098,13 @@ export class SVGRenderer {
 		this.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
 
 		// Arc path with arrowheads
-		const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
+		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 		createSvgPath(
 			`M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`,
 			{
 				fill: 'none',
 				stroke: color,
-				'stroke-width': 1.5,
+				'stroke-width': STROKE_WIDTH.dimension,
 				'marker-start': arrowUrl,
 				'marker-end': arrowUrl,
 			},
@@ -1056,9 +1117,9 @@ export class SVGRenderer {
 
 		createSvgRect(midX - textLen * 0.5, midY - 10, textLen, 20, {
 			rx: 4,
-			fill: '#ffffff',
+			fill: COLORS.white,
 			stroke: color,
-			'stroke-width': 1.5,
+			'stroke-width': STROKE_WIDTH.dimension,
 		}, g);
 
 		createSvgText(midX, midY + 4, textVal, {
@@ -1154,20 +1215,20 @@ export class SVGRenderer {
 			'data-type': 'constraint',
 		}, this.constraintGroup);
 
-		const color = isSelected ? '#0ea5e9' : '#0284c7';
-		const arrowUrl = isSelected ? 'url(#dim-arrow-selected)' : 'url(#dim-arrow)';
+		const color = isSelected ? COLORS.selected : COLORS.primary;
+		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 
 		// Leader radial line from center to edge with arrow at circumference
 		createSvgLine(sc.x, sc.y, edge.x, edge.y, {
 			stroke: color,
-			'stroke-width': 1.5,
+			'stroke-width': STROKE_WIDTH.dimension,
 			'marker-end': arrowUrl,
 		}, g);
 
 		// Shelf line from edge to tip
 		createSvgLine(edge.x, edge.y, tip.x, tip.y, {
 			stroke: color,
-			'stroke-width': 1.5,
+			'stroke-width': STROKE_WIDTH.dimension,
 		}, g);
 
 		const isDiameter = constraint.displayMode === 'diameter';
@@ -1179,9 +1240,9 @@ export class SVGRenderer {
 		const rectX = dirX > 0 ? tip.x : tip.x - textLen;
 		createSvgRect(rectX, tip.y - 12, textLen, 20, {
 			rx: 4,
-			fill: '#ffffff',
+			fill: COLORS.white,
 			stroke: color,
-			'stroke-width': isSelected ? 2 : 1,
+			'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
 		}, g);
 
 		createSvgText(rectX + textLen * 0.5, tip.y + 3, textVal, {
@@ -1364,7 +1425,7 @@ export class SVGRenderer {
 		const pt = sketch.points.get(constraint.c1CenterId);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x + 12, s.y + 12, '◎', isSelected, '#0284c7');
+		this.renderConstraintBadge(constraint.id, s.x + 12, s.y + 12, '◎', isSelected, COLORS.primary);
 	}
 
 	private renderMidpointBadge(
@@ -1376,7 +1437,7 @@ export class SVGRenderer {
 		const pt = sketch.points.get(constraint.midId);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x, s.y - 14, 'M', isSelected, '#0284c7');
+		this.renderConstraintBadge(constraint.id, s.x, s.y - 14, 'M', isSelected, COLORS.primary);
 	}
 
 	private renderPointOnLineBadge(
@@ -1388,7 +1449,7 @@ export class SVGRenderer {
 		const pt = sketch.points.get(constraint.pointId);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, '#0284c7');
+		this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, COLORS.primary);
 	}
 
 	private renderPointOnCircleBadge(
@@ -1400,7 +1461,7 @@ export class SVGRenderer {
 		const pt = sketch.points.get(constraint.pointId);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, '#0284c7');
+		this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, COLORS.primary);
 	}
 
 	private renderFixedBadge(
@@ -1412,7 +1473,7 @@ export class SVGRenderer {
 		const pt = sketch.points.get(constraint.pointId);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x + 12, s.y - 12, 'fixed', isSelected, '#d97706');
+		this.renderConstraintBadge(constraint.id, s.x + 12, s.y - 12, 'fixed', isSelected, COLORS.fixed);
 	}
 
 	private renderCoincidentBadge(
@@ -1424,7 +1485,7 @@ export class SVGRenderer {
 		const pt = sketch.points.get(constraint.p1Id);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x - 12, s.y - 12, '●', isSelected, '#0284c7');
+		this.renderConstraintBadge(constraint.id, s.x - 12, s.y - 12, '●', isSelected, COLORS.primary);
 	}
 
 	private renderConstraintBadge(
@@ -1441,15 +1502,15 @@ export class SVGRenderer {
 			'data-type': 'constraint',
 		}, this.constraintGroup);
 
-		const color = isSelected ? '#0284c7' : customColor ?? '#475569';
+		const color = isSelected ? COLORS.primary : customColor ?? COLORS.badgeText;
 		const icon = getBadgeIcon(label, x, y, color);
 		const width = icon ? 18 : Math.max(18, label.length * 8 + 8);
 
 		createSvgRect(x - width * 0.5, y - 9, width, 18, {
 			rx: 3,
-			fill: isSelected ? '#e0f2fe' : '#ffffff',
-			stroke: isSelected ? '#0284c7' : '#cbd5e1',
-			'stroke-width': isSelected ? 1.5 : 1,
+			fill: isSelected ? COLORS.selectedBg : COLORS.white,
+			stroke: isSelected ? COLORS.primary : COLORS.badgeBorder,
+			'stroke-width': isSelected ? STROKE_WIDTH.dimension : STROKE_WIDTH.thin,
 		}, g);
 
 		if (icon) {
@@ -1476,12 +1537,7 @@ export class SVGRenderer {
 	): void {
 		this.previewGroup.innerHTML = '';
 
-		createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-			stroke: isConstruction ? '#64748b' : '#1e293b',
-			'stroke-width': 2,
-			'stroke-linecap': 'round',
-			'stroke-dasharray': isConstruction ? '6,6' : undefined,
-		}, this.previewGroup);
+		createSvgLine(s1.x, s1.y, s2.x, s2.y, getPreviewStrokeAttrs(isConstruction, false, true), this.previewGroup);
 
 		// Length & Angle Tooltip
 		const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 - 16 };
@@ -1542,19 +1598,14 @@ export class SVGRenderer {
 			mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
 		}
 
-		const extAttrs: SvgAttrs = {
-			stroke: '#0284c7',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,2',
-		};
-		createSvgLine(s1.x, s1.y, extEnd1.x, extEnd1.y, extAttrs, this.previewGroup);
-		createSvgLine(s2.x, s2.y, extEnd2.x, extEnd2.y, extAttrs, this.previewGroup);
+		createSvgLine(s1.x, s1.y, extEnd1.x, extEnd1.y, PREVIEW_EXTENSION_LINE_ATTRS, this.previewGroup);
+		createSvgLine(s2.x, s2.y, extEnd2.x, extEnd2.y, PREVIEW_EXTENSION_LINE_ATTRS, this.previewGroup);
 
 		createSvgLine(d1.x, d1.y, d2.x, d2.y, {
-			stroke: '#0284c7',
-			'stroke-width': 1.5,
-			'marker-start': 'url(#dim-arrow)',
-			'marker-end': 'url(#dim-arrow)',
+			stroke: COLORS.primary,
+			'stroke-width': STROKE_WIDTH.dimension,
+			'marker-start': DIM_ARROWS.default,
+			'marker-end': DIM_ARROWS.default,
 		}, this.previewGroup);
 
 		const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
@@ -1585,10 +1636,10 @@ export class SVGRenderer {
 		const rScreen = Math.max(28, Math.hypot(cursor.x - sCenter.x, cursor.y - sCenter.y));
 
 		if (sp1 && sp2) {
-			this.renderDashedExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, '#0284c7');
+			this.renderDashedExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, COLORS.primary);
 		}
 		if (sp3 && sp4) {
-			this.renderDashedExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, '#0284c7');
+			this.renderDashedExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, COLORS.primary);
 		}
 
 		const ax = sCenter.x + rScreen * Math.cos(a1);
@@ -1604,10 +1655,10 @@ export class SVGRenderer {
 			`M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`,
 			{
 				fill: 'none',
-				stroke: '#0284c7',
-				'stroke-width': 1.5,
-				'marker-start': 'url(#dim-arrow)',
-				'marker-end': 'url(#dim-arrow)',
+				stroke: COLORS.primary,
+				'stroke-width': STROKE_WIDTH.dimension,
+				'marker-start': DIM_ARROWS.default,
+				'marker-end': DIM_ARROWS.default,
 			},
 			this.previewGroup
 		);
@@ -1625,18 +1676,9 @@ export class SVGRenderer {
 		this.previewGroup.innerHTML = '';
 
 		const rPx = Math.hypot(current.x - center.x, current.y - center.y);
-		createSvgCircle(center.x, center.y, rPx, {
-			stroke: isGuide ? '#0284c7' : isConstruction ? '#64748b' : '#1e293b',
-			'stroke-width': 2,
-			'stroke-dasharray': isGuide ? '4,4' : isConstruction ? '6,6' : undefined,
-			fill: 'none',
-		}, this.previewGroup);
+		createSvgCircle(center.x, center.y, rPx, getPreviewStrokeAttrs(isConstruction, isGuide), this.previewGroup);
 
-		createSvgLine(center.x, center.y, current.x, current.y, {
-			stroke: '#0284c7',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,2',
-		}, this.previewGroup);
+		createSvgLine(center.x, center.y, current.x, current.y, AUX_RAY_ATTRS, this.previewGroup);
 
 		this.renderTooltip(current.x + 12, current.y - 12, `R ${radius.toFixed(1)} mm`);
 	}
@@ -1666,30 +1708,14 @@ export class SVGRenderer {
 		}
 
 		// Faint guide circle
-		createSvgCircle(sc.x, sc.y, sr, {
-			stroke: 'rgba(2, 132, 199, 0.25)',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,4',
-			fill: 'none',
-		}, this.previewGroup);
+		createSvgCircle(sc.x, sc.y, sr, GUIDE_OUTLINE_ATTRS, this.previewGroup);
 
 		const d = getArcSvgPath(sc, ss, se, sr, clockwise);
-		createSvgPath(d, {
-			stroke: isConstruction ? '#64748b' : '#1e293b',
-			'stroke-width': 2,
-			'stroke-linecap': 'round',
-			'stroke-dasharray': isConstruction ? '6,6' : undefined,
-			fill: 'none',
-		}, this.previewGroup);
+		createSvgPath(d, getPreviewStrokeAttrs(isConstruction, false, true), this.previewGroup);
 
 		// Dashed center rays
-		const rayAttrs: SvgAttrs = {
-			stroke: '#0284c7',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,2',
-		};
-		createSvgLine(sc.x, sc.y, ss.x, ss.y, rayAttrs, this.previewGroup);
-		createSvgLine(sc.x, sc.y, se.x, se.y, rayAttrs, this.previewGroup);
+		createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_RAY_ATTRS, this.previewGroup);
+		createSvgLine(sc.x, sc.y, se.x, se.y, AUX_RAY_ATTRS, this.previewGroup);
 
 		// Tooltip at mid-arc
 		const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
@@ -1708,12 +1734,7 @@ export class SVGRenderer {
 		const rw = Math.abs(s2.x - s1.x);
 		const rh = Math.abs(s2.y - s1.y);
 
-		createSvgRect(rx, ry, rw, rh, {
-			stroke: isConstruction ? '#64748b' : '#1e293b',
-			'stroke-width': 2,
-			'stroke-dasharray': isConstruction ? '6,6' : undefined,
-			fill: 'none',
-		}, this.previewGroup);
+		createSvgRect(rx, ry, rw, rh, getPreviewStrokeAttrs(isConstruction), this.previewGroup);
 
 		this.renderTooltip(s2.x + 12, s2.y - 12, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
 	}
@@ -1722,9 +1743,9 @@ export class SVGRenderer {
 		this.previewGroup.innerHTML = '';
 
 		createSvgLine(sc.x, sc.y, current.x, current.y, {
-			stroke: '#0284c7',
-			'stroke-width': 1.5,
-			'stroke-dasharray': '3,3',
+			stroke: COLORS.primary,
+			'stroke-width': STROKE_WIDTH.dimension,
+			'stroke-dasharray': DASH_ARRAY.axis,
 		}, this.previewGroup);
 
 		const deg = (Math.atan2(current.y - sc.y, current.x - sc.x) * 180) / Math.PI;
@@ -1748,19 +1769,11 @@ export class SVGRenderer {
 
 		createSvgEllipse(sc.x, sc.y, rx, ry, {
 			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			stroke: isGuide ? '#0284c7' : isConstruction ? '#64748b' : '#1e293b',
-			'stroke-width': 2,
-			'stroke-dasharray': isGuide ? '4,4' : isConstruction ? '6,6' : undefined,
-			fill: 'none',
+			...getPreviewStrokeAttrs(isConstruction, isGuide),
 		}, this.previewGroup);
 
-		const axisAttrs: SvgAttrs = {
-			stroke: '#0284c7',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,2',
-		};
-		createSvgLine(sc.x, sc.y, smaj.x, smaj.y, axisAttrs, this.previewGroup);
-		createSvgLine(sc.x, sc.y, smin.x, smin.y, axisAttrs, this.previewGroup);
+		createSvgLine(sc.x, sc.y, smaj.x, smaj.y, AUX_RAY_ATTRS, this.previewGroup);
+		createSvgLine(sc.x, sc.y, smin.x, smin.y, AUX_RAY_ATTRS, this.previewGroup);
 
 		this.renderTooltip(smin.x + 12, smin.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm`);
 	}
@@ -1782,20 +1795,16 @@ export class SVGRenderer {
 
 		createSvgEllipse(sc.x, sc.y, rx, ry, {
 			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			stroke: 'rgba(2, 132, 199, 0.3)',
-			'stroke-width': 1.5,
-			'stroke-dasharray': '3,3',
+			stroke: COLORS.guideStartEllipse,
+			'stroke-width': STROKE_WIDTH.dimension,
+			'stroke-dasharray': DASH_ARRAY.axis,
 			fill: 'none',
 		}, this.previewGroup);
 
-		createSvgLine(sc.x, sc.y, ss.x, ss.y, {
-			stroke: '#0284c7',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,2',
-		}, this.previewGroup);
+		createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_RAY_ATTRS, this.previewGroup);
 
 		createSvgCircle(ss.x, ss.y, 4, {
-			fill: '#0284c7',
+			fill: COLORS.primary,
 		}, this.previewGroup);
 
 		this.renderTooltip(ss.x + 12, ss.y - 12, `Start Angle | Rx ${rxVal.toFixed(1)} Ry ${ryVal.toFixed(1)}`);
@@ -1824,10 +1833,7 @@ export class SVGRenderer {
 		// Faint guide ellipse
 		createSvgEllipse(sc.x, sc.y, rx, ry, {
 			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			stroke: 'rgba(2, 132, 199, 0.25)',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,4',
-			fill: 'none',
+			...GUIDE_OUTLINE_ATTRS,
 		}, this.previewGroup);
 
 		const ux = Math.cos(theta);
@@ -1853,21 +1859,10 @@ export class SVGRenderer {
 		}
 
 		const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
-		createSvgPath(d, {
-			stroke: isConstruction ? '#64748b' : '#1e293b',
-			'stroke-width': 2,
-			'stroke-linecap': 'round',
-			'stroke-dasharray': isConstruction ? '6,6' : undefined,
-			fill: 'none',
-		}, this.previewGroup);
+		createSvgPath(d, getPreviewStrokeAttrs(isConstruction, false, true), this.previewGroup);
 
-		const rayAttrs: SvgAttrs = {
-			stroke: '#0284c7',
-			'stroke-width': 1,
-			'stroke-dasharray': '2,2',
-		};
-		createSvgLine(sc.x, sc.y, ss.x, ss.y, rayAttrs, this.previewGroup);
-		createSvgLine(sc.x, sc.y, se.x, se.y, rayAttrs, this.previewGroup);
+		createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_RAY_ATTRS, this.previewGroup);
+		createSvgLine(sc.x, sc.y, se.x, se.y, AUX_RAY_ATTRS, this.previewGroup);
 
 		const sweepDeg = (sweepAngle * 180) / Math.PI;
 		this.renderTooltip(se.x + 12, se.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
@@ -1885,9 +1880,9 @@ export class SVGRenderer {
 				'polygon',
 				{
 					points: `${s.x.toFixed(1)},${(s.y - d).toFixed(1)} ${(s.x + d).toFixed(1)},${s.y.toFixed(1)} ${s.x.toFixed(1)},${(s.y + d).toFixed(1)} ${(s.x - d).toFixed(1)},${s.y.toFixed(1)}`,
-					fill: 'rgba(16, 185, 129, 0.25)',
-					stroke: '#0e9c6dff',
-					'stroke-width': 1,
+					fill: COLORS.objectSnapFill,
+					stroke: COLORS.objectSnapStroke,
+					'stroke-width': STROKE_WIDTH.thin,
 					'pointer-events': 'none',
 				},
 				this.overlayGroup
@@ -1896,18 +1891,18 @@ export class SVGRenderer {
 			// Indigo square at grid intersection
 			const size = 7;
 			createSvgRect(s.x - size, s.y - size, size * 2, size * 2, {
-				fill: 'rgba(99, 102, 241, 0.15)',
-				stroke: '#7cbdfaff',
-				'stroke-width': 1,
+				fill: COLORS.gridSnapFill,
+				stroke: COLORS.gridSnapStroke,
+				'stroke-width': STROKE_WIDTH.thin,
 				rx: 1,
 				'pointer-events': 'none',
 			}, this.overlayGroup);
 		} else {
 			// Circular blue ring for point
 			createSvgCircle(s.x, s.y, 9, {
-				fill: 'rgba(2, 132, 199, 0.2)',
-				stroke: '#0284c7',
-				'stroke-width': 1,
+				fill: COLORS.pointSnapFill,
+				stroke: COLORS.primary,
+				'stroke-width': STROKE_WIDTH.thin,
 				'pointer-events': 'none',
 			}, this.overlayGroup);
 		}
@@ -1926,10 +1921,10 @@ export class SVGRenderer {
 		const height = Math.abs(s2.y - s1.y);
 
 		createSvgRect(minX, minY, width, height, {
-			fill: 'rgba(14, 165, 233, 0.12)',
-			stroke: '#0ea5e9',
-			'stroke-width': 1,
-			'stroke-dasharray': '4 3',
+			fill: COLORS.selectionBoxFill,
+			stroke: COLORS.selected,
+			'stroke-width': STROKE_WIDTH.thin,
+			'stroke-dasharray': DASH_ARRAY.selectionBox,
 			'pointer-events': 'none',
 		}, this.overlayGroup);
 	}
@@ -1945,14 +1940,14 @@ export class SVGRenderer {
 
 		createSvgRect(x - width * 0.5, y - 11, width, 22, {
 			rx: 4,
-			fill: '#0f172a',
-			stroke: '#0284c7',
-			'stroke-width': 1,
+			fill: COLORS.tooltipBg,
+			stroke: COLORS.primary,
+			'stroke-width': STROKE_WIDTH.thin,
 		}, g);
 
 		createSvgText(x, y + 4, textStr, {
 			'text-anchor': 'middle',
-			fill: '#ffffff',
+			fill: COLORS.white,
 			'font-size': 11,
 			'font-weight': 500,
 			'font-family': 'monospace',
