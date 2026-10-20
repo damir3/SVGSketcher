@@ -45,6 +45,7 @@ export const CONSTRAINT_TOOLS = [
 	'distance',
 	'equal',
 	'parallel',
+	'collinear',
 	'perpendicular',
 	'tangent',
 	'concentric',
@@ -3903,6 +3904,7 @@ export class CanvasInteraction {
 				break;
 			}
 			case 'parallel':
+			case 'collinear':
 			case 'perpendicular': {
 				sel.pointIds.clear();
 				sel.circleIds.clear();
@@ -4007,6 +4009,7 @@ export class CanvasInteraction {
 			case 'equal':
 				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
 			case 'parallel':
+			case 'collinear':
 			case 'perpendicular':
 				return entityType === 'line';
 			case 'tangent':
@@ -4052,6 +4055,7 @@ export class CanvasInteraction {
 			case 'equal':
 				return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
 			case 'parallel':
+			case 'collinear':
 			case 'perpendicular':
 				return lCount === 2 && pCount === 0 && cCount === 0;
 			case 'tangent':
@@ -4268,6 +4272,14 @@ export class CanvasInteraction {
 				}
 				break;
 			}
+			case 'collinear': {
+				if (lIds.length === 2) {
+					this.sketch.addCollinearConstraint(lIds[0], lIds[1]);
+					applied = true;
+					toastMsg = 'Collinear constraint applied';
+				}
+				break;
+			}
 			case 'perpendicular': {
 				if (lIds.length === 2) {
 					this.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
@@ -4457,6 +4469,7 @@ export class CanvasInteraction {
 				break;
 			}
 			case 'parallel':
+			case 'collinear':
 			case 'perpendicular': {
 				if (sel.lineIds.size >= 2) sel.lineIds.clear();
 				break;

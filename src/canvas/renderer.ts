@@ -6,6 +6,7 @@ import {
 	HorizontalConstraint,
 	VerticalConstraint,
 	ParallelConstraint,
+	CollinearConstraint,
 	PerpendicularConstraint,
 	EqualLengthConstraint,
 	EqualRadiusConstraint,
@@ -1022,6 +1023,9 @@ export class SVGRenderer {
 			} else if (constraint instanceof ParallelConstraint) {
 				this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
 				this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
+			} else if (constraint instanceof CollinearConstraint) {
+				this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, 'collinear', isSelected, lineBadgeCounts);
+				this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, 'collinear', isSelected, lineBadgeCounts);
 			} else if (constraint instanceof PerpendicularConstraint) {
 				this.renderPerpendicularBadge(constraint, sketch, viewport, isSelected, lineBadgeCounts);
 			} else if (constraint instanceof EqualLengthConstraint) {

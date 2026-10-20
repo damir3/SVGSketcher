@@ -114,6 +114,10 @@ export class Toolbar {
 						${ICONS.parallel}
 						<span class="btn-tooltip">Parallel</span>
 					</button>
+					<button class="tool-btn" data-constraint="collinear" title="Collinear (2 lines)">
+						${ICONS.collinear}
+						<span class="btn-tooltip">Collinear</span>
+					</button>
 					<button class="tool-btn" data-constraint="perpendicular" title="Perpendicular (2 lines)">
 						${ICONS.perpendicular}
 						<span class="btn-tooltip">Perpendicular</span>

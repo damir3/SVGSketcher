@@ -10,6 +10,7 @@ import {
 	EqualLengthConstraint,
 	EqualRadiusConstraint,
 	ParallelConstraint,
+	CollinearConstraint,
 	PerpendicularConstraint,
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
@@ -978,6 +979,25 @@ export class SketchDocument {
 		return c;
 	}
 
+	addCollinearConstraint(line1Id: string, line2Id: string): CollinearConstraint | null {
+		if (line1Id === line2Id) return null;
+		const l1 = this.lines.get(line1Id);
+		const l2 = this.lines.get(line2Id);
+		if (!l1 || !l2) return null;
+
+		const existing = [...this.constraints.values()].find(
+			c =>
+				c instanceof CollinearConstraint &&
+				((this.matchesEndpoints(c.l1P1, c.l1P2, l1.p1Id, l1.p2Id) && this.matchesEndpoints(c.l2P1, c.l2P2, l2.p1Id, l2.p2Id)) ||
+					(this.matchesEndpoints(c.l1P1, c.l1P2, l2.p1Id, l2.p2Id) && this.matchesEndpoints(c.l2P1, c.l2P2, l1.p1Id, l1.p2Id)))
+		);
+		if (existing) return existing as CollinearConstraint;
+
+		const c = new CollinearConstraint(this.nextId('c_collin'), l1.p1Id, l1.p2Id, l2.p1Id, l2.p2Id);
+		this.addConstraint(c);
+		return c;
+	}
+
 	addPerpendicularConstraint(line1Id: string, line2Id: string): PerpendicularConstraint | null {
 		const l1 = this.lines.get(line1Id);
 		const l2 = this.lines.get(line2Id);
@@ -1571,6 +1591,7 @@ export class SketchDocument {
 				} else if (
 					c.type !== 'equal_length' &&
 					c.type !== 'parallel' &&
+					c.type !== 'collinear' &&
 					c.type !== 'perpendicular' &&
 					c.type !== 'tangent_line_circle' &&
 					c.type !== 'angle'
@@ -1601,7 +1622,7 @@ export class SketchDocument {
 					) {
 						res.push(c);
 					}
-				} else if (c.type === 'parallel' || c.type === 'perpendicular') {
+				} else if (c.type === 'parallel' || c.type === 'collinear' || c.type === 'perpendicular') {
 					if (
 						this.matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) ||
 						this.matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)

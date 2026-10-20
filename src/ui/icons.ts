@@ -23,6 +23,7 @@ import dimension from '../assets/icons/dimension.svg?raw';
 import angle from '../assets/icons/angle.svg?raw';
 import equal from '../assets/icons/equal.svg?raw';
 import parallel from '../assets/icons/parallel.svg?raw';
+import collinear from '../assets/icons/collinear.svg?raw';
 import perpendicular from '../assets/icons/perpendicular.svg?raw';
 import tangent from '../assets/icons/tangent.svg?raw';
 import concentric from '../assets/icons/concentric.svg?raw';
@@ -64,6 +65,7 @@ export const ICONS = {
 	angle,
 	equal,
 	parallel,
+	collinear,
 	perpendicular,
 	tangent,
 	concentric,

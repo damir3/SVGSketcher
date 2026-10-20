@@ -10,6 +10,7 @@ export type ConstraintType =
 	| 'equal_length'
 	| 'equal_radius'
 	| 'parallel'
+	| 'collinear'
 	| 'perpendicular'
 	| 'concentric'
 	| 'tangent_line_circle'

@@ -5,6 +5,7 @@ import {
 	HorizontalConstraint,
 	VerticalConstraint,
 	ParallelConstraint,
+	CollinearConstraint,
 	PerpendicularConstraint,
 	AngleConstraint,
 	TangentLineCircleConstraint,
@@ -983,6 +984,14 @@ function transferLineConstraints(
 			const otherLine = sketch.getLineBetween(otherP1, otherP2);
 			if (otherLine && otherLine.id !== oldLine.id) {
 				sketch.addParallelConstraint(newLine.id, otherLine.id);
+			}
+		} else if (c instanceof CollinearConstraint) {
+			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
+			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
+			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
+			const otherLine = sketch.getLineBetween(otherP1, otherP2);
+			if (otherLine && otherLine.id !== oldLine.id) {
+				sketch.addCollinearConstraint(newLine.id, otherLine.id);
 			}
 		} else if (c instanceof PerpendicularConstraint) {
 			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);

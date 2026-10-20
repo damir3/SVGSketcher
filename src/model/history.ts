@@ -10,6 +10,7 @@ import {
 	EqualLengthConstraint,
 	EqualRadiusConstraint,
 	ParallelConstraint,
+	CollinearConstraint,
 	PerpendicularConstraint,
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
@@ -170,6 +171,11 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.l1P2 = c.l1P2;
 		base.l2P1 = c.l2P1;
 		base.l2P2 = c.l2P2;
+	} else if (c instanceof CollinearConstraint) {
+		base.l1P1 = c.l1P1;
+		base.l1P2 = c.l1P2;
+		base.l2P1 = c.l2P1;
+		base.l2P2 = c.l2P2;
 	} else if (c instanceof PerpendicularConstraint) {
 		base.l1P1 = c.l1P1;
 		base.l1P2 = c.l1P2;
@@ -285,6 +291,9 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 			break;
 		case 'parallel':
 			c = new ParallelConstraint(d.id, d.l1P1!, d.l1P2!, d.l2P1!, d.l2P2!, d.weight);
+			break;
+		case 'collinear':
+			c = new CollinearConstraint(d.id, d.l1P1!, d.l1P2!, d.l2P1!, d.l2P2!, d.weight);
 			break;
 		case 'perpendicular':
 			c = new PerpendicularConstraint(d.id, d.l1P1!, d.l1P2!, d.l2P1!, d.l2P2!, d.weight);

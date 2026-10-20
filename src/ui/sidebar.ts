@@ -419,7 +419,6 @@ export class Sidebar {
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof PointToLineDistanceConstraint ? 'Point-to-Line Distance' : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
-						<div class="inspector-row"><span>Type:</span> <strong>${c.type}</strong></div>
 						${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
 						${c instanceof PointToLineDistanceConstraint ? `<div class="inspector-row"><span>Distance:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
 						${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
@@ -650,6 +649,7 @@ export class Sidebar {
 			case 'equal_length':
 			case 'equal_radius': return ICONS.equal;
 			case 'parallel': return ICONS.parallel;
+			case 'collinear': return ICONS.collinear;
 			case 'perpendicular': return ICONS.perpendicular;
 			case 'tangent_line_circle': return ICONS.tangent;
 			case 'concentric': return ICONS.concentric;
