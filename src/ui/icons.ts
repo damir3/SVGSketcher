@@ -11,6 +11,7 @@ import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
 import construction from '../assets/icons/construction.svg?raw';
 import snap from '../assets/icons/snap.svg?raw';
 import trim from '../assets/icons/trim.svg?raw';
+import breakIcon from '../assets/icons/break.svg?raw';
 
 import coincident from '../assets/icons/coincident.svg?raw';
 import fixed from '../assets/icons/fixed.svg?raw';
@@ -50,6 +51,7 @@ export const ICONS = {
 	construction,
 	snap,
 	trim,
+	break: breakIcon,
 
 	// Constraints
 	coincident,

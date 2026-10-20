@@ -18,6 +18,7 @@ import {
 	getAllGeoCurves,
 	getTrimCandidate,
 	executeTrim,
+	executeBreak,
 	type GeoCurve,
 } from '../math/intersection';
 
@@ -69,6 +70,7 @@ export type ToolType =
 	| 'select'
 	| 'pan'
 	| 'trim'
+	| 'break'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 
@@ -549,6 +551,8 @@ export class CanvasInteraction {
 				this.setTool('ellipse');
 			} else if (e.key === 't' || e.key === 'T') {
 				this.setTool(this.activeTool === 'trim' ? 'select' : 'trim');
+			} else if (e.key === 'b' || e.key === 'B') {
+				this.setTool(this.activeTool === 'break' ? 'select' : 'break');
 			} else if (e.key === 'h' || e.key === 'H') {
 				this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
 			} else if (e.key === 'd' || e.key === 'D') {
@@ -1443,17 +1447,25 @@ export class CanvasInteraction {
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
 		const snap = this.findSnap(screen);
 
-		// --- TOOL: TRIM ---
-		if (this.activeTool === 'trim') {
+		// --- TOOL: TRIM / BREAK ---
+		if (this.activeTool === 'trim' || this.activeTool === 'break') {
+			const isBreak = this.activeTool === 'break';
 			const target = this.findTrimTargetNearScreen(screen, 18);
 			if (target) {
 				const allCurves = getAllGeoCurves(this.sketch);
 				const candidate = getTrimCandidate(target, allCurves, world);
 				if (candidate) {
+					if (isBreak && candidate.isWholeEntity) {
+						return;
+					}
 					this.sketch.beginTransaction();
-					executeTrim(this.sketch, candidate);
+					if (isBreak) {
+						executeBreak(this.sketch, candidate);
+					} else {
+						executeTrim(this.sketch, candidate);
+					}
 					this.sketch.commitTransaction();
-					showToast('Trimmed');
+					showToast(isBreak ? 'Broken' : 'Trimmed');
 
 					// Refresh preview under current cursor
 					const newCurves = getAllGeoCurves(this.sketch);
@@ -1461,7 +1473,11 @@ export class CanvasInteraction {
 					if (newTarget) {
 						const newCand = getTrimCandidate(newTarget, newCurves, world);
 						if (newCand) {
-							this.renderer.renderTrimPreview(newCand, this.viewport);
+							if (isBreak) {
+								this.renderer.renderBreakPreview(newCand, this.viewport);
+							} else {
+								this.renderer.renderTrimPreview(newCand, this.viewport);
+							}
 						} else {
 							this.renderer.clearPreviews();
 						}
@@ -2694,13 +2710,17 @@ export class CanvasInteraction {
 			return;
 		}
 
-		if (this.activeTool === 'trim') {
+		if (this.activeTool === 'trim' || this.activeTool === 'break') {
 			const target = this.findTrimTargetNearScreen(screen, 18);
 			if (target) {
 				const allCurves = getAllGeoCurves(this.sketch);
 				const candidate = getTrimCandidate(target, allCurves, world);
 				if (candidate) {
-					this.renderer.renderTrimPreview(candidate, this.viewport);
+					if (this.activeTool === 'break') {
+						this.renderer.renderBreakPreview(candidate, this.viewport);
+					} else {
+						this.renderer.renderTrimPreview(candidate, this.viewport);
+					}
 					return;
 				}
 			}

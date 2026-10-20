@@ -156,6 +156,14 @@ export const TRIM_STROKE_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
+export const CUT_MARKER_ATTRS: SvgAttrs = {
+	stroke: COLORS.trim,
+	'stroke-width': STROKE_WIDTH.trim,
+	'stroke-linecap': 'round',
+	fill: 'none',
+	'pointer-events': 'none',
+};
+
 export function getPrimitiveStrokeAttrs(
 	isSelected: boolean,
 	isConstruction: boolean,
@@ -2199,6 +2207,34 @@ export class SVGRenderer {
 			const smin = viewport.worldToScreen(curve.minorAxisPoint.x, curve.minorAxisPoint.y);
 			const d = getEllipticalArcSvgPath(sc, smaj, smin, sStart, sEnd, curve.clockwise);
 			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+		}
+	}
+
+	renderCutMarker(pt: Vec2): void {
+		const size = 5;
+		createSvgLine(pt.x - size, pt.y - size, pt.x + size, pt.y + size, CUT_MARKER_ATTRS, this.previewGroup);
+		createSvgLine(pt.x - size, pt.y + size, pt.x + size, pt.y - size, CUT_MARKER_ATTRS, this.previewGroup);
+	}
+
+	renderBreakPreview(candidate: TrimCandidate, viewport: Viewport): void {
+		this.previewGroup.innerHTML = '';
+		const { curve, isWholeEntity, cutStartWorld, cutEndWorld, interval } = candidate;
+		if (isWholeEntity) return;
+
+		if (curve.type === 'circle' || curve.type === 'ellipse') {
+			const sStart = viewport.worldToScreen(cutStartWorld.x, cutStartWorld.y);
+			const sEnd = viewport.worldToScreen(cutEndWorld.x, cutEndWorld.y);
+			this.renderCutMarker(sStart);
+			this.renderCutMarker(sEnd);
+		} else {
+			if (interval[0] > 1e-4) {
+				const sStart = viewport.worldToScreen(cutStartWorld.x, cutStartWorld.y);
+				this.renderCutMarker(sStart);
+			}
+			if (interval[1] < 1 - 1e-4) {
+				const sEnd = viewport.worldToScreen(cutEndWorld.x, cutEndWorld.y);
+				this.renderCutMarker(sEnd);
+			}
 		}
 	}
 
