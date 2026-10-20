@@ -13,6 +13,13 @@ import {
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
+import {
+	sketchPrimitiveToGeoCurve,
+	getAllGeoCurves,
+	getTrimCandidate,
+	executeTrim,
+	type GeoCurve,
+} from '../math/intersection';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -61,6 +68,7 @@ export function isConstraintTool(tool: string): tool is ConstraintToolType {
 export type ToolType =
 	| 'select'
 	| 'pan'
+	| 'trim'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 
@@ -539,6 +547,8 @@ export class CanvasInteraction {
 				this.setTool('point');
 			} else if (e.key === 'e' || e.key === 'E') {
 				this.setTool('ellipse');
+			} else if (e.key === 't' || e.key === 'T') {
+				this.setTool(this.activeTool === 'trim' ? 'select' : 'trim');
 			} else if (e.key === 'h' || e.key === 'H') {
 				this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
 			} else if (e.key === 'd' || e.key === 'D') {
@@ -1261,6 +1271,141 @@ export class CanvasInteraction {
 		return foundArc;
 	}
 
+	private findTrimTargetNearScreen(screen: Vec2, thresholdPx = 18): GeoCurve | null {
+		let bestDist = thresholdPx;
+		let bestCurve: GeoCurve | null = null;
+
+		// 1. Lines
+		for (const line of this.sketch.lines.values()) {
+			const p1 = this.sketch.points.get(line.p1Id);
+			const p2 = this.sketch.points.get(line.p2Id);
+			if (!p1 || !p2) continue;
+			const s1 = this.viewport.worldToScreen(p1.x, p1.y);
+			const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+			const proj = projectPointOntoSegment(screen, s1, s2);
+			if (proj.dist < bestDist) {
+				bestDist = proj.dist;
+				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'line', line.id);
+			}
+		}
+
+		// 2. Arcs (checked before full circles so arcs take priority)
+		for (const arc of this.sketch.arcs.values()) {
+			const center = this.sketch.points.get(arc.centerId);
+			const start = this.sketch.points.get(arc.startPointId);
+			const end = this.sketch.points.get(arc.endPointId);
+			if (!center || !start || !end) continue;
+			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const ss = this.viewport.worldToScreen(start.x, start.y);
+			const se = this.viewport.worldToScreen(end.x, end.y);
+			const sr = arc.radius * this.viewport.zoom;
+			const dToCenter = dist(screen, sc);
+			const dToPerimeter = Math.abs(dToCenter - sr);
+			if (dToPerimeter < bestDist) {
+				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+				const ap = Math.atan2(screen.y - sc.y, screen.x - sc.x);
+				let sweep = arc.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
+				if (sweep < 0) sweep += TWO_PI;
+				let delta = arc.clockwise ? (ap - as) % TWO_PI : (as - ap) % TWO_PI;
+				if (delta < 0) delta += TWO_PI;
+				const angTol = thresholdPx / Math.max(sr, 1);
+				if (delta <= sweep + angTol || delta >= TWO_PI - angTol) {
+					bestDist = dToPerimeter;
+					bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'arc', arc.id);
+				}
+			}
+		}
+
+		// 3. Elliptical Arcs
+		for (const arc of this.sketch.ellipticalArcs.values()) {
+			const center = this.sketch.points.get(arc.centerId);
+			const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+			const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+			const startPt = this.sketch.points.get(arc.startPointId);
+			const endPt = this.sketch.points.get(arc.endPointId);
+			if (!center || !majorPt || !minorPt || !startPt || !endPt) continue;
+			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
+			const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+			const ss = this.viewport.worldToScreen(startPt.x, startPt.y);
+			const se = this.viewport.worldToScreen(endPt.x, endPt.y);
+			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+			if (rx < 0.1 || ry < 0.1) continue;
+			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+			const ux = Math.cos(theta), uy = Math.sin(theta);
+			const vx = -Math.sin(theta), vy = Math.cos(theta);
+			const dx = screen.x - sc.x, dy = screen.y - sc.y;
+			const u = dx * ux + dy * uy;
+			const v = dx * vx + dy * vy;
+			const t = Math.atan2(v / ry, u / rx);
+			const ex = rx * Math.cos(t) * ux + ry * Math.sin(t) * vx;
+			const ey = rx * Math.cos(t) * uy + ry * Math.sin(t) * vy;
+			const dPerimeter = Math.hypot(dx - ex, dy - ey);
+			if (dPerimeter < bestDist) {
+				const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+				const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+				const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+				const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+				const ts = Math.atan2(vs / ry, us / rx);
+				const te = Math.atan2(ve / ry, ue / rx);
+				let sweep = arc.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
+				if (sweep < 0) sweep += TWO_PI;
+				let delta = arc.clockwise ? (t - ts) % TWO_PI : (ts - t) % TWO_PI;
+				if (delta < 0) delta += TWO_PI;
+				const angTol = thresholdPx / Math.max(Math.min(rx, ry), 1);
+				if (delta <= sweep + angTol || delta >= TWO_PI - angTol) {
+					bestDist = dPerimeter;
+					bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'elliptical_arc', arc.id);
+				}
+			}
+		}
+
+		// 4. Circles
+		for (const circle of this.sketch.circles.values()) {
+			const center = this.sketch.points.get(circle.centerId);
+			if (!center) continue;
+			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const sr = circle.radius * this.viewport.zoom;
+			const dToPerimeter = Math.abs(dist(screen, sc) - sr);
+			if (dToPerimeter < bestDist) {
+				bestDist = dToPerimeter;
+				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'circle', circle.id);
+			}
+		}
+
+		// 5. Ellipses
+		for (const ellipse of this.sketch.ellipses.values()) {
+			const center = this.sketch.points.get(ellipse.centerId);
+			const maj = this.sketch.points.get(ellipse.majorAxisPointId);
+			const min = this.sketch.points.get(ellipse.minorAxisPointId);
+			if (!center || !maj || !min) continue;
+			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const smaj = this.viewport.worldToScreen(maj.x, maj.y);
+			const smin = this.viewport.worldToScreen(min.x, min.y);
+			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+			if (rx < 0.1 || ry < 0.1) continue;
+			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+			const ux = Math.cos(theta), uy = Math.sin(theta);
+			const vx = -Math.sin(theta), vy = Math.cos(theta);
+			const dx = screen.x - sc.x, dy = screen.y - sc.y;
+			const u = dx * ux + dy * uy;
+			const v = dx * vx + dy * vy;
+			const t = Math.atan2(v / ry, u / rx);
+			const ex = rx * Math.cos(t) * ux + ry * Math.sin(t) * vx;
+			const ey = rx * Math.cos(t) * uy + ry * Math.sin(t) * vy;
+			const dPerimeter = Math.hypot(dx - ex, dy - ey);
+			if (dPerimeter < bestDist) {
+				bestDist = dPerimeter;
+				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'ellipse', ellipse.id);
+			}
+		}
+
+		return bestCurve;
+	}
+
 	private handleMouseDown(e: MouseEvent): void {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
@@ -1297,6 +1442,38 @@ export class CanvasInteraction {
 
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
 		const snap = this.findSnap(screen);
+
+		// --- TOOL: TRIM ---
+		if (this.activeTool === 'trim') {
+			const target = this.findTrimTargetNearScreen(screen, 18);
+			if (target) {
+				const allCurves = getAllGeoCurves(this.sketch);
+				const candidate = getTrimCandidate(target, allCurves, world);
+				if (candidate) {
+					this.sketch.beginTransaction();
+					executeTrim(this.sketch, candidate);
+					this.sketch.commitTransaction();
+					showToast('Trimmed');
+
+					// Refresh preview under current cursor
+					const newCurves = getAllGeoCurves(this.sketch);
+					const newTarget = this.findTrimTargetNearScreen(screen, 18);
+					if (newTarget) {
+						const newCand = getTrimCandidate(newTarget, newCurves, world);
+						if (newCand) {
+							this.renderer.renderTrimPreview(newCand, this.viewport);
+						} else {
+							this.renderer.clearPreviews();
+						}
+					} else {
+						this.renderer.clearPreviews();
+					}
+					this.render();
+					return;
+				}
+			}
+			return;
+		}
 
 		// --- ACTIVE CONSTRAINT TOOL MODE ---
 		if (isConstraintTool(this.activeTool)) {
@@ -2514,6 +2691,20 @@ export class CanvasInteraction {
 				this.sketch.solve();
 				this.render();
 			}
+			return;
+		}
+
+		if (this.activeTool === 'trim') {
+			const target = this.findTrimTargetNearScreen(screen, 18);
+			if (target) {
+				const allCurves = getAllGeoCurves(this.sketch);
+				const candidate = getTrimCandidate(target, allCurves, world);
+				if (candidate) {
+					this.renderer.renderTrimPreview(candidate, this.viewport);
+					return;
+				}
+			}
+			this.renderer.clearPreviews();
 			return;
 		}
 

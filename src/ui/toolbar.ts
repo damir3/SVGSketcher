@@ -26,13 +26,17 @@ export class Toolbar {
 						${ICONS.select}
 						<span class="btn-tooltip">Select (V)</span>
 					</button>
+					<button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
+						${ICONS.snap}
+						<span class="btn-tooltip">Snap (S)</span>
+					</button>
 					<button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
 						${ICONS.construction}
 						<span class="btn-tooltip">Construction (X)</span>
 					</button>
-					<button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
-						${ICONS.snap}
-						<span class="btn-tooltip">Snap (S)</span>
+					<button class="tool-btn" data-tool="trim" title="Trim (T)">
+						${ICONS.trim}
+						<span class="btn-tooltip">Trim (T)</span>
 					</button>
 				</div>
 			</div>

@@ -21,6 +21,7 @@ import {
 } from '../solver/constraints';
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
+import type { TrimCandidate } from '../math/intersection';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 const TWO_PI = 2 * Math.PI;
@@ -58,6 +59,7 @@ export const COLORS = {
 	gridMinor: 'rgba(0, 0, 0, 0.08)',
 	gridMajor: 'rgba(0, 0, 0, 0.20)',
 	gridLabel: 'rgba(0, 0, 0, 0.6)',
+	trim: 'rgba(255, 0, 0, 0.75)',
 } as const;
 
 export const DASH_ARRAY = {
@@ -75,9 +77,10 @@ export const STROKE_WIDTH = {
 	thin: 1,
 	majorGrid: 1.2,
 	normal: 2,
-	selected: 3.5,
+	selected: 3,
 	dimension: 1.5,
 	hitArea: 18,
+	trim: 3,
 } as const;
 
 export const DIM_ARROWS = {
@@ -143,6 +146,14 @@ export const PREVIEW_EXTENSION_LINE_ATTRS: SvgAttrs = {
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.thin,
 	'stroke-dasharray': DASH_ARRAY.ray,
+};
+
+export const TRIM_STROKE_ATTRS: SvgAttrs = {
+	stroke: COLORS.trim,
+	'stroke-width': STROKE_WIDTH.trim,
+	'stroke-linecap': 'round',
+	fill: 'none',
+	'pointer-events': 'none',
 };
 
 export function getPrimitiveStrokeAttrs(
@@ -2118,6 +2129,77 @@ export class SVGRenderer {
 			'stroke-dasharray': DASH_ARRAY.selectionBox,
 			'pointer-events': 'none',
 		}, this.overlayGroup);
+	}
+
+	renderTrimPreview(candidate: TrimCandidate, viewport: Viewport): void {
+		this.previewGroup.innerHTML = '';
+		const { curve, isWholeEntity, cutStartWorld, cutEndWorld } = candidate;
+
+		if (isWholeEntity) {
+			if (curve.type === 'segment') {
+				const s1 = viewport.worldToScreen(curve.p1.x, curve.p1.y);
+				const s2 = viewport.worldToScreen(curve.p2.x, curve.p2.y);
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, TRIM_STROKE_ATTRS, this.previewGroup);
+			} else if (curve.type === 'circle') {
+				const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+				const sr = curve.radius * viewport.zoom;
+				createSvgCircle(sc.x, sc.y, sr, TRIM_STROKE_ATTRS, this.previewGroup);
+			} else if (curve.type === 'arc') {
+				const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+				const ss = viewport.worldToScreen(curve.start.x, curve.start.y);
+				const se = viewport.worldToScreen(curve.end.x, curve.end.y);
+				const sr = curve.radius * viewport.zoom;
+				const d = getArcSvgPath(sc, ss, se, sr, curve.clockwise);
+				createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+			} else if (curve.type === 'ellipse') {
+				const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+				const smaj = viewport.worldToScreen(curve.majorAxisPoint.x, curve.majorAxisPoint.y);
+				const smin = viewport.worldToScreen(curve.minorAxisPoint.x, curve.minorAxisPoint.y);
+				const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+				const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+				const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+				createSvgEllipse(sc.x, sc.y, rx, ry, { transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`, ...TRIM_STROKE_ATTRS }, this.previewGroup);
+			} else if (curve.type === 'elliptical_arc') {
+				const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+				const smaj = viewport.worldToScreen(curve.majorAxisPoint.x, curve.majorAxisPoint.y);
+				const smin = viewport.worldToScreen(curve.minorAxisPoint.x, curve.minorAxisPoint.y);
+				const ss = viewport.worldToScreen(curve.start.x, curve.start.y);
+				const se = viewport.worldToScreen(curve.end.x, curve.end.y);
+				const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, curve.clockwise);
+				createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+			}
+			return;
+		}
+
+		// Partial curve trimmed:
+		const sStart = viewport.worldToScreen(cutStartWorld.x, cutStartWorld.y);
+		const sEnd = viewport.worldToScreen(cutEndWorld.x, cutEndWorld.y);
+
+		if (curve.type === 'segment') {
+			createSvgLine(sStart.x, sStart.y, sEnd.x, sEnd.y, TRIM_STROKE_ATTRS, this.previewGroup);
+		} else if (curve.type === 'circle') {
+			const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+			const sr = curve.radius * viewport.zoom;
+			const d = getArcSvgPath(sc, sStart, sEnd, sr, true);
+			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+		} else if (curve.type === 'arc') {
+			const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+			const sr = curve.radius * viewport.zoom;
+			const d = getArcSvgPath(sc, sStart, sEnd, sr, curve.clockwise);
+			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+		} else if (curve.type === 'ellipse') {
+			const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+			const smaj = viewport.worldToScreen(curve.majorAxisPoint.x, curve.majorAxisPoint.y);
+			const smin = viewport.worldToScreen(curve.minorAxisPoint.x, curve.minorAxisPoint.y);
+			const d = getEllipticalArcSvgPath(sc, smaj, smin, sStart, sEnd, true);
+			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+		} else if (curve.type === 'elliptical_arc') {
+			const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
+			const smaj = viewport.worldToScreen(curve.majorAxisPoint.x, curve.majorAxisPoint.y);
+			const smin = viewport.worldToScreen(curve.minorAxisPoint.x, curve.minorAxisPoint.y);
+			const d = getEllipticalArcSvgPath(sc, smaj, smin, sStart, sEnd, curve.clockwise);
+			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+		}
 	}
 
 	clearPreviews(): void {
