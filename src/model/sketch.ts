@@ -2264,7 +2264,7 @@ export class SketchDocument {
 		}
 
 		const bbox = this.getBoundingBox();
-		let viewBox = '-500 -500 1000 1000';
+		let viewBox = '-100 -100 200 200';
 
 		if (bbox) {
 			const w = bbox.maxX - bbox.minX;

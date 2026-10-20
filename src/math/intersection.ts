@@ -1,8 +1,17 @@
 import type { Vec2 } from './vector';
-import type {
-	SketchDocument
-} from '../model/sketch';
-import type { SketchPoint } from '../model/types';
+import type { SketchDocument } from '../model/sketch';
+import type { SketchPoint, SketchLine } from '../model/types';
+import {
+	HorizontalConstraint,
+	VerticalConstraint,
+	ParallelConstraint,
+	PerpendicularConstraint,
+	AngleConstraint,
+	TangentLineCircleConstraint,
+	PointOnLineConstraint,
+	PointToLineDistanceConstraint,
+} from '../solver/constraints';
+import type { IConstraint } from '../solver/types';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -67,12 +76,17 @@ export interface GeoEllipticalArc {
 }
 
 export type GeoCurve = GeoSegment | GeoCircle | GeoArc | GeoEllipse | GeoEllipticalArc;
+export type CurveType = GeoCurve['type'];
 
 export interface TrimCandidate {
 	curve: GeoCurve;
 	interval: [number, number]; // [paramA, paramB]
 	cutStartWorld: Vec2;
 	cutEndWorld: Vec2;
+	startCuttingCurveId?: string;
+	startCuttingCurveType?: CurveType;
+	endCuttingCurveId?: string;
+	endCuttingCurveType?: CurveType;
 	isWholeEntity: boolean;
 }
 
@@ -728,11 +742,22 @@ export function intersectCurves(c1: GeoCurve, c2: GeoCurve): Vec2[] {
  * Computes all intersection points of `target` curve with all other curves in `allCurves`.
  * Returns intersection points with their parameter values along `target`.
  */
+export interface CurveIntersection {
+	point: Vec2;
+	param: number;
+	cuttingCurveId: string;
+	cuttingCurveType: CurveType;
+}
+
+/**
+ * Finds all intersection points of `target` with `allCurves` (excluding target itself),
+ * parameterized along target curve in ascending order.
+ */
 export function getCurveIntersections(
 	target: GeoCurve,
 	allCurves: GeoCurve[]
-): Array<{ point: Vec2; param: number }> {
-	const results: Array<{ point: Vec2; param: number }> = [];
+): CurveIntersection[] {
+	const results: CurveIntersection[] = [];
 
 	for (const other of allCurves) {
 		if (other.id === target.id) continue;
@@ -745,13 +770,13 @@ export function getCurveIntersections(
 					continue;
 				}
 			}
-			results.push({ point: pt, param });
+			results.push({ point: pt, param, cuttingCurveId: other.id, cuttingCurveType: other.type });
 		}
 	}
 
 	// Sort and deduplicate by param
 	results.sort((a, b) => a.param - b.param);
-	const unique: Array<{ point: Vec2; param: number }> = [];
+	const unique: CurveIntersection[] = [];
 	for (const item of results) {
 		const eps = target.type === 'circle' || target.type === 'ellipse' ? 1e-3 : 1e-4;
 		const exists = unique.some(u => Math.abs(u.param - item.param) < eps);
@@ -793,22 +818,31 @@ export function getTrimCandidate(
 			const pA = params[i];
 			const pB = params[i + 1];
 			if (cursorParam >= pA - 1e-5 && cursorParam <= pB + 1e-5) {
+				const startCut = i > 0 ? intersections[i - 1] : undefined;
+				const endCut = i < intersections.length ? intersections[i] : undefined;
 				return {
 					curve: target,
 					interval: [pA, pB],
 					cutStartWorld: getPointAtParam(target, pA),
 					cutEndWorld: getPointAtParam(target, pB),
+					startCuttingCurveId: startCut?.cuttingCurveId,
+					startCuttingCurveType: startCut?.cuttingCurveType,
+					endCuttingCurveId: endCut?.cuttingCurveId,
+					endCuttingCurveType: endCut?.cuttingCurveType,
 					isWholeEntity: false,
 				};
 			}
 		}
 
 		// Fallback to nearest interval
+		const fallbackEnd = intersections[0];
 		return {
 			curve: target,
 			interval: [0, params[1]],
 			cutStartWorld: getPointAtParam(target, 0),
 			cutEndWorld: getPointAtParam(target, params[1]),
+			endCuttingCurveId: fallbackEnd?.cuttingCurveId,
+			endCuttingCurveType: fallbackEnd?.cuttingCurveType,
 			isWholeEntity: false,
 		};
 	}
@@ -830,44 +864,163 @@ export function getTrimCandidate(
 	const thetas = intersections.map(i => i.param);
 	const n = thetas.length;
 
-	let chosenA = thetas[n - 1];
-	let chosenB = thetas[0];
+	let chosenIdxA = n - 1;
+	let chosenIdxB = 0;
 
 	// Check if cursorParam falls between thetas[i] and thetas[i+1]
 	let found = false;
 	for (let i = 0; i < n - 1; i++) {
 		if (cursorParam >= thetas[i] - 1e-5 && cursorParam <= thetas[i + 1] + 1e-5) {
-			chosenA = thetas[i];
-			chosenB = thetas[i + 1];
+			chosenIdxA = i;
+			chosenIdxB = i + 1;
 			found = true;
 			break;
 		}
 	}
 	if (!found) {
-		// cursorParam is either < thetas[0] or >= thetas[n-1]
-		chosenA = thetas[n - 1];
-		chosenB = thetas[0];
+		chosenIdxA = n - 1;
+		chosenIdxB = 0;
 	}
+
+	const cutA = intersections[chosenIdxA];
+	const cutB = intersections[chosenIdxB];
 
 	return {
 		curve: target,
-		interval: [chosenA, chosenB],
-		cutStartWorld: getPointAtParam(target, chosenA),
-		cutEndWorld: getPointAtParam(target, chosenB),
+		interval: [cutA.param, cutB.param],
+		cutStartWorld: getPointAtParam(target, cutA.param),
+		cutEndWorld: getPointAtParam(target, cutB.param),
+		startCuttingCurveId: cutA.cuttingCurveId,
+		startCuttingCurveType: cutA.cuttingCurveType,
+		endCuttingCurveId: cutB.cuttingCurveId,
+		endCuttingCurveType: cutB.cuttingCurveType,
 		isWholeEntity: false,
 	};
 }
 
 /**
- * Reuses existing point if within tolerance, or creates a new one.
+ * Creates a new cut endpoint at pos.
+ * - If an existing point in sketch is at pos (within eps), adds a CoincidentConstraint (point-point).
+ * - Otherwise, if cut by a line, attaches point-on-line constraint; if cut by a circle/arc, attaches point-on-circle constraint.
  */
-export function getOrCreatePointAt(sketch: SketchDocument, pos: Vec2, eps = 1e-3): SketchPoint {
+export function createCutPoint(
+	sketch: SketchDocument,
+	pos: Vec2,
+	cuttingCurveId?: string,
+	cuttingCurveType?: CurveType,
+	eps = 1e-3
+): SketchPoint {
+	const newPt = sketch.addPoint(pos.x, pos.y);
+
+	// Check if there is already an existing point at pos (excluding newPt)
+	let attachedCoincident = false;
 	for (const pt of sketch.points.values()) {
-		if (Math.hypot(pt.x - pos.x, pt.y - pos.y) < eps) {
-			return pt;
+		if (pt.id !== newPt.id && Math.hypot(pt.x - pos.x, pt.y - pos.y) < eps) {
+			const c = sketch.addCoincidentConstraint(newPt.id, pt.id);
+			if (c) {
+				attachedCoincident = true;
+				break;
+			}
 		}
 	}
-	return sketch.addPoint(pos.x, pos.y);
+
+	// If no existing point was at this position, attach to the cutting entity
+	if (!attachedCoincident && cuttingCurveId) {
+		if (cuttingCurveType === 'segment') {
+			sketch.addPointOnLineConstraint(newPt.id, cuttingCurveId);
+		} else if (cuttingCurveType === 'circle' || cuttingCurveType === 'arc') {
+			sketch.addPointOnCircleConstraint(newPt.id, cuttingCurveId);
+		}
+	}
+
+	return newPt;
+}
+
+/**
+ * Backward compatibility alias for createCutPoint.
+ */
+export function getOrCreatePointAt(
+	sketch: SketchDocument,
+	pos: Vec2,
+	cuttingCurveId?: string,
+	cuttingCurveType?: CurveType,
+	eps = 1e-3
+): SketchPoint {
+	return createCutPoint(sketch, pos, cuttingCurveId, cuttingCurveType, eps);
+}
+
+function matchesEndpoints(pA: string, pB: string, end1: string, end2: string): boolean {
+	return (pA === end1 && pB === end2) || (pA === end2 && pB === end1);
+}
+
+function getLineConstraints(sketch: SketchDocument, line: SketchLine): IConstraint[] {
+	const constraints = sketch.getConstraintsForEntity('line', line.id);
+	for (const c of sketch.constraints.values()) {
+		if (c instanceof PointToLineDistanceConstraint && c.lineId === line.id) {
+			if (!constraints.some(sc => sc.id === c.id)) {
+				constraints.push(c);
+			}
+		}
+	}
+	return constraints;
+}
+
+function transferLineConstraints(
+	sketch: SketchDocument,
+	oldLine: SketchLine,
+	newLine: SketchLine,
+	oldConstraints: IConstraint[]
+): void {
+	for (const c of oldConstraints) {
+		if (c instanceof HorizontalConstraint) {
+			sketch.addHorizontalConstraint(newLine.p1Id, newLine.p2Id);
+		} else if (c instanceof VerticalConstraint) {
+			sketch.addVerticalConstraint(newLine.p1Id, newLine.p2Id);
+		} else if (c instanceof ParallelConstraint) {
+			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
+			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
+			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
+			const otherLine = sketch.getLineBetween(otherP1, otherP2);
+			if (otherLine && otherLine.id !== oldLine.id) {
+				sketch.addParallelConstraint(newLine.id, otherLine.id);
+			}
+		} else if (c instanceof PerpendicularConstraint) {
+			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
+			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
+			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
+			const otherLine = sketch.getLineBetween(otherP1, otherP2);
+			if (otherLine && otherLine.id !== oldLine.id) {
+				sketch.addPerpendicularConstraint(newLine.id, otherLine.id);
+			}
+		} else if (c instanceof AngleConstraint) {
+			const isL1 = c.line1Id === oldLine.id || matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
+			const otherId = isL1 ? c.line2Id : c.line1Id;
+			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
+			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
+			const otherLine = sketch.lines.get(otherId) ?? sketch.getLineBetween(otherP1, otherP2);
+			if (otherLine && otherLine.id !== oldLine.id) {
+				if (isL1) {
+					sketch.addAngleConstraint(newLine.id, otherLine.id, c.targetAngle, c.arcRadius, c.s1, c.s2, c.sign);
+				} else {
+					sketch.addAngleConstraint(otherLine.id, newLine.id, c.targetAngle, c.arcRadius, c.s1, c.s2, c.sign);
+				}
+			}
+		} else if (c instanceof TangentLineCircleConstraint) {
+			sketch.addTangentConstraint(newLine.id, c.circleId);
+		} else if (c instanceof PointOnLineConstraint) {
+			if (matchesEndpoints(c.lineP1Id, c.lineP2Id, oldLine.p1Id, oldLine.p2Id)) {
+				if (c.pointId !== newLine.p1Id && c.pointId !== newLine.p2Id) {
+					sketch.addPointOnLineConstraint(c.pointId, newLine.id);
+				}
+			}
+		} else if (c instanceof PointToLineDistanceConstraint) {
+			if (c.lineId === oldLine.id || matchesEndpoints(c.lineP1Id, c.lineP2Id, oldLine.p1Id, oldLine.p2Id)) {
+				if (c.pointId !== newLine.p1Id && c.pointId !== newLine.p2Id) {
+					sketch.addPointToLineDistanceConstraint(c.pointId, newLine.id, c.targetDistance, c.offset);
+				}
+			}
+		}
+	}
 }
 
 /**
@@ -896,20 +1049,46 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 
 		if (isStart) {
 			// Trim off start: keep [uB, 1]
-			const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, uB));
-			sketch.addLine(pB.id, line.p2Id, line.isConstruction);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			const newLine = sketch.addLine(pB.id, line.p2Id, line.isConstruction);
+
+			// Inherit constraints from old line
+			const oldConstraints = getLineConstraints(sketch, line);
+			for (const c of oldConstraints) {
+				sketch.removeConstraint(c.id);
+			}
+			transferLineConstraints(sketch, line, newLine, oldConstraints);
 			sketch.removeEntity(line.id);
 		} else if (isEnd) {
 			// Trim off end: keep [0, uA]
-			const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, uA));
-			sketch.addLine(line.p1Id, pA.id, line.isConstruction);
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const newLine = sketch.addLine(line.p1Id, pA.id, line.isConstruction);
+
+			// Inherit constraints from old line
+			const oldConstraints = getLineConstraints(sketch, line);
+			for (const c of oldConstraints) {
+				sketch.removeConstraint(c.id);
+			}
+			transferLineConstraints(sketch, line, newLine, oldConstraints);
 			sketch.removeEntity(line.id);
 		} else {
 			// Trim middle: keep [0, uA] and [uB, 1]
-			const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, uA));
-			const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, uB));
-			sketch.addLine(line.p1Id, pA.id, line.isConstruction);
-			sketch.addLine(pB.id, line.p2Id, line.isConstruction);
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+
+			const line1 = sketch.addLine(line.p1Id, pA.id, line.isConstruction);
+			const line2 = sketch.addLine(pB.id, line.p2Id, line.isConstruction);
+
+			// Rule 2: 2 new points must have point on line constraint
+			sketch.addPointOnLineConstraint(pA.id, line2.id);
+			sketch.addPointOnLineConstraint(pB.id, line1.id);
+
+			// Transfer orientation constraints to line1
+			const oldConstraints = getLineConstraints(sketch, line);
+			for (const c of oldConstraints) {
+				sketch.removeConstraint(c.id);
+			}
+			transferLineConstraints(sketch, line, line1, oldConstraints);
 			sketch.removeEntity(line.id);
 		}
 	} else if (curve.type === 'circle') {
@@ -919,8 +1098,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 
 		// Cut from thetaA to thetaB in clockwise direction.
 		// Remaining is arc from thetaB around clockwise to thetaA!
-		const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, thetaA));
-		const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, thetaB));
+		const pA = createCutPoint(sketch, getPointAtParam(curve, thetaA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+		const pB = createCutPoint(sketch, getPointAtParam(curve, thetaB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 
 		// Check if old circle had a RadiusConstraint
 		const radConstraint = sketch.getConstraintsForEntity('circle', circle.id).find(
@@ -953,7 +1132,7 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 
 		if (isStart) {
 			// Trim off start: keep [uB, 1]
-			const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, uB));
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 			const newArc = sketch.addArc(arc.centerId, pB.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
 			sketch.removeEntity(arc.id);
 			if (radConstraint && radConstraint.targetRadius) {
@@ -961,7 +1140,7 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 			}
 		} else if (isEnd) {
 			// Trim off end: keep [0, uA]
-			const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, uA));
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
 			const newArc = sketch.addArc(arc.centerId, arc.startPointId, pA.id, arc.radius, arc.clockwise, arc.isConstruction);
 			sketch.removeEntity(arc.id);
 			if (radConstraint && radConstraint.targetRadius) {
@@ -969,8 +1148,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 			}
 		} else {
 			// Trim middle: keep [0, uA] and [uB, 1]
-			const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, uA));
-			const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, uB));
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 			const arc1 = sketch.addArc(arc.centerId, arc.startPointId, pA.id, arc.radius, arc.clockwise, arc.isConstruction);
 			const arc2 = sketch.addArc(arc.centerId, pB.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
 			sketch.removeEntity(arc.id);
@@ -985,8 +1164,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 		const [thetaA, thetaB] = interval;
 
 		// Cut from thetaA to thetaB. Remaining is elliptical arc from thetaB around clockwise to thetaA!
-		const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, thetaA));
-		const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, thetaB));
+		const pA = createCutPoint(sketch, getPointAtParam(curve, thetaA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+		const pB = createCutPoint(sketch, getPointAtParam(curve, thetaB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 
 		// Add elliptical arc FIRST to keep center and axis points in use
 		sketch.addEllipticalArc(
@@ -1014,7 +1193,7 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 
 		if (isStart) {
 			// Trim off start: keep [uB, 1]
-			const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, uB));
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 			sketch.addEllipticalArc(
 				arc.centerId,
 				arc.majorAxisPointId,
@@ -1027,7 +1206,7 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 			sketch.removeEntity(arc.id);
 		} else if (isEnd) {
 			// Trim off end: keep [0, uA]
-			const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, uA));
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
 			sketch.addEllipticalArc(
 				arc.centerId,
 				arc.majorAxisPointId,
@@ -1040,8 +1219,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 			sketch.removeEntity(arc.id);
 		} else {
 			// Trim middle: keep [0, uA] and [uB, 1]
-			const pA = getOrCreatePointAt(sketch, getPointAtParam(curve, uA));
-			const pB = getOrCreatePointAt(sketch, getPointAtParam(curve, uB));
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 			sketch.addEllipticalArc(
 				arc.centerId,
 				arc.majorAxisPointId,
