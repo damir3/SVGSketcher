@@ -19,6 +19,7 @@ import {
 	CoincidentConstraint,
 	AngleConstraint,
 	PointToLineDistanceConstraint,
+	SymmetryConstraint,
 } from '../solver/constraints';
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
@@ -350,6 +351,10 @@ export interface RenderOptions {
 	showGrid?: boolean;
 	showConstraints?: boolean;
 	showDimensions?: boolean;
+	mirrorHighlight?: {
+		selectedObjectIds: Set<string>;
+		mirrorLineId: string | null;
+	};
 }
 
 export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
@@ -588,6 +593,7 @@ export class SVGRenderer {
 	private geometryGroup: SVGGElement;
 	private constraintGroup: SVGGElement;
 	private pointGroup: SVGGElement;
+	private mirrorGroup: SVGGElement;
 	private previewGroup: SVGGElement;
 	private overlayGroup: SVGGElement;
 
@@ -606,6 +612,9 @@ export class SVGRenderer {
 		this.constraintGroup = this.createGroup('constraint-layer');
 		this.pointGroup = this.createGroup('point-layer');
 
+		this.mirrorGroup = this.createGroup('mirror-preview-layer');
+		this.mirrorGroup.style.pointerEvents = 'none';
+
 		this.previewGroup = this.createGroup('preview-layer');
 		this.previewGroup.style.pointerEvents = 'none';
 
@@ -616,6 +625,7 @@ export class SVGRenderer {
 		this.svg.appendChild(this.geometryGroup);
 		this.svg.appendChild(this.constraintGroup);
 		this.svg.appendChild(this.pointGroup);
+		this.svg.appendChild(this.mirrorGroup);
 		this.svg.appendChild(this.previewGroup);
 		this.svg.appendChild(this.overlayGroup);
 	}
@@ -645,9 +655,18 @@ export class SVGRenderer {
 
 	render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
 		this.renderGrid(viewport, options.showGrid ?? true);
-		this.renderGeometry(sketch, viewport);
+		this.renderGeometry(sketch, viewport, options);
 		if (options.showConstraints !== false) {
 			this.renderConstraints(sketch, viewport);
+		}
+		this.mirrorGroup.innerHTML = '';
+		if (options.mirrorHighlight) {
+			this.renderMirrorPreview(
+				sketch,
+				viewport,
+				options.mirrorHighlight.selectedObjectIds,
+				options.mirrorHighlight.mirrorLineId
+			);
 		}
 	}
 
@@ -781,7 +800,7 @@ export class SVGRenderer {
 		}, originG);
 	}
 
-	private renderGeometry(sketch: SketchDocument, viewport: Viewport): void {
+	private renderGeometry(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
 		this.geometryGroup.innerHTML = '';
 		this.pointGroup.innerHTML = '';
 
@@ -799,19 +818,32 @@ export class SVGRenderer {
 
 			const s1 = viewport.worldToScreen(p1.x, p1.y);
 			const s2 = viewport.worldToScreen(p2.x, p2.y);
-			const isSelected = sketch.selection.lineIds.has(line.id);
+			const isMirrorLine = options.mirrorHighlight?.mirrorLineId === line.id;
+			const isMirrorSelected = options.mirrorHighlight?.selectedObjectIds.has(line.id);
+			const isSelected = sketch.selection.lineIds.has(line.id) || !!isMirrorSelected;
 
 			const lineG = createSvgElement('g', {
 				'data-id': line.id,
 				'data-type': 'line',
-				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''}`,
+				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${isMirrorLine ? 'is-mirror-line' : ''}`,
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px wide)
 			createSvgLine(s1.x, s1.y, s2.x, s2.y, HIT_AREA_STROKE_ATTRS, lineG);
 
 			// Visible line
-			createSvgLine(s1.x, s1.y, s2.x, s2.y, getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true), lineG);
+			if (isMirrorLine) {
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
+					class: 'entity-visible visible-primitive is-mirror-line',
+					fill: 'none',
+					stroke: '#f59e0b',
+					'stroke-width': 2.5,
+					'stroke-dasharray': '6 3',
+					'stroke-linecap': 'round',
+				}, lineG);
+			} else {
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true), lineG);
+			}
 		}
 
 		// 2. Render Circles
@@ -821,7 +853,7 @@ export class SVGRenderer {
 
 			const sc = viewport.worldToScreen(center.x, center.y);
 			const sr = circle.radius * viewport.zoom;
-			const isSelected = sketch.selection.circleIds.has(circle.id);
+			const isSelected = sketch.selection.circleIds.has(circle.id) || !!options.mirrorHighlight?.selectedObjectIds.has(circle.id);
 
 			const circleG = createSvgElement('g', {
 				'data-id': circle.id,
@@ -850,7 +882,7 @@ export class SVGRenderer {
 			const ss = viewport.worldToScreen(start.x, start.y);
 			const se = viewport.worldToScreen(end.x, end.y);
 			const sr = arc.radius * viewport.zoom;
-			const isSelected = sketch.selection.arcIds.has(arc.id);
+			const isSelected = sketch.selection.arcIds.has(arc.id) || !!options.mirrorHighlight?.selectedObjectIds.has(arc.id);
 
 			const clockwise = !!arc.clockwise;
 			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
@@ -893,7 +925,7 @@ export class SVGRenderer {
 			if (rx < 0.1 || ry < 0.1) continue;
 
 			const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
-			const isSelected = sketch.selection.ellipseIds.has(ellipse.id);
+			const isSelected = sketch.selection.ellipseIds.has(ellipse.id) || !!options.mirrorHighlight?.selectedObjectIds.has(ellipse.id);
 
 			const ellipseG = createSvgElement('g', {
 				'data-id': ellipse.id,
@@ -938,7 +970,7 @@ export class SVGRenderer {
 
 			const clockwise = !!arc.clockwise;
 			const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
-			const isSelected = sketch.selection.ellipticalArcIds.has(arc.id);
+			const isSelected = sketch.selection.ellipticalArcIds.has(arc.id) || !!options.mirrorHighlight?.selectedObjectIds.has(arc.id);
 
 			const arcG = createSvgElement('g', {
 				'data-id': arc.id,
@@ -967,7 +999,7 @@ export class SVGRenderer {
 		// 6. Render Points (Vertices)
 		for (const pt of sketch.points.values()) {
 			const s = viewport.worldToScreen(pt.x, pt.y);
-			const isSelected = sketch.selection.pointIds.has(pt.id);
+			const isSelected = sketch.selection.pointIds.has(pt.id) || !!options.mirrorHighlight?.selectedObjectIds.has(pt.id);
 
 			const ptG = createSvgElement('g', {
 				'data-id': pt.id,
@@ -1051,6 +1083,8 @@ export class SVGRenderer {
 				this.renderCoincidentBadge(constraint, sketch, viewport, isSelected);
 			} else if (constraint instanceof AngleConstraint) {
 				this.renderAngleDimension(constraint, sketch, viewport, isSelected);
+			} else if (constraint instanceof SymmetryConstraint) {
+				this.renderSymmetryBadge(constraint, sketch, viewport, isSelected);
 			}
 		}
 	}
@@ -1712,6 +1746,33 @@ export class SVGRenderer {
 		this.renderConstraintBadge(constraint.id, s.x - 12, s.y - 12, '●', isSelected, COLORS.primary);
 	}
 
+	private renderSymmetryBadge(
+		constraint: SymmetryConstraint,
+		sketch: SketchDocument,
+		viewport: Viewport,
+		isSelected: boolean
+	): void {
+		const p1 = sketch.points.get(constraint.p1Id);
+		const p2 = sketch.points.get(constraint.p2Id);
+		if (!p1 || !p2) return;
+
+		const s1 = viewport.worldToScreen(p1.x, p1.y);
+		const s2 = viewport.worldToScreen(p2.x, p2.y);
+
+		if (isSelected) {
+			createSvgLine(s1.x, s1.y, s2.x, s2.y, {
+				stroke: COLORS.primary,
+				'stroke-width': 1.2,
+				'stroke-dasharray': '3 3',
+				opacity: 0.65,
+				'pointer-events': 'none',
+			}, this.constraintGroup);
+		}
+
+		this.renderConstraintBadge(constraint.id, s1.x + 12, s1.y - 12, 'symmetry', isSelected, COLORS.primary);
+		this.renderConstraintBadge(constraint.id, s2.x + 12, s2.y - 12, 'symmetry', isSelected, COLORS.primary);
+	}
+
 	private renderConstraintBadge(
 		id: string,
 		x: number,
@@ -2238,6 +2299,250 @@ export class SVGRenderer {
 			if (interval[1] < 1 - 1e-4) {
 				const sEnd = viewport.worldToScreen(cutEndWorld.x, cutEndWorld.y);
 				this.renderCutMarker(sEnd);
+			}
+		}
+	}
+
+	renderMirrorPreview(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		selectedObjectIds: Set<string>,
+		mirrorLineId: string | null
+	): void {
+		this.mirrorGroup.innerHTML = '';
+		if (!mirrorLineId) return;
+
+		const line = sketch.lines.get(mirrorLineId);
+		if (!line) return;
+		const pA = sketch.points.get(line.p1Id);
+		const pB = sketch.points.get(line.p2Id);
+		if (!pA || !pB) return;
+
+		const sA = viewport.worldToScreen(pA.x, pA.y);
+		const sB = viewport.worldToScreen(pB.x, pB.y);
+
+		const dx = pB.x - pA.x;
+		const dy = pB.y - pA.y;
+		const lineLen = Math.hypot(dx, dy);
+		if (lineLen < 1e-6) return;
+
+		const nx = -dy / lineLen;
+		const ny = dx / lineLen;
+
+		// Highlight mirror line: bright gold/amber centerline
+		createSvgLine(sA.x, sA.y, sB.x, sB.y, {
+			stroke: '#f59e0b',
+			'stroke-width': 2.5,
+			'stroke-dasharray': '6 3',
+			opacity: 0.9,
+			'pointer-events': 'none',
+		}, this.mirrorGroup);
+
+		if (selectedObjectIds.size === 0) return;
+
+		const reflectPoint = (x: number, y: number): { x: number; y: number } => {
+			const distToLine = (x - pA.x) * nx + (y - pA.y) * ny;
+			return {
+				x: x - 2 * distToLine * nx,
+				y: y - 2 * distToLine * ny,
+			};
+		};
+
+		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
+		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
+		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+
+		const reflectedPoints = new Set<string>();
+		const drawReflectedVertex = (screenPt: { x: number; y: number }, key: string) => {
+			if (reflectedPoints.has(key)) return;
+			reflectedPoints.add(key);
+			createSvgCircle(screenPt.x, screenPt.y, 3.5, {
+				fill: COLORS.primary,
+				stroke: COLORS.white,
+				'stroke-width': 1.5,
+				opacity: 0.5,
+				'pointer-events': 'none',
+			}, this.mirrorGroup);
+		};
+
+		for (const objId of selectedObjectIds) {
+			if (objId === mirrorLineId) continue;
+
+			// Line
+			const l = sketch.lines.get(objId);
+			if (l) {
+				const pt1 = sketch.points.get(l.p1Id);
+				const pt2 = sketch.points.get(l.p2Id);
+				if (pt1 && pt2) {
+					const r1 = reflectPoint(pt1.x, pt1.y);
+					const r2 = reflectPoint(pt2.x, pt2.y);
+					const sr1 = viewport.worldToScreen(r1.x, r1.y);
+					const sr2 = viewport.worldToScreen(r2.x, r2.y);
+
+					const strokeColor = l.isConstruction ? COLORS.construction : baseColor;
+					const strokeDash = l.isConstruction ? DASH_ARRAY.construction : undefined;
+
+					createSvgLine(sr1.x, sr1.y, sr2.x, sr2.y, {
+						stroke: strokeColor,
+						'stroke-width': STROKE_WIDTH.normal,
+						'stroke-dasharray': strokeDash,
+						'stroke-linecap': 'round',
+						fill: 'none',
+						opacity: 0.5,
+						'pointer-events': 'none',
+					}, this.mirrorGroup);
+
+					drawReflectedVertex(sr1, `${Math.round(r1.x * 100)},${Math.round(r1.y * 100)}`);
+					drawReflectedVertex(sr2, `${Math.round(r2.x * 100)},${Math.round(r2.y * 100)}`);
+				}
+				continue;
+			}
+
+			// Circle
+			const c = sketch.circles.get(objId);
+			if (c) {
+				const center = sketch.points.get(c.centerId);
+				if (center) {
+					const rc = reflectPoint(center.x, center.y);
+					const src = viewport.worldToScreen(rc.x, rc.y);
+					const sr = c.radius * viewport.zoom;
+
+					const strokeColor = c.isConstruction ? COLORS.construction : baseColor;
+					const strokeDash = c.isConstruction ? DASH_ARRAY.construction : undefined;
+
+					createSvgCircle(src.x, src.y, sr, {
+						stroke: strokeColor,
+						'stroke-width': STROKE_WIDTH.normal,
+						'stroke-dasharray': strokeDash,
+						fill: 'none',
+						opacity: 0.5,
+						'pointer-events': 'none',
+					}, this.mirrorGroup);
+
+					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
+				}
+				continue;
+			}
+
+			// Arc
+			const arc = sketch.arcs.get(objId);
+			if (arc) {
+				const center = sketch.points.get(arc.centerId);
+				const start = sketch.points.get(arc.startPointId);
+				const end = sketch.points.get(arc.endPointId);
+				if (center && start && end) {
+					const rc = reflectPoint(center.x, center.y);
+					const rs = reflectPoint(start.x, start.y);
+					const re = reflectPoint(end.x, end.y);
+					const src = viewport.worldToScreen(rc.x, rc.y);
+					const srs = viewport.worldToScreen(rs.x, rs.y);
+					const sre = viewport.worldToScreen(re.x, re.y);
+					const sr = arc.radius * viewport.zoom;
+					const d = getArcSvgPath(src, srs, sre, sr, !arc.clockwise);
+
+					const strokeColor = arc.isConstruction ? COLORS.construction : baseColor;
+					const strokeDash = arc.isConstruction ? DASH_ARRAY.construction : undefined;
+
+					createSvgPath(d, {
+						stroke: strokeColor,
+						'stroke-width': STROKE_WIDTH.normal,
+						'stroke-dasharray': strokeDash,
+						'stroke-linecap': 'round',
+						fill: 'none',
+						opacity: 0.5,
+						'pointer-events': 'none',
+					}, this.mirrorGroup);
+
+					drawReflectedVertex(srs, `${Math.round(rs.x * 100)},${Math.round(rs.y * 100)}`);
+					drawReflectedVertex(sre, `${Math.round(re.x * 100)},${Math.round(re.y * 100)}`);
+					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
+				}
+				continue;
+			}
+
+			// Ellipse
+			const el = sketch.ellipses.get(objId);
+			if (el) {
+				const center = sketch.points.get(el.centerId);
+				const major = sketch.points.get(el.majorAxisPointId);
+				const minor = sketch.points.get(el.minorAxisPointId);
+				if (center && major && minor) {
+					const rc = reflectPoint(center.x, center.y);
+					const rmaj = reflectPoint(major.x, major.y);
+					const rmin = reflectPoint(minor.x, minor.y);
+					const src = viewport.worldToScreen(rc.x, rc.y);
+					const srmaj = viewport.worldToScreen(rmaj.x, rmaj.y);
+					const srmin = viewport.worldToScreen(rmin.x, rmin.y);
+					const rx = Math.hypot(srmaj.x - src.x, srmaj.y - src.y);
+					const ry = Math.hypot(srmin.x - src.x, srmin.y - src.y);
+					const thetaDeg = (Math.atan2(srmaj.y - src.y, srmaj.x - src.x) * 180) / Math.PI;
+
+					const strokeColor = el.isConstruction ? COLORS.construction : baseColor;
+					const strokeDash = el.isConstruction ? DASH_ARRAY.construction : undefined;
+
+					createSvgEllipse(src.x, src.y, rx, ry, {
+						transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
+						stroke: strokeColor,
+						'stroke-width': STROKE_WIDTH.normal,
+						'stroke-dasharray': strokeDash,
+						fill: 'none',
+						opacity: 0.5,
+						'pointer-events': 'none',
+					}, this.mirrorGroup);
+
+					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
+				}
+				continue;
+			}
+
+			// Elliptical Arc
+			const elArc = sketch.ellipticalArcs.get(objId);
+			if (elArc) {
+				const center = sketch.points.get(elArc.centerId);
+				const major = sketch.points.get(elArc.majorAxisPointId);
+				const minor = sketch.points.get(elArc.minorAxisPointId);
+				const start = sketch.points.get(elArc.startPointId);
+				const end = sketch.points.get(elArc.endPointId);
+				if (center && major && minor && start && end) {
+					const rc = reflectPoint(center.x, center.y);
+					const rmaj = reflectPoint(major.x, major.y);
+					const rmin = reflectPoint(minor.x, minor.y);
+					const rs = reflectPoint(start.x, start.y);
+					const re = reflectPoint(end.x, end.y);
+					const src = viewport.worldToScreen(rc.x, rc.y);
+					const srmaj = viewport.worldToScreen(rmaj.x, rmaj.y);
+					const srmin = viewport.worldToScreen(rmin.x, rmin.y);
+					const srs = viewport.worldToScreen(rs.x, rs.y);
+					const sre = viewport.worldToScreen(re.x, re.y);
+					const d = getEllipticalArcSvgPath(src, srmaj, srmin, srs, sre, !elArc.clockwise);
+
+					const strokeColor = elArc.isConstruction ? COLORS.construction : baseColor;
+					const strokeDash = elArc.isConstruction ? DASH_ARRAY.construction : undefined;
+
+					createSvgPath(d, {
+						stroke: strokeColor,
+						'stroke-width': STROKE_WIDTH.normal,
+						'stroke-dasharray': strokeDash,
+						'stroke-linecap': 'round',
+						fill: 'none',
+						opacity: 0.5,
+						'pointer-events': 'none',
+					}, this.mirrorGroup);
+
+					drawReflectedVertex(srs, `${Math.round(rs.x * 100)},${Math.round(rs.y * 100)}`);
+					drawReflectedVertex(sre, `${Math.round(re.x * 100)},${Math.round(re.y * 100)}`);
+					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
+				}
+				continue;
+			}
+
+			// Standalone Point
+			const pt = sketch.points.get(objId);
+			if (pt) {
+				const rp = reflectPoint(pt.x, pt.y);
+				const srp = viewport.worldToScreen(rp.x, rp.y);
+				drawReflectedVertex(srp, `${Math.round(rp.x * 100)},${Math.round(rp.y * 100)}`);
+				continue;
 			}
 		}
 	}

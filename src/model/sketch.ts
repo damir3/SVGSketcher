@@ -23,6 +23,7 @@ import {
 	EllipseAxisConstraint,
 	EllipticalArcEndpointsConstraint,
 	PointToLineDistanceConstraint,
+	SymmetryConstraint,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SelectionState } from './types';
 import { dist } from '../math/vector';
@@ -998,6 +999,33 @@ export class SketchDocument {
 		return c;
 	}
 
+	addSymmetryConstraint(p1Id: string, p2Id: string, lineId: string): SymmetryConstraint | null {
+		if (p1Id === p2Id) return null;
+		if (!this.points.has(p1Id) || !this.points.has(p2Id)) return null;
+		const line = this.lines.get(lineId);
+		if (!line) return null;
+
+		const existing = [...this.constraints.values()].find(
+			c =>
+				c instanceof SymmetryConstraint &&
+				((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id)) &&
+				this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)
+		);
+		if (existing) return existing as SymmetryConstraint;
+
+		const c = new SymmetryConstraint(
+			this.nextId('c_symm'),
+			p1Id,
+			p2Id,
+			line.p1Id,
+			line.p2Id,
+			1.0,
+			line.id
+		);
+		this.addConstraint(c);
+		return c;
+	}
+
 	addPerpendicularConstraint(line1Id: string, line2Id: string): PerpendicularConstraint | null {
 		const l1 = this.lines.get(line1Id);
 		const l2 = this.lines.get(line2Id);
@@ -1187,6 +1215,13 @@ export class SketchDocument {
 			if (hasMissingEntity) {
 				this.constraints.delete(cid);
 				this.selection.constraintIds.delete(cid);
+				continue;
+			}
+			if (constraint instanceof SymmetryConstraint) {
+				if (constraint.lineId && !this.lines.has(constraint.lineId) && !this.getLineBetween(constraint.lineP1Id, constraint.lineP2Id)) {
+					this.constraints.delete(cid);
+					this.selection.constraintIds.delete(cid);
+				}
 			}
 		}
 	}
@@ -1581,6 +1616,8 @@ export class SketchDocument {
 					if (anyC.pointId === id) res.push(c);
 				} else if (c.type === 'midpoint') {
 					if (anyC.midId === id) res.push(c);
+				} else if (c.type === 'symmetry') {
+					if (anyC.p1Id === id || anyC.p2Id === id) res.push(c);
 				} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
 					if (anyC.p1Id === id || anyC.p2Id === id) {
 						// Only associate if there is no line between these points (i.e. not a line constraint)
@@ -1635,6 +1672,10 @@ export class SketchDocument {
 					}
 				} else if (c.type === 'midpoint') {
 					if (this.matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
+						res.push(c);
+					}
+				} else if (c.type === 'symmetry') {
+					if (anyC.lineId === id || this.matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
 						res.push(c);
 					}
 				} else if (c.type === 'angle') {
@@ -1763,11 +1804,20 @@ export class SketchDocument {
 			const l2 = this.getLineBetween(anyC.line2P1, anyC.line2P2);
 			if (l1) add(l1.id, 'line');
 			if (l2) add(l2.id, 'line');
-		} else if (c.type === 'parallel' || c.type === 'perpendicular') {
+		} else if (c.type === 'parallel' || c.type === 'perpendicular' || c.type === 'collinear') {
 			const l1 = this.getLineBetween(anyC.l1P1, anyC.l1P2);
 			const l2 = this.getLineBetween(anyC.l2P1, anyC.l2P2);
 			if (l1) add(l1.id, 'line');
 			if (l2) add(l2.id, 'line');
+		} else if (c.type === 'symmetry') {
+			if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
+			if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
+			if (anyC.lineId && this.lines.has(anyC.lineId)) {
+				add(anyC.lineId, 'line');
+			} else {
+				const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
+				if (line) add(line.id, 'line');
+			}
 		} else if (c.type === 'angle') {
 			if (anyC.line1Id && this.lines.has(anyC.line1Id)) {
 				add(anyC.line1Id, 'line');

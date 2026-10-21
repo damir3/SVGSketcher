@@ -22,6 +22,7 @@ import {
 	EllipseAxisConstraint,
 	EllipticalArcEndpointsConstraint,
 	PointToLineDistanceConstraint,
+	SymmetryConstraint,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -176,6 +177,12 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.l1P2 = c.l1P2;
 		base.l2P1 = c.l2P1;
 		base.l2P2 = c.l2P2;
+	} else if (c instanceof SymmetryConstraint) {
+		base.p1Id = c.p1Id;
+		base.p2Id = c.p2Id;
+		base.lineP1Id = c.lineP1Id;
+		base.lineP2Id = c.lineP2Id;
+		base.lineId = c.lineId;
 	} else if (c instanceof PerpendicularConstraint) {
 		base.l1P1 = c.l1P1;
 		base.l1P2 = c.l1P2;
@@ -294,6 +301,9 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 			break;
 		case 'collinear':
 			c = new CollinearConstraint(d.id, d.l1P1!, d.l1P2!, d.l2P1!, d.l2P2!, d.weight);
+			break;
+		case 'symmetry':
+			c = new SymmetryConstraint(d.id, d.p1Id!, d.p2Id!, d.lineP1Id!, d.lineP2Id!, d.weight, d.lineId);
 			break;
 		case 'perpendicular':
 			c = new PerpendicularConstraint(d.id, d.l1P1!, d.l1P2!, d.l2P1!, d.l2P2!, d.weight);

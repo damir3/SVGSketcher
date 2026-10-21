@@ -42,6 +42,10 @@ export class Toolbar {
 						${ICONS.break}
 						<span class="btn-tooltip">Break (B)</span>
 					</button>
+					<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
+						${ICONS.mirror}
+						<span class="btn-tooltip">Mirror (M)</span>
+					</button>
 				</div>
 			</div>
 
@@ -133,6 +137,10 @@ export class Toolbar {
 					<button class="tool-btn" data-constraint="midpoint" title="Midpoint (1 point + 1 line)">
 						${ICONS.midpoint}
 						<span class="btn-tooltip">Midpoint</span>
+					</button>
+					<button class="tool-btn" data-constraint="symmetry" id="constraint-symmetry" title="Symmetry (2 points/circles + 1 line)">
+						${ICONS.symmetry}
+						<span class="btn-tooltip">Symmetry</span>
 					</button>
 				</div>
 			</div>

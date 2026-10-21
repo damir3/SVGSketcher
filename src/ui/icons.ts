@@ -12,6 +12,7 @@ import construction from '../assets/icons/construction.svg?raw';
 import snap from '../assets/icons/snap.svg?raw';
 import trim from '../assets/icons/trim.svg?raw';
 import breakIcon from '../assets/icons/break.svg?raw';
+import mirror from '../assets/icons/mirror.svg?raw';
 
 import coincident from '../assets/icons/coincident.svg?raw';
 import fixed from '../assets/icons/fixed.svg?raw';
@@ -29,6 +30,7 @@ import tangent from '../assets/icons/tangent.svg?raw';
 import concentric from '../assets/icons/concentric.svg?raw';
 import pointOnLine from '../assets/icons/point-on-line.svg?raw';
 import midpoint from '../assets/icons/midpoint.svg?raw';
+import symmetry from '../assets/icons/symmetry.svg?raw';
 
 import undo from '../assets/icons/undo.svg?raw';
 import redo from '../assets/icons/redo.svg?raw';
@@ -53,6 +55,7 @@ export const ICONS = {
 	snap,
 	trim,
 	break: breakIcon,
+	mirror,
 
 	// Constraints
 	coincident,
@@ -71,6 +74,7 @@ export const ICONS = {
 	concentric,
 	pointOnLine,
 	midpoint,
+	symmetry,
 
 	// General tools
 	undo,

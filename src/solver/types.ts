@@ -20,7 +20,8 @@ export type ConstraintType =
 	| 'arc_endpoints'
 	| 'ellipse_axis'
 	| 'elliptical_arc_endpoints'
-	| 'point_to_line_distance';
+	| 'point_to_line_distance'
+	| 'symmetry';
 
 export interface ParamRef {
 	id: string;

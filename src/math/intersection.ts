@@ -11,6 +11,7 @@ import {
 	TangentLineCircleConstraint,
 	PointOnLineConstraint,
 	PointToLineDistanceConstraint,
+	SymmetryConstraint,
 } from '../solver/constraints';
 import type { IConstraint } from '../solver/types';
 
@@ -1026,6 +1027,12 @@ function transferLineConstraints(
 			if (c.lineId === oldLine.id || matchesEndpoints(c.lineP1Id, c.lineP2Id, oldLine.p1Id, oldLine.p2Id)) {
 				if (c.pointId !== newLine.p1Id && c.pointId !== newLine.p2Id) {
 					sketch.addPointToLineDistanceConstraint(c.pointId, newLine.id, c.targetDistance, c.offset);
+				}
+			}
+		} else if (c instanceof SymmetryConstraint) {
+			if (c.lineId === oldLine.id || matchesEndpoints(c.lineP1Id, c.lineP2Id, oldLine.p1Id, oldLine.p2Id)) {
+				if (c.p1Id !== newLine.p1Id && c.p1Id !== newLine.p2Id && c.p2Id !== newLine.p1Id && c.p2Id !== newLine.p2Id) {
+					sketch.addSymmetryConstraint(c.p1Id, c.p2Id, newLine.id);
 				}
 			}
 		}

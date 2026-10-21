@@ -1,4 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
+import type { CanvasInteraction } from '../canvas/interaction';
 import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
@@ -6,14 +7,19 @@ import { dist } from '../math/vector';
 export class Sidebar {
 	private container: HTMLElement;
 	private sketch: SketchDocument;
+	private interaction?: CanvasInteraction;
 
 	onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint) => void;
 
-	constructor(container: HTMLElement, sketch: SketchDocument) {
+	constructor(container: HTMLElement, sketch: SketchDocument, interaction?: CanvasInteraction) {
 		this.container = container;
 		this.sketch = sketch;
+		this.interaction = interaction;
 
 		this.sketch.onChange(() => this.render());
+		if (this.interaction) {
+			this.interaction.onMirrorStateChange = () => this.render();
+		}
 		this.render();
 	}
 
@@ -57,6 +63,9 @@ export class Sidebar {
 			</div>
 
 			<div class="sidebar-content">
+				<!-- Mirror Tool Panel (when mirror tool is active) -->
+				${this.renderMirrorToolCard()}
+
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
 
@@ -79,6 +88,85 @@ export class Sidebar {
 		`;
 
 		this.bindEvents();
+	}
+
+	private renderMirrorToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'mirror') {
+			return '';
+		}
+
+		const state = this.interaction.mirrorState;
+		const objCount = state ? state.selectedObjectIds.size : 0;
+		const mirrorLineId = state?.mirrorLineId ?? null;
+		const phase = state?.phase ?? 'objects';
+
+		let lineLabel = 'Click a line in canvas';
+		if (mirrorLineId) {
+			const line = this.sketch.lines.get(mirrorLineId);
+			if (line) {
+				const p1 = this.sketch.points.get(line.p1Id);
+				const p2 = this.sketch.points.get(line.p2Id);
+				const len = p1 && p2 ? ` (${dist(p1, p2).toFixed(1)} mm)` : '';
+				lineLabel = `${line.id}${len}`;
+			} else {
+				lineLabel = mirrorLineId;
+			}
+		}
+
+		const canApply = objCount > 0 && !!mirrorLineId;
+
+		return `
+			<div class="sidebar-panel-card mirror-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${ICONS.mirror}</span>
+						<span>Mirror Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-mirror-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Create symmetric copies of primitives across a centerline.
+				</div>
+
+				<div class="mirror-steps">
+					<div class="mirror-step-item ${phase === 'objects' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-mirror-phase-objects" type="button">
+							<span class="mirror-step-num">1</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Objects to Mirror</div>
+								<div class="mirror-step-value">${objCount === 0 ? 'Click or box-select...' : `${objCount} object${objCount === 1 ? '' : 's'} selected`}</div>
+							</div>
+						</button>
+						${objCount > 0 ? `<button class="mirror-step-clear" id="btn-mirror-clear-objects" title="Clear selection">✕</button>` : ''}
+					</div>
+
+					<div class="mirror-step-item ${phase === 'mirror_line' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-mirror-phase-line" type="button">
+							<span class="mirror-step-num">2</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Mirror Line</div>
+								<div class="mirror-step-value ${mirrorLineId ? 'selected-line' : ''}">${lineLabel}</div>
+							</div>
+						</button>
+						${mirrorLineId ? `<button class="mirror-step-clear" id="btn-mirror-clear-line" title="Clear mirror line">✕</button>` : ''}
+					</div>
+				</div>
+
+				<div class="mirror-actions">
+					<button class="btn-mirror-ok" id="btn-mirror-ok" ${canApply ? '' : 'disabled'} title="Apply Mirror (Enter)">
+						Apply Mirror
+					</button>
+					<button class="btn-mirror-cancel" id="btn-mirror-cancel" title="Cancel (Esc)">
+						Cancel
+					</button>
+				</div>
+				<div class="mirror-hint">
+					${!mirrorLineId && objCount === 0 
+						? 'Select objects first, then pick a mirror line.' 
+						: (!mirrorLineId ? 'Click a centerline in the canvas to reflect across.' : (objCount === 0 ? 'Pick geometry in the canvas to mirror.' : 'Ready to apply! Press Enter or click Apply Mirror.'))}
+				</div>
+			</div>
+		`;
 	}
 
 	private renderInspector(): string {
@@ -501,14 +589,27 @@ export class Sidebar {
 		`;
 	}
 
+	private isItemMirrorSelected(id: string): { isSelected: boolean; extraClass: string } {
+		if (this.interaction?.activeTool === 'mirror' && this.interaction.mirrorState) {
+			if (this.interaction.mirrorState.mirrorLineId === id) {
+				return { isSelected: true, extraClass: 'is-mirror-line' };
+			}
+			if (this.interaction.mirrorState.selectedObjectIds.has(id)) {
+				return { isSelected: true, extraClass: 'is-mirror-obj' };
+			}
+		}
+		return { isSelected: false, extraClass: '' };
+	}
+
 	private renderLineItem(line: any): string {
-		const isSelected = this.sketch.selection.lineIds.has(line.id);
+		const mirror = this.isItemMirrorSelected(line.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.lineIds.has(line.id);
 		const p1 = this.sketch.points.get(line.p1Id);
 		const p2 = this.sketch.points.get(line.p2Id);
 		const len = p1 && p2 ? dist(p1, p2).toFixed(1) : '?';
 
 		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="line" data-id="${line.id}">
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="line" data-id="${line.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${ICONS.line}</span>
 					<span class="tree-name">${line.id}</span>
@@ -520,9 +621,10 @@ export class Sidebar {
 	}
 
 	private renderCircleItem(circle: any): string {
-		const isSelected = this.sketch.selection.circleIds.has(circle.id);
+		const mirror = this.isItemMirrorSelected(circle.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.circleIds.has(circle.id);
 		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="circle" data-id="${circle.id}">
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="circle" data-id="${circle.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${ICONS.circle}</span>
 					<span class="tree-name">${circle.id}</span>
@@ -534,9 +636,10 @@ export class Sidebar {
 	}
 
 	private renderArcItem(arc: any): string {
-		const isSelected = this.sketch.selection.arcIds.has(arc.id);
+		const mirror = this.isItemMirrorSelected(arc.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.arcIds.has(arc.id);
 		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="arc" data-id="${arc.id}">
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="arc" data-id="${arc.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${ICONS.arc}</span>
 					<span class="tree-name">${arc.id}</span>
@@ -548,14 +651,15 @@ export class Sidebar {
 	}
 
 	private renderEllipseItem(ellipse: any): string {
-		const isSelected = this.sketch.selection.ellipseIds.has(ellipse.id);
+		const mirror = this.isItemMirrorSelected(ellipse.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.ellipseIds.has(ellipse.id);
 		const center = this.sketch.points.get(ellipse.centerId);
 		const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
 		const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
 		const rx = center && majorPt ? dist(center, majorPt).toFixed(1) : '?';
 		const ry = center && minorPt ? dist(center, minorPt).toFixed(1) : '?';
 		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="ellipse" data-id="${ellipse.id}">
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="ellipse" data-id="${ellipse.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${ICONS.ellipse}</span>
 					<span class="tree-name">${ellipse.id}</span>
@@ -567,14 +671,15 @@ export class Sidebar {
 	}
 
 	private renderEllipticalArcItem(arc: any): string {
-		const isSelected = this.sketch.selection.ellipticalArcIds.has(arc.id);
+		const mirror = this.isItemMirrorSelected(arc.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.ellipticalArcIds.has(arc.id);
 		const center = this.sketch.points.get(arc.centerId);
 		const majorPt = this.sketch.points.get(arc.majorAxisPointId);
 		const minorPt = this.sketch.points.get(arc.minorAxisPointId);
 		const rx = center && majorPt ? dist(center, majorPt).toFixed(1) : '?';
 		const ry = center && minorPt ? dist(center, minorPt).toFixed(1) : '?';
 		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="elliptical_arc" data-id="${arc.id}">
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="elliptical_arc" data-id="${arc.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${ICONS.elliptical_arc}</span>
 					<span class="tree-name">${arc.id}</span>
@@ -586,9 +691,10 @@ export class Sidebar {
 	}
 
 	private renderPointItem(pt: any): string {
-		const isSelected = this.sketch.selection.pointIds.has(pt.id);
+		const mirror = this.isItemMirrorSelected(pt.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.pointIds.has(pt.id);
 		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="point" data-id="${pt.id}">
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="point" data-id="${pt.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${ICONS.point}</span>
 					<span class="tree-name">${pt.id}</span>
@@ -656,6 +762,7 @@ export class Sidebar {
 			case 'point_on_line': return ICONS.pointOnLine;
 			case 'point_on_circle': return ICONS.pointOnLine;
 			case 'midpoint': return ICONS.midpoint;
+			case 'symmetry': return ICONS.symmetry;
 			default: return ICONS.coincident;
 		}
 	}
@@ -675,6 +782,30 @@ export class Sidebar {
 					| 'ellipse'
 					| 'elliptical_arc'
 					| 'constraint';
+				if (this.interaction?.activeTool === 'mirror' && this.interaction.mirrorState) {
+					if (this.interaction.mirrorState.phase === 'mirror_line') {
+						if (type === 'line') {
+							this.interaction.mirrorState.mirrorLineId = id;
+							this.interaction.mirrorState.selectedObjectIds.delete(id);
+							this.interaction.onMirrorStateChange?.();
+							this.interaction.render();
+						}
+					} else {
+						if (type !== 'constraint') {
+							if (this.interaction.mirrorState.selectedObjectIds.has(id)) {
+								this.interaction.mirrorState.selectedObjectIds.delete(id);
+							} else {
+								if (this.interaction.mirrorState.mirrorLineId === id) {
+									this.interaction.mirrorState.mirrorLineId = null;
+								}
+								this.interaction.mirrorState.selectedObjectIds.add(id);
+							}
+							this.interaction.onMirrorStateChange?.();
+							this.interaction.render();
+						}
+					}
+					return;
+				}
 
 				this.sketch.selectEntity(id, type, false);
 
@@ -765,6 +896,52 @@ export class Sidebar {
 				const id = btn.getAttribute('data-delete-id')!;
 				this.sketch.removeEntity(id);
 			});
+		});
+
+		// Mirror Tool events
+		const btnPhaseObjects = this.container.querySelector<HTMLButtonElement>('#btn-mirror-phase-objects');
+		btnPhaseObjects?.addEventListener('click', () => {
+			this.interaction?.setMirrorPhase('objects');
+		});
+
+		const btnPhaseLine = this.container.querySelector<HTMLButtonElement>('#btn-mirror-phase-line');
+		btnPhaseLine?.addEventListener('click', () => {
+			this.interaction?.setMirrorPhase('mirror_line');
+		});
+
+		const btnClearObjects = this.container.querySelector<HTMLButtonElement>('#btn-mirror-clear-objects');
+		btnClearObjects?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.mirrorState) {
+				this.interaction.mirrorState.selectedObjectIds.clear();
+				this.interaction.onMirrorStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		const btnClearLine = this.container.querySelector<HTMLButtonElement>('#btn-mirror-clear-line');
+		btnClearLine?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.mirrorState) {
+				this.interaction.mirrorState.mirrorLineId = null;
+				this.interaction.onMirrorStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		const btnOk = this.container.querySelector<HTMLButtonElement>('#btn-mirror-ok');
+		btnOk?.addEventListener('click', () => {
+			this.interaction?.executeMirror();
+		});
+
+		const btnCancel = this.container.querySelector<HTMLButtonElement>('#btn-mirror-cancel');
+		btnCancel?.addEventListener('click', () => {
+			this.interaction?.cancelMirror();
+		});
+
+		const btnCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-mirror-cancel-icon');
+		btnCancelIcon?.addEventListener('click', () => {
+			this.interaction?.cancelMirror();
 		});
 	}
 }

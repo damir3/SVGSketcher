@@ -1,5 +1,6 @@
 import fixedRaw from '../assets/icons/fixed.svg?raw';
 import collinearRaw from '../assets/icons/badge-collinear.svg?raw';
+import symmetryRaw from '../assets/icons/badge-symmetry.svg?raw';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -24,6 +25,7 @@ function parseSvgIcon(raw: string, width = 12, height = 12): BadgeIconDef {
 const BADGE_ICONS: Record<string, BadgeIconDef> = {
 	fixed: parseSvgIcon(fixedRaw, 12, 12),
 	collinear: parseSvgIcon(collinearRaw, 13, 13),
+	symmetry: parseSvgIcon(symmetryRaw, 13, 13),
 };
 
 export function getBadgeIcon(name: string, x: number, y: number, color: string): SVGElement | null {

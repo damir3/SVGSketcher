@@ -117,7 +117,7 @@ function initApp(): void {
 	const renderer = new SVGRenderer(svg);
 	const interaction = new CanvasInteraction(svg, sketch, viewport, renderer);
 	const toolbar = new Toolbar(toolbarContainer, sketch, interaction);
-	const sidebar = new Sidebar(sidebarContainer, sketch);
+	const sidebar = new Sidebar(sidebarContainer, sketch, interaction);
 	const dimModal = new DimensionModal(sketch);
 
 	// Connect callbacks
@@ -131,6 +131,7 @@ function initApp(): void {
 
 	interaction.onToolChange = tool => {
 		toolbar.setActiveButton(tool);
+		sidebar.render();
 	};
 
 	interaction.onConstructionChange = active => {

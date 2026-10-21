@@ -51,6 +51,7 @@ export const CONSTRAINT_TOOLS = [
 	'concentric',
 	'point_on_line',
 	'midpoint',
+	'symmetry',
 ] as const;
 
 export type DrawingPrimitiveToolType = (typeof DRAWING_PRIMITIVE_TOOLS)[number];
@@ -72,6 +73,7 @@ export type ToolType =
 	| 'pan'
 	| 'trim'
 	| 'break'
+	| 'mirror'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 
@@ -289,6 +291,14 @@ export class CanvasInteraction {
 	isSnappingEnabled = true;
 	onSnappingChange?: (active: boolean) => void;
 
+	// Mirror tool state
+	mirrorState: {
+		phase: 'objects' | 'mirror_line';
+		selectedObjectIds: Set<string>;
+		mirrorLineId: string | null;
+	} | null = null;
+	onMirrorStateChange?: () => void;
+
 	// Dimension tool multi-step state: 0 = pick first entity, 1 = pick second entity / offset, 2 = place dimension / pick angle radius
 	private dimensionState: {
 		step: 0 | 1 | 2;
@@ -358,11 +368,31 @@ export class CanvasInteraction {
 				this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 			}
 		}
+		if (tool === 'mirror') {
+			const sel = this.sketch.selection;
+			const initialObjects = new Set<string>();
+			for (const id of sel.lineIds) initialObjects.add(id);
+			for (const id of sel.circleIds) initialObjects.add(id);
+			for (const id of sel.arcIds) initialObjects.add(id);
+			for (const id of sel.ellipseIds) initialObjects.add(id);
+			for (const id of sel.ellipticalArcIds) initialObjects.add(id);
+			for (const id of sel.pointIds) initialObjects.add(id);
+
+			this.mirrorState = {
+				phase: initialObjects.size > 0 ? 'mirror_line' : 'objects',
+				selectedObjectIds: initialObjects,
+				mirrorLineId: null,
+			};
+			this.sketch.clearSelection();
+		} else {
+			this.mirrorState = null;
+		}
 		if (isConstraintTool(tool)) {
 			this.pruneIncompatibleSelection(tool);
 		}
 		this.updateCursor();
 		this.onToolChange?.(tool);
+		this.onMirrorStateChange?.();
 		this.render();
 	}
 
@@ -487,8 +517,218 @@ export class CanvasInteraction {
 		this.renderer.clearPreviews();
 	}
 
-	private render(): void {
-		this.renderer.render(this.sketch, this.viewport);
+	setMirrorPhase(phase: 'objects' | 'mirror_line'): void {
+		if (this.mirrorState) {
+			this.mirrorState.phase = phase;
+			this.onMirrorStateChange?.();
+			this.render();
+		}
+	}
+
+	cancelMirror(): void {
+		this.mirrorState = null;
+		this.setTool('select');
+		this.onMirrorStateChange?.();
+		this.render();
+	}
+
+	executeMirror(): boolean {
+		if (this.activeTool !== 'mirror' || !this.mirrorState) return false;
+		const { selectedObjectIds, mirrorLineId } = this.mirrorState;
+		if (selectedObjectIds.size === 0 || !mirrorLineId) {
+			showToast('Select objects and a mirror line');
+			return false;
+		}
+
+		const mirrorLine = this.sketch.lines.get(mirrorLineId);
+		if (!mirrorLine) {
+			showToast('Mirror line not found');
+			return false;
+		}
+
+		const pA = this.sketch.points.get(mirrorLine.p1Id);
+		const pB = this.sketch.points.get(mirrorLine.p2Id);
+		if (!pA || !pB) return false;
+
+		const dx = pB.x - pA.x;
+		const dy = pB.y - pA.y;
+		const lineLen = Math.hypot(dx, dy);
+		if (lineLen < 1e-6) {
+			showToast('Mirror line length is zero');
+			return false;
+		}
+
+		// Unit normal to mirror line
+		const nx = -dy / lineLen;
+		const ny = dx / lineLen;
+
+		const reflectPoint = (x: number, y: number): { x: number; y: number } => {
+			const distToLine = (x - pA.x) * nx + (y - pA.y) * ny;
+			return {
+				x: x - 2 * distToLine * nx,
+				y: y - 2 * distToLine * ny,
+			};
+		};
+
+		const isPointOnMirrorLine = (x: number, y: number, tol = 1e-3): boolean => {
+			const distToLine = Math.abs((x - pA.x) * nx + (y - pA.y) * ny);
+			return distToLine < tol;
+		};
+
+		this.sketch.beginTransaction();
+
+		// Map from original point ID to reflected point ID
+		const pointMap = new Map<string, string>();
+
+		const getOrReflectPoint = (origPtId: string): string => {
+			if (pointMap.has(origPtId)) {
+				return pointMap.get(origPtId)!;
+			}
+			const pt = this.sketch.points.get(origPtId);
+			if (!pt) return origPtId;
+
+			// If point is strictly on the mirror line, reuse it
+			if (origPtId === mirrorLine.p1Id || origPtId === mirrorLine.p2Id || isPointOnMirrorLine(pt.x, pt.y)) {
+				pointMap.set(origPtId, origPtId);
+				if (origPtId !== mirrorLine.p1Id && origPtId !== mirrorLine.p2Id) {
+					this.sketch.addPointOnLineConstraint(origPtId, mirrorLine.id);
+				}
+				return origPtId;
+			}
+
+			// Reflect point
+			const refPos = reflectPoint(pt.x, pt.y);
+			const newPt = this.sketch.addPoint(refPos.x, refPos.y, false);
+			pointMap.set(origPtId, newPt.id);
+
+			// Automatically add SymmetryConstraint
+			this.sketch.addSymmetryConstraint(origPtId, newPt.id, mirrorLine.id);
+			return newPt.id;
+		};
+
+		let createdCount = 0;
+		const newCreatedItems: Array<{ id: string; type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' }> = [];
+
+		// Mirror each primitive in selectedObjectIds
+		for (const objId of selectedObjectIds) {
+			if (objId === mirrorLineId) continue; // Cannot mirror mirror line across itself
+
+			// 1. Line
+			const line = this.sketch.lines.get(objId);
+			if (line) {
+				const np1Id = getOrReflectPoint(line.p1Id);
+				const np2Id = getOrReflectPoint(line.p2Id);
+				if (np1Id !== np2Id) {
+					const newLine = this.sketch.addLine(np1Id, np2Id, line.isConstruction);
+					newCreatedItems.push({ id: newLine.id, type: 'line' });
+					createdCount++;
+				}
+				continue;
+			}
+
+			// 2. Circle
+			const circle = this.sketch.circles.get(objId);
+			if (circle) {
+				const nCenterId = getOrReflectPoint(circle.centerId);
+				const newCircle = this.sketch.addCircle(nCenterId, circle.radius, circle.isConstruction);
+				this.sketch.addEqualRadiusConstraint(circle.id, newCircle.id);
+				newCreatedItems.push({ id: newCircle.id, type: 'circle' });
+				createdCount++;
+				continue;
+			}
+
+			// 3. Arc
+			const arc = this.sketch.arcs.get(objId);
+			if (arc) {
+				const nCenterId = getOrReflectPoint(arc.centerId);
+				const nStartId = getOrReflectPoint(arc.startPointId);
+				const nEndId = getOrReflectPoint(arc.endPointId);
+				const newArc = this.sketch.addArc(
+					nCenterId,
+					nStartId,
+					nEndId,
+					arc.radius,
+					!arc.clockwise,
+					arc.isConstruction
+				);
+				this.sketch.addEqualRadiusConstraint(arc.id, newArc.id);
+				newCreatedItems.push({ id: newArc.id, type: 'arc' });
+				createdCount++;
+				continue;
+			}
+
+			// 4. Ellipse
+			const ellipse = this.sketch.ellipses.get(objId);
+			if (ellipse) {
+				const nCenterId = getOrReflectPoint(ellipse.centerId);
+				const nMajorId = getOrReflectPoint(ellipse.majorAxisPointId);
+				const nMinorId = getOrReflectPoint(ellipse.minorAxisPointId);
+				const newEllipse = this.sketch.addEllipse(nCenterId, nMajorId, nMinorId, ellipse.isConstruction);
+				newCreatedItems.push({ id: newEllipse.id, type: 'ellipse' });
+				createdCount++;
+				continue;
+			}
+
+			// 5. Elliptical Arc
+			const elArc = this.sketch.ellipticalArcs.get(objId);
+			if (elArc) {
+				const nCenterId = getOrReflectPoint(elArc.centerId);
+				const nMajorId = getOrReflectPoint(elArc.majorAxisPointId);
+				const nMinorId = getOrReflectPoint(elArc.minorAxisPointId);
+				const nStartId = getOrReflectPoint(elArc.startPointId);
+				const nEndId = getOrReflectPoint(elArc.endPointId);
+				const newElArc = this.sketch.addEllipticalArc(
+					nCenterId,
+					nMajorId,
+					nMinorId,
+					nStartId,
+					nEndId,
+					!elArc.clockwise,
+					elArc.isConstruction
+				);
+				newCreatedItems.push({ id: newElArc.id, type: 'elliptical_arc' });
+				createdCount++;
+				continue;
+			}
+
+			// 6. Standalone Point
+			const pt = this.sketch.points.get(objId);
+			if (pt) {
+				const nPtId = getOrReflectPoint(pt.id);
+				if (nPtId !== pt.id) {
+					newCreatedItems.push({ id: nPtId, type: 'point' });
+					createdCount++;
+				}
+				continue;
+			}
+		}
+
+		this.sketch.commitTransaction();
+		this.sketch.solve();
+
+		this.mirrorState = null;
+		this.setTool('select');
+
+		if (newCreatedItems.length > 0) {
+			this.sketch.selectEntities(newCreatedItems, false);
+		}
+
+		showToast(`Mirrored ${createdCount} object${createdCount !== 1 ? 's' : ''}`);
+		this.onMirrorStateChange?.();
+		this.render();
+		return true;
+	}
+
+	render(): void {
+		this.renderer.render(this.sketch, this.viewport, {
+			mirrorHighlight:
+				this.activeTool === 'mirror' && this.mirrorState
+					? {
+							selectedObjectIds: this.mirrorState.selectedObjectIds,
+							mirrorLineId: this.mirrorState.mirrorLineId,
+					  }
+					: undefined,
+		});
 	}
 
 	private bindEvents(): void {
@@ -520,6 +760,10 @@ export class CanvasInteraction {
 				return;
 			}
 			if (e.key === 'Escape') {
+				if (this.activeTool === 'mirror') {
+					this.cancelMirror();
+					return;
+				}
 				if (this.activeTool === 'dimension' && this.dimensionState.step > 0) {
 					this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 					this.sketch.clearSelection();
@@ -531,6 +775,8 @@ export class CanvasInteraction {
 				this.setTool('select');
 				this.sketch.clearSelection();
 				this.render();
+			} else if (e.key === 'Enter' && this.activeTool === 'mirror') {
+				this.executeMirror();
 			} else if (e.key === 'Delete' || e.key === 'Backspace') {
 				this.sketch.deleteSelected();
 				this.render();
@@ -554,6 +800,8 @@ export class CanvasInteraction {
 				this.setTool(this.activeTool === 'trim' ? 'select' : 'trim');
 			} else if (e.key === 'b' || e.key === 'B') {
 				this.setTool(this.activeTool === 'break' ? 'select' : 'break');
+			} else if (e.key === 'm' || e.key === 'M' || e.code === 'KeyM') {
+				this.setTool(this.activeTool === 'mirror' ? 'select' : 'mirror');
 			} else if (e.key === 'h' || e.key === 'H') {
 				this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
 			} else if (e.key === 'd' || e.key === 'D') {
@@ -1488,6 +1736,91 @@ export class CanvasInteraction {
 					this.render();
 					return;
 				}
+			}
+			return;
+		}
+
+		// --- TOOL: MIRROR ---
+		if (this.activeTool === 'mirror') {
+			if (!this.mirrorState) {
+				this.mirrorState = {
+					phase: 'objects',
+					selectedObjectIds: new Set(),
+					mirrorLineId: null,
+				};
+			}
+
+			let hitId: string | null = null;
+			let hitType: string | null = null;
+
+			if (this.mirrorState.phase === 'mirror_line') {
+				const hitLine = this.findLineNearScreen(screen, 18);
+				if (hitLine) {
+					hitId = hitLine.id;
+					hitType = 'line';
+				}
+			} else {
+				const nearPoint = this.findPointNearScreen(screen, 16);
+				if (nearPoint) {
+					hitId = nearPoint.id;
+					hitType = 'point';
+				} else {
+					const hitLine = this.findLineNearScreen(screen, 18);
+					if (hitLine) {
+						hitId = hitLine.id;
+						hitType = 'line';
+					} else {
+						const hitCircle = this.findCircleNearScreen(screen, 18);
+						if (hitCircle) {
+							hitId = hitCircle.id;
+							hitType = 'circle';
+						} else {
+							const hitArc = this.findArcNearScreen(screen, 18);
+							if (hitArc) {
+								hitId = hitArc.id;
+								hitType = 'arc';
+							} else {
+								const hitEllipse = this.findEllipseNearScreen(screen, 18);
+								if (hitEllipse) {
+									hitId = hitEllipse.id;
+									hitType = 'ellipse';
+								} else {
+									const hitEllipticalArc = this.findEllipticalArcNearScreen(screen, 18);
+									if (hitEllipticalArc) {
+										hitId = hitEllipticalArc.id;
+										hitType = 'elliptical_arc';
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (hitId) {
+				if (this.mirrorState.phase === 'mirror_line') {
+					if (hitType === 'line') {
+						this.mirrorState.mirrorLineId = hitId;
+						this.mirrorState.selectedObjectIds.delete(hitId);
+						this.onMirrorStateChange?.();
+						this.render();
+					}
+				} else {
+					if (this.mirrorState.selectedObjectIds.has(hitId)) {
+						this.mirrorState.selectedObjectIds.delete(hitId);
+					} else {
+						if (this.mirrorState.mirrorLineId === hitId) {
+							this.mirrorState.mirrorLineId = null;
+						}
+						this.mirrorState.selectedObjectIds.add(hitId);
+					}
+					this.onMirrorStateChange?.();
+					this.render();
+				}
+			} else if (this.mirrorState.phase === 'objects') {
+				this.isBoxSelecting = true;
+				this.boxSelectStartScreen = screen;
+				this.boxSelectCurrentScreen = screen;
 			}
 			return;
 		}
@@ -4019,6 +4352,8 @@ export class CanvasInteraction {
 			case 'point_on_line':
 			case 'midpoint':
 				return entityType === 'point' || entityType === 'line';
+			case 'symmetry':
+				return entityType === 'point' || entityType === 'line' || entityType === 'circle' || entityType === 'arc';
 			default:
 				return false;
 		}
@@ -4065,6 +4400,12 @@ export class CanvasInteraction {
 			case 'point_on_line':
 			case 'midpoint':
 				return pCount === 1 && lCount === 1 && cCount === 0;
+			case 'symmetry':
+				return (
+					(pCount === 2 && lCount === 1 && cCount === 0) ||
+					(cCount === 2 && lCount === 1 && pCount === 0) ||
+					(lCount === 3 && pCount === 0 && cCount === 0)
+				);
 			default:
 				return false;
 		}
@@ -4321,6 +4662,43 @@ export class CanvasInteraction {
 					this.sketch.addMidpointConstraint(pIds[0], lIds[0]);
 					applied = true;
 					toastMsg = 'Midpoint constraint applied';
+				}
+				break;
+			}
+			case 'symmetry': {
+				if (pIds.length === 2 && lIds.length === 1) {
+					const c = this.sketch.addSymmetryConstraint(pIds[0], pIds[1], lIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Symmetry constraint applied';
+					} else {
+						showToast('Cannot apply symmetry to these entities');
+					}
+				} else if (cIds.length === 2 && lIds.length === 1) {
+					const c1 = this.sketch.circles.get(cIds[0]) ?? this.sketch.arcs.get(cIds[0]);
+					const c2 = this.sketch.circles.get(cIds[1]) ?? this.sketch.arcs.get(cIds[1]);
+					if (c1 && c2) {
+						this.sketch.beginTransaction();
+						this.sketch.addSymmetryConstraint(c1.centerId, c2.centerId, lIds[0]);
+						this.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
+						this.sketch.commitTransaction();
+						applied = true;
+						toastMsg = 'Symmetry & equal radius applied';
+					}
+				} else if (lIds.length === 3) {
+					const constrIdx = lIds.findIndex(id => this.sketch.lines.get(id)?.isConstruction);
+					const axisId = constrIdx !== -1 ? lIds[constrIdx] : lIds[2];
+					const otherLines = lIds.filter(id => id !== axisId);
+					const l1 = this.sketch.lines.get(otherLines[0]);
+					const l2 = this.sketch.lines.get(otherLines[1]);
+					if (l1 && l2) {
+						this.sketch.beginTransaction();
+						this.sketch.addSymmetryConstraint(l1.p1Id, l2.p1Id, axisId);
+						this.sketch.addSymmetryConstraint(l1.p2Id, l2.p2Id, axisId);
+						this.sketch.commitTransaction();
+						applied = true;
+						toastMsg = 'Line symmetry constraints applied';
+					}
 				}
 				break;
 			}
@@ -4607,6 +4985,17 @@ export class CanvasInteraction {
 			if (this.ellipticalArcIntersectsAABB(elArc, minX, minY, maxX, maxY)) {
 				itemsToSelect.push({ id: elArc.id, type: 'elliptical_arc' });
 			}
+		}
+
+		if (this.activeTool === 'mirror' && this.mirrorState && this.mirrorState.phase === 'objects') {
+			for (const item of itemsToSelect) {
+				if (item.id !== this.mirrorState.mirrorLineId) {
+					this.mirrorState.selectedObjectIds.add(item.id);
+				}
+			}
+			this.onMirrorStateChange?.();
+			this.render();
+			return;
 		}
 
 		this.sketch.selectEntities(itemsToSelect, shiftKey);
