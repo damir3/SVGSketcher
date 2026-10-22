@@ -23,6 +23,8 @@ import {
 	EllipticalArcEndpointsConstraint,
 	PointToLineDistanceConstraint,
 	SymmetryConstraint,
+	CircularPatternConstraint,
+	type PatternCopyData,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -90,6 +92,18 @@ export interface SerializedConstraint {
 	ellipseId?: string;
 	majorAxisPointId?: string;
 	minorAxisPointId?: string;
+
+	sourcePtId?: string;
+	patternPtId?: string;
+	centerPtId?: string;
+	angleDeg?: number;
+	sourceObjectIds?: string[];
+	distribution?: 'full' | 'partial' | 'symmetric';
+	totalAngle?: number;
+	quantity?: number;
+	suppression?: boolean;
+	suppressedIndices?: number[];
+	copies?: PatternCopyData[];
 }
 
 export interface SketchSnapshot {
@@ -183,6 +197,15 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.lineP1Id = c.lineP1Id;
 		base.lineP2Id = c.lineP2Id;
 		base.lineId = c.lineId;
+	} else if (c instanceof CircularPatternConstraint) {
+		base.centerPtId = c.centerPtId;
+		base.sourceObjectIds = [...c.sourceObjectIds];
+		base.distribution = c.distribution;
+		base.totalAngle = c.totalAngle;
+		base.quantity = c.quantity;
+		base.suppression = c.suppression;
+		base.suppressedIndices = [...c.suppressedIndices];
+		base.copies = JSON.parse(JSON.stringify(c.copies));
 	} else if (c instanceof PerpendicularConstraint) {
 		base.l1P1 = c.l1P1;
 		base.l1P2 = c.l1P2;
@@ -304,6 +327,20 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 			break;
 		case 'symmetry':
 			c = new SymmetryConstraint(d.id, d.p1Id!, d.p2Id!, d.lineP1Id!, d.lineP2Id!, d.weight, d.lineId);
+			break;
+		case 'circular_pattern':
+			c = new CircularPatternConstraint(
+				d.id,
+				d.centerPtId!,
+				d.sourceObjectIds || [],
+				d.distribution || 'full',
+				d.totalAngle ?? d.angleDeg ?? 180,
+				d.quantity || 3,
+				d.suppression ?? false,
+				d.suppressedIndices || [],
+				d.copies || [],
+				d.weight
+			);
 			break;
 		case 'perpendicular':
 			c = new PerpendicularConstraint(d.id, d.l1P1!, d.l1P2!, d.l2P1!, d.l2P2!, d.weight);

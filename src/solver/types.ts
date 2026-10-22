@@ -21,7 +21,8 @@ export type ConstraintType =
 	| 'ellipse_axis'
 	| 'elliptical_arc_endpoints'
 	| 'point_to_line_distance'
-	| 'symmetry';
+	| 'symmetry'
+	| 'circular_pattern';
 
 export interface ParamRef {
 	id: string;

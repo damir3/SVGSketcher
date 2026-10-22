@@ -1,6 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction } from '../canvas/interaction';
-import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint } from '../solver/constraints';
+import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, CircularPatternConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 
@@ -19,6 +19,7 @@ export class Sidebar {
 		this.sketch.onChange(() => this.render());
 		if (this.interaction) {
 			this.interaction.onMirrorStateChange = () => this.render();
+			this.interaction.onCircularPatternStateChange = () => this.render();
 		}
 		this.render();
 	}
@@ -65,6 +66,9 @@ export class Sidebar {
 			<div class="sidebar-content">
 				<!-- Mirror Tool Panel (when mirror tool is active) -->
 				${this.renderMirrorToolCard()}
+
+				<!-- Circular Pattern Tool Panel (when circular pattern tool is active) -->
+				${this.renderCircularPatternToolCard()}
 
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
@@ -164,6 +168,126 @@ export class Sidebar {
 					${!mirrorLineId && objCount === 0 
 						? 'Select objects first, then pick a mirror line.' 
 						: (!mirrorLineId ? 'Click a centerline in the canvas to reflect across.' : (objCount === 0 ? 'Pick geometry in the canvas to mirror.' : 'Ready to apply! Press Enter or click Apply Mirror.'))}
+				</div>
+			</div>
+		`;
+	}
+
+	private renderCircularPatternToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'circular_pattern') {
+			return '';
+		}
+
+		const state = this.interaction.circularPatternState;
+		const objCount = state ? state.selectedObjectIds.size : 0;
+		const centerPointId = state?.centerPointId ?? null;
+		const phase = state?.phase ?? 'objects';
+		const distribution = state?.distribution ?? 'full';
+		const angle = state?.angle ?? 180;
+		const quantity = state?.quantity ?? 3;
+		const suppression = state?.suppression ?? false;
+		const suppressedCount = state?.suppressedIndices.size ?? 0;
+		const totalCopies = Math.max(1, quantity - 1);
+		const activeCopies = totalCopies - suppressedCount;
+
+		let centerLabel = 'Click a point in canvas';
+		if (centerPointId) {
+			const pt = this.sketch.points.get(centerPointId);
+			if (pt) {
+				centerLabel = `Point (${pt.x.toFixed(1)}, ${pt.y.toFixed(1)})`;
+			} else {
+				centerLabel = centerPointId;
+			}
+		}
+
+		const canApply = objCount > 0 && !!centerPointId && activeCopies > 0 && (distribution === 'full' || (!isNaN(angle) && Math.abs(angle) > 1e-3));
+
+		return `
+			<div class="sidebar-panel-card pattern-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${ICONS.circular_pattern}</span>
+						<span>Circular Pattern</span>
+					</div>
+					<button class="btn-panel-close" id="btn-cpat-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Rotate copies of geometry around a center point.
+				</div>
+
+				<div class="mirror-steps">
+					<div class="mirror-step-item ${phase === 'objects' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-cpat-phase-objects" type="button">
+							<span class="mirror-step-num">1</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Objects to Pattern</div>
+								<div class="mirror-step-value">${objCount === 0 ? 'Click or box-select...' : `${objCount} object${objCount === 1 ? '' : 's'} selected`}</div>
+							</div>
+						</button>
+						${objCount > 0 ? `<button class="mirror-step-clear" id="btn-cpat-clear-objects" title="Clear selection">✕</button>` : ''}
+					</div>
+
+					<div class="mirror-step-item ${phase === 'center_point' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-cpat-phase-center" type="button">
+							<span class="mirror-step-num">2</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Center Point</div>
+								<div class="mirror-step-value ${centerPointId ? 'selected-line' : ''}">${centerLabel}</div>
+							</div>
+						</button>
+						${centerPointId ? `<button class="mirror-step-clear" id="btn-cpat-clear-center" title="Clear center point">✕</button>` : ''}
+					</div>
+				</div>
+
+				<!-- Pattern Parameters -->
+				<div class="pattern-params-card">
+					<div class="pattern-param-row">
+						<label class="pattern-param-label">Distribution</label>
+						<div class="pattern-segmented-control">
+							<button type="button" class="seg-btn ${distribution === 'full' ? 'active' : ''}" data-dist="full">Full</button>
+							<button type="button" class="seg-btn ${distribution === 'partial' ? 'active' : ''}" data-dist="partial">Partial</button>
+							<button type="button" class="seg-btn ${distribution === 'symmetric' ? 'active' : ''}" data-dist="symmetric">Symmetric</button>
+						</div>
+					</div>
+
+					${distribution !== 'full' ? `
+					<div class="pattern-param-row">
+						<label class="pattern-param-label" for="input-cpat-angle">Total Angle</label>
+						<div class="pattern-input-suffix-wrapper">
+							<input type="number" id="input-cpat-angle" value="${angle}" min="-360" max="360" step="5" class="pattern-num-input" />
+							<span class="pattern-input-suffix">°</span>
+						</div>
+					</div>
+					` : ''}
+
+					<div class="pattern-param-row">
+						<label class="pattern-param-label" for="input-cpat-quantity">Quantity</label>
+						<div class="pattern-quantity-wrapper">
+							<input type="number" id="input-cpat-quantity" value="${quantity}" min="2" max="100" step="1" class="pattern-num-input" />
+						</div>
+					</div>
+
+					<div class="pattern-param-row pattern-suppress-row">
+						<label class="pattern-checkbox-label">
+							<input type="checkbox" id="check-cpat-suppression" ${suppression ? 'checked' : ''} />
+							<span>Suppression</span>
+						</label>
+						${suppression ? `<span class="pattern-suppress-count">${activeCopies} of ${totalCopies} enabled</span>` : ''}
+					</div>
+				</div>
+
+				<div class="mirror-actions">
+					<button class="btn-mirror-ok" id="btn-cpat-ok" ${canApply ? '' : 'disabled'} title="Apply Pattern (Enter)">
+						Apply Pattern
+					</button>
+					<button class="btn-mirror-cancel" id="btn-cpat-cancel" title="Cancel (Esc)">
+						Cancel
+					</button>
+				</div>
+				<div class="mirror-hint">
+					${!centerPointId && objCount === 0 
+						? 'Select objects first, then pick a center point.' 
+						: (!centerPointId ? 'Click a point in the canvas to set the rotation center.' : (objCount === 0 ? 'Pick geometry in the canvas to pattern.' : 'Ready to apply! Press Enter or click Apply Pattern.'))}
 				</div>
 			</div>
 		`;
@@ -504,16 +628,66 @@ export class Sidebar {
 			const c = this.sketch.constraints.get(cid);
 			if (c) {
 				const relatedPrimitives = this.sketch.getEntitiesForConstraint(c);
-				detailsHtml = `
-					<div class="inspector-card">
-						<div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof PointToLineDistanceConstraint ? 'Point-to-Line Distance' : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
-						${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
-						${c instanceof PointToLineDistanceConstraint ? `<div class="inspector-row"><span>Distance:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
-						${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
-						${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
-						${this.renderPrimitivesSublist(relatedPrimitives)}
-					</div>
-				`;
+				if (c instanceof CircularPatternConstraint) {
+					const totalCopies = Math.max(1, c.quantity - 1);
+					const activeCopies = totalCopies - c.suppressedIndices.length;
+					detailsHtml = `
+						<div class="inspector-card">
+							<div class="inspector-card-title">
+								<span class="panel-card-icon">${ICONS.circular_pattern}</span>
+								<span>Circular Pattern</span>
+							</div>
+							
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label">Distribution</label>
+									<div class="pattern-segmented-control">
+										<button type="button" class="seg-btn insp-cpat-dist-btn ${c.distribution === 'full' ? 'active' : ''}" data-dist="full">Full</button>
+										<button type="button" class="seg-btn insp-cpat-dist-btn ${c.distribution === 'partial' ? 'active' : ''}" data-dist="partial">Partial</button>
+										<button type="button" class="seg-btn insp-cpat-dist-btn ${c.distribution === 'symmetric' ? 'active' : ''}" data-dist="symmetric">Symmetric</button>
+									</div>
+								</div>
+
+								${c.distribution !== 'full' ? `
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-cpat-angle">Total Angle</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-cpat-angle" value="${c.totalAngle}" min="-360" max="360" step="5" class="pattern-num-input" />
+										<span class="pattern-input-suffix">°</span>
+									</div>
+								</div>
+								` : ''}
+
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-cpat-quantity">Quantity</label>
+									<div class="pattern-quantity-wrapper">
+										<input type="number" id="insp-cpat-quantity" value="${c.quantity}" min="2" max="100" step="1" class="pattern-num-input" />
+									</div>
+								</div>
+
+								<div class="pattern-param-row pattern-suppress-row">
+									<label class="pattern-checkbox-label">
+										<input type="checkbox" id="insp-cpat-suppression" ${c.suppression ? 'checked' : ''} />
+										<span>Suppression</span>
+									</label>
+									${c.suppression ? `<span class="pattern-suppress-count">${activeCopies} of ${totalCopies} enabled</span>` : ''}
+								</div>
+							</div>
+
+							${this.renderPrimitivesSublist(relatedPrimitives)}
+					`;
+				} else {
+					detailsHtml = `
+						<div class="inspector-card">
+							<div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof PointToLineDistanceConstraint ? 'Point-to-Line Distance' : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
+							${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
+							${c instanceof PointToLineDistanceConstraint ? `<div class="inspector-row"><span>Distance:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
+							${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
+							${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
+							${this.renderPrimitivesSublist(relatedPrimitives)}
+						</div>
+					`;
+				}
 			}
 		}
 
@@ -596,6 +770,14 @@ export class Sidebar {
 			}
 			if (this.interaction.mirrorState.selectedObjectIds.has(id)) {
 				return { isSelected: true, extraClass: 'is-mirror-obj' };
+			}
+		}
+		if (this.interaction?.activeTool === 'circular_pattern' && this.interaction.circularPatternState) {
+			if (this.interaction.circularPatternState.centerPointId === id) {
+				return { isSelected: true, extraClass: 'is-pattern-center' };
+			}
+			if (this.interaction.circularPatternState.selectedObjectIds.has(id)) {
+				return { isSelected: true, extraClass: 'is-pattern-obj' };
 			}
 		}
 		return { isSelected: false, extraClass: '' };
@@ -728,6 +910,10 @@ export class Sidebar {
 				? `<span class="val-badge">Ø ${(c.targetRadius * 2).toFixed(1)} mm</span>`
 				: `<span class="val-badge">R ${c.targetRadius.toFixed(1)} mm</span>`;
 			name = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
+		} else if (c instanceof CircularPatternConstraint) {
+			const label = c.distribution === 'full' ? `${c.quantity}x Full` : `${c.quantity}x ${c.totalAngle.toFixed(1)}°`;
+			valBadge = `<span class="val-badge">${label}</span>`;
+			name = 'Circular Pattern';
 		}
 
 		return `
@@ -763,6 +949,7 @@ export class Sidebar {
 			case 'point_on_circle': return ICONS.pointOnLine;
 			case 'midpoint': return ICONS.midpoint;
 			case 'symmetry': return ICONS.symmetry;
+			case 'circular_pattern': return ICONS.circular_pattern;
 			default: return ICONS.coincident;
 		}
 	}
@@ -801,6 +988,27 @@ export class Sidebar {
 								this.interaction.mirrorState.selectedObjectIds.add(id);
 							}
 							this.interaction.onMirrorStateChange?.();
+							this.interaction.render();
+						}
+					}
+					return;
+				}
+
+				if (this.interaction?.activeTool === 'circular_pattern' && this.interaction.circularPatternState) {
+					if (this.interaction.circularPatternState.phase === 'center_point') {
+						if (type === 'point') {
+							this.interaction.circularPatternState.centerPointId = id;
+							this.interaction.onCircularPatternStateChange?.();
+							this.interaction.render();
+						}
+					} else {
+						if (type !== 'constraint') {
+							if (this.interaction.circularPatternState.selectedObjectIds.has(id)) {
+								this.interaction.circularPatternState.selectedObjectIds.delete(id);
+							} else {
+								this.interaction.circularPatternState.selectedObjectIds.add(id);
+							}
+							this.interaction.onCircularPatternStateChange?.();
 							this.interaction.render();
 						}
 					}
@@ -943,6 +1151,158 @@ export class Sidebar {
 		btnCancelIcon?.addEventListener('click', () => {
 			this.interaction?.cancelMirror();
 		});
+
+		// Circular Pattern Tool events
+		const btnCpatPhaseObjects = this.container.querySelector<HTMLButtonElement>('#btn-cpat-phase-objects');
+		btnCpatPhaseObjects?.addEventListener('click', () => {
+			this.interaction?.setCircularPatternPhase('objects');
+		});
+
+		const btnCpatPhaseCenter = this.container.querySelector<HTMLButtonElement>('#btn-cpat-phase-center');
+		btnCpatPhaseCenter?.addEventListener('click', () => {
+			this.interaction?.setCircularPatternPhase('center_point');
+		});
+
+		const btnCpatClearObjects = this.container.querySelector<HTMLButtonElement>('#btn-cpat-clear-objects');
+		btnCpatClearObjects?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.circularPatternState) {
+				this.interaction.circularPatternState.selectedObjectIds.clear();
+				this.interaction.onCircularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		const btnCpatClearCenter = this.container.querySelector<HTMLButtonElement>('#btn-cpat-clear-center');
+		btnCpatClearCenter?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.circularPatternState) {
+				this.interaction.circularPatternState.centerPointId = null;
+				this.interaction.onCircularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		// Distribution buttons
+		this.container.querySelectorAll<HTMLButtonElement>('.pattern-segmented-control .seg-btn').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const dist = btn.getAttribute('data-dist') as 'full' | 'partial' | 'symmetric';
+				if (dist && this.interaction?.circularPatternState) {
+					this.interaction.circularPatternState.distribution = dist;
+					this.interaction.onCircularPatternStateChange?.();
+					this.interaction.render();
+				}
+			});
+		});
+
+		// Angle input
+		const inputAngle = this.container.querySelector<HTMLInputElement>('#input-cpat-angle');
+		inputAngle?.addEventListener('input', () => {
+			const val = parseFloat(inputAngle.value);
+			if (!isNaN(val) && isFinite(val) && this.interaction?.circularPatternState) {
+				this.interaction.circularPatternState.angle = val;
+				this.interaction.render();
+			}
+		});
+		inputAngle?.addEventListener('change', () => {
+			const val = parseFloat(inputAngle.value);
+			if (isNaN(val) || !isFinite(val)) {
+				if (this.interaction?.circularPatternState) {
+					inputAngle.value = String(this.interaction.circularPatternState.angle);
+				}
+			}
+			this.render();
+		});
+
+		// Quantity input
+		const inputQty = this.container.querySelector<HTMLInputElement>('#input-cpat-quantity');
+		inputQty?.addEventListener('input', () => {
+			const val = parseInt(inputQty.value, 10);
+			if (!isNaN(val) && val >= 2 && this.interaction?.circularPatternState) {
+				this.interaction.circularPatternState.quantity = val;
+				for (const idx of this.interaction.circularPatternState.suppressedIndices) {
+					if (idx >= val) {
+						this.interaction.circularPatternState.suppressedIndices.delete(idx);
+					}
+				}
+				this.interaction.render();
+			}
+		});
+		inputQty?.addEventListener('change', () => {
+			this.render();
+		});
+
+		// Suppression checkbox
+		const checkSuppression = this.container.querySelector<HTMLInputElement>('#check-cpat-suppression');
+		checkSuppression?.addEventListener('change', () => {
+			if (this.interaction?.circularPatternState) {
+				this.interaction.circularPatternState.suppression = checkSuppression.checked;
+				this.interaction.onCircularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		// OK & Cancel buttons
+		const btnCpatOk = this.container.querySelector<HTMLButtonElement>('#btn-cpat-ok');
+		btnCpatOk?.addEventListener('click', () => {
+			this.interaction?.executeCircularPattern();
+		});
+
+		const btnCpatCancel = this.container.querySelector<HTMLButtonElement>('#btn-cpat-cancel');
+		btnCpatCancel?.addEventListener('click', () => {
+			this.interaction?.cancelCircularPattern();
+		});
+
+		const btnCpatCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-cpat-cancel-icon');
+		btnCpatCancelIcon?.addEventListener('click', () => {
+			this.interaction?.cancelCircularPattern();
+		});
+
+		// Inspector Circular Pattern Constraint editing
+		const selectedConstraintId = [...this.sketch.selection.constraintIds][0];
+		const selectedC = selectedConstraintId ? this.sketch.constraints.get(selectedConstraintId) : null;
+		if (selectedC instanceof CircularPatternConstraint) {
+			this.container.querySelectorAll<HTMLButtonElement>('.insp-cpat-dist-btn').forEach(btn => {
+				btn.addEventListener('click', () => {
+					const dist = btn.getAttribute('data-dist') as 'full' | 'partial' | 'symmetric';
+					if (dist) {
+						this.sketch.updateCircularPattern(selectedC.id, { distribution: dist });
+						this.render();
+						this.interaction?.render();
+					}
+				});
+			});
+
+			const inspAngle = this.container.querySelector<HTMLInputElement>('#insp-cpat-angle');
+			inspAngle?.addEventListener('input', () => {
+				const val = parseFloat(inspAngle.value);
+				if (!isNaN(val) && isFinite(val) && Math.abs(val) > 1e-3) {
+					this.sketch.updateCircularPattern(selectedC.id, { totalAngle: val });
+					this.interaction?.render();
+				}
+			});
+			inspAngle?.addEventListener('change', () => {
+				this.render();
+				this.interaction?.render();
+			});
+
+			const inspQty = this.container.querySelector<HTMLInputElement>('#insp-cpat-quantity');
+			inspQty?.addEventListener('input', () => {
+				const val = parseInt(inspQty.value, 10);
+				if (!isNaN(val) && val >= 2) {
+					this.sketch.updateCircularPattern(selectedC.id, { quantity: val });
+					this.render();
+					this.interaction?.render();
+				}
+			});
+
+			const inspSuppress = this.container.querySelector<HTMLInputElement>('#insp-cpat-suppression');
+			inspSuppress?.addEventListener('change', () => {
+				this.sketch.updateCircularPattern(selectedC.id, { suppression: inspSuppress.checked });
+				this.render();
+				this.interaction?.render();
+			});
+		}
 	}
 }
 

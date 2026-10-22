@@ -10,6 +10,7 @@ import {
 	HorizontalConstraint,
 	VerticalConstraint,
 	PointToLineDistanceConstraint,
+	CircularPatternConstraint,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
@@ -74,6 +75,7 @@ export type ToolType =
 	| 'trim'
 	| 'break'
 	| 'mirror'
+	| 'circular_pattern'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 
@@ -299,6 +301,19 @@ export class CanvasInteraction {
 	} | null = null;
 	onMirrorStateChange?: () => void;
 
+	// Circular pattern tool state
+	circularPatternState: {
+		phase: 'objects' | 'center_point';
+		selectedObjectIds: Set<string>;
+		centerPointId: string | null;
+		distribution: 'full' | 'partial' | 'symmetric';
+		angle: number;
+		quantity: number;
+		suppression: boolean;
+		suppressedIndices: Set<number>;
+	} | null = null;
+	onCircularPatternStateChange?: () => void;
+
 	// Dimension tool multi-step state: 0 = pick first entity, 1 = pick second entity / offset, 2 = place dimension / pick angle radius
 	private dimensionState: {
 		step: 0 | 1 | 2;
@@ -387,12 +402,39 @@ export class CanvasInteraction {
 		} else {
 			this.mirrorState = null;
 		}
+
+		if (tool === 'circular_pattern') {
+			const sel = this.sketch.selection;
+			const initialObjects = new Set<string>();
+			for (const id of sel.lineIds) initialObjects.add(id);
+			for (const id of sel.circleIds) initialObjects.add(id);
+			for (const id of sel.arcIds) initialObjects.add(id);
+			for (const id of sel.ellipseIds) initialObjects.add(id);
+			for (const id of sel.ellipticalArcIds) initialObjects.add(id);
+			for (const id of sel.pointIds) initialObjects.add(id);
+
+			this.circularPatternState = {
+				phase: initialObjects.size > 0 ? 'center_point' : 'objects',
+				selectedObjectIds: initialObjects,
+				centerPointId: null,
+				distribution: 'full',
+				angle: 180,
+				quantity: 3,
+				suppression: false,
+				suppressedIndices: new Set<number>(),
+			};
+			this.sketch.clearSelection();
+		} else {
+			this.circularPatternState = null;
+		}
+
 		if (isConstraintTool(tool)) {
 			this.pruneIncompatibleSelection(tool);
 		}
 		this.updateCursor();
 		this.onToolChange?.(tool);
 		this.onMirrorStateChange?.();
+		this.onCircularPatternStateChange?.();
 		this.render();
 	}
 
@@ -719,6 +761,96 @@ export class CanvasInteraction {
 		return true;
 	}
 
+	setCircularPatternPhase(phase: 'objects' | 'center_point'): void {
+		if (this.circularPatternState) {
+			this.circularPatternState.phase = phase;
+			this.onCircularPatternStateChange?.();
+			this.render();
+		}
+	}
+
+	cancelCircularPattern(): void {
+		this.circularPatternState = null;
+		this.setTool('select');
+		this.onCircularPatternStateChange?.();
+		this.render();
+	}
+
+	executeCircularPattern(): boolean {
+		if (this.activeTool !== 'circular_pattern' || !this.circularPatternState) return false;
+		const { selectedObjectIds, centerPointId, distribution, angle, quantity, suppression, suppressedIndices } =
+			this.circularPatternState;
+		if (selectedObjectIds.size === 0 || !centerPointId) {
+			showToast('Select objects and a center point');
+			return false;
+		}
+
+		const centerPt = this.sketch.points.get(centerPointId);
+		if (!centerPt) {
+			showToast('Center point not found');
+			return false;
+		}
+
+		const N = Math.max(2, Math.round(quantity));
+		if (distribution !== 'full' && (isNaN(angle) || Math.abs(angle) < 1e-3)) {
+			showToast('Specify a non-zero angle');
+			return false;
+		}
+
+		this.sketch.beginTransaction();
+
+		const copies = [];
+		let totalCreated = 0;
+
+		for (let k = 1; k < N; k++) {
+			if (suppression && suppressedIndices.has(k)) continue;
+			const copy = this.sketch.generatePatternCopy(
+				centerPointId,
+				Array.from(selectedObjectIds),
+				k,
+				N,
+				distribution,
+				angle
+			);
+			if (copy) {
+				copies.push(copy);
+				totalCreated += copy.createdEntityIds.length;
+			}
+		}
+
+		if (copies.length === 0) {
+			showToast('All pattern copies are suppressed');
+			this.sketch.rollbackTransaction();
+			return false;
+		}
+
+		const constraint = this.sketch.addCircularPatternConstraint(
+			centerPointId,
+			Array.from(selectedObjectIds),
+			distribution,
+			angle,
+			N,
+			suppression,
+			Array.from(suppressedIndices),
+			copies
+		);
+
+		this.sketch.commitTransaction();
+		this.sketch.solve();
+
+		this.circularPatternState = null;
+		this.setTool('select');
+
+		if (constraint) {
+			this.sketch.selectEntity(constraint.id, 'constraint', false);
+		}
+
+		showToast(`Circular pattern created (${copies.length} copies)`);
+		this.onCircularPatternStateChange?.();
+		this.render();
+		return true;
+	}
+
 	render(): void {
 		this.renderer.render(this.sketch, this.viewport, {
 			mirrorHighlight:
@@ -726,6 +858,18 @@ export class CanvasInteraction {
 					? {
 							selectedObjectIds: this.mirrorState.selectedObjectIds,
 							mirrorLineId: this.mirrorState.mirrorLineId,
+					  }
+					: undefined,
+			patternHighlight:
+				this.activeTool === 'circular_pattern' && this.circularPatternState
+					? {
+							selectedObjectIds: this.circularPatternState.selectedObjectIds,
+							centerPointId: this.circularPatternState.centerPointId,
+							distribution: this.circularPatternState.distribution,
+							angle: this.circularPatternState.angle,
+							quantity: this.circularPatternState.quantity,
+							suppression: this.circularPatternState.suppression,
+							suppressedIndices: this.circularPatternState.suppressedIndices,
 					  }
 					: undefined,
 		});
@@ -764,6 +908,10 @@ export class CanvasInteraction {
 					this.cancelMirror();
 					return;
 				}
+				if (this.activeTool === 'circular_pattern') {
+					this.cancelCircularPattern();
+					return;
+				}
 				if (this.activeTool === 'dimension' && this.dimensionState.step > 0) {
 					this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 					this.sketch.clearSelection();
@@ -775,8 +923,12 @@ export class CanvasInteraction {
 				this.setTool('select');
 				this.sketch.clearSelection();
 				this.render();
-			} else if (e.key === 'Enter' && this.activeTool === 'mirror') {
-				this.executeMirror();
+			} else if (e.key === 'Enter') {
+				if (this.activeTool === 'mirror') {
+					this.executeMirror();
+				} else if (this.activeTool === 'circular_pattern') {
+					this.executeCircularPattern();
+				}
 			} else if (e.key === 'Delete' || e.key === 'Backspace') {
 				this.sketch.deleteSelected();
 				this.render();
@@ -1825,6 +1977,108 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// --- TOOL: CIRCULAR PATTERN ---
+		if (this.activeTool === 'circular_pattern') {
+			if (!this.circularPatternState) {
+				this.circularPatternState = {
+					phase: 'objects',
+					selectedObjectIds: new Set(),
+					centerPointId: null,
+					distribution: 'full',
+					angle: 90,
+					quantity: 3,
+					suppression: false,
+					suppressedIndices: new Set(),
+				};
+			}
+
+			// 1. Suppression checkbox click hit-test
+			if (this.circularPatternState.suppression) {
+				for (const entry of this.renderer.patternCheckboxPositions.values()) {
+					if (!entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+						if (this.circularPatternState.suppressedIndices.has(entry.copyIndex)) {
+							this.circularPatternState.suppressedIndices.delete(entry.copyIndex);
+						} else {
+							this.circularPatternState.suppressedIndices.add(entry.copyIndex);
+						}
+						this.onCircularPatternStateChange?.();
+						this.render();
+						return;
+					}
+				}
+			}
+
+			let hitId: string | null = null;
+			let hitType: string | null = null;
+
+			if (this.circularPatternState.phase === 'center_point') {
+				const nearPoint = this.findPointNearScreen(screen, 18);
+				if (nearPoint) {
+					hitId = nearPoint.id;
+					hitType = 'point';
+				}
+			} else {
+				const nearPoint = this.findPointNearScreen(screen, 16);
+				if (nearPoint) {
+					hitId = nearPoint.id;
+					hitType = 'point';
+				} else {
+					const hitLine = this.findLineNearScreen(screen, 18);
+					if (hitLine) {
+						hitId = hitLine.id;
+						hitType = 'line';
+					} else {
+						const hitCircle = this.findCircleNearScreen(screen, 18);
+						if (hitCircle) {
+							hitId = hitCircle.id;
+							hitType = 'circle';
+						} else {
+							const hitArc = this.findArcNearScreen(screen, 18);
+							if (hitArc) {
+								hitId = hitArc.id;
+								hitType = 'arc';
+							} else {
+								const hitEllipse = this.findEllipseNearScreen(screen, 18);
+								if (hitEllipse) {
+									hitId = hitEllipse.id;
+									hitType = 'ellipse';
+								} else {
+									const hitEllipticalArc = this.findEllipticalArcNearScreen(screen, 18);
+									if (hitEllipticalArc) {
+										hitId = hitEllipticalArc.id;
+										hitType = 'elliptical_arc';
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (hitId) {
+				if (this.circularPatternState.phase === 'center_point') {
+					if (hitType === 'point') {
+						this.circularPatternState.centerPointId = hitId;
+						this.onCircularPatternStateChange?.();
+						this.render();
+					}
+				} else {
+					if (this.circularPatternState.selectedObjectIds.has(hitId)) {
+						this.circularPatternState.selectedObjectIds.delete(hitId);
+					} else {
+						this.circularPatternState.selectedObjectIds.add(hitId);
+					}
+					this.onCircularPatternStateChange?.();
+					this.render();
+				}
+			} else if (this.circularPatternState.phase === 'objects') {
+				this.isBoxSelecting = true;
+				this.boxSelectStartScreen = screen;
+				this.boxSelectCurrentScreen = screen;
+			}
+			return;
+		}
+
 		// --- ACTIVE CONSTRAINT TOOL MODE ---
 		if (isConstraintTool(this.activeTool)) {
 			if (this.activeTool === 'dimension') {
@@ -1904,6 +2158,27 @@ export class CanvasInteraction {
 
 		// --- TOOL: SELECT ---
 		if (this.activeTool === 'select') {
+			// Check if clicking on a circular pattern suppression checkbox on canvas
+			for (const entry of this.renderer.patternCheckboxPositions.values()) {
+				if (entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+					const c = this.sketch.constraints.get(entry.constraintId);
+					if (c instanceof CircularPatternConstraint && c.suppression) {
+						this.sketch.selection.constraintIds.add(c.id);
+						const currentSuppressed = new Set(c.suppressedIndices);
+						if (currentSuppressed.has(entry.copyIndex)) {
+							currentSuppressed.delete(entry.copyIndex);
+						} else {
+							currentSuppressed.add(entry.copyIndex);
+						}
+						this.sketch.updateCircularPattern(c.id, {
+							suppressedIndices: Array.from(currentSuppressed),
+						});
+						this.render();
+						return;
+					}
+				}
+			}
+
 			const target = e.target as SVGElement;
 			const targetG = target.closest('[data-id]') as SVGElement | null;
 			let id = targetG?.getAttribute('data-id');
@@ -4994,6 +5269,15 @@ export class CanvasInteraction {
 				}
 			}
 			this.onMirrorStateChange?.();
+			this.render();
+			return;
+		}
+
+		if (this.activeTool === 'circular_pattern' && this.circularPatternState && this.circularPatternState.phase === 'objects') {
+			for (const item of itemsToSelect) {
+				this.circularPatternState.selectedObjectIds.add(item.id);
+			}
+			this.onCircularPatternStateChange?.();
 			this.render();
 			return;
 		}

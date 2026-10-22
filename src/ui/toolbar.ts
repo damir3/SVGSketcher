@@ -46,6 +46,10 @@ export class Toolbar {
 						${ICONS.mirror}
 						<span class="btn-tooltip">Mirror (M)</span>
 					</button>
+					<button class="tool-btn" data-tool="circular_pattern" id="tool-circular-pattern" title="Circular Pattern">
+						${ICONS.circular_pattern}
+						<span class="btn-tooltip">Circular Pattern</span>
+					</button>
 				</div>
 			</div>
 
