@@ -11,6 +11,9 @@ import {
 	VerticalConstraint,
 	PointToLineDistanceConstraint,
 	CircularPatternConstraint,
+	RectangularPatternConstraint,
+	computeRectangularPatternDirections,
+	type RectangularPatternCopyData,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
 import { showToast } from '../ui/toast';
@@ -76,6 +79,7 @@ export type ToolType =
 	| 'break'
 	| 'mirror'
 	| 'circular_pattern'
+	| 'rectangular_pattern'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 
@@ -314,6 +318,32 @@ export class CanvasInteraction {
 	} | null = null;
 	onCircularPatternStateChange?: () => void;
 
+	// Rectangular pattern tool state
+	rectangularPatternState: {
+		phase: 'objects' | 'direction1' | 'direction2';
+		selectedObjectIds: Set<string>;
+		line1Id: string | null;
+		line2Id: string | null;
+		quantity1: number;
+		distance1: number;
+		direction1: 'one_direction' | 'symmetric';
+		quantity2: number;
+		distance2: number;
+		direction2: 'one_direction' | 'symmetric';
+		suppression: boolean;
+		suppressedIndices: Set<number>;
+	} | null = null;
+	onRectangularPatternStateChange?: () => void;
+
+	gizmoDragState: {
+		axis: 1 | 2;
+		startMouseWorld: Vec2;
+		centroidWorld: Vec2;
+		u: Vec2;
+		startDistance: number;
+		constraintId?: string;
+	} | null = null;
+
 	// Dimension tool multi-step state: 0 = pick first entity, 1 = pick second entity / offset, 2 = place dimension / pick angle radius
 	private dimensionState: {
 		step: 0 | 1 | 2;
@@ -428,6 +458,35 @@ export class CanvasInteraction {
 			this.circularPatternState = null;
 		}
 
+		if (tool === 'rectangular_pattern') {
+			const sel = this.sketch.selection;
+			const initialObjects = new Set<string>();
+			for (const id of sel.lineIds) initialObjects.add(id);
+			for (const id of sel.circleIds) initialObjects.add(id);
+			for (const id of sel.arcIds) initialObjects.add(id);
+			for (const id of sel.ellipseIds) initialObjects.add(id);
+			for (const id of sel.ellipticalArcIds) initialObjects.add(id);
+			for (const id of sel.pointIds) initialObjects.add(id);
+
+			this.rectangularPatternState = {
+				phase: initialObjects.size > 0 ? 'direction1' : 'objects',
+				selectedObjectIds: initialObjects,
+				line1Id: null,
+				line2Id: null,
+				quantity1: 3,
+				distance1: 0,
+				direction1: 'one_direction',
+				quantity2: 3,
+				distance2: 0,
+				direction2: 'one_direction',
+				suppression: false,
+				suppressedIndices: new Set<number>(),
+			};
+			this.sketch.clearSelection();
+		} else {
+			this.rectangularPatternState = null;
+		}
+
 		if (isConstraintTool(tool)) {
 			this.pruneIncompatibleSelection(tool);
 		}
@@ -435,6 +494,7 @@ export class CanvasInteraction {
 		this.onToolChange?.(tool);
 		this.onMirrorStateChange?.();
 		this.onCircularPatternStateChange?.();
+		this.onRectangularPatternStateChange?.();
 		this.render();
 	}
 
@@ -851,6 +911,157 @@ export class CanvasInteraction {
 		return true;
 	}
 
+	setRectangularPatternPhase(phase: 'objects' | 'direction1' | 'direction2'): void {
+		if (this.rectangularPatternState) {
+			this.rectangularPatternState.phase = phase;
+			this.onRectangularPatternStateChange?.();
+			this.render();
+		}
+	}
+
+	cancelRectangularPattern(): void {
+		this.rectangularPatternState = null;
+		this.setTool('select');
+		this.onRectangularPatternStateChange?.();
+		this.render();
+	}
+
+	executeRectangularPattern(): boolean {
+		if (this.activeTool !== 'rectangular_pattern' || !this.rectangularPatternState) return false;
+		const state = this.rectangularPatternState;
+		if (state.selectedObjectIds.size === 0) {
+			showToast('Select objects to pattern');
+			return false;
+		}
+
+		const maxI = Math.abs(state.distance1) > 1e-6 ? state.quantity1 : 1;
+		const maxJ = Math.abs(state.distance2) > 1e-6 ? state.quantity2 : 1;
+
+		if (maxI <= 1 && maxJ <= 1) {
+			showToast('Specify non-zero distance for at least one direction');
+			return false;
+		}
+
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of this.sketch.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const line1 = state.line1Id ? this.sketch.lines.get(state.line1Id) : null;
+		const line2 = state.line2Id ? this.sketch.lines.get(state.line2Id) : null;
+		const { u1, u2 } = computeRectangularPatternDirections(
+			paramMap,
+			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+		);
+
+		this.sketch.beginTransaction();
+
+		const copies: RectangularPatternCopyData[] = [];
+		for (let i = 0; i < maxI; i++) {
+			for (let j = 0; j < maxJ; j++) {
+				if (i === 0 && j === 0) continue;
+				const copyIndex = i * 1000 + j;
+				if (state.suppression && state.suppressedIndices.has(copyIndex)) continue;
+
+				const copy = this.sketch.generateRectangularPatternCopy(
+					Array.from(state.selectedObjectIds),
+					i,
+					j,
+					state.distance1,
+					state.direction1,
+					state.distance2,
+					state.direction2,
+					u1,
+					u2
+				);
+				if (copy) {
+					copies.push(copy);
+				}
+			}
+		}
+
+		if (copies.length === 0) {
+			showToast('All pattern copies are suppressed');
+			this.sketch.rollbackTransaction();
+			return false;
+		}
+
+		const constraint = this.sketch.addRectangularPatternConstraint(
+			Array.from(state.selectedObjectIds),
+			state.line1Id,
+			state.line2Id,
+			state.quantity1,
+			state.distance1,
+			state.direction1,
+			state.quantity2,
+			state.distance2,
+			state.direction2,
+			state.suppression,
+			Array.from(state.suppressedIndices),
+			copies
+		);
+
+		this.sketch.commitTransaction();
+		this.sketch.solve();
+
+		this.rectangularPatternState = null;
+		this.setTool('select');
+
+		if (constraint) {
+			this.sketch.selectEntity(constraint.id, 'constraint', false);
+		}
+
+		showToast(`Rectangular pattern created (${copies.length} copies)`);
+		this.onRectangularPatternStateChange?.();
+		this.render();
+		return true;
+	}
+
+	calculateObjectsCentroid(objectIds: Iterable<string>): Vec2 | null {
+		let sumX = 0;
+		let sumY = 0;
+		let ptCount = 0;
+		for (const objId of objectIds) {
+			const pt = this.sketch.points.get(objId);
+			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
+			const l = this.sketch.lines.get(objId);
+			if (l) {
+				const p1 = this.sketch.points.get(l.p1Id);
+				const p2 = this.sketch.points.get(l.p2Id);
+				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
+				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+				continue;
+			}
+			const c = this.sketch.circles.get(objId);
+			if (c) {
+				const cp = this.sketch.points.get(c.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const a = this.sketch.arcs.get(objId);
+			if (a) {
+				const cp = this.sketch.points.get(a.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const el = this.sketch.ellipses.get(objId);
+			if (el) {
+				const cp = this.sketch.points.get(el.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const ea = this.sketch.ellipticalArcs.get(objId);
+			if (ea) {
+				const cp = this.sketch.points.get(ea.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+		}
+		if (ptCount === 0) return null;
+		return { x: sumX / ptCount, y: sumY / ptCount };
+	}
+
 	render(): void {
 		this.renderer.render(this.sketch, this.viewport, {
 			mirrorHighlight:
@@ -870,6 +1081,22 @@ export class CanvasInteraction {
 							quantity: this.circularPatternState.quantity,
 							suppression: this.circularPatternState.suppression,
 							suppressedIndices: this.circularPatternState.suppressedIndices,
+					  }
+					: undefined,
+			rectangularPatternHighlight:
+				this.activeTool === 'rectangular_pattern' && this.rectangularPatternState
+					? {
+							selectedObjectIds: this.rectangularPatternState.selectedObjectIds,
+							line1Id: this.rectangularPatternState.line1Id,
+							line2Id: this.rectangularPatternState.line2Id,
+							quantity1: this.rectangularPatternState.quantity1,
+							distance1: this.rectangularPatternState.distance1,
+							direction1: this.rectangularPatternState.direction1,
+							quantity2: this.rectangularPatternState.quantity2,
+							distance2: this.rectangularPatternState.distance2,
+							direction2: this.rectangularPatternState.direction2,
+							suppression: this.rectangularPatternState.suppression,
+							suppressedIndices: this.rectangularPatternState.suppressedIndices,
 					  }
 					: undefined,
 		});
@@ -912,6 +1139,10 @@ export class CanvasInteraction {
 					this.cancelCircularPattern();
 					return;
 				}
+				if (this.activeTool === 'rectangular_pattern') {
+					this.cancelRectangularPattern();
+					return;
+				}
 				if (this.activeTool === 'dimension' && this.dimensionState.step > 0) {
 					this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 					this.sketch.clearSelection();
@@ -928,6 +1159,8 @@ export class CanvasInteraction {
 					this.executeMirror();
 				} else if (this.activeTool === 'circular_pattern') {
 					this.executeCircularPattern();
+				} else if (this.activeTool === 'rectangular_pattern') {
+					this.executeRectangularPattern();
 				}
 			} else if (e.key === 'Delete' || e.key === 'Backspace') {
 				this.sketch.deleteSelected();
@@ -1848,6 +2081,66 @@ export class CanvasInteraction {
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
 		const snap = this.findSnap(screen);
 
+		// Check for Rectangular Pattern Gizmo handle dragging
+		for (const handle of this.renderer.rectangularGizmoHandles.values()) {
+			if (dist(screen, { x: handle.x, y: handle.y }) <= 18) {
+				let centroidWorld: Vec2 | null = null;
+				let u: Vec2 | null = null;
+				let startDistance = 0;
+				if (handle.constraintId) {
+					const constraint = this.sketch.constraints.get(handle.constraintId) as RectangularPatternConstraint | undefined;
+					if (constraint && constraint.type === 'rectangular_pattern') {
+						startDistance = handle.axis === 1 ? constraint.distance1 : constraint.distance2;
+						const paramMap = new Map<string, number>();
+						for (const [pid, pt] of this.sketch.points.entries()) {
+							paramMap.set(`${pid}.x`, pt.x);
+							paramMap.set(`${pid}.y`, pt.y);
+						}
+						const line1 = constraint.line1Id ? this.sketch.lines.get(constraint.line1Id) : null;
+						const line2 = constraint.line2Id ? this.sketch.lines.get(constraint.line2Id) : null;
+						const dirs = computeRectangularPatternDirections(
+							paramMap,
+							line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+							line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+						);
+						u = handle.axis === 1 ? dirs.u1 : dirs.u2;
+						centroidWorld = this.calculateObjectsCentroid(constraint.sourceObjectIds);
+					}
+				} else if (this.activeTool === 'rectangular_pattern' && this.rectangularPatternState) {
+					startDistance = handle.axis === 1 ? this.rectangularPatternState.distance1 : this.rectangularPatternState.distance2;
+					const paramMap = new Map<string, number>();
+					for (const [pid, pt] of this.sketch.points.entries()) {
+						paramMap.set(`${pid}.x`, pt.x);
+						paramMap.set(`${pid}.y`, pt.y);
+					}
+					const line1 = this.rectangularPatternState.line1Id ? this.sketch.lines.get(this.rectangularPatternState.line1Id) : null;
+					const line2 = this.rectangularPatternState.line2Id ? this.sketch.lines.get(this.rectangularPatternState.line2Id) : null;
+					const dirs = computeRectangularPatternDirections(
+						paramMap,
+						line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+						line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+					);
+					u = handle.axis === 1 ? dirs.u1 : dirs.u2;
+					centroidWorld = this.calculateObjectsCentroid(this.rectangularPatternState.selectedObjectIds);
+				}
+
+				if (centroidWorld && u) {
+					if (handle.constraintId) {
+						this.sketch.selectEntity(handle.constraintId, 'constraint', false);
+					}
+					this.gizmoDragState = {
+						axis: handle.axis,
+						startMouseWorld: world,
+						centroidWorld,
+						u,
+						startDistance,
+						constraintId: handle.constraintId,
+					};
+					return;
+				}
+			}
+		}
+
 		// --- TOOL: TRIM / BREAK ---
 		if (this.activeTool === 'trim' || this.activeTool === 'break') {
 			const isBreak = this.activeTool === 'break';
@@ -2079,6 +2372,141 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// --- TOOL: RECTANGULAR PATTERN ---
+		if (this.activeTool === 'rectangular_pattern') {
+			if (!this.rectangularPatternState) {
+				this.rectangularPatternState = {
+					phase: 'objects',
+					selectedObjectIds: new Set(),
+					line1Id: null,
+					line2Id: null,
+					quantity1: 3,
+					distance1: 0,
+					direction1: 'one_direction',
+					quantity2: 3,
+					distance2: 0,
+					direction2: 'one_direction',
+					suppression: false,
+					suppressedIndices: new Set(),
+				};
+			}
+
+			// 1. Suppression checkbox click hit-test
+			if (this.rectangularPatternState.suppression) {
+				for (const entry of this.renderer.patternCheckboxPositions.values()) {
+					if (!entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+						if (this.rectangularPatternState.suppressedIndices.has(entry.copyIndex)) {
+							this.rectangularPatternState.suppressedIndices.delete(entry.copyIndex);
+						} else {
+							this.rectangularPatternState.suppressedIndices.add(entry.copyIndex);
+						}
+						this.onRectangularPatternStateChange?.();
+						this.render();
+						return;
+					}
+				}
+			}
+
+			let hitId: string | null = null;
+			let hitType: string | null = null;
+
+			if (this.rectangularPatternState.phase === 'direction1' || this.rectangularPatternState.phase === 'direction2') {
+				const hitLine = this.findLineNearScreen(screen, 18);
+				if (hitLine) {
+					hitId = hitLine.id;
+					hitType = 'line';
+				}
+			} else {
+				const nearPoint = this.findPointNearScreen(screen, 16);
+				if (nearPoint) {
+					hitId = nearPoint.id;
+					hitType = 'point';
+				} else {
+					const hitLine = this.findLineNearScreen(screen, 18);
+					if (hitLine) {
+						hitId = hitLine.id;
+						hitType = 'line';
+					} else {
+						const hitCircle = this.findCircleNearScreen(screen, 18);
+						if (hitCircle) {
+							hitId = hitCircle.id;
+							hitType = 'circle';
+						} else {
+							const hitArc = this.findArcNearScreen(screen, 18);
+							if (hitArc) {
+								hitId = hitArc.id;
+								hitType = 'arc';
+							} else {
+								const hitEllipse = this.findEllipseNearScreen(screen, 18);
+								if (hitEllipse) {
+									hitId = hitEllipse.id;
+									hitType = 'ellipse';
+								} else {
+									const hitEllipticalArc = this.findEllipticalArcNearScreen(screen, 18);
+									if (hitEllipticalArc) {
+										hitId = hitEllipticalArc.id;
+										hitType = 'elliptical_arc';
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			if (hitId) {
+				if (this.rectangularPatternState.phase === 'direction1') {
+					if (hitType === 'line') {
+						if (this.rectangularPatternState.line1Id === hitId) {
+							this.rectangularPatternState.line1Id = null;
+						} else {
+							this.rectangularPatternState.line1Id = hitId;
+							this.rectangularPatternState.selectedObjectIds.delete(hitId);
+							if (this.rectangularPatternState.line2Id === hitId) {
+								this.rectangularPatternState.line2Id = null;
+							}
+							this.rectangularPatternState.phase = 'direction2';
+						}
+						this.onRectangularPatternStateChange?.();
+						this.render();
+					}
+				} else if (this.rectangularPatternState.phase === 'direction2') {
+					if (hitType === 'line') {
+						if (this.rectangularPatternState.line2Id === hitId) {
+							this.rectangularPatternState.line2Id = null;
+						} else {
+							this.rectangularPatternState.line2Id = hitId;
+							this.rectangularPatternState.selectedObjectIds.delete(hitId);
+							if (this.rectangularPatternState.line1Id === hitId) {
+								this.rectangularPatternState.line1Id = null;
+							}
+						}
+						this.onRectangularPatternStateChange?.();
+						this.render();
+					}
+				} else {
+					if (this.rectangularPatternState.selectedObjectIds.has(hitId)) {
+						this.rectangularPatternState.selectedObjectIds.delete(hitId);
+					} else {
+						if (this.rectangularPatternState.line1Id === hitId) {
+							this.rectangularPatternState.line1Id = null;
+						}
+						if (this.rectangularPatternState.line2Id === hitId) {
+							this.rectangularPatternState.line2Id = null;
+						}
+						this.rectangularPatternState.selectedObjectIds.add(hitId);
+					}
+					this.onRectangularPatternStateChange?.();
+					this.render();
+				}
+			} else if (this.rectangularPatternState.phase === 'objects') {
+				this.isBoxSelecting = true;
+				this.boxSelectStartScreen = screen;
+				this.boxSelectCurrentScreen = screen;
+			}
+			return;
+		}
+
 		// --- ACTIVE CONSTRAINT TOOL MODE ---
 		if (isConstraintTool(this.activeTool)) {
 			if (this.activeTool === 'dimension') {
@@ -2158,12 +2586,12 @@ export class CanvasInteraction {
 
 		// --- TOOL: SELECT ---
 		if (this.activeTool === 'select') {
-			// Check if clicking on a circular pattern suppression checkbox on canvas
+			// Check if clicking on a circular or rectangular pattern suppression checkbox on canvas
 			for (const entry of this.renderer.patternCheckboxPositions.values()) {
 				if (entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
 					const c = this.sketch.constraints.get(entry.constraintId);
 					if (c instanceof CircularPatternConstraint && c.suppression) {
-						this.sketch.selection.constraintIds.add(c.id);
+						this.sketch.selectEntity(c.id, 'constraint', false);
 						const currentSuppressed = new Set(c.suppressedIndices);
 						if (currentSuppressed.has(entry.copyIndex)) {
 							currentSuppressed.delete(entry.copyIndex);
@@ -2171,6 +2599,20 @@ export class CanvasInteraction {
 							currentSuppressed.add(entry.copyIndex);
 						}
 						this.sketch.updateCircularPattern(c.id, {
+							suppressedIndices: Array.from(currentSuppressed),
+						});
+						this.render();
+						return;
+					}
+					if (c instanceof RectangularPatternConstraint && c.suppression) {
+						this.sketch.selectEntity(c.id, 'constraint', false);
+						const currentSuppressed = new Set(c.suppressedIndices);
+						if (currentSuppressed.has(entry.copyIndex)) {
+							currentSuppressed.delete(entry.copyIndex);
+						} else {
+							currentSuppressed.add(entry.copyIndex);
+						}
+						this.sketch.updateRectangularPattern(c.id, {
 							suppressedIndices: Array.from(currentSuppressed),
 						});
 						this.render();
@@ -3026,6 +3468,45 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// Gizmo drag handling (Rectangular pattern distance1 / distance2)
+		if (this.gizmoDragState) {
+			const { axis, centroidWorld, u, startMouseWorld, startDistance, constraintId } = this.gizmoDragState;
+			const startProj = (startMouseWorld.x - centroidWorld.x) * u.x + (startMouseWorld.y - centroidWorld.y) * u.y;
+			const currentProj = (world.x - centroidWorld.x) * u.x + (world.y - centroidWorld.y) * u.y;
+			const delta = currentProj - startProj;
+			let newDist = startDistance + delta;
+			if (Math.abs(newDist) < 0.25) {
+				newDist = 0;
+			} else {
+				newDist = Math.round(newDist * 2) / 2;
+			}
+
+			if (constraintId) {
+				const constraint = this.sketch.constraints.get(constraintId) as RectangularPatternConstraint | undefined;
+				if (constraint && constraint.type === 'rectangular_pattern') {
+					if (axis === 1) {
+						if (constraint.distance1 !== newDist) {
+							this.sketch.updateRectangularPattern(constraintId, { distance1: newDist });
+						}
+					} else {
+						if (constraint.distance2 !== newDist) {
+							this.sketch.updateRectangularPattern(constraintId, { distance2: newDist });
+						}
+					}
+					this.render();
+				}
+			} else if (this.activeTool === 'rectangular_pattern' && this.rectangularPatternState) {
+				if (axis === 1) {
+					this.rectangularPatternState.distance1 = newDist;
+				} else {
+					this.rectangularPatternState.distance2 = newDist;
+				}
+				this.onRectangularPatternStateChange?.();
+				this.render();
+			}
+			return;
+		}
+
 		// Box selection handling
 		if (this.isBoxSelecting && this.boxSelectStartScreen) {
 			this.boxSelectCurrentScreen = screen;
@@ -3787,6 +4268,10 @@ export class CanvasInteraction {
 			this.isSnapModifierPressed = this.isSnapModifier(e);
 		}
 		this.svg.classList.remove('is-dragging');
+		if (this.gizmoDragState) {
+			this.gizmoDragState = null;
+			this.render();
+		}
 		if (this.isPanning) {
 			this.isPanning = false;
 			this.updateCursor();
@@ -5278,6 +5763,17 @@ export class CanvasInteraction {
 				this.circularPatternState.selectedObjectIds.add(item.id);
 			}
 			this.onCircularPatternStateChange?.();
+			this.render();
+			return;
+		}
+
+		if (this.activeTool === 'rectangular_pattern' && this.rectangularPatternState && this.rectangularPatternState.phase === 'objects') {
+			for (const item of itemsToSelect) {
+				if (item.id !== this.rectangularPatternState.line1Id && item.id !== this.rectangularPatternState.line2Id) {
+					this.rectangularPatternState.selectedObjectIds.add(item.id);
+				}
+			}
+			this.onRectangularPatternStateChange?.();
 			this.render();
 			return;
 		}

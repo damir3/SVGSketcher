@@ -2,6 +2,7 @@ import fixedRaw from '../assets/icons/fixed.svg?raw';
 import collinearRaw from '../assets/icons/badge-collinear.svg?raw';
 import symmetryRaw from '../assets/icons/badge-symmetry.svg?raw';
 import circularPatternRaw from '../assets/icons/badge-circular-pattern.svg?raw';
+import rectangularPatternRaw from '../assets/icons/badge-rectangular-pattern.svg?raw';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -28,6 +29,7 @@ const BADGE_ICONS: Record<string, BadgeIconDef> = {
 	collinear: parseSvgIcon(collinearRaw, 13, 13),
 	symmetry: parseSvgIcon(symmetryRaw, 13, 13),
 	circular_pattern: parseSvgIcon(circularPatternRaw, 13, 13),
+	rectangular_pattern: parseSvgIcon(rectangularPatternRaw, 13, 13),
 };
 
 export function getBadgeIcon(name: string, x: number, y: number, color: string): SVGElement | null {

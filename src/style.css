@@ -1184,6 +1184,16 @@ html, body {
   border-left: 3px solid #d97706 !important;
 }
 
+.tree-item.is-dir1-line {
+  background-color: #fef3c7 !important;
+  border-left: 3px solid #d97706 !important;
+}
+
+.tree-item.is-dir2-line {
+  background-color: #f3e8ff !important;
+  border-left: 3px solid #9333ea !important;
+}
+
 .tree-item.is-pattern-obj {
   background-color: #e0f2fe !important;
   border-left: 3px solid #0284c7 !important;
@@ -1196,6 +1206,14 @@ html, body {
 .pattern-params-card.in-inspector {
   margin-top: 8px;
   margin-bottom: 8px;
+}
+
+.rectangular-pattern-gizmo-arrow {
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.rectangular-pattern-gizmo-arrow:hover {
+  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.45)) brightness(1.15) !important;
 }
 
 

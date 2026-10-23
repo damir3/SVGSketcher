@@ -1,6 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction } from '../canvas/interaction';
-import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, CircularPatternConstraint } from '../solver/constraints';
+import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, CircularPatternConstraint, RectangularPatternConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 
@@ -20,6 +20,7 @@ export class Sidebar {
 		if (this.interaction) {
 			this.interaction.onMirrorStateChange = () => this.render();
 			this.interaction.onCircularPatternStateChange = () => this.render();
+			this.interaction.onRectangularPatternStateChange = () => this.render();
 		}
 		this.render();
 	}
@@ -69,6 +70,9 @@ export class Sidebar {
 
 				<!-- Circular Pattern Tool Panel (when circular pattern tool is active) -->
 				${this.renderCircularPatternToolCard()}
+
+				<!-- Rectangular Pattern Tool Panel (when rectangular pattern tool is active) -->
+				${this.renderRectangularPatternToolCard()}
 
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
@@ -288,6 +292,194 @@ export class Sidebar {
 					${!centerPointId && objCount === 0 
 						? 'Select objects first, then pick a center point.' 
 						: (!centerPointId ? 'Click a point in the canvas to set the rotation center.' : (objCount === 0 ? 'Pick geometry in the canvas to pattern.' : 'Ready to apply! Press Enter or click Apply Pattern.'))}
+				</div>
+			</div>
+		`;
+	}
+
+	private renderRectangularPatternToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'rectangular_pattern') {
+			return '';
+		}
+
+		const state = this.interaction.rectangularPatternState;
+		const objCount = state ? state.selectedObjectIds.size : 0;
+		const line1Id = state?.line1Id ?? null;
+		const line2Id = state?.line2Id ?? null;
+		const phase = state?.phase ?? 'objects';
+		const quantity1 = state?.quantity1 ?? 3;
+		const distance1 = state?.distance1 ?? 0;
+		const direction1 = state?.direction1 ?? 'one_direction';
+		const quantity2 = state?.quantity2 ?? 3;
+		const distance2 = state?.distance2 ?? 0;
+		const direction2 = state?.direction2 ?? 'one_direction';
+		const suppression = state?.suppression ?? false;
+		const suppressedIndices = state?.suppressedIndices ?? new Set<number>();
+
+		const maxI = Math.abs(distance1) > 1e-6 ? quantity1 : 1;
+		const maxJ = Math.abs(distance2) > 1e-6 ? quantity2 : 1;
+		let totalCopies = 0;
+		let suppressedCount = 0;
+		for (let i = 0; i < maxI; i++) {
+			for (let j = 0; j < maxJ; j++) {
+				if (i === 0 && j === 0) continue;
+				totalCopies++;
+				if (suppression && suppressedIndices.has(i * 1000 + j)) {
+					suppressedCount++;
+				}
+			}
+		}
+		const activeCopies = totalCopies - suppressedCount;
+
+		let line1Label = 'Default: X-Axis (1, 0)';
+		if (line1Id) {
+			const line = this.sketch.lines.get(line1Id);
+			if (line) {
+				const p1 = this.sketch.points.get(line.p1Id);
+				const p2 = this.sketch.points.get(line.p2Id);
+				const len = p1 && p2 ? ` (${dist(p1, p2).toFixed(1)} mm)` : '';
+				line1Label = `${line.id}${len}`;
+			} else {
+				line1Label = line1Id;
+			}
+		}
+
+		let line2Label = line1Id ? 'Default: Perpendicular' : 'Default: Y-Axis (0, 1)';
+		if (line2Id) {
+			const line = this.sketch.lines.get(line2Id);
+			if (line) {
+				const p1 = this.sketch.points.get(line.p1Id);
+				const p2 = this.sketch.points.get(line.p2Id);
+				const len = p1 && p2 ? ` (${dist(p1, p2).toFixed(1)} mm)` : '';
+				line2Label = `${line.id}${len}`;
+			} else {
+				line2Label = line2Id;
+			}
+		}
+
+		const canApply = objCount > 0 && totalCopies > 0 && activeCopies > 0;
+
+		return `
+			<div class="sidebar-panel-card pattern-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${ICONS.rectangular_pattern}</span>
+						<span>Rectangular Pattern</span>
+					</div>
+					<button class="btn-panel-close" id="btn-rpat-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Create linear or 2D grid copies along direction axes.
+				</div>
+
+				<div class="mirror-steps">
+					<div class="mirror-step-item ${phase === 'objects' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-rpat-phase-objects" type="button">
+							<span class="mirror-step-num">1</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Objects to Pattern</div>
+								<div class="mirror-step-value">${objCount === 0 ? 'Click or box-select...' : `${objCount} object${objCount === 1 ? '' : 's'} selected`}</div>
+							</div>
+						</button>
+						${objCount > 0 ? `<button class="mirror-step-clear" id="btn-rpat-clear-objects" title="Clear selection">✕</button>` : ''}
+					</div>
+
+					<div class="mirror-step-item ${phase === 'direction1' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-rpat-phase-dir1" type="button">
+							<span class="mirror-step-num">2</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Direction 1</div>
+								<div class="mirror-step-value ${line1Id ? 'selected-line' : ''}">${line1Label}</div>
+							</div>
+						</button>
+						${line1Id ? `<button class="mirror-step-clear" id="btn-rpat-clear-dir1" title="Reset to X-Axis">✕</button>` : ''}
+					</div>
+
+					<div class="mirror-step-item ${phase === 'direction2' ? 'active' : ''}">
+						<button class="mirror-step-btn" id="btn-rpat-phase-dir2" type="button">
+							<span class="mirror-step-num">3</span>
+							<div class="mirror-step-info">
+								<div class="mirror-step-title">Direction 2</div>
+								<div class="mirror-step-value ${line2Id ? 'selected-line' : ''}">${line2Label}</div>
+							</div>
+						</button>
+						${line2Id ? `<button class="mirror-step-clear" id="btn-rpat-clear-dir2" title="Reset to Perpendicular">✕</button>` : ''}
+					</div>
+				</div>
+
+				<!-- Pattern Parameters -->
+				<div class="pattern-params-card">
+					<!-- Axis 1 -->
+					<div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 2px;">AXIS 1</div>
+					<div class="pattern-param-row">
+						<label class="pattern-param-label">Direction</label>
+						<div class="pattern-segmented-control">
+							<button type="button" class="seg-btn rpat-dir1-btn ${direction1 === 'one_direction' ? 'active' : ''}" data-dir="one_direction">One Dir</button>
+							<button type="button" class="seg-btn rpat-dir1-btn ${direction1 === 'symmetric' ? 'active' : ''}" data-dir="symmetric">Symmetric</button>
+						</div>
+					</div>
+
+					<div class="pattern-param-row">
+						<label class="pattern-param-label" for="input-rpat-dist1">Distance</label>
+						<div class="pattern-input-suffix-wrapper">
+							<input type="number" id="input-rpat-dist1" value="${distance1}" step="0.5" class="pattern-num-input" />
+							<span class="pattern-input-suffix">mm</span>
+						</div>
+					</div>
+
+					<div class="pattern-param-row">
+						<label class="pattern-param-label" for="input-rpat-qty1">Quantity</label>
+						<div class="pattern-quantity-wrapper">
+							<input type="number" id="input-rpat-qty1" value="${quantity1}" min="1" max="100" step="1" class="pattern-num-input" />
+						</div>
+					</div>
+
+					<!-- Axis 2 -->
+					<div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 6px;">AXIS 2</div>
+					<div class="pattern-param-row">
+						<label class="pattern-param-label">Direction</label>
+						<div class="pattern-segmented-control">
+							<button type="button" class="seg-btn rpat-dir2-btn ${direction2 === 'one_direction' ? 'active' : ''}" data-dir="one_direction">One Dir</button>
+							<button type="button" class="seg-btn rpat-dir2-btn ${direction2 === 'symmetric' ? 'active' : ''}" data-dir="symmetric">Symmetric</button>
+						</div>
+					</div>
+
+					<div class="pattern-param-row">
+						<label class="pattern-param-label" for="input-rpat-dist2">Distance</label>
+						<div class="pattern-input-suffix-wrapper">
+							<input type="number" id="input-rpat-dist2" value="${distance2}" step="0.5" class="pattern-num-input" />
+							<span class="pattern-input-suffix">mm</span>
+						</div>
+					</div>
+
+					<div class="pattern-param-row">
+						<label class="pattern-param-label" for="input-rpat-qty2">Quantity</label>
+						<div class="pattern-quantity-wrapper">
+							<input type="number" id="input-rpat-qty2" value="${quantity2}" min="1" max="100" step="1" class="pattern-num-input" />
+						</div>
+					</div>
+
+					<div class="pattern-param-row pattern-suppress-row" style="margin-top: 6px;">
+						<label class="pattern-checkbox-label">
+							<input type="checkbox" id="check-rpat-suppression" ${suppression ? 'checked' : ''} />
+							<span>Suppression</span>
+						</label>
+						${suppression ? `<span class="pattern-suppress-count">${activeCopies} of ${totalCopies} enabled</span>` : ''}
+					</div>
+				</div>
+
+				<div class="mirror-actions">
+					<button class="btn-mirror-ok" id="btn-rpat-ok" ${canApply ? '' : 'disabled'} title="Apply Pattern (Enter)">
+						Apply Pattern
+					</button>
+					<button class="btn-mirror-cancel" id="btn-rpat-cancel" title="Cancel (Esc)">
+						Cancel
+					</button>
+				</div>
+				<div class="mirror-hint">
+					${totalCopies === 0
+						? 'Set a non-zero distance for Axis 1 or Axis 2 (or drag arrows).'
+						: (objCount === 0 ? 'Select objects to pattern.' : 'Ready to apply! Press Enter or click Apply Pattern.')}
 				</div>
 			</div>
 		`;
@@ -675,6 +867,90 @@ export class Sidebar {
 							</div>
 
 							${this.renderPrimitivesSublist(relatedPrimitives)}
+						</div>
+					`;
+				} else if (c instanceof RectangularPatternConstraint) {
+					const maxI = Math.abs(c.distance1) > 1e-6 ? c.quantity1 : 1;
+					const maxJ = Math.abs(c.distance2) > 1e-6 ? c.quantity2 : 1;
+					let totalCopies = 0;
+					let suppressedCount = 0;
+					const suppressedSet = new Set(c.suppressedIndices);
+					for (let i = 0; i < maxI; i++) {
+						for (let j = 0; j < maxJ; j++) {
+							if (i === 0 && j === 0) continue;
+							totalCopies++;
+							if (c.suppression && suppressedSet.has(i * 1000 + j)) {
+								suppressedCount++;
+							}
+						}
+					}
+					const activeCopies = totalCopies - suppressedCount;
+
+					detailsHtml = `
+						<div class="inspector-card">
+							<div class="inspector-card-title">
+								<span class="panel-card-icon">${ICONS.rectangular_pattern}</span>
+								<span>Rectangular Pattern</span>
+							</div>
+
+							<div class="pattern-params-card in-inspector">
+								<!-- Axis 1 -->
+								<div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 2px;">AXIS 1</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label">Direction</label>
+									<div class="pattern-segmented-control">
+										<button type="button" class="seg-btn insp-rpat-dir1-btn ${c.direction1 === 'one_direction' ? 'active' : ''}" data-dir="one_direction">One Dir</button>
+										<button type="button" class="seg-btn insp-rpat-dir1-btn ${c.direction1 === 'symmetric' ? 'active' : ''}" data-dir="symmetric">Symmetric</button>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-rpat-dist1">Distance</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-rpat-dist1" value="${c.distance1}" step="0.5" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-rpat-qty1">Quantity</label>
+									<div class="pattern-quantity-wrapper">
+										<input type="number" id="insp-rpat-qty1" value="${c.quantity1}" min="1" max="100" step="1" class="pattern-num-input" />
+									</div>
+								</div>
+
+								<!-- Axis 2 -->
+								<div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 6px;">AXIS 2</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label">Direction</label>
+									<div class="pattern-segmented-control">
+										<button type="button" class="seg-btn insp-rpat-dir2-btn ${c.direction2 === 'one_direction' ? 'active' : ''}" data-dir="one_direction">One Dir</button>
+										<button type="button" class="seg-btn insp-rpat-dir2-btn ${c.direction2 === 'symmetric' ? 'active' : ''}" data-dir="symmetric">Symmetric</button>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-rpat-dist2">Distance</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-rpat-dist2" value="${c.distance2}" step="0.5" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-rpat-qty2">Quantity</label>
+									<div class="pattern-quantity-wrapper">
+										<input type="number" id="insp-rpat-qty2" value="${c.quantity2}" min="1" max="100" step="1" class="pattern-num-input" />
+									</div>
+								</div>
+
+								<div class="pattern-param-row pattern-suppress-row" style="margin-top: 6px;">
+									<label class="pattern-checkbox-label">
+										<input type="checkbox" id="insp-rpat-suppression" ${c.suppression ? 'checked' : ''} />
+										<span>Suppression</span>
+									</label>
+									${c.suppression ? `<span class="pattern-suppress-count">${activeCopies} of ${totalCopies} enabled</span>` : ''}
+								</div>
+							</div>
+
+							${this.renderPrimitivesSublist(relatedPrimitives)}
+						</div>
 					`;
 				} else {
 					detailsHtml = `
@@ -777,6 +1053,17 @@ export class Sidebar {
 				return { isSelected: true, extraClass: 'is-pattern-center' };
 			}
 			if (this.interaction.circularPatternState.selectedObjectIds.has(id)) {
+				return { isSelected: true, extraClass: 'is-pattern-obj' };
+			}
+		}
+		if (this.interaction?.activeTool === 'rectangular_pattern' && this.interaction.rectangularPatternState) {
+			if (this.interaction.rectangularPatternState.line1Id === id) {
+				return { isSelected: true, extraClass: 'is-dir1-line' };
+			}
+			if (this.interaction.rectangularPatternState.line2Id === id) {
+				return { isSelected: true, extraClass: 'is-dir2-line' };
+			}
+			if (this.interaction.rectangularPatternState.selectedObjectIds.has(id)) {
 				return { isSelected: true, extraClass: 'is-pattern-obj' };
 			}
 		}
@@ -950,6 +1237,7 @@ export class Sidebar {
 			case 'midpoint': return ICONS.midpoint;
 			case 'symmetry': return ICONS.symmetry;
 			case 'circular_pattern': return ICONS.circular_pattern;
+			case 'rectangular_pattern': return ICONS.rectangular_pattern;
 			default: return ICONS.coincident;
 		}
 	}
@@ -1009,6 +1297,56 @@ export class Sidebar {
 								this.interaction.circularPatternState.selectedObjectIds.add(id);
 							}
 							this.interaction.onCircularPatternStateChange?.();
+							this.interaction.render();
+						}
+					}
+					return;
+				}
+
+				if (this.interaction?.activeTool === 'rectangular_pattern' && this.interaction.rectangularPatternState) {
+					if (this.interaction.rectangularPatternState.phase === 'direction1') {
+						if (type === 'line') {
+							if (this.interaction.rectangularPatternState.line1Id === id) {
+								this.interaction.rectangularPatternState.line1Id = null;
+							} else {
+								this.interaction.rectangularPatternState.line1Id = id;
+								this.interaction.rectangularPatternState.selectedObjectIds.delete(id);
+								if (this.interaction.rectangularPatternState.line2Id === id) {
+									this.interaction.rectangularPatternState.line2Id = null;
+								}
+								this.interaction.rectangularPatternState.phase = 'direction2';
+							}
+							this.interaction.onRectangularPatternStateChange?.();
+							this.interaction.render();
+						}
+					} else if (this.interaction.rectangularPatternState.phase === 'direction2') {
+						if (type === 'line') {
+							if (this.interaction.rectangularPatternState.line2Id === id) {
+								this.interaction.rectangularPatternState.line2Id = null;
+							} else {
+								this.interaction.rectangularPatternState.line2Id = id;
+								this.interaction.rectangularPatternState.selectedObjectIds.delete(id);
+								if (this.interaction.rectangularPatternState.line1Id === id) {
+									this.interaction.rectangularPatternState.line1Id = null;
+								}
+							}
+							this.interaction.onRectangularPatternStateChange?.();
+							this.interaction.render();
+						}
+					} else {
+						if (type !== 'constraint') {
+							if (this.interaction.rectangularPatternState.selectedObjectIds.has(id)) {
+								this.interaction.rectangularPatternState.selectedObjectIds.delete(id);
+							} else {
+								if (this.interaction.rectangularPatternState.line1Id === id) {
+									this.interaction.rectangularPatternState.line1Id = null;
+								}
+								if (this.interaction.rectangularPatternState.line2Id === id) {
+									this.interaction.rectangularPatternState.line2Id = null;
+								}
+								this.interaction.rectangularPatternState.selectedObjectIds.add(id);
+							}
+							this.interaction.onRectangularPatternStateChange?.();
 							this.interaction.render();
 						}
 					}
@@ -1299,6 +1637,232 @@ export class Sidebar {
 			const inspSuppress = this.container.querySelector<HTMLInputElement>('#insp-cpat-suppression');
 			inspSuppress?.addEventListener('change', () => {
 				this.sketch.updateCircularPattern(selectedC.id, { suppression: inspSuppress.checked });
+				this.render();
+				this.interaction?.render();
+			});
+		}
+
+		// Rectangular Pattern Tool events
+		const btnRpatPhaseObjects = this.container.querySelector<HTMLButtonElement>('#btn-rpat-phase-objects');
+		btnRpatPhaseObjects?.addEventListener('click', () => {
+			this.interaction?.setRectangularPatternPhase('objects');
+		});
+
+		const btnRpatPhaseDir1 = this.container.querySelector<HTMLButtonElement>('#btn-rpat-phase-dir1');
+		btnRpatPhaseDir1?.addEventListener('click', () => {
+			this.interaction?.setRectangularPatternPhase('direction1');
+		});
+
+		const btnRpatPhaseDir2 = this.container.querySelector<HTMLButtonElement>('#btn-rpat-phase-dir2');
+		btnRpatPhaseDir2?.addEventListener('click', () => {
+			this.interaction?.setRectangularPatternPhase('direction2');
+		});
+
+		const btnRpatClearObjects = this.container.querySelector<HTMLButtonElement>('#btn-rpat-clear-objects');
+		btnRpatClearObjects?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.selectedObjectIds.clear();
+				this.interaction.onRectangularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		const btnRpatClearDir1 = this.container.querySelector<HTMLButtonElement>('#btn-rpat-clear-dir1');
+		btnRpatClearDir1?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.line1Id = null;
+				this.interaction.onRectangularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		const btnRpatClearDir2 = this.container.querySelector<HTMLButtonElement>('#btn-rpat-clear-dir2');
+		btnRpatClearDir2?.addEventListener('click', e => {
+			e.stopPropagation();
+			if (this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.line2Id = null;
+				this.interaction.onRectangularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		// Direction 1 toggle
+		this.container.querySelectorAll<HTMLButtonElement>('.rpat-dir1-btn').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const dir = btn.getAttribute('data-dir') as 'one_direction' | 'symmetric';
+				if (dir && this.interaction?.rectangularPatternState) {
+					this.interaction.rectangularPatternState.direction1 = dir;
+					this.interaction.onRectangularPatternStateChange?.();
+					this.interaction.render();
+				}
+			});
+		});
+
+		// Distance 1 input
+		const inputDist1 = this.container.querySelector<HTMLInputElement>('#input-rpat-dist1');
+		inputDist1?.addEventListener('input', () => {
+			const val = parseFloat(inputDist1.value);
+			if (!isNaN(val) && isFinite(val) && this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.distance1 = val;
+				this.interaction.render();
+			}
+		});
+		inputDist1?.addEventListener('change', () => {
+			this.render();
+		});
+
+		// Quantity 1 input
+		const inputQty1 = this.container.querySelector<HTMLInputElement>('#input-rpat-qty1');
+		inputQty1?.addEventListener('input', () => {
+			const val = parseInt(inputQty1.value, 10);
+			if (!isNaN(val) && val >= 1 && this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.quantity1 = val;
+				this.interaction.render();
+			}
+		});
+		inputQty1?.addEventListener('change', () => {
+			this.render();
+		});
+
+		// Direction 2 toggle
+		this.container.querySelectorAll<HTMLButtonElement>('.rpat-dir2-btn').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const dir = btn.getAttribute('data-dir') as 'one_direction' | 'symmetric';
+				if (dir && this.interaction?.rectangularPatternState) {
+					this.interaction.rectangularPatternState.direction2 = dir;
+					this.interaction.onRectangularPatternStateChange?.();
+					this.interaction.render();
+				}
+			});
+		});
+
+		// Distance 2 input
+		const inputDist2 = this.container.querySelector<HTMLInputElement>('#input-rpat-dist2');
+		inputDist2?.addEventListener('input', () => {
+			const val = parseFloat(inputDist2.value);
+			if (!isNaN(val) && isFinite(val) && this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.distance2 = val;
+				this.interaction.render();
+			}
+		});
+		inputDist2?.addEventListener('change', () => {
+			this.render();
+		});
+
+		// Quantity 2 input
+		const inputQty2 = this.container.querySelector<HTMLInputElement>('#input-rpat-qty2');
+		inputQty2?.addEventListener('input', () => {
+			const val = parseInt(inputQty2.value, 10);
+			if (!isNaN(val) && val >= 1 && this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.quantity2 = val;
+				this.interaction.render();
+			}
+		});
+		inputQty2?.addEventListener('change', () => {
+			this.render();
+		});
+
+		// Suppression checkbox
+		const checkRpatSuppression = this.container.querySelector<HTMLInputElement>('#check-rpat-suppression');
+		checkRpatSuppression?.addEventListener('change', () => {
+			if (this.interaction?.rectangularPatternState) {
+				this.interaction.rectangularPatternState.suppression = checkRpatSuppression.checked;
+				this.interaction.onRectangularPatternStateChange?.();
+				this.interaction.render();
+			}
+		});
+
+		// OK & Cancel buttons
+		const btnRpatOk = this.container.querySelector<HTMLButtonElement>('#btn-rpat-ok');
+		btnRpatOk?.addEventListener('click', () => {
+			this.interaction?.executeRectangularPattern();
+		});
+
+		const btnRpatCancel = this.container.querySelector<HTMLButtonElement>('#btn-rpat-cancel');
+		btnRpatCancel?.addEventListener('click', () => {
+			this.interaction?.cancelRectangularPattern();
+		});
+
+		const btnRpatCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-rpat-cancel-icon');
+		btnRpatCancelIcon?.addEventListener('click', () => {
+			this.interaction?.cancelRectangularPattern();
+		});
+
+		// Inspector Rectangular Pattern Constraint editing
+		if (selectedC instanceof RectangularPatternConstraint) {
+			this.container.querySelectorAll<HTMLButtonElement>('.insp-rpat-dir1-btn').forEach(btn => {
+				btn.addEventListener('click', () => {
+					const dir = btn.getAttribute('data-dir') as 'one_direction' | 'symmetric';
+					if (dir) {
+						this.sketch.updateRectangularPattern(selectedC.id, { direction1: dir });
+						this.render();
+						this.interaction?.render();
+					}
+				});
+			});
+
+			const inspDist1 = this.container.querySelector<HTMLInputElement>('#insp-rpat-dist1');
+			inspDist1?.addEventListener('input', () => {
+				const val = parseFloat(inspDist1.value);
+				if (!isNaN(val) && isFinite(val)) {
+					this.sketch.updateRectangularPattern(selectedC.id, { distance1: val });
+					this.interaction?.render();
+				}
+			});
+			inspDist1?.addEventListener('change', () => {
+				this.render();
+				this.interaction?.render();
+			});
+
+			const inspQty1 = this.container.querySelector<HTMLInputElement>('#insp-rpat-qty1');
+			inspQty1?.addEventListener('input', () => {
+				const val = parseInt(inspQty1.value, 10);
+				if (!isNaN(val) && val >= 1) {
+					this.sketch.updateRectangularPattern(selectedC.id, { quantity1: val });
+					this.render();
+					this.interaction?.render();
+				}
+			});
+
+			this.container.querySelectorAll<HTMLButtonElement>('.insp-rpat-dir2-btn').forEach(btn => {
+				btn.addEventListener('click', () => {
+					const dir = btn.getAttribute('data-dir') as 'one_direction' | 'symmetric';
+					if (dir) {
+						this.sketch.updateRectangularPattern(selectedC.id, { direction2: dir });
+						this.render();
+						this.interaction?.render();
+					}
+				});
+			});
+
+			const inspDist2 = this.container.querySelector<HTMLInputElement>('#insp-rpat-dist2');
+			inspDist2?.addEventListener('input', () => {
+				const val = parseFloat(inspDist2.value);
+				if (!isNaN(val) && isFinite(val)) {
+					this.sketch.updateRectangularPattern(selectedC.id, { distance2: val });
+					this.interaction?.render();
+				}
+			});
+			inspDist2?.addEventListener('change', () => {
+				this.render();
+				this.interaction?.render();
+			});
+
+			const inspQty2 = this.container.querySelector<HTMLInputElement>('#insp-rpat-qty2');
+			inspQty2?.addEventListener('input', () => {
+				const val = parseInt(inspQty2.value, 10);
+				if (!isNaN(val) && val >= 1) {
+					this.sketch.updateRectangularPattern(selectedC.id, { quantity2: val });
+					this.render();
+					this.interaction?.render();
+				}
+			});
+
+			const inspRpatSuppress = this.container.querySelector<HTMLInputElement>('#insp-rpat-suppression');
+			inspRpatSuppress?.addEventListener('change', () => {
+				this.sketch.updateRectangularPattern(selectedC.id, { suppression: inspRpatSuppress.checked });
 				this.render();
 				this.interaction?.render();
 			});

@@ -25,6 +25,8 @@ import {
 	SymmetryConstraint,
 	CircularPatternConstraint,
 	type PatternCopyData,
+	RectangularPatternConstraint,
+	type RectangularPatternCopyData,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -49,8 +51,8 @@ export interface SerializedConstraint {
 	orientation?: 'aligned' | 'horizontal' | 'vertical';
 	targetAngle?: number;
 	arcRadius?: number;
-	line1Id?: string;
-	line2Id?: string;
+	line1Id?: string | null;
+	line2Id?: string | null;
 	lineId?: string;
 	side?: number;
 	s1?: number;
@@ -103,7 +105,17 @@ export interface SerializedConstraint {
 	quantity?: number;
 	suppression?: boolean;
 	suppressedIndices?: number[];
-	copies?: PatternCopyData[];
+	copies?: PatternCopyData[] | RectangularPatternCopyData[];
+	line1P1Id?: string | null;
+	line1P2Id?: string | null;
+	line2P1Id?: string | null;
+	line2P2Id?: string | null;
+	quantity1?: number;
+	distance1?: number;
+	direction1?: 'one_direction' | 'symmetric';
+	quantity2?: number;
+	distance2?: number;
+	direction2?: 'one_direction' | 'symmetric';
 }
 
 export interface SketchSnapshot {
@@ -203,6 +215,23 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.distribution = c.distribution;
 		base.totalAngle = c.totalAngle;
 		base.quantity = c.quantity;
+		base.suppression = c.suppression;
+		base.suppressedIndices = [...c.suppressedIndices];
+		base.copies = JSON.parse(JSON.stringify(c.copies));
+	} else if (c instanceof RectangularPatternConstraint) {
+		base.sourceObjectIds = [...c.sourceObjectIds];
+		base.line1Id = c.line1Id;
+		base.line1P1Id = c.line1P1Id;
+		base.line1P2Id = c.line1P2Id;
+		base.line2Id = c.line2Id;
+		base.line2P1Id = c.line2P1Id;
+		base.line2P2Id = c.line2P2Id;
+		base.quantity1 = c.quantity1;
+		base.distance1 = c.distance1;
+		base.direction1 = c.direction1;
+		base.quantity2 = c.quantity2;
+		base.distance2 = c.distance2;
+		base.direction2 = c.direction2;
 		base.suppression = c.suppression;
 		base.suppressedIndices = [...c.suppressedIndices];
 		base.copies = JSON.parse(JSON.stringify(c.copies));
@@ -338,7 +367,29 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.quantity || 3,
 				d.suppression ?? false,
 				d.suppressedIndices || [],
-				d.copies || [],
+				(d.copies as PatternCopyData[]) || [],
+				d.weight
+			);
+			break;
+		case 'rectangular_pattern':
+			c = new RectangularPatternConstraint(
+				d.id,
+				d.sourceObjectIds || [],
+				d.line1Id ?? null,
+				d.line1P1Id,
+				d.line1P2Id,
+				d.line2Id ?? null,
+				d.line2P1Id,
+				d.line2P2Id,
+				d.quantity1 || 3,
+				d.distance1 ?? 0,
+				d.direction1 || 'one_direction',
+				d.quantity2 || 3,
+				d.distance2 ?? 0,
+				d.direction2 || 'one_direction',
+				d.suppression ?? false,
+				d.suppressedIndices || [],
+				(d.copies as RectangularPatternCopyData[]) || [],
 				d.weight
 			);
 			break;

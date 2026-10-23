@@ -22,6 +22,9 @@ import {
 	SymmetryConstraint,
 	CircularPatternConstraint,
 	computePatternCopyAngle,
+	RectangularPatternConstraint,
+	computeRectangularPatternOffset,
+	computeRectangularPatternDirections,
 } from '../solver/constraints';
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
@@ -387,6 +390,19 @@ export interface RenderOptions {
 		suppression: boolean;
 		suppressedIndices: Set<number>;
 	};
+	rectangularPatternHighlight?: {
+		selectedObjectIds: Set<string>;
+		line1Id: string | null;
+		line2Id: string | null;
+		quantity1: number;
+		distance1: number;
+		direction1: 'one_direction' | 'symmetric';
+		quantity2: number;
+		distance2: number;
+		direction2: 'one_direction' | 'symmetric';
+		suppression: boolean;
+		suppressedIndices: Set<number>;
+	};
 }
 
 export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
@@ -629,6 +645,7 @@ export class SVGRenderer {
 	private patternGroup: SVGGElement;
 	private patternCheckboxGroup: SVGGElement;
 	readonly patternCheckboxPositions = new Map<string, { x: number; y: number; copyIndex: number; constraintId?: string }>();
+	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
 	private previewGroup: SVGGElement;
 	private overlayGroup: SVGGElement;
 
@@ -697,6 +714,7 @@ export class SVGRenderer {
 
 	render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
 		this.patternCheckboxPositions.clear();
+		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
 		this.renderGrid(viewport, options.showGrid ?? true);
 		this.renderGeometry(sketch, viewport, options);
@@ -724,6 +742,13 @@ export class SVGRenderer {
 				options.patternHighlight.quantity,
 				options.patternHighlight.suppression,
 				options.patternHighlight.suppressedIndices
+			);
+		}
+		if (options.rectangularPatternHighlight) {
+			this.renderRectangularPatternPreview(
+				sketch,
+				viewport,
+				options.rectangularPatternHighlight
 			);
 		}
 	}
@@ -877,14 +902,18 @@ export class SVGRenderer {
 			const s1 = viewport.worldToScreen(p1.x, p1.y);
 			const s2 = viewport.worldToScreen(p2.x, p2.y);
 			const isMirrorLine = options.mirrorHighlight?.mirrorLineId === line.id;
+			const isDir1Line = options.rectangularPatternHighlight?.line1Id === line.id;
+			const isDir2Line = options.rectangularPatternHighlight?.line2Id === line.id;
 			const isMirrorSelected = options.mirrorHighlight?.selectedObjectIds.has(line.id);
-			const isPatternSelected = options.patternHighlight?.selectedObjectIds.has(line.id);
+			const isPatternSelected =
+				options.patternHighlight?.selectedObjectIds.has(line.id) ||
+				options.rectangularPatternHighlight?.selectedObjectIds.has(line.id);
 			const isSelected = sketch.selection.lineIds.has(line.id) || !!isMirrorSelected || !!isPatternSelected;
 
 			const lineG = createSvgElement('g', {
 				'data-id': line.id,
 				'data-type': 'line',
-				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${isMirrorLine ? 'is-mirror-line' : ''}`,
+				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${isMirrorLine ? 'is-mirror-line' : ''} ${isDir1Line || isDir2Line ? 'is-direction-line' : ''}`,
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px wide)
@@ -896,6 +925,24 @@ export class SVGRenderer {
 					class: 'entity-visible visible-primitive is-mirror-line',
 					fill: 'none',
 					stroke: '#f59e0b',
+					'stroke-width': 2.5,
+					'stroke-dasharray': '6 3',
+					'stroke-linecap': 'round',
+				}, lineG);
+			} else if (isDir1Line) {
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
+					class: 'entity-visible visible-primitive is-direction-line is-dir1-line',
+					fill: 'none',
+					stroke: '#2563eb',
+					'stroke-width': 2.5,
+					'stroke-dasharray': '6 3',
+					'stroke-linecap': 'round',
+				}, lineG);
+			} else if (isDir2Line) {
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
+					class: 'entity-visible visible-primitive is-direction-line is-dir2-line',
+					fill: 'none',
+					stroke: '#059669',
 					'stroke-width': 2.5,
 					'stroke-dasharray': '6 3',
 					'stroke-linecap': 'round',
@@ -912,7 +959,11 @@ export class SVGRenderer {
 
 			const sc = viewport.worldToScreen(center.x, center.y);
 			const sr = circle.radius * viewport.zoom;
-			const isSelected = sketch.selection.circleIds.has(circle.id) || !!options.mirrorHighlight?.selectedObjectIds.has(circle.id) || !!options.patternHighlight?.selectedObjectIds.has(circle.id);
+			const isSelected =
+				sketch.selection.circleIds.has(circle.id) ||
+				!!options.mirrorHighlight?.selectedObjectIds.has(circle.id) ||
+				!!options.patternHighlight?.selectedObjectIds.has(circle.id) ||
+				!!options.rectangularPatternHighlight?.selectedObjectIds.has(circle.id);
 
 			const circleG = createSvgElement('g', {
 				'data-id': circle.id,
@@ -941,7 +992,11 @@ export class SVGRenderer {
 			const ss = viewport.worldToScreen(start.x, start.y);
 			const se = viewport.worldToScreen(end.x, end.y);
 			const sr = arc.radius * viewport.zoom;
-			const isSelected = sketch.selection.arcIds.has(arc.id) || !!options.mirrorHighlight?.selectedObjectIds.has(arc.id) || !!options.patternHighlight?.selectedObjectIds.has(arc.id);
+			const isSelected =
+				sketch.selection.arcIds.has(arc.id) ||
+				!!options.mirrorHighlight?.selectedObjectIds.has(arc.id) ||
+				!!options.patternHighlight?.selectedObjectIds.has(arc.id) ||
+				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id);
 
 			const clockwise = !!arc.clockwise;
 			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
@@ -984,7 +1039,11 @@ export class SVGRenderer {
 			if (rx < 0.1 || ry < 0.1) continue;
 
 			const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
-			const isSelected = sketch.selection.ellipseIds.has(ellipse.id) || !!options.mirrorHighlight?.selectedObjectIds.has(ellipse.id) || !!options.patternHighlight?.selectedObjectIds.has(ellipse.id);
+			const isSelected =
+				sketch.selection.ellipseIds.has(ellipse.id) ||
+				!!options.mirrorHighlight?.selectedObjectIds.has(ellipse.id) ||
+				!!options.patternHighlight?.selectedObjectIds.has(ellipse.id) ||
+				!!options.rectangularPatternHighlight?.selectedObjectIds.has(ellipse.id);
 
 			const ellipseG = createSvgElement('g', {
 				'data-id': ellipse.id,
@@ -1029,7 +1088,11 @@ export class SVGRenderer {
 
 			const clockwise = !!arc.clockwise;
 			const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
-			const isSelected = sketch.selection.ellipticalArcIds.has(arc.id) || !!options.mirrorHighlight?.selectedObjectIds.has(arc.id) || !!options.patternHighlight?.selectedObjectIds.has(arc.id);
+			const isSelected =
+				sketch.selection.ellipticalArcIds.has(arc.id) ||
+				!!options.mirrorHighlight?.selectedObjectIds.has(arc.id) ||
+				!!options.patternHighlight?.selectedObjectIds.has(arc.id) ||
+				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id);
 
 			const arcG = createSvgElement('g', {
 				'data-id': arc.id,
@@ -1059,8 +1122,14 @@ export class SVGRenderer {
 		for (const pt of sketch.points.values()) {
 			const s = viewport.worldToScreen(pt.x, pt.y);
 			const isPatternCenter = options.patternHighlight?.centerPointId === pt.id;
-			const isPatternSelected = options.patternHighlight?.selectedObjectIds.has(pt.id);
-			const isSelected = sketch.selection.pointIds.has(pt.id) || !!options.mirrorHighlight?.selectedObjectIds.has(pt.id) || !!isPatternSelected || isPatternCenter;
+			const isPatternSelected =
+				options.patternHighlight?.selectedObjectIds.has(pt.id) ||
+				options.rectangularPatternHighlight?.selectedObjectIds.has(pt.id);
+			const isSelected =
+				sketch.selection.pointIds.has(pt.id) ||
+				!!options.mirrorHighlight?.selectedObjectIds.has(pt.id) ||
+				!!isPatternSelected ||
+				isPatternCenter;
 
 			const ptG = createSvgElement('g', {
 				'data-id': pt.id,
@@ -1151,7 +1220,9 @@ export class SVGRenderer {
 			} else if (constraint instanceof SymmetryConstraint) {
 				this.renderSymmetryBadge(constraint, sketch, viewport, isSelected);
 			} else if (constraint instanceof CircularPatternConstraint) {
-				this.renderCircularPatternBadge(constraint, sketch, viewport, isSelected);
+				this.renderCircularPatternBadge(constraint, sketch, viewport);
+			} else if (constraint instanceof RectangularPatternConstraint) {
+				this.renderRectangularPatternBadge(constraint, sketch, viewport);
 			}
 		}
 	}
@@ -1840,19 +1911,32 @@ export class SVGRenderer {
 		this.renderConstraintBadge(constraint.id, s2.x + 12, s2.y - 12, 'symmetry', isSelected, COLORS.primary);
 	}
 
+	private isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
+		const sel = sketch.selection;
+		return (
+			sel.constraintIds.has(constraintId) &&
+			sel.pointIds.size === 0 &&
+			sel.lineIds.size === 0 &&
+			sel.circleIds.size === 0 &&
+			sel.arcIds.size === 0 &&
+			sel.ellipseIds.size === 0 &&
+			sel.ellipticalArcIds.size === 0
+		);
+	}
+
 	private renderCircularPatternBadge(
 		constraint: CircularPatternConstraint,
 		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
+		viewport: Viewport
 	): void {
 		const pCtr = sketch.points.get(constraint.centerPtId);
 		if (!pCtr) return;
 
 		const sCtr = viewport.worldToScreen(pCtr.x, pCtr.y);
+		const isConstraintActive = this.isConstraintOnlySelected(constraint.id, sketch);
 
-		// Render suppression checkboxes and suppressed objects only when constraint is selected
-		if (constraint.suppression && isSelected) {
+		// Render suppression checkboxes and suppressed objects only when constraint itself is selected
+		if (constraint.suppression && isConstraintActive) {
 			const N = constraint.quantity;
 			const suppressedSet = new Set(constraint.suppressedIndices);
 			const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
@@ -1882,12 +1966,11 @@ export class SVGRenderer {
 						: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
 				} else {
 					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
-					const copyWorldPoints = this.renderRotatedObjects(
+					const copyWorldPoints = this.renderTransformedObjects(
 						sketch,
 						viewport,
 						constraint.sourceObjectIds,
-						pCtr,
-						aDeg,
+						{ center: pCtr, angleDeg: aDeg },
 						{
 							targetGroup: this.constraintGroup,
 							baseColor,
@@ -1925,7 +2008,283 @@ export class SVGRenderer {
 			}
 		}
 
-		this.renderConstraintBadge(constraint.id, sCtr.x + 14, sCtr.y - 14, 'circular_pattern', isSelected, COLORS.primary);
+		this.renderConstraintBadge(constraint.id, sCtr.x + 14, sCtr.y - 14, 'circular_pattern', isConstraintActive, COLORS.primary);
+	}
+
+	private renderRectangularPatternGizmos(
+		viewport: Viewport,
+		centroidWorld: { x: number; y: number },
+		u1: { x: number; y: number },
+		u2: { x: number; y: number },
+		distance1: number,
+		distance2: number,
+		options: {
+			targetGroup: SVGGElement;
+			constraintId?: string;
+		}
+	): void {
+		const sCtr = viewport.worldToScreen(centroidWorld.x, centroidWorld.y);
+
+		const p1Screen = viewport.worldToScreen(centroidWorld.x + u1.x, centroidWorld.y + u1.y);
+		const v1x = p1Screen.x - sCtr.x;
+		const v1y = p1Screen.y - sCtr.y;
+		const v1Len = Math.max(Math.hypot(v1x, v1y), 1e-6);
+		const u1Screen = { x: v1x / v1Len, y: v1y / v1Len };
+
+		const p2Screen = viewport.worldToScreen(centroidWorld.x + u2.x, centroidWorld.y + u2.y);
+		const v2x = p2Screen.x - sCtr.x;
+		const v2y = p2Screen.y - sCtr.y;
+		const v2Len = Math.max(Math.hypot(v2x, v2y), 1e-6);
+		const u2Screen = { x: v2x / v2Len, y: v2y / v2Len };
+
+		const h1World = { x: centroidWorld.x + distance1 * u1.x, y: centroidWorld.y + distance1 * u1.y };
+		const h1Screen = viewport.worldToScreen(h1World.x, h1World.y);
+
+		const h2World = { x: centroidWorld.x + distance2 * u2.x, y: centroidWorld.y + distance2 * u2.y };
+		const h2Screen = viewport.worldToScreen(h2World.x, h2World.y);
+
+		const gizmoG = createSvgElement('g', {
+			class: 'rectangular-pattern-gizmos',
+		}, options.targetGroup);
+
+		const renderArrow = (
+			from: { x: number; y: number },
+			to: { x: number; y: number },
+			dirScreen: { x: number; y: number },
+			color: string,
+			axisNum: 1 | 2,
+			distVal: number
+		) => {
+			const isNegative = distVal < -1e-3;
+			const aux = isNegative ? -dirScreen.x : dirScreen.x;
+			const auy = isNegative ? -dirScreen.y : dirScreen.y;
+			const apx = -auy;
+			const apy = aux;
+
+			const arrowLen = 18;
+			const arrowHalfWidth = 7.5;
+			const offsetDist = 48; // Offset equals initial line length at distance=0 (48px)
+
+			const tipX = to.x + offsetDist * aux;
+			const tipY = to.y + offsetDist * auy;
+			const baseCenterX = tipX - arrowLen * aux;
+			const baseCenterY = tipY - arrowLen * auy;
+
+			const base1X = baseCenterX + arrowHalfWidth * apx;
+			const base1Y = baseCenterY + arrowHalfWidth * apy;
+			const base2X = baseCenterX - arrowHalfWidth * apx;
+			const base2Y = baseCenterY - arrowHalfWidth * apy;
+
+			// Register handle centered on the arrowhead for dragging
+			const key = options.constraintId ? `gizmo-${axisNum}-${options.constraintId}` : `gizmo-${axisNum}`;
+			this.rectangularGizmoHandles.set(key, {
+				x: tipX - (arrowLen * 0.5) * aux,
+				y: tipY - (arrowLen * 0.5) * auy,
+				axis: axisNum,
+				constraintId: options.constraintId,
+			});
+
+			// Shaft line connecting origin to base of arrowhead (always solid, no dashed lines)
+			createSvgLine(from.x, from.y, baseCenterX, baseCenterY, {
+				stroke: color,
+				'stroke-width': 2.5,
+				'stroke-dasharray': 'none',
+				opacity: 0.9,
+				'pointer-events': 'none',
+			}, gizmoG);
+
+			// Arrowhead as the draggable gizmo handle (replaces circle)
+			const arrowPath = `M ${tipX} ${tipY} L ${base1X} ${base1Y} L ${base2X} ${base2Y} Z`;
+			createSvgPath(arrowPath, {
+				fill: color,
+				stroke: '#ffffff',
+				'stroke-width': 1.5,
+				'stroke-linejoin': 'round',
+				class: 'rectangular-pattern-gizmo-arrow',
+				filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.35))',
+				'data-axis': String(axisNum),
+			}, gizmoG);
+
+			// Distance label pill: without "d1:", "d2:", only the value
+			const labelText = `${distVal.toFixed(1)} mm`;
+			const pillWidth = labelText.length * 6.8 + 14;
+			const isHorizontal = Math.abs(aux) >= Math.abs(auy);
+
+			let pillX: number;
+			let pillY: number;
+
+			if (isHorizontal) {
+				// Horizontal arrow -> place label below the arrow
+				const midX = tipX - (arrowLen * 0.5) * aux;
+				const maxY = Math.max(from.y, tipY, base1Y, base2Y);
+				pillX = midX;
+				pillY = maxY + 16;
+			} else {
+				// Vertical arrow -> place label to the right of the arrow
+				const midY = tipY - (arrowLen * 0.5) * auy;
+				const maxX = Math.max(from.x, tipX, base1X, base2X);
+				pillX = maxX + 10 + pillWidth * 0.5;
+				pillY = midY;
+			}
+
+			createSvgRect(pillX - pillWidth * 0.5, pillY - 10, pillWidth, 20, {
+				rx: 4,
+				fill: '#0f172a',
+				stroke: color,
+				'stroke-width': 1.5,
+				opacity: 0.9,
+				'pointer-events': 'none',
+			}, gizmoG);
+
+			createSvgText(pillX, pillY + 3.5, labelText, {
+				'text-anchor': 'middle',
+				fill: '#f8fafc',
+				'font-size': 10,
+				'font-weight': 600,
+				'font-family': 'monospace',
+				'pointer-events': 'none',
+			}, gizmoG);
+		};
+
+		renderArrow(sCtr, h1Screen, u1Screen, '#2563eb', 1, distance1);
+		renderArrow(sCtr, h2Screen, u2Screen, '#059669', 2, distance2);
+	}
+
+	private renderRectangularPatternBadge(
+		constraint: RectangularPatternConstraint,
+		sketch: SketchDocument,
+		viewport: Viewport
+	): void {
+		let sumX = 0, sumY = 0, ptCount = 0;
+		for (const objId of constraint.sourceObjectIds) {
+			const pt = sketch.points.get(objId);
+			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
+			const l = sketch.lines.get(objId);
+			if (l) {
+				const p1 = sketch.points.get(l.p1Id);
+				const p2 = sketch.points.get(l.p2Id);
+				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
+				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+				continue;
+			}
+			const c = sketch.circles.get(objId);
+			if (c) {
+				const cp = sketch.points.get(c.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const a = sketch.arcs.get(objId);
+			if (a) {
+				const cp = sketch.points.get(a.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const el = sketch.ellipses.get(objId);
+			if (el) {
+				const cp = sketch.points.get(el.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const ea = sketch.ellipticalArcs.get(objId);
+			if (ea) {
+				const cp = sketch.points.get(ea.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+		}
+
+		if (ptCount === 0) return;
+		const centroidWorld = { x: sumX / ptCount, y: sumY / ptCount };
+		const sCtr = viewport.worldToScreen(centroidWorld.x, centroidWorld.y);
+
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of sketch.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const line1 = constraint.line1P1Id && constraint.line1P2Id ? { p1Id: constraint.line1P1Id, p2Id: constraint.line1P2Id } : null;
+		const line2 = constraint.line2P1Id && constraint.line2P2Id ? { p1Id: constraint.line2P1Id, p2Id: constraint.line2P2Id } : null;
+		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
+		const isConstraintActive = this.isConstraintOnlySelected(constraint.id, sketch);
+
+		if (isConstraintActive) {
+			this.renderRectangularPatternGizmos(viewport, centroidWorld, u1, u2, constraint.distance1, constraint.distance2, {
+				targetGroup: this.constraintGroup,
+				constraintId: constraint.id,
+			});
+
+			if (constraint.suppression) {
+				const suppressedSet = new Set(constraint.suppressedIndices);
+				const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
+				const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
+				const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+
+				const maxI = Math.abs(constraint.distance1) > 1e-6 ? constraint.quantity1 : 1;
+				const maxJ = Math.abs(constraint.distance2) > 1e-6 ? constraint.quantity2 : 1;
+
+				for (let i = 0; i < maxI; i++) {
+					for (let j = 0; j < maxJ; j++) {
+						if (i === 0 && j === 0) continue;
+						const copyIndex = i * 1000 + j;
+						const isSuppressed = suppressedSet.has(copyIndex);
+						const offset = computeRectangularPatternOffset(i, j, constraint.distance1, constraint.direction1, constraint.distance2, constraint.direction2, u1, u2);
+
+						let centroid: { x: number; y: number };
+						const copy = constraint.copies.find(cp => cp.copyIndex === copyIndex);
+
+						if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
+							let cSumX = 0, cSumY = 0, cCount = 0;
+							for (const pair of copy.pointPairs) {
+								const pt = sketch.points.get(pair.patternPtId);
+								if (pt) {
+									cSumX += pt.x;
+									cSumY += pt.y;
+									cCount++;
+								}
+							}
+							centroid = cCount > 0
+								? viewport.worldToScreen(cSumX / cCount, cSumY / cCount)
+								: viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+						} else {
+							const copyWorldPoints = this.renderTransformedObjects(
+								sketch,
+								viewport,
+								constraint.sourceObjectIds,
+								offset,
+								{
+									targetGroup: this.constraintGroup,
+									baseColor,
+									opacity: 0.25,
+									drawVertices: true,
+									skipRender: !isSuppressed,
+								}
+							);
+							if (copyWorldPoints.length > 0) {
+								let cSumX = 0, cSumY = 0;
+								for (const p of copyWorldPoints) {
+									cSumX += p.x;
+									cSumY += p.y;
+								}
+								centroid = viewport.worldToScreen(cSumX / copyWorldPoints.length, cSumY / copyWorldPoints.length);
+							} else {
+								centroid = viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+							}
+						}
+
+						this.patternCheckboxPositions.set(`c-${constraint.id}-${copyIndex}`, {
+							x: centroid.x,
+							y: centroid.y,
+							copyIndex,
+							constraintId: constraint.id,
+						});
+
+						this.renderPatternSuppressionCheckbox(centroid, copyIndex, isSuppressed, constraint.id);
+					}
+				}
+			}
+		}
+
+		this.renderConstraintBadge(constraint.id, sCtr.x + 14, sCtr.y - 14, 'rectangular_pattern', isConstraintActive, COLORS.primary);
 	}
 
 	private renderPatternSuppressionCheckbox(
@@ -1987,12 +2346,14 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderRotatedObjects(
+	private renderTransformedObjects(
 		sketch: SketchDocument,
 		viewport: Viewport,
 		objectIds: Iterable<string>,
-		centerPt: { x: number; y: number },
-		angleDeg: number,
+		transform:
+			| { center: { x: number; y: number }; angleDeg: number }
+			| { dx: number; dy: number }
+			| ((x: number, y: number) => { x: number; y: number }),
 		options: {
 			targetGroup?: SVGGElement;
 			baseColor?: string;
@@ -2003,18 +2364,28 @@ export class SVGRenderer {
 			skipRender?: boolean;
 		}
 	): Array<{ x: number; y: number }> {
-		const rad = (angleDeg * Math.PI) / 180;
-		const cosA = Math.cos(rad);
-		const sinA = Math.sin(rad);
-
-		const rotatePoint = (x: number, y: number): { x: number; y: number } => {
-			const dx = x - centerPt.x;
-			const dy = y - centerPt.y;
-			return {
-				x: centerPt.x + dx * cosA - dy * sinA,
-				y: centerPt.y + dx * sinA + dy * cosA,
+		let transformPoint: (x: number, y: number) => { x: number; y: number };
+		if (typeof transform === 'function') {
+			transformPoint = transform;
+		} else if ('angleDeg' in transform) {
+			const rad = (transform.angleDeg * Math.PI) / 180;
+			const cosA = Math.cos(rad);
+			const sinA = Math.sin(rad);
+			const cx = transform.center.x;
+			const cy = transform.center.y;
+			transformPoint = (x: number, y: number) => {
+				const dx = x - cx;
+				const dy = y - cy;
+				return {
+					x: cx + dx * cosA - dy * sinA,
+					y: cy + dx * sinA + dy * cosA,
+				};
 			};
-		};
+		} else {
+			const dx = transform.dx;
+			const dy = transform.dy;
+			transformPoint = (x: number, y: number) => ({ x: x + dx, y: y + dy });
+		}
 
 		const copyWorldPoints: Array<{ x: number; y: number }> = [];
 		const targetGroup = options.targetGroup;
@@ -2023,7 +2394,7 @@ export class SVGRenderer {
 		const baseColor = options.baseColor ?? COLORS.unconstrained;
 		const strokeWidth = options.strokeWidth ?? STROKE_WIDTH.normal;
 
-		const drawRotatedVertex = (screenPt: { x: number; y: number }) => {
+		const drawTransformedVertex = (screenPt: { x: number; y: number }) => {
 			if (!options.drawVertices || skipRender || !targetGroup) return;
 			createSvgCircle(screenPt.x, screenPt.y, 3.5, {
 				fill: baseColor === COLORS.constrained ? COLORS.constrained : COLORS.primary,
@@ -2044,8 +2415,8 @@ export class SVGRenderer {
 				const pt1 = sketch.points.get(l.p1Id);
 				const pt2 = sketch.points.get(l.p2Id);
 				if (pt1 && pt2) {
-					const rp1 = rotatePoint(pt1.x, pt1.y);
-					const rp2 = rotatePoint(pt2.x, pt2.y);
+					const rp1 = transformPoint(pt1.x, pt1.y);
+					const rp2 = transformPoint(pt2.x, pt2.y);
 					copyWorldPoints.push(rp1, rp2);
 
 					if (!skipRender && targetGroup) {
@@ -2053,8 +2424,8 @@ export class SVGRenderer {
 						const sp2 = viewport.worldToScreen(rp2.x, rp2.y);
 						createSvgLine(sp1.x, sp1.y, sp2.x, sp2.y, getAttrs(!!l.isConstruction), targetGroup);
 
-						drawRotatedVertex(sp1);
-						drawRotatedVertex(sp2);
+						drawTransformedVertex(sp1);
+						drawTransformedVertex(sp2);
 					}
 				}
 				continue;
@@ -2065,7 +2436,7 @@ export class SVGRenderer {
 			if (c) {
 				const origCtr = sketch.points.get(c.centerId);
 				if (origCtr) {
-					const rc = rotatePoint(origCtr.x, origCtr.y);
+					const rc = transformPoint(origCtr.x, origCtr.y);
 					copyWorldPoints.push(rc);
 
 					if (!skipRender && targetGroup) {
@@ -2073,7 +2444,7 @@ export class SVGRenderer {
 						const sr = c.radius * viewport.zoom;
 						createSvgCircle(sc.x, sc.y, sr, getAttrs(!!c.isConstruction), targetGroup);
 
-						drawRotatedVertex(sc);
+						drawTransformedVertex(sc);
 					}
 				}
 				continue;
@@ -2086,9 +2457,9 @@ export class SVGRenderer {
 				const origStart = sketch.points.get(a.startPointId);
 				const origEnd = sketch.points.get(a.endPointId);
 				if (origCtr && origStart && origEnd) {
-					const rc = rotatePoint(origCtr.x, origCtr.y);
-					const rs = rotatePoint(origStart.x, origStart.y);
-					const re = rotatePoint(origEnd.x, origEnd.y);
+					const rc = transformPoint(origCtr.x, origCtr.y);
+					const rs = transformPoint(origStart.x, origStart.y);
+					const re = transformPoint(origEnd.x, origEnd.y);
 					copyWorldPoints.push(rc, rs, re);
 
 					if (!skipRender && targetGroup) {
@@ -2100,9 +2471,9 @@ export class SVGRenderer {
 						const d = getArcSvgPath(sc, ss, se, sr, a.clockwise);
 						createSvgPath(d, getAttrs(!!a.isConstruction), targetGroup);
 
-						drawRotatedVertex(sc);
-						drawRotatedVertex(ss);
-						drawRotatedVertex(se);
+						drawTransformedVertex(sc);
+						drawTransformedVertex(ss);
+						drawTransformedVertex(se);
 					}
 				}
 				continue;
@@ -2115,9 +2486,9 @@ export class SVGRenderer {
 				const origMajor = sketch.points.get(e.majorAxisPointId);
 				const origMinor = sketch.points.get(e.minorAxisPointId);
 				if (origCtr && origMajor && origMinor) {
-					const rc = rotatePoint(origCtr.x, origCtr.y);
-					const rmaj = rotatePoint(origMajor.x, origMajor.y);
-					const rmin = rotatePoint(origMinor.x, origMinor.y);
+					const rc = transformPoint(origCtr.x, origCtr.y);
+					const rmaj = transformPoint(origMajor.x, origMajor.y);
+					const rmin = transformPoint(origMinor.x, origMinor.y);
 					copyWorldPoints.push(rc, rmaj, rmin);
 
 					if (!skipRender && targetGroup) {
@@ -2133,9 +2504,9 @@ export class SVGRenderer {
 							...getAttrs(!!e.isConstruction),
 						}, targetGroup);
 
-						drawRotatedVertex(src);
-						drawRotatedVertex(srmaj);
-						drawRotatedVertex(srmin);
+						drawTransformedVertex(src);
+						drawTransformedVertex(srmaj);
+						drawTransformedVertex(srmin);
 					}
 				}
 				continue;
@@ -2150,11 +2521,11 @@ export class SVGRenderer {
 				const origStart = sketch.points.get(elArc.startPointId);
 				const origEnd = sketch.points.get(elArc.endPointId);
 				if (origCtr && origMajor && origMinor && origStart && origEnd) {
-					const rc = rotatePoint(origCtr.x, origCtr.y);
-					const rmaj = rotatePoint(origMajor.x, origMajor.y);
-					const rmin = rotatePoint(origMinor.x, origMinor.y);
-					const rs = rotatePoint(origStart.x, origStart.y);
-					const re = rotatePoint(origEnd.x, origEnd.y);
+					const rc = transformPoint(origCtr.x, origCtr.y);
+					const rmaj = transformPoint(origMajor.x, origMajor.y);
+					const rmin = transformPoint(origMinor.x, origMinor.y);
+					const rs = transformPoint(origStart.x, origStart.y);
+					const re = transformPoint(origEnd.x, origEnd.y);
 					copyWorldPoints.push(rc, rmaj, rmin, rs, re);
 
 					if (!skipRender && targetGroup) {
@@ -2167,9 +2538,9 @@ export class SVGRenderer {
 
 						createSvgPath(d, getAttrs(!!elArc.isConstruction), targetGroup);
 
-						drawRotatedVertex(srs);
-						drawRotatedVertex(sre);
-						drawRotatedVertex(src);
+						drawTransformedVertex(srs);
+						drawTransformedVertex(sre);
+						drawTransformedVertex(src);
 					}
 				}
 				continue;
@@ -2178,19 +2549,18 @@ export class SVGRenderer {
 			// Standalone Point
 			const pt = sketch.points.get(objId);
 			if (pt) {
-				const rp = rotatePoint(pt.x, pt.y);
+				const rp = transformPoint(pt.x, pt.y);
 				copyWorldPoints.push(rp);
 
 				if (!skipRender && targetGroup) {
 					const srp = viewport.worldToScreen(rp.x, rp.y);
-					drawRotatedVertex(srp);
+					drawTransformedVertex(srp);
 				}
 			}
 		}
 
 		return copyWorldPoints;
 	}
-
 	private renderConstraintBadge(
 		id: string,
 		x: number,
@@ -2980,12 +3350,11 @@ export class SVGRenderer {
 			const isSuppressed = suppressedIndices.has(k);
 			const copyOpacity = isSuppressed ? 0.15 : 0.5;
 
-			const copyWorldPoints = this.renderRotatedObjects(
+			const copyWorldPoints = this.renderTransformedObjects(
 				sketch,
 				viewport,
 				selectedObjectIds,
-				centerPt,
-				aDeg,
+				{ center: centerPt, angleDeg: aDeg },
 				{
 					targetGroup: this.patternGroup,
 					baseColor,
@@ -3022,6 +3391,134 @@ export class SVGRenderer {
 				this.renderPatternSuppressionCheckbox(centroid, k, isSuppressed);
 			}
 		}
+	}
+
+	renderRectangularPatternPreview(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		highlight: {
+			selectedObjectIds: Set<string>;
+			line1Id: string | null;
+			line2Id: string | null;
+			quantity1: number;
+			distance1: number;
+			direction1: 'one_direction' | 'symmetric';
+			quantity2: number;
+			distance2: number;
+			direction2: 'one_direction' | 'symmetric';
+			suppression: boolean;
+			suppressedIndices: Set<number>;
+		}
+	): void {
+		this.patternGroup.innerHTML = '';
+		if (highlight.selectedObjectIds.size === 0) return;
+
+		let sumX = 0, sumY = 0, ptCount = 0;
+		for (const objId of highlight.selectedObjectIds) {
+			const pt = sketch.points.get(objId);
+			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
+			const l = sketch.lines.get(objId);
+			if (l) {
+				const p1 = sketch.points.get(l.p1Id);
+				const p2 = sketch.points.get(l.p2Id);
+				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
+				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+				continue;
+			}
+			const c = sketch.circles.get(objId);
+			if (c) {
+				const cp = sketch.points.get(c.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const a = sketch.arcs.get(objId);
+			if (a) {
+				const cp = sketch.points.get(a.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const el = sketch.ellipses.get(objId);
+			if (el) {
+				const cp = sketch.points.get(el.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const ea = sketch.ellipticalArcs.get(objId);
+			if (ea) {
+				const cp = sketch.points.get(ea.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+		}
+
+		if (ptCount === 0) return;
+		const centroidWorld = { x: sumX / ptCount, y: sumY / ptCount };
+
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of sketch.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const line1 = highlight.line1Id ? sketch.lines.get(highlight.line1Id) : null;
+		const line2 = highlight.line2Id ? sketch.lines.get(highlight.line2Id) : null;
+		const { u1, u2 } = computeRectangularPatternDirections(
+			paramMap,
+			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+		);
+
+		const maxI = Math.abs(highlight.distance1) > 1e-6 ? highlight.quantity1 : 1;
+		const maxJ = Math.abs(highlight.distance2) > 1e-6 ? highlight.quantity2 : 1;
+		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
+		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
+		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+
+		for (let i = 0; i < maxI; i++) {
+			for (let j = 0; j < maxJ; j++) {
+				if (i === 0 && j === 0) continue;
+				const copyIndex = i * 1000 + j;
+				const isSuppressed = highlight.suppressedIndices.has(copyIndex);
+				const copyOpacity = isSuppressed ? 0.15 : 0.5;
+				const offset = computeRectangularPatternOffset(i, j, highlight.distance1, highlight.direction1, highlight.distance2, highlight.direction2, u1, u2);
+
+				const copyWorldPoints = this.renderTransformedObjects(
+					sketch,
+					viewport,
+					highlight.selectedObjectIds,
+					offset,
+					{
+						targetGroup: this.patternGroup,
+						baseColor,
+						opacity: copyOpacity,
+						isSuppressed,
+						drawVertices: true,
+						strokeWidth: STROKE_WIDTH.normal,
+					}
+				);
+
+				let centroid: { x: number; y: number };
+				if (copyWorldPoints.length > 0) {
+					let cSumX = 0, cSumY = 0;
+					for (const p of copyWorldPoints) {
+						cSumX += p.x;
+						cSumY += p.y;
+					}
+					centroid = viewport.worldToScreen(cSumX / copyWorldPoints.length, cSumY / copyWorldPoints.length);
+				} else {
+					centroid = viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+				}
+
+				this.patternCheckboxPositions.set(`tool-${copyIndex}`, { x: centroid.x, y: centroid.y, copyIndex });
+
+				if (highlight.suppression) {
+					this.renderPatternSuppressionCheckbox(centroid, copyIndex, isSuppressed);
+				}
+			}
+		}
+
+		this.renderRectangularPatternGizmos(viewport, centroidWorld, u1, u2, highlight.distance1, highlight.distance2, {
+			targetGroup: this.patternGroup,
+		});
 	}
 
 	clearPreviews(): void {

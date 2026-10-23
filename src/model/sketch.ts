@@ -29,6 +29,10 @@ import {
 	type PatternCopyData,
 	type PatternPointPair,
 	type PatternRadiusPair,
+	RectangularPatternConstraint,
+	computeRectangularPatternOffset,
+	computeRectangularPatternDirections,
+	type RectangularPatternCopyData,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SelectionState } from './types';
 import { dist } from '../math/vector';
@@ -1327,6 +1331,326 @@ export class SketchDocument {
 		return true;
 	}
 
+	generateRectangularPatternCopy(
+		sourceObjectIds: string[],
+		i: number,
+		j: number,
+		distance1: number,
+		direction1: 'one_direction' | 'symmetric',
+		distance2: number,
+		direction2: 'one_direction' | 'symmetric',
+		u1: { x: number; y: number },
+		u2: { x: number; y: number }
+	): RectangularPatternCopyData | null {
+		const offset = computeRectangularPatternOffset(i, j, distance1, direction1, distance2, direction2, u1, u2);
+		const pointMap = new Map<string, string>();
+		const pointPairs: PatternPointPair[] = [];
+		const radiusPairs: PatternRadiusPair[] = [];
+		const createdEntityIds: Array<{
+			id: string;
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+		}> = [];
+
+		const getOrTranslatePoint = (origPtId: string): string => {
+			if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
+			const pt = this.points.get(origPtId);
+			if (!pt) return origPtId;
+
+			const tx = pt.x + offset.dx;
+			const ty = pt.y + offset.dy;
+
+			const newPt = this.addPoint(tx, ty, false);
+			pointMap.set(origPtId, newPt.id);
+			pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
+			createdEntityIds.push({ id: newPt.id, type: 'point' });
+			return newPt.id;
+		};
+
+		for (const objId of sourceObjectIds) {
+			const line = this.lines.get(objId);
+			if (line) {
+				const np1Id = getOrTranslatePoint(line.p1Id);
+				const np2Id = getOrTranslatePoint(line.p2Id);
+				if (np1Id !== np2Id) {
+					const newLine = this.addLine(np1Id, np2Id, line.isConstruction);
+					createdEntityIds.push({ id: newLine.id, type: 'line' });
+				}
+				continue;
+			}
+
+			const circle = this.circles.get(objId);
+			if (circle) {
+				const nCenterId = getOrTranslatePoint(circle.centerId);
+				const newCircle = this.addCircle(nCenterId, circle.radius, circle.isConstruction);
+				radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
+				createdEntityIds.push({ id: newCircle.id, type: 'circle' });
+				continue;
+			}
+
+			const arc = this.arcs.get(objId);
+			if (arc) {
+				const nCenterId = getOrTranslatePoint(arc.centerId);
+				const nStartId = getOrTranslatePoint(arc.startPointId);
+				const nEndId = getOrTranslatePoint(arc.endPointId);
+				const newArc = this.addArc(
+					nCenterId,
+					nStartId,
+					nEndId,
+					arc.radius,
+					arc.clockwise,
+					arc.isConstruction
+				);
+				radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
+				createdEntityIds.push({ id: newArc.id, type: 'arc' });
+				continue;
+			}
+
+			const ellipse = this.ellipses.get(objId);
+			if (ellipse) {
+				const nCenterId = getOrTranslatePoint(ellipse.centerId);
+				const nMajorId = getOrTranslatePoint(ellipse.majorAxisPointId);
+				const nMinorId = getOrTranslatePoint(ellipse.minorAxisPointId);
+				const newEllipse = this.addEllipse(
+					nCenterId,
+					nMajorId,
+					nMinorId,
+					ellipse.isConstruction
+				);
+				createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
+				continue;
+			}
+
+			const elArc = this.ellipticalArcs.get(objId);
+			if (elArc) {
+				const nCenterId = getOrTranslatePoint(elArc.centerId);
+				const nMajorId = getOrTranslatePoint(elArc.majorAxisPointId);
+				const nMinorId = getOrTranslatePoint(elArc.minorAxisPointId);
+				const nStartId = getOrTranslatePoint(elArc.startPointId);
+				const nEndId = getOrTranslatePoint(elArc.endPointId);
+				const newElArc = this.addEllipticalArc(
+					nCenterId,
+					nMajorId,
+					nMinorId,
+					nStartId,
+					nEndId,
+					elArc.clockwise,
+					elArc.isConstruction
+				);
+				createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
+				continue;
+			}
+
+			const pt = this.points.get(objId);
+			if (pt) {
+				getOrTranslatePoint(pt.id);
+				continue;
+			}
+		}
+
+		return {
+			copyIndex: i * 1000 + j,
+			i,
+			j,
+			pointPairs,
+			radiusPairs,
+			createdEntityIds,
+		};
+	}
+
+	addRectangularPatternConstraint(
+		sourceObjectIds: string[],
+		line1Id: string | null,
+		line2Id: string | null,
+		quantity1: number,
+		distance1: number,
+		direction1: 'one_direction' | 'symmetric',
+		quantity2: number,
+		distance2: number,
+		direction2: 'one_direction' | 'symmetric',
+		suppression: boolean,
+		suppressedIndices: number[],
+		copies: RectangularPatternCopyData[],
+		id?: string
+	): RectangularPatternConstraint | null {
+		const line1 = line1Id ? this.lines.get(line1Id) : null;
+		const line2 = line2Id ? this.lines.get(line2Id) : null;
+
+		const cid = id || this.nextId('c_rpat');
+		const c = new RectangularPatternConstraint(
+			cid,
+			sourceObjectIds,
+			line1Id,
+			line1?.p1Id,
+			line1?.p2Id,
+			line2Id,
+			line2?.p1Id,
+			line2?.p2Id,
+			quantity1,
+			distance1,
+			direction1,
+			quantity2,
+			distance2,
+			direction2,
+			suppression,
+			suppressedIndices,
+			copies,
+			1.0
+		);
+		this.addConstraint(c);
+		return c;
+	}
+
+	updateRectangularPattern(
+		constraintId: string,
+		updates: {
+			line1Id?: string | null;
+			line2Id?: string | null;
+			quantity1?: number;
+			distance1?: number;
+			direction1?: 'one_direction' | 'symmetric';
+			quantity2?: number;
+			distance2?: number;
+			direction2?: 'one_direction' | 'symmetric';
+			suppression?: boolean;
+			suppressedIndices?: number[];
+		}
+	): boolean {
+		const c = this.constraints.get(constraintId);
+		if (!c || !(c instanceof RectangularPatternConstraint)) return false;
+
+		this.beginTransaction();
+
+		const newLine1Id = updates.line1Id !== undefined ? updates.line1Id : c.line1Id;
+		const newLine2Id = updates.line2Id !== undefined ? updates.line2Id : c.line2Id;
+		const newQty1 = updates.quantity1 !== undefined ? Math.max(1, Math.round(updates.quantity1)) : c.quantity1;
+		const newDist1 = updates.distance1 !== undefined ? updates.distance1 : c.distance1;
+		const newDir1 = updates.direction1 !== undefined ? updates.direction1 : c.direction1;
+		const newQty2 = updates.quantity2 !== undefined ? Math.max(1, Math.round(updates.quantity2)) : c.quantity2;
+		const newDist2 = updates.distance2 !== undefined ? updates.distance2 : c.distance2;
+		const newDir2 = updates.direction2 !== undefined ? updates.direction2 : c.direction2;
+		const newSuppression = updates.suppression !== undefined ? updates.suppression : c.suppression;
+		const newSuppressed = updates.suppressedIndices !== undefined ? new Set(updates.suppressedIndices) : new Set(c.suppressedIndices);
+
+		const line1 = newLine1Id ? this.lines.get(newLine1Id) : null;
+		const line2 = newLine2Id ? this.lines.get(newLine2Id) : null;
+
+		c.line1Id = newLine1Id;
+		c.line1P1Id = line1?.p1Id ?? null;
+		c.line1P2Id = line1?.p2Id ?? null;
+		c.line2Id = newLine2Id;
+		c.line2P1Id = line2?.p1Id ?? null;
+		c.line2P2Id = line2?.p2Id ?? null;
+		c.quantity1 = newQty1;
+		c.distance1 = newDist1;
+		c.direction1 = newDir1;
+		c.quantity2 = newQty2;
+		c.distance2 = newDist2;
+		c.direction2 = newDir2;
+		c.suppression = newSuppression;
+		c.suppressedIndices = Array.from(newSuppressed);
+
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of this.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const { u1, u2 } = computeRectangularPatternDirections(
+			paramMap,
+			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+		);
+
+		const maxI = Math.abs(newDist1) > 1e-6 ? newQty1 : 1;
+		const maxJ = Math.abs(newDist2) > 1e-6 ? newQty2 : 1;
+
+		const neededKeys = new Map<number, { i: number; j: number }>();
+		for (let i = 0; i < maxI; i++) {
+			for (let j = 0; j < maxJ; j++) {
+				if (i === 0 && j === 0) continue;
+				const key = i * 1000 + j;
+				if (newSuppression && newSuppressed.has(key)) continue;
+				neededKeys.set(key, { i, j });
+			}
+		}
+
+		// 1. Remove copies that are no longer needed
+		for (let idx = c.copies.length - 1; idx >= 0; idx--) {
+			const copy = c.copies[idx];
+			if (!neededKeys.has(copy.copyIndex)) {
+				this.deletePatternCopy(copy);
+				c.copies.splice(idx, 1);
+			}
+		}
+
+		// 2. Add newly needed copies
+		for (const [key, coords] of neededKeys.entries()) {
+			const existingIndex = c.copies.findIndex(cp => cp.copyIndex === key);
+			if (existingIndex < 0) {
+				const newCopy = this.generateRectangularPatternCopy(
+					c.sourceObjectIds,
+					coords.i,
+					coords.j,
+					newDist1,
+					newDir1,
+					newDist2,
+					newDir2,
+					u1,
+					u2
+				);
+				if (newCopy) {
+					c.copies.push(newCopy);
+				}
+			}
+		}
+
+		// 3. Update coordinates of existing copies
+		for (const copy of c.copies) {
+			const offset = computeRectangularPatternOffset(
+				copy.i,
+				copy.j,
+				newDist1,
+				newDir1,
+				newDist2,
+				newDir2,
+				u1,
+				u2
+			);
+			for (const pair of copy.pointPairs) {
+				const sPt = this.points.get(pair.sourcePtId);
+				const pPt = this.points.get(pair.patternPtId);
+				if (sPt && pPt) {
+					pPt.x = sPt.x + offset.dx;
+					pPt.y = sPt.y + offset.dy;
+				}
+			}
+		}
+
+		// 4. Update entityIds on BaseConstraint
+		const entityIdSet = new Set<string>();
+		if (c.line1P1Id) entityIdSet.add(c.line1P1Id);
+		if (c.line1P2Id) entityIdSet.add(c.line1P2Id);
+		if (c.line2P1Id) entityIdSet.add(c.line2P1Id);
+		if (c.line2P2Id) entityIdSet.add(c.line2P2Id);
+		for (const copy of c.copies) {
+			for (const pair of copy.pointPairs) {
+				entityIdSet.add(pair.sourcePtId);
+				entityIdSet.add(pair.patternPtId);
+			}
+			if (copy.radiusPairs) {
+				for (const pair of copy.radiusPairs) {
+					entityIdSet.add(pair.sourceCircleId);
+					entityIdSet.add(pair.patternCircleId);
+				}
+			}
+		}
+		(c as any).entityIds = Array.from(entityIdSet);
+
+		this.rebuildParamManager();
+		this.solve();
+		this.commitTransaction();
+		return true;
+	}
+
 	addPerpendicularConstraint(line1Id: string, line2Id: string): PerpendicularConstraint | null {
 		const l1 = this.lines.get(line1Id);
 		const l2 = this.lines.get(line2Id);
@@ -1509,6 +1833,33 @@ export class SketchDocument {
 					this.constraints.delete(cid);
 					this.selection.constraintIds.delete(cid);
 					continue;
+				}
+				const hasAnySource = constraint.sourceObjectIds.some(
+					id =>
+						this.lines.has(id) ||
+						this.circles.has(id) ||
+						this.arcs.has(id) ||
+						this.ellipses.has(id) ||
+						this.ellipticalArcs.has(id) ||
+						this.points.has(id)
+				);
+				if (!hasAnySource) {
+					this.constraints.delete(cid);
+					this.selection.constraintIds.delete(cid);
+					continue;
+				}
+				continue;
+			}
+			if (constraint instanceof RectangularPatternConstraint) {
+				if (constraint.line1Id && !this.lines.has(constraint.line1Id)) {
+					constraint.line1Id = null;
+					constraint.line1P1Id = null;
+					constraint.line1P2Id = null;
+				}
+				if (constraint.line2Id && !this.lines.has(constraint.line2Id)) {
+					constraint.line2Id = null;
+					constraint.line2P1Id = null;
+					constraint.line2P2Id = null;
 				}
 				const hasAnySource = constraint.sourceObjectIds.some(
 					id =>
@@ -2156,6 +2507,32 @@ export class SketchDocument {
 			}
 			if (cpat.copies) {
 				for (const copy of cpat.copies) {
+					for (const item of copy.createdEntityIds) {
+						if (item.type === 'line' && this.lines.has(item.id)) add(item.id, 'line');
+						else if (item.type === 'circle' && this.circles.has(item.id)) add(item.id, 'circle');
+						else if (item.type === 'arc' && this.arcs.has(item.id)) add(item.id, 'arc');
+						else if (item.type === 'ellipse' && this.ellipses.has(item.id)) add(item.id, 'ellipse');
+						else if (item.type === 'elliptical_arc' && this.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
+						else if (item.type === 'point' && this.points.has(item.id)) add(item.id, 'point');
+					}
+				}
+			}
+		} else if (c.type === 'rectangular_pattern') {
+			const rpat = c as RectangularPatternConstraint;
+			if (rpat.line1Id && this.lines.has(rpat.line1Id)) add(rpat.line1Id, 'line');
+			if (rpat.line2Id && this.lines.has(rpat.line2Id)) add(rpat.line2Id, 'line');
+			if (rpat.sourceObjectIds) {
+				for (const id of rpat.sourceObjectIds) {
+					if (this.lines.has(id)) add(id, 'line');
+					else if (this.circles.has(id)) add(id, 'circle');
+					else if (this.arcs.has(id)) add(id, 'arc');
+					else if (this.ellipses.has(id)) add(id, 'ellipse');
+					else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
+					else if (this.points.has(id)) add(id, 'point');
+				}
+			}
+			if (rpat.copies) {
+				for (const copy of rpat.copies) {
 					for (const item of copy.createdEntityIds) {
 						if (item.type === 'line' && this.lines.has(item.id)) add(item.id, 'line');
 						else if (item.type === 'circle' && this.circles.has(item.id)) add(item.id, 'circle');

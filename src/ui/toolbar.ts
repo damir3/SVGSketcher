@@ -50,6 +50,10 @@ export class Toolbar {
 						${ICONS.circular_pattern}
 						<span class="btn-tooltip">Circular Pattern</span>
 					</button>
+					<button class="tool-btn" data-tool="rectangular_pattern" id="tool-rectangular-pattern" title="Rectangular Pattern">
+						${ICONS.rectangular_pattern}
+						<span class="btn-tooltip">Rectangular Pattern</span>
+					</button>
 				</div>
 			</div>
 
