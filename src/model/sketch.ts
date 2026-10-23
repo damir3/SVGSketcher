@@ -15,6 +15,7 @@ import {
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
 	TangentLineCircleConstraint,
+	TangentCircleCircleConstraint,
 	ConcentricConstraint,
 	MidpointConstraint,
 	DragPointConstraint,
@@ -1719,29 +1720,86 @@ export class SketchDocument {
 		return c;
 	}
 
-	addTangentConstraint(lineId: string, circleOrArcId: string): TangentLineCircleConstraint | null {
-		const line = this.lines.get(lineId);
-		const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
-		if (!line || !circle) return null;
+	addTangentConstraint(
+		entity1Id: string,
+		entity2Id: string
+	): TangentLineCircleConstraint | TangentCircleCircleConstraint | null {
+		const line1 = this.lines.get(entity1Id);
+		const line2 = this.lines.get(entity2Id);
+		const circ1 = this.circles.get(entity1Id) ?? this.arcs.get(entity1Id);
+		const circ2 = this.circles.get(entity2Id) ?? this.arcs.get(entity2Id);
 
-		const existing = [...this.constraints.values()].find(
-			c =>
-				c instanceof TangentLineCircleConstraint &&
-				c.circleId === circleOrArcId &&
-				this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)
-		);
-		if (existing) return existing as TangentLineCircleConstraint;
+		// Case 1: Line and Circle/Arc
+		if ((line1 && circ2) || (line2 && circ1)) {
+			const line = line1 ?? line2!;
+			const circ = circ2 ?? circ1!;
 
-		const c = new TangentLineCircleConstraint(
-			this.nextId('c_tang'),
-			line.p1Id,
-			line.p2Id,
-			circle.centerId,
-			circleOrArcId,
-			this.getTangentSide(line, circle.centerId)
-		);
-		this.addConstraint(c);
-		return c;
+			const existing = [...this.constraints.values()].find(
+				c =>
+					c instanceof TangentLineCircleConstraint &&
+					c.circleId === circ.id &&
+					this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)
+			);
+			if (existing) return existing as TangentLineCircleConstraint;
+
+			const c = new TangentLineCircleConstraint(
+				this.nextId('c_tang'),
+				line.p1Id,
+				line.p2Id,
+				circ.centerId,
+				circ.id,
+				this.getTangentSide(line, circ.centerId)
+			);
+			this.addConstraint(c);
+			return c;
+		}
+
+		// Case 2: Circle/Arc and Circle/Arc
+		if (circ1 && circ2 && circ1.id !== circ2.id) {
+			const existing = [...this.constraints.values()].find(
+				c =>
+					c instanceof TangentCircleCircleConstraint &&
+					((c.circle1Id === circ1.id && c.circle2Id === circ2.id) ||
+						(c.circle1Id === circ2.id && c.circle2Id === circ1.id))
+			);
+			if (existing) return existing as TangentCircleCircleConstraint;
+
+			const center1 = this.points.get(circ1.centerId);
+			const center2 = this.points.get(circ2.centerId);
+			if (!center1 || !center2) return null;
+
+			const d = dist(center1, center2);
+			const r1 = circ1.radius;
+			const r2 = circ2.radius;
+
+			const errExt = Math.abs(d - (r1 + r2));
+			const errInt = Math.abs(d - Math.abs(r1 - r2));
+
+			const isInternal = errInt < errExt;
+			let outerCircleId: string | null = null;
+			if (isInternal) {
+				outerCircleId = r1 >= r2 ? circ1.id : circ2.id;
+			}
+
+			const c = new TangentCircleCircleConstraint(
+				this.nextId('c_tang'),
+				circ1.centerId,
+				circ1.id,
+				circ2.centerId,
+				circ2.id,
+				isInternal,
+				outerCircleId
+			);
+			this.addConstraint(c);
+			return c;
+		}
+
+		return null;
+	}
+
+	addCircleTangentConstraint(c1Id: string, c2Id: string): TangentCircleCircleConstraint | null {
+		const res = this.addTangentConstraint(c1Id, c2Id);
+		return res instanceof TangentCircleCircleConstraint ? res : null;
 	}
 
 	/**
@@ -2378,6 +2436,8 @@ export class SketchDocument {
 					}
 				} else if (c.type === 'tangent_line_circle') {
 					if (anyC.circleId === id) res.push(c);
+				} else if (c.type === 'tangent_circle_circle') {
+					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
 				} else if (c.type === 'point_on_circle') {
 					if (anyC.circleId === id) res.push(c);
 				} else if (c.entityIds.includes(id)) {
@@ -2399,6 +2459,8 @@ export class SketchDocument {
 					}
 				} else if (c.type === 'tangent_line_circle') {
 					if (anyC.circleId === id) res.push(c);
+				} else if (c.type === 'tangent_circle_circle') {
+					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
 				} else if (c.type === 'point_on_circle') {
 					if (anyC.circleId === id) res.push(c);
 				} else if (c.entityIds.includes(id)) {
@@ -2571,6 +2633,13 @@ export class SketchDocument {
 			const cid = anyC.circleId;
 			if (this.circles.has(cid)) add(cid, 'circle');
 			else if (this.arcs.has(cid)) add(cid, 'arc');
+		} else if (c.type === 'tangent_circle_circle') {
+			const c1 = anyC.circle1Id;
+			if (this.circles.has(c1)) add(c1, 'circle');
+			else if (this.arcs.has(c1)) add(c1, 'arc');
+			const c2 = anyC.circle2Id;
+			if (this.circles.has(c2)) add(c2, 'circle');
+			else if (this.arcs.has(c2)) add(c2, 'arc');
 		} else if (c.type === 'concentric') {
 			const e1 =
 				[...this.circles.values()].find(circ => circ.centerId === anyC.c1CenterId) ??

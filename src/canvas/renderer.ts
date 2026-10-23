@@ -11,6 +11,7 @@ import {
 	EqualLengthConstraint,
 	EqualRadiusConstraint,
 	TangentLineCircleConstraint,
+	TangentCircleCircleConstraint,
 	ConcentricConstraint,
 	MidpointConstraint,
 	PointOnLineConstraint,
@@ -1202,6 +1203,8 @@ export class SVGRenderer {
 				this.renderBadgeOnCircle(constraint.id, constraint.circle2Id, sketch, viewport, '=', isSelected);
 			} else if (constraint instanceof TangentLineCircleConstraint) {
 				this.renderTangentBadge(constraint, sketch, viewport, isSelected, lineBadgeCounts);
+			} else if (constraint instanceof TangentCircleCircleConstraint) {
+				this.renderTangentCircleCircleBadge(constraint, sketch, viewport, isSelected);
 			} else if (constraint instanceof ConcentricConstraint) {
 				this.renderConcentricBadge(constraint, sketch, viewport, isSelected);
 			} else if (constraint instanceof MidpointConstraint) {
@@ -1774,41 +1777,7 @@ export class SVGRenderer {
 		const distToSeg = t < 0 ? -t : t > lineLen ? t - lineLen : 0;
 		const distToCirc = Math.abs(normDist - rScreen);
 
-		let isNearArc = true;
-		if (arc) {
-			const start = sketch.points.get(arc.startPointId);
-			const end = sketch.points.get(arc.endPointId);
-			if (start && end) {
-				const ss = viewport.worldToScreen(start.x, start.y);
-				const se = viewport.worldToScreen(end.x, end.y);
-				const as = Math.atan2(ss.y - sCenter.y, ss.x - sCenter.x);
-				const ae = Math.atan2(se.y - sCenter.y, se.x - sCenter.x);
-				const aTan = Math.atan2(tanY - sCenter.y, tanX - sCenter.x);
-				const clockwise = !!arc.clockwise;
-
-				let totalSweep = 0;
-				let tanSweep = 0;
-				if (clockwise) {
-					totalSweep = (ae - as) % TWO_PI;
-					if (totalSweep < 0) totalSweep += TWO_PI;
-					tanSweep = (aTan - as) % TWO_PI;
-					if (tanSweep < 0) tanSweep += TWO_PI;
-				} else {
-					totalSweep = (as - ae) % TWO_PI;
-					if (totalSweep < 0) totalSweep += TWO_PI;
-					tanSweep = (as - aTan) % TWO_PI;
-					if (tanSweep < 0) tanSweep += TWO_PI;
-				}
-
-				if (tanSweep > totalSweep) {
-					const excessAngle = Math.min(tanSweep - totalSweep, TWO_PI - tanSweep);
-					if (excessAngle * rScreen > 60) {
-						isNearArc = false;
-					}
-				}
-			}
-		}
-
+		const isNearArc = arc ? this.isAngleNearArc(arc, center, tanX, tanY, sketch, viewport, rScreen) : true;
 		const isNear = distToSeg < 60 && distToCirc < 60 && isNearArc;
 
 		if (isNear) {
@@ -1822,6 +1791,146 @@ export class SVGRenderer {
 		// Fallback if entities are completely disconnected and far apart
 		this.renderBadgeOnSegment(constraint.id, constraint.lineP1Id, constraint.lineP2Id, sketch, viewport, 'tangent', isSelected, lineBadgeCounts);
 		this.renderBadgeOnCircle(constraint.id, constraint.circleId, sketch, viewport, 'tangent', isSelected);
+	}
+
+	private isAngleNearArc(
+		arc: { startPointId: string; endPointId: string; clockwise?: boolean },
+		center: { x: number; y: number },
+		px: number,
+		py: number,
+		sketch: SketchDocument,
+		viewport: Viewport,
+		rScreen: number
+	): boolean {
+		const start = sketch.points.get(arc.startPointId);
+		const end = sketch.points.get(arc.endPointId);
+		if (!start || !end) return true;
+
+		const sCenter = viewport.worldToScreen(center.x, center.y);
+		const ss = viewport.worldToScreen(start.x, start.y);
+		const se = viewport.worldToScreen(end.x, end.y);
+		const as = Math.atan2(ss.y - sCenter.y, ss.x - sCenter.x);
+		const ae = Math.atan2(se.y - sCenter.y, se.x - sCenter.x);
+		const aPt = Math.atan2(py - sCenter.y, px - sCenter.x);
+		const clockwise = !!arc.clockwise;
+
+		let totalSweep = 0;
+		let ptSweep = 0;
+		if (clockwise) {
+			totalSweep = (ae - as) % TWO_PI;
+			if (totalSweep < 0) totalSweep += TWO_PI;
+			ptSweep = (aPt - as) % TWO_PI;
+			if (ptSweep < 0) ptSweep += TWO_PI;
+		} else {
+			totalSweep = (as - ae) % TWO_PI;
+			if (totalSweep < 0) totalSweep += TWO_PI;
+			ptSweep = (as - aPt) % TWO_PI;
+			if (ptSweep < 0) ptSweep += TWO_PI;
+		}
+
+		if (ptSweep > totalSweep) {
+			const excessAngle = Math.min(ptSweep - totalSweep, TWO_PI - ptSweep);
+			if (excessAngle * rScreen > 60) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private renderTangentCircleCircleBadge(
+		constraint: TangentCircleCircleConstraint,
+		sketch: SketchDocument,
+		viewport: Viewport,
+		isSelected: boolean
+	): void {
+		const circle1 = sketch.circles.get(constraint.circle1Id);
+		const arc1 = sketch.arcs.get(constraint.circle1Id);
+		const entity1 = circle1 ?? arc1;
+
+		const circle2 = sketch.circles.get(constraint.circle2Id);
+		const arc2 = sketch.arcs.get(constraint.circle2Id);
+		const entity2 = circle2 ?? arc2;
+
+		if (!entity1 || !entity2) return;
+
+		const center1 = sketch.points.get(entity1.centerId);
+		const center2 = sketch.points.get(entity2.centerId);
+		if (!center1 || !center2) return;
+
+		const sCenter1 = viewport.worldToScreen(center1.x, center1.y);
+		const sCenter2 = viewport.worldToScreen(center2.x, center2.y);
+		const r1Screen = entity1.radius * viewport.zoom;
+		const r2Screen = entity2.radius * viewport.zoom;
+
+		const dx = sCenter2.x - sCenter1.x;
+		const dy = sCenter2.y - sCenter1.y;
+		const distScreen = Math.hypot(dx, dy);
+
+		let ux = 1;
+		let uy = 0;
+		if (distScreen > 1e-4) {
+			ux = dx / distScreen;
+			uy = dy / distScreen;
+		}
+
+		let tanPt1X: number;
+		let tanPt1Y: number;
+		let tanPt2X: number;
+		let tanPt2Y: number;
+
+		const isInternal = constraint.isInternal;
+		const outerId = constraint.outerCircleId;
+
+		if (!isInternal || !outerId) {
+			// External tangency: contact point is along ux between the centers
+			tanPt1X = sCenter1.x + ux * r1Screen;
+			tanPt1Y = sCenter1.y + uy * r1Screen;
+			tanPt2X = sCenter2.x - ux * r2Screen;
+			tanPt2Y = sCenter2.y - uy * r2Screen;
+		} else if (outerId === constraint.circle1Id) {
+			// Circle 2 is inside Circle 1: contact point is along ux past center 2
+			tanPt1X = sCenter1.x + ux * r1Screen;
+			tanPt1Y = sCenter1.y + uy * r1Screen;
+			tanPt2X = sCenter2.x + ux * r2Screen;
+			tanPt2Y = sCenter2.y + uy * r2Screen;
+		} else {
+			// Circle 1 is inside Circle 2: contact point is along -ux past center 1
+			tanPt1X = sCenter1.x - ux * r1Screen;
+			tanPt1Y = sCenter1.y - uy * r1Screen;
+			tanPt2X = sCenter2.x - ux * r2Screen;
+			tanPt2Y = sCenter2.y - uy * r2Screen;
+		}
+
+		const tanX = (tanPt1X + tanPt2X) * 0.5;
+		const tanY = (tanPt1Y + tanPt2Y) * 0.5;
+
+		const distBetweenContactPts = Math.hypot(tanPt2X - tanPt1X, tanPt2Y - tanPt1Y);
+
+		let isNearArc1 = true;
+		if (arc1) {
+			isNearArc1 = this.isAngleNearArc(arc1, center1, tanX, tanY, sketch, viewport, r1Screen);
+		}
+		let isNearArc2 = true;
+		if (arc2) {
+			isNearArc2 = this.isAngleNearArc(arc2, center2, tanX, tanY, sketch, viewport, r2Screen);
+		}
+
+		const isNear = distBetweenContactPts < 60 && isNearArc1 && isNearArc2;
+
+		if (isNear) {
+			// Place badge along the common tangent line (perpendicular to center-to-center line)
+			const nx = -uy;
+			const ny = ux;
+			const offset = 14;
+			const badgeX = tanX + nx * offset;
+			const badgeY = tanY + ny * offset;
+			this.renderConstraintBadge(constraint.id, badgeX, badgeY, 'tangent', isSelected);
+			return;
+		}
+
+		// Fallback if entities are disconnected / far apart
+		this.renderBadgeOnCircle(constraint.id, constraint.circle1Id, sketch, viewport, 'tangent', isSelected);
+		this.renderBadgeOnCircle(constraint.id, constraint.circle2Id, sketch, viewport, 'tangent', isSelected);
 	}
 
 	private renderBadgeOnSegment(

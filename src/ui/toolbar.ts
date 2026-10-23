@@ -134,7 +134,7 @@ export class Toolbar {
 						${ICONS.perpendicular}
 						<span class="btn-tooltip">Perpendicular</span>
 					</button>
-					<button class="tool-btn" data-constraint="tangent" title="Tangent (1 line + 1 circle)">
+					<button class="tool-btn" data-constraint="tangent" title="Tangent (1 line + 1 circle, or 2 circles)">
 						${ICONS.tangent}
 						<span class="btn-tooltip">Tangent</span>
 					</button>

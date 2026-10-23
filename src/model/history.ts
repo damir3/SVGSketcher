@@ -15,6 +15,7 @@ import {
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
 	TangentLineCircleConstraint,
+	TangentCircleCircleConstraint,
 	ConcentricConstraint,
 	MidpointConstraint,
 	AngleConstraint,
@@ -63,6 +64,10 @@ export interface SerializedConstraint {
 	circle1Id?: string;
 	circle2Id?: string;
 	circleCenterId?: string;
+	circle1CenterId?: string;
+	circle2CenterId?: string;
+	isInternal?: boolean;
+	outerCircleId?: string | null;
 	targetRadius?: number;
 	leaderAngle?: number;
 	displayMode?: 'radius' | 'diameter';
@@ -254,6 +259,13 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.circleCenterId = c.circleCenterId;
 		base.circleId = c.circleId;
 		base.initialSide = c.initialSide;
+	} else if (c instanceof TangentCircleCircleConstraint) {
+		base.circle1CenterId = c.circle1CenterId;
+		base.circle1Id = c.circle1Id;
+		base.circle2CenterId = c.circle2CenterId;
+		base.circle2Id = c.circle2Id;
+		base.isInternal = c.isInternal;
+		base.outerCircleId = c.outerCircleId;
 	} else if (c instanceof ConcentricConstraint) {
 		base.c1CenterId = c.c1CenterId;
 		base.c2CenterId = c.c2CenterId;
@@ -410,6 +422,18 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.circleCenterId!,
 				d.circleId!,
 				d.initialSide ?? 1,
+				d.weight
+			);
+			break;
+		case 'tangent_circle_circle':
+			c = new TangentCircleCircleConstraint(
+				d.id,
+				d.circle1CenterId!,
+				d.circle1Id!,
+				d.circle2CenterId!,
+				d.circle2Id!,
+				d.isInternal ?? false,
+				d.outerCircleId ?? null,
 				d.weight
 			);
 			break;

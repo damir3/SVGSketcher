@@ -5012,7 +5012,11 @@ export class CanvasInteraction {
 			}
 			case 'tangent': {
 				sel.pointIds.clear();
-				sel.arcIds.clear();
+				if (sel.lineIds.size > 1) sel.lineIds.clear();
+				if (sel.circleIds.size + sel.arcIds.size > 2) {
+					sel.circleIds.clear();
+					sel.arcIds.clear();
+				}
 				break;
 			}
 			case 'point_on_line':
@@ -5154,7 +5158,10 @@ export class CanvasInteraction {
 			case 'perpendicular':
 				return lCount === 2 && pCount === 0 && cCount === 0;
 			case 'tangent':
-				return lCount === 1 && cCount === 1 && pCount === 0;
+				return (
+					((lCount === 1 && cCount === 1) || (cCount === 2 && lCount === 0)) &&
+					pCount === 0
+				);
 			case 'concentric':
 				return cCount === 2 && pCount === 0 && lCount === 0;
 			case 'point_on_line':
@@ -5392,6 +5399,10 @@ export class CanvasInteraction {
 			case 'tangent': {
 				if (lIds.length === 1 && cIds.length === 1) {
 					this.sketch.addTangentConstraint(lIds[0], cIds[0]);
+					applied = true;
+					toastMsg = 'Tangent constraint applied';
+				} else if (cIds.length === 2 && lIds.length === 0) {
+					this.sketch.addTangentConstraint(cIds[0], cIds[1]);
 					applied = true;
 					toastMsg = 'Tangent constraint applied';
 				}
@@ -5648,11 +5659,21 @@ export class CanvasInteraction {
 				break;
 			}
 			case 'tangent': {
-				if (type === 'line' && sel.lineIds.size >= 1) {
-					sel.lineIds.clear();
-				} else if ((type === 'circle' || type === 'arc') && (sel.circleIds.size + sel.arcIds.size >= 1)) {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
+				if (type === 'line') {
+					if (sel.lineIds.size >= 1 || (sel.circleIds.size + sel.arcIds.size >= 2)) {
+						sel.lineIds.clear();
+						sel.circleIds.clear();
+						sel.arcIds.clear();
+					}
+				} else if (type === 'circle' || type === 'arc') {
+					if (
+						(sel.circleIds.size + sel.arcIds.size >= 2) ||
+						(sel.lineIds.size >= 1 && (sel.circleIds.size + sel.arcIds.size >= 1))
+					) {
+						sel.lineIds.clear();
+						sel.circleIds.clear();
+						sel.arcIds.clear();
+					}
 				}
 				break;
 			}

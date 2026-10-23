@@ -14,6 +14,7 @@ export type ConstraintType =
 	| 'perpendicular'
 	| 'concentric'
 	| 'tangent_line_circle'
+	| 'tangent_circle_circle'
 	| 'midpoint'
 	| 'drag_point'
 	| 'angle'

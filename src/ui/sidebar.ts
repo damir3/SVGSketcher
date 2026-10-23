@@ -1230,7 +1230,8 @@ export class Sidebar {
 			case 'parallel': return ICONS.parallel;
 			case 'collinear': return ICONS.collinear;
 			case 'perpendicular': return ICONS.perpendicular;
-			case 'tangent_line_circle': return ICONS.tangent;
+			case 'tangent_line_circle':
+			case 'tangent_circle_circle': return ICONS.tangent;
 			case 'concentric': return ICONS.concentric;
 			case 'point_on_line': return ICONS.pointOnLine;
 			case 'point_on_circle': return ICONS.pointOnLine;
