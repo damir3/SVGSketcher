@@ -503,11 +503,24 @@ html, body {
 }
 
 .inspector-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   font-weight: 700;
   color: var(--cad-blue);
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 4px;
+}
+
+.inspector-card-title .val-badge {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.inspector-card-title + .inspector-divider {
+  display: none;
 }
 
 .inspector-row {

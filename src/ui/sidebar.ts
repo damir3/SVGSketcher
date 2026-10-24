@@ -546,7 +546,6 @@ export class Sidebar {
 					<div class="inspector-card">
 						<div class="inspector-card-title">${line.id}</div>
 						<div class="inspector-row"><span>Length:</span> <strong>${length} mm</strong></div>
-						<div class="inspector-row"><span>Type:</span> <strong>${line.isConstruction ? 'Construction' : 'Solid'}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this line')}
 					</div>
 				`;
@@ -568,7 +567,6 @@ export class Sidebar {
 						<div class="inspector-card-title">${circ.id}</div>
 						<div class="inspector-row"><span>Radius:</span> <strong>${circ.radius.toFixed(1)} mm</strong></div>
 						<div class="inspector-row"><span>Diameter:</span> <strong>${(circ.radius * 2).toFixed(1)} mm</strong></div>
-						<div class="inspector-row"><span>Type:</span> <strong>${circ.isConstruction ? 'Construction' : 'Solid'}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this circle')}
 					</div>
 				`;
@@ -587,22 +585,20 @@ export class Sidebar {
 				const center = this.sketch.points.get(arc.centerId);
 				const start = this.sketch.points.get(arc.startPointId);
 				const end = this.sketch.points.get(arc.endPointId);
-				let arcLen = '?';
+				let angleDeg = '?';
 				if (center && start && end) {
 					const as = Math.atan2(start.y - center.y, start.x - center.x);
 					const ae = Math.atan2(end.y - center.y, end.x - center.x);
 					let sweep = arc.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
 					if (sweep < 0) sweep += 2 * Math.PI;
-					arcLen = (arc.radius * sweep).toFixed(1);
+					angleDeg = `${((sweep * 180) / Math.PI).toFixed(1)}°`;
 				}
 				const relatedConstraints = this.sketch.getConstraintsForEntity('arc', arc.id);
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${arc.id}</div>
 						<div class="inspector-row"><span>Radius:</span> <strong>${arc.radius.toFixed(1)} mm</strong></div>
-						<div class="inspector-row"><span>Length:</span> <strong>${arcLen} mm</strong></div>
-						<div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
-						<div class="inspector-row"><span>Type:</span> <strong>${arc.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+						<div class="inspector-row"><span>Angle:</span> <strong>${angleDeg}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this arc')}
 					</div>
 				`;
@@ -637,7 +633,6 @@ export class Sidebar {
 						<div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
 						<div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
 						<div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
-						<div class="inspector-row"><span>Type:</span> <strong>${ellipse.isConstruction ? 'Construction' : 'Solid'}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this ellipse')}
 					</div>
 				`;
@@ -673,7 +668,6 @@ export class Sidebar {
 						<div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
 						<div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
 						<div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
-						<div class="inspector-row"><span>Type:</span> <strong>${arc.isConstruction ? 'Construction' : 'Solid'}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this elliptical arc')}
 					</div>
 				`;
@@ -696,7 +690,6 @@ export class Sidebar {
 						<div class="inspector-row"><span>Type:</span> <strong>${spline.splineType === 'fit' ? 'Fit Point Spline' : 'Control Point Spline'}</strong></div>
 						<div class="inspector-row"><span>Points:</span> <strong>${spline.pointIds.length} points</strong></div>
 						<div class="inspector-row"><span>Closed:</span> <strong>${spline.isClosed ? 'Yes' : 'No'}</strong></div>
-						<div class="inspector-row"><span>Style:</span> <strong>${spline.isConstruction ? 'Construction' : 'Solid'}</strong></div>
 					</div>
 				`;
 			}
@@ -996,13 +989,34 @@ export class Sidebar {
 						</div>
 					`;
 				} else {
+					let title = c.name;
+					let valBadge = '';
+					if (c instanceof DistanceConstraint) {
+						title =
+							c.orientation === 'horizontal'
+								? 'Horizontal Distance'
+								: c.orientation === 'vertical'
+								? 'Vertical Distance'
+								: 'Distance';
+						valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+					} else if (c instanceof PointToLineDistanceConstraint) {
+						title = 'Point-to-Line Distance';
+						valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+					} else if (c instanceof AngleConstraint) {
+						title = 'Angle';
+						valBadge = `<span class="val-badge">${c.targetAngle.toFixed(1)}°</span>`;
+					} else if (c instanceof RadiusConstraint) {
+						title = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
+						const val = c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius;
+						valBadge = `<span class="val-badge">${c.displayMode === 'diameter' ? 'Ø ' : 'R '}${val.toFixed(1)} mm</span>`;
+					}
+
 					detailsHtml = `
 						<div class="inspector-card">
-							<div class="inspector-card-title">${c instanceof DistanceConstraint ? (c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance') : c instanceof PointToLineDistanceConstraint ? 'Point-to-Line Distance' : c instanceof AngleConstraint ? 'Angle' : c.name}</div>
-							${c instanceof DistanceConstraint ? `<div class="inspector-row"><span>${c.orientation === 'horizontal' ? 'Horizontal Distance' : c.orientation === 'vertical' ? 'Vertical Distance' : 'Distance'}:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
-							${c instanceof PointToLineDistanceConstraint ? `<div class="inspector-row"><span>Distance:</span> <strong>${c.targetDistance.toFixed(1)} mm</strong></div>` : ''}
-							${c instanceof AngleConstraint ? `<div class="inspector-row"><span>Angle:</span> <strong>${c.targetAngle.toFixed(1)}°</strong></div>` : ''}
-							${c instanceof RadiusConstraint ? `<div class="inspector-row"><span>${c.displayMode === 'diameter' ? 'Diameter' : 'Radius'}:</span> <strong>${(c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius).toFixed(1)} mm</strong></div>` : ''}
+							<div class="inspector-card-title">
+								<span>${title}</span>
+								${valBadge}
+							</div>
 							${this.renderPrimitivesSublist(relatedPrimitives)}
 						</div>
 					`;
@@ -1068,15 +1082,18 @@ export class Sidebar {
 	}
 
 	private renderConstraintsSublist(constraints: any[], entityName: string): string {
+		const visibleConstraints = constraints.filter(
+			c => c.type !== 'arc_endpoints' && c.type !== 'elliptical_arc_endpoints'
+		);
 		return `
 			<div class="inspector-divider"></div>
 			<div class="inspector-constraints-section">
 				<div class="inspector-constraints-header">
-					<span class="inspector-constraints-title">Constraints (${constraints.length})</span>
+					<span class="inspector-constraints-title">Constraints (${visibleConstraints.length})</span>
 				</div>
 				<div class="inspector-constraints-list">
-					${constraints.map(c => this.renderConstraintItem(c)).join('')}
-					${constraints.length === 0 ? `<div class="inspector-empty-constraints">No constraints on ${entityName}</div>` : ''}
+					${visibleConstraints.map(c => this.renderConstraintItem(c)).join('')}
+					${visibleConstraints.length === 0 ? `<div class="inspector-empty-constraints">No constraints on ${entityName}</div>` : ''}
 				</div>
 			</div>
 		`;

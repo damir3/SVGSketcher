@@ -584,6 +584,8 @@ export class SketchDocument {
 		const c = this.constraints.get(id);
 		if (!c) return;
 		if (this.isSplineInternalConstraint(c)) return;
+		if (c instanceof ArcEndpointsConstraint || c.type === 'arc_endpoints') return;
+		if (c instanceof EllipticalArcEndpointsConstraint || c.type === 'elliptical_arc_endpoints') return;
 		this.pushHistory();
 		if (c instanceof FixedConstraint) {
 			const pt = this.points.get(c.pointId);
