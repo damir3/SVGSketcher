@@ -746,6 +746,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 	suppression: boolean;
 	suppressedIndices: number[];
 	copies: PatternCopyData[];
+	isReadOnly?: boolean;
 
 	constructor(
 		id: string,
@@ -757,7 +758,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 		suppression: boolean,
 		suppressedIndices: number[],
 		copies: PatternCopyData[],
-		weight = 1.0
+		weight = 1.0,
+		isReadOnly = false
 	) {
 		const entityIdSet = new Set<string>();
 		entityIdSet.add(centerPtId);
@@ -783,6 +785,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		this.suppression = suppression;
 		this.suppressedIndices = [...suppressedIndices];
 		this.copies = copies;
+		this.isReadOnly = !!isReadOnly;
 	}
 
 	override getEquationsCount(): number {

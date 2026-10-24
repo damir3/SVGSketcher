@@ -1345,7 +1345,8 @@ export class SketchDocument {
 		suppression: boolean,
 		suppressedIndices: number[],
 		copies: PatternCopyData[],
-		id?: string
+		id?: string,
+		isReadOnly?: boolean
 	): CircularPatternConstraint | null {
 		if (!this.points.has(centerPtId)) return null;
 
@@ -1360,7 +1361,8 @@ export class SketchDocument {
 			suppression,
 			suppressedIndices,
 			copies,
-			1.0
+			1.0,
+			isReadOnly
 		);
 		this.addConstraint(c);
 		return c;
@@ -1377,7 +1379,7 @@ export class SketchDocument {
 		}
 	): boolean {
 		const c = this.constraints.get(constraintId);
-		if (!c || !(c instanceof CircularPatternConstraint)) return false;
+		if (!c || !(c instanceof CircularPatternConstraint) || c.isReadOnly) return false;
 
 		this.beginTransaction();
 
@@ -1472,6 +1474,90 @@ export class SketchDocument {
 		this.solve();
 		this.commitTransaction();
 		return true;
+	}
+
+	addPolygon(
+		centerPointId: string,
+		inradius: number,
+		sides: number,
+		angleRad: number,
+		isConstruction = false,
+		addDistanceConstraint = false
+	): {
+		centerPoint: SketchPoint;
+		vertices: SketchPoint[];
+		lines: SketchLine[];
+		constraint: CircularPatternConstraint;
+		distanceConstraint?: PointToLineDistanceConstraint;
+	} | null {
+		const centerPt = this.points.get(centerPointId);
+		if (!centerPt) return null;
+
+		const N = Math.max(3, Math.round(sides));
+		if (inradius <= 1e-4) return null;
+
+		this.beginTransaction();
+
+		const R = inradius / Math.cos(Math.PI / N);
+		const baseAngle = angleRad - Math.PI / N;
+		const step = (2 * Math.PI) / N;
+
+		const vertices: SketchPoint[] = [];
+		for (let k = 0; k < N; k++) {
+			const a = baseAngle + k * step;
+			const vx = centerPt.x + R * Math.cos(a);
+			const vy = centerPt.y + R * Math.sin(a);
+			const pt = this.addPoint(vx, vy, false);
+			vertices.push(pt);
+		}
+
+		const lines: SketchLine[] = [];
+		for (let k = 0; k < N; k++) {
+			const nextK = (k + 1) % N;
+			const line = this.addLine(vertices[k].id, vertices[nextK].id, isConstruction);
+			lines.push(line);
+		}
+
+		const copies: PatternCopyData[] = [];
+		for (let k = 1; k < N; k++) {
+			copies.push({
+				copyIndex: k,
+				pointPairs: [{ sourcePtId: vertices[0].id, patternPtId: vertices[k].id }],
+				createdEntityIds: [{ id: vertices[k].id, type: 'point' }],
+			});
+		}
+
+		const constraint = this.addCircularPatternConstraint(
+			centerPointId,
+			[vertices[0].id],
+			'full',
+			360,
+			N,
+			false,
+			[],
+			copies,
+			undefined,
+			true // isReadOnly
+		);
+
+		let distanceConstraint: PointToLineDistanceConstraint | undefined;
+		if (addDistanceConstraint && lines.length > 0) {
+			const distC = this.addPointToLineDistanceConstraint(centerPointId, lines[0].id, inradius);
+			if (distC) distanceConstraint = distC;
+		}
+
+		this.commitTransaction();
+		this.solve();
+
+		if (!constraint) return null;
+
+		return {
+			centerPoint: centerPt,
+			vertices,
+			lines,
+			constraint,
+			distanceConstraint,
+		};
 	}
 
 	generateRectangularPatternCopy(
@@ -2095,6 +2181,16 @@ export class SketchDocument {
 						this.points.has(id)
 				);
 				if (!hasAnySource) {
+					this.constraints.delete(cid);
+					this.selection.constraintIds.delete(cid);
+					continue;
+				}
+				const hasMissingPoint = constraint.copies.some(copy =>
+					copy.pointPairs.some(
+						pair => !this.points.has(pair.sourcePtId) || !this.points.has(pair.patternPtId)
+					)
+				);
+				if (hasMissingPoint) {
 					this.constraints.delete(cid);
 					this.selection.constraintIds.delete(cid);
 					continue;

@@ -122,6 +122,7 @@ export interface SerializedConstraint {
 	quantity2?: number;
 	distance2?: number;
 	direction2?: 'one_direction' | 'symmetric';
+	isReadOnly?: boolean;
 }
 
 export interface SketchSnapshot {
@@ -225,6 +226,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.suppression = c.suppression;
 		base.suppressedIndices = [...c.suppressedIndices];
 		base.copies = JSON.parse(JSON.stringify(c.copies));
+		if (c.isReadOnly) base.isReadOnly = true;
 	} else if (c instanceof RectangularPatternConstraint) {
 		base.sourceObjectIds = [...c.sourceObjectIds];
 		base.line1Id = c.line1Id;
@@ -383,7 +385,8 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.suppression ?? false,
 				d.suppressedIndices || [],
 				(d.copies as PatternCopyData[]) || [],
-				d.weight
+				d.weight,
+				!!d.isReadOnly
 			);
 			break;
 		case 'rectangular_pattern':

@@ -847,9 +847,25 @@ export class Sidebar {
 			if (c) {
 				const relatedPrimitives = this.sketch.getEntitiesForConstraint(c);
 				if (c instanceof CircularPatternConstraint) {
-					const totalCopies = Math.max(1, c.quantity - 1);
-					const activeCopies = totalCopies - c.suppressedIndices.length;
-					detailsHtml = `
+					if (c.isReadOnly) {
+						detailsHtml = `
+						<div class="inspector-card">
+							<div class="inspector-card-title">
+								<span class="panel-card-icon">${ICONS.polygon}</span>
+								<span>Polygon Pattern</span>
+							</div>
+							<div style="margin-top: 10px;">
+								<button type="button" class="btn-sidebar-delete-constraint" data-delete-id="${c.id}" style="width: 100%; padding: 6px 10px; font-size: 12px; font-weight: 600; color: #dc2626; background: rgba(220, 38, 38, 0.08); border: 1px solid rgba(220, 38, 38, 0.2); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+									${ICONS.delete} Delete Constraint
+								</button>
+							</div>
+							${this.renderPrimitivesSublist(relatedPrimitives)}
+						</div>
+					`;
+					} else {
+						const totalCopies = Math.max(1, c.quantity - 1);
+						const activeCopies = totalCopies - c.suppressedIndices.length;
+						detailsHtml = `
 						<div class="inspector-card">
 							<div class="inspector-card-title">
 								<span class="panel-card-icon">${ICONS.circular_pattern}</span>
@@ -895,6 +911,7 @@ export class Sidebar {
 							${this.renderPrimitivesSublist(relatedPrimitives)}
 						</div>
 					`;
+					}
 				} else if (c instanceof RectangularPatternConstraint) {
 					const maxI = Math.abs(c.distance1) > 1e-6 ? c.quantity1 : 1;
 					const maxJ = Math.abs(c.distance2) > 1e-6 ? c.quantity2 : 1;
@@ -1240,15 +1257,17 @@ export class Sidebar {
 				: `<span class="val-badge">R ${c.targetRadius.toFixed(1)} mm</span>`;
 			name = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
 		} else if (c instanceof CircularPatternConstraint) {
-			const label = c.distribution === 'full' ? `${c.quantity}x Full` : `${c.quantity}x ${c.totalAngle.toFixed(1)}°`;
+			const label = c.isReadOnly
+				? `${c.quantity} Vertices`
+				: (c.distribution === 'full' ? `${c.quantity}x Full` : `${c.quantity}x ${c.totalAngle.toFixed(1)}°`);
 			valBadge = `<span class="val-badge">${label}</span>`;
-			name = 'Circular Pattern';
+			name = c.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern';
 		}
 
 		return `
 			<div class="tree-item constraint-item ${isSelected ? 'selected' : ''}" data-type="constraint" data-id="${c.id}">
 				<div class="tree-item-info">
-					<span class="tree-icon">${this.getConstraintIcon(c.type)}</span>
+					<span class="tree-icon">${c instanceof CircularPatternConstraint && c.isReadOnly ? ICONS.polygon : this.getConstraintIcon(c.type)}</span>
 					<span class="tree-name">${name}</span>
 					${valBadge}
 				</div>
@@ -1642,7 +1661,7 @@ export class Sidebar {
 		// Inspector Circular Pattern Constraint editing
 		const selectedConstraintId = [...this.sketch.selection.constraintIds][0];
 		const selectedC = selectedConstraintId ? this.sketch.constraints.get(selectedConstraintId) : null;
-		if (selectedC instanceof CircularPatternConstraint) {
+		if (selectedC instanceof CircularPatternConstraint && !selectedC.isReadOnly) {
 			this.container.querySelectorAll<HTMLButtonElement>('.insp-cpat-dist-btn').forEach(btn => {
 				btn.addEventListener('click', () => {
 					const dist = btn.getAttribute('data-dist') as 'full' | 'partial' | 'symmetric';
@@ -1684,6 +1703,18 @@ export class Sidebar {
 				this.interaction?.render();
 			});
 		}
+
+		// Delete constraint button in inspector
+		this.container.querySelectorAll<HTMLButtonElement>('.btn-sidebar-delete-constraint').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const cid = btn.getAttribute('data-delete-id');
+				if (cid) {
+					this.sketch.removeConstraint(cid);
+					this.render();
+					this.interaction?.render();
+				}
+			});
+		});
 
 		// Rectangular Pattern Tool events
 		const btnRpatPhaseObjects = this.container.querySelector<HTMLButtonElement>('#btn-rpat-phase-objects');

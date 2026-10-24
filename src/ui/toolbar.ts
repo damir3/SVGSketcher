@@ -78,6 +78,10 @@ export class Toolbar {
 						${ICONS.circle}
 						<span class="btn-tooltip">Circle (C)</span>
 					</button>
+					<button class="tool-btn" data-tool="polygon" title="Polygon (G)">
+						${ICONS.polygon}
+						<span class="btn-tooltip">Polygon (G)</span>
+					</button>
 					<button class="tool-btn" data-tool="arc_center" title="Centerpoint Arc (A)">
 						${ICONS.arc_center}
 						<span class="btn-tooltip">Center Arc (A)</span>

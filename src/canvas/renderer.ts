@@ -2406,7 +2406,7 @@ export class SVGRenderer {
 		const isConstraintActive = this.isConstraintOnlySelected(constraint.id, sketch);
 
 		// Render suppression checkboxes and suppressed objects only when constraint itself is selected
-		if (constraint.suppression && isConstraintActive) {
+		if (constraint.suppression && isConstraintActive && !constraint.isReadOnly) {
 			const N = constraint.quantity;
 			const suppressedSet = new Set(constraint.suppressedIndices);
 			const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
@@ -3314,6 +3314,79 @@ export class SVGRenderer {
 		createSvgRect(rx, ry, rw, rh, getPreviewStrokeAttrs(isConstruction), this.previewGroup);
 
 		this.renderTooltip(s2.x + 12, s2.y - 12, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
+	}
+
+	renderPolygonPreview(
+		sCtr: Vec2,
+		_sCurrent: Vec2,
+		centerWorld: Vec2,
+		_currentWorld: Vec2,
+		sides: number,
+		inradius: number,
+		angleRad: number,
+		isConstruction = false,
+		viewport: Viewport
+	): void {
+		this.previewGroup.innerHTML = '';
+
+		const N = Math.max(3, Math.round(sides));
+		const R = inradius / Math.cos(Math.PI / N);
+		const sInradius = inradius * viewport.zoom;
+
+		// 1. Inscribed guide circle (dashed faint outline)
+		createSvgCircle(sCtr.x, sCtr.y, sInradius, GUIDE_OUTLINE_ATTRS, this.previewGroup);
+
+		// 2. Auxiliary ray from center to current point (tangency point on incircle / midpoint of first edge)
+		const midWorld: Vec2 = {
+			x: centerWorld.x + inradius * Math.cos(angleRad),
+			y: centerWorld.y + inradius * Math.sin(angleRad),
+		};
+		const midScreen = viewport.worldToScreen(midWorld.x, midWorld.y);
+		createSvgLine(sCtr.x, sCtr.y, midScreen.x, midScreen.y, AUX_RAY_ATTRS, this.previewGroup);
+
+		// 3. Polygon vertices in world coordinates, transformed to screen
+		const baseAngle = angleRad - Math.PI / N;
+		const step = (2 * Math.PI) / N;
+		const pts: Vec2[] = [];
+		for (let i = 0; i < N; i++) {
+			const a = baseAngle + i * step;
+			const wx = centerWorld.x + R * Math.cos(a);
+			const wy = centerWorld.y + R * Math.sin(a);
+			pts.push(viewport.worldToScreen(wx, wy));
+		}
+
+		// 4. Polygon outline path
+		if (pts.length >= 3) {
+			let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+			for (let i = 1; i < pts.length; i++) {
+				d += ` L ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}`;
+			}
+			d += ' Z';
+			createSvgPath(d, getPreviewStrokeAttrs(isConstruction), this.previewGroup);
+		}
+
+		// 5. Draw vertex dots
+		for (const pt of pts) {
+			createSvgCircle(pt.x, pt.y, 2.5, {
+				fill: COLORS.primary,
+				stroke: COLORS.white,
+				'stroke-width': '1',
+			}, this.previewGroup);
+		}
+
+		// 6. Center marker
+		createSvgCircle(sCtr.x, sCtr.y, 3, {
+			fill: COLORS.primary,
+			stroke: COLORS.white,
+			'stroke-width': '1',
+		}, this.previewGroup);
+
+		// 7. Midpoint marker on incircle
+		createSvgCircle(midScreen.x, midScreen.y, 2.5, {
+			fill: COLORS.constrained,
+			stroke: COLORS.white,
+			'stroke-width': '1',
+		}, this.previewGroup);
 	}
 
 	renderEllipseMajorAxisPreview(sc: Vec2, current: Vec2, radiusVal: number, _isConstruction = false): void {

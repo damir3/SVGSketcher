@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "tsx --test test/spline.test.ts"
+    "test": "tsx --test test/*.test.ts"
   },
   "devDependencies": {
     "tsx": "^4.23.15",

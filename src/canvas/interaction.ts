@@ -14,9 +14,11 @@ import {
 	RectangularPatternConstraint,
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
+	type PatternCopyData,
 } from '../solver/constraints';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline } from '../model/types';
 import { showToast } from '../ui/toast';
+import { PolygonPopup } from '../ui/polygon-popup';
 import {
 	sketchPrimitiveToGeoCurve,
 	getAllGeoCurves,
@@ -38,6 +40,7 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'point',
 	'line',
 	'circle',
+	'polygon',
 	'arc',
 	'arc_center',
 	'rectangle',
@@ -212,6 +215,15 @@ export class CanvasInteraction {
 	// Elliptical arc tracking state
 	private ellipticalArcPrevAngle: number | null = null;
 	private ellipticalArcTotalAngle = 0;
+
+	// Polygon tool state
+	polygonPopup: PolygonPopup;
+	polygonSides = 6;
+	polygonRadius = 50;
+	polygonCenterPtId: string | null = null;
+	polygonCenterWorldPos: Vec2 | null = null;
+	polygonRadiusLocked = false;
+	polygonCurrentAngle = 0;
 
 	// Dragging point state
 	private isDraggingPoint = false;
@@ -391,6 +403,51 @@ export class CanvasInteraction {
 		this.sketch.onChange(() => {
 			this.updateConstructionState();
 		});
+
+		this.polygonPopup = new PolygonPopup();
+		this.polygonPopup.onValuesChange = (sides, radius, isRadiusChanged) => {
+			this.polygonSides = sides;
+			if (isRadiusChanged) {
+				this.polygonRadius = radius;
+				this.polygonRadiusLocked = true;
+			}
+			if (this.activeTool === 'polygon' && this.drawingStep === 1 && this.polygonCenterWorldPos) {
+				const s1 = this.viewport.worldToScreen(this.polygonCenterWorldPos.x, this.polygonCenterWorldPos.y);
+				const curWorld = {
+					x: this.polygonCenterWorldPos.x + this.polygonRadius * Math.cos(this.polygonCurrentAngle),
+					y: this.polygonCenterWorldPos.y + this.polygonRadius * Math.sin(this.polygonCurrentAngle),
+				};
+				const s2 = this.viewport.worldToScreen(curWorld.x, curWorld.y);
+				this.renderer.renderPolygonPreview(
+					s1,
+					s2,
+					this.polygonCenterWorldPos,
+					curWorld,
+					this.polygonSides,
+					this.polygonRadius,
+					this.polygonCurrentAngle,
+					this.isConstructionMode,
+					this.viewport
+				);
+			}
+		};
+		this.polygonPopup.onCommit = () => {
+			if (this.activeTool === 'polygon' && this.drawingStep === 1 && this.polygonCenterPtId) {
+				const hasRadiusConstraint = this.polygonRadiusLocked || this.polygonPopup.isRadiusLocked();
+				this.commitPolygon(
+					this.polygonCenterPtId,
+					this.polygonSides,
+					this.polygonRadius,
+					this.polygonCurrentAngle,
+					hasRadiusConstraint
+				);
+			}
+		};
+		this.polygonPopup.onCancel = () => {
+			this.cancelDrawing();
+			this.setTool('select');
+			this.render();
+		};
 	}
 
 	setTool(tool: ToolType): void {
@@ -510,6 +567,10 @@ export class CanvasInteraction {
 			this.rectangularPatternState = null;
 		}
 
+		if (tool === 'polygon') {
+			showToast('Polygon: Click center point');
+		}
+
 		if (isConstraintTool(tool)) {
 			this.pruneIncompatibleSelection(tool);
 		}
@@ -586,6 +647,11 @@ export class CanvasInteraction {
 		this.arcCenterTotalAngle = 0;
 		this.ellipticalArcPrevAngle = null;
 		this.ellipticalArcTotalAngle = 0;
+
+		this.polygonPopup?.hide();
+		this.polygonCenterPtId = null;
+		this.polygonCenterWorldPos = null;
+		this.polygonRadiusLocked = false;
 
 		this.isDraggingPoint = false;
 		this.draggedPointId = null;
@@ -1226,6 +1292,11 @@ export class CanvasInteraction {
 					  }
 					: undefined,
 		});
+
+		if (this.activeTool === 'polygon' && this.drawingStep === 1 && this.polygonCenterWorldPos && this.polygonPopup.isOpen()) {
+			const sCtr = this.viewport.worldToScreen(this.polygonCenterWorldPos.x, this.polygonCenterWorldPos.y);
+			this.polygonPopup.updatePosition(sCtr);
+		}
 	}
 
 	private bindEvents(): void {
@@ -1252,6 +1323,13 @@ export class CanvasInteraction {
 			}
 			if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
 				this.isSpacePressed = true;
+			}
+			if (e.key === 'Tab') {
+				if (this.activeTool === 'polygon' && this.drawingStep === 1 && this.polygonPopup.isOpen()) {
+					e.preventDefault();
+					this.polygonPopup.cycleFocus(e.shiftKey);
+					return;
+				}
 			}
 			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
 				return;
@@ -1289,6 +1367,17 @@ export class CanvasInteraction {
 					this.finishSpline();
 					return;
 				}
+				if (this.activeTool === 'polygon' && this.drawingStep === 1 && this.polygonCenterPtId) {
+					const hasRadiusConstraint = this.polygonRadiusLocked || this.polygonPopup.isRadiusLocked();
+					this.commitPolygon(
+						this.polygonCenterPtId,
+						this.polygonSides,
+						this.polygonRadius,
+						this.polygonCurrentAngle,
+						hasRadiusConstraint
+					);
+					return;
+				}
 				if (this.activeTool === 'mirror') {
 					this.executeMirror();
 				} else if (this.activeTool === 'circular_pattern') {
@@ -1311,6 +1400,8 @@ export class CanvasInteraction {
 				this.setTool('arc_center');
 			} else if (e.key === 'r' || e.key === 'R') {
 				this.setTool('rectangle');
+			} else if (e.key === 'g' || e.key === 'G') {
+				this.setTool('polygon');
 			} else if (e.key === 'p' || e.key === 'P') {
 				this.setTool('point');
 			} else if (e.key === 'e' || e.key === 'E') {
@@ -3453,6 +3544,50 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// --- TOOL: POLYGON ---
+		if (this.activeTool === 'polygon') {
+			if (this.drawingStep === 0) {
+				this.sketch.beginTransaction();
+				let centerId: string;
+				if (snap && snap.type === 'point' && snap.id) {
+					centerId = snap.id;
+					this.startWorldPos = snap.worldPos;
+				} else {
+					const ptPos = snap ? snap.worldPos : world;
+					const pt = this.sketch.addPoint(ptPos.x, ptPos.y);
+					centerId = pt.id;
+					this.startWorldPos = vec(pt.x, pt.y);
+					this.applySnapConstraintIfNeeded(pt.id, snap);
+				}
+				this.startPointId = centerId;
+				this.polygonCenterPtId = centerId;
+				this.polygonCenterWorldPos = vec(this.startWorldPos.x, this.startWorldPos.y);
+				this.polygonRadiusLocked = false;
+				this.polygonCurrentAngle = 0;
+				this.drawingStep = 1;
+
+				const sCtr = this.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
+				this.polygonPopup.show(sCtr, this.polygonSides, 50);
+				this.render();
+			} else {
+				const curPos = snap ? snap.worldPos : world;
+				const currentDist = dist(this.polygonCenterWorldPos!, curPos);
+				const radius = this.polygonRadiusLocked ? this.polygonRadius : Math.max(1, currentDist);
+				const angleRad = Math.atan2(
+					curPos.y - this.polygonCenterWorldPos!.y,
+					curPos.x - this.polygonCenterWorldPos!.x
+				);
+				this.commitPolygon(
+					this.polygonCenterPtId!,
+					this.polygonSides,
+					radius,
+					angleRad,
+					this.polygonRadiusLocked
+				);
+			}
+			return;
+		}
+
 		// --- TOOL: RECTANGLE ---
 		if (this.activeTool === 'rectangle') {
 			if (this.drawingStep === 0) {
@@ -3855,6 +3990,84 @@ export class CanvasInteraction {
 			this.updateSplineDrawingPreview(screen);
 			return;
 		}
+	}
+
+	private commitPolygon(
+		centerPtId: string,
+		sides: number,
+		inradius: number,
+		angleRad: number,
+		addDistanceConstraint = false
+	): void {
+		const N = Math.max(3, Math.round(sides));
+		const r = Math.max(0.1, inradius);
+		const centerPt = this.sketch.points.get(centerPtId);
+		if (!centerPt) {
+			this.cancelDrawing();
+			return;
+		}
+
+		const R = r / Math.cos(Math.PI / N);
+		const baseAngle = angleRad - Math.PI / N;
+		const step = (2 * Math.PI) / N;
+
+		const vertices: SketchPoint[] = [];
+		for (let k = 0; k < N; k++) {
+			const a = baseAngle + k * step;
+			const vx = centerPt.x + R * Math.cos(a);
+			const vy = centerPt.y + R * Math.sin(a);
+			const pt = this.sketch.addPoint(vx, vy, false);
+			vertices.push(pt);
+		}
+
+		const lines: SketchLine[] = [];
+		for (let k = 0; k < N; k++) {
+			const nextK = (k + 1) % N;
+			const line = this.sketch.addLine(vertices[k].id, vertices[nextK].id, this.isConstructionMode);
+			lines.push(line);
+		}
+
+		const copies: PatternCopyData[] = [];
+		for (let k = 1; k < N; k++) {
+			copies.push({
+				copyIndex: k,
+				pointPairs: [{ sourcePtId: vertices[0].id, patternPtId: vertices[k].id }],
+				createdEntityIds: [{ id: vertices[k].id, type: 'point' }],
+			});
+		}
+
+		const constraint = this.sketch.addCircularPatternConstraint(
+			centerPtId,
+			[vertices[0].id],
+			'full',
+			360,
+			N,
+			false,
+			[],
+			copies,
+			undefined,
+			true // isReadOnly
+		);
+
+		let distConstraint: PointToLineDistanceConstraint | null = null;
+		if (addDistanceConstraint && lines.length > 0) {
+			distConstraint = this.sketch.addPointToLineDistanceConstraint(centerPtId, lines[0].id, r);
+		}
+
+		this.sketch.commitTransaction();
+		this.sketch.solve();
+
+		this.polygonPopup.hide();
+		this.cancelDrawing();
+
+		if (distConstraint) {
+			this.sketch.selectEntity(distConstraint.id, 'constraint', false);
+		} else if (constraint) {
+			this.sketch.selectEntity(constraint.id, 'constraint', false);
+		}
+
+		showToast(`Polygon created (${N} vertices)`);
+		this.render();
 	}
 
 	private handleMouseMove(e: MouseEvent): void {
@@ -4301,6 +4514,26 @@ export class CanvasInteraction {
 				const radius = dist(this.startWorldPos, effectiveWorld);
 				const isGuide = this.activeTool === 'arc_center';
 				this.renderer.renderCirclePreview(s1, s2, radius, this.isConstructionMode, isGuide);
+			} else if (this.activeTool === 'polygon') {
+				if (!this.polygonRadiusLocked) {
+					this.polygonRadius = Math.max(1, dist(this.startWorldPos, effectiveWorld));
+					this.polygonPopup.updateRadius(this.polygonRadius);
+				}
+				this.polygonCurrentAngle = Math.atan2(
+					effectiveWorld.y - this.startWorldPos.y,
+					effectiveWorld.x - this.startWorldPos.x
+				);
+				this.renderer.renderPolygonPreview(
+					s1,
+					s2,
+					this.startWorldPos,
+					effectiveWorld,
+					this.polygonSides,
+					this.polygonRadius,
+					this.polygonCurrentAngle,
+					this.isConstructionMode,
+					this.viewport
+				);
 			} else if (this.activeTool === 'rectangle') {
 				const w = Math.abs(effectiveWorld.x - this.startWorldPos.x);
 				const h = Math.abs(effectiveWorld.y - this.startWorldPos.y);

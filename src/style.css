@@ -809,6 +809,91 @@ html, body {
   flex-shrink: 0;
 }
 
+/* --- POLYGON POPUP --- */
+.polygon-popup {
+  position: fixed;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 6px 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: auto;
+  min-width: 140px;
+  user-select: none;
+  font-family: inherit;
+}
+
+.polygon-popup.hidden {
+  display: none;
+}
+
+.polygon-popup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.polygon-popup-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  letter-spacing: 0.3px;
+}
+
+.polygon-input-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface-elevated, #f8fafc);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  height: 26px;
+  box-sizing: border-box;
+}
+
+.polygon-input-wrapper:focus-within {
+  border-color: var(--cad-blue, #0284c7);
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.polygon-input-wrapper input {
+  width: 48px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: monospace;
+  padding: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.polygon-input-wrapper input::-webkit-outer-spin-button,
+.polygon-input-wrapper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.polygon-input-wrapper input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.polygon-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  margin-left: 4px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+
 /* Toast */
 .cad-toast {
   position: fixed;

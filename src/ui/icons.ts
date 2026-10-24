@@ -6,6 +6,7 @@ import circle from '../assets/icons/circle.svg?raw';
 import arc from '../assets/icons/arc.svg?raw';
 import arcCenter from '../assets/icons/arc-center.svg?raw';
 import rectangle from '../assets/icons/rectangle.svg?raw';
+import polygon from '../assets/icons/polygon.svg?raw';
 import ellipse from '../assets/icons/ellipse.svg?raw';
 import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
 import splineFit from '../assets/icons/spline-fit.svg?raw';
@@ -53,6 +54,7 @@ export const ICONS = {
 	arc,
 	arc_center: arcCenter,
 	rectangle,
+	polygon,
 	ellipse,
 	elliptical_arc: ellipticalArc,
 	spline_fit: splineFit,
