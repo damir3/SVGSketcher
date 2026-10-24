@@ -332,7 +332,8 @@ html, body {
   cursor: inherit;
 }
 
-#cad-svg .visible-primitive {
+#cad-svg .visible-primitive,
+#cad-svg .visible-spline-handle {
   transition: stroke 0.08s ease, stroke-width 0.08s ease;
 }
 
@@ -340,10 +341,11 @@ html, body {
   transition: fill 0.08s ease, stroke 0.08s ease, r 0.08s ease;
 }
 
-/* Hover highlighting on unselected primitives when not dragging */
-#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected):hover .visible-primitive {
+/* Hover highlighting on unselected primitives and spline handles when not dragging */
+#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected):hover .visible-primitive,
+#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected):hover .visible-spline-handle {
   stroke: #0ea5e9 !important;
-  stroke-width: 3px !important;
+  stroke-width: 2.5px !important;
   filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45));
 }
 
@@ -355,16 +357,42 @@ html, body {
   filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.8));
 }
 
-/* Hover highlighting on already selected primitives */
-#cad-svg:not(.is-dragging) .sketch-entity.is-selected:hover .visible-primitive {
+/* Hover highlighting on already selected primitives and spline handles */
+#cad-svg:not(.is-dragging) .sketch-entity.is-selected:hover .visible-primitive,
+#cad-svg:not(.is-dragging) .sketch-entity.is-selected:hover .visible-spline-handle {
   stroke: #38bdf8 !important;
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
+  stroke-width: 3.5px !important;
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.85));
 }
 
 #cad-svg:not(.is-dragging) .sketch-point.is-selected:hover .visible-point {
   fill: #7dd3fc !important;
   r: 5px !important;
   filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.9));
+}
+
+/* When a constraint tool is active, spline curves cannot be constrained directly:
+   disable hover highlighting and pointer-events on splines while keeping points and handles active */
+#cad-svg.tool-constraint .sketch-spline,
+#cad-svg.tool-constraint .sketch-spline * {
+  pointer-events: none !important;
+}
+#cad-svg.tool-constraint .sketch-spline:hover .visible-primitive {
+  stroke: initial !important;
+  stroke-width: initial !important;
+  filter: none !important;
+}
+
+/* When trim or break tool is active, spline tangent handles cannot be trimmed:
+   disable hover highlighting and pointer-events on tangent handles */
+#cad-svg.tool-trim .sketch-spline-handle,
+#cad-svg.tool-trim .sketch-spline-handle * {
+  pointer-events: none !important;
+}
+#cad-svg.tool-trim .sketch-spline-handle:hover .visible-spline-handle {
+  stroke: initial !important;
+  stroke-width: initial !important;
+  filter: none !important;
 }
 
 /* Hover highlighting on dimension annotations */

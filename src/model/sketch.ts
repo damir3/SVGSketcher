@@ -35,8 +35,9 @@ import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 } from '../solver/constraints';
-import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SelectionState } from './types';
-import { dist } from '../math/vector';
+import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline, SelectionState } from './types';
+import { dist, type Vec2 } from '../math/vector';
+import { bsplineToBezier, fitPointsToBezier, computeNaturalFitHandles, getSplineSvgPath, type BezierSegment } from '../math/spline';
 import {
 	HistoryManager,
 	type SketchSnapshot,
@@ -64,6 +65,7 @@ export class SketchDocument {
 	arcs = new Map<string, SketchArc>();
 	ellipses = new Map<string, SketchEllipse>();
 	ellipticalArcs = new Map<string, SketchEllipticalArc>();
+	splines = new Map<string, SketchSpline>();
 	constraints = new Map<string, IConstraint>();
 
 	selection: SelectionState = {
@@ -73,6 +75,7 @@ export class SketchDocument {
 		arcIds: new Set(),
 		ellipseIds: new Set(),
 		ellipticalArcIds: new Set(),
+		splineIds: new Set(),
 		constraintIds: new Set(),
 	};
 
@@ -112,6 +115,7 @@ export class SketchDocument {
 			this.arcs.has(id) ||
 			this.ellipses.has(id) ||
 			this.ellipticalArcs.has(id) ||
+			this.splines.has(id) ||
 			this.constraints.has(id);
 
 		let next = (this.counters.get(prefix) ?? 0) + 1;
@@ -220,6 +224,12 @@ export class SketchDocument {
 			arcs: Array.from(this.arcs.values()).map(a => ({ ...a })),
 			ellipses: Array.from(this.ellipses.values()).map(e => ({ ...e })),
 			ellipticalArcs: Array.from(this.ellipticalArcs.values()).map(a => ({ ...a })),
+			splines: Array.from(this.splines.values()).map(s => ({
+				...s,
+				pointIds: [...s.pointIds],
+				tangentLineIds: s.tangentLineIds ? [...s.tangentLineIds] : undefined,
+				knots: s.knots ? [...s.knots] : undefined,
+			})),
 			constraints: Array.from(this.constraints.values()).map(c => serializeConstraint(c)),
 			idCounter: this.idCounter,
 		};
@@ -254,6 +264,16 @@ export class SketchDocument {
 		this.ellipticalArcs.clear();
 		for (const a of snapshot.ellipticalArcs ?? []) {
 			this.ellipticalArcs.set(a.id, { ...a });
+		}
+
+		this.splines.clear();
+		for (const s of snapshot.splines ?? []) {
+			this.splines.set(s.id, {
+				...s,
+				pointIds: [...s.pointIds],
+				tangentLineIds: s.tangentLineIds ? [...s.tangentLineIds] : undefined,
+				knots: s.knots ? [...s.knots] : undefined,
+			});
 		}
 
 		this.constraints.clear();
@@ -432,6 +452,127 @@ export class SketchDocument {
 		return arc;
 	}
 
+	// --- Spline methods ---
+	addFitSpline(
+		pointIds: string[],
+		tangentLineIds?: string[],
+		isConstruction = false,
+		id?: string,
+		isClosed?: boolean,
+		explicitHandles?: Array<{ h1: Vec2; h2: Vec2 }>
+	): SketchSpline {
+		this.pushHistory();
+		const sid = id || this.nextId('Spline');
+
+		const closed = isClosed ?? (
+			pointIds.length >= 4 &&
+			(pointIds[0] === pointIds[pointIds.length - 1] ||
+				(this.points.has(pointIds[0]) &&
+					this.points.has(pointIds[pointIds.length - 1]) &&
+					Math.hypot(
+						this.points.get(pointIds[0])!.x - this.points.get(pointIds[pointIds.length - 1])!.x,
+						this.points.get(pointIds[0])!.y - this.points.get(pointIds[pointIds.length - 1])!.y
+					) < 1e-4))
+		);
+
+		const actualPointIds = [...pointIds];
+		if (closed && actualPointIds[0] !== actualPointIds[actualPointIds.length - 1]) {
+			actualPointIds.push(actualPointIds[0]);
+		}
+
+		let actualTangentLineIds = tangentLineIds ? [...tangentLineIds] : undefined;
+
+		// Automatically construct tangent handle lines with midpoint constraints if not provided
+		if (!actualTangentLineIds || actualTangentLineIds.length === 0) {
+			const pts = actualPointIds.map(pid => this.points.get(pid)).filter((p): p is SketchPoint => !!p);
+			if (pts.length >= 2) {
+				const handles = explicitHandles || computeNaturalFitHandles(pts);
+				actualTangentLineIds = [];
+				const count = closed ? pts.length - 1 : pts.length;
+				for (let i = 0; i < count; i++) {
+					const h = handles[i];
+					const pFit = pts[i];
+					const p1Id = this.nextId('Point');
+					this.points.set(p1Id, { id: p1Id, x: h.h1.x, y: h.h1.y, fixed: false });
+					const p2Id = this.nextId('Point');
+					this.points.set(p2Id, { id: p2Id, x: h.h2.x, y: h.h2.y, fixed: false });
+					const lineId = this.nextId('Line');
+					const hLine: SketchLine = {
+						id: lineId,
+						p1Id,
+						p2Id,
+						isConstruction: true,
+						isSplineHandle: true,
+						parentSplineId: sid,
+					};
+					this.lines.set(lineId, hLine);
+					const d1 = Math.hypot(pFit.x - h.h1.x, pFit.y - h.h1.y);
+					const d2 = Math.hypot(h.h2.x - pFit.x, h.h2.y - pFit.y);
+					const ratio = (d1 + d2) > 1e-6 ? d1 / (d1 + d2) : 0.5;
+					const midC = new MidpointConstraint(this.nextId('c_midpoint'), pFit.id, p1Id, p2Id, 1.0, ratio);
+					this.constraints.set(midC.id, midC);
+					actualTangentLineIds.push(lineId);
+				}
+				if (closed && actualTangentLineIds.length > 0) {
+					actualTangentLineIds.push(actualTangentLineIds[0]);
+				}
+				this.rebuildParamManager();
+			}
+		}
+
+		const spline: SketchSpline = {
+			id: sid,
+			splineType: 'fit',
+			pointIds: actualPointIds,
+			tangentLineIds: actualTangentLineIds,
+			isClosed: closed,
+			isConstruction,
+		};
+		this.splines.set(sid, spline);
+
+		if (actualTangentLineIds) {
+			for (const lid of actualTangentLineIds) {
+				const line = this.lines.get(lid);
+				if (line) {
+					line.parentSplineId = sid;
+					line.isSplineHandle = true;
+				}
+			}
+		}
+
+		this.notify();
+		return spline;
+	}
+
+	addControlSpline(
+		pointIds: string[],
+		isConstruction = false,
+		id?: string,
+		_isClosed?: boolean,
+		knots?: number[]
+	): SketchSpline {
+		this.pushHistory();
+		const sid = id || this.nextId('Spline');
+
+		const actualPointIds = [...pointIds];
+
+		const spline: SketchSpline = {
+			id: sid,
+			splineType: 'control',
+			pointIds: actualPointIds,
+			knots: knots ? [...knots] : undefined,
+			isClosed: false,
+			isConstruction,
+		};
+		this.splines.set(sid, spline);
+		this.notify();
+		return spline;
+	}
+
+	getSpline(id: string): SketchSpline | undefined {
+		return this.splines.get(id);
+	}
+
 	// --- Constraint methods ---
 	addConstraint(constraint: IConstraint): void {
 		this.pushHistory();
@@ -442,6 +583,7 @@ export class SketchDocument {
 	removeConstraint(id: string): void {
 		const c = this.constraints.get(id);
 		if (!c) return;
+		if (this.isSplineInternalConstraint(c)) return;
 		this.pushHistory();
 		if (c instanceof FixedConstraint) {
 			const pt = this.points.get(c.pointId);
@@ -1862,6 +2004,45 @@ export class SketchDocument {
 				return true;
 			}
 		}
+		for (const spline of this.splines.values()) {
+			if (spline.pointIds.includes(pointId)) return true;
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					const line = this.lines.get(lid);
+					if (line && (line.p1Id === pointId || line.p2Id === pointId)) return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	isSplineHandleLine(lineId: string): boolean {
+		const line = this.lines.get(lineId);
+		return !!line?.isSplineHandle;
+	}
+
+	isSplineHandlePoint(pointId: string): boolean {
+		for (const line of this.lines.values()) {
+			if (line.isSplineHandle && (line.p1Id === pointId || line.p2Id === pointId)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	isSplineInternalConstraint(c: IConstraint): boolean {
+		if (c instanceof MidpointConstraint || c.type === 'midpoint') {
+			const anyC = c as any;
+			for (const line of this.lines.values()) {
+				if (
+					line.isSplineHandle &&
+					((line.p1Id === anyC.p1Id && line.p2Id === anyC.p2Id) ||
+						(line.p1Id === anyC.p2Id && line.p2Id === anyC.p1Id))
+				) {
+					return true;
+				}
+			}
+		}
 		return false;
 	}
 
@@ -1880,6 +2061,18 @@ export class SketchDocument {
 
 		const elarc = this.ellipticalArcs.get(primitiveId);
 		if (elarc) return [elarc.centerId, elarc.majorAxisPointId, elarc.minorAxisPointId, elarc.startPointId, elarc.endPointId];
+
+		const spline = this.splines.get(primitiveId);
+		if (spline) {
+			const pts = [...spline.pointIds];
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					const l = this.lines.get(lid);
+					if (l) pts.push(l.p1Id, l.p2Id);
+				}
+			}
+			return pts;
+		}
 
 		return [];
 	}
@@ -1970,8 +2163,17 @@ export class SketchDocument {
 			!this.circles.has(id) &&
 			!this.arcs.has(id) &&
 			!this.ellipses.has(id) &&
-			!this.ellipticalArcs.has(id)
+			!this.ellipticalArcs.has(id) &&
+			!this.splines.has(id)
 		) {
+			return;
+		}
+
+		// Tangent lines and their handle endpoints cannot be deleted directly!
+		if (this.lines.has(id) && this.isSplineHandleLine(id)) {
+			return;
+		}
+		if (this.points.has(id) && this.isSplineHandlePoint(id)) {
 			return;
 		}
 
@@ -2037,6 +2239,94 @@ export class SketchDocument {
 					this.selection.ellipticalArcIds.delete(eaid);
 				}
 			}
+			// Update splines referencing this point
+			for (const [sid, spline] of this.splines.entries()) {
+				if (spline.pointIds.includes(id)) {
+					if (spline.splineType === 'control') {
+						const remaining = spline.pointIds.filter(pid => pid !== id);
+						if (remaining.length >= 4) {
+							spline.pointIds = remaining;
+							delete spline.knots;
+						} else {
+							for (const ptId of spline.pointIds) candidatePointIds.add(ptId);
+							this.splines.delete(sid);
+							this.selection.splineIds.delete(sid);
+						}
+					} else if (spline.splineType === 'fit') {
+						if (spline.isClosed) {
+							const unique = spline.pointIds.slice(0, -1);
+							if (unique.length <= 3) {
+								for (const ptId of spline.pointIds) candidatePointIds.add(ptId);
+								if (spline.tangentLineIds) {
+									for (const lid of spline.tangentLineIds) {
+										const line = this.lines.get(lid);
+										if (line) {
+											candidatePointIds.add(line.p1Id);
+											candidatePointIds.add(line.p2Id);
+											this.lines.delete(lid);
+											this.selection.lineIds.delete(lid);
+										}
+									}
+								}
+								this.splines.delete(sid);
+								this.selection.splineIds.delete(sid);
+							} else {
+								const idx = unique.indexOf(id);
+								if (idx !== -1) {
+									if (spline.tangentLineIds && spline.tangentLineIds[idx]) {
+										const lid = spline.tangentLineIds[idx];
+										const line = this.lines.get(lid);
+										if (line) {
+											candidatePointIds.add(line.p1Id);
+											candidatePointIds.add(line.p2Id);
+											this.lines.delete(lid);
+											this.selection.lineIds.delete(lid);
+										}
+									}
+									const newUnique = unique.filter((_, i) => i !== idx);
+									spline.pointIds = [...newUnique, newUnique[0]];
+									if (spline.tangentLineIds) {
+										const uniqueTangents = spline.tangentLineIds.slice(0, -1).filter((_, i) => i !== idx);
+										spline.tangentLineIds = [...uniqueTangents, uniqueTangents[0]];
+									}
+								}
+							}
+						} else {
+							const remaining = spline.pointIds.filter(pid => pid !== id);
+							if (remaining.length < 2) {
+								for (const ptId of spline.pointIds) candidatePointIds.add(ptId);
+								if (spline.tangentLineIds) {
+									for (const lid of spline.tangentLineIds) {
+										const line = this.lines.get(lid);
+										if (line) {
+											candidatePointIds.add(line.p1Id);
+											candidatePointIds.add(line.p2Id);
+											this.lines.delete(lid);
+											this.selection.lineIds.delete(lid);
+										}
+									}
+								}
+								this.splines.delete(sid);
+								this.selection.splineIds.delete(sid);
+							} else {
+								const idx = spline.pointIds.indexOf(id);
+								if (idx !== -1 && spline.tangentLineIds && spline.tangentLineIds[idx]) {
+									const lid = spline.tangentLineIds[idx];
+									const line = this.lines.get(lid);
+									if (line) {
+										candidatePointIds.add(line.p1Id);
+										candidatePointIds.add(line.p2Id);
+										this.lines.delete(lid);
+										this.selection.lineIds.delete(lid);
+									}
+									spline.tangentLineIds.splice(idx, 1);
+								}
+								spline.pointIds = remaining;
+							}
+						}
+					}
+				}
+			}
 		} else if (this.lines.has(id)) {
 			const line = this.lines.get(id)!;
 			candidatePointIds.add(line.p1Id);
@@ -2071,6 +2361,24 @@ export class SketchDocument {
 			candidatePointIds.add(elarc.endPointId);
 			this.ellipticalArcs.delete(id);
 			this.selection.ellipticalArcIds.delete(id);
+		} else if (this.splines.has(id)) {
+			const spline = this.splines.get(id)!;
+			for (const ptId of spline.pointIds) {
+				candidatePointIds.add(ptId);
+			}
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					const line = this.lines.get(lid);
+					if (line) {
+						candidatePointIds.add(line.p1Id);
+						candidatePointIds.add(line.p2Id);
+						this.lines.delete(lid);
+						this.selection.lineIds.delete(lid);
+					}
+				}
+			}
+			this.splines.delete(id);
+			this.selection.splineIds.delete(id);
 		}
 
 		// Remove candidate points if they are no longer used by any remaining primitive
@@ -2117,6 +2425,12 @@ export class SketchDocument {
 		const elarc = this.ellipticalArcs.get(id);
 		if (elarc) {
 			elarc.isConstruction = !elarc.isConstruction;
+			this.notify();
+			return;
+		}
+		const spline = this.splines.get(id);
+		if (spline) {
+			spline.isConstruction = !spline.isConstruction;
 			this.notify();
 			return;
 		}
@@ -2337,6 +2651,7 @@ export class SketchDocument {
 		const res: IConstraint[] = [];
 		if (type === 'point') {
 			for (const c of this.constraints.values()) {
+				if (this.isSplineInternalConstraint(c)) continue;
 				const anyC = c as any;
 				if (c.type === 'fixed') {
 					if (anyC.pointId === id) res.push(c);
@@ -2375,6 +2690,7 @@ export class SketchDocument {
 			if (!line) return [];
 			const { p1Id, p2Id } = line;
 			for (const c of this.constraints.values()) {
+				if (this.isSplineInternalConstraint(c)) continue;
 				const anyC = c as any;
 				if (c.entityIds.includes(id)) {
 					res.push(c);
@@ -2703,7 +3019,7 @@ export class SketchDocument {
 
 	isEntitySelected(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint'
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint'
 	): boolean {
 		switch (type) {
 			case 'point': return this.selection.pointIds.has(id);
@@ -2712,6 +3028,7 @@ export class SketchDocument {
 			case 'arc': return this.selection.arcIds.has(id);
 			case 'ellipse': return this.selection.ellipseIds.has(id);
 			case 'elliptical_arc': return this.selection.ellipticalArcIds.has(id);
+			case 'spline': return this.selection.splineIds.has(id);
 			case 'constraint': return this.selection.constraintIds.has(id);
 			default: return false;
 		}
@@ -2719,7 +3036,7 @@ export class SketchDocument {
 
 	deselectEntity(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint'
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint'
 	): void {
 		switch (type) {
 			case 'point':
@@ -2740,13 +3057,16 @@ export class SketchDocument {
 			case 'elliptical_arc':
 				this.selection.ellipticalArcIds.delete(id);
 				break;
+			case 'spline':
+				this.selection.splineIds.delete(id);
+				break;
 			case 'constraint':
 				this.selection.constraintIds.delete(id);
 				break;
 		}
 
 		if (type !== 'constraint') {
-			for (const c of this.getConstraintsForEntity(type, id)) {
+			for (const c of this.getConstraintsForEntity(type as any, id)) {
 				const otherEntities = this.getEntitiesForConstraint(c);
 				const stillSelected = otherEntities.some(ent => this.isEntitySelected(ent.id, ent.type));
 				if (!stillSelected) {
@@ -2760,7 +3080,7 @@ export class SketchDocument {
 
 	toggleEntitySelection(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint'
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint'
 	): void {
 		if (this.isEntitySelected(id, type)) {
 			this.deselectEntity(id, type);
@@ -2772,7 +3092,7 @@ export class SketchDocument {
 	selectEntities(
 		items: Array<{
 			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint';
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
 		}>,
 		multiSelect = false
 	): void {
@@ -2783,6 +3103,7 @@ export class SketchDocument {
 			this.selection.arcIds.clear();
 			this.selection.ellipseIds.clear();
 			this.selection.ellipticalArcIds.clear();
+			this.selection.splineIds.clear();
 			this.selection.constraintIds.clear();
 		}
 
@@ -2817,6 +3138,8 @@ export class SketchDocument {
 				for (const c of this.getConstraintsForEntity('elliptical_arc', item.id)) {
 					this.selection.constraintIds.add(c.id);
 				}
+			} else if (item.type === 'spline') {
+				this.selection.splineIds.add(item.id);
 			} else if (item.type === 'constraint') {
 				this.selection.constraintIds.add(item.id);
 			}
@@ -2827,12 +3150,11 @@ export class SketchDocument {
 
 	selectEntity(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint',
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint',
 		multiSelect = false
 	): void {
 		this.selectEntities([{ id, type }], multiSelect);
 	}
-
 
 	clear(): void {
 		this.pushHistory();
@@ -2842,6 +3164,7 @@ export class SketchDocument {
 		this.arcs.clear();
 		this.ellipses.clear();
 		this.ellipticalArcs.clear();
+		this.splines.clear();
 		this.constraints.clear();
 		this.selection.pointIds.clear();
 		this.selection.lineIds.clear();
@@ -2849,6 +3172,7 @@ export class SketchDocument {
 		this.selection.arcIds.clear();
 		this.selection.ellipseIds.clear();
 		this.selection.ellipticalArcIds.clear();
+		this.selection.splineIds.clear();
 		this.selection.constraintIds.clear();
 		this.counters.clear();
 		this.rebuildParamManager();
@@ -2862,6 +3186,7 @@ export class SketchDocument {
 		this.selection.arcIds.clear();
 		this.selection.ellipseIds.clear();
 		this.selection.ellipticalArcIds.clear();
+		this.selection.splineIds.clear();
 		this.selection.constraintIds.clear();
 		this.notify();
 	}
@@ -2888,6 +3213,10 @@ export class SketchDocument {
 			const ea = this.ellipticalArcs.get(id);
 			if (ea) list.push(ea);
 		}
+		for (const id of this.selection.splineIds) {
+			const s = this.splines.get(id);
+			if (s) list.push(s);
+		}
 		for (const id of this.selection.pointIds) {
 			const p = this.points.get(id);
 			if (p) list.push(p);
@@ -2909,6 +3238,7 @@ export class SketchDocument {
 			this.selection.arcIds.size > 0 ||
 			this.selection.ellipseIds.size > 0 ||
 			this.selection.ellipticalArcIds.size > 0 ||
+			this.selection.splineIds.size > 0 ||
 			this.selection.constraintIds.size > 0;
 
 		if (!hasSelection) return;
@@ -2920,11 +3250,49 @@ export class SketchDocument {
 		const selectedArcs = [...this.selection.arcIds];
 		const selectedEllipses = [...this.selection.ellipseIds];
 		const selectedEllipticalArcs = [...this.selection.ellipticalArcIds];
-		const selectedConstraints = [...this.selection.constraintIds];
+		const selectedSplines = [...this.selection.splineIds];
+		const selectedConstraints = [...this.selection.constraintIds].filter(cid => {
+			const c = this.constraints.get(cid);
+			return c ? !this.isSplineInternalConstraint(c) : true;
+		});
+
+		const selectedSplinesSet = new Set(selectedSplines);
+
+		// Do not delete tangent lines directly unless parent spline is also being deleted
+		const filteredLines = selectedLines.filter(lid => {
+			const line = this.lines.get(lid);
+			if (line?.isSplineHandle) {
+				if (!line.parentSplineId || !selectedSplinesSet.has(line.parentSplineId)) {
+					this.selection.lineIds.delete(lid);
+					return false;
+				}
+			}
+			return true;
+		});
+
+		// Do not delete tangent handle points directly unless parent spline is also being deleted
+		const filteredPoints = selectedPoints.filter(pid => {
+			if (this.isSplineHandlePoint(pid)) {
+				let parentSplineSelected = false;
+				for (const line of this.lines.values()) {
+					if (line.isSplineHandle && (line.p1Id === pid || line.p2Id === pid)) {
+						if (line.parentSplineId && selectedSplinesSet.has(line.parentSplineId)) {
+							parentSplineSelected = true;
+							break;
+						}
+					}
+				}
+				if (!parentSplineSelected) {
+					this.selection.pointIds.delete(pid);
+					return false;
+				}
+			}
+			return true;
+		});
 
 		// Collect all candidate points from all selected primitives before deleting
 		const candidatePointIds = new Set<string>();
-		for (const id of selectedLines) {
+		for (const id of filteredLines) {
 			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
 		}
 		for (const id of selectedCircles) {
@@ -2939,14 +3307,18 @@ export class SketchDocument {
 		for (const id of selectedEllipticalArcs) {
 			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
 		}
+		for (const id of selectedSplines) {
+			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+		}
 
 		for (const id of selectedConstraints) this.removeConstraint(id);
-		for (const id of selectedLines) this.removeEntity(id);
+		for (const id of filteredLines) this.removeEntity(id);
 		for (const id of selectedCircles) this.removeEntity(id);
 		for (const id of selectedArcs) this.removeEntity(id);
 		for (const id of selectedEllipses) this.removeEntity(id);
 		for (const id of selectedEllipticalArcs) this.removeEntity(id);
-		for (const id of selectedPoints) this.removeEntity(id);
+		for (const id of selectedSplines) this.removeEntity(id);
+		for (const id of filteredPoints) this.removeEntity(id);
 
 		// Final sweep for any candidate points that became unused across the batch
 		for (const ptId of candidatePointIds) {
@@ -2982,6 +3354,7 @@ export class SketchDocument {
 		const usedPoints = new Set<string>();
 
 		for (const line of this.lines.values()) {
+			if (line.isSplineHandle) continue;
 			usedPoints.add(line.p1Id);
 			usedPoints.add(line.p2Id);
 			const p1 = this.points.get(line.p1Id);
@@ -3114,6 +3487,44 @@ export class SketchDocument {
 				const dash = elarc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
 				elements.push(
 					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
+				);
+			}
+		}
+
+		for (const spline of this.splines.values()) {
+			for (const pid of spline.pointIds) usedPoints.add(pid);
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					const l = this.lines.get(lid);
+					if (l) {
+						usedPoints.add(l.p1Id);
+						usedPoints.add(l.p2Id);
+					}
+				}
+			}
+			const pts = spline.pointIds.map(id => this.points.get(id)).filter(Boolean) as SketchPoint[];
+			if (pts.length >= 2) {
+				let segments: BezierSegment[] = [];
+				if (spline.splineType === 'control') {
+					segments = bsplineToBezier(pts.map(p => ({ x: p.x, y: -p.y })), spline.knots);
+				} else {
+					const handles = (spline.tangentLineIds || []).map(lid => {
+						const line = this.lines.get(lid);
+						if (!line) return null;
+						const p1 = this.points.get(line.p1Id);
+						const p2 = this.points.get(line.p2Id);
+						if (!p1 || !p2) return null;
+						return {
+							h1: { x: p1.x, y: -p1.y },
+							h2: { x: p2.x, y: -p2.y },
+						};
+					});
+					segments = fitPointsToBezier(pts.map(p => ({ x: p.x, y: -p.y })), handles);
+				}
+				const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
+				const dash = spline.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+				elements.push(
+					`<path d="${d}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
 				);
 			}
 		}

@@ -1,4 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
+import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
 import {
 	DistanceConstraint,
@@ -30,6 +31,13 @@ import {
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
 import type { TrimCandidate } from '../math/intersection';
+import {
+	bsplineToBezier,
+	fitPointsToBezier,
+	getSplineSvgPath,
+	extractSplineInterval,
+	type BezierSegment,
+} from '../math/spline';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 const TWO_PI = 2 * Math.PI;
@@ -68,6 +76,16 @@ export const COLORS = {
 	gridMajor: 'rgba(0, 0, 0, 0.20)',
 	gridLabel: 'rgba(0, 0, 0, 0.6)',
 	trim: 'rgba(255, 0, 0, 0.75)',
+
+	// Spline styles and colors
+	splineHandle: '#b45309', // Amber-700: tangent handle & control polygon idle stroke
+	splineHandleSelected: '#0284c7', // Sky-600: selected tangent handle stroke
+	splineHandleDotFill: '#22c55e', // Green-500: tangent handle endpoint dot fill
+	splineHandleDotStroke: '#15803d', // Green-700: tangent handle endpoint dot stroke
+	splineClosedFill: 'rgba(56, 189, 248, 0.12)', // Sky-400 12%: closed spline fill
+	splinePreview: '#84cc16', // Lime-500: spline drawing preview stroke
+	splineCheckmarkFill: '#22c55e', // Green-500: spline completion checkmark fill
+	splineCheckmarkStroke: '#16a34a', // Green-600: spline completion checkmark border
 } as const;
 
 export const DASH_ARRAY = {
@@ -78,6 +96,10 @@ export const DASH_ARRAY = {
 	guideCircle: '4,4',
 	angleExtension: '4,4',
 	selectionBox: '4 3',
+	splineHandle: '4 3',
+	splineControlPolygon: '4 3',
+	splinePreviewGuide: '3 3',
+	splineConstruction: '6 4',
 } as const;
 
 export const STROKE_WIDTH = {
@@ -89,6 +111,11 @@ export const STROKE_WIDTH = {
 	dimension: 1.5,
 	hitArea: 18,
 	trim: 3,
+	splineHandle: 1.5,
+	splineHandleSelected: 2.5,
+	splineControlPolygon: 1.5,
+	splinePreview: 2,
+	splinePreviewGuide: 1.2,
 } as const;
 
 export const DIM_ARROWS = {
@@ -177,6 +204,99 @@ export const COPY_STROKE_BASE_ATTRS: SvgAttrs = {
 	fill: 'none',
 	'pointer-events': 'none',
 };
+
+// Spline SvgAttrs Presets
+export const SPLINE_HANDLE_ATTRS: SvgAttrs = {
+	class: 'entity-visible visible-spline-handle',
+	fill: 'none',
+	stroke: COLORS.splineHandle,
+	'stroke-width': STROKE_WIDTH.splineHandle,
+	'stroke-dasharray': DASH_ARRAY.splineHandle,
+	'stroke-linecap': 'round',
+};
+
+export const SPLINE_HANDLE_SELECTED_ATTRS: SvgAttrs = {
+	class: 'entity-visible visible-spline-handle',
+	fill: 'none',
+	stroke: COLORS.splineHandleSelected,
+	'stroke-width': STROKE_WIDTH.splineHandleSelected,
+	'stroke-dasharray': 'none',
+	'stroke-linecap': 'round',
+};
+
+export const SPLINE_CONTROL_POLYGON_ATTRS: SvgAttrs = {
+	stroke: COLORS.splineHandle,
+	'stroke-width': STROKE_WIDTH.splineControlPolygon,
+	'stroke-dasharray': DASH_ARRAY.splineControlPolygon,
+	fill: 'none',
+};
+
+export const SPLINE_HANDLE_DOT_ATTRS: SvgAttrs = {
+	class: 'entity-visible visible-point',
+	fill: COLORS.splineHandleDotFill,
+	stroke: COLORS.splineHandleDotStroke,
+	'stroke-width': STROKE_WIDTH.normal,
+	'pointer-events': 'all',
+};
+
+export const SPLINE_PREVIEW_STROKE_ATTRS: SvgAttrs = {
+	stroke: COLORS.splinePreview,
+	'stroke-width': STROKE_WIDTH.splinePreview,
+	fill: 'none',
+};
+
+export const SPLINE_PREVIEW_GUIDE_ATTRS: SvgAttrs = {
+	stroke: COLORS.splinePreview,
+	'stroke-width': STROKE_WIDTH.splinePreviewGuide,
+	'stroke-dasharray': DASH_ARRAY.splinePreviewGuide,
+	opacity: '0.7',
+};
+
+export const SPLINE_PREVIEW_VERTEX_ATTRS: SvgAttrs = {
+	fill: COLORS.splinePreview,
+	stroke: COLORS.white,
+	'stroke-width': 1.5,
+};
+
+export const SPLINE_CHECKMARK_CIRCLE_ATTRS: SvgAttrs = {
+	fill: COLORS.splineCheckmarkFill,
+	stroke: COLORS.splineCheckmarkStroke,
+	'stroke-width': 1.5,
+	filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.25))',
+};
+
+export const SPLINE_CHECKMARK_PATH_ATTRS: SvgAttrs = {
+	stroke: COLORS.white,
+	'stroke-width': 2,
+	'stroke-linecap': 'round',
+	'stroke-linejoin': 'round',
+	fill: 'none',
+};
+
+export function getSplineHandleStrokeAttrs(isSelected: boolean): SvgAttrs {
+	return isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_HANDLE_ATTRS;
+}
+
+export function getSplinePreviewStrokeAttrs(isConstruction = false): SvgAttrs {
+	return {
+		...SPLINE_PREVIEW_STROKE_ATTRS,
+		'stroke-dasharray': isConstruction ? DASH_ARRAY.splineConstruction : undefined,
+	};
+}
+
+export const SPLINE_STYLES = {
+	handle: {
+		normal: SPLINE_HANDLE_ATTRS,
+		selected: SPLINE_HANDLE_SELECTED_ATTRS,
+	},
+	controlPolygon: SPLINE_CONTROL_POLYGON_ATTRS,
+	handleDot: {
+		fill: COLORS.splineHandleDotFill,
+		stroke: COLORS.splineHandleDotStroke,
+		r: 4,
+	},
+	closedFill: COLORS.splineClosedFill,
+} as const;
 
 export function getCopyStrokeAttrs(
 	isConstruction: boolean,
@@ -378,6 +498,7 @@ export interface RenderOptions {
 	showGrid?: boolean;
 	showConstraints?: boolean;
 	showDimensions?: boolean;
+	showSplineHandles?: boolean;
 	mirrorHighlight?: {
 		selectedObjectIds: Set<string>;
 		mirrorLineId: string | null;
@@ -894,11 +1015,37 @@ export class SVGRenderer {
 		// Light Theme: Unconstrained is bold slate, fully constrained is green, conflict is red
 		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
 
+		// Determine which splines have any part active (spline curve, fit points, or tangent handles/endpoints)
+		const activeSplineIds = new Set<string>(sketch.selection.splineIds);
+		for (const spline of sketch.splines.values()) {
+			if (spline.pointIds.some(pid => sketch.selection.pointIds.has(pid))) {
+				activeSplineIds.add(spline.id);
+			}
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					if (sketch.selection.lineIds.has(lid)) {
+						activeSplineIds.add(spline.id);
+						break;
+					}
+					const l = sketch.lines.get(lid);
+					if (l && (sketch.selection.pointIds.has(l.p1Id) || sketch.selection.pointIds.has(l.p2Id))) {
+						activeSplineIds.add(spline.id);
+						break;
+					}
+				}
+			}
+		}
+
 		// 1. Render Lines
 		for (const line of sketch.lines.values()) {
 			const p1 = sketch.points.get(line.p1Id);
 			const p2 = sketch.points.get(line.p2Id);
 			if (!p1 || !p2) continue;
+
+			if (line.isSplineHandle) {
+				const isParentActive = line.parentSplineId ? activeSplineIds.has(line.parentSplineId) : false;
+				if (!isParentActive && !options.showSplineHandles) continue;
+			}
 
 			const s1 = viewport.worldToScreen(p1.x, p1.y);
 			const s2 = viewport.worldToScreen(p2.x, p2.y);
@@ -914,14 +1061,16 @@ export class SVGRenderer {
 			const lineG = createSvgElement('g', {
 				'data-id': line.id,
 				'data-type': 'line',
-				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${isMirrorLine ? 'is-mirror-line' : ''} ${isDir1Line || isDir2Line ? 'is-direction-line' : ''}`,
+				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''} ${isMirrorLine ? 'is-mirror-line' : ''} ${isDir1Line || isDir2Line ? 'is-direction-line' : ''}`,
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px wide)
 			createSvgLine(s1.x, s1.y, s2.x, s2.y, HIT_AREA_STROKE_ATTRS, lineG);
 
 			// Visible line
-			if (isMirrorLine) {
+			if (line.isSplineHandle) {
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, getSplineHandleStrokeAttrs(isSelected), lineG);
+			} else if (isMirrorLine) {
 				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
 					class: 'entity-visible visible-primitive is-mirror-line',
 					fill: 'none',
@@ -1119,8 +1268,99 @@ export class SVGRenderer {
 			}
 		}
 
+		// 5b. Render Splines
+		for (const spline of sketch.splines.values()) {
+			const pts = spline.pointIds.map(id => sketch.points.get(id)).filter((p): p is SketchPoint => !!p);
+			if (pts.length < 2) continue;
+
+			let bezierSegments: BezierSegment[] = [];
+			if (spline.splineType === 'control') {
+				bezierSegments = bsplineToBezier(pts, spline.knots);
+			} else {
+				const handles = (spline.tangentLineIds || []).map(lid => {
+					const line = sketch.lines.get(lid);
+					if (!line) return null;
+					const p1 = sketch.points.get(line.p1Id);
+					const p2 = sketch.points.get(line.p2Id);
+					if (!p1 || !p2) return null;
+					return {
+						h1: { x: p1.x, y: p1.y },
+						h2: { x: p2.x, y: p2.y },
+					};
+				});
+				bezierSegments = fitPointsToBezier(pts, handles);
+			}
+
+			const isSelected =
+				sketch.selection.splineIds.has(spline.id) ||
+				spline.pointIds.some(pid => sketch.selection.pointIds.has(pid)) ||
+				(spline.tangentLineIds && spline.tangentLineIds.some(lid => {
+					const line = sketch.lines.get(lid);
+					return line && (sketch.selection.lineIds.has(lid) || sketch.selection.pointIds.has(line.p1Id) || sketch.selection.pointIds.has(line.p2Id));
+				}));
+
+			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
+
+			const splineG = createSvgElement('g', {
+				'data-id': spline.id,
+				'data-type': 'spline',
+				class: `sketch-entity sketch-spline ${isSelected ? 'is-selected' : ''}`,
+			}, this.geometryGroup);
+
+			// Invisible generous hit target (18px stroke)
+			createSvgPath(d, HIT_AREA_STROKE_ATTRS, splineG);
+
+			// Visible spline path
+			createSvgPath(d, {
+				fill: spline.isClosed ? SPLINE_STYLES.closedFill : 'none',
+				...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, baseColor, true),
+			}, splineG);
+
+			// If control spline and selected or in constraint tool: draw dashed control polygon
+			if (spline.splineType === 'control' && (isSelected || options.showSplineHandles)) {
+				for (let i = 0; i < pts.length - 1; i++) {
+					const s1 = viewport.worldToScreen(pts[i].x, pts[i].y);
+					const s2 = viewport.worldToScreen(pts[i + 1].x, pts[i + 1].y);
+					createSvgLine(s1.x, s1.y, s2.x, s2.y, SPLINE_STYLES.controlPolygon, splineG);
+				}
+			}
+		}
+
 		// 6. Render Points (Vertices)
+		const handlePointToSpline = new Map<string, { spline: SketchSpline; isHandleDot: boolean }>();
+		const controlPointToSpline = new Map<string, SketchSpline>();
+		for (const spline of sketch.splines.values()) {
+			if (spline.splineType === 'control') {
+				for (const pid of spline.pointIds) {
+					controlPointToSpline.set(pid, spline);
+				}
+			}
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					const line = sketch.lines.get(lid);
+					if (line) {
+						handlePointToSpline.set(line.p1Id, { spline, isHandleDot: true });
+						handlePointToSpline.set(line.p2Id, { spline, isHandleDot: true });
+					}
+				}
+			}
+		}
+
 		for (const pt of sketch.points.values()) {
+			const splineHandleInfo = handlePointToSpline.get(pt.id);
+			const splineControl = controlPointToSpline.get(pt.id);
+
+			if (splineHandleInfo) {
+				if (!activeSplineIds.has(splineHandleInfo.spline.id) && !sketch.selection.pointIds.has(pt.id) && !options.showSplineHandles) {
+					continue;
+				}
+			}
+			if (splineControl) {
+				if (!activeSplineIds.has(splineControl.id) && !sketch.selection.pointIds.has(pt.id) && !options.showSplineHandles) {
+					continue;
+				}
+			}
+
 			const s = viewport.worldToScreen(pt.x, pt.y);
 			const isPatternCenter = options.patternHighlight?.centerPointId === pt.id;
 			const isPatternSelected =
@@ -1145,7 +1385,10 @@ export class SVGRenderer {
 			let fillColor: string = COLORS.primary; // Default interactive CAD vertex color
 			let strokeColor: string = COLORS.white;
 
-			if (pt.fixed) {
+			if (splineHandleInfo?.isHandleDot) {
+				fillColor = SPLINE_STYLES.handleDot.fill;
+				strokeColor = SPLINE_STYLES.handleDot.stroke;
+			} else if (pt.fixed) {
 				fillColor = COLORS.fixed; // Fixed points highlighted amber
 			} else if (isFullyConstrained) {
 				fillColor = COLORS.constrained; // Fully defined
@@ -1160,7 +1403,7 @@ export class SVGRenderer {
 				strokeColor = '#ffffff';
 			}
 
-			createSvgCircle(s.x, s.y, isSelected ? 4.5 : 3.5, {
+			createSvgCircle(s.x, s.y, isSelected ? 4.5 : (splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3.5), {
 				class: 'entity-visible visible-point',
 				fill: fillColor,
 				stroke: strokeColor,
@@ -1175,6 +1418,7 @@ export class SVGRenderer {
 		const lineBadgeCounts = new Map<string, number>();
 
 		for (const constraint of sketch.constraints.values()) {
+			if (sketch.isSplineInternalConstraint(constraint)) continue;
 			const isSelected = sketch.selection.constraintIds.has(constraint.id);
 
 			if (constraint instanceof DistanceConstraint) {
@@ -2049,6 +2293,13 @@ export class SVGRenderer {
 		viewport: Viewport,
 		isSelected: boolean
 	): void {
+		// Never draw midpoint badge for internal spline tangent handle lines:
+		// users should not know about its existence
+		for (const line of sketch.lines.values()) {
+			if (line.isSplineHandle && ((line.p1Id === constraint.p1Id && line.p2Id === constraint.p2Id) || (line.p1Id === constraint.p2Id && line.p2Id === constraint.p1Id))) {
+				return;
+			}
+		}
 		const pt = sketch.points.get(constraint.midId);
 		if (!pt) return;
 		const s = viewport.worldToScreen(pt.x, pt.y);
@@ -2819,6 +3070,50 @@ export class SVGRenderer {
 	}
 
 	// Live drawing previews
+	renderSplinePreview(
+		splineType: 'fit' | 'control',
+		points: Vec2[],
+		cursorPos: Vec2,
+		isConstruction = false
+	): { checkmarkPos?: Vec2 } {
+		this.previewGroup.innerHTML = '';
+		if (points.length === 0) return {};
+
+		const allPts = [...points, cursorPos];
+		let segments: BezierSegment[] = [];
+		if (splineType === 'control') {
+			segments = bsplineToBezier(allPts);
+			for (let i = 0; i < allPts.length - 1; i++) {
+				createSvgLine(allPts[i].x, allPts[i].y, allPts[i + 1].x, allPts[i + 1].y, SPLINE_STYLES.controlPolygon, this.previewGroup);
+			}
+		} else {
+			segments = fitPointsToBezier(allPts);
+		}
+
+		const d = getSplineSvgPath(segments);
+		createSvgPath(d, getSplinePreviewStrokeAttrs(isConstruction), this.previewGroup);
+
+		const lastPt = points[points.length - 1];
+		createSvgLine(lastPt.x, lastPt.y, cursorPos.x, cursorPos.y, SPLINE_PREVIEW_GUIDE_ATTRS, this.previewGroup);
+
+		for (let i = 0; i < points.length; i++) {
+			const p = points[i];
+			createSvgCircle(p.x, p.y, 4, SPLINE_PREVIEW_VERTEX_ATTRS, this.previewGroup);
+		}
+
+		const checkmarkPos = { x: lastPt.x + 20, y: lastPt.y - 12 };
+		const checkG = createSvgElement('g', {
+			class: 'spline-finish-checkmark',
+			style: 'cursor: pointer;',
+		}, this.previewGroup);
+
+		createSvgCircle(checkmarkPos.x, checkmarkPos.y, 11, SPLINE_CHECKMARK_CIRCLE_ATTRS, checkG);
+		const checkD = `M ${checkmarkPos.x - 4} ${checkmarkPos.y} L ${checkmarkPos.x - 1} ${checkmarkPos.y + 3.5} L ${checkmarkPos.x + 4.5} ${checkmarkPos.y - 3.5}`;
+		createSvgPath(checkD, SPLINE_CHECKMARK_PATH_ATTRS, checkG);
+
+		return { checkmarkPos };
+	}
+
 	renderLinePreview(
 		s1: Vec2,
 		s2: Vec2,
@@ -3150,12 +3445,12 @@ export class SVGRenderer {
 		this.renderTooltip(se.x + 12, se.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
 	}
 
-	renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'circle' | 'grid' = 'point', clearFirst = true): void {
+	renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'circle' | 'spline' | 'grid' = 'point', clearFirst = true): void {
 		if (clearFirst) {
 			this.overlayGroup.innerHTML = '';
 		}
 
-		if (type === 'line' || type === 'circle') {
+		if (type === 'line' || type === 'circle' || type === 'spline') {
 			// Emerald diamond on object - enlarged so it clearly surrounds points
 			const d = 10;
 			createSvgElement(
@@ -3247,6 +3542,9 @@ export class SVGRenderer {
 				const se = viewport.worldToScreen(curve.end.x, curve.end.y);
 				const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, curve.clockwise);
 				createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+			} else if (curve.type === 'spline') {
+				const d = getSplineSvgPath(curve.bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!curve.isClosed);
+				createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
 			}
 			return;
 		}
@@ -3279,6 +3577,10 @@ export class SVGRenderer {
 			const smin = viewport.worldToScreen(curve.minorAxisPoint.x, curve.minorAxisPoint.y);
 			const d = getEllipticalArcSvgPath(sc, smaj, smin, sStart, sEnd, curve.clockwise);
 			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
+		} else if (curve.type === 'spline') {
+			const subSegments = extractSplineInterval(curve.bezierSegments, candidate.interval[0], candidate.interval[1]);
+			const d = getSplineSvgPath(subSegments, p => viewport.worldToScreen(p.x, p.y));
+			createSvgPath(d, TRIM_STROKE_ATTRS, this.previewGroup);
 		}
 	}
 
@@ -3293,7 +3595,7 @@ export class SVGRenderer {
 		const { curve, isWholeEntity, cutStartWorld, cutEndWorld, interval } = candidate;
 		if (isWholeEntity) return;
 
-		if (curve.type === 'circle' || curve.type === 'ellipse') {
+		if (curve.type === 'circle' || curve.type === 'ellipse' || (curve.type === 'spline' && !!curve.isClosed)) {
 			const sStart = viewport.worldToScreen(cutStartWorld.x, cutStartWorld.y);
 			const sEnd = viewport.worldToScreen(cutEndWorld.x, cutEndWorld.y);
 			this.renderCutMarker(sStart);

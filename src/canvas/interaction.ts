@@ -15,7 +15,7 @@ import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 } from '../solver/constraints';
-import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from '../model/types';
+import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline } from '../model/types';
 import { showToast } from '../ui/toast';
 import {
 	sketchPrimitiveToGeoCurve,
@@ -25,6 +25,12 @@ import {
 	executeBreak,
 	type GeoCurve,
 } from '../math/intersection';
+import {
+	bsplineToBezier,
+	fitPointsToBezier,
+	getSplineParamAtPoint,
+	type BezierSegment,
+} from '../math/spline';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -37,6 +43,8 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'rectangle',
 	'ellipse',
 	'elliptical_arc',
+	'spline_fit',
+	'spline_control',
 ] as const;
 
 export const CONSTRAINT_TOOLS = [
@@ -84,10 +92,11 @@ export type ToolType =
 	| ConstraintToolType;
 
 export interface SnapResult {
-	type: 'point' | 'line' | 'circle' | 'grid';
+	type: 'point' | 'line' | 'circle' | 'spline' | 'grid';
 	id?: string;
 	lineId?: string;
 	circleId?: string;
+	splineId?: string;
 	worldPos: Vec2;
 	screenPos: Vec2;
 }
@@ -248,6 +257,20 @@ export class CanvasInteraction {
 	private ellipticalArcStartPointStart: Vec2 | null = null;
 	private ellipticalArcEndPointStart: Vec2 | null = null;
 
+	// Dragging spline state
+	private isDraggingSpline = false;
+	private draggedSplineId: string | null = null;
+	private dragSplineStartWorld: Vec2 | null = null;
+	private splinePointsStart: Map<string, Vec2> = new Map();
+
+	// Spline drawing state
+	splineState: {
+		type: 'fit' | 'control';
+		points: Array<{ id: string; x: number; y: number }>;
+		undonePoints: Array<{ id?: string; x: number; y: number }>;
+		checkmarkPos?: Vec2;
+	} | null = null;
+
 	// Dragging constraint state
 	private isDraggingConstraint = false;
 	private draggedConstraintId: string | null = null;
@@ -260,7 +283,7 @@ export class CanvasInteraction {
 	private boxSelectShift = false;
 	private pendingExclusiveSelection: {
 		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint';
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
 	} | null = null;
 
 	// Dragging history snapshot
@@ -490,6 +513,8 @@ export class CanvasInteraction {
 		if (isConstraintTool(tool)) {
 			this.pruneIncompatibleSelection(tool);
 		}
+		this.svg.classList.toggle('tool-constraint', isConstraintTool(tool));
+		this.svg.classList.toggle('tool-trim', tool === 'trim' || tool === 'break');
 		this.updateCursor();
 		this.onToolChange?.(tool);
 		this.onMirrorStateChange?.();
@@ -614,9 +639,109 @@ export class CanvasInteraction {
 		this.boxSelectShift = false;
 		this.pendingExclusiveSelection = null;
 
-		this.dimensionState = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+		this.isDraggingSpline = false;
+		this.draggedSplineId = null;
+		this.dragSplineStartWorld = null;
+		this.splinePointsStart.clear();
+
+		if (this.splineState) {
+			this.cancelSpline();
+		}
 
 		this.renderer.clearPreviews();
+	}
+
+	isDrawingSpline(): boolean {
+		return this.splineState !== null && this.splineState.points.length > 0;
+	}
+
+	undoSplinePoint(): boolean {
+		if (!this.splineState || this.splineState.points.length === 0) return false;
+		const last = this.splineState.points.pop()!;
+		this.splineState.undonePoints.push(last);
+		if (!this.sketch.isPointUsed(last.id)) {
+			this.sketch.removeEntity(last.id);
+		}
+		if (this.splineState.points.length === 0) {
+			this.splineState = null;
+			this.renderer.clearPreviews();
+		}
+		this.render();
+		if (this.splineState && this.splineState.points.length > 0) {
+			this.updateSplineDrawingPreview();
+		}
+		return true;
+	}
+
+	redoSplinePoint(): boolean {
+		if (!this.splineState || this.splineState.undonePoints.length === 0) return false;
+		const next = this.splineState.undonePoints.pop()!;
+		let ptId = next.id;
+		if (!ptId || !this.sketch.points.has(ptId)) {
+			const pt = this.sketch.addPoint(next.x, next.y);
+			ptId = pt.id;
+		}
+		this.splineState.points.push({ id: ptId, x: next.x, y: next.y });
+		this.render();
+		this.updateSplineDrawingPreview();
+		return true;
+	}
+
+	finishSpline(isClosed = false): void {
+		if (!this.splineState || this.splineState.points.length < 2) {
+			this.cancelSpline();
+			return;
+		}
+		if (this.splineState.type === 'control' && this.splineState.points.length < 4) {
+			showToast('Control spline requires at least 4 points');
+			return;
+		}
+		const pointIds = this.splineState.points.map(p => p.id);
+		if (this.splineState.type === 'fit') {
+			this.sketch.addFitSpline(pointIds, undefined, this.isConstructionMode, undefined, isClosed);
+		} else {
+			this.sketch.addControlSpline(pointIds, this.isConstructionMode, undefined, false);
+		}
+		this.splineState = null;
+		this.renderer.clearPreviews();
+		this.render();
+	}
+
+	cancelSpline(): void {
+		if (!this.splineState) return;
+		for (const p of this.splineState.points) {
+			if (!this.sketch.isPointUsed(p.id)) {
+				this.sketch.removeEntity(p.id);
+			}
+		}
+		this.splineState = null;
+		this.renderer.clearPreviews();
+		this.render();
+	}
+
+	private updateSplineDrawingPreview(screenPos?: Vec2): void {
+		if (!this.splineState || this.splineState.points.length === 0) return;
+		this.renderer.clearPreviews();
+		const sPos = screenPos ?? this.lastMouseScreen;
+		const lastPtId = this.splineState.points[this.splineState.points.length - 1].id;
+		const snap = this.findSnap(sPos, lastPtId);
+		const worldPos = this.viewport.screenToWorld(sPos.x, sPos.y);
+		const effectiveWorld = snap ? snap.worldPos : worldPos;
+		const screenPts = this.splineState.points.map(p => this.viewport.worldToScreen(p.x, p.y));
+		const curScreen = this.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+		const { checkmarkPos } = this.renderer.renderSplinePreview(
+			this.splineState.type,
+			screenPts,
+			curScreen,
+			this.isConstructionMode
+		);
+		this.splineState.checkmarkPos = checkmarkPos;
+		if (snap) {
+			this.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
+		}
+		if (checkmarkPos && dist(sPos, checkmarkPos) <= 15) {
+			this.svg.style.cursor = 'pointer';
+		}
 	}
 
 	setMirrorPhase(phase: 'objects' | 'mirror_line'): void {
@@ -1064,6 +1189,7 @@ export class CanvasInteraction {
 
 	render(): void {
 		this.renderer.render(this.sketch, this.viewport, {
+			showSplineHandles: isConstraintTool(this.activeTool),
 			mirrorHighlight:
 				this.activeTool === 'mirror' && this.mirrorState
 					? {
@@ -1131,6 +1257,10 @@ export class CanvasInteraction {
 				return;
 			}
 			if (e.key === 'Escape') {
+				if (this.isDrawingSpline()) {
+					this.cancelSpline();
+					return;
+				}
 				if (this.activeTool === 'mirror') {
 					this.cancelMirror();
 					return;
@@ -1155,6 +1285,10 @@ export class CanvasInteraction {
 				this.sketch.clearSelection();
 				this.render();
 			} else if (e.key === 'Enter') {
+				if (this.isDrawingSpline()) {
+					this.finishSpline();
+					return;
+				}
 				if (this.activeTool === 'mirror') {
 					this.executeMirror();
 				} else if (this.activeTool === 'circular_pattern') {
@@ -1245,8 +1379,45 @@ export class CanvasInteraction {
 		let closestPointDist = pointSnapDistPx;
 		let foundPoint: { id: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
 
+		const selectedSplineIds = new Set<string>(this.sketch.selection.splineIds);
+		for (const spline of this.sketch.splines.values()) {
+			if (spline.pointIds.some(pid => this.sketch.selection.pointIds.has(pid))) {
+				selectedSplineIds.add(spline.id);
+			}
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					const line = this.sketch.lines.get(lid);
+					if (line && (this.sketch.selection.lineIds.has(lid) || this.sketch.selection.pointIds.has(line.p1Id) || this.sketch.selection.pointIds.has(line.p2Id))) {
+						selectedSplineIds.add(spline.id);
+					}
+				}
+			}
+		}
+
 		for (const pt of this.sketch.points.values()) {
 			if (excludePointId && pt.id === excludePointId) continue;
+			// If point belongs to a spline handle or control polygon, only snap if spline is selected or constraint tool active
+			let isHiddenSplinePoint = false;
+			for (const spline of this.sketch.splines.values()) {
+				if (!selectedSplineIds.has(spline.id) && !isConstraintTool(this.activeTool)) {
+					if (spline.splineType === 'control' && spline.pointIds.includes(pt.id)) {
+						isHiddenSplinePoint = true;
+						break;
+					}
+					if (spline.tangentLineIds) {
+						for (const lid of spline.tangentLineIds) {
+							const l = this.sketch.lines.get(lid);
+							if (l && (l.p1Id === pt.id || l.p2Id === pt.id)) {
+								isHiddenSplinePoint = true;
+								break;
+							}
+						}
+					}
+				}
+				if (isHiddenSplinePoint) break;
+			}
+			if (isHiddenSplinePoint) continue;
+
 			const s = this.viewport.worldToScreen(pt.x, pt.y);
 			const d = dist(screenPos, s);
 			if (d < closestPointDist) {
@@ -1264,17 +1435,25 @@ export class CanvasInteraction {
 			};
 		}
 
-		// Priority 2: Line & Circle/Arc snapping (Active independently of Snap button, closest geometry wins)
+		// Priority 2: Line, Circle/Arc & Spline snapping (Active independently of Snap button, closest geometry wins)
 		const geomSnapDistPx = 10;
 		let closestGeomDist = geomSnapDistPx;
 		let foundGeom:
 			| { type: 'line'; lineId: string; worldPos: Vec2; screenPos: Vec2 }
 			| { type: 'circle'; circleId: string; worldPos: Vec2; screenPos: Vec2 }
+			| { type: 'spline'; splineId: string; worldPos: Vec2; screenPos: Vec2 }
 			| null = null;
 
 		for (const line of this.sketch.lines.values()) {
 			if (excludePointId && (line.p1Id === excludePointId || line.p2Id === excludePointId)) {
 				continue;
+			}
+			if (line.isSplineHandle) {
+				const parentSpline = line.parentSplineId ? this.sketch.splines.get(line.parentSplineId) : undefined;
+				const isParentSelected = parentSpline && selectedSplineIds.has(parentSpline.id);
+				if (!isParentSelected && !this.sketch.selection.lineIds.has(line.id) && !isConstraintTool(this.activeTool)) {
+					continue;
+				}
 			}
 			const p1 = this.sketch.points.get(line.p1Id);
 			const p2 = this.sketch.points.get(line.p2Id);
@@ -1390,8 +1569,59 @@ export class CanvasInteraction {
 			}
 		}
 
+		if (!isConstraintTool(this.activeTool)) {
+			for (const spline of this.sketch.splines.values()) {
+				const pts = spline.pointIds.map(id => this.sketch.points.get(id)).filter((p): p is SketchPoint => !!p);
+				if (pts.length < 2) continue;
+
+				let bezierSegments: BezierSegment[] = [];
+				if (spline.splineType === 'control') {
+					bezierSegments = bsplineToBezier(pts, spline.knots);
+				} else {
+					const handles = (spline.tangentLineIds || []).map(lid => {
+						const line = this.sketch.lines.get(lid);
+						if (!line) return null;
+						const p1 = this.sketch.points.get(line.p1Id);
+						const p2 = this.sketch.points.get(line.p2Id);
+						if (!p1 || !p2) return null;
+						return {
+							h1: { x: p1.x, y: p1.y },
+							h2: { x: p2.x, y: p2.y },
+						};
+					});
+					bezierSegments = fitPointsToBezier(pts, handles);
+				}
+
+				const screenSegments: BezierSegment[] = bezierSegments.map(seg => [
+					this.viewport.worldToScreen(seg[0].x, seg[0].y),
+					this.viewport.worldToScreen(seg[1].x, seg[1].y),
+					this.viewport.worldToScreen(seg[2].x, seg[2].y),
+					this.viewport.worldToScreen(seg[3].x, seg[3].y),
+				]);
+
+				const proj = getSplineParamAtPoint(screenSegments, screenPos);
+				if (proj.distance < closestGeomDist) {
+					closestGeomDist = proj.distance;
+					const worldPos = this.viewport.screenToWorld(proj.point.x, proj.point.y);
+					foundGeom = {
+						type: 'spline',
+						splineId: spline.id,
+						worldPos,
+						screenPos: proj.point,
+					};
+				}
+			}
+		}
+
 		if (foundGeom) {
-			if (foundGeom.type === 'line') {
+			if (foundGeom.type === 'spline') {
+				return {
+					type: 'spline',
+					splineId: foundGeom.splineId,
+					worldPos: foundGeom.worldPos,
+					screenPos: foundGeom.screenPos,
+				};
+			} else if (foundGeom.type === 'line') {
 				return {
 					type: 'line',
 					lineId: foundGeom.lineId,
@@ -1558,6 +1788,15 @@ export class CanvasInteraction {
 		let foundLine: SketchLine | null = null;
 
 		for (const line of this.sketch.lines.values()) {
+			if (line.isSplineHandle) {
+				const parentSpline = line.parentSplineId ? this.sketch.splines.get(line.parentSplineId) : undefined;
+				const isParentSelected = parentSpline && (this.sketch.selection.splineIds.has(parentSpline.id) || parentSpline.pointIds.some(pid => this.sketch.selection.pointIds.has(pid)));
+				const isHandleActive = this.sketch.selection.lineIds.has(line.id) || this.sketch.selection.pointIds.has(line.p1Id) || this.sketch.selection.pointIds.has(line.p2Id);
+				if (!isParentSelected && !isHandleActive && !isConstraintTool(this.activeTool)) {
+					continue;
+				}
+			}
+
 			const p1 = this.sketch.points.get(line.p1Id);
 			const p2 = this.sketch.points.get(line.p2Id);
 			if (!p1 || !p2) continue;
@@ -1909,12 +2148,56 @@ export class CanvasInteraction {
 		return foundArc;
 	}
 
+	private findSplineNearScreen(screen: Vec2, thresholdPx = 18): SketchSpline | null {
+		let closestDist = thresholdPx;
+		let foundSpline: SketchSpline | null = null;
+
+		for (const spline of this.sketch.splines.values()) {
+			const pts = spline.pointIds.map(id => this.sketch.points.get(id)).filter((p): p is SketchPoint => !!p);
+			if (pts.length < 2) continue;
+
+			let bezierSegments: BezierSegment[] = [];
+			if (spline.splineType === 'control') {
+				bezierSegments = bsplineToBezier(pts, spline.knots);
+			} else {
+				const handles = (spline.tangentLineIds || []).map(lid => {
+					const line = this.sketch.lines.get(lid);
+					if (!line) return null;
+					const p1 = this.sketch.points.get(line.p1Id);
+					const p2 = this.sketch.points.get(line.p2Id);
+					if (!p1 || !p2) return null;
+					return {
+						h1: { x: p1.x, y: p1.y },
+						h2: { x: p2.x, y: p2.y },
+					};
+				});
+				bezierSegments = fitPointsToBezier(pts, handles);
+			}
+
+			const screenSegments: BezierSegment[] = bezierSegments.map(seg => [
+				this.viewport.worldToScreen(seg[0].x, seg[0].y),
+				this.viewport.worldToScreen(seg[1].x, seg[1].y),
+				this.viewport.worldToScreen(seg[2].x, seg[2].y),
+				this.viewport.worldToScreen(seg[3].x, seg[3].y),
+			]);
+
+			const proj = getSplineParamAtPoint(screenSegments, screen);
+			if (proj.distance < closestDist) {
+				closestDist = proj.distance;
+				foundSpline = spline;
+			}
+		}
+
+		return foundSpline;
+	}
+
 	private findTrimTargetNearScreen(screen: Vec2, thresholdPx = 18): GeoCurve | null {
 		let bestDist = thresholdPx;
 		let bestCurve: GeoCurve | null = null;
 
 		// 1. Lines
 		for (const line of this.sketch.lines.values()) {
+			if (line.isSplineHandle) continue;
 			const p1 = this.sketch.points.get(line.p1Id);
 			const p2 = this.sketch.points.get(line.p2Id);
 			if (!p1 || !p2) continue;
@@ -2041,6 +2324,43 @@ export class CanvasInteraction {
 			}
 		}
 
+		// 6. Splines
+		for (const spline of this.sketch.splines.values()) {
+			const pts = spline.pointIds.map(id => this.sketch.points.get(id)).filter((p): p is SketchPoint => !!p);
+			if (pts.length < 2) continue;
+
+			let bezierSegments: BezierSegment[] = [];
+			if (spline.splineType === 'control') {
+				bezierSegments = bsplineToBezier(pts, spline.knots);
+			} else {
+				const handles = (spline.tangentLineIds || []).map(lid => {
+					const line = this.sketch.lines.get(lid);
+					if (!line) return null;
+					const p1 = this.sketch.points.get(line.p1Id);
+					const p2 = this.sketch.points.get(line.p2Id);
+					if (!p1 || !p2) return null;
+					return {
+						h1: { x: p1.x, y: p1.y },
+						h2: { x: p2.x, y: p2.y },
+					};
+				});
+				bezierSegments = fitPointsToBezier(pts, handles);
+			}
+
+			const screenSegments: BezierSegment[] = bezierSegments.map(seg => [
+				this.viewport.worldToScreen(seg[0].x, seg[0].y),
+				this.viewport.worldToScreen(seg[1].x, seg[1].y),
+				this.viewport.worldToScreen(seg[2].x, seg[2].y),
+				this.viewport.worldToScreen(seg[3].x, seg[3].y),
+			]);
+
+			const proj = getSplineParamAtPoint(screenSegments, screen);
+			if (proj.distance < bestDist) {
+				bestDist = proj.distance;
+				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'spline', spline.id);
+			}
+		}
+
 		return bestCurve;
 	}
 
@@ -2076,6 +2396,14 @@ export class CanvasInteraction {
 		} else {
 			this.lastClickTime = now;
 			this.lastClickPos = screen;
+		}
+
+		if (this.splineState?.checkmarkPos && dist(screen, this.splineState.checkmarkPos) <= 15) {
+			this.renderer.clearPreviews();
+			this.finishSpline(false);
+			e.preventDefault();
+			e.stopPropagation();
+			return;
 		}
 
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
@@ -2624,7 +2952,7 @@ export class CanvasInteraction {
 			const target = e.target as SVGElement;
 			const targetG = target.closest('[data-id]') as SVGElement | null;
 			let id = targetG?.getAttribute('data-id');
-			let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint' | undefined;
+			let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint' | undefined;
 
 			// Priority 1: Points ALWAYS have top priority! If cursor is near any point, select & drag the point!
 			const nearPoint = this.findPointNearScreen(screen, 16);
@@ -2660,6 +2988,12 @@ export class CanvasInteraction {
 									if (hitEllipticalArc) {
 										id = hitEllipticalArc.id;
 										type = 'elliptical_arc';
+									} else {
+										const hitSpline = this.findSplineNearScreen(screen, 18);
+										if (hitSpline) {
+											id = hitSpline.id;
+											type = 'spline';
+										}
 									}
 								}
 							}
@@ -2776,6 +3110,31 @@ export class CanvasInteraction {
 							this.ellipticalArcMinorPointStart = vec(minorPt.x, minorPt.y);
 							this.ellipticalArcStartPointStart = vec(start.x, start.y);
 							this.ellipticalArcEndPointStart = vec(end.x, end.y);
+						}
+					}
+				} else if (type === 'spline') {
+					const spline = this.sketch.splines.get(id);
+					if (spline) {
+						this.isDraggingSpline = true;
+						this.draggedSplineId = id;
+						this.preDragSnapshot = this.sketch.takeSnapshot();
+						this.hasDragged = false;
+						this.dragSplineStartWorld = world;
+						this.splinePointsStart.clear();
+						for (const pid of spline.pointIds) {
+							const p = this.sketch.points.get(pid);
+							if (p) this.splinePointsStart.set(pid, vec(p.x, p.y));
+						}
+						if (spline.tangentLineIds) {
+							for (const lid of spline.tangentLineIds) {
+								const line = this.sketch.lines.get(lid);
+								if (line) {
+									const p1 = this.sketch.points.get(line.p1Id);
+									const p2 = this.sketch.points.get(line.p2Id);
+									if (p1) this.splinePointsStart.set(p1.id, vec(p1.x, p1.y));
+									if (p2) this.splinePointsStart.set(p2.id, vec(p2.x, p2.y));
+								}
+							}
 						}
 					}
 				} else if (type === 'constraint') {
@@ -3451,6 +3810,51 @@ export class CanvasInteraction {
 			}
 			return;
 		}
+
+		// --- TOOL: SPLINE (Fit point or Control point) ---
+		if (this.activeTool === 'spline_fit' || this.activeTool === 'spline_control') {
+			if (!this.splineState) {
+				this.splineState = {
+					type: this.activeTool === 'spline_fit' ? 'fit' : 'control',
+					points: [],
+					undonePoints: [],
+				};
+			}
+
+			// Check if clicking first point to close spline (only for fit splines; needs at least 3 points placed)
+			if (this.splineState.type === 'fit' && this.splineState.points.length >= 3) {
+				const firstPointId = this.splineState.points[0].id;
+				if (snap && snap.type === 'point' && snap.id === firstPointId) {
+					this.finishSpline(true);
+					showToast('Closed spline created');
+					return;
+				}
+				const firstPtPos = this.viewport.worldToScreen(this.splineState.points[0].x, this.splineState.points[0].y);
+				if (dist(screen, firstPtPos) <= 15) {
+					this.finishSpline(true);
+					showToast('Closed spline created');
+					return;
+				}
+			}
+
+			let pId: string;
+			let pPos: Vec2;
+			if (snap && snap.type === 'point' && snap.id) {
+				pId = snap.id;
+				pPos = snap.worldPos;
+			} else {
+				pPos = snap ? snap.worldPos : world;
+				const pt = this.sketch.addPoint(pPos.x, pPos.y);
+				pId = pt.id;
+				this.applySnapConstraintIfNeeded(pt.id, snap);
+			}
+
+			this.splineState.points.push({ id: pId, x: pPos.x, y: pPos.y });
+			this.splineState.undonePoints = [];
+			this.render();
+			this.updateSplineDrawingPreview(screen);
+			return;
+		}
 	}
 
 	private handleMouseMove(e: MouseEvent): void {
@@ -3800,6 +4204,28 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// Drag spline handling (Translates all control/fit/handle points of the spline)
+		if (
+			this.isDraggingSpline &&
+			this.draggedSplineId &&
+			this.dragSplineStartWorld
+		) {
+			this.hasDragged = true;
+			const dx = world.x - this.dragSplineStartWorld.x;
+			const dy = world.y - this.dragSplineStartWorld.y;
+
+			for (const [pid, startPos] of this.splinePointsStart.entries()) {
+				const pt = this.sketch.points.get(pid);
+				if (pt && !pt.fixed) {
+					pt.x = startPos.x + dx;
+					pt.y = startPos.y + dy;
+				}
+			}
+			this.sketch.solve();
+			this.render();
+			return;
+		}
+
 		if (this.activeTool === 'trim' || this.activeTool === 'break') {
 			const target = this.findTrimTargetNearScreen(screen, 18);
 			if (target) {
@@ -3821,8 +4247,21 @@ export class CanvasInteraction {
 		// Snapping indicator is shown during primitive creation (both first and subsequent points)
 		// or when dragging points (handled in point drag block above).
 		const snap = isDrawingPrimitiveTool(this.activeTool)
-			? this.findSnap(screen, this.drawingStep > 0 ? (this.startPointId ?? undefined) : undefined)
+			? this.findSnap(
+					screen,
+					this.drawingStep > 0
+						? (this.startPointId ?? undefined)
+						: this.splineState && this.splineState.points.length > 0
+							? this.splineState.points[this.splineState.points.length - 1].id
+							: undefined
+			  )
 			: null;
+
+		// Active tool drawing preview: Splines
+		if (this.splineState && this.splineState.points.length > 0) {
+			this.updateSplineDrawingPreview(screen);
+			return;
+		}
 
 		if (
 			snap &&
@@ -3831,7 +4270,8 @@ export class CanvasInteraction {
 			!this.isDraggingCircle &&
 			!this.isDraggingArc &&
 			!this.isDraggingEllipse &&
-			!this.isDraggingEllipticalArc
+			!this.isDraggingEllipticalArc &&
+			!this.isDraggingSpline
 		) {
 			this.renderer.renderSnapIndicator(snap.screenPos, snap.type);
 		} else {
@@ -4415,6 +4855,23 @@ export class CanvasInteraction {
 			this.ellipticalArcMinorPointStart = null;
 			this.ellipticalArcStartPointStart = null;
 			this.ellipticalArcEndPointStart = null;
+			this.renderer.clearPreviews();
+			if (this.hasDragged) {
+				this.sketch.solve();
+				this.render();
+				if (this.preDragSnapshot) {
+					this.sketch.pushSnapshot(this.preDragSnapshot);
+				}
+			}
+			this.preDragSnapshot = null;
+			this.hasDragged = false;
+			this.updateCursor();
+		}
+		if (this.isDraggingSpline) {
+			this.isDraggingSpline = false;
+			this.draggedSplineId = null;
+			this.dragSplineStartWorld = null;
+			this.splinePointsStart.clear();
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
@@ -5053,6 +5510,7 @@ export class CanvasInteraction {
 		}
 		sel.ellipseIds.clear();
 		sel.ellipticalArcIds.clear();
+		sel.splineIds.clear();
 		// Clean up constraintIds
 		sel.constraintIds.clear();
 		for (const pid of sel.pointIds) {

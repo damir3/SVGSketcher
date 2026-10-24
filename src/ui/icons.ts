@@ -8,6 +8,8 @@ import arcCenter from '../assets/icons/arc-center.svg?raw';
 import rectangle from '../assets/icons/rectangle.svg?raw';
 import ellipse from '../assets/icons/ellipse.svg?raw';
 import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
+import splineFit from '../assets/icons/spline-fit.svg?raw';
+import splineControl from '../assets/icons/spline-control.svg?raw';
 import construction from '../assets/icons/construction.svg?raw';
 import snap from '../assets/icons/snap.svg?raw';
 import trim from '../assets/icons/trim.svg?raw';
@@ -53,6 +55,8 @@ export const ICONS = {
 	rectangle,
 	ellipse,
 	elliptical_arc: ellipticalArc,
+	spline_fit: splineFit,
+	spline_control: splineControl,
 	construction,
 	snap,
 	trim,

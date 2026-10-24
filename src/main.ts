@@ -196,6 +196,12 @@ function initApp(): void {
 
 	// Header Actions
 	btnUndo.addEventListener('click', () => {
+		if (interaction.isDrawingSpline()) {
+			if (interaction.undoSplinePoint()) {
+				showToast('Spline: Undo point');
+			}
+			return;
+		}
 		if (sketch.undo()) {
 			renderer.render(sketch, viewport);
 			showToast('Undo');
@@ -203,6 +209,12 @@ function initApp(): void {
 	});
 
 	btnRedo.addEventListener('click', () => {
+		if (interaction.isDrawingSpline()) {
+			if (interaction.redoSplinePoint()) {
+				showToast('Spline: Redo point');
+			}
+			return;
+		}
 		if (sketch.redo()) {
 			renderer.render(sketch, viewport);
 			showToast('Redo');
@@ -336,6 +348,12 @@ function initApp(): void {
 				!e.shiftKey
 			) {
 				e.preventDefault();
+				if (interaction.isDrawingSpline()) {
+					if (interaction.undoSplinePoint()) {
+						showToast('Spline: Undo point');
+					}
+					return;
+				}
 				if (sketch.undo()) {
 					renderer.render(sketch, viewport);
 					showToast('Undo');
@@ -351,6 +369,12 @@ function initApp(): void {
 				e.key === 'y' || e.key === 'Y' || e.code === 'KeyY';
 			if (isRedoZ || isRedoY) {
 				e.preventDefault();
+				if (interaction.isDrawingSpline()) {
+					if (interaction.redoSplinePoint()) {
+						showToast('Spline: Redo point');
+					}
+					return;
+				}
 				if (sketch.redo()) {
 					renderer.render(sketch, viewport);
 					showToast('Redo');

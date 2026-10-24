@@ -1664,12 +1664,14 @@ export class MidpointConstraint extends BaseConstraint {
 	readonly midId: string;
 	readonly p1Id: string;
 	readonly p2Id: string;
+	readonly ratio: number;
 
-	constructor(id: string, midId: string, p1Id: string, p2Id: string, weight = 1.0) {
+	constructor(id: string, midId: string, p1Id: string, p2Id: string, weight = 1.0, ratio = 0.5) {
 		super(id, 'midpoint', 'Midpoint', [midId, p1Id, p2Id], weight);
 		this.midId = midId;
 		this.p1Id = p1Id;
 		this.p2Id = p2Id;
+		this.ratio = ratio;
 	}
 
 	override getEquationsCount(): number {
@@ -1684,21 +1686,23 @@ export class MidpointConstraint extends BaseConstraint {
 		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
 		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
 
+		const alpha = this.ratio;
 		return [
-			(mx - 0.5 * (p1x + p2x)) * this.weight,
-			(my - 0.5 * (p1y + p2y)) * this.weight,
+			(mx - ((1 - alpha) * p1x + alpha * p2x)) * this.weight,
+			(my - ((1 - alpha) * p1y + alpha * p2y)) * this.weight,
 		];
 	}
 
 	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
+		const alpha = this.ratio;
 		this.addJacobianEntry(res, paramIndices, `${this.midId}.x`, baseRow, this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -0.5 * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, -0.5 * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -(1 - alpha) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, -alpha * this.weight);
 
 		this.addJacobianEntry(res, paramIndices, `${this.midId}.y`, baseRow + 1, this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow + 1, -0.5 * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow + 1, -0.5 * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow + 1, -(1 - alpha) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow + 1, -alpha * this.weight);
 		return res;
 	}
 }

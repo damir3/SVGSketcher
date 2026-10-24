@@ -1,4 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
+import type { SketchSpline } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
 import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, CircularPatternConstraint, RectangularPatternConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
@@ -41,19 +42,21 @@ export class Sidebar {
 			statusLabel = 'Fully Defined (0 DoF)';
 		}
 
-		const points = [...this.sketch.points.values()];
-		const lines = [...this.sketch.lines.values()];
+		const points = [...this.sketch.points.values()].filter(p => !this.sketch.isSplineHandlePoint(p.id));
+		const lines = [...this.sketch.lines.values()].filter(l => !l.isSplineHandle);
 		const circles = [...this.sketch.circles.values()];
 		const arcs = [...this.sketch.arcs.values()];
 		const ellipses = [...this.sketch.ellipses.values()];
 		const ellipticalArcs = [...this.sketch.ellipticalArcs.values()];
+		const splines = [...this.sketch.splines.values()];
 		const totalPrimitives =
 			points.length +
 			lines.length +
 			circles.length +
 			arcs.length +
 			ellipses.length +
-			ellipticalArcs.length;
+			ellipticalArcs.length +
+			splines.length;
 
 		this.container.innerHTML = `
 			<div class="sidebar-header">
@@ -83,6 +86,7 @@ export class Sidebar {
 						<span class="tree-title">Primitives (${totalPrimitives})</span>
 					</div>
 					<div class="tree-list">
+						${splines.map(s => this.renderSplineItem(s)).join('')}
 						${lines.map(l => this.renderLineItem(l)).join('')}
 						${circles.map(c => this.renderCircleItem(c)).join('')}
 						${arcs.map(a => this.renderArcItem(a)).join('')}
@@ -675,6 +679,28 @@ export class Sidebar {
 				`;
 			}
 		} else if (
+			sel.splineIds.size === 1 &&
+			sel.pointIds.size === 0 &&
+			sel.lineIds.size === 0 &&
+			sel.circleIds.size === 0 &&
+			sel.arcIds.size === 0 &&
+			sel.ellipseIds.size === 0 &&
+			sel.ellipticalArcIds.size === 0
+		) {
+			const sid = [...sel.splineIds][0];
+			const spline = this.sketch.splines.get(sid);
+			if (spline) {
+				detailsHtml = `
+					<div class="inspector-card">
+						<div class="inspector-card-title">${spline.id}</div>
+						<div class="inspector-row"><span>Type:</span> <strong>${spline.splineType === 'fit' ? 'Fit Point Spline' : 'Control Point Spline'}</strong></div>
+						<div class="inspector-row"><span>Points:</span> <strong>${spline.pointIds.length} points</strong></div>
+						<div class="inspector-row"><span>Closed:</span> <strong>${spline.isClosed ? 'Yes' : 'No'}</strong></div>
+						<div class="inspector-row"><span>Style:</span> <strong>${spline.isConstruction ? 'Construction' : 'Solid'}</strong></div>
+					</div>
+				`;
+			}
+		} else if (
 			sel.pointIds.size === 2 &&
 			sel.lineIds.size === 0 &&
 			sel.circleIds.size === 0 &&
@@ -1155,6 +1181,22 @@ export class Sidebar {
 					<span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${arc.isConstruction ? '(aux)' : ''}</span>
 				</div>
 				<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>
+			</div>
+		`;
+	}
+
+	private renderSplineItem(spline: SketchSpline): string {
+		const mirror = this.isItemMirrorSelected(spline.id);
+		const isSelected = mirror.isSelected || this.sketch.selection.splineIds.has(spline.id);
+		const typeLabel = spline.splineType === 'fit' ? 'Fit Spline' : 'Control Spline';
+		return `
+			<div class="tree-item ${isSelected ? 'selected' : ''} ${mirror.extraClass}" data-type="spline" data-id="${spline.id}">
+				<div class="tree-item-info">
+					<span class="tree-icon">${spline.splineType === 'fit' ? ICONS.spline_fit : ICONS.spline_control}</span>
+					<span class="tree-name">${spline.id}</span>
+					<span class="tree-meta">${typeLabel} (${spline.pointIds.length} pts) ${spline.isConstruction ? '(aux)' : ''}</span>
+				</div>
+				<button class="tree-delete-btn" data-delete-id="${spline.id}" title="Delete">${ICONS.delete}</button>
 			</div>
 		`;
 	}

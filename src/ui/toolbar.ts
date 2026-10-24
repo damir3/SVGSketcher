@@ -94,6 +94,14 @@ export class Toolbar {
 						${ICONS.elliptical_arc}
 						<span class="btn-tooltip">Elliptical Arc</span>
 					</button>
+					<button class="tool-btn" data-tool="spline_fit" title="Fit Point Spline">
+						${ICONS.spline_fit}
+						<span class="btn-tooltip">Fit Spline</span>
+					</button>
+					<button class="tool-btn" data-tool="spline_control" title="Control Point Spline">
+						${ICONS.spline_control}
+						<span class="btn-tooltip">Control Spline</span>
+					</button>
 				</div>
 			</div>
 

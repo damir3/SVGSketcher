@@ -12,6 +12,8 @@ export interface SketchLine {
 	p1Id: string;
 	p2Id: string;
 	isConstruction?: boolean;
+	isSplineHandle?: boolean;
+	parentSplineId?: string;
 }
 
 export interface SketchCircle {
@@ -50,6 +52,16 @@ export interface SketchEllipticalArc {
 	isConstruction?: boolean;
 }
 
+export interface SketchSpline {
+	id: string;
+	splineType: 'fit' | 'control';
+	pointIds: string[];
+	tangentLineIds?: string[];
+	knots?: number[];
+	isClosed?: boolean;
+	isConstruction?: boolean;
+}
+
 export type SketchEntity =
 	| { type: 'point'; entity: SketchPoint }
 	| { type: 'line'; entity: SketchLine }
@@ -57,6 +69,7 @@ export type SketchEntity =
 	| { type: 'arc'; entity: SketchArc }
 	| { type: 'ellipse'; entity: SketchEllipse }
 	| { type: 'elliptical_arc'; entity: SketchEllipticalArc }
+	| { type: 'spline'; entity: SketchSpline }
 	| { type: 'constraint'; entity: IConstraint };
 
 export interface SelectionState {
@@ -66,5 +79,7 @@ export interface SelectionState {
 	arcIds: Set<string>;
 	ellipseIds: Set<string>;
 	ellipticalArcIds: Set<string>;
+	splineIds: Set<string>;
 	constraintIds: Set<string>;
 }
+

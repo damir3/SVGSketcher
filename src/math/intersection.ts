@@ -1,6 +1,16 @@
 import type { Vec2 } from './vector';
+import { projectPointOntoSegment } from './vector';
 import type { SketchDocument } from '../model/sketch';
-import type { SketchPoint, SketchLine } from '../model/types';
+import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
+import {
+	bsplineToBezier,
+	fitPointsToBezier,
+	getSplinePointAtParam,
+	getSplineParamAtPoint,
+	evaluateBezier,
+	extractSplineInterval,
+	type BezierSegment,
+} from './spline';
 import {
 	HorizontalConstraint,
 	VerticalConstraint,
@@ -77,7 +87,19 @@ export interface GeoEllipticalArc {
 	isConstruction?: boolean;
 }
 
-export type GeoCurve = GeoSegment | GeoCircle | GeoArc | GeoEllipse | GeoEllipticalArc;
+export interface GeoSpline {
+	type: 'spline';
+	id: string;
+	splineType: 'fit' | 'control';
+	pointIds: string[];
+	points: Vec2[];
+	tangentLineIds?: string[];
+	bezierSegments: BezierSegment[];
+	isClosed?: boolean;
+	isConstruction?: boolean;
+}
+
+export type GeoCurve = GeoSegment | GeoCircle | GeoArc | GeoEllipse | GeoEllipticalArc | GeoSpline;
 export type CurveType = GeoCurve['type'];
 
 export interface TrimCandidate {
@@ -97,7 +119,7 @@ export interface TrimCandidate {
  */
 export function sketchPrimitiveToGeoCurve(
 	sketch: SketchDocument,
-	type: 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc',
+	type: 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
 	id: string
 ): GeoCurve | null {
 	if (type === 'line') {
@@ -189,6 +211,46 @@ export function sketchPrimitiveToGeoCurve(
 			clockwise: !!arc.clockwise,
 			isConstruction: arc.isConstruction,
 		};
+	} else if (type === 'spline') {
+		const spline = sketch.splines.get(id);
+		if (!spline) return null;
+		const pts: Vec2[] = [];
+		for (const pid of spline.pointIds) {
+			const p = sketch.points.get(pid);
+			if (!p) return null;
+			pts.push({ x: p.x, y: p.y });
+		}
+		if (pts.length < 2) return null;
+
+		let bezierSegments: BezierSegment[] = [];
+		if (spline.splineType === 'control') {
+			bezierSegments = bsplineToBezier(pts, spline.knots);
+		} else {
+			const handles = (spline.tangentLineIds || []).map(lid => {
+				const line = sketch.lines.get(lid);
+				if (!line) return null;
+				const p1 = sketch.points.get(line.p1Id);
+				const p2 = sketch.points.get(line.p2Id);
+				if (!p1 || !p2) return null;
+				return {
+					h1: { x: p1.x, y: p1.y },
+					h2: { x: p2.x, y: p2.y },
+				};
+			});
+			bezierSegments = fitPointsToBezier(pts, handles);
+		}
+
+		return {
+			type: 'spline',
+			id,
+			splineType: spline.splineType,
+			pointIds: [...spline.pointIds],
+			points: pts,
+			tangentLineIds: spline.tangentLineIds ? [...spline.tangentLineIds] : undefined,
+			bezierSegments,
+			isClosed: spline.splineType === 'control' ? false : spline.isClosed,
+			isConstruction: spline.isConstruction,
+		};
 	}
 	return null;
 }
@@ -196,6 +258,8 @@ export function sketchPrimitiveToGeoCurve(
 export function getAllGeoCurves(sketch: SketchDocument): GeoCurve[] {
 	const curves: GeoCurve[] = [];
 	for (const id of sketch.lines.keys()) {
+		const line = sketch.lines.get(id);
+		if (line?.isSplineHandle) continue; // Skip tangent handles
 		const c = sketchPrimitiveToGeoCurve(sketch, 'line', id);
 		if (c) curves.push(c);
 	}
@@ -215,16 +279,22 @@ export function getAllGeoCurves(sketch: SketchDocument): GeoCurve[] {
 		const c = sketchPrimitiveToGeoCurve(sketch, 'elliptical_arc', id);
 		if (c) curves.push(c);
 	}
+	for (const id of sketch.splines.keys()) {
+		const c = sketchPrimitiveToGeoCurve(sketch, 'spline', id);
+		if (c) curves.push(c);
+	}
 	return curves;
 }
 
 /**
  * Returns point in world coordinates at parameter `param` on `curve`.
- * - For Segment / Arc / EllipticalArc: param in [0, 1]
+ * - For Segment / Arc / EllipticalArc / Spline: param in [0, 1]
  * - For Circle / Ellipse: param in [0, 2pi) in SVG-coordinate angle
  */
 export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
-	if (curve.type === 'segment') {
+	if (curve.type === 'spline') {
+		return getSplinePointAtParam(curve.bezierSegments, param);
+	} else if (curve.type === 'segment') {
 		const t = Math.max(0, Math.min(1, param));
 		return {
 			x: curve.p1.x + t * (curve.p2.x - curve.p1.x),
@@ -304,7 +374,9 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
  * Computes parameter of point `pt` (in world coordinates) along `curve`.
  */
 export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
-	if (curve.type === 'segment') {
+	if (curve.type === 'spline') {
+		return getSplineParamAtPoint(curve.bezierSegments, pt).param;
+	} else if (curve.type === 'segment') {
 		const dx = curve.p2.x - curve.p1.x;
 		const dy = curve.p2.y - curve.p1.y;
 		const l2 = dx * dx + dy * dy;
@@ -712,6 +784,137 @@ export function intersectEllipseEllipse(
 			pts.push(worldP);
 		}
 	}
+	return deduplicatePoints(pts);
+}
+
+function findBezierImplicitRoots(b: BezierSegment, f: (p: Vec2) => number): Vec2[] {
+	const N = 16;
+	const vals: number[] = new Array(N + 1);
+	for (let i = 0; i <= N; i++) {
+		vals[i] = f(evaluateBezier(b, i / N));
+	}
+
+	const roots: number[] = [];
+	for (let i = 0; i < N; i++) {
+		const tA = i / N;
+		const tB = (i + 1) / N;
+		const vA = vals[i];
+		const vB = vals[i + 1];
+
+		if (vA * vB <= 0) {
+			let low = tA;
+			let high = tB;
+			let fLow = vA;
+			for (let iter = 0; iter < 28; iter++) {
+				const mid = (low + high) * 0.5;
+				const fMid = f(evaluateBezier(b, mid));
+				if (Math.abs(fMid) < 1e-12 || high - low < 1e-10) {
+					low = mid;
+					break;
+				}
+				if (fLow * fMid <= 0) {
+					high = mid;
+				} else {
+					low = mid;
+					fLow = fMid;
+				}
+			}
+			roots.push((low + high) * 0.5);
+		} else if (Math.abs(vA) < 1e-4 && (i === 0 || Math.abs(vA) <= Math.abs(vals[i - 1])) && Math.abs(vA) <= Math.abs(vB)) {
+			roots.push(tA);
+		}
+	}
+	return roots.map(t => evaluateBezier(b, t));
+}
+
+function bezierBBoxesOverlap(b1: BezierSegment, b2: BezierSegment): boolean {
+	let minX1 = Infinity, maxX1 = -Infinity, minY1 = Infinity, maxY1 = -Infinity;
+	for (const p of b1) {
+		if (p.x < minX1) minX1 = p.x;
+		if (p.x > maxX1) maxX1 = p.x;
+		if (p.y < minY1) minY1 = p.y;
+		if (p.y > maxY1) maxY1 = p.y;
+	}
+	let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
+	for (const p of b2) {
+		if (p.x < minX2) minX2 = p.x;
+		if (p.x > maxX2) maxX2 = p.x;
+		if (p.y < minY2) minY2 = p.y;
+		if (p.y > maxY2) maxY2 = p.y;
+	}
+	return !(maxX1 < minX2 - 1e-4 || minX1 > maxX2 + 1e-4 || maxY1 < minY2 - 1e-4 || minY1 > maxY2 + 1e-4);
+}
+
+export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[] {
+	if (spline.id === other.id) return [];
+	const pts: Vec2[] = [];
+
+	for (const b of spline.bezierSegments) {
+		if (other.type === 'segment') {
+			const p1 = other.p1;
+			const p2 = other.p2;
+			const A = -(p2.y - p1.y);
+			const B = p2.x - p1.x;
+			const C = -(A * p1.x + B * p1.y);
+			const len = Math.hypot(A, B);
+			if (len < 1e-12) continue;
+
+			const f = (p: Vec2) => (A * p.x + B * p.y + C) / len;
+			const rPts = findBezierImplicitRoots(b, f);
+			for (const rPt of rPts) {
+				const proj = projectPointOntoSegment(rPt, p1, p2);
+				if (proj.dist < 1e-3 && proj.t >= -1e-4 && proj.t <= 1 + 1e-4) {
+					pts.push(rPt);
+				}
+			}
+		} else if (other.type === 'circle' || other.type === 'arc') {
+			const f = (p: Vec2) => Math.hypot(p.x - other.center.x, p.y - other.center.y) - other.radius;
+			const rPts = findBezierImplicitRoots(b, f);
+			for (const rPt of rPts) {
+				if (other.type === 'circle' || isPointOnArc(rPt, other)) {
+					pts.push(rPt);
+				}
+			}
+		} else if (other.type === 'ellipse' || other.type === 'elliptical_arc') {
+			const sc = { x: other.center.x, y: -other.center.y };
+			const maj = { x: other.majorAxisPoint.x, y: -other.majorAxisPoint.y };
+			const min = { x: other.minorAxisPoint.x, y: -other.minorAxisPoint.y };
+			const rx = Math.hypot(maj.x - sc.x, maj.y - sc.y);
+			const ry = Math.hypot(min.x - sc.x, min.y - sc.y);
+			if (rx < 1e-6 || ry < 1e-6) continue;
+			const theta = Math.atan2(maj.y - sc.y, maj.x - sc.x);
+			const ux = Math.cos(theta), uy = Math.sin(theta);
+			const vx = -Math.sin(theta), vy = Math.cos(theta);
+
+			const f = (p: Vec2) => {
+				const sp = { x: p.x, y: -p.y };
+				const dx = sp.x - sc.x;
+				const dy = sp.y - sc.y;
+				const up = dx * ux + dy * uy;
+				const vp = dx * vx + dy * vy;
+				return (up * up) / (rx * rx) + (vp * vp) / (ry * ry) - 1.0;
+			};
+			const rPts = findBezierImplicitRoots(b, f);
+			for (const rPt of rPts) {
+				if (other.type === 'ellipse' || isPointOnEllipticalArc(rPt, other)) {
+					pts.push(rPt);
+				}
+			}
+		} else if (other.type === 'spline') {
+			for (const b2 of other.bezierSegments) {
+				if (!bezierBBoxesOverlap(b, b2)) continue;
+				const N = 16;
+				for (let i = 0; i <= N; i++) {
+					const t = i / N;
+					const ptOnB = evaluateBezier(b, t);
+					const proj = getSplineParamAtPoint([b2], ptOnB);
+					if (proj.distance < 1e-3) {
+						pts.push(ptOnB);
+					}
+				}
+			}
+		}
+	}
 
 	return deduplicatePoints(pts);
 }
@@ -721,6 +924,13 @@ export function intersectEllipseEllipse(
  */
 export function intersectCurves(c1: GeoCurve, c2: GeoCurve): Vec2[] {
 	if (c1.id === c2.id) return [];
+
+	if (c1.type === 'spline') {
+		return intersectSplineCurve(c1, c2);
+	}
+	if (c2.type === 'spline') {
+		return intersectSplineCurve(c2, c1);
+	}
 
 	if (c1.type === 'segment') {
 		if (c2.type === 'segment') return intersectSegmentSegment(c1, c2);
@@ -801,7 +1011,12 @@ export function getTrimCandidate(
 	const intersections = getCurveIntersections(target, allCurves);
 	const cursorParam = getParamAtPoint(target, cursorWorldPos);
 
-	if (target.type === 'segment' || target.type === 'arc' || target.type === 'elliptical_arc') {
+	const isClosedCurve =
+		target.type === 'circle' ||
+		target.type === 'ellipse' ||
+		(target.type === 'spline' && target.splineType !== 'control' && !!target.isClosed);
+
+	if (!isClosedCurve) {
 		// Open curves: domain [0, 1]
 		if (intersections.length === 0) {
 			// Entire curve will be removed
@@ -849,27 +1064,28 @@ export function getTrimCandidate(
 		};
 	}
 
-	// Closed curves (Circle, Ellipse): domain [0, 2pi)
+	// Closed curves (Circle, Ellipse, Closed Spline):
+	const period = target.type === 'circle' || target.type === 'ellipse' ? TWO_PI : 1.0;
+
 	if (intersections.length < 2) {
-		// As requested: circle and ellipse with < 2 intersections are completely deleted!
+		// As requested: closed curves with < 2 intersections are completely deleted!
 		return {
 			curve: target,
-			interval: [0, TWO_PI],
+			interval: [0, period],
 			cutStartWorld: getPointAtParam(target, 0),
-			cutEndWorld: getPointAtParam(target, TWO_PI),
+			cutEndWorld: getPointAtParam(target, period),
 			isWholeEntity: true,
 		};
 	}
 
-	// For >= 2 intersections on circle/ellipse:
-	// Interval k loops from last back to first: [theta_last, theta_0 + 2pi]
+	// For >= 2 intersections on closed curve:
+	// Cyclic intervals: [p0, p1], [p1, p2], ..., [pn-1, p0] (wrapping)
 	const thetas = intersections.map(i => i.param);
 	const n = thetas.length;
 
 	let chosenIdxA = n - 1;
 	let chosenIdxB = 0;
 
-	// Check if cursorParam falls between thetas[i] and thetas[i+1]
 	let found = false;
 	for (let i = 0; i < n - 1; i++) {
 		if (cursorParam >= thetas[i] - 1e-5 && cursorParam <= thetas[i + 1] + 1e-5) {
@@ -1036,6 +1252,140 @@ function transferLineConstraints(
 				}
 			}
 		}
+	}
+}
+
+function replaceSplineWithInterval(
+	sketch: SketchDocument,
+	originalSpline: SketchSpline,
+	curve: GeoSpline,
+	uA: number,
+	uB: number,
+	startPointId: string,
+	endPointId: string
+): void {
+	if (curve.bezierSegments.length === 0) return;
+
+	const subSegments = extractSplineInterval(curve.bezierSegments, uA, uB);
+	if (subSegments.length === 0) return;
+
+	const M = subSegments.length;
+	const rawPoints: Vec2[] = [];
+	const rawHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
+
+	for (let j = 0; j <= M; j++) {
+		if (j === 0) {
+			const p0 = subSegments[0][0];
+			rawPoints.push(p0);
+			const v = {
+				x: subSegments[0][1].x - p0.x,
+				y: subSegments[0][1].y - p0.y,
+			};
+			rawHandles.push({
+				h1: { x: p0.x - v.x, y: p0.y - v.y },
+				h2: { x: p0.x + v.x, y: p0.y + v.y },
+			});
+		} else if (j === M) {
+			const pM = subSegments[M - 1][3];
+			rawPoints.push(pM);
+			const v = {
+				x: pM.x - subSegments[M - 1][2].x,
+				y: pM.y - subSegments[M - 1][2].y,
+			};
+			rawHandles.push({
+				h1: { x: pM.x - v.x, y: pM.y - v.y },
+				h2: { x: pM.x + v.x, y: pM.y + v.y },
+			});
+		} else {
+			const pJ = subSegments[j][0];
+			rawPoints.push(pJ);
+			rawHandles.push({
+				h1: { x: subSegments[j - 1][2].x, y: subSegments[j - 1][2].y },
+				h2: { x: subSegments[j][1].x, y: subSegments[j][1].y },
+			});
+		}
+	}
+
+	// Filter any degenerate segments (points closer than 1e-3)
+	const points: Vec2[] = [];
+	const handles: Array<{ h1: Vec2; h2: Vec2 }> = [];
+	for (let k = 0; k < rawPoints.length; k++) {
+		if (points.length === 0 || Math.hypot(rawPoints[k].x - points[points.length - 1].x, rawPoints[k].y - points[points.length - 1].y) >= 1e-3) {
+			points.push(rawPoints[k]);
+			handles.push(rawHandles[k]);
+		}
+	}
+	if (points.length < 2) return;
+
+	// Assign startPointId, matched intermediate IDs, and endPointId
+	const ptIds: string[] = [startPointId];
+	for (let k = 1; k < points.length - 1; k++) {
+		const pos = points[k];
+		let matchedId: string | null = null;
+		for (const pid of originalSpline.pointIds) {
+			const pt = sketch.points.get(pid);
+			if (pt && Math.hypot(pt.x - pos.x, pt.y - pos.y) < 1e-2) {
+				matchedId = pid;
+				break;
+			}
+		}
+		if (!matchedId) {
+			const newPt = sketch.addPoint(pos.x, pos.y);
+			matchedId = newPt.id;
+		}
+		ptIds.push(matchedId);
+	}
+	ptIds.push(endPointId);
+
+	// Deduplicate consecutive identical IDs if any
+	const cleanPtIds: string[] = [];
+	const cleanHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
+	for (let k = 0; k < ptIds.length; k++) {
+		if (cleanPtIds.length === 0 || cleanPtIds[cleanPtIds.length - 1] !== ptIds[k]) {
+			cleanPtIds.push(ptIds[k]);
+			cleanHandles.push(handles[k]);
+		}
+	}
+
+	if (cleanPtIds.length < 2) return;
+
+	if (originalSpline.splineType === 'control') {
+		const controlRawPoints: Vec2[] = [subSegments[0][0]];
+		for (let s = 0; s < M; s++) {
+			controlRawPoints.push(subSegments[s][1]);
+			controlRawPoints.push(subSegments[s][2]);
+			controlRawPoints.push(subSegments[s][3]);
+		}
+
+		const controlPtIds: string[] = [startPointId];
+		for (let k = 1; k < controlRawPoints.length - 1; k++) {
+			const pos = controlRawPoints[k];
+			let matchedId: string | null = null;
+			for (const pid of originalSpline.pointIds) {
+				const pt = sketch.points.get(pid);
+				if (pt && Math.hypot(pt.x - pos.x, pt.y - pos.y) < 1e-2) {
+					matchedId = pid;
+					break;
+				}
+			}
+			if (!matchedId) {
+				const newPt = sketch.addPoint(pos.x, pos.y);
+				matchedId = newPt.id;
+			}
+			controlPtIds.push(matchedId);
+		}
+		controlPtIds.push(endPointId);
+
+		const knots: number[] = [0, 0, 0, 0];
+		for (let i = 1; i < M; i++) knots.push(i, i, i);
+		knots.push(M, M, M, M);
+
+		sketch.addControlSpline(controlPtIds, originalSpline.isConstruction, undefined, false, knots);
+		return;
+	}
+
+	if (originalSpline.splineType === 'fit') {
+		sketch.addFitSpline(cleanPtIds, undefined, originalSpline.isConstruction, undefined, false, cleanHandles);
 	}
 }
 
@@ -1257,6 +1607,43 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 			);
 			sketch.removeEntity(arc.id);
 		}
+	} else if (curve.type === 'spline') {
+		const spline = sketch.splines.get(curve.id);
+		if (!spline) return;
+		const [uA, uB] = interval;
+
+		if (spline.isClosed && spline.splineType === 'fit') {
+			// Closed spline: cut out [uA, uB], remaining is an open spline from uB around to uA!
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, uB, uA, pB.id, pA.id);
+			sketch.removeEntity(spline.id);
+			return;
+		}
+
+		const isStart = uA <= 1e-4;
+		const isEnd = uB >= 1 - 1e-4;
+
+		if (isStart && isEnd) {
+			sketch.removeEntity(spline.id);
+			return;
+		}
+
+		if (isStart) {
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
+			sketch.removeEntity(spline.id);
+		} else if (isEnd) {
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
+			sketch.removeEntity(spline.id);
+		} else {
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
+			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
+			sketch.removeEntity(spline.id);
+		}
 	}
 }
 
@@ -1446,5 +1833,44 @@ export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): 
 			sketch.addEllipticalArc(arc.centerId, arc.majorAxisPointId, arc.minorAxisPointId, pB.id, arc.endPointId, arc.clockwise, arc.isConstruction);
 			sketch.removeEntity(arc.id);
 		}
+	} else if (curve.type === 'spline') {
+		const spline = sketch.splines.get(curve.id);
+		if (!spline) return;
+		const [uA, uB] = interval;
+
+		if (spline.isClosed && spline.splineType === 'fit') {
+			// Closed spline: break into 2 open splines covering the full loop: [uA, uB] and [uB, uA]
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, uA, uB, pA.id, pB.id);
+			replaceSplineWithInterval(sketch, spline, curve, uB, uA, pB.id, pA.id);
+			sketch.removeEntity(spline.id);
+			return;
+		}
+
+		const isStart = uA <= 1e-4;
+		const isEnd = uB >= 1 - 1e-4;
+
+		if (isStart && isEnd) return;
+
+		if (isStart) {
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, 0, uB, spline.pointIds[0], pB.id);
+			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
+			sketch.removeEntity(spline.id);
+		} else if (isEnd) {
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
+			replaceSplineWithInterval(sketch, spline, curve, uA, 1, pA.id, spline.pointIds[spline.pointIds.length - 1]);
+			sketch.removeEntity(spline.id);
+		} else {
+			const pA = createCutPoint(sketch, getPointAtParam(curve, uA), candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+			const pB = createCutPoint(sketch, getPointAtParam(curve, uB), candidate.endCuttingCurveId, candidate.endCuttingCurveType);
+			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
+			replaceSplineWithInterval(sketch, spline, curve, uA, uB, pA.id, pB.id);
+			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
+			sketch.removeEntity(spline.id);
+		}
 	}
 }
+

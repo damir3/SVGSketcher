@@ -1,5 +1,5 @@
 import type { IConstraint, ConstraintType } from '../solver/types';
-import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc } from './types';
+import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline } from './types';
 import {
 	FixedConstraint,
 	CoincidentConstraint,
@@ -90,6 +90,7 @@ export interface SerializedConstraint {
 	c2CenterId?: string;
 
 	midId?: string;
+	ratio?: number;
 
 	arcId?: string;
 	centerId?: string;
@@ -130,6 +131,7 @@ export interface SketchSnapshot {
 	arcs: SketchArc[];
 	ellipses: SketchEllipse[];
 	ellipticalArcs: SketchEllipticalArc[];
+	splines?: SketchSpline[];
 	constraints: SerializedConstraint[];
 	idCounter: number;
 }
@@ -273,6 +275,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.midId = c.midId;
 		base.p1Id = c.p1Id;
 		base.p2Id = c.p2Id;
+		base.ratio = c.ratio;
 	} else if (c instanceof ArcEndpointsConstraint) {
 		base.arcId = c.arcId;
 		base.centerId = c.centerId;
@@ -441,7 +444,7 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 			c = new ConcentricConstraint(d.id, d.c1CenterId!, d.c2CenterId!, d.weight);
 			break;
 		case 'midpoint':
-			c = new MidpointConstraint(d.id, d.midId!, d.p1Id!, d.p2Id!, d.weight);
+			c = new MidpointConstraint(d.id, d.midId!, d.p1Id!, d.p2Id!, d.weight, d.ratio ?? 0.5);
 			break;
 		case 'arc_endpoints':
 			c = new ArcEndpointsConstraint(
