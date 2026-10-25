@@ -2,33 +2,12 @@ import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
 import {
-	DistanceConstraint,
-	RadiusConstraint,
-	HorizontalConstraint,
-	VerticalConstraint,
-	ParallelConstraint,
-	CollinearConstraint,
-	PerpendicularConstraint,
-	EqualLengthConstraint,
-	EqualRadiusConstraint,
-	TangentLineCircleConstraint,
-	TangentCircleCircleConstraint,
-	ConcentricConstraint,
-	MidpointConstraint,
-	PointOnLineConstraint,
-	PointOnCircleConstraint,
-	FixedConstraint,
-	CoincidentConstraint,
-	AngleConstraint,
-	PointToLineDistanceConstraint,
-	SymmetryConstraint,
-	CircularPatternConstraint,
 	computePatternCopyAngle,
-	RectangularPatternConstraint,
 	computeRectangularPatternOffset,
 	computeRectangularPatternDirections,
+	type ConstraintRenderContext,
 } from '../solver/constraints';
-import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
+import { type Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
 import { sketchPrimitiveToGeoCurve, type GeoSpline, type TrimCandidate } from '../math/intersection';
 import {
@@ -39,461 +18,89 @@ import {
 	type BezierSegment,
 } from '../math/spline';
 
-export const SVG_NS = 'http://www.w3.org/2000/svg';
+export * from './styles';
+export * from './svg';
+export * from './dimensionGeometry';
+
+import {
+	createSvgElement,
+	createSvgLine,
+	createSvgCircle,
+	createSvgRect,
+	createSvgEllipse,
+	createSvgPath,
+	createSvgText,
+} from './svg';
+import {
+	type LinearDimensionVisualOptions,
+	computeDistanceDimensionGeometry,
+	computePointToLineDimensionGeometry,
+} from './dimensionGeometry';
+import {
+	COLORS,
+	DASH_ARRAY,
+	STROKE_WIDTH,
+	DIM_ARROWS,
+	FILTERS,
+	type SvgAttrs,
+	HIT_AREA_STROKE_ATTRS,
+	HIT_AREA_RING_ATTRS,
+	HIT_AREA_POINT_ATTRS,
+	AUX_RAY_ATTRS,
+	AUX_AXIS_ATTRS,
+	GUIDE_OUTLINE_ATTRS,
+	EXTENSION_LINE_ATTRS,
+	PREVIEW_EXTENSION_LINE_ATTRS,
+	TRIM_STROKE_ATTRS,
+	CUT_MARKER_ATTRS,
+	SELECTION_BOX_ATTRS,
+	MIRROR_LINE_ATTRS,
+	DIR1_LINE_ATTRS,
+	DIR2_LINE_ATTRS,
+	MIRROR_PREVIEW_LINE_ATTRS,
+	MIRROR_PREVIEW_VERTEX_ATTRS,
+	PATTERN_CENTER_RING_ATTRS,
+	PATTERN_CENTER_CROSSHAIR_ATTRS,
+	PATTERN_CENTER_DOT_ATTRS,
+	CHECKBOX_HALO_ATTRS,
+	CHECKBOX_ACTIVE_ATTRS,
+	CHECKBOX_CHECKMARK_ATTRS,
+	CHECKBOX_SUPPRESSED_ATTRS,
+	CHECKBOX_SUPPRESSED_DASH_ATTRS,
+	RECT_PATTERN_PILL_ATTRS,
+	RECT_PATTERN_PILL_TEXT_ATTRS,
+	FILLET_HIGHLIGHT_ATTRS,
+	FILLET_HOVER_POINT_ATTRS,
+	FILLET_WEDGE_ATTRS,
+	FILLET_ARC_ATTRS,
+	FILLET_GIZMO_CENTER_ATTRS,
+	FILLET_GIZMO_RADIAL_ATTRS,
+	FILLET_GIZMO_SQUARE_ATTRS,
+	FILLET_GIZMO_ARROW_ATTRS,
+	SNAP_POINT_ATTRS,
+	SNAP_GRID_ATTRS,
+	SNAP_OBJECT_ATTRS,
+	TOOLTIP_RECT_ATTRS,
+	TOOLTIP_TEXT_ATTRS,
+	SPLINE_HANDLE_SELECTED_ATTRS,
+	SPLINE_CONTROL_POLYGON_ATTRS,
+	SPLINE_PREVIEW_GUIDE_ATTRS,
+	SPLINE_PREVIEW_VERTEX_ATTRS,
+	SPLINE_CHECKMARK_CIRCLE_ATTRS,
+	SPLINE_CHECKMARK_PATH_ATTRS,
+	POLYGON_VERTEX_ATTRS,
+	POLYGON_CENTER_ATTRS,
+	POLYGON_RADIUS_HANDLE_ATTRS,
+	getSplineHandleStrokeAttrs,
+	getSplinePreviewStrokeAttrs,
+	SPLINE_STYLES,
+	getCopyStrokeAttrs,
+	getPrimitiveStrokeAttrs,
+	getPreviewStrokeAttrs,
+} from './styles';
+
 const TWO_PI = 2 * Math.PI;
 
-// ==========================================
-// Styling Constants & Design Tokens
-// ==========================================
-
-export const COLORS = {
-	primary: '#0284c7', // Sky-600: main active CAD color (selection, dimensions, rays)
-	selected: '#0ea5e9', // Sky-500: selected constraint/dimension/accent
-	selectedBg: '#e0f2fe', // Sky-100: selected badge fill
-	unconstrained: '#1e293b', // Slate-800: normal unconstrained geometry
-	constrained: '#16a34a', // Green-600: fully constrained geometry & vertices
-	conflict: '#dc2626', // Red-600: overconstrained error
-	construction: '#64748b', // Slate-500: construction geometry & auxiliary rings
-	fixed: '#d97706', // Amber-600: fixed points / badges
-	badgeBorder: '#cbd5e1', // Slate-300: default badge border
-	badgeText: '#475569', // Slate-600: default badge text
-	tooltipBg: '#0f172a', // Slate-900: tooltip background
-	white: '#ffffff',
-	hitTransparent: 'rgba(0, 0, 0, 0.001)',
-	guideFaint: 'rgba(2, 132, 199, 0.25)',
-	guideStartEllipse: 'rgba(2, 132, 199, 0.3)',
-	extLineDim: 'rgba(2, 132, 199, 0.45)',
-	selectionBoxFill: 'rgba(14, 165, 233, 0.12)',
-	pointSnapFill: 'rgba(2, 132, 199, 0.2)',
-	objectSnapFill: 'rgba(16, 185, 129, 0.25)',
-	objectSnapStroke: '#0e9c6d',
-	gridSnapFill: 'rgba(99, 102, 241, 0.15)',
-	gridSnapStroke: '#7cbdfa',
-	xAxis: 'rgba(220, 38, 38, 0.65)',
-	yAxis: 'rgba(22, 163, 74, 0.65)',
-	originQuarter: 'rgba(100, 116, 139, 0.45)',
-	gridMinor: 'rgba(0, 0, 0, 0.08)',
-	gridMajor: 'rgba(0, 0, 0, 0.20)',
-	gridLabel: 'rgba(0, 0, 0, 0.6)',
-	trim: 'rgba(255, 0, 0, 0.75)',
-
-	// Spline styles and colors
-	splineHandle: '#b45309', // Amber-700: tangent handle & control polygon idle stroke
-	splineHandleSelected: '#0284c7', // Sky-600: selected tangent handle stroke
-	splineHandleDotFill: '#22c55e', // Green-500: tangent handle endpoint dot fill
-	splineHandleDotStroke: '#15803d', // Green-700: tangent handle endpoint dot stroke
-	splineClosedFill: 'rgba(56, 189, 248, 0.12)', // Sky-400 12%: closed spline fill
-	splinePreview: '#84cc16', // Lime-500: spline drawing preview stroke
-	splineCheckmarkFill: '#22c55e', // Green-500: spline completion checkmark fill
-	splineCheckmarkStroke: '#16a34a', // Green-600: spline completion checkmark border
-} as const;
-
-export const DASH_ARRAY = {
-	construction: '6,6',
-	ray: '2,2',
-	axis: '3,3',
-	guide: '2,4',
-	guideCircle: '4,4',
-	angleExtension: '4,4',
-	selectionBox: '4 3',
-	splineHandle: '4 3',
-	splineControlPolygon: '4 3',
-	splinePreviewGuide: '3 3',
-	splineConstruction: '6 4',
-} as const;
-
-export const STROKE_WIDTH = {
-	minorGrid: 0.75,
-	thin: 1,
-	majorGrid: 1.2,
-	normal: 2,
-	selected: 3,
-	dimension: 1.5,
-	hitArea: 18,
-	trim: 3,
-	splineHandle: 1.5,
-	splineHandleSelected: 2.5,
-	splineControlPolygon: 1.5,
-	splinePreview: 2,
-	splinePreviewGuide: 1.2,
-} as const;
-
-export const DIM_ARROWS = {
-	default: 'url(#dim-arrow)',
-	selected: 'url(#dim-arrow-selected)',
-} as const;
-
-export type SvgAttrs = Record<string, string | number | boolean | undefined | null>;
-
-// ==========================================
-// Reusable SvgAttrs Presets & Helpers
-// ==========================================
-
-export const HIT_AREA_STROKE_ATTRS: SvgAttrs = {
-	class: 'hit-area',
-	fill: 'none',
-	stroke: COLORS.hitTransparent,
-	'stroke-width': STROKE_WIDTH.hitArea,
-	'stroke-linecap': 'round',
-	'pointer-events': 'stroke',
-};
-
-export const HIT_AREA_RING_ATTRS: SvgAttrs = {
-	class: 'hit-area',
-	fill: 'none',
-	stroke: COLORS.hitTransparent,
-	'stroke-width': STROKE_WIDTH.hitArea,
-	'pointer-events': 'stroke',
-};
-
-export const HIT_AREA_POINT_ATTRS: SvgAttrs = {
-	class: 'hit-area',
-	fill: COLORS.hitTransparent,
-	'pointer-events': 'all',
-};
-
-export const AUX_RAY_ATTRS: SvgAttrs = {
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.thin,
-	'stroke-dasharray': DASH_ARRAY.ray,
-};
-
-export const AUX_AXIS_ATTRS: SvgAttrs = {
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.thin,
-	'stroke-dasharray': DASH_ARRAY.axis,
-};
-
-export const GUIDE_OUTLINE_ATTRS: SvgAttrs = {
-	stroke: COLORS.guideFaint,
-	'stroke-width': STROKE_WIDTH.thin,
-	'stroke-dasharray': DASH_ARRAY.guide,
-	fill: 'none',
-};
-
-export const EXTENSION_LINE_ATTRS: SvgAttrs = {
-	stroke: COLORS.extLineDim,
-	'stroke-width': STROKE_WIDTH.thin,
-	'pointer-events': 'none',
-};
-
-export const PREVIEW_EXTENSION_LINE_ATTRS: SvgAttrs = {
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.thin,
-	'stroke-dasharray': DASH_ARRAY.ray,
-};
-
-export const TRIM_STROKE_ATTRS: SvgAttrs = {
-	stroke: COLORS.trim,
-	'stroke-width': STROKE_WIDTH.trim,
-	'stroke-linecap': 'round',
-	fill: 'none',
-	'pointer-events': 'none',
-};
-
-export const CUT_MARKER_ATTRS: SvgAttrs = {
-	stroke: COLORS.trim,
-	'stroke-width': STROKE_WIDTH.trim,
-	'stroke-linecap': 'round',
-	fill: 'none',
-	'pointer-events': 'none',
-};
-
-export const COPY_STROKE_BASE_ATTRS: SvgAttrs = {
-	'stroke-linecap': 'round',
-	fill: 'none',
-	'pointer-events': 'none',
-};
-
-// Spline SvgAttrs Presets
-export const SPLINE_HANDLE_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-spline-handle',
-	fill: 'none',
-	stroke: COLORS.splineHandle,
-	'stroke-width': STROKE_WIDTH.splineHandle,
-	'stroke-dasharray': DASH_ARRAY.splineHandle,
-	'stroke-linecap': 'round',
-};
-
-export const SPLINE_HANDLE_SELECTED_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-spline-handle',
-	fill: 'none',
-	stroke: COLORS.splineHandleSelected,
-	'stroke-width': STROKE_WIDTH.splineHandleSelected,
-	'stroke-dasharray': 'none',
-	'stroke-linecap': 'round',
-};
-
-export const SPLINE_CONTROL_POLYGON_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-spline-handle',
-	stroke: COLORS.splineHandle,
-	'stroke-width': STROKE_WIDTH.splineControlPolygon,
-	'stroke-dasharray': DASH_ARRAY.splineControlPolygon,
-	fill: 'none',
-};
-
-export const SPLINE_HANDLE_DOT_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-point',
-	fill: COLORS.splineHandleDotFill,
-	stroke: COLORS.splineHandleDotStroke,
-	'stroke-width': STROKE_WIDTH.normal,
-	'pointer-events': 'all',
-};
-
-export const SPLINE_PREVIEW_STROKE_ATTRS: SvgAttrs = {
-	stroke: COLORS.splinePreview,
-	'stroke-width': STROKE_WIDTH.splinePreview,
-	fill: 'none',
-};
-
-export const SPLINE_PREVIEW_GUIDE_ATTRS: SvgAttrs = {
-	stroke: COLORS.splinePreview,
-	'stroke-width': STROKE_WIDTH.splinePreviewGuide,
-	'stroke-dasharray': DASH_ARRAY.splinePreviewGuide,
-	opacity: '0.7',
-};
-
-export const SPLINE_PREVIEW_VERTEX_ATTRS: SvgAttrs = {
-	fill: COLORS.splinePreview,
-	stroke: COLORS.white,
-	'stroke-width': 1.5,
-};
-
-export const SPLINE_CHECKMARK_CIRCLE_ATTRS: SvgAttrs = {
-	fill: COLORS.splineCheckmarkFill,
-	stroke: COLORS.splineCheckmarkStroke,
-	'stroke-width': 1.5,
-	filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.25))',
-};
-
-export const SPLINE_CHECKMARK_PATH_ATTRS: SvgAttrs = {
-	stroke: COLORS.white,
-	'stroke-width': 2,
-	'stroke-linecap': 'round',
-	'stroke-linejoin': 'round',
-	fill: 'none',
-};
-
-export function getSplineHandleStrokeAttrs(isSelected: boolean): SvgAttrs {
-	return isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_HANDLE_ATTRS;
-}
-
-export function getSplinePreviewStrokeAttrs(isConstruction = false): SvgAttrs {
-	return {
-		...SPLINE_PREVIEW_STROKE_ATTRS,
-		'stroke-dasharray': isConstruction ? DASH_ARRAY.splineConstruction : undefined,
-	};
-}
-
-export const SPLINE_STYLES = {
-	handle: {
-		normal: SPLINE_HANDLE_ATTRS,
-		selected: SPLINE_HANDLE_SELECTED_ATTRS,
-	},
-	controlPolygon: SPLINE_CONTROL_POLYGON_ATTRS,
-	handleDot: {
-		fill: COLORS.splineHandleDotFill,
-		stroke: COLORS.splineHandleDotStroke,
-		r: 4,
-	},
-	closedFill: COLORS.splineClosedFill,
-} as const;
-
-export function getCopyStrokeAttrs(
-	isConstruction: boolean,
-	baseColor: string,
-	opacity = 1.0,
-	strokeWidth: number = STROKE_WIDTH.normal
-): SvgAttrs {
-	return {
-		...COPY_STROKE_BASE_ATTRS,
-		stroke: isConstruction ? COLORS.construction : baseColor,
-		'stroke-width': strokeWidth,
-		'stroke-dasharray': isConstruction ? DASH_ARRAY.construction : undefined,
-		opacity,
-	};
-}
-
-export function getPrimitiveStrokeAttrs(
-	isSelected: boolean,
-	isConstruction: boolean,
-	baseColor: string,
-	roundCap = false
-): SvgAttrs {
-	return {
-		class: 'entity-visible visible-primitive',
-		fill: 'none',
-		stroke: isSelected ? COLORS.primary : isConstruction ? COLORS.construction : baseColor,
-		'stroke-width': isSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.normal,
-		'stroke-linecap': roundCap ? 'round' : undefined,
-		'stroke-dasharray': isConstruction ? DASH_ARRAY.construction : undefined,
-		'pointer-events': 'stroke',
-	};
-}
-
-export function getPreviewStrokeAttrs(
-	isConstruction = false,
-	isGuide = false,
-	roundCap = false
-): SvgAttrs {
-	return {
-		stroke: isGuide ? COLORS.primary : isConstruction ? COLORS.construction : COLORS.unconstrained,
-		'stroke-width': STROKE_WIDTH.normal,
-		'stroke-linecap': roundCap ? 'round' : undefined,
-		'stroke-dasharray': isGuide ? DASH_ARRAY.guideCircle : isConstruction ? DASH_ARRAY.construction : undefined,
-		fill: 'none',
-	};
-}
-
-function fmtCoord(v: number | string): string {
-	return typeof v === 'number' ? (Number.isInteger(v) ? v.toString() : v.toFixed(1)) : String(v);
-}
-
-/**
- * Creates an SVG element with attributes, optional parent to append to, and optional textContent.
- */
-export function createSvgElement<K extends keyof SVGElementTagNameMap>(
-	tag: K,
-	attrs?: SvgAttrs,
-	parent?: SVGElement,
-	textContent?: string
-): SVGElementTagNameMap[K] {
-	const el = document.createElementNS(SVG_NS, tag);
-	if (attrs) {
-		for (const [key, val] of Object.entries(attrs)) {
-			if (val !== undefined && val !== null) {
-				const sVal = String(val);
-				el.setAttribute(key, sVal);
-				if (key === 'pointer-events') {
-					el.style.pointerEvents = sVal;
-				}
-			}
-		}
-	}
-	if (textContent !== undefined) {
-		el.textContent = textContent;
-	}
-	if (parent) {
-		parent.appendChild(el);
-	}
-	return el;
-}
-
-export function createSvgLine(
-	x1: number | string,
-	y1: number | string,
-	x2: number | string,
-	y2: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGLineElement {
-	return createSvgElement(
-		'line',
-		{
-			x1: fmtCoord(x1),
-			y1: fmtCoord(y1),
-			x2: fmtCoord(x2),
-			y2: fmtCoord(y2),
-			...attrs,
-		},
-		parent
-	);
-}
-
-export function createSvgCircle(
-	cx: number | string,
-	cy: number | string,
-	r: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGCircleElement {
-	return createSvgElement(
-		'circle',
-		{
-			cx: fmtCoord(cx),
-			cy: fmtCoord(cy),
-			r: fmtCoord(r),
-			...attrs,
-		},
-		parent
-	);
-}
-
-export function createSvgRect(
-	x: number | string,
-	y: number | string,
-	width: number | string,
-	height: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGRectElement {
-	return createSvgElement(
-		'rect',
-		{
-			x: fmtCoord(x),
-			y: fmtCoord(y),
-			width: fmtCoord(width),
-			height: fmtCoord(height),
-			...attrs,
-		},
-		parent
-	);
-}
-
-export function createSvgEllipse(
-	cx: number | string,
-	cy: number | string,
-	rx: number | string,
-	ry: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGEllipseElement {
-	return createSvgElement(
-		'ellipse',
-		{
-			cx: fmtCoord(cx),
-			cy: fmtCoord(cy),
-			rx: fmtCoord(rx),
-			ry: fmtCoord(ry),
-			...attrs,
-		},
-		parent
-	);
-}
-
-export function createSvgPath(
-	d: string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGPathElement {
-	return createSvgElement(
-		'path',
-		{
-			d,
-			...attrs,
-		},
-		parent
-	);
-}
-
-export function createSvgText(
-	x: number | string,
-	y: number | string,
-	text: string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGTextElement {
-	return createSvgElement(
-		'text',
-		{
-			x: fmtCoord(x),
-			y: fmtCoord(y),
-			...attrs,
-		},
-		parent,
-		text
-	);
-}
 
 export interface RenderOptions {
 	showGrid?: boolean;
@@ -625,154 +232,6 @@ export function getEllipticalArcSvgPath(
 	const my = sc.y + umid * uy + vmid * vy;
 
 	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
-}
-
-interface LinearDimensionGeometry {
-	d1: Vec2;
-	d2: Vec2;
-	extensionLines: Array<{ from: Vec2; to: Vec2 }>;
-}
-
-interface LinearDimensionVisualOptions {
-	d1: Vec2;
-	d2: Vec2;
-	label: string;
-	extensionLines?: Array<{ from: Vec2; to: Vec2 }>;
-	parent: SVGElement;
-	isSelected?: boolean;
-	constraintId?: string;
-	isTooltip?: boolean;
-	startPointHighlight?: Vec2;
-	targetPointSnapped?: boolean;
-}
-
-function formatDimensionValue(val: number): string {
-	return Number.isInteger(val) ? val.toFixed(1) : Number(val.toFixed(2)).toString();
-}
-
-function computeDistanceDimensionGeometry(
-	s1: Vec2,
-	s2: Vec2,
-	orientation: 'aligned' | 'horizontal' | 'vertical' | 'direct',
-	screenOffset = 0,
-	cursor?: Vec2
-): LinearDimensionGeometry | null {
-	if (orientation === 'direct') {
-		return {
-			d1: s1,
-			d2: s2,
-			extensionLines: [],
-		};
-	}
-
-	let d1: Vec2;
-	let d2: Vec2;
-	let extEnd1: Vec2;
-	let extEnd2: Vec2;
-
-	if (orientation === 'horizontal') {
-		const midY = (s1.y + s2.y) * 0.5;
-		const dimY = cursor ? cursor.y : midY + screenOffset;
-		d1 = { x: s1.x, y: dimY };
-		d2 = { x: s2.x, y: dimY };
-		const extDir = dimY >= midY ? 1 : -1;
-		extEnd1 = { x: s1.x, y: dimY + extDir * 4 };
-		extEnd2 = { x: s2.x, y: dimY + extDir * 4 };
-	} else if (orientation === 'vertical') {
-		const midX = (s1.x + s2.x) * 0.5;
-		const dimX = cursor ? cursor.x : midX + screenOffset;
-		d1 = { x: dimX, y: s1.y };
-		d2 = { x: dimX, y: s2.y };
-		const extDir = dimX >= midX ? 1 : -1;
-		extEnd1 = { x: dimX + extDir * 4, y: s1.y };
-		extEnd2 = { x: dimX + extDir * 4, y: s2.y };
-	} else {
-		const dx = s2.x - s1.x;
-		const dy = s2.y - s1.y;
-		const len = Math.hypot(dx, dy);
-		if (len < 1e-4) return null;
-
-		const nx = -dy / len;
-		const ny = dx / len;
-		const midX = (s1.x + s2.x) * 0.5;
-		const midY = (s1.y + s2.y) * 0.5;
-		const offset = cursor ? (cursor.x - midX) * nx + (cursor.y - midY) * ny : screenOffset;
-
-		d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
-		d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
-		const extDir = offset >= 0 ? 4 : -4;
-		extEnd1 = { x: d1.x + nx * extDir, y: d1.y + ny * extDir };
-		extEnd2 = { x: d2.x + nx * extDir, y: d2.y + ny * extDir };
-	}
-
-	return {
-		d1,
-		d2,
-		extensionLines: [
-			{ from: s1, to: extEnd1 },
-			{ from: s2, to: extEnd2 },
-		],
-	};
-}
-
-function computePointToLineDimensionGeometry(
-	sp: Vec2,
-	s1: Vec2,
-	s2: Vec2,
-	screenOffset = 0,
-	cursor?: Vec2
-): LinearDimensionGeometry | null {
-	const dx = s2.x - s1.x;
-	const dy = s2.y - s1.y;
-	const lineLen = Math.hypot(dx, dy);
-	if (lineLen < 1e-4) return null;
-
-	const ux = dx / lineLen;
-	const uy = dy / lineLen;
-
-	const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
-	let tDim = cursor ? (cursor.x - s1.x) * ux + (cursor.y - s1.y) * uy : tProj + screenOffset;
-
-	// Ensure there is always a visible offset / выноска if none was specified or cursor is directly at projection
-	if (Math.abs(tDim - tProj) < 2) {
-		const defaultOffset = (tProj < lineLen * 0.5 ? 25 : -25);
-		tDim = tProj + (screenOffset !== 0 ? screenOffset : defaultOffset);
-	}
-
-	const dBase = { x: s1.x + ux * tDim, y: s1.y + uy * tDim };
-	const hx = sp.x - (s1.x + ux * tProj);
-	const hy = sp.y - (s1.y + uy * tProj);
-	const dTop = { x: dBase.x + hx, y: dBase.y + hy };
-
-	const extensionLines: Array<{ from: Vec2; to: Vec2 }> = [];
-
-	// Extension line from point to dTop if offset along line
-	if (Math.abs(tDim - tProj) > 2) {
-		const extDir = tDim >= tProj ? 1 : -1;
-		extensionLines.push({
-			from: sp,
-			to: { x: dTop.x + ux * extDir * 4, y: dTop.y + uy * extDir * 4 },
-		});
-	}
-
-	// Extension line along line if dBase is beyond segment endpoints
-	if (tDim < 0) {
-		extensionLines.push({
-			from: s1,
-			to: { x: dBase.x - ux * 4, y: dBase.y - uy * 4 },
-		});
-	} else if (tDim > lineLen) {
-		extensionLines.push({
-			from: s2,
-			to: { x: dBase.x + ux * 4, y: dBase.y + uy * 4 },
-		});
-	}
-
-	return {
-		d1: dBase,
-		d2: dTop,
-		extensionLines,
-	};
 }
 
 export class SVGRenderer {
@@ -1112,32 +571,11 @@ export class SVGRenderer {
 					createSvgLine(s1.x, s1.y, s2.x, s2.y, getSplineHandleStrokeAttrs(isSelected), lineG);
 				}
 			} else if (isMirrorLine) {
-				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-					class: 'entity-visible visible-primitive is-mirror-line',
-					fill: 'none',
-					stroke: '#f59e0b',
-					'stroke-width': 2.5,
-					'stroke-dasharray': '6 3',
-					'stroke-linecap': 'round',
-				}, lineG);
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, MIRROR_LINE_ATTRS, lineG);
 			} else if (isDir1Line) {
-				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-					class: 'entity-visible visible-primitive is-direction-line is-dir1-line',
-					fill: 'none',
-					stroke: '#2563eb',
-					'stroke-width': 2.5,
-					'stroke-dasharray': '6 3',
-					'stroke-linecap': 'round',
-				}, lineG);
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, DIR1_LINE_ATTRS, lineG);
 			} else if (isDir2Line) {
-				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-					class: 'entity-visible visible-primitive is-direction-line is-dir2-line',
-					fill: 'none',
-					stroke: '#059669',
-					'stroke-width': 2.5,
-					'stroke-dasharray': '6 3',
-					'stroke-linecap': 'round',
-				}, lineG);
+				createSvgLine(s1.x, s1.y, s2.x, s2.y, DIR2_LINE_ATTRS, lineG);
 			} else {
 				createSvgLine(s1.x, s1.y, s2.x, s2.y, getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true), lineG);
 			}
@@ -1432,8 +870,8 @@ export class SVGRenderer {
 				strokeColor = COLORS.tooltipBg;
 			}
 			if (isPatternCenter) {
-				fillColor = '#f59e0b';
-				strokeColor = '#ffffff';
+				fillColor = COLORS.patternCenter;
+				strokeColor = COLORS.white;
 			}
 
 			createSvgCircle(s.x, s.y, isSelected ? 4.5 : (splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3.5), {
@@ -1450,116 +888,50 @@ export class SVGRenderer {
 		this.constraintGroup.innerHTML = '';
 		const lineBadgeCounts = new Map<string, number>();
 
+		const ctx: ConstraintRenderContext = {
+			sketch,
+			viewport,
+			targetGroup: this.constraintGroup,
+			isSelected: false,
+			lineBadgeCounts,
+			renderBadge: (id, x, y, label, color) => {
+				this.renderConstraintBadge(id, x, y, label, ctx.isSelected, color);
+			},
+			renderBadgeOnSegment: (id, p1Id, p2Id, label) => {
+				this.renderBadgeOnSegment(id, p1Id, p2Id, sketch, viewport, label, ctx.isSelected, lineBadgeCounts);
+			},
+			renderBadgeOnCircle: (id, circleId, label) => {
+				this.renderBadgeOnCircle(id, circleId, sketch, viewport, label, ctx.isSelected);
+			},
+			renderLinearDimensionVisual: (opts) => {
+				this.renderLinearDimensionVisual(opts);
+			},
+			renderDashedExtensionLines: (g, sCenter, angle, rScreen, sp1, sp2, color) => {
+				this.renderDashedExtensionLines(g, sCenter, angle, rScreen, sp1, sp2, color);
+			},
+			patternCheckboxGroup: this.patternCheckboxGroup,
+			patternCheckboxPositions: this.patternCheckboxPositions,
+			rectangularGizmoHandles: this.rectangularGizmoHandles,
+			isConstraintOnlySelected: (constraintId) => this.isConstraintOnlySelected(constraintId, sketch),
+			renderTransformedObjects: (objectIds, transform, options) => {
+				return this.renderTransformedObjects(sketch, viewport, objectIds, transform, options);
+			},
+			renderPatternSuppressionCheckbox: (centroid, k, isSuppressed, constraintId) => {
+				this.renderPatternSuppressionCheckbox(centroid, k, isSuppressed, constraintId);
+			},
+			renderRectangularPatternGizmos: (v, centroidWorld, u1, u2, distance1, distance2, options) => {
+				this.renderRectangularPatternGizmos(v, centroidWorld, u1, u2, distance1, distance2, options);
+			},
+			isAngleNearArc: (arc, center, px, py, rScreen) => {
+				return this.isAngleNearArc(arc, center, px, py, sketch, viewport, rScreen);
+			},
+		};
+
 		for (const constraint of sketch.constraints.values()) {
 			if (sketch.isSplineInternalConstraint(constraint)) continue;
-			const isSelected = sketch.selection.constraintIds.has(constraint.id);
-
-			if (constraint instanceof DistanceConstraint) {
-				this.renderDistanceDimension(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof PointToLineDistanceConstraint) {
-				this.renderPointToLineDistanceDimension(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof RadiusConstraint) {
-				this.renderRadiusDimension(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof HorizontalConstraint) {
-				this.renderBadgeOnSegment(constraint.id, constraint.p1Id, constraint.p2Id, sketch, viewport, 'H', isSelected, lineBadgeCounts);
-			} else if (constraint instanceof VerticalConstraint) {
-				this.renderBadgeOnSegment(constraint.id, constraint.p1Id, constraint.p2Id, sketch, viewport, 'V', isSelected, lineBadgeCounts);
-			} else if (constraint instanceof ParallelConstraint) {
-				this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
-				this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '//', isSelected, lineBadgeCounts);
-			} else if (constraint instanceof CollinearConstraint) {
-				this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, 'collinear', isSelected, lineBadgeCounts);
-				this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, 'collinear', isSelected, lineBadgeCounts);
-			} else if (constraint instanceof PerpendicularConstraint) {
-				this.renderPerpendicularBadge(constraint, sketch, viewport, isSelected, lineBadgeCounts);
-			} else if (constraint instanceof EqualLengthConstraint) {
-				this.renderBadgeOnSegment(constraint.id, constraint.line1P1, constraint.line1P2, sketch, viewport, '=', isSelected, lineBadgeCounts);
-				this.renderBadgeOnSegment(constraint.id, constraint.line2P1, constraint.line2P2, sketch, viewport, '=', isSelected, lineBadgeCounts);
-			} else if (constraint instanceof EqualRadiusConstraint) {
-				this.renderBadgeOnCircle(constraint.id, constraint.circle1Id, sketch, viewport, '=', isSelected);
-				this.renderBadgeOnCircle(constraint.id, constraint.circle2Id, sketch, viewport, '=', isSelected);
-			} else if (constraint instanceof TangentLineCircleConstraint) {
-				this.renderTangentBadge(constraint, sketch, viewport, isSelected, lineBadgeCounts);
-			} else if (constraint instanceof TangentCircleCircleConstraint) {
-				this.renderTangentCircleCircleBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof ConcentricConstraint) {
-				this.renderConcentricBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof MidpointConstraint) {
-				this.renderMidpointBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof PointOnLineConstraint) {
-				this.renderPointOnLineBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof PointOnCircleConstraint) {
-				this.renderPointOnCircleBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof FixedConstraint) {
-				this.renderFixedBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof CoincidentConstraint) {
-				this.renderCoincidentBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof AngleConstraint) {
-				this.renderAngleDimension(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof SymmetryConstraint) {
-				this.renderSymmetryBadge(constraint, sketch, viewport, isSelected);
-			} else if (constraint instanceof CircularPatternConstraint) {
-				this.renderCircularPatternBadge(constraint, sketch, viewport);
-			} else if (constraint instanceof RectangularPatternConstraint) {
-				this.renderRectangularPatternBadge(constraint, sketch, viewport);
-			}
+			ctx.isSelected = sketch.selection.constraintIds.has(constraint.id);
+			constraint.render?.(ctx);
 		}
-	}
-
-	private renderDistanceDimension(
-		constraint: DistanceConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const p1 = sketch.points.get(constraint.p1Id);
-		const p2 = sketch.points.get(constraint.p2Id);
-		if (!p1 || !p2) return;
-
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
-		const offsetScreen = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 32;
-		const geom = computeDistanceDimensionGeometry(s1, s2, constraint.orientation ?? 'aligned', offsetScreen);
-		if (!geom) return;
-
-		this.renderLinearDimensionVisual({
-			d1: geom.d1,
-			d2: geom.d2,
-			label: formatDimensionValue(constraint.targetDistance),
-			extensionLines: geom.extensionLines,
-			parent: this.constraintGroup,
-			isSelected,
-			constraintId: constraint.id,
-		});
-	}
-
-	private renderPointToLineDistanceDimension(
-		constraint: PointToLineDistanceConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const pt = sketch.points.get(constraint.pointId);
-		const p1 = sketch.points.get(constraint.lineP1Id);
-		const p2 = sketch.points.get(constraint.lineP2Id);
-		if (!pt || !p1 || !p2) return;
-
-		const sp = viewport.worldToScreen(pt.x, pt.y);
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
-		const offsetScreen = constraint.offset !== undefined ? constraint.offset * viewport.zoom : 0;
-		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
-		if (!geom) return;
-
-		this.renderLinearDimensionVisual({
-			d1: geom.d1,
-			d2: geom.d2,
-			label: formatDimensionValue(constraint.targetDistance),
-			extensionLines: geom.extensionLines,
-			parent: this.constraintGroup,
-			isSelected,
-			constraintId: constraint.id,
-		});
 	}
 
 	private renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void {
@@ -1611,7 +983,7 @@ export class SVGRenderer {
 		// 3. Target point snap ring
 		if (targetPointSnapped) {
 			createSvgCircle(d2.x, d2.y, 6, {
-				fill: 'rgba(2, 132, 199, 0.25)',
+				fill: COLORS.guideFaint,
 				stroke: COLORS.primary,
 				'stroke-width': 1.5,
 			}, g);
@@ -1702,373 +1074,6 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderAngleDimension(
-		constraint: AngleConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const l1 = sketch.lines.get(constraint.line1Id);
-		const l2 = sketch.lines.get(constraint.line2Id);
-		if (!l1 || !l2) return;
-
-		const p1 = sketch.points.get(l1.p1Id);
-		const p2 = sketch.points.get(l1.p2Id);
-		const p3 = sketch.points.get(l2.p1Id);
-		const p4 = sketch.points.get(l2.p2Id);
-		if (!p1 || !p2 || !p3 || !p4) return;
-
-		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
-
-		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
-		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
-		const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
-		const l2Len = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
-
-		const s1Factor = constraint.s1 ?? geom.s1;
-		const s2Factor = constraint.s2 ?? geom.s2;
-
-		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
-		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
-
-		const sCenter = viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-		const sRay1 = viewport.worldToScreen(geom.pInt.x + u1.x * 20, geom.pInt.y + u1.y * 20);
-		const sRay2 = viewport.worldToScreen(geom.pInt.x + u2.x * 20, geom.pInt.y + u2.y * 20);
-
-		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
-
-		let delta = a2 - a1;
-		while (delta > Math.PI) delta -= TWO_PI;
-		while (delta < -Math.PI) delta += TWO_PI;
-
-		const sweepFlag = delta > 0 ? 1 : 0;
-		const rWorld = constraint.arcRadius ?? 40;
-		const rScreen = Math.max(28, rWorld * viewport.zoom);
-
-		const ax = sCenter.x + rScreen * Math.cos(a1);
-		const ay = sCenter.y + rScreen * Math.sin(a1);
-		const bx = sCenter.x + rScreen * Math.cos(a2);
-		const by = sCenter.y + rScreen * Math.sin(a2);
-
-		const midAngle = a1 + delta * 0.5;
-		const midX = sCenter.x + rScreen * Math.cos(midAngle);
-		const midY = sCenter.y + rScreen * Math.sin(midAngle);
-
-		const g = createSvgElement('g', {
-			class: 'dimension-item',
-			'data-id': constraint.id,
-			'data-type': 'constraint',
-		}, this.constraintGroup);
-
-		const color = isSelected ? COLORS.selected : COLORS.primary;
-
-		// Dashed extension lines if arc points extend beyond the physical line segments
-		const sp1 = viewport.worldToScreen(p1.x, p1.y);
-		const sp2 = viewport.worldToScreen(p2.x, p2.y);
-		const sp3 = viewport.worldToScreen(p3.x, p3.y);
-		const sp4 = viewport.worldToScreen(p4.x, p4.y);
-
-		this.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, sp2, color);
-		this.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
-
-		// Arc path with arrowheads
-		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
-		createSvgPath(
-			`M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`,
-			{
-				fill: 'none',
-				stroke: color,
-				'stroke-width': STROKE_WIDTH.dimension,
-				'marker-start': arrowUrl,
-				'marker-end': arrowUrl,
-			},
-			g
-		);
-
-		// Text label badge with background
-		const textVal = `${constraint.targetAngle.toFixed(1)}°`;
-		const textLen = textVal.length * 8 + 14;
-
-		createSvgRect(midX - textLen * 0.5, midY - 10, textLen, 20, {
-			rx: 4,
-			fill: COLORS.white,
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, g);
-
-		createSvgText(midX, midY + 4, textVal, {
-			'text-anchor': 'middle',
-			fill: color,
-			'font-size': 11,
-			'font-weight': 700,
-			'font-family': 'ui-monospace, monospace',
-		}, g);
-	}
-
-	private renderRadiusDimension(
-		constraint: RadiusConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const circle = sketch.circles.get(constraint.circleId);
-		const arc = sketch.arcs.get(constraint.circleId);
-		const entity = circle ?? arc;
-		if (!entity) return;
-		const center = sketch.points.get(entity.centerId);
-		if (!center) return;
-
-		const sc = viewport.worldToScreen(center.x, center.y);
-		const sr = entity.radius * viewport.zoom;
-
-		// Leader angle in screen space (screen Y is positive downwards)
-		let screenAngle = -Math.PI / 4; // Default for circle: 45° up and right
-
-		if (arc) {
-			const start = sketch.points.get(arc.startPointId);
-			const end = sketch.points.get(arc.endPointId);
-			if (start && end) {
-				const ss = viewport.worldToScreen(start.x, start.y);
-				const se = viewport.worldToScreen(end.x, end.y);
-				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-				const clockwise = !!arc.clockwise;
-
-				let sweepAngle = 0;
-				if (clockwise) {
-					sweepAngle = (ae - as) % TWO_PI;
-					if (sweepAngle < 0) sweepAngle += TWO_PI;
-					if (constraint.leaderAngle !== undefined) {
-						let rel = (constraint.leaderAngle - as) % TWO_PI;
-						if (rel < 0) rel += TWO_PI;
-						if (rel > sweepAngle) {
-							rel = rel - sweepAngle < TWO_PI - rel ? sweepAngle : 0;
-						}
-						screenAngle = as + rel;
-					} else {
-						screenAngle = as + sweepAngle / 2;
-					}
-				} else {
-					sweepAngle = (as - ae) % TWO_PI;
-					if (sweepAngle < 0) sweepAngle += TWO_PI;
-					if (constraint.leaderAngle !== undefined) {
-						let rel = (as - constraint.leaderAngle) % TWO_PI;
-						if (rel < 0) rel += TWO_PI;
-						if (rel > sweepAngle) {
-							rel = rel - sweepAngle < TWO_PI - rel ? sweepAngle : 0;
-						}
-						screenAngle = as - rel;
-					} else {
-						screenAngle = as - sweepAngle / 2;
-					}
-				}
-			}
-		} else {
-			if (constraint.leaderAngle !== undefined) {
-				screenAngle = constraint.leaderAngle;
-			}
-		}
-
-		const cosA = Math.cos(screenAngle);
-		const sinA = Math.sin(screenAngle);
-		const edge = {
-			x: sc.x + cosA * sr,
-			y: sc.y + sinA * sr,
-		};
-
-		const dirX = cosA >= 0 ? 1 : -1;
-		const dirY = sinA >= 0 ? 1 : -1;
-		const tip = {
-			x: edge.x + dirX * 30,
-			y: edge.y + dirY * 20,
-		};
-
-		const g = createSvgElement('g', {
-			class: 'dimension-item',
-			'data-id': constraint.id,
-			'data-type': 'constraint',
-		}, this.constraintGroup);
-
-		const color = isSelected ? COLORS.selected : COLORS.primary;
-		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
-
-		// Leader radial line from center to edge with arrow at circumference
-		createSvgLine(sc.x, sc.y, edge.x, edge.y, {
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-			'marker-end': arrowUrl,
-		}, g);
-
-		// Shelf line from edge to tip
-		createSvgLine(edge.x, edge.y, tip.x, tip.y, {
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, g);
-
-		const isDiameter = constraint.displayMode === 'diameter';
-		const num = isDiameter ? constraint.targetRadius * 2 : constraint.targetRadius;
-		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
-		const textVal = isDiameter ? `Ø ${numStr}` : `R ${numStr}`;
-		const textLen = textVal.length * 8 + 14;
-
-		const rectX = dirX > 0 ? tip.x : tip.x - textLen;
-		createSvgRect(rectX, tip.y - 12, textLen, 20, {
-			rx: 4,
-			fill: COLORS.white,
-			stroke: color,
-			'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
-		}, g);
-
-		createSvgText(rectX + textLen * 0.5, tip.y + 3, textVal, {
-			'text-anchor': 'middle',
-			fill: color,
-			'font-size': 12,
-			'font-weight': 600,
-			'font-family': 'monospace',
-		}, g);
-	}
-
-	private renderPerpendicularBadge(
-		constraint: PerpendicularConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean,
-		lineBadgeCounts: Map<string, number>
-	): void {
-		const p1 = sketch.points.get(constraint.l1P1);
-		const p2 = sketch.points.get(constraint.l1P2);
-		const p3 = sketch.points.get(constraint.l2P1);
-		const p4 = sketch.points.get(constraint.l2P2);
-		if (!p1 || !p2 || !p3 || !p4) return;
-
-		const isSharedPoint =
-			p1.id === p3.id ||
-			p1.id === p4.id ||
-			p2.id === p3.id ||
-			p2.id === p4.id ||
-			dist(p1, p3) < 1e-3 ||
-			dist(p1, p4) < 1e-3 ||
-			dist(p2, p3) < 1e-3 ||
-			dist(p2, p4) < 1e-3;
-
-		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
-
-		const distToSeg1 = projectPointOntoSegment(geom.pInt, p1, p2).dist;
-		const distToSeg2 = projectPointOntoSegment(geom.pInt, p3, p4).dist;
-		const isNearSegments = distToSeg1 < 30 && distToSeg2 < 30;
-
-		if (isSharedPoint || isNearSegments) {
-			const sCenter = viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-			const sRay1 = viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-			const sRay2 = viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
-
-			const d1 = { x: sRay1.x - sCenter.x, y: sRay1.y - sCenter.y };
-			const d2 = { x: sRay2.x - sCenter.x, y: sRay2.y - sCenter.y };
-			const l1 = Math.hypot(d1.x, d1.y);
-			const l2 = Math.hypot(d2.x, d2.y);
-
-			let dir = { x: 1, y: -1 };
-			if (l1 > 1e-4 && l2 > 1e-4) {
-				const u1 = { x: d1.x / l1, y: d1.y / l1 };
-				const u2 = { x: d2.x / l2, y: d2.y / l2 };
-				const bis = { x: u1.x + u2.x, y: u1.y + u2.y };
-				const bisLen = Math.hypot(bis.x, bis.y);
-				if (bisLen > 1e-3) {
-					dir = { x: bis.x / bisLen, y: bis.y / bisLen };
-				} else {
-					dir = { x: -u1.y, y: u1.x };
-				}
-			}
-
-			const offset = 18;
-			const badgeX = sCenter.x + dir.x * offset;
-			const badgeY = sCenter.y + dir.y * offset;
-			this.renderConstraintBadge(constraint.id, badgeX, badgeY, '⊥', isSelected);
-			return;
-		}
-
-		// Fallback if segments are completely disconnected and far apart
-		this.renderBadgeOnSegment(constraint.id, constraint.l1P1, constraint.l1P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
-		this.renderBadgeOnSegment(constraint.id, constraint.l2P1, constraint.l2P2, sketch, viewport, '⊥', isSelected, lineBadgeCounts);
-	}
-
-	private renderTangentBadge(
-		constraint: TangentLineCircleConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean,
-		lineBadgeCounts?: Map<string, number>
-	): void {
-		const p1 = sketch.points.get(constraint.lineP1Id);
-		const p2 = sketch.points.get(constraint.lineP2Id);
-		const circle = sketch.circles.get(constraint.circleId);
-		const arc = sketch.arcs.get(constraint.circleId);
-		const entity = circle ?? arc;
-		if (!p1 || !p2 || !entity) return;
-
-		const center = sketch.points.get(entity.centerId);
-		if (!center) return;
-
-		const sCenter = viewport.worldToScreen(center.x, center.y);
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
-		const rScreen = entity.radius * viewport.zoom;
-
-		const dx = s2.x - s1.x;
-		const dy = s2.y - s1.y;
-		const lineLen = Math.hypot(dx, dy);
-		if (lineLen < 1e-4) return;
-
-		const ux = dx / lineLen;
-		const uy = dy / lineLen;
-
-		// Projection of sCenter onto the infinite line
-		const vx = sCenter.x - s1.x;
-		const vy = sCenter.y - s1.y;
-		const t = vx * ux + vy * uy;
-		const projX = s1.x + t * ux;
-		const projY = s1.y + t * uy;
-
-		const normX = projX - sCenter.x;
-		const normY = projY - sCenter.y;
-		const normDist = Math.hypot(normX, normY);
-
-		let dirX = 0;
-		let dirY = 0;
-		if (normDist > 1e-3) {
-			dirX = normX / normDist;
-			dirY = normY / normDist;
-		} else {
-			dirX = -uy;
-			dirY = ux;
-		}
-
-		// Contact point between circle circumference and line
-		const circPtX = sCenter.x + dirX * rScreen;
-		const circPtY = sCenter.y + dirY * rScreen;
-		const tanX = (projX + circPtX) * 0.5;
-		const tanY = (projY + circPtY) * 0.5;
-
-		// Distance from the contact point to the actual line segment bounds
-		const distToSeg = t < 0 ? -t : t > lineLen ? t - lineLen : 0;
-		const distToCirc = Math.abs(normDist - rScreen);
-
-		const isNearArc = arc ? this.isAngleNearArc(arc, center, tanX, tanY, sketch, viewport, rScreen) : true;
-		const isNear = distToSeg < 60 && distToCirc < 60 && isNearArc;
-
-		if (isNear) {
-			const offset = 14;
-			const badgeX = tanX - dirX * offset;
-			const badgeY = tanY - dirY * offset;
-			this.renderConstraintBadge(constraint.id, badgeX, badgeY, 'tangent', isSelected);
-			return;
-		}
-
-		// Fallback if entities are completely disconnected and far apart
-		this.renderBadgeOnSegment(constraint.id, constraint.lineP1Id, constraint.lineP2Id, sketch, viewport, 'tangent', isSelected, lineBadgeCounts);
-		this.renderBadgeOnCircle(constraint.id, constraint.circleId, sketch, viewport, 'tangent', isSelected);
-	}
 
 	private isAngleNearArc(
 		arc: { startPointId: string; endPointId: string; clockwise?: boolean },
@@ -2114,101 +1119,6 @@ export class SVGRenderer {
 		return true;
 	}
 
-	private renderTangentCircleCircleBadge(
-		constraint: TangentCircleCircleConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const circle1 = sketch.circles.get(constraint.circle1Id);
-		const arc1 = sketch.arcs.get(constraint.circle1Id);
-		const entity1 = circle1 ?? arc1;
-
-		const circle2 = sketch.circles.get(constraint.circle2Id);
-		const arc2 = sketch.arcs.get(constraint.circle2Id);
-		const entity2 = circle2 ?? arc2;
-
-		if (!entity1 || !entity2) return;
-
-		const center1 = sketch.points.get(entity1.centerId);
-		const center2 = sketch.points.get(entity2.centerId);
-		if (!center1 || !center2) return;
-
-		const sCenter1 = viewport.worldToScreen(center1.x, center1.y);
-		const sCenter2 = viewport.worldToScreen(center2.x, center2.y);
-		const r1Screen = entity1.radius * viewport.zoom;
-		const r2Screen = entity2.radius * viewport.zoom;
-
-		const dx = sCenter2.x - sCenter1.x;
-		const dy = sCenter2.y - sCenter1.y;
-		const distScreen = Math.hypot(dx, dy);
-
-		let ux = 1;
-		let uy = 0;
-		if (distScreen > 1e-4) {
-			ux = dx / distScreen;
-			uy = dy / distScreen;
-		}
-
-		let tanPt1X: number;
-		let tanPt1Y: number;
-		let tanPt2X: number;
-		let tanPt2Y: number;
-
-		const isInternal = constraint.isInternal;
-		const outerId = constraint.outerCircleId;
-
-		if (!isInternal || !outerId) {
-			// External tangency: contact point is along ux between the centers
-			tanPt1X = sCenter1.x + ux * r1Screen;
-			tanPt1Y = sCenter1.y + uy * r1Screen;
-			tanPt2X = sCenter2.x - ux * r2Screen;
-			tanPt2Y = sCenter2.y - uy * r2Screen;
-		} else if (outerId === constraint.circle1Id) {
-			// Circle 2 is inside Circle 1: contact point is along ux past center 2
-			tanPt1X = sCenter1.x + ux * r1Screen;
-			tanPt1Y = sCenter1.y + uy * r1Screen;
-			tanPt2X = sCenter2.x + ux * r2Screen;
-			tanPt2Y = sCenter2.y + uy * r2Screen;
-		} else {
-			// Circle 1 is inside Circle 2: contact point is along -ux past center 1
-			tanPt1X = sCenter1.x - ux * r1Screen;
-			tanPt1Y = sCenter1.y - uy * r1Screen;
-			tanPt2X = sCenter2.x - ux * r2Screen;
-			tanPt2Y = sCenter2.y - uy * r2Screen;
-		}
-
-		const tanX = (tanPt1X + tanPt2X) * 0.5;
-		const tanY = (tanPt1Y + tanPt2Y) * 0.5;
-
-		const distBetweenContactPts = Math.hypot(tanPt2X - tanPt1X, tanPt2Y - tanPt1Y);
-
-		let isNearArc1 = true;
-		if (arc1) {
-			isNearArc1 = this.isAngleNearArc(arc1, center1, tanX, tanY, sketch, viewport, r1Screen);
-		}
-		let isNearArc2 = true;
-		if (arc2) {
-			isNearArc2 = this.isAngleNearArc(arc2, center2, tanX, tanY, sketch, viewport, r2Screen);
-		}
-
-		const isNear = distBetweenContactPts < 60 && isNearArc1 && isNearArc2;
-
-		if (isNear) {
-			// Place badge along the common tangent line (perpendicular to center-to-center line)
-			const nx = -uy;
-			const ny = ux;
-			const offset = 14;
-			const badgeX = tanX + nx * offset;
-			const badgeY = tanY + ny * offset;
-			this.renderConstraintBadge(constraint.id, badgeX, badgeY, 'tangent', isSelected);
-			return;
-		}
-
-		// Fallback if entities are disconnected / far apart
-		this.renderBadgeOnCircle(constraint.id, constraint.circle1Id, sketch, viewport, 'tangent', isSelected);
-		this.renderBadgeOnCircle(constraint.id, constraint.circle2Id, sketch, viewport, 'tangent', isSelected);
-	}
 
 	private renderBadgeOnSegment(
 		constraintId: string,
@@ -2308,111 +1218,6 @@ export class SVGRenderer {
 		this.renderConstraintBadge(constraintId, bx, by, label, isSelected);
 	}
 
-	private renderConcentricBadge(
-		constraint: ConcentricConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const pt = sketch.points.get(constraint.c1CenterId);
-		if (!pt) return;
-		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x + 12, s.y + 12, '◎', isSelected, COLORS.primary);
-	}
-
-	private renderMidpointBadge(
-		constraint: MidpointConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		// Never draw midpoint badge for internal spline tangent handle lines:
-		// users should not know about its existence
-		for (const line of sketch.lines.values()) {
-			if (line.isSplineHandle && ((line.p1Id === constraint.p1Id && line.p2Id === constraint.p2Id) || (line.p1Id === constraint.p2Id && line.p2Id === constraint.p1Id))) {
-				return;
-			}
-		}
-		const pt = sketch.points.get(constraint.midId);
-		if (!pt) return;
-		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x, s.y - 14, 'M', isSelected, COLORS.primary);
-	}
-
-	private renderPointOnLineBadge(
-		constraint: PointOnLineConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const pt = sketch.points.get(constraint.pointId);
-		if (!pt) return;
-		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, COLORS.primary);
-	}
-
-	private renderPointOnCircleBadge(
-		constraint: PointOnCircleConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const pt = sketch.points.get(constraint.pointId);
-		if (!pt) return;
-		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x, s.y + 14, '⚲', isSelected, COLORS.primary);
-	}
-
-	private renderFixedBadge(
-		constraint: FixedConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const pt = sketch.points.get(constraint.pointId);
-		if (!pt) return;
-		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x + 12, s.y - 12, 'fixed', isSelected, COLORS.fixed);
-	}
-
-	private renderCoincidentBadge(
-		constraint: CoincidentConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const pt = sketch.points.get(constraint.p1Id);
-		if (!pt) return;
-		const s = viewport.worldToScreen(pt.x, pt.y);
-		this.renderConstraintBadge(constraint.id, s.x - 12, s.y - 12, '●', isSelected, COLORS.primary);
-	}
-
-	private renderSymmetryBadge(
-		constraint: SymmetryConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		isSelected: boolean
-	): void {
-		const p1 = sketch.points.get(constraint.p1Id);
-		const p2 = sketch.points.get(constraint.p2Id);
-		if (!p1 || !p2) return;
-
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
-
-		if (isSelected) {
-			createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-				stroke: COLORS.primary,
-				'stroke-width': 1.2,
-				'stroke-dasharray': '3 3',
-				opacity: 0.65,
-				'pointer-events': 'none',
-			}, this.constraintGroup);
-		}
-
-		this.renderConstraintBadge(constraint.id, s1.x + 12, s1.y - 12, 'symmetry', isSelected, COLORS.primary);
-		this.renderConstraintBadge(constraint.id, s2.x + 12, s2.y - 12, 'symmetry', isSelected, COLORS.primary);
-	}
 
 	private isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
 		const sel = sketch.selection;
@@ -2427,92 +1232,6 @@ export class SVGRenderer {
 		);
 	}
 
-	private renderCircularPatternBadge(
-		constraint: CircularPatternConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport
-	): void {
-		const pCtr = sketch.points.get(constraint.centerPtId);
-		if (!pCtr) return;
-
-		const sCtr = viewport.worldToScreen(pCtr.x, pCtr.y);
-		const isConstraintActive = this.isConstraintOnlySelected(constraint.id, sketch);
-
-		// Render suppression checkboxes and suppressed objects only when constraint itself is selected
-		if (constraint.suppression && isConstraintActive && !constraint.isReadOnly) {
-			const N = constraint.quantity;
-			const suppressedSet = new Set(constraint.suppressedIndices);
-			const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
-			const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-			const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
-
-			for (let k = 1; k < N; k++) {
-				const isSuppressed = suppressedSet.has(k);
-				const aDeg = computePatternCopyAngle(k, N, constraint.distribution, constraint.totalAngle);
-				const rad = (aDeg * Math.PI) / 180;
-
-				let centroid: { x: number; y: number };
-				const copy = constraint.copies.find(cp => cp.copyIndex === k);
-
-				if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-					let sumX = 0, sumY = 0, count = 0;
-					for (const pair of copy.pointPairs) {
-						const pt = sketch.points.get(pair.patternPtId);
-						if (pt) {
-							sumX += pt.x;
-							sumY += pt.y;
-							count++;
-						}
-					}
-					centroid = count > 0
-						? viewport.worldToScreen(sumX / count, sumY / count)
-						: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
-				} else {
-					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
-					const copyWorldPoints = this.renderTransformedObjects(
-						sketch,
-						viewport,
-						constraint.sourceObjectIds,
-						{ center: pCtr, angleDeg: aDeg },
-						{
-							targetGroup: this.constraintGroup,
-							baseColor,
-							opacity: 0.25,
-							drawVertices: true,
-							skipRender: !isSuppressed,
-						}
-					);
-
-					if (copyWorldPoints.length > 0) {
-						let sumX = 0, sumY = 0;
-						for (const p of copyWorldPoints) {
-							sumX += p.x;
-							sumY += p.y;
-						}
-						centroid = viewport.worldToScreen(sumX / copyWorldPoints.length, sumY / copyWorldPoints.length);
-					} else {
-						centroid = {
-							x: sCtr.x + 40 * Math.cos(rad),
-							y: sCtr.y + 40 * Math.sin(rad),
-						};
-					}
-				}
-
-				// Register screen position for hit-testing
-				this.patternCheckboxPositions.set(`c-${constraint.id}-${k}`, {
-					x: centroid.x,
-					y: centroid.y,
-					copyIndex: k,
-					constraintId: constraint.id,
-				});
-
-				// Render suppression checkbox over copy
-				this.renderPatternSuppressionCheckbox(centroid, k, isSuppressed, constraint.id);
-			}
-		}
-
-		this.renderConstraintBadge(constraint.id, sCtr.x + 14, sCtr.y - 14, 'circular_pattern', isConstraintActive, COLORS.primary);
-	}
 
 	private renderRectangularPatternGizmos(
 		viewport: Viewport,
@@ -2600,11 +1319,11 @@ export class SVGRenderer {
 			const arrowPath = `M ${tipX} ${tipY} L ${base1X} ${base1Y} L ${base2X} ${base2Y} Z`;
 			createSvgPath(arrowPath, {
 				fill: color,
-				stroke: '#ffffff',
+				stroke: COLORS.white,
 				'stroke-width': 1.5,
 				'stroke-linejoin': 'round',
 				class: 'rectangular-pattern-gizmo-arrow',
-				filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.35))',
+				filter: FILTERS.gizmoArrow,
 				'data-axis': String(axisNum),
 			}, gizmoG);
 
@@ -2631,163 +1350,15 @@ export class SVGRenderer {
 			}
 
 			createSvgRect(pillX - pillWidth * 0.5, pillY - 10, pillWidth, 20, {
-				rx: 4,
-				fill: '#0f172a',
+				...RECT_PATTERN_PILL_ATTRS,
 				stroke: color,
-				'stroke-width': 1.5,
-				opacity: 0.9,
-				'pointer-events': 'none',
 			}, gizmoG);
 
-			createSvgText(pillX, pillY + 3.5, labelText, {
-				'text-anchor': 'middle',
-				fill: '#f8fafc',
-				'font-size': 10,
-				'font-weight': 600,
-				'font-family': 'monospace',
-				'pointer-events': 'none',
-			}, gizmoG);
+			createSvgText(pillX, pillY + 3.5, labelText, RECT_PATTERN_PILL_TEXT_ATTRS, gizmoG);
 		};
 
-		renderArrow(sCtr, h1Screen, u1Screen, '#2563eb', 1, distance1);
-		renderArrow(sCtr, h2Screen, u2Screen, '#059669', 2, distance2);
-	}
-
-	private renderRectangularPatternBadge(
-		constraint: RectangularPatternConstraint,
-		sketch: SketchDocument,
-		viewport: Viewport
-	): void {
-		let sumX = 0, sumY = 0, ptCount = 0;
-		for (const objId of constraint.sourceObjectIds) {
-			const pt = sketch.points.get(objId);
-			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
-			const l = sketch.lines.get(objId);
-			if (l) {
-				const p1 = sketch.points.get(l.p1Id);
-				const p2 = sketch.points.get(l.p2Id);
-				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
-				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
-				continue;
-			}
-			const c = sketch.circles.get(objId);
-			if (c) {
-				const cp = sketch.points.get(c.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
-				continue;
-			}
-			const a = sketch.arcs.get(objId);
-			if (a) {
-				const cp = sketch.points.get(a.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
-				continue;
-			}
-			const el = sketch.ellipses.get(objId);
-			if (el) {
-				const cp = sketch.points.get(el.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
-				continue;
-			}
-			const ea = sketch.ellipticalArcs.get(objId);
-			if (ea) {
-				const cp = sketch.points.get(ea.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
-				continue;
-			}
-		}
-
-		if (ptCount === 0) return;
-		const centroidWorld = { x: sumX / ptCount, y: sumY / ptCount };
-		const sCtr = viewport.worldToScreen(centroidWorld.x, centroidWorld.y);
-
-		const paramMap = new Map<string, number>();
-		for (const [pid, pt] of sketch.points.entries()) {
-			paramMap.set(`${pid}.x`, pt.x);
-			paramMap.set(`${pid}.y`, pt.y);
-		}
-		const line1 = constraint.line1P1Id && constraint.line1P2Id ? { p1Id: constraint.line1P1Id, p2Id: constraint.line1P2Id } : null;
-		const line2 = constraint.line2P1Id && constraint.line2P2Id ? { p1Id: constraint.line2P1Id, p2Id: constraint.line2P2Id } : null;
-		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
-		const isConstraintActive = this.isConstraintOnlySelected(constraint.id, sketch);
-
-		if (isConstraintActive) {
-			this.renderRectangularPatternGizmos(viewport, centroidWorld, u1, u2, constraint.distance1, constraint.distance2, {
-				targetGroup: this.constraintGroup,
-				constraintId: constraint.id,
-			});
-
-			if (constraint.suppression) {
-				const suppressedSet = new Set(constraint.suppressedIndices);
-				const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
-				const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-				const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
-
-				const maxI = Math.abs(constraint.distance1) > 1e-6 ? constraint.quantity1 : 1;
-				const maxJ = Math.abs(constraint.distance2) > 1e-6 ? constraint.quantity2 : 1;
-
-				for (let i = 0; i < maxI; i++) {
-					for (let j = 0; j < maxJ; j++) {
-						if (i === 0 && j === 0) continue;
-						const copyIndex = i * 1000 + j;
-						const isSuppressed = suppressedSet.has(copyIndex);
-						const offset = computeRectangularPatternOffset(i, j, constraint.distance1, constraint.direction1, constraint.distance2, constraint.direction2, u1, u2);
-
-						let centroid: { x: number; y: number };
-						const copy = constraint.copies.find(cp => cp.copyIndex === copyIndex);
-
-						if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-							let cSumX = 0, cSumY = 0, cCount = 0;
-							for (const pair of copy.pointPairs) {
-								const pt = sketch.points.get(pair.patternPtId);
-								if (pt) {
-									cSumX += pt.x;
-									cSumY += pt.y;
-									cCount++;
-								}
-							}
-							centroid = cCount > 0
-								? viewport.worldToScreen(cSumX / cCount, cSumY / cCount)
-								: viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
-						} else {
-							const copyWorldPoints = this.renderTransformedObjects(
-								sketch,
-								viewport,
-								constraint.sourceObjectIds,
-								offset,
-								{
-									targetGroup: this.constraintGroup,
-									baseColor,
-									opacity: 0.25,
-									drawVertices: true,
-									skipRender: !isSuppressed,
-								}
-							);
-							if (copyWorldPoints.length > 0) {
-								let cSumX = 0, cSumY = 0;
-								for (const p of copyWorldPoints) {
-									cSumX += p.x;
-									cSumY += p.y;
-								}
-								centroid = viewport.worldToScreen(cSumX / copyWorldPoints.length, cSumY / copyWorldPoints.length);
-							} else {
-								centroid = viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
-							}
-						}
-
-						this.patternCheckboxPositions.set(`c-${constraint.id}-${copyIndex}`, {
-							x: centroid.x,
-							y: centroid.y,
-							copyIndex,
-							constraintId: constraint.id,
-						});
-
-						this.renderPatternSuppressionCheckbox(centroid, copyIndex, isSuppressed, constraint.id);
-					}
-				}
-			}
-		}
-
-		this.renderConstraintBadge(constraint.id, sCtr.x + 14, sCtr.y - 14, 'rectangular_pattern', isConstraintActive, COLORS.primary);
+		renderArrow(sCtr, h1Screen, u1Screen, COLORS.patternAxis1, 1, distance1);
+		renderArrow(sCtr, h2Screen, u2Screen, COLORS.patternAxis2, 2, distance2);
 	}
 
 	private renderPatternSuppressionCheckbox(
@@ -2804,48 +1375,22 @@ export class SVGRenderer {
 		}, this.patternCheckboxGroup);
 
 		// Outer halo / shadow
-		createSvgRect(centroid.x - 11, centroid.y - 11, 22, 22, {
-			rx: 5,
-			fill: '#ffffff',
-			stroke: '#cbd5e1',
-			'stroke-width': 1,
-			filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))',
-		}, cbG);
+		createSvgRect(centroid.x - 11, centroid.y - 11, 22, 22, CHECKBOX_HALO_ATTRS, cbG);
 
 		if (!isSuppressed) {
 			// Active checkbox (blue filled with white checkmark)
-			createSvgRect(centroid.x - 9, centroid.y - 9, 18, 18, {
-				rx: 3.5,
-				fill: '#2563eb',
-				stroke: '#1d4ed8',
-				'stroke-width': 1,
-			}, cbG);
+			createSvgRect(centroid.x - 9, centroid.y - 9, 18, 18, CHECKBOX_ACTIVE_ATTRS, cbG);
 
 			createSvgPath(
 				`M ${centroid.x - 4.5} ${centroid.y} L ${centroid.x - 1.5} ${centroid.y + 3.5} L ${centroid.x + 5} ${centroid.y - 3.5}`,
-				{
-					stroke: '#ffffff',
-					'stroke-width': 2,
-					'stroke-linecap': 'round',
-					'stroke-linejoin': 'round',
-					fill: 'none',
-				},
+				CHECKBOX_CHECKMARK_ATTRS,
 				cbG
 			);
 		} else {
 			// Suppressed checkbox (grey outline with red dash)
-			createSvgRect(centroid.x - 9, centroid.y - 9, 18, 18, {
-				rx: 3.5,
-				fill: '#f8fafc',
-				stroke: '#94a3b8',
-				'stroke-width': 1.5,
-			}, cbG);
+			createSvgRect(centroid.x - 9, centroid.y - 9, 18, 18, CHECKBOX_SUPPRESSED_ATTRS, cbG);
 
-			createSvgLine(centroid.x - 4, centroid.y, centroid.x + 4, centroid.y, {
-				stroke: '#ef4444',
-				'stroke-width': 2,
-				'stroke-linecap': 'round',
-			}, cbG);
+			createSvgLine(centroid.x - 4, centroid.y, centroid.x + 4, centroid.y, CHECKBOX_SUPPRESSED_DASH_ATTRS, cbG);
 		}
 	}
 
@@ -3400,26 +1945,14 @@ export class SVGRenderer {
 
 		// 5. Draw vertex dots
 		for (const pt of pts) {
-			createSvgCircle(pt.x, pt.y, 2.5, {
-				fill: COLORS.primary,
-				stroke: COLORS.white,
-				'stroke-width': '1',
-			}, this.previewGroup);
+			createSvgCircle(pt.x, pt.y, 2.5, POLYGON_VERTEX_ATTRS, this.previewGroup);
 		}
 
 		// 6. Center marker
-		createSvgCircle(sCtr.x, sCtr.y, 3, {
-			fill: COLORS.primary,
-			stroke: COLORS.white,
-			'stroke-width': '1',
-		}, this.previewGroup);
+		createSvgCircle(sCtr.x, sCtr.y, 3, POLYGON_CENTER_ATTRS, this.previewGroup);
 
 		// 7. Midpoint marker on incircle
-		createSvgCircle(midScreen.x, midScreen.y, 2.5, {
-			fill: COLORS.constrained,
-			stroke: COLORS.white,
-			'stroke-width': '1',
-		}, this.previewGroup);
+		createSvgCircle(midScreen.x, midScreen.y, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, this.previewGroup);
 	}
 
 	renderEllipseMajorAxisPreview(sc: Vec2, current: Vec2, radiusVal: number, _isConstruction = false): void {
@@ -3563,10 +2096,7 @@ export class SVGRenderer {
 				'polygon',
 				{
 					points: `${s.x.toFixed(1)},${(s.y - d).toFixed(1)} ${(s.x + d).toFixed(1)},${s.y.toFixed(1)} ${s.x.toFixed(1)},${(s.y + d).toFixed(1)} ${(s.x - d).toFixed(1)},${s.y.toFixed(1)}`,
-					fill: COLORS.objectSnapFill,
-					stroke: COLORS.objectSnapStroke,
-					'stroke-width': STROKE_WIDTH.thin,
-					'pointer-events': 'none',
+					...SNAP_OBJECT_ATTRS,
 				},
 				this.overlayGroup
 			);
@@ -3574,20 +2104,12 @@ export class SVGRenderer {
 			// Indigo square at grid intersection
 			const size = 7;
 			createSvgRect(s.x - size, s.y - size, size * 2, size * 2, {
-				fill: COLORS.gridSnapFill,
-				stroke: COLORS.gridSnapStroke,
-				'stroke-width': STROKE_WIDTH.thin,
+				...SNAP_GRID_ATTRS,
 				rx: 1,
-				'pointer-events': 'none',
 			}, this.overlayGroup);
 		} else {
 			// Circular blue ring for point
-			createSvgCircle(s.x, s.y, 9, {
-				fill: COLORS.pointSnapFill,
-				stroke: COLORS.primary,
-				'stroke-width': STROKE_WIDTH.thin,
-				'pointer-events': 'none',
-			}, this.overlayGroup);
+			createSvgCircle(s.x, s.y, 9, SNAP_POINT_ATTRS, this.overlayGroup);
 		}
 	}
 
@@ -3603,13 +2125,7 @@ export class SVGRenderer {
 		const width = Math.abs(s2.x - s1.x);
 		const height = Math.abs(s2.y - s1.y);
 
-		createSvgRect(minX, minY, width, height, {
-			fill: COLORS.selectionBoxFill,
-			stroke: COLORS.selected,
-			'stroke-width': STROKE_WIDTH.thin,
-			'stroke-dasharray': DASH_ARRAY.selectionBox,
-			'pointer-events': 'none',
-		}, this.overlayGroup);
+		createSvgRect(minX, minY, width, height, SELECTION_BOX_ATTRS, this.overlayGroup);
 	}
 
 	renderTrimPreview(candidate: TrimCandidate, viewport: Viewport): void {
@@ -3745,13 +2261,7 @@ export class SVGRenderer {
 		const ny = dx / lineLen;
 
 		// Highlight mirror line: bright gold/amber centerline
-		createSvgLine(sA.x, sA.y, sB.x, sB.y, {
-			stroke: '#f59e0b',
-			'stroke-width': 2.5,
-			'stroke-dasharray': '6 3',
-			opacity: 0.9,
-			'pointer-events': 'none',
-		}, this.mirrorGroup);
+		createSvgLine(sA.x, sA.y, sB.x, sB.y, MIRROR_PREVIEW_LINE_ATTRS, this.mirrorGroup);
 
 		if (selectedObjectIds.size === 0) return;
 
@@ -3772,11 +2282,8 @@ export class SVGRenderer {
 			if (reflectedPoints.has(key)) return;
 			reflectedPoints.add(key);
 			createSvgCircle(screenPt.x, screenPt.y, 3.5, {
-				fill: COLORS.primary,
-				stroke: COLORS.white,
-				'stroke-width': 1.5,
+				...MIRROR_PREVIEW_VERTEX_ATTRS,
 				opacity: 0.5,
-				'pointer-events': 'none',
 			}, this.mirrorGroup);
 		};
 
@@ -3934,35 +2441,13 @@ export class SVGRenderer {
 		const sCtr = viewport.worldToScreen(centerPt.x, centerPt.y);
 
 		// Render center point marker: amber target crosshair & concentric ring
-		createSvgCircle(sCtr.x, sCtr.y, 12, {
-			fill: 'none',
-			stroke: '#f59e0b',
-			'stroke-width': 2,
-			'stroke-dasharray': '4 2',
-			opacity: 0.9,
-			'pointer-events': 'none',
-		}, this.patternGroup);
+		createSvgCircle(sCtr.x, sCtr.y, 12, PATTERN_CENTER_RING_ATTRS, this.patternGroup);
 
-		createSvgLine(sCtr.x - 16, sCtr.y, sCtr.x + 16, sCtr.y, {
-			stroke: '#f59e0b',
-			'stroke-width': 1.5,
-			opacity: 0.8,
-			'pointer-events': 'none',
-		}, this.patternGroup);
+		createSvgLine(sCtr.x - 16, sCtr.y, sCtr.x + 16, sCtr.y, PATTERN_CENTER_CROSSHAIR_ATTRS, this.patternGroup);
 
-		createSvgLine(sCtr.x, sCtr.y - 16, sCtr.x, sCtr.y + 16, {
-			stroke: '#f59e0b',
-			'stroke-width': 1.5,
-			opacity: 0.8,
-			'pointer-events': 'none',
-		}, this.patternGroup);
+		createSvgLine(sCtr.x, sCtr.y - 16, sCtr.x, sCtr.y + 16, PATTERN_CENTER_CROSSHAIR_ATTRS, this.patternGroup);
 
-		createSvgCircle(sCtr.x, sCtr.y, 4, {
-			fill: '#f59e0b',
-			stroke: '#ffffff',
-			'stroke-width': 1.5,
-			'pointer-events': 'none',
-		}, this.patternGroup);
+		createSvgCircle(sCtr.x, sCtr.y, 4, PATTERN_CENTER_DOT_ATTRS, this.patternGroup);
 
 		if (selectedObjectIds.size === 0) return;
 
@@ -4164,13 +2649,7 @@ export class SVGRenderer {
 					if (p1 && p2) {
 						const s1 = viewport.worldToScreen(p1.x, p1.y);
 						const s2 = viewport.worldToScreen(p2.x, p2.y);
-						createSvgLine(s1.x, s1.y, s2.x, s2.y, {
-							stroke: '#0284c7',
-							'stroke-width': 4,
-							opacity: 0.8,
-							'stroke-linecap': 'round',
-							'pointer-events': 'none',
-						}, this.filletGroup);
+						createSvgLine(s1.x, s1.y, s2.x, s2.y, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);
 					}
 				}
 			} else if (type === 'arc') {
@@ -4181,14 +2660,7 @@ export class SVGRenderer {
 					const se = viewport.worldToScreen(sketch.points.get(arc.endPointId)!.x, sketch.points.get(arc.endPointId)!.y);
 					const sr = arc.radius * viewport.zoom;
 					const d = getArcSvgPath(sc, ss, se, sr, !!arc.clockwise);
-					createSvgPath(d, {
-						stroke: '#0284c7',
-						'stroke-width': 4,
-						opacity: 0.8,
-						fill: 'none',
-						'stroke-linecap': 'round',
-						'pointer-events': 'none',
-					}, this.filletGroup);
+					createSvgPath(d, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);
 				}
 			} else if (type === 'spline') {
 				const spline = sketch.splines.get(id);
@@ -4196,14 +2668,7 @@ export class SVGRenderer {
 					const geoCurve = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id) as GeoSpline | null;
 					if (geoCurve) {
 						const d = getSplineSvgPath(geoCurve.bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
-						createSvgPath(d, {
-							stroke: '#0284c7',
-							'stroke-width': 4,
-							opacity: 0.8,
-							fill: 'none',
-							'stroke-linecap': 'round',
-							'pointer-events': 'none',
-						}, this.filletGroup);
+						createSvgPath(d, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);
 					}
 				}
 			}
@@ -4214,12 +2679,7 @@ export class SVGRenderer {
 			const pt = sketch.points.get(state.hoverPointId);
 			if (pt) {
 				const s = viewport.worldToScreen(pt.x, pt.y);
-				createSvgCircle(s.x, s.y, 8, {
-					fill: 'rgba(2, 132, 199, 0.25)',
-					stroke: '#0284c7',
-					'stroke-width': 2,
-					'pointer-events': 'none',
-				}, this.filletGroup);
+				createSvgCircle(s.x, s.y, 8, FILLET_HOVER_POINT_ATTRS, this.filletGroup);
 			}
 		}
 
@@ -4238,32 +2698,17 @@ export class SVGRenderer {
 			// Shaded corner wedge
 			const sweepWedgeFlag = res.clockwise ? 0 : 1;
 			const wedgePath = `M ${sT1.x} ${sT1.y} L ${sV.x} ${sV.y} L ${sT2.x} ${sT2.y} A ${sRadius.toFixed(2)} ${sRadius.toFixed(2)} 0 0 ${sweepWedgeFlag} ${sT1.x} ${sT1.y} Z`;
-			createSvgPath(wedgePath, {
-				fill: 'rgba(2, 132, 199, 0.16)',
-				stroke: 'none',
-				'pointer-events': 'none',
-			}, this.filletGroup);
+			createSvgPath(wedgePath, FILLET_WEDGE_ATTRS, this.filletGroup);
 
 			// Fillet arc
 			const arcD = getArcSvgPath(sCenter, sT1, sT2, sRadius, res.clockwise);
-			createSvgPath(arcD, {
-				stroke: '#0284c7',
-				'stroke-width': 2.5,
-				fill: 'none',
-				'stroke-linecap': 'round',
-				'pointer-events': 'none',
-			}, this.filletGroup);
+			createSvgPath(arcD, FILLET_ARC_ATTRS, this.filletGroup);
 
 			// Check if this fillet is active for Gizmo
 			const isActive = pf.id === state.activeFilletId || (!state.activeFilletId && pf === state.pendingFillets[state.pendingFillets.length - 1]);
 			if (isActive) {
 				// Center circle handle
-				createSvgCircle(sCenter.x, sCenter.y, 4, {
-					fill: '#ffffff',
-					stroke: '#0284c7',
-					'stroke-width': 2,
-					'pointer-events': 'none',
-				}, this.filletGroup);
+				createSvgCircle(sCenter.x, sCenter.y, 4, FILLET_GIZMO_CENTER_ATTRS, this.filletGroup);
 
 				// Radial dashed line extending outward from center through midArc
 				const uDir = {
@@ -4274,21 +2719,11 @@ export class SVGRenderer {
 				const lineEndX = sCenter.x + lineLen * uDir.x;
 				const lineEndY = sCenter.y + lineLen * uDir.y;
 
-				createSvgLine(sCenter.x, sCenter.y, lineEndX, lineEndY, {
-					stroke: '#0284c7',
-					'stroke-width': 2,
-					'stroke-dasharray': '4 4',
-					'pointer-events': 'none',
-				}, this.filletGroup);
+				createSvgLine(sCenter.x, sCenter.y, lineEndX, lineEndY, FILLET_GIZMO_RADIAL_ATTRS, this.filletGroup);
 
 				// Small square at tip
 				const sqSize = 6;
-				createSvgRect(lineEndX - sqSize * 0.5, lineEndY - sqSize * 0.5, sqSize, sqSize, {
-					fill: '#ffffff',
-					stroke: '#0284c7',
-					'stroke-width': 1.5,
-					'pointer-events': 'none',
-				}, this.filletGroup);
+				createSvgRect(lineEndX - sqSize * 0.5, lineEndY - sqSize * 0.5, sqSize, sqSize, FILLET_GIZMO_SQUARE_ATTRS, this.filletGroup);
 
 				// Inward arrow gizmo at sMid pointing towards sCenter
 				const aux = -uDir.x;
@@ -4308,14 +2743,7 @@ export class SVGRenderer {
 				const b2Y = baseCenterY - arrowHalfWidth * apy;
 
 				const arrowPath = `M ${tipX} ${tipY} L ${b1X} ${b1Y} L ${b2X} ${b2Y} Z`;
-				createSvgPath(arrowPath, {
-					fill: '#0284c7',
-					stroke: '#ffffff',
-					'stroke-width': 1.5,
-					'stroke-linejoin': 'round',
-					class: 'fillet-gizmo-arrow',
-					filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
-				}, this.filletGroup);
+				createSvgPath(arrowPath, FILLET_GIZMO_ARROW_ATTRS, this.filletGroup);
 
 				this.filletGizmoHandle = {
 					screenX: tipX,
@@ -4340,19 +2768,8 @@ export class SVGRenderer {
 		const g = createSvgElement('g', undefined, this.previewGroup);
 		const width = textStr.length * 7.5 + 14;
 
-		createSvgRect(x - width * 0.5, y - 11, width, 22, {
-			rx: 4,
-			fill: COLORS.tooltipBg,
-			stroke: COLORS.primary,
-			'stroke-width': STROKE_WIDTH.thin,
-		}, g);
+		createSvgRect(x - width * 0.5, y - 11, width, 22, TOOLTIP_RECT_ATTRS, g);
 
-		createSvgText(x, y + 4, textStr, {
-			'text-anchor': 'middle',
-			fill: COLORS.white,
-			'font-size': 11,
-			'font-weight': 500,
-			'font-family': 'monospace',
-		}, g);
+		createSvgText(x, y + 4, textStr, TOOLTIP_TEXT_ATTRS, g);
 	}
 }

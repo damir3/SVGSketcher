@@ -1,4 +1,5 @@
 export * from './base';
+export * from './renderContext';
 export * from './fixed';
 export * from './coincident';
 export * from './horizontal';

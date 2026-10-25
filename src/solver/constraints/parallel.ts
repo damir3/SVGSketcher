@@ -1,5 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import type { ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains two lines to be parallel (cross product of unit vectors = 0)
@@ -39,5 +40,10 @@ export class ParallelConstraint extends BaseConstraint {
 
 	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		ctx.renderBadgeOnSegment(this.id, this.l1P1, this.l1P2, '//');
+		ctx.renderBadgeOnSegment(this.id, this.l2P1, this.l2P2, '//');
 	}
 }

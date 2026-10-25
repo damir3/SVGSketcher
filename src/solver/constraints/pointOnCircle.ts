@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS } from '../../canvas/styles';
 
 /**
  * Constrains a point to lie on the circumference of a circle or arc
@@ -61,5 +63,12 @@ export class PointOnCircleConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.circleId}.r`, baseRow, -1.0 * this.weight);
 
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const pt = ctx.sketch.points.get(this.pointId);
+		if (!pt) return;
+		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
+		ctx.renderBadge(this.id, s.x, s.y + 14, '⚲', COLORS.primary);
 	}
 }

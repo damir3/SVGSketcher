@@ -1,4 +1,6 @@
 import type { IConstraint, ConstraintType, JacobianEntry } from '../types';
+import type { ConstraintRenderContext } from './renderContext';
+export * from './renderContext';
 
 export class BaseConstraint implements IConstraint {
 	readonly id: string;
@@ -40,6 +42,10 @@ export class BaseConstraint implements IConstraint {
 
 	jacobian(_paramIndices: Map<string, number>, _baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
 		return [];
+	}
+
+	render(_context: ConstraintRenderContext): void {
+		// Default: no visual representation
 	}
 
 	protected addJacobianEntry(

@@ -67,6 +67,7 @@ export interface IConstraint {
 	getEquationsCount(): number;
 	evaluate(paramMap: Map<string, number>): number[];
 	jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[];
+	render?(context: any): void;
 }
 
 export interface SolverOptions {

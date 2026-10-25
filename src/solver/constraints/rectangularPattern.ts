@@ -1,6 +1,8 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { PatternPointPair, PatternRadiusPair } from './circularPattern';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS } from '../../canvas/styles';
 
 export interface RectangularPatternCopyData {
 	copyIndex: number;
@@ -347,5 +349,144 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		}
 
 		return entries;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		let sumX = 0, sumY = 0, ptCount = 0;
+		for (const objId of this.sourceObjectIds) {
+			const pt = ctx.sketch.points.get(objId);
+			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
+			const l = ctx.sketch.lines.get(objId);
+			if (l) {
+				const p1 = ctx.sketch.points.get(l.p1Id);
+				const p2 = ctx.sketch.points.get(l.p2Id);
+				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
+				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+				continue;
+			}
+			const c = ctx.sketch.circles.get(objId);
+			if (c) {
+				const cp = ctx.sketch.points.get(c.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const a = ctx.sketch.arcs.get(objId);
+			if (a) {
+				const cp = ctx.sketch.points.get(a.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const el = ctx.sketch.ellipses.get(objId);
+			if (el) {
+				const cp = ctx.sketch.points.get(el.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+			const ea = ctx.sketch.ellipticalArcs.get(objId);
+			if (ea) {
+				const cp = ctx.sketch.points.get(ea.centerId);
+				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				continue;
+			}
+		}
+
+		if (ptCount === 0) return;
+		const centroidWorld = { x: sumX / ptCount, y: sumY / ptCount };
+		const sCtr = ctx.viewport.worldToScreen(centroidWorld.x, centroidWorld.y);
+
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of ctx.sketch.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const line1 = this.line1P1Id && this.line1P2Id ? { p1Id: this.line1P1Id, p2Id: this.line1P2Id } : null;
+		const line2 = this.line2P1Id && this.line2P2Id ? { p1Id: this.line2P1Id, p2Id: this.line2P2Id } : null;
+		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
+		const isConstraintActive = ctx.isConstraintOnlySelected ? ctx.isConstraintOnlySelected(this.id) : false;
+
+		if (isConstraintActive) {
+			if (ctx.renderRectangularPatternGizmos) {
+				ctx.renderRectangularPatternGizmos(ctx.viewport, centroidWorld, u1, u2, this.distance1, this.distance2, {
+					targetGroup: ctx.targetGroup,
+					constraintId: this.id,
+				});
+			}
+
+			if (this.suppression) {
+				const suppressedSet = new Set(this.suppressedIndices);
+				const isFullyConstrained = ctx.sketch.lastSolverResult?.status === 'CONVERGED';
+				const hasConflict = ctx.sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
+				const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+
+				const maxI = Math.abs(this.distance1) > 1e-6 ? this.quantity1 : 1;
+				const maxJ = Math.abs(this.distance2) > 1e-6 ? this.quantity2 : 1;
+
+				for (let i = 0; i < maxI; i++) {
+					for (let j = 0; j < maxJ; j++) {
+						if (i === 0 && j === 0) continue;
+						const copyIndex = i * 1000 + j;
+						const isSuppressed = suppressedSet.has(copyIndex);
+						const offset = computeRectangularPatternOffset(i, j, this.distance1, this.direction1, this.distance2, this.direction2, u1, u2);
+
+						let centroid: { x: number; y: number };
+						const copy = this.copies.find(cp => cp.copyIndex === copyIndex);
+
+						if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
+							let cSumX = 0, cSumY = 0, cCount = 0;
+							for (const pair of copy.pointPairs) {
+								const pt = ctx.sketch.points.get(pair.patternPtId);
+								if (pt) {
+									cSumX += pt.x;
+									cSumY += pt.y;
+									cCount++;
+								}
+							}
+							centroid = cCount > 0
+								? ctx.viewport.worldToScreen(cSumX / cCount, cSumY / cCount)
+								: ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+						} else if (ctx.renderTransformedObjects) {
+							const copyWorldPoints = ctx.renderTransformedObjects(
+								this.sourceObjectIds,
+								offset,
+								{
+									targetGroup: ctx.targetGroup,
+									baseColor,
+									opacity: 0.25,
+									drawVertices: true,
+									skipRender: !isSuppressed,
+								}
+							);
+							if (copyWorldPoints.length > 0) {
+								let cSumX = 0, cSumY = 0;
+								for (const p of copyWorldPoints) {
+									cSumX += p.x;
+									cSumY += p.y;
+								}
+								centroid = ctx.viewport.worldToScreen(cSumX / copyWorldPoints.length, cSumY / copyWorldPoints.length);
+							} else {
+								centroid = ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+							}
+						} else {
+							centroid = ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+						}
+
+						if (ctx.patternCheckboxPositions) {
+							ctx.patternCheckboxPositions.set(`c-${this.id}-${copyIndex}`, {
+								x: centroid.x,
+								y: centroid.y,
+								copyIndex,
+								constraintId: this.id,
+							});
+						}
+
+						if (ctx.renderPatternSuppressionCheckbox) {
+							ctx.renderPatternSuppressionCheckbox(centroid, copyIndex, isSuppressed, this.id);
+						}
+					}
+				}
+			}
+		}
+
+		ctx.renderBadge(this.id, sCtr.x + 14, sCtr.y - 14, 'rectangular_pattern', COLORS.primary);
 	}
 }

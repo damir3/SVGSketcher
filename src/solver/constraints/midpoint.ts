@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS } from '../../canvas/styles';
 
 /**
  * Midpoint constraint: midpoint equals 0.5 * (p1 + p2)
@@ -48,5 +50,17 @@ export class MidpointConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow + 1, -(1 - alpha) * this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow + 1, -alpha * this.weight);
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		for (const line of ctx.sketch.lines.values()) {
+			if (line.isSplineHandle && ((line.p1Id === this.p1Id && line.p2Id === this.p2Id) || (line.p1Id === this.p2Id && line.p2Id === this.p1Id))) {
+				return;
+			}
+		}
+		const pt = ctx.sketch.points.get(this.midId);
+		if (!pt) return;
+		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
+		ctx.renderBadge(this.id, s.x, s.y - 14, 'M', COLORS.primary);
 	}
 }

@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { computePointToLineDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 
 /**
  * Dimensional constraint: distance from a point to a line segment (infinite line extension) equals value
@@ -68,5 +70,29 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 
 	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const pt = ctx.sketch.points.get(this.pointId);
+		const p1 = ctx.sketch.points.get(this.lineP1Id);
+		const p2 = ctx.sketch.points.get(this.lineP2Id);
+		if (!pt || !p1 || !p2) return;
+
+		const sp = ctx.viewport.worldToScreen(pt.x, pt.y);
+		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
+		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
+		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
+		if (!geom) return;
+
+		ctx.renderLinearDimensionVisual({
+			d1: geom.d1,
+			d2: geom.d2,
+			label: formatDimensionValue(this.targetDistance),
+			extensionLines: geom.extensionLines,
+			parent: ctx.targetGroup,
+			isSelected: ctx.isSelected,
+			constraintId: this.id,
+		});
 	}
 }

@@ -1,5 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import type { ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains two lines to be collinear (parallel and lying on the same line)
@@ -63,5 +64,10 @@ export class CollinearConstraint extends BaseConstraint {
 		const j0 = computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 		const j1 = computeNumericJacobianForEquation(this, paramIndices, baseRow, 1, paramMap);
 		return [...j0, ...j1];
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		ctx.renderBadgeOnSegment(this.id, this.l1P1, this.l1P2, 'collinear');
+		ctx.renderBadgeOnSegment(this.id, this.l2P1, this.l2P2, 'collinear');
 	}
 }

@@ -1,5 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains two line segments to have equal length
@@ -65,5 +66,10 @@ export class EqualLengthConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.line2P2}.y`, baseRow, (-dy2 / l2) * this.weight);
 
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		ctx.renderBadgeOnSegment(this.id, this.line1P1, this.line1P2, '=');
+		ctx.renderBadgeOnSegment(this.id, this.line2P1, this.line2P2, '=');
 	}
 }

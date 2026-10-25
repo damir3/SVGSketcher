@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS } from '../../canvas/styles';
 
 export interface PatternPointPair {
 	sourcePtId: string;
@@ -219,5 +221,95 @@ export class CircularPatternConstraint extends BaseConstraint {
 		}
 
 		return entries;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const pCtr = ctx.sketch.points.get(this.centerPtId);
+		if (!pCtr) return;
+
+		const sCtr = ctx.viewport.worldToScreen(pCtr.x, pCtr.y);
+		const isConstraintActive = ctx.isConstraintOnlySelected ? ctx.isConstraintOnlySelected(this.id) : false;
+
+		// Render suppression checkboxes and suppressed objects only when constraint itself is selected
+		if (this.suppression && isConstraintActive && !this.isReadOnly) {
+			const N = this.quantity;
+			const suppressedSet = new Set(this.suppressedIndices);
+			const isFullyConstrained = ctx.sketch.lastSolverResult?.status === 'CONVERGED';
+			const hasConflict = ctx.sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
+			const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+
+			for (let k = 1; k < N; k++) {
+				const isSuppressed = suppressedSet.has(k);
+				const aDeg = computePatternCopyAngle(k, N, this.distribution, this.totalAngle);
+				const rad = (aDeg * Math.PI) / 180;
+
+				let centroid: { x: number; y: number };
+				const copy = this.copies.find(cp => cp.copyIndex === k);
+
+				if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
+					let sumX = 0, sumY = 0, count = 0;
+					for (const pair of copy.pointPairs) {
+						const pt = ctx.sketch.points.get(pair.patternPtId);
+						if (pt) {
+							sumX += pt.x;
+							sumY += pt.y;
+							count++;
+						}
+					}
+					centroid = count > 0
+						? ctx.viewport.worldToScreen(sumX / count, sumY / count)
+						: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
+				} else if (ctx.renderTransformedObjects) {
+					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
+					const copyWorldPoints = ctx.renderTransformedObjects(
+						this.sourceObjectIds,
+						{ center: pCtr, angleDeg: aDeg },
+						{
+							targetGroup: ctx.targetGroup,
+							baseColor,
+							opacity: 0.25,
+							drawVertices: true,
+							skipRender: !isSuppressed,
+						}
+					);
+
+					if (copyWorldPoints.length > 0) {
+						let sumX = 0, sumY = 0;
+						for (const p of copyWorldPoints) {
+							sumX += p.x;
+							sumY += p.y;
+						}
+						centroid = ctx.viewport.worldToScreen(sumX / copyWorldPoints.length, sumY / copyWorldPoints.length);
+					} else {
+						centroid = {
+							x: sCtr.x + 40 * Math.cos(rad),
+							y: sCtr.y + 40 * Math.sin(rad),
+						};
+					}
+				} else {
+					centroid = {
+						x: sCtr.x + 40 * Math.cos(rad),
+						y: sCtr.y + 40 * Math.sin(rad),
+					};
+				}
+
+				// Register screen position for hit-testing
+				if (ctx.patternCheckboxPositions) {
+					ctx.patternCheckboxPositions.set(`c-${this.id}-${k}`, {
+						x: centroid.x,
+						y: centroid.y,
+						copyIndex: k,
+						constraintId: this.id,
+					});
+				}
+
+				// Render suppression checkbox over copy
+				if (ctx.renderPatternSuppressionCheckbox) {
+					ctx.renderPatternSuppressionCheckbox(centroid, k, isSuppressed, this.id);
+				}
+			}
+		}
+
+		ctx.renderBadge(this.id, sCtr.x + 14, sCtr.y - 14, 'circular_pattern', COLORS.primary);
 	}
 }

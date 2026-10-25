@@ -1,5 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains a line segment or two points to be vertical (x1 = x2)
@@ -29,5 +30,9 @@ export class VerticalConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, this.weight);
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		ctx.renderBadgeOnSegment(this.id, this.p1Id, this.p2Id, 'V');
 	}
 }

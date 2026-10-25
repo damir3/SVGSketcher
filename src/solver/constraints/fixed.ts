@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS } from '../../canvas/styles';
 
 /**
  * Fixes a point to specific world coordinates (X0, Y0)
@@ -31,5 +33,12 @@ export class FixedConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow + 1, this.weight);
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const pt = ctx.sketch.points.get(this.pointId);
+		if (!pt) return;
+		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
+		ctx.renderBadge(this.id, s.x + 12, s.y - 12, 'fixed', COLORS.fixed);
 	}
 }

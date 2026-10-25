@@ -1,5 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains two circles to have equal radius
@@ -29,5 +30,10 @@ export class EqualRadiusConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.circle1Id}.r`, baseRow, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.circle2Id}.r`, baseRow, -this.weight);
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		ctx.renderBadgeOnCircle(this.id, this.circle1Id, '=');
+		ctx.renderBadgeOnCircle(this.id, this.circle2Id, '=');
 	}
 }

@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS } from '../../canvas/styles';
 
 /**
  * Makes two points coincide
@@ -35,5 +37,12 @@ export class CoincidentConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow + 1, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow + 1, -this.weight);
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const pt = ctx.sketch.points.get(this.p1Id);
+		if (!pt) return;
+		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
+		ctx.renderBadge(this.id, s.x - 12, s.y - 12, '●', COLORS.primary);
 	}
 }

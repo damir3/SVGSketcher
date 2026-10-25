@@ -1,5 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 
 /**
  * Dimensional constraint: distance between two points equals value
@@ -108,5 +110,27 @@ export class DistanceConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, dP2y);
 
 		return res;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const p1 = ctx.sketch.points.get(this.p1Id);
+		const p2 = ctx.sketch.points.get(this.p2Id);
+		if (!p1 || !p2) return;
+
+		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
+		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 32;
+		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
+		if (!geom) return;
+
+		ctx.renderLinearDimensionVisual({
+			d1: geom.d1,
+			d2: geom.d2,
+			label: formatDimensionValue(this.targetDistance),
+			extensionLines: geom.extensionLines,
+			parent: ctx.targetGroup,
+			isSelected: ctx.isSelected,
+			constraintId: this.id,
+		});
 	}
 }

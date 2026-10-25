@@ -1,5 +1,8 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import type { ConstraintRenderContext } from './renderContext';
+import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
+import { createSvgElement, createSvgPath, createSvgRect, createSvgText } from '../../canvas/svg';
 
 /**
  * Dimensional constraint: angle between two lines equals targetAngle (in degrees)
@@ -99,5 +102,107 @@ export class AngleConstraint extends BaseConstraint {
 
 	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const l1 = ctx.sketch.lines.get(this.line1Id);
+		const l2 = ctx.sketch.lines.get(this.line2Id);
+		if (!l1 || !l2) return;
+
+		const p1 = ctx.sketch.points.get(l1.p1Id);
+		const p2 = ctx.sketch.points.get(l1.p2Id);
+		const p3 = ctx.sketch.points.get(l2.p1Id);
+		const p4 = ctx.sketch.points.get(l2.p2Id);
+		if (!p1 || !p2 || !p3 || !p4) return;
+
+		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+
+		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
+		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+		const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
+		const l2Len = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
+
+		const s1Factor = this.s1 ?? geom.s1;
+		const s2Factor = this.s2 ?? geom.s2;
+
+		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
+		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
+
+		const sCenter = ctx.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
+		const sRay1 = ctx.viewport.worldToScreen(geom.pInt.x + u1.x * 20, geom.pInt.y + u1.y * 20);
+		const sRay2 = ctx.viewport.worldToScreen(geom.pInt.x + u2.x * 20, geom.pInt.y + u2.y * 20);
+
+		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
+		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+
+		const TWO_PI = 2 * Math.PI;
+		let delta = a2 - a1;
+		while (delta > Math.PI) delta -= TWO_PI;
+		while (delta < -Math.PI) delta += TWO_PI;
+
+		const sweepFlag = delta > 0 ? 1 : 0;
+		const rWorld = this.arcRadius ?? 40;
+		const rScreen = Math.max(28, rWorld * ctx.viewport.zoom);
+
+		const ax = sCenter.x + rScreen * Math.cos(a1);
+		const ay = sCenter.y + rScreen * Math.sin(a1);
+		const bx = sCenter.x + rScreen * Math.cos(a2);
+		const by = sCenter.y + rScreen * Math.sin(a2);
+
+		const midAngle = a1 + delta * 0.5;
+		const midX = sCenter.x + rScreen * Math.cos(midAngle);
+		const midY = sCenter.y + rScreen * Math.sin(midAngle);
+
+		const g = createSvgElement('g', {
+			class: 'dimension-item',
+			'data-id': this.id,
+			'data-type': 'constraint',
+		}, ctx.targetGroup);
+
+		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
+
+		// Dashed extension lines if arc points extend beyond the physical line segments
+		const sp1 = ctx.viewport.worldToScreen(p1.x, p1.y);
+		const sp2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const sp3 = ctx.viewport.worldToScreen(p3.x, p3.y);
+		const sp4 = ctx.viewport.worldToScreen(p4.x, p4.y);
+
+		if (ctx.renderDashedExtensionLines) {
+			ctx.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, sp2, color);
+			ctx.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
+		}
+
+		// Arc path with arrowheads
+		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
+		createSvgPath(
+			`M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`,
+			{
+				fill: 'none',
+				stroke: color,
+				'stroke-width': STROKE_WIDTH.dimension,
+				'marker-start': arrowUrl,
+				'marker-end': arrowUrl,
+			},
+			g
+		);
+
+		// Text label badge with background
+		const textVal = `${this.targetAngle.toFixed(1)}°`;
+		const textLen = textVal.length * 8 + 14;
+
+		createSvgRect(midX - textLen * 0.5, midY - 10, textLen, 20, {
+			rx: 4,
+			fill: COLORS.white,
+			stroke: color,
+			'stroke-width': STROKE_WIDTH.dimension,
+		}, g);
+
+		createSvgText(midX, midY + 4, textVal, {
+			'text-anchor': 'middle',
+			fill: color,
+			'font-size': 11,
+			'font-weight': 700,
+			'font-family': 'ui-monospace, monospace',
+		}, g);
 	}
 }
