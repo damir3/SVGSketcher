@@ -242,7 +242,7 @@ describe('SketchDocument Spline Integration', () => {
 		assert.ok(sketch.isPointUsed(handleLine0.p2Id));
 	});
 
-	it('addControlSpline creates control point spline', () => {
+	it('addControlSpline creates control point spline with control polygon lines', () => {
 		const sketch = new SketchDocument();
 		const p1 = sketch.addPoint(0, 0);
 		const p2 = sketch.addPoint(20, 50);
@@ -254,6 +254,50 @@ describe('SketchDocument Spline Integration', () => {
 		assert.equal(spline.pointIds.length, 4);
 		assert.equal(sketch.splines.size, 1);
 		assert.ok(sketch.isPointUsed(p2.id));
+
+		// Check control polygon lines
+		assert.ok(spline.tangentLineIds);
+		assert.equal(spline.tangentLineIds.length, 3);
+		const l0 = sketch.lines.get(spline.tangentLineIds[0])!;
+		assert.equal(l0.p1Id, p1.id);
+		assert.equal(l0.p2Id, p2.id);
+		assert.equal(l0.isSplineHandle, true);
+		assert.equal(l0.isConstruction, true);
+		assert.equal(l0.parentSplineId, spline.id);
+
+		const l1 = sketch.lines.get(spline.tangentLineIds[1])!;
+		assert.equal(l1.p1Id, p2.id);
+		assert.equal(l1.p2Id, p3.id);
+
+		const l2 = sketch.lines.get(spline.tangentLineIds[2])!;
+		assert.equal(l2.p1Id, p3.id);
+		assert.equal(l2.p2Id, p4.id);
+	});
+
+	it('supports tangent constraint between arc and control spline control segment', () => {
+		const sketch = new SketchDocument();
+		const p0 = sketch.addPoint(0, 0);
+		const p1 = sketch.addPoint(0, 50);
+		const p2 = sketch.addPoint(50, 50);
+		const p3 = sketch.addPoint(50, 0);
+
+		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id]);
+		assert.ok(spline.tangentLineIds && spline.tangentLineIds.length === 3);
+
+		const pCenter = sketch.addPoint(100, 50);
+		const pArcStart = sketch.addPoint(0, 50);
+		const pArcEnd = sketch.addPoint(100, 150);
+		const arc = sketch.addArc(pCenter.id, pArcStart.id, pArcEnd.id, 100);
+
+		// Add tangent constraint between first control segment (line 0) and the arc
+		const controlLineId = spline.tangentLineIds[0];
+		const c = sketch.addTangentConstraint(controlLineId, arc.id);
+		assert.ok(c);
+		assert.equal(c.type, 'tangent_line_circle');
+
+		sketch.solve();
+		const eq = c.evaluate(sketch.paramManager.getCurrentValues());
+		assert.ok(Math.abs(eq[0]) < 1e-4, 'Tangent constraint on control segment must evaluate to ~0');
 	});
 
 	it('addFitSpline creates closed loop with isClosed true when endpoints coincident', () => {

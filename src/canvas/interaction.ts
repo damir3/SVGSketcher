@@ -19,6 +19,15 @@ import {
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline } from '../model/types';
 import { showToast } from '../ui/toast';
 import { PolygonPopup } from '../ui/polygon-popup';
+import { FilletPopup } from '../ui/fillet-popup';
+import {
+	getConnectedPrimitivesForPoint,
+	calculateFilletGeometry,
+	findMaxFilletRadius,
+	commitFilletToSketch,
+	type FilletCandidate,
+	type FilletResult,
+} from '../math/fillet';
 import {
 	sketchPrimitiveToGeoCurve,
 	getAllGeoCurves,
@@ -91,6 +100,7 @@ export type ToolType =
 	| 'mirror'
 	| 'circular_pattern'
 	| 'rectangular_pattern'
+	| 'fillet'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 
@@ -224,6 +234,20 @@ export class CanvasInteraction {
 	polygonCenterWorldPos: Vec2 | null = null;
 	polygonRadiusLocked = false;
 	polygonCurrentAngle = 0;
+
+	// Fillet tool state
+	filletPopup: FilletPopup;
+	filletRadius = 10.0;
+	pendingFillets: FilletCandidate[] = [];
+	activeFilletId: string | null = null;
+	filletFirstPrimitive: { type: 'line' | 'arc' | 'spline'; id: string; clickPos: Vec2 } | null = null;
+	filletHoverPointId: string | null = null;
+	filletGizmoDragState: {
+		startMouseWorld: Vec2;
+		startRadius: number;
+		center: Vec2;
+		bisectorDir: Vec2;
+	} | null = null;
 
 	// Dragging point state
 	private isDraggingPoint = false;
@@ -448,6 +472,73 @@ export class CanvasInteraction {
 			this.setTool('select');
 			this.render();
 		};
+
+		this.filletPopup = new FilletPopup();
+		this.filletPopup.onRadiusChange = radius => {
+			this.filletRadius = radius;
+			this.recalculatePendingFillets();
+			const activePf = this.pendingFillets.find(pf => pf.id === this.activeFilletId) || this.pendingFillets[this.pendingFillets.length - 1];
+			if (activePf && !activePf.result) {
+				const c1 = sketchPrimitiveToGeoCurve(this.sketch, activePf.primitive1.type, activePf.primitive1.id);
+				const c2 = sketchPrimitiveToGeoCurve(this.sketch, activePf.primitive2.type, activePf.primitive2.id);
+				let maxR: number | null = null;
+				if (c1 && c2) {
+					let cornerVertex: Vec2 | undefined;
+					if (activePf.vertexPointId) {
+						const pt = this.sketch.points.get(activePf.vertexPointId);
+						if (pt) cornerVertex = { x: pt.x, y: pt.y };
+					}
+					maxR = findMaxFilletRadius(c1, c2, {
+						cornerVertex,
+						clickPos1: activePf.clickPos1,
+						clickPos2: activePf.clickPos2,
+						endPointId1: activePf.endPointId1,
+						endPointId2: activePf.endPointId2,
+					}, radius, 0.1);
+				}
+				this.filletPopup.setError(true, maxR !== null ? `Max: ${maxR.toFixed(1)} mm` : 'Radius too large');
+			} else {
+				this.filletPopup.setError(false);
+			}
+			this.render();
+		};
+		this.filletPopup.onCommit = () => {
+			const invalidPf = this.pendingFillets.find(pf => !pf.result);
+			if (invalidPf) {
+				const c1 = sketchPrimitiveToGeoCurve(this.sketch, invalidPf.primitive1.type, invalidPf.primitive1.id);
+				const c2 = sketchPrimitiveToGeoCurve(this.sketch, invalidPf.primitive2.type, invalidPf.primitive2.id);
+				let maxR: number | null = null;
+				if (c1 && c2) {
+					let cornerVertex: Vec2 | undefined;
+					if (invalidPf.vertexPointId) {
+						const pt = this.sketch.points.get(invalidPf.vertexPointId);
+						if (pt) cornerVertex = { x: pt.x, y: pt.y };
+					}
+					maxR = findMaxFilletRadius(c1, c2, {
+						cornerVertex,
+						clickPos1: invalidPf.clickPos1,
+						clickPos2: invalidPf.clickPos2,
+						endPointId1: invalidPf.endPointId1,
+						endPointId2: invalidPf.endPointId2,
+					}, this.filletRadius, 0.1);
+				}
+				if (maxR !== null) {
+					this.filletRadius = maxR;
+					this.recalculatePendingFillets();
+					this.filletPopup.updateRadius(maxR);
+					this.filletPopup.setError(false);
+					this.commitFillets();
+					showToast(`Committed with maximum possible radius (${maxR.toFixed(1)} mm)`);
+				} else {
+					showToast('Cannot commit: radius too large for corner');
+				}
+				return;
+			}
+			this.commitFillets();
+		};
+		this.filletPopup.onCancel = () => {
+			this.cancelFillets();
+		};
 	}
 
 	setTool(tool: ToolType): void {
@@ -569,6 +660,12 @@ export class CanvasInteraction {
 
 		if (tool === 'polygon') {
 			showToast('Polygon: Click center point');
+		}
+
+		if (tool === 'fillet') {
+			if (this.filletRadius <= 0.1 || !isFinite(this.filletRadius)) {
+				this.filletRadius = 10.0;
+			}
 		}
 
 		if (isConstraintTool(tool)) {
@@ -1291,11 +1388,39 @@ export class CanvasInteraction {
 							suppressedIndices: this.rectangularPatternState.suppressedIndices,
 					  }
 					: undefined,
+			filletState:
+				this.activeTool === 'fillet'
+					? {
+							pendingFillets: this.pendingFillets,
+							activeFilletId: this.activeFilletId,
+							selectedPrimitive1: this.filletFirstPrimitive,
+							hoverPointId: this.filletHoverPointId,
+					  }
+					: undefined,
 		});
 
 		if (this.activeTool === 'polygon' && this.drawingStep === 1 && this.polygonCenterWorldPos && this.polygonPopup.isOpen()) {
 			const sCtr = this.viewport.worldToScreen(this.polygonCenterWorldPos.x, this.polygonCenterWorldPos.y);
 			this.polygonPopup.updatePosition(sCtr);
+		}
+
+		if (this.activeTool === 'fillet' && this.filletPopup.isOpen() && this.pendingFillets.length > 0) {
+			const activePf = this.pendingFillets.find(pf => pf.id === this.activeFilletId) || this.pendingFillets[this.pendingFillets.length - 1];
+			if (activePf) {
+				if (activePf.result) {
+					const sPos = this.viewport.worldToScreen(activePf.result.midArc.x, activePf.result.midArc.y);
+					this.filletPopup.updatePosition(sPos);
+				} else if (activePf.vertexPointId) {
+					const pt = this.sketch.points.get(activePf.vertexPointId);
+					if (pt) {
+						const sPos = this.viewport.worldToScreen(pt.x, pt.y);
+						this.filletPopup.updatePosition(sPos);
+					}
+				} else if (activePf.clickPos1) {
+					const sPos = this.viewport.worldToScreen(activePf.clickPos1.x, activePf.clickPos1.y);
+					this.filletPopup.updatePosition(sPos);
+				}
+			}
 		}
 	}
 
@@ -1330,6 +1455,11 @@ export class CanvasInteraction {
 					this.polygonPopup.cycleFocus(e.shiftKey);
 					return;
 				}
+				if (this.activeTool === 'fillet' && this.filletPopup.isOpen()) {
+					e.preventDefault();
+					this.filletPopup.focus();
+					return;
+				}
 			}
 			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
 				return;
@@ -1358,11 +1488,29 @@ export class CanvasInteraction {
 					this.render();
 					return;
 				}
+				if (this.activeTool === 'fillet') {
+					if (this.filletFirstPrimitive != null) {
+						this.filletFirstPrimitive = null;
+						this.render();
+						return;
+					}
+					if (this.pendingFillets.length > 0) {
+						this.cancelFillets();
+						return;
+					}
+					this.setTool('select');
+					this.render();
+					return;
+				}
 				this.cancelDrawing();
 				this.setTool('select');
 				this.sketch.clearSelection();
 				this.render();
 			} else if (e.key === 'Enter') {
+				if (this.activeTool === 'fillet') {
+					this.commitFillets();
+					return;
+				}
 				if (this.isDrawingSpline()) {
 					this.finishSpline();
 					return;
@@ -1491,11 +1639,14 @@ export class CanvasInteraction {
 			let isHiddenSplinePoint = false;
 			for (const spline of this.sketch.splines.values()) {
 				if (!selectedSplineIds.has(spline.id) && !isConstraintTool(this.activeTool)) {
-					if (spline.splineType === 'control' && spline.pointIds.includes(pt.id)) {
-						isHiddenSplinePoint = true;
-						break;
+					if (spline.splineType === 'control') {
+						const isEndpoint = pt.id === spline.pointIds[0] || pt.id === spline.pointIds[spline.pointIds.length - 1];
+						if (!isEndpoint && spline.pointIds.includes(pt.id)) {
+							isHiddenSplinePoint = true;
+							break;
+						}
 					}
-					if (spline.tangentLineIds) {
+					if (spline.tangentLineIds && spline.splineType !== 'control') {
 						for (const lid of spline.tangentLineIds) {
 							const l = this.sketch.lines.get(lid);
 							if (l && (l.p1Id === pt.id || l.p2Id === pt.id)) {
@@ -2560,6 +2711,66 @@ export class CanvasInteraction {
 			}
 		}
 
+		// Check for Fillet Gizmo handle dragging
+		if (this.activeTool === 'fillet' && this.renderer.filletGizmoHandle) {
+			const gh = this.renderer.filletGizmoHandle;
+			if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= 20) {
+				this.filletGizmoDragState = {
+					startMouseWorld: world,
+					startRadius: gh.radius,
+					center: gh.worldCenter,
+					bisectorDir: gh.worldBisectorDir,
+				};
+				e.preventDefault();
+				e.stopPropagation();
+				return;
+			}
+		}
+
+		// --- TOOL: FILLET ---
+		if (this.activeTool === 'fillet') {
+			if (!this.filletFirstPrimitive) {
+				const nearPt = this.findPointNearScreen(screen, 16);
+				if (nearPt) {
+					const conn = getConnectedPrimitivesForPoint(this.sketch, nearPt.id);
+					if (conn.valid) {
+						this.addFilletForPoint(nearPt.id);
+						return;
+					}
+				}
+
+				const hitPrim = this.findFilletPrimitiveNearScreen(screen);
+				if (hitPrim) {
+					this.filletFirstPrimitive = {
+						type: hitPrim.type,
+						id: hitPrim.id,
+						clickPos: world,
+					};
+					this.render();
+					return;
+				}
+			} else {
+				const hitPrim = this.findFilletPrimitiveNearScreen(screen);
+				if (hitPrim) {
+					if (hitPrim.id === this.filletFirstPrimitive.id) {
+						this.filletFirstPrimitive = null;
+						this.render();
+						return;
+					} else {
+						this.addFilletForPrimitives(
+							this.filletFirstPrimitive,
+							{ type: hitPrim.type, id: hitPrim.id },
+							this.filletFirstPrimitive.clickPos,
+							world
+						);
+						this.filletFirstPrimitive = null;
+						return;
+					}
+				}
+			}
+			return;
+		}
+
 		// --- TOOL: TRIM / BREAK ---
 		if (this.activeTool === 'trim' || this.activeTool === 'break') {
 			const isBreak = this.activeTool === 'break';
@@ -2951,13 +3162,14 @@ export class CanvasInteraction {
 			let id = targetG?.getAttribute('data-id');
 			let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | undefined;
 
-			// Priority 1: Points ALWAYS have top priority when clicking near a point!
-			const nearPoint = this.findPointNearScreen(screen, 16);
+			// Priority 1: Points ALWAYS have top priority when clicking near a point (if points are applicable to this tool)!
+			const canUsePoints = this.isEntityCompatibleWithConstraint(this.activeTool, 'point');
+			const nearPoint = canUsePoints ? this.findPointNearScreen(screen, 16) : null;
 			if (nearPoint) {
 				id = nearPoint.id;
 				type = 'point';
 			} else if (!type || (type !== 'point' && type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'ellipse' && type !== 'elliptical_arc')) {
-				if (snap && snap.type === 'point' && snap.id) {
+				if (canUsePoints && snap && snap.type === 'point' && snap.id) {
 					id = snap.id;
 					type = 'point';
 				} else {
@@ -4070,6 +4282,266 @@ export class CanvasInteraction {
 		this.render();
 	}
 
+	private findFilletPrimitiveNearScreen(screen: Vec2): { type: 'line' | 'arc' | 'spline'; id: string } | null {
+		const line = this.findLineNearScreen(screen, 16);
+		if (line && !line.isSplineHandle) {
+			return { type: 'line', id: line.id };
+		}
+		const arc = this.findArcNearScreen(screen, 18);
+		if (arc) {
+			return { type: 'arc', id: arc.id };
+		}
+		const spline = this.findSplineNearScreen(screen, 18);
+		if (spline) {
+			return { type: 'spline', id: spline.id };
+		}
+		return null;
+	}
+
+	private addFilletForPoint(pointId: string): void {
+		const conn = getConnectedPrimitivesForPoint(this.sketch, pointId);
+		if (!conn.valid || conn.primitives.length !== 2) return;
+
+		// Check if this vertex is already in pending fillets: if so, toggle off (remove)
+		const existingIdx = this.pendingFillets.findIndex(pf => pf.vertexPointId && conn.pointIds.has(pf.vertexPointId));
+		if (existingIdx !== -1) {
+			this.pendingFillets.splice(existingIdx, 1);
+			if (this.pendingFillets.length === 0) {
+				this.filletPopup.hide();
+				this.activeFilletId = null;
+			} else {
+				this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
+			}
+			this.render();
+			return;
+		}
+
+		const prim1 = conn.primitives[0];
+		const prim2 = conn.primitives[1];
+		const pt = this.sketch.points.get(pointId);
+		if (!pt) return;
+
+		const candidate: FilletCandidate = {
+			id: `fillet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+			vertexPointId: pointId,
+			primitive1: { type: prim1.type, id: prim1.id },
+			primitive2: { type: prim2.type, id: prim2.id },
+			endPointId1: prim1.endPointId,
+			endPointId2: prim2.endPointId,
+		};
+
+		const c1 = sketchPrimitiveToGeoCurve(this.sketch, prim1.type, prim1.id);
+		const c2 = sketchPrimitiveToGeoCurve(this.sketch, prim2.type, prim2.id);
+		let candidateResult: FilletResult | null = null;
+		if (c1 && c2) {
+			const filletOpts = {
+				cornerVertex: { x: pt.x, y: pt.y },
+				endPointId1: prim1.endPointId,
+				endPointId2: prim2.endPointId,
+			};
+			candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
+			if (!candidateResult) {
+				const maxR = findMaxFilletRadius(c1, c2, filletOpts, Math.max(100, this.filletRadius), 0.1);
+				if (maxR === null) {
+					showToast('Cannot fillet this corner (curves are parallel or collinear)');
+					return;
+				}
+				this.filletRadius = Math.min(this.filletRadius, maxR);
+				candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
+				showToast(`Radius adjusted to ${this.filletRadius.toFixed(1)} mm for this corner`);
+			}
+		}
+
+		candidate.result = candidateResult;
+		this.pendingFillets.push(candidate);
+		this.activeFilletId = candidate.id;
+
+		const sPos = candidate.result
+			? this.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
+			: this.viewport.worldToScreen(pt.x, pt.y);
+
+		if (this.pendingFillets.length === 1) {
+			this.filletPopup.show(sPos, this.filletRadius);
+		} else {
+			this.filletPopup.updatePosition(sPos);
+		}
+
+		this.render();
+	}
+
+	private addFilletForPrimitives(
+		prim1: { type: 'line' | 'arc' | 'spline'; id: string },
+		prim2: { type: 'line' | 'arc' | 'spline'; id: string },
+		clickPos1: Vec2,
+		clickPos2: Vec2
+	): void {
+		// Check if candidate between these two already exists
+		const existingIdx = this.pendingFillets.findIndex(
+			pf =>
+				(pf.primitive1.id === prim1.id && pf.primitive2.id === prim2.id) ||
+				(pf.primitive1.id === prim2.id && pf.primitive2.id === prim1.id)
+		);
+		if (existingIdx !== -1) {
+			this.pendingFillets.splice(existingIdx, 1);
+			if (this.pendingFillets.length === 0) {
+				this.filletPopup.hide();
+				this.activeFilletId = null;
+			} else {
+				this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
+			}
+			this.render();
+			return;
+		}
+
+		const candidate: FilletCandidate = {
+			id: `fillet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+			primitive1: { type: prim1.type, id: prim1.id },
+			primitive2: { type: prim2.type, id: prim2.id },
+			clickPos1,
+			clickPos2,
+		};
+
+		// Check if prim1 and prim2 share an endpoint (directly or via coincident constraint)
+		const getEndpoints = (p: { type: 'line' | 'arc' | 'spline'; id: string }): string[] => {
+			if (p.type === 'line') {
+				const l = this.sketch.lines.get(p.id);
+				return l ? [l.p1Id, l.p2Id] : [];
+			}
+			if (p.type === 'arc') {
+				const a = this.sketch.arcs.get(p.id);
+				return a ? [a.startPointId, a.endPointId] : [];
+			}
+			if (p.type === 'spline') {
+				const s = this.sketch.splines.get(p.id);
+				return s && s.pointIds.length >= 2 ? [s.pointIds[0], s.pointIds[s.pointIds.length - 1]] : [];
+			}
+			return [];
+		};
+
+		const eps1 = getEndpoints(prim1);
+		const eps2 = getEndpoints(prim2);
+		let sharedCornerPt: Vec2 | undefined;
+		let endPointId1: string | undefined;
+		let endPointId2: string | undefined;
+
+		for (const ep1 of eps1) {
+			const conn1 = getConnectedPrimitivesForPoint(this.sketch, ep1);
+			for (const ep2 of eps2) {
+				if (conn1.pointIds.has(ep2)) {
+					const pt = this.sketch.points.get(ep1);
+					if (pt) {
+						sharedCornerPt = { x: pt.x, y: pt.y };
+						endPointId1 = ep1;
+						endPointId2 = ep2;
+						candidate.vertexPointId = ep1;
+						candidate.endPointId1 = ep1;
+						candidate.endPointId2 = ep2;
+						break;
+					}
+				}
+			}
+			if (sharedCornerPt) break;
+		}
+
+		const c1 = sketchPrimitiveToGeoCurve(this.sketch, prim1.type, prim1.id);
+		const c2 = sketchPrimitiveToGeoCurve(this.sketch, prim2.type, prim2.id);
+		let candidateResult: FilletResult | null = null;
+		if (c1 && c2) {
+			const filletOpts = {
+				cornerVertex: sharedCornerPt,
+				endPointId1,
+				endPointId2,
+				clickPos1,
+				clickPos2,
+			};
+			candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
+			if (!candidateResult) {
+				const maxR = findMaxFilletRadius(c1, c2, filletOpts, Math.max(100, this.filletRadius), 0.1);
+				if (maxR === null) {
+					showToast('Cannot fillet this corner (curves are parallel or collinear)');
+					return;
+				}
+				this.filletRadius = Math.min(this.filletRadius, maxR);
+				candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
+				showToast(`Radius adjusted to ${this.filletRadius.toFixed(1)} mm for this corner`);
+			}
+		}
+
+		candidate.result = candidateResult;
+		this.pendingFillets.push(candidate);
+		this.activeFilletId = candidate.id;
+
+		const sPos = candidate.result
+			? this.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
+			: sharedCornerPt
+			? this.viewport.worldToScreen(sharedCornerPt.x, sharedCornerPt.y)
+			: this.viewport.worldToScreen(clickPos1.x, clickPos1.y);
+
+		if (this.pendingFillets.length === 1) {
+			this.filletPopup.show(sPos, this.filletRadius);
+		} else {
+			this.filletPopup.updatePosition(sPos);
+		}
+
+		this.render();
+	}
+
+	private recalculatePendingFillets(): void {
+		for (const pf of this.pendingFillets) {
+			const c1 = sketchPrimitiveToGeoCurve(this.sketch, pf.primitive1.type, pf.primitive1.id);
+			const c2 = sketchPrimitiveToGeoCurve(this.sketch, pf.primitive2.type, pf.primitive2.id);
+			if (c1 && c2) {
+				let cornerVertex: Vec2 | undefined;
+				if (pf.vertexPointId) {
+					const pt = this.sketch.points.get(pf.vertexPointId);
+					if (pt) cornerVertex = { x: pt.x, y: pt.y };
+				}
+				pf.result = calculateFilletGeometry(c1, c2, this.filletRadius, {
+					cornerVertex,
+					clickPos1: pf.clickPos1,
+					clickPos2: pf.clickPos2,
+					endPointId1: pf.endPointId1,
+					endPointId2: pf.endPointId2,
+				});
+			}
+		}
+	}
+
+	private commitFillets(): void {
+		if (this.pendingFillets.length === 0) return;
+		this.sketch.beginTransaction();
+		let firstArcId: string | undefined;
+
+		for (let i = 0; i < this.pendingFillets.length; i++) {
+			const pf = this.pendingFillets[i];
+			if (!pf.result) continue;
+			const res = commitFilletToSketch(this.sketch, pf, i === 0, firstArcId);
+			if (res && i === 0) {
+				firstArcId = res.arcId;
+			}
+		}
+
+		this.sketch.solve();
+		this.sketch.commitTransaction();
+
+		showToast(`Created ${this.pendingFillets.length} fillet${this.pendingFillets.length > 1 ? 's' : ''}`);
+		this.cancelFillets();
+	}
+
+	private cancelFillets(): void {
+		if (this.pendingFillets.some(pf => !pf.result)) {
+			this.filletRadius = 10.0;
+		}
+		this.pendingFillets = [];
+		this.activeFilletId = null;
+		this.filletFirstPrimitive = null;
+		this.filletHoverPointId = null;
+		this.filletGizmoDragState = null;
+		this.filletPopup.hide();
+		this.renderer.clearPreviews();
+		this.render();
+	}
+
 	private handleMouseMove(e: MouseEvent): void {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
@@ -4119,6 +4591,30 @@ export class CanvasInteraction {
 					this.rectangularPatternState.distance2 = newDist;
 				}
 				this.onRectangularPatternStateChange?.();
+				this.render();
+			}
+			return;
+		}
+
+		// Gizmo drag handling (Fillet radius)
+		if (this.filletGizmoDragState) {
+			const { startMouseWorld, startRadius, bisectorDir } = this.filletGizmoDragState;
+			// bisectorDir points from center towards midArc (outward towards the corner).
+			// The arrow gizmo at midArc points inward towards center (into the shape).
+			// Dragging in the arrow direction (-bisectorDir) increases radius; dragging towards the corner decreases radius.
+			const inwardDir = { x: -bisectorDir.x, y: -bisectorDir.y };
+			const delta = (world.x - startMouseWorld.x) * inwardDir.x + (world.y - startMouseWorld.y) * inwardDir.y;
+			const newRadius = Math.max(0.5, Math.round((startRadius + delta) * 2) / 2);
+			if (Math.abs(newRadius - this.filletRadius) > 1e-4) {
+				const oldRadius = this.filletRadius;
+				this.filletRadius = newRadius;
+				this.recalculatePendingFillets();
+				const activePf = this.pendingFillets.find(pf => pf.id === this.activeFilletId) || this.pendingFillets[this.pendingFillets.length - 1];
+				if (activePf && !activePf.result && newRadius > oldRadius) {
+					this.filletRadius = oldRadius;
+					this.recalculatePendingFillets();
+				}
+				this.filletPopup.updateRadius(this.filletRadius);
 				this.render();
 			}
 			return;
@@ -4454,6 +4950,46 @@ export class CanvasInteraction {
 				}
 			}
 			this.renderer.clearPreviews();
+			return;
+		}
+
+		if (this.activeTool === 'fillet') {
+			let needsRender = false;
+			if (!this.filletFirstPrimitive) {
+				const nearPt = this.findPointNearScreen(screen, 16);
+				if (nearPt) {
+					const conn = getConnectedPrimitivesForPoint(this.sketch, nearPt.id);
+					const newHover = conn.valid ? nearPt.id : null;
+					if (newHover !== this.filletHoverPointId) {
+						this.filletHoverPointId = newHover;
+						needsRender = true;
+					}
+				} else if (this.filletHoverPointId !== null) {
+					this.filletHoverPointId = null;
+					needsRender = true;
+				}
+			} else {
+				if (this.filletHoverPointId !== null) {
+					this.filletHoverPointId = null;
+					needsRender = true;
+				}
+			}
+
+			// Update cursor
+			if (
+				this.renderer.filletGizmoHandle &&
+				dist(screen, { x: this.renderer.filletGizmoHandle.screenX, y: this.renderer.filletGizmoHandle.screenY }) <= 20
+			) {
+				this.svg.style.cursor = 'grab';
+			} else if (this.filletHoverPointId) {
+				this.svg.style.cursor = 'pointer';
+			} else {
+				this.svg.style.cursor = 'crosshair';
+			}
+
+			if (needsRender) {
+				this.render();
+			}
 			return;
 		}
 
@@ -4943,6 +5479,10 @@ export class CanvasInteraction {
 		this.svg.classList.remove('is-dragging');
 		if (this.gizmoDragState) {
 			this.gizmoDragState = null;
+			this.render();
+		}
+		if (this.filletGizmoDragState) {
+			this.filletGizmoDragState = null;
 			this.render();
 		}
 		if (this.isPanning) {

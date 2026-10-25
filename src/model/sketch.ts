@@ -549,17 +549,47 @@ export class SketchDocument {
 		isConstruction = false,
 		id?: string,
 		_isClosed?: boolean,
-		knots?: number[]
+		knots?: number[],
+		tangentLineIds?: string[]
 	): SketchSpline {
 		this.pushHistory();
 		const sid = id || this.nextId('Spline');
 
 		const actualPointIds = [...pointIds];
+		let actualTangentLineIds = tangentLineIds ? [...tangentLineIds] : undefined;
+
+		if (!actualTangentLineIds) {
+			actualTangentLineIds = [];
+			for (let i = 0; i < actualPointIds.length - 1; i++) {
+				const p1Id = actualPointIds[i];
+				const p2Id = actualPointIds[i + 1];
+				const lineId = this.nextId('Line');
+				const hLine: SketchLine = {
+					id: lineId,
+					p1Id,
+					p2Id,
+					isConstruction: true,
+					isSplineHandle: true,
+					parentSplineId: sid,
+				};
+				this.lines.set(lineId, hLine);
+				actualTangentLineIds.push(lineId);
+			}
+		} else {
+			for (const lid of actualTangentLineIds) {
+				const line = this.lines.get(lid);
+				if (line) {
+					line.parentSplineId = sid;
+					line.isSplineHandle = true;
+				}
+			}
+		}
 
 		const spline: SketchSpline = {
 			id: sid,
 			splineType: 'control',
 			pointIds: actualPointIds,
+			tangentLineIds: actualTangentLineIds,
 			knots: knots ? [...knots] : undefined,
 			isClosed: false,
 			isConstruction,
@@ -2112,6 +2142,10 @@ export class SketchDocument {
 	isSplineHandlePoint(pointId: string): boolean {
 		for (const line of this.lines.values()) {
 			if (line.isSplineHandle && (line.p1Id === pointId || line.p2Id === pointId)) {
+				const parentSpline = line.parentSplineId ? this.splines.get(line.parentSplineId) : undefined;
+				if (parentSpline && parentSpline.pointIds.includes(pointId)) {
+					return false;
+				}
 				return true;
 			}
 		}
@@ -2345,8 +2379,37 @@ export class SketchDocument {
 						if (remaining.length >= 4) {
 							spline.pointIds = remaining;
 							delete spline.knots;
+							if (spline.tangentLineIds) {
+								for (const lid of spline.tangentLineIds) {
+									this.lines.delete(lid);
+									this.selection.lineIds.delete(lid);
+								}
+							}
+							spline.tangentLineIds = [];
+							for (let i = 0; i < remaining.length - 1; i++) {
+								const lineId = this.nextId('Line');
+								const hLine: SketchLine = {
+									id: lineId,
+									p1Id: remaining[i],
+									p2Id: remaining[i + 1],
+									isConstruction: true,
+									isSplineHandle: true,
+									parentSplineId: sid,
+								};
+								this.lines.set(lineId, hLine);
+								spline.tangentLineIds.push(lineId);
+							}
 						} else {
 							for (const ptId of spline.pointIds) candidatePointIds.add(ptId);
+							if (spline.tangentLineIds) {
+								for (const lid of spline.tangentLineIds) {
+									const line = this.lines.get(lid);
+									if (line) {
+										this.lines.delete(lid);
+										this.selection.lineIds.delete(lid);
+									}
+								}
+							}
 							this.splines.delete(sid);
 							this.selection.splineIds.delete(sid);
 						}

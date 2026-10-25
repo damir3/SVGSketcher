@@ -5,7 +5,7 @@ export class Viewport {
 	height = 600;
 	panX = 0; // World origin X on screen
 	panY = 0; // World origin Y on screen
-	zoom = 2.0; // Screen pixels per world unit
+	zoom = 4.0; // Screen pixels per world unit
 
 	constructor(width = 800, height = 600) {
 		this.resize(width, height);

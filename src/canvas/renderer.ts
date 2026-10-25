@@ -30,7 +30,7 @@ import {
 } from '../solver/constraints';
 import { type Vec2, dist, projectPointOntoSegment } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
-import type { TrimCandidate } from '../math/intersection';
+import { sketchPrimitiveToGeoCurve, type GeoSpline, type TrimCandidate } from '../math/intersection';
 import {
 	bsplineToBezier,
 	fitPointsToBezier,
@@ -225,6 +225,7 @@ export const SPLINE_HANDLE_SELECTED_ATTRS: SvgAttrs = {
 };
 
 export const SPLINE_CONTROL_POLYGON_ATTRS: SvgAttrs = {
+	class: 'entity-visible visible-spline-handle',
 	stroke: COLORS.splineHandle,
 	'stroke-width': STROKE_WIDTH.splineControlPolygon,
 	'stroke-dasharray': DASH_ARRAY.splineControlPolygon,
@@ -525,6 +526,24 @@ export interface RenderOptions {
 		suppression: boolean;
 		suppressedIndices: Set<number>;
 	};
+	filletState?: {
+		pendingFillets: Array<{
+			id: string;
+			result?: {
+				center: Vec2;
+				radius: number;
+				t1: Vec2;
+				t2: Vec2;
+				clockwise: boolean;
+				cornerVertex: Vec2;
+				midArc: Vec2;
+				bisectorDir: Vec2;
+			} | null;
+		}>;
+		activeFilletId?: string | null;
+		selectedPrimitive1?: { type: 'line' | 'arc' | 'spline'; id: string } | null;
+		hoverPointId?: string | null;
+	};
 }
 
 export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
@@ -768,8 +787,17 @@ export class SVGRenderer {
 	private patternCheckboxGroup: SVGGElement;
 	readonly patternCheckboxPositions = new Map<string, { x: number; y: number; copyIndex: number; constraintId?: string }>();
 	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
+	filletGizmoHandle: {
+		screenX: number;
+		screenY: number;
+		worldMidArc: Vec2;
+		worldCenter: Vec2;
+		worldBisectorDir: Vec2;
+		radius: number;
+	} | null = null;
 	private previewGroup: SVGGElement;
 	private overlayGroup: SVGGElement;
+	private filletGroup: SVGGElement;
 
 	constructor(svgElement: SVGSVGElement) {
 		this.svg = svgElement;
@@ -794,6 +822,8 @@ export class SVGRenderer {
 
 		this.patternCheckboxGroup = this.createGroup('pattern-checkbox-layer');
 
+		this.filletGroup = this.createGroup('fillet-layer');
+
 		this.previewGroup = this.createGroup('preview-layer');
 		this.previewGroup.style.pointerEvents = 'none';
 
@@ -807,6 +837,7 @@ export class SVGRenderer {
 		this.svg.appendChild(this.mirrorGroup);
 		this.svg.appendChild(this.patternGroup);
 		this.svg.appendChild(this.patternCheckboxGroup);
+		this.svg.appendChild(this.filletGroup);
 		this.svg.appendChild(this.previewGroup);
 		this.svg.appendChild(this.overlayGroup);
 	}
@@ -872,6 +903,11 @@ export class SVGRenderer {
 				viewport,
 				options.rectangularPatternHighlight
 			);
+		}
+		this.filletGizmoHandle = null;
+		this.filletGroup.innerHTML = '';
+		if (options.filletState) {
+			this.renderFilletPreviews(sketch, viewport, options.filletState);
 		}
 	}
 
@@ -1069,7 +1105,12 @@ export class SVGRenderer {
 
 			// Visible line
 			if (line.isSplineHandle) {
-				createSvgLine(s1.x, s1.y, s2.x, s2.y, getSplineHandleStrokeAttrs(isSelected), lineG);
+				const parentSpline = line.parentSplineId ? sketch.splines.get(line.parentSplineId) : undefined;
+				if (parentSpline?.splineType === 'control') {
+					createSvgLine(s1.x, s1.y, s2.x, s2.y, isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_CONTROL_POLYGON_ATTRS, lineG);
+				} else {
+					createSvgLine(s1.x, s1.y, s2.x, s2.y, getSplineHandleStrokeAttrs(isSelected), lineG);
+				}
 			} else if (isMirrorLine) {
 				createSvgLine(s1.x, s1.y, s2.x, s2.y, {
 					class: 'entity-visible visible-primitive is-mirror-line',
@@ -1316,14 +1357,6 @@ export class SVGRenderer {
 				...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, baseColor, true),
 			}, splineG);
 
-			// If control spline and selected or in constraint tool: draw dashed control polygon
-			if (spline.splineType === 'control' && (isSelected || options.showSplineHandles)) {
-				for (let i = 0; i < pts.length - 1; i++) {
-					const s1 = viewport.worldToScreen(pts[i].x, pts[i].y);
-					const s2 = viewport.worldToScreen(pts[i + 1].x, pts[i + 1].y);
-					createSvgLine(s1.x, s1.y, s2.x, s2.y, SPLINE_STYLES.controlPolygon, splineG);
-				}
-			}
 		}
 
 		// 6. Render Points (Vertices)
@@ -1331,11 +1364,11 @@ export class SVGRenderer {
 		const controlPointToSpline = new Map<string, SketchSpline>();
 		for (const spline of sketch.splines.values()) {
 			if (spline.splineType === 'control') {
-				for (const pid of spline.pointIds) {
-					controlPointToSpline.set(pid, spline);
+				for (let i = 1; i < spline.pointIds.length - 1; i++) {
+					controlPointToSpline.set(spline.pointIds[i], spline);
 				}
 			}
-			if (spline.tangentLineIds) {
+			if (spline.tangentLineIds && spline.splineType !== 'control') {
 				for (const lid of spline.tangentLineIds) {
 					const line = sketch.lines.get(lid);
 					if (line) {
@@ -4115,9 +4148,192 @@ export class SVGRenderer {
 		});
 	}
 
+	renderFilletPreviews(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		state: NonNullable<RenderOptions['filletState']>
+	): void {
+		// 1. Highlight selected first primitive if any
+		if (state.selectedPrimitive1) {
+			const { type, id } = state.selectedPrimitive1;
+			if (type === 'line') {
+				const line = sketch.lines.get(id);
+				if (line) {
+					const p1 = sketch.points.get(line.p1Id);
+					const p2 = sketch.points.get(line.p2Id);
+					if (p1 && p2) {
+						const s1 = viewport.worldToScreen(p1.x, p1.y);
+						const s2 = viewport.worldToScreen(p2.x, p2.y);
+						createSvgLine(s1.x, s1.y, s2.x, s2.y, {
+							stroke: '#0284c7',
+							'stroke-width': 4,
+							opacity: 0.8,
+							'stroke-linecap': 'round',
+							'pointer-events': 'none',
+						}, this.filletGroup);
+					}
+				}
+			} else if (type === 'arc') {
+				const arc = sketch.arcs.get(id);
+				if (arc) {
+					const sc = viewport.worldToScreen(sketch.points.get(arc.centerId)!.x, sketch.points.get(arc.centerId)!.y);
+					const ss = viewport.worldToScreen(sketch.points.get(arc.startPointId)!.x, sketch.points.get(arc.startPointId)!.y);
+					const se = viewport.worldToScreen(sketch.points.get(arc.endPointId)!.x, sketch.points.get(arc.endPointId)!.y);
+					const sr = arc.radius * viewport.zoom;
+					const d = getArcSvgPath(sc, ss, se, sr, !!arc.clockwise);
+					createSvgPath(d, {
+						stroke: '#0284c7',
+						'stroke-width': 4,
+						opacity: 0.8,
+						fill: 'none',
+						'stroke-linecap': 'round',
+						'pointer-events': 'none',
+					}, this.filletGroup);
+				}
+			} else if (type === 'spline') {
+				const spline = sketch.splines.get(id);
+				if (spline) {
+					const geoCurve = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id) as GeoSpline | null;
+					if (geoCurve) {
+						const d = getSplineSvgPath(geoCurve.bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
+						createSvgPath(d, {
+							stroke: '#0284c7',
+							'stroke-width': 4,
+							opacity: 0.8,
+							fill: 'none',
+							'stroke-linecap': 'round',
+							'pointer-events': 'none',
+						}, this.filletGroup);
+					}
+				}
+			}
+		}
+
+		// 2. Highlight hovered eligible point
+		if (state.hoverPointId) {
+			const pt = sketch.points.get(state.hoverPointId);
+			if (pt) {
+				const s = viewport.worldToScreen(pt.x, pt.y);
+				createSvgCircle(s.x, s.y, 8, {
+					fill: 'rgba(2, 132, 199, 0.25)',
+					stroke: '#0284c7',
+					'stroke-width': 2,
+					'pointer-events': 'none',
+				}, this.filletGroup);
+			}
+		}
+
+		// 3. Render all pending fillets
+		for (const pf of state.pendingFillets) {
+			const res = pf.result;
+			if (!res) continue;
+
+			const sV = viewport.worldToScreen(res.cornerVertex.x, res.cornerVertex.y);
+			const sT1 = viewport.worldToScreen(res.t1.x, res.t1.y);
+			const sT2 = viewport.worldToScreen(res.t2.x, res.t2.y);
+			const sCenter = viewport.worldToScreen(res.center.x, res.center.y);
+			const sMid = viewport.worldToScreen(res.midArc.x, res.midArc.y);
+			const sRadius = res.radius * viewport.zoom;
+
+			// Shaded corner wedge
+			const sweepWedgeFlag = res.clockwise ? 0 : 1;
+			const wedgePath = `M ${sT1.x} ${sT1.y} L ${sV.x} ${sV.y} L ${sT2.x} ${sT2.y} A ${sRadius.toFixed(2)} ${sRadius.toFixed(2)} 0 0 ${sweepWedgeFlag} ${sT1.x} ${sT1.y} Z`;
+			createSvgPath(wedgePath, {
+				fill: 'rgba(2, 132, 199, 0.16)',
+				stroke: 'none',
+				'pointer-events': 'none',
+			}, this.filletGroup);
+
+			// Fillet arc
+			const arcD = getArcSvgPath(sCenter, sT1, sT2, sRadius, res.clockwise);
+			createSvgPath(arcD, {
+				stroke: '#0284c7',
+				'stroke-width': 2.5,
+				fill: 'none',
+				'stroke-linecap': 'round',
+				'pointer-events': 'none',
+			}, this.filletGroup);
+
+			// Check if this fillet is active for Gizmo
+			const isActive = pf.id === state.activeFilletId || (!state.activeFilletId && pf === state.pendingFillets[state.pendingFillets.length - 1]);
+			if (isActive) {
+				// Center circle handle
+				createSvgCircle(sCenter.x, sCenter.y, 4, {
+					fill: '#ffffff',
+					stroke: '#0284c7',
+					'stroke-width': 2,
+					'pointer-events': 'none',
+				}, this.filletGroup);
+
+				// Radial dashed line extending outward from center through midArc
+				const uDir = {
+					x: (sMid.x - sCenter.x) / (Math.hypot(sMid.x - sCenter.x, sMid.y - sCenter.y) || 1),
+					y: (sMid.y - sCenter.y) / (Math.hypot(sMid.x - sCenter.x, sMid.y - sCenter.y) || 1),
+				};
+				const lineLen = sRadius + 45;
+				const lineEndX = sCenter.x + lineLen * uDir.x;
+				const lineEndY = sCenter.y + lineLen * uDir.y;
+
+				createSvgLine(sCenter.x, sCenter.y, lineEndX, lineEndY, {
+					stroke: '#0284c7',
+					'stroke-width': 2,
+					'stroke-dasharray': '4 4',
+					'pointer-events': 'none',
+				}, this.filletGroup);
+
+				// Small square at tip
+				const sqSize = 6;
+				createSvgRect(lineEndX - sqSize * 0.5, lineEndY - sqSize * 0.5, sqSize, sqSize, {
+					fill: '#ffffff',
+					stroke: '#0284c7',
+					'stroke-width': 1.5,
+					'pointer-events': 'none',
+				}, this.filletGroup);
+
+				// Inward arrow gizmo at sMid pointing towards sCenter
+				const aux = -uDir.x;
+				const auy = -uDir.y;
+				const apx = -auy;
+				const apy = aux;
+
+				const arrowLen = 18;
+				const arrowHalfWidth = 7.5;
+				const tipX = sMid.x;
+				const tipY = sMid.y;
+				const baseCenterX = tipX - arrowLen * aux;
+				const baseCenterY = tipY - arrowLen * auy;
+				const b1X = baseCenterX + arrowHalfWidth * apx;
+				const b1Y = baseCenterY + arrowHalfWidth * apy;
+				const b2X = baseCenterX - arrowHalfWidth * apx;
+				const b2Y = baseCenterY - arrowHalfWidth * apy;
+
+				const arrowPath = `M ${tipX} ${tipY} L ${b1X} ${b1Y} L ${b2X} ${b2Y} Z`;
+				createSvgPath(arrowPath, {
+					fill: '#0284c7',
+					stroke: '#ffffff',
+					'stroke-width': 1.5,
+					'stroke-linejoin': 'round',
+					class: 'fillet-gizmo-arrow',
+					filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
+				}, this.filletGroup);
+
+				this.filletGizmoHandle = {
+					screenX: tipX,
+					screenY: tipY,
+					worldMidArc: res.midArc,
+					worldCenter: res.center,
+					worldBisectorDir: res.bisectorDir,
+					radius: res.radius,
+				};
+			}
+		}
+	}
+
 	clearPreviews(): void {
 		this.previewGroup.innerHTML = '';
 		this.overlayGroup.innerHTML = '';
+		this.filletGroup.innerHTML = '';
+		this.filletGizmoHandle = null;
 	}
 
 	private renderTooltip(x: number, y: number, textStr: string): void {

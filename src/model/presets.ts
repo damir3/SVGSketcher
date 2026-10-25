@@ -5,9 +5,9 @@ export function loadTrianglePreset(sketch: SketchDocument): void {
 	sketch.clear();
 
 	// Create points
-	const pA = sketch.addPoint(-80, 0);
-	const pB = sketch.addPoint(80, 0);
-	const pC = sketch.addPoint(0, 120);
+	const pA = sketch.addPoint(-50, 0);
+	const pB = sketch.addPoint(50, 0);
+	const pC = sketch.addPoint(0, 80);
 
 	// Fix origin / vertex A
 	sketch.addFixedConstraint(pA.id);
@@ -19,7 +19,7 @@ export function loadTrianglePreset(sketch: SketchDocument): void {
 
 	// Constraints
 	sketch.addHorizontalConstraint(pA.id, pB.id);
-	sketch.addDistanceConstraint(pA.id, pB.id, 160);
+	sketch.addDistanceConstraint(pA.id, pB.id, 100);
 	sketch.addEqualLengthConstraint(lLeft.id, lRight.id);
 
 	sketch.solve();

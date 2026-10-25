@@ -38,6 +38,10 @@ export class Toolbar {
 						${ICONS.trim}
 						<span class="btn-tooltip">Trim (T)</span>
 					</button>
+					<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
+						${ICONS.fillet}
+						<span class="btn-tooltip">Fillet</span>
+					</button>
 					<button class="tool-btn" data-tool="break" title="Break (B)">
 						${ICONS.break}
 						<span class="btn-tooltip">Break (B)</span>
