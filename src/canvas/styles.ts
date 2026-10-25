@@ -36,10 +36,10 @@ export const COLORS = {
 	trim: 'rgba(255, 0, 0, 0.75)',
 
 	// Spline styles and colors
-	splineHandle: '#b45309', // Amber-700: tangent handle & control polygon idle stroke
+	splineHandle: '#84cc16', // Amber-700: tangent handle & control polygon idle stroke
 	splineHandleSelected: '#0284c7', // Sky-600: selected tangent handle stroke
 	splineHandleDotFill: '#22c55e', // Green-500: tangent handle endpoint dot fill
-	splineHandleDotStroke: '#15803d', // Green-700: tangent handle endpoint dot stroke
+	splineHandleDotStroke: 'none',
 	splineClosedFill: 'rgba(56, 189, 248, 0.12)', // Sky-400 12%: closed spline fill
 	splinePreview: '#84cc16', // Lime-500: spline drawing preview stroke
 	splineCheckmarkFill: '#22c55e', // Green-500: spline completion checkmark fill
@@ -83,18 +83,18 @@ export const DASH_ARRAY = {
 export const STROKE_WIDTH = {
 	minorGrid: 0.75,
 	thin: 1,
-	majorGrid: 1.2,
-	dimension: 1.5,
-	normal: 2,
-	thick: 2.5,
-	selected: 3,
-	trim: 3,
-	heavy: 4,
+	majorGrid: 1,
+	dimension: 1,
+	normal: 1.5,
+	thick: 2,
+	selected: 2,
+	trim: 2,
+	heavy: 3,
 	hitArea: 18,
-	splineHandle: 1.5,
-	splineHandleSelected: 2.5,
+	splineHandle: 1,
+	splineHandleSelected: 2,
 	splineControlPolygon: 1.5,
-	splinePreview: 2,
+	splinePreview: 1.5,
 	splinePreviewGuide: 1.2,
 } as const;
 
@@ -408,7 +408,7 @@ export const SNAP_GRID_ATTRS: SvgAttrs = {
 export const SNAP_OBJECT_ATTRS: SvgAttrs = {
 	fill: COLORS.objectSnapFill,
 	stroke: COLORS.objectSnapStroke,
-	'stroke-width': STROKE_WIDTH.normal,
+	'stroke-width': STROKE_WIDTH.thin,
 	'stroke-linejoin': 'round',
 	'pointer-events': 'none',
 };
@@ -456,14 +456,6 @@ export const SPLINE_CONTROL_POLYGON_ATTRS: SvgAttrs = {
 	fill: 'none',
 };
 
-export const SPLINE_HANDLE_DOT_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-point',
-	fill: COLORS.splineHandleDotFill,
-	stroke: COLORS.splineHandleDotStroke,
-	'stroke-width': STROKE_WIDTH.normal,
-	'pointer-events': 'all',
-};
-
 export const SPLINE_PREVIEW_STROKE_ATTRS: SvgAttrs = {
 	stroke: COLORS.splinePreview,
 	'stroke-width': STROKE_WIDTH.splinePreview,
@@ -479,8 +471,8 @@ export const SPLINE_PREVIEW_GUIDE_ATTRS: SvgAttrs = {
 
 export const SPLINE_PREVIEW_VERTEX_ATTRS: SvgAttrs = {
 	fill: COLORS.splinePreview,
-	stroke: COLORS.white,
-	'stroke-width': 1.5,
+	stroke: 'none',
+	'stroke-width': 1,
 };
 
 export const SPLINE_CHECKMARK_CIRCLE_ATTRS: SvgAttrs = {
@@ -537,7 +529,7 @@ export const SPLINE_STYLES = {
 	handleDot: {
 		fill: COLORS.splineHandleDotFill,
 		stroke: COLORS.splineHandleDotStroke,
-		r: 4,
+		r: 3,
 	},
 	closedFill: COLORS.splineClosedFill,
 } as const;

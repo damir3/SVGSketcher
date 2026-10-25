@@ -854,7 +854,7 @@ export class SVGRenderer {
 
 			// Visible point handle
 			let fillColor: string = COLORS.primary; // Default interactive CAD vertex color
-			let strokeColor: string = COLORS.white;
+			let strokeColor: string = 'none';
 
 			if (splineHandleInfo?.isHandleDot) {
 				fillColor = SPLINE_STYLES.handleDot.fill;
@@ -874,7 +874,7 @@ export class SVGRenderer {
 				strokeColor = COLORS.white;
 			}
 
-			createSvgCircle(s.x, s.y, isSelected ? 4.5 : (splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3.5), {
+			createSvgCircle(s.x, s.y, isSelected ? 4 : (splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3), {
 				class: 'entity-visible visible-point',
 				fill: fillColor,
 				stroke: strokeColor,
@@ -1444,7 +1444,7 @@ export class SVGRenderer {
 
 		const drawTransformedVertex = (screenPt: { x: number; y: number }) => {
 			if (!options.drawVertices || skipRender || !targetGroup) return;
-			createSvgCircle(screenPt.x, screenPt.y, 3.5, {
+			createSvgCircle(screenPt.x, screenPt.y, 3, {
 				fill: baseColor === COLORS.constrained ? COLORS.constrained : COLORS.primary,
 				stroke: COLORS.white,
 				'stroke-width': STROKE_WIDTH.normal,
@@ -1676,7 +1676,7 @@ export class SVGRenderer {
 
 		for (let i = 0; i < points.length; i++) {
 			const p = points[i];
-			createSvgCircle(p.x, p.y, 4, SPLINE_PREVIEW_VERTEX_ATTRS, this.previewGroup);
+			createSvgCircle(p.x, p.y, 3, SPLINE_PREVIEW_VERTEX_ATTRS, this.previewGroup);
 		}
 
 		const checkmarkPos = { x: lastPt.x + 20, y: lastPt.y - 12 };
