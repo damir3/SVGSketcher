@@ -52,6 +52,7 @@ import {
 	RectangleTool,
 	ArcTool,
 	ArcCenterTool,
+	type ArcMode,
 	PolygonTool,
 	EllipseTool,
 	EllipticalArcTool,
@@ -186,6 +187,8 @@ export class CanvasInteraction {
 	onMirrorStateChange?: () => void;
 	onCircularPatternStateChange?: () => void;
 	onRectangularPatternStateChange?: () => void;
+	onArcStateChange?: () => void;
+	onArcModeChange?: (mode: ArcMode) => void;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -205,6 +208,28 @@ export class CanvasInteraction {
 	set mirrorState(state: MirrorState | null) {
 		const tool = this.tools.get('mirror') as MirrorTool;
 		if (tool) tool.state = state;
+	}
+
+	getArcTool(): ArcTool | undefined {
+		return this.tools.get('arc') as ArcTool | undefined;
+	}
+
+	get arcMode(): ArcMode {
+		return this.getArcTool()?.mode ?? 'center';
+	}
+
+	setArcMode(mode: ArcMode): void {
+		const arcTool = this.getArcTool();
+		if (arcTool) {
+			arcTool.setMode(mode);
+			this.onArcModeChange?.(mode);
+			if (this.activeTool !== 'arc') {
+				this.setTool('arc');
+			} else {
+				this.updateToolPreview();
+				this.onArcStateChange?.();
+			}
+		}
 	}
 
 	setMirrorPhase(phase: 'objects' | 'mirror_line'): void {
@@ -314,7 +339,13 @@ export class CanvasInteraction {
 		this.tools.set('line', new LineTool());
 		this.tools.set('circle', new CircleTool());
 		this.tools.set('rectangle', new RectangleTool());
-		this.tools.set('arc', new ArcTool());
+		const arcTool = new ArcTool('center');
+		arcTool.onModeChange = mode => {
+			this.onArcModeChange?.(mode);
+			this.onArcStateChange?.();
+		};
+		arcTool.onStateChange = () => this.onArcStateChange?.();
+		this.tools.set('arc', arcTool);
 		this.tools.set('arc_center', new ArcCenterTool());
 		this.tools.set('polygon', new PolygonTool());
 		this.tools.set('ellipse', new EllipseTool());
@@ -450,6 +481,10 @@ export class CanvasInteraction {
 	}
 
 	setTool(tool: ToolType): void {
+		if (tool === 'arc_center') {
+			this.getArcTool()?.setMode('center');
+			tool = 'arc';
+		}
 		if (this.activeToolInstance) {
 			this.activeToolInstance.deactivate();
 		}
@@ -472,6 +507,7 @@ export class CanvasInteraction {
 		this.onMirrorStateChange?.();
 		this.onCircularPatternStateChange?.();
 		this.onRectangularPatternStateChange?.();
+		this.onArcStateChange?.();
 		this.render();
 	}
 
@@ -687,7 +723,7 @@ export class CanvasInteraction {
 			} else if (e.key === 'c' || e.key === 'C') {
 				this.setTool('circle');
 			} else if (e.key === 'a' || e.key === 'A') {
-				this.setTool('arc_center');
+				this.setTool('arc');
 			} else if (e.key === 'r' || e.key === 'R') {
 				this.setTool('rectangle');
 			} else if (e.key === 'g' || e.key === 'G') {

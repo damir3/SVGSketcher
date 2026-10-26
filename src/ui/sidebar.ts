@@ -4,6 +4,7 @@ import type { CanvasInteraction } from '../canvas/interaction';
 import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, CircularPatternConstraint, RectangularPatternConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
+import type { ArcMode } from '../canvas/tools/primitives/arc';
 
 export class Sidebar {
 	private container: HTMLElement;
@@ -22,6 +23,7 @@ export class Sidebar {
 			this.interaction.onMirrorStateChange = () => this.render();
 			this.interaction.onCircularPatternStateChange = () => this.render();
 			this.interaction.onRectangularPatternStateChange = () => this.render();
+			this.interaction.onArcStateChange = () => this.render();
 		}
 		this.render();
 	}
@@ -77,6 +79,9 @@ export class Sidebar {
 				<!-- Rectangular Pattern Tool Panel (when rectangular pattern tool is active) -->
 				${this.renderRectangularPatternToolCard()}
 
+				<!-- Arc Tool Panel (when arc tool is active) -->
+				${this.renderArcToolCard()}
+
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
 
@@ -100,6 +105,66 @@ export class Sidebar {
 		`;
 
 		this.bindEvents();
+	}
+
+	private renderArcToolCard(): string {
+		if (!this.interaction || (this.interaction.activeTool !== 'arc' && this.interaction.activeTool !== 'arc_center')) {
+			return '';
+		}
+
+		const currentMode = this.interaction.arcMode;
+		const hint = this.getArcStepHint();
+
+		return `
+			<div class="sidebar-panel-card arc-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${currentMode === 'center' ? ICONS.arc_center : currentMode === 'tangent' ? ICONS.arc_tangent : ICONS.arc}</span>
+						<span>Arc Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-arc-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Select arc creation method:
+				</div>
+				<div class="arc-mode-selector">
+					<button class="arc-mode-btn ${currentMode === 'center' ? 'active' : ''}" data-arc-mode="center" type="button" title="Centerpoint Arc">
+						<span class="arc-mode-icon">${ICONS.arc_center}</span>
+						<span class="arc-mode-text">Center</span>
+					</button>
+					<button class="arc-mode-btn ${currentMode === 'three_point' ? 'active' : ''}" data-arc-mode="three_point" type="button" title="3-Point Arc">
+						<span class="arc-mode-icon">${ICONS.arc}</span>
+						<span class="arc-mode-text">3-Point</span>
+					</button>
+					<button class="arc-mode-btn ${currentMode === 'tangent' ? 'active' : ''}" data-arc-mode="tangent" type="button" title="Tangent Arc">
+						<span class="arc-mode-icon">${ICONS.arc_tangent}</span>
+						<span class="arc-mode-text">Tangent</span>
+					</button>
+				</div>
+				<div class="arc-mode-hint">
+					${hint}
+				</div>
+			</div>
+		`;
+	}
+
+	private getArcStepHint(): string {
+		const arcTool = this.interaction?.getArcTool();
+		if (!arcTool) return '';
+		const mode = arcTool.mode;
+		const step = arcTool.step;
+		if (mode === 'three_point') {
+			if (step === 0) return '1. Click to place start point';
+			if (step === 1) return '2. Click to place end point';
+			return '3. Click to set arc radius and bulge';
+		} else if (mode === 'center') {
+			if (step === 0) return '1. Click to place center point';
+			if (step === 1) return '2. Click to place start point (sets radius)';
+			return '3. Click to place end point (sets sweep angle)';
+		} else {
+			if (step === 0) return '1. Click an endpoint of an existing line or arc';
+			return '2. Click to place tangent arc end point';
+		}
 	}
 
 	private renderMirrorToolCard(): string {
@@ -1567,6 +1632,25 @@ export class Sidebar {
 		const btnCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-mirror-cancel-icon');
 		btnCancelIcon?.addEventListener('click', () => {
 			this.interaction?.cancelMirror();
+		});
+
+		// Arc Tool events
+		const arcModeBtns = this.container.querySelectorAll<HTMLButtonElement>('.arc-mode-btn');
+		arcModeBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const mode = btn.getAttribute('data-arc-mode') as ArcMode;
+				if (mode && this.interaction) {
+					this.interaction.setArcMode(mode);
+					this.render();
+				}
+			});
+		});
+
+		const btnArcCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-arc-cancel-icon');
+		btnArcCancelIcon?.addEventListener('click', () => {
+			if (this.interaction) {
+				this.interaction.setTool('select');
+			}
 		});
 
 		// Circular Pattern Tool events

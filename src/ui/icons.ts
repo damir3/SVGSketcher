@@ -5,6 +5,7 @@ import line from '../assets/icons/line.svg?raw';
 import circle from '../assets/icons/circle.svg?raw';
 import arc from '../assets/icons/arc.svg?raw';
 import arcCenter from '../assets/icons/arc-center.svg?raw';
+import arcTangent from '../assets/icons/arc-tangent.svg?raw';
 import rectangle from '../assets/icons/rectangle.svg?raw';
 import polygon from '../assets/icons/polygon.svg?raw';
 import ellipse from '../assets/icons/ellipse.svg?raw';
@@ -54,6 +55,7 @@ export const ICONS = {
 	circle,
 	arc,
 	arc_center: arcCenter,
+	arc_tangent: arcTangent,
 	rectangle,
 	polygon,
 	ellipse,

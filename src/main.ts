@@ -134,6 +134,10 @@ function initApp(): void {
 		sidebar.render();
 	};
 
+	interaction.onArcModeChange = mode => {
+		toolbar.setArcMode(mode);
+	};
+
 	interaction.onConstructionChange = active => {
 		toolbar.setConstructionActive(active);
 	};

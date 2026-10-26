@@ -1,6 +1,7 @@
 import { ICONS } from './icons';
 import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/interaction';
+import type { ArcMode } from '../canvas/tools/primitives/arc';
 import { showToast } from './toast';
 export { showToast };
 
@@ -86,13 +87,9 @@ export class Toolbar {
 						${ICONS.polygon}
 						<span class="btn-tooltip">Polygon (G)</span>
 					</button>
-					<button class="tool-btn" data-tool="arc_center" title="Centerpoint Arc (A)">
+					<button class="tool-btn" data-tool="arc" title="Centerpoint Arc (A)">
 						${ICONS.arc_center}
 						<span class="btn-tooltip">Center Arc (A)</span>
-					</button>
-					<button class="tool-btn" data-tool="arc" title="3-Point Arc">
-						${ICONS.arc}
-						<span class="btn-tooltip">3-Point Arc</span>
 					</button>
 					<button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
 						${ICONS.ellipse}
@@ -248,5 +245,30 @@ export class Toolbar {
 
 	setActiveToolButton(tool: ToolType): void {
 		this.setActiveButton(tool);
+	}
+
+	setArcMode(mode: ArcMode): void {
+		const arcBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="arc"]');
+		if (!arcBtn) return;
+
+		let icon = ICONS.arc_center;
+		let title = 'Centerpoint Arc (A)';
+		let tooltip = 'Center Arc (A)';
+
+		if (mode === 'three_point') {
+			icon = ICONS.arc;
+			title = '3-Point Arc (A)';
+			tooltip = '3-Point Arc (A)';
+		} else if (mode === 'tangent') {
+			icon = ICONS.arc_tangent;
+			title = 'Tangent Arc (A)';
+			tooltip = 'Tangent Arc (A)';
+		}
+
+		arcBtn.title = title;
+		arcBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${tooltip}</span>
+		`;
 	}
 }
