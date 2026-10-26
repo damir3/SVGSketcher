@@ -10,7 +10,6 @@ import {
 	type FilletCandidate,
 	type FilletResult,
 } from '../../../math/fillet';
-import { sketchPrimitiveToGeoCurve } from '../../../math/intersection';
 
 export class FilletTool extends BaseTool {
 	readonly id = 'fillet' as const;
@@ -38,8 +37,8 @@ export class FilletTool extends BaseTool {
 				this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
 				this.pendingFillets[this.pendingFillets.length - 1];
 			if (activePf && !activePf.result) {
-				const c1 = sketchPrimitiveToGeoCurve(this.ctx.sketch, activePf.primitive1.type, activePf.primitive1.id);
-				const c2 = sketchPrimitiveToGeoCurve(this.ctx.sketch, activePf.primitive2.type, activePf.primitive2.id);
+				const c1 = this.ctx.toGeoCurve(activePf.primitive1.type, activePf.primitive1.id);
+				const c2 = this.ctx.toGeoCurve(activePf.primitive2.type, activePf.primitive2.id);
 				let maxR: number | null = null;
 				if (c1 && c2) {
 					let cornerVertex: Vec2 | undefined;
@@ -70,8 +69,8 @@ export class FilletTool extends BaseTool {
 		this.popup.onCommit = () => {
 			const invalidPf = this.pendingFillets.find(pf => !pf.result);
 			if (invalidPf) {
-				const c1 = sketchPrimitiveToGeoCurve(this.ctx.sketch, invalidPf.primitive1.type, invalidPf.primitive1.id);
-				const c2 = sketchPrimitiveToGeoCurve(this.ctx.sketch, invalidPf.primitive2.type, invalidPf.primitive2.id);
+				const c1 = this.ctx.toGeoCurve(invalidPf.primitive1.type, invalidPf.primitive1.id);
+				const c2 = this.ctx.toGeoCurve(invalidPf.primitive2.type, invalidPf.primitive2.id);
 				let maxR: number | null = null;
 				if (c1 && c2) {
 					let cornerVertex: Vec2 | undefined;
@@ -396,8 +395,8 @@ export class FilletTool extends BaseTool {
 			endPointId2: prim2.endPointId,
 		};
 
-		const c1 = sketchPrimitiveToGeoCurve(this.ctx.sketch, prim1.type, prim1.id);
-		const c2 = sketchPrimitiveToGeoCurve(this.ctx.sketch, prim2.type, prim2.id);
+		const c1 = this.ctx.toGeoCurve(prim1.type, prim1.id);
+		const c2 = this.ctx.toGeoCurve(prim2.type, prim2.id);
 		let candidateResult: FilletResult | null = null;
 		if (c1 && c2) {
 			const filletOpts = {
@@ -507,8 +506,8 @@ export class FilletTool extends BaseTool {
 			if (sharedCornerPt) break;
 		}
 
-		const c1 = sketchPrimitiveToGeoCurve(this.ctx.sketch, prim1.type, prim1.id);
-		const c2 = sketchPrimitiveToGeoCurve(this.ctx.sketch, prim2.type, prim2.id);
+		const c1 = this.ctx.toGeoCurve(prim1.type, prim1.id);
+		const c2 = this.ctx.toGeoCurve(prim2.type, prim2.id);
 		let candidateResult: FilletResult | null = null;
 		if (c1 && c2) {
 			const filletOpts = {
@@ -552,8 +551,8 @@ export class FilletTool extends BaseTool {
 
 	private recalculatePendingFillets(): void {
 		for (const pf of this.pendingFillets) {
-			const c1 = sketchPrimitiveToGeoCurve(this.ctx.sketch, pf.primitive1.type, pf.primitive1.id);
-			const c2 = sketchPrimitiveToGeoCurve(this.ctx.sketch, pf.primitive2.type, pf.primitive2.id);
+			const c1 = this.ctx.toGeoCurve(pf.primitive1.type, pf.primitive1.id);
+			const c2 = this.ctx.toGeoCurve(pf.primitive2.type, pf.primitive2.id);
 			if (c1 && c2) {
 				let cornerVertex: Vec2 | undefined;
 				if (pf.vertexPointId) {

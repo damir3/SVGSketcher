@@ -7,9 +7,9 @@ import {
 	computeRectangularPatternDirections,
 	type ConstraintRenderContext,
 } from '../solver/constraints';
-import { type Vec2 } from '../math/vector';
+import type { Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
-import { sketchPrimitiveToGeoCurve, type GeoSpline, type TrimCandidate } from '../math/intersection';
+import type { TrimCandidate } from '../math/intersection';
 import {
 	bsplineToBezier,
 	fitPointsToBezier,
@@ -2665,7 +2665,7 @@ export class SVGRenderer {
 			} else if (type === 'spline') {
 				const spline = sketch.splines.get(id);
 				if (spline) {
-					const geoCurve = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id) as GeoSpline | null;
+					const geoCurve = spline.toGeoCurve(sketch);
 					if (geoCurve) {
 						const d = getSplineSvgPath(geoCurve.bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
 						createSvgPath(d, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);

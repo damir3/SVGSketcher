@@ -1,4 +1,5 @@
 import type { Vec2 } from '../../math/vector';
+import type { GeoCurve } from '../../math/intersection';
 
 export type PrimitiveType =
 	| 'point'
@@ -27,4 +28,10 @@ export interface ISketchPrimitive {
 	 * Checks if this primitive is inside or intersects an axis-aligned bounding box (world coordinates).
 	 */
 	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch?: any): boolean;
+
+	/**
+	 * Converts the sketch primitive into a normalized GeoCurve representation for geometric operations.
+	 * Returns null if the primitive is degenerate or not a curve (e.g. points).
+	 */
+	toGeoCurve(sketch: any): GeoCurve | null;
 }

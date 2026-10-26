@@ -5,6 +5,7 @@ import {
 	type BezierSegment,
 } from '../../math/spline';
 import { distanceToSpline } from '../../math/hitTest';
+import type { GeoSpline } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 import type { SketchPoint } from './point';
 
@@ -48,15 +49,20 @@ export class SketchSpline implements ISketchPrimitive {
 		}
 	}
 
-	getScreenSegments(sketch: any, viewport: any): BezierSegment[] | null {
-		const pts = this.pointIds.map(id => sketch.points.get(id)).filter((p: any): p is SketchPoint => !!p);
+	toGeoCurve(sketch: any): GeoSpline | null {
+		const pts: Vec2[] = [];
+		for (const pid of this.pointIds) {
+			const p = sketch.points.get(pid);
+			if (!p) return null;
+			pts.push({ x: p.x, y: p.y });
+		}
 		if (pts.length < 2) return null;
 
 		let bezierSegments: BezierSegment[] = [];
 		if (this.splineType === 'control') {
 			bezierSegments = bsplineToBezier(pts, this.knots);
 		} else {
-			const handles = (this.tangentLineIds || []).map(lid => {
+			const handles = (this.tangentLineIds || []).map((lid: string) => {
 				const line = sketch.lines.get(lid);
 				if (!line) return null;
 				const p1 = sketch.points.get(line.p1Id);
@@ -70,7 +76,24 @@ export class SketchSpline implements ISketchPrimitive {
 			bezierSegments = fitPointsToBezier(pts, handles);
 		}
 
-		return bezierSegments.map(seg => [
+		return {
+			type: 'spline',
+			id: this.id,
+			splineType: this.splineType,
+			pointIds: [...this.pointIds],
+			points: pts,
+			tangentLineIds: this.tangentLineIds ? [...this.tangentLineIds] : undefined,
+			bezierSegments,
+			isClosed: this.splineType === 'control' ? false : this.isClosed,
+			isConstruction: this.isConstruction,
+		};
+	}
+
+	getScreenSegments(sketch: any, viewport: any): BezierSegment[] | null {
+		const geo = this.toGeoCurve(sketch);
+		if (!geo) return null;
+
+		return geo.bezierSegments.map(seg => [
 			viewport.worldToScreen(seg[0].x, seg[0].y),
 			viewport.worldToScreen(seg[1].x, seg[1].y),
 			viewport.worldToScreen(seg[2].x, seg[2].y),

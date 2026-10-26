@@ -43,8 +43,10 @@ import {
 	SketchEllipse,
 	SketchEllipticalArc,
 	SketchSpline,
+	type ISketchPrimitive,
 	type SelectionState,
 } from './types';
+import type { GeoCurve } from '../math/intersection';
 import { dist, type Vec2 } from '../math/vector';
 import { bsplineToBezier, fitPointsToBezier, computeNaturalFitHandles, getSplineSvgPath, type BezierSegment } from '../math/spline';
 import {
@@ -330,6 +332,47 @@ export class SketchDocument {
 
 	getPoint(id: string): SketchPoint | undefined {
 		return this.points.get(id);
+	}
+
+	getPrimitive(
+		id: string,
+		type?: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
+	): ISketchPrimitive | undefined {
+		if (type) {
+			switch (type) {
+				case 'line':
+					return this.lines.get(id);
+				case 'point':
+					return this.points.get(id);
+				case 'circle':
+					return this.circles.get(id);
+				case 'arc':
+					return this.arcs.get(id);
+				case 'ellipse':
+					return this.ellipses.get(id);
+				case 'elliptical_arc':
+					return this.ellipticalArcs.get(id);
+				case 'spline':
+					return this.splines.get(id);
+			}
+		}
+		return (
+			this.lines.get(id) ??
+			this.points.get(id) ??
+			this.circles.get(id) ??
+			this.arcs.get(id) ??
+			this.ellipses.get(id) ??
+			this.ellipticalArcs.get(id) ??
+			this.splines.get(id)
+		);
+	}
+
+	toGeoCurve(
+		id: string,
+		type?: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
+	): GeoCurve | null {
+		const prim = this.getPrimitive(id, type);
+		return prim ? prim.toGeoCurve(this) : null;
 	}
 
 	// --- Line methods ---

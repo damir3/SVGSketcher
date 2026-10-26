@@ -28,7 +28,7 @@ import { showToast } from '../ui/toast';
 import { PolygonPopup } from '../ui/polygon-popup';
 import { FilletPopup } from '../ui/fillet-popup';
 import type { FilletCandidate } from '../math/fillet';
-import { sketchPrimitiveToGeoCurve, type GeoCurve } from '../math/intersection';
+import type { GeoCurve } from '../math/intersection';
 import {
 	bsplineToBezier,
 	fitPointsToBezier,
@@ -375,7 +375,7 @@ export class CanvasInteraction {
 			findEllipticalArcNear: (screen: Vec2, thresholdPx?: number) =>
 				this.findEllipticalArcNearScreen(screen, thresholdPx),
 			findSplineNear: (screen: Vec2, thresholdPx?: number) => this.findSplineNearScreen(screen, thresholdPx),
-			toGeoCurve: (type, id) => sketchPrimitiveToGeoCurve(this.sketch, type, id),
+			toGeoCurve: (type, id) => this.sketch.toGeoCurve(id, type),
 			findTrimTarget: (screen: Vec2, thresholdPx?: number) =>
 				this.findTrimTargetNearScreen(screen, thresholdPx),
 			applySnapConstraintIfNeeded: (pointId: string, snap: SnapResult | null) =>
@@ -1288,7 +1288,7 @@ export class CanvasInteraction {
 			const d = line.distanceTo(screen, this.sketch, this.viewport, bestDist);
 			if (d !== null && d < bestDist) {
 				bestDist = d;
-				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'line', line.id);
+				bestCurve = line.toGeoCurve(this.sketch);
 			}
 		}
 
@@ -1297,7 +1297,7 @@ export class CanvasInteraction {
 			const d = arc.distanceTo(screen, this.sketch, this.viewport, bestDist);
 			if (d !== null && d < bestDist) {
 				bestDist = d;
-				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'arc', arc.id);
+				bestCurve = arc.toGeoCurve(this.sketch);
 			}
 		}
 
@@ -1306,7 +1306,7 @@ export class CanvasInteraction {
 			const d = arc.distanceTo(screen, this.sketch, this.viewport, bestDist);
 			if (d !== null && d < bestDist) {
 				bestDist = d;
-				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'elliptical_arc', arc.id);
+				bestCurve = arc.toGeoCurve(this.sketch);
 			}
 		}
 
@@ -1315,7 +1315,7 @@ export class CanvasInteraction {
 			const d = circle.distanceTo(screen, this.sketch, this.viewport, bestDist);
 			if (d !== null && d < bestDist) {
 				bestDist = d;
-				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'circle', circle.id);
+				bestCurve = circle.toGeoCurve(this.sketch);
 			}
 		}
 
@@ -1324,7 +1324,7 @@ export class CanvasInteraction {
 			const d = ellipse.distanceTo(screen, this.sketch, this.viewport, bestDist);
 			if (d !== null && d < bestDist) {
 				bestDist = d;
-				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'ellipse', ellipse.id);
+				bestCurve = ellipse.toGeoCurve(this.sketch);
 			}
 		}
 
@@ -1333,7 +1333,7 @@ export class CanvasInteraction {
 			const d = spline.distanceTo(screen, this.sketch, this.viewport, bestDist);
 			if (d !== null && d < bestDist) {
 				bestDist = d;
-				bestCurve = sketchPrimitiveToGeoCurve(this.sketch, 'spline', spline.id);
+				bestCurve = spline.toGeoCurve(this.sketch);
 			}
 		}
 

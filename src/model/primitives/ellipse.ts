@@ -1,6 +1,7 @@
 import type { Vec2 } from '../../math/vector';
 import { distanceToEllipse } from '../../math/hitTest';
 import { ellipseIntersectsAABB } from '../../math/aabb';
+import type { GeoEllipse } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 
 export class SketchEllipse implements ISketchPrimitive {
@@ -60,5 +61,23 @@ export class SketchEllipse implements ISketchPrimitive {
 		const minorPt = sketch.points.get(this.minorAxisPointId);
 		if (!center || !majorPt || !minorPt) return false;
 		return ellipseIntersectsAABB(center, majorPt, minorPt, minX, minY, maxX, maxY);
+	}
+
+	toGeoCurve(sketch: any): GeoEllipse | null {
+		const center = sketch.points.get(this.centerId);
+		const maj = sketch.points.get(this.majorAxisPointId);
+		const min = sketch.points.get(this.minorAxisPointId);
+		if (!center || !maj || !min) return null;
+		return {
+			type: 'ellipse',
+			id: this.id,
+			center: { x: center.x, y: center.y },
+			centerId: this.centerId,
+			majorAxisPointId: this.majorAxisPointId,
+			minorAxisPointId: this.minorAxisPointId,
+			majorAxisPoint: { x: maj.x, y: maj.y },
+			minorAxisPoint: { x: min.x, y: min.y },
+			isConstruction: this.isConstruction,
+		};
 	}
 }

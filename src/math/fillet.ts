@@ -4,7 +4,6 @@ import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline } from '../model/types';
 import { CoincidentConstraint, MidpointConstraint } from '../solver/constraints';
 import {
-	sketchPrimitiveToGeoCurve,
 	getPointAtParam,
 	type GeoCurve,
 	type GeoSpline,
@@ -922,7 +921,7 @@ function trimOrExtendPrimitive(
 		}
 
 		if (param >= 0 && param <= 1) {
-			const curve = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id) as GeoSpline | null;
+			const curve = spline.toGeoCurve(sketch);
 			if (curve) {
 				let newSpline: SketchSpline | null = null;
 				if (isNearStart) {

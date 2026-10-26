@@ -37,4 +37,8 @@ export class SketchPoint implements ISketchPrimitive {
 	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, _sketch?: any): boolean {
 		return pointIntersectsAABB(this.x, this.y, minX, minY, maxX, maxY);
 	}
+
+	toGeoCurve(_sketch?: any): null {
+		return null;
+	}
 }

@@ -1,6 +1,7 @@
 import type { Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
+import type { GeoSegment } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 
 export class SketchLine implements ISketchPrimitive {
@@ -56,5 +57,18 @@ export class SketchLine implements ISketchPrimitive {
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return false;
 		return segmentIntersectsAABB(p1.x, p1.y, p2.x, p2.y, minX, minY, maxX, maxY);
+	}
+
+	toGeoCurve(sketch: any): GeoSegment | null {
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
+		if (!p1 || !p2) return null;
+		return {
+			type: 'segment',
+			id: this.id,
+			p1: { x: p1.x, y: p1.y },
+			p2: { x: p2.x, y: p2.y },
+			isConstruction: this.isConstruction,
+		};
 	}
 }

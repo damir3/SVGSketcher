@@ -1,6 +1,7 @@
 import type { Vec2 } from '../../math/vector';
 import { distanceToEllipticalArc } from '../../math/hitTest';
 import { ellipticalArcIntersectsAABB } from '../../math/aabb';
+import type { GeoEllipticalArc } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 
 export class SketchEllipticalArc implements ISketchPrimitive {
@@ -92,5 +93,30 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 			maxX,
 			maxY
 		);
+	}
+
+	toGeoCurve(sketch: any): GeoEllipticalArc | null {
+		const center = sketch.points.get(this.centerId);
+		const maj = sketch.points.get(this.majorAxisPointId);
+		const min = sketch.points.get(this.minorAxisPointId);
+		const start = sketch.points.get(this.startPointId);
+		const end = sketch.points.get(this.endPointId);
+		if (!center || !maj || !min || !start || !end) return null;
+		return {
+			type: 'elliptical_arc',
+			id: this.id,
+			center: { x: center.x, y: center.y },
+			centerId: this.centerId,
+			majorAxisPointId: this.majorAxisPointId,
+			minorAxisPointId: this.minorAxisPointId,
+			startPointId: this.startPointId,
+			endPointId: this.endPointId,
+			majorAxisPoint: { x: maj.x, y: maj.y },
+			minorAxisPoint: { x: min.x, y: min.y },
+			start: { x: start.x, y: start.y },
+			end: { x: end.x, y: end.y },
+			clockwise: !!this.clockwise,
+			isConstruction: this.isConstruction,
+		};
 	}
 }

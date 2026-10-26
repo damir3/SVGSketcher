@@ -1,6 +1,7 @@
 import type { Vec2 } from '../../math/vector';
 import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
+import type { GeoArc } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 
 export class SketchArc implements ISketchPrimitive {
@@ -71,5 +72,25 @@ export class SketchArc implements ISketchPrimitive {
 		const end = sketch.points.get(this.endPointId);
 		if (!center || !start || !end) return false;
 		return arcIntersectsAABB(center, this.radius, start, end, !!this.clockwise, minX, minY, maxX, maxY);
+	}
+
+	toGeoCurve(sketch: any): GeoArc | null {
+		const center = sketch.points.get(this.centerId);
+		const start = sketch.points.get(this.startPointId);
+		const end = sketch.points.get(this.endPointId);
+		if (!center || !start || !end) return null;
+		return {
+			type: 'arc',
+			id: this.id,
+			center: { x: center.x, y: center.y },
+			centerId: this.centerId,
+			startPointId: this.startPointId,
+			endPointId: this.endPointId,
+			radius: this.radius,
+			start: { x: start.x, y: start.y },
+			end: { x: end.x, y: end.y },
+			clockwise: !!this.clockwise,
+			isConstruction: this.isConstruction,
+		};
 	}
 }

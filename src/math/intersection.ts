@@ -3,8 +3,6 @@ import { projectPointOntoSegment } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
 import {
-	bsplineToBezier,
-	fitPointsToBezier,
 	getSplinePointAtParam,
 	getSplineParamAtPoint,
 	evaluateBezier,
@@ -116,171 +114,41 @@ export interface TrimCandidate {
 
 /**
  * Converts sketch document primitives into normalized GeoCurves.
+ * Delegates polymorphically to primitive.toGeoCurve(sketch).
  */
 export function sketchPrimitiveToGeoCurve(
 	sketch: SketchDocument,
 	type: 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
 	id: string
 ): GeoCurve | null {
-	if (type === 'line') {
-		const line = sketch.lines.get(id);
-		if (!line) return null;
-		const p1 = sketch.points.get(line.p1Id);
-		const p2 = sketch.points.get(line.p2Id);
-		if (!p1 || !p2) return null;
-		return {
-			type: 'segment',
-			id,
-			p1: { x: p1.x, y: p1.y },
-			p2: { x: p2.x, y: p2.y },
-			isConstruction: line.isConstruction,
-		};
-	} else if (type === 'circle') {
-		const circle = sketch.circles.get(id);
-		if (!circle) return null;
-		const center = sketch.points.get(circle.centerId);
-		if (!center) return null;
-		return {
-			type: 'circle',
-			id,
-			center: { x: center.x, y: center.y },
-			centerId: circle.centerId,
-			radius: circle.radius,
-			isConstruction: circle.isConstruction,
-		};
-	} else if (type === 'arc') {
-		const arc = sketch.arcs.get(id);
-		if (!arc) return null;
-		const center = sketch.points.get(arc.centerId);
-		const start = sketch.points.get(arc.startPointId);
-		const end = sketch.points.get(arc.endPointId);
-		if (!center || !start || !end) return null;
-		return {
-			type: 'arc',
-			id,
-			center: { x: center.x, y: center.y },
-			centerId: arc.centerId,
-			startPointId: arc.startPointId,
-			endPointId: arc.endPointId,
-			radius: arc.radius,
-			start: { x: start.x, y: start.y },
-			end: { x: end.x, y: end.y },
-			clockwise: !!arc.clockwise,
-			isConstruction: arc.isConstruction,
-		};
-	} else if (type === 'ellipse') {
-		const ellipse = sketch.ellipses.get(id);
-		if (!ellipse) return null;
-		const center = sketch.points.get(ellipse.centerId);
-		const maj = sketch.points.get(ellipse.majorAxisPointId);
-		const min = sketch.points.get(ellipse.minorAxisPointId);
-		if (!center || !maj || !min) return null;
-		return {
-			type: 'ellipse',
-			id,
-			center: { x: center.x, y: center.y },
-			centerId: ellipse.centerId,
-			majorAxisPointId: ellipse.majorAxisPointId,
-			minorAxisPointId: ellipse.minorAxisPointId,
-			majorAxisPoint: { x: maj.x, y: maj.y },
-			minorAxisPoint: { x: min.x, y: min.y },
-			isConstruction: ellipse.isConstruction,
-		};
-	} else if (type === 'elliptical_arc') {
-		const arc = sketch.ellipticalArcs.get(id);
-		if (!arc) return null;
-		const center = sketch.points.get(arc.centerId);
-		const maj = sketch.points.get(arc.majorAxisPointId);
-		const min = sketch.points.get(arc.minorAxisPointId);
-		const start = sketch.points.get(arc.startPointId);
-		const end = sketch.points.get(arc.endPointId);
-		if (!center || !maj || !min || !start || !end) return null;
-		return {
-			type: 'elliptical_arc',
-			id,
-			center: { x: center.x, y: center.y },
-			centerId: arc.centerId,
-			majorAxisPointId: arc.majorAxisPointId,
-			minorAxisPointId: arc.minorAxisPointId,
-			startPointId: arc.startPointId,
-			endPointId: arc.endPointId,
-			majorAxisPoint: { x: maj.x, y: maj.y },
-			minorAxisPoint: { x: min.x, y: min.y },
-			start: { x: start.x, y: start.y },
-			end: { x: end.x, y: end.y },
-			clockwise: !!arc.clockwise,
-			isConstruction: arc.isConstruction,
-		};
-	} else if (type === 'spline') {
-		const spline = sketch.splines.get(id);
-		if (!spline) return null;
-		const pts: Vec2[] = [];
-		for (const pid of spline.pointIds) {
-			const p = sketch.points.get(pid);
-			if (!p) return null;
-			pts.push({ x: p.x, y: p.y });
-		}
-		if (pts.length < 2) return null;
-
-		let bezierSegments: BezierSegment[] = [];
-		if (spline.splineType === 'control') {
-			bezierSegments = bsplineToBezier(pts, spline.knots);
-		} else {
-			const handles = (spline.tangentLineIds || []).map(lid => {
-				const line = sketch.lines.get(lid);
-				if (!line) return null;
-				const p1 = sketch.points.get(line.p1Id);
-				const p2 = sketch.points.get(line.p2Id);
-				if (!p1 || !p2) return null;
-				return {
-					h1: { x: p1.x, y: p1.y },
-					h2: { x: p2.x, y: p2.y },
-				};
-			});
-			bezierSegments = fitPointsToBezier(pts, handles);
-		}
-
-		return {
-			type: 'spline',
-			id,
-			splineType: spline.splineType,
-			pointIds: [...spline.pointIds],
-			points: pts,
-			tangentLineIds: spline.tangentLineIds ? [...spline.tangentLineIds] : undefined,
-			bezierSegments,
-			isClosed: spline.splineType === 'control' ? false : spline.isClosed,
-			isConstruction: spline.isConstruction,
-		};
-	}
-	return null;
+	return sketch.getPrimitive(id, type)?.toGeoCurve(sketch) ?? null;
 }
 
 export function getAllGeoCurves(sketch: SketchDocument): GeoCurve[] {
 	const curves: GeoCurve[] = [];
-	for (const id of sketch.lines.keys()) {
-		const line = sketch.lines.get(id);
-		if (line?.isSplineHandle) continue; // Skip tangent handles
-		const c = sketchPrimitiveToGeoCurve(sketch, 'line', id);
+	for (const line of sketch.lines.values()) {
+		if (line.isSplineHandle) continue; // Skip tangent handles
+		const c = line.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
-	for (const id of sketch.circles.keys()) {
-		const c = sketchPrimitiveToGeoCurve(sketch, 'circle', id);
+	for (const circle of sketch.circles.values()) {
+		const c = circle.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
-	for (const id of sketch.arcs.keys()) {
-		const c = sketchPrimitiveToGeoCurve(sketch, 'arc', id);
+	for (const arc of sketch.arcs.values()) {
+		const c = arc.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
-	for (const id of sketch.ellipses.keys()) {
-		const c = sketchPrimitiveToGeoCurve(sketch, 'ellipse', id);
+	for (const ellipse of sketch.ellipses.values()) {
+		const c = ellipse.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
-	for (const id of sketch.ellipticalArcs.keys()) {
-		const c = sketchPrimitiveToGeoCurve(sketch, 'elliptical_arc', id);
+	for (const elArc of sketch.ellipticalArcs.values()) {
+		const c = elArc.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
-	for (const id of sketch.splines.keys()) {
-		const c = sketchPrimitiveToGeoCurve(sketch, 'spline', id);
+	for (const spline of sketch.splines.values()) {
+		const c = spline.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
 	return curves;

@@ -1,6 +1,7 @@
 import type { Vec2 } from '../../math/vector';
 import { distanceToCircle } from '../../math/hitTest';
 import { circleIntersectsAABB } from '../../math/aabb';
+import type { GeoCircle } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 
 export class SketchCircle implements ISketchPrimitive {
@@ -41,5 +42,18 @@ export class SketchCircle implements ISketchPrimitive {
 		const center = sketch.points.get(this.centerId);
 		if (!center) return false;
 		return circleIntersectsAABB(center.x, center.y, this.radius, minX, minY, maxX, maxY);
+	}
+
+	toGeoCurve(sketch: any): GeoCircle | null {
+		const center = sketch.points.get(this.centerId);
+		if (!center) return null;
+		return {
+			type: 'circle',
+			id: this.id,
+			center: { x: center.x, y: center.y },
+			centerId: this.centerId,
+			radius: this.radius,
+			isConstruction: this.isConstruction,
+		};
 	}
 }

@@ -246,4 +246,84 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		assert.ok(fixedC);
 		assert.equal(fixedC.distanceTo?.(vec(0, 0), sketch, viewport), null);
 	});
+
+	it('primitives and SketchDocument implement toGeoCurve polymorphically', () => {
+		const sketch = new SketchDocument();
+		const p1 = sketch.addPoint(0, 0);
+		const p2 = sketch.addPoint(10, 0);
+		const line = sketch.addLine(p1.id, p2.id);
+
+		const cCenter = sketch.addPoint(50, 50);
+		const circle = sketch.addCircle(cCenter.id, 20);
+
+		const aCenter = sketch.addPoint(100, 100);
+		const aStart = sketch.addPoint(120, 100);
+		const aEnd = sketch.addPoint(100, 120);
+		const arc = sketch.addArc(aCenter.id, aStart.id, aEnd.id, 20, true);
+
+		const eCenter = sketch.addPoint(200, 200);
+		const eMajor = sketch.addPoint(240, 200);
+		const eMinor = sketch.addPoint(200, 220);
+		const ellipse = sketch.addEllipse(eCenter.id, eMajor.id, eMinor.id);
+
+		const eaStart = sketch.addPoint(240, 200);
+		const eaEnd = sketch.addPoint(200, 220);
+		const ellipticalArc = sketch.addEllipticalArc(eCenter.id, eMajor.id, eMinor.id, eaStart.id, eaEnd.id, true);
+
+		const sp1 = sketch.addPoint(0, 0);
+		const sp2 = sketch.addPoint(10, 20);
+		const sp3 = sketch.addPoint(20, 0);
+		const spline = sketch.addFitSpline([sp1.id, sp2.id, sp3.id]);
+
+		// Point
+		assert.equal(p1.toGeoCurve(sketch), null);
+		assert.equal(sketch.toGeoCurve(p1.id, 'point'), null);
+
+		// Line -> GeoSegment
+		const geoLine = line.toGeoCurve(sketch);
+		assert.ok(geoLine && geoLine.type === 'segment');
+		assert.deepEqual(geoLine.p1, vec(0, 0));
+		assert.deepEqual(geoLine.p2, vec(10, 0));
+		assert.deepEqual(sketch.toGeoCurve(line.id, 'line'), geoLine);
+
+		// Circle -> GeoCircle
+		const geoCircle = circle.toGeoCurve(sketch);
+		assert.ok(geoCircle && geoCircle.type === 'circle');
+		assert.deepEqual(geoCircle.center, vec(50, 50));
+		assert.equal(geoCircle.radius, 20);
+		assert.deepEqual(sketch.toGeoCurve(circle.id, 'circle'), geoCircle);
+
+		// Arc -> GeoArc
+		const geoArc = arc.toGeoCurve(sketch);
+		assert.ok(geoArc && geoArc.type === 'arc');
+		assert.deepEqual(geoArc.center, vec(100, 100));
+		assert.equal(geoArc.radius, 20);
+		assert.deepEqual(sketch.toGeoCurve(arc.id, 'arc'), geoArc);
+
+		// Ellipse -> GeoEllipse
+		const geoEllipse = ellipse.toGeoCurve(sketch);
+		assert.ok(geoEllipse && geoEllipse.type === 'ellipse');
+		assert.deepEqual(geoEllipse.center, vec(200, 200));
+		assert.deepEqual(geoEllipse.majorAxisPoint, vec(240, 200));
+		assert.deepEqual(geoEllipse.minorAxisPoint, vec(200, 220));
+		assert.deepEqual(sketch.toGeoCurve(ellipse.id, 'ellipse'), geoEllipse);
+
+		// EllipticalArc -> GeoEllipticalArc
+		const geoEllipticalArc = ellipticalArc.toGeoCurve(sketch);
+		assert.ok(geoEllipticalArc && geoEllipticalArc.type === 'elliptical_arc');
+		assert.deepEqual(geoEllipticalArc.center, vec(200, 200));
+		assert.deepEqual(geoEllipticalArc.majorAxisPoint, vec(240, 200));
+		assert.deepEqual(geoEllipticalArc.minorAxisPoint, vec(200, 220));
+		assert.deepEqual(sketch.toGeoCurve(ellipticalArc.id, 'ellipticalArc'), geoEllipticalArc);
+
+		// Spline -> GeoSpline
+		const geoSpline = spline.toGeoCurve(sketch);
+		assert.ok(geoSpline && geoSpline.type === 'spline');
+		assert.ok(geoSpline.bezierSegments.length > 0);
+		assert.deepEqual(sketch.toGeoCurve(spline.id, 'spline'), geoSpline);
+
+		// Non-existent id returns null
+		assert.equal(sketch.toGeoCurve('unknown-id', 'line'), null);
+	});
 });
+
