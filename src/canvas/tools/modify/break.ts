@@ -1,10 +1,11 @@
 import { BaseTool } from '../base';
-import type { ToolMouseEvent } from '../types';
+import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import {
 	getAllGeoCurves,
 	getTrimCandidate,
 	executeBreak,
 } from '../../../math/intersection';
+import { renderBreakPreviewVisual } from '../../previewHelpers';
 
 export class BreakTool extends BaseTool {
 	readonly id = 'break' as const;
@@ -21,34 +22,18 @@ export class BreakTool extends BaseTool {
 		executeBreak(this.ctx.sketch, candidate);
 		this.ctx.sketch.commitTransaction();
 		this.ctx.showToast('Broken');
-
-		// Refresh preview under current cursor
-		const newCurves = getAllGeoCurves(this.ctx.sketch);
-		const newTarget = this.ctx.findTrimTarget?.(e.screen, 18);
-		if (newTarget) {
-			const newCand = getTrimCandidate(newTarget, newCurves, e.world);
-			if (newCand) {
-				this.ctx.renderer.renderBreakPreview(newCand, this.ctx.viewport);
-			} else {
-				this.ctx.renderer.clearPreviews();
-			}
-		} else {
-			this.ctx.renderer.clearPreviews();
-		}
 		this.ctx.requestRender();
 	}
 
-	override onMouseMove(e: ToolMouseEvent): void {
-		const target = this.ctx.findTrimTarget?.(e.screen, 18);
+	override renderPreview(ctx: ToolRenderContext): void {
+		const target = this.ctx.findTrimTarget?.(ctx.cursorScreen, 18);
 		if (target) {
 			const allCurves = getAllGeoCurves(this.ctx.sketch);
-			const candidate = getTrimCandidate(target, allCurves, e.world);
+			const candidate = getTrimCandidate(target, allCurves, ctx.cursorWorld);
 			if (candidate) {
-				this.ctx.renderer.renderBreakPreview(candidate, this.ctx.viewport);
-				return;
+				renderBreakPreviewVisual(ctx.targetGroup, candidate, ctx.viewport);
 			}
 		}
-		this.ctx.renderer.clearPreviews();
 	}
 
 	override cancel(): void {

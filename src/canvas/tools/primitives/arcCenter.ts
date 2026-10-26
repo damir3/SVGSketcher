@@ -1,6 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
+import { renderCirclePreviewVisual, renderArcPreviewVisual } from '../../previewHelpers';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -123,22 +124,14 @@ export class ArcCenterTool extends BaseTool {
 	}
 
 	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
-			const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			const radius = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderCirclePreview(s1, s2, radius, this.ctx.isConstructionMode, true);
-		} else if (this.drawingStep === 2 && this.centerWorldPos && this.arcPoint1WorldPos) {
+		if (this.drawingStep === 2 && this.centerWorldPos && this.arcPoint1WorldPos) {
 			const centerWorld = this.centerWorldPos;
 			const startWorld = this.arcPoint1WorldPos;
-			const radius = Math.max(1, dist(centerWorld, startWorld));
-			const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
+			const effectiveWorld = e.effectiveWorld;
 
 			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 			const sStart = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
 			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			const sr = radius * this.ctx.viewport.zoom;
 
 			const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
 			const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
@@ -155,41 +148,6 @@ export class ArcCenterTool extends BaseTool {
 			this.arcCenterTotalAngle += dAngle;
 			this.arcCenterPrevAngle = acur;
 			this.arcCenterTotalAngle = this.arcCenterTotalAngle % TWO_PI;
-
-			let clockwise = this.arcCenterTotalAngle >= 0;
-			if (Math.abs(this.arcCenterTotalAngle) < 0.001) {
-				let delta = acur - as;
-				while (delta > Math.PI) delta -= TWO_PI;
-				while (delta < -Math.PI) delta += TWO_PI;
-				clockwise = delta >= 0;
-			}
-
-			const worldAngle = Math.atan2(effectiveWorld.y - centerWorld.y, effectiveWorld.x - centerWorld.x);
-			const endWorld = vec(
-				centerWorld.x + radius * Math.cos(worldAngle),
-				centerWorld.y + radius * Math.sin(worldAngle)
-			);
-			const sEnd = this.ctx.viewport.worldToScreen(endWorld.x, endWorld.y);
-
-			let sweepAngle = 0;
-			if (clockwise) {
-				sweepAngle = (acur - as) % TWO_PI;
-				if (sweepAngle < 0) sweepAngle += TWO_PI;
-			} else {
-				sweepAngle = (as - acur) % TWO_PI;
-				if (sweepAngle < 0) sweepAngle += TWO_PI;
-			}
-
-			this.ctx.renderer.renderArcPreview(
-				sCenter,
-				sStart,
-				sEnd,
-				sr,
-				clockwise,
-				radius,
-				sweepAngle,
-				this.ctx.isConstructionMode
-			);
 		}
 	}
 
@@ -199,7 +157,7 @@ export class ArcCenterTool extends BaseTool {
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const radius = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderCirclePreview(s1, s2, radius, ctx.isConstruction, true);
+			renderCirclePreviewVisual(ctx.targetGroup, s1, s2, radius, ctx.isConstruction, true);
 		} else if (this.drawingStep === 2 && this.centerWorldPos && this.arcPoint1WorldPos) {
 			const centerWorld = this.centerWorldPos;
 			const startWorld = this.arcPoint1WorldPos;
@@ -238,7 +196,8 @@ export class ArcCenterTool extends BaseTool {
 				if (sweepAngle < 0) sweepAngle += TWO_PI;
 			}
 
-			this.ctx.renderer.renderArcPreview(
+			renderArcPreviewVisual(
+				ctx.targetGroup,
 				sCenter,
 				sStart,
 				sEnd,

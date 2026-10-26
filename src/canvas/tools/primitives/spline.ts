@@ -1,6 +1,7 @@
 import { BaseTool } from '../base';
-import type { ToolMouseEvent } from '../types';
+import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
+import { renderSplinePreviewVisual } from '../../previewHelpers';
 
 export class SplineTool extends BaseTool {
 	readonly id: 'spline_fit' | 'spline_control';
@@ -71,12 +72,36 @@ export class SplineTool extends BaseTool {
 		this.points.push({ id: pId, x: pPos.x, y: pPos.y });
 		this.undonePoints = [];
 		this.ctx.requestRender();
-		this.updateDrawingPreview(screen);
 	}
 
 	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.points.length > 0) {
-			this.updateDrawingPreview(e.screen);
+		if (this.points.length > 0 && this.checkmarkPos) {
+			if (dist(e.screen, this.checkmarkPos) <= 15) {
+				this.ctx.setCursor('pointer');
+			} else {
+				this.ctx.setCursor(this.defaultCursor);
+			}
+		}
+	}
+
+	override renderPreview(ctx: ToolRenderContext): void {
+		if (this.points.length === 0) return;
+		const sPos = ctx.cursorScreen;
+		const lastPtId = this.points[this.points.length - 1].id;
+		const snap = this.ctx.findSnap(sPos, lastPtId);
+		const effectiveWorld = snap ? snap.worldPos : ctx.cursorWorld;
+		const screenPts = this.points.map(p => ctx.viewport.worldToScreen(p.x, p.y));
+		const curScreen = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+		const { checkmarkPos } = renderSplinePreviewVisual(
+			ctx.targetGroup,
+			this.splineType,
+			screenPts,
+			curScreen,
+			ctx.isConstruction
+		);
+		this.checkmarkPos = checkmarkPos;
+		if (snap) {
+			this.ctx.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
 		}
 	}
 
@@ -101,9 +126,6 @@ export class SplineTool extends BaseTool {
 			this.ctx.renderer.clearPreviews();
 		}
 		this.ctx.requestRender();
-		if (this.points.length > 0) {
-			this.updateDrawingPreview();
-		}
 		return true;
 	}
 
@@ -117,7 +139,6 @@ export class SplineTool extends BaseTool {
 		}
 		this.points.push({ id: ptId, x: next.x, y: next.y });
 		this.ctx.requestRender();
-		this.updateDrawingPreview();
 		return true;
 	}
 
@@ -158,32 +179,5 @@ export class SplineTool extends BaseTool {
 		this.checkmarkPos = undefined;
 		this.ctx.renderer.clearPreviews();
 		this.ctx.requestRender();
-	}
-
-	private updateDrawingPreview(screenPos?: Vec2): void {
-		if (this.points.length === 0) return;
-		this.ctx.renderer.clearPreviews();
-		const sPos = screenPos ?? this.ctx.viewport.worldToScreen(this.points[this.points.length - 1].x, this.points[this.points.length - 1].y);
-		const lastPtId = this.points[this.points.length - 1].id;
-		const snap = this.ctx.findSnap(sPos, lastPtId);
-		const worldPos = this.ctx.viewport.screenToWorld(sPos.x, sPos.y);
-		const effectiveWorld = snap ? snap.worldPos : worldPos;
-		const screenPts = this.points.map(p => this.ctx.viewport.worldToScreen(p.x, p.y));
-		const curScreen = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-		const { checkmarkPos } = this.ctx.renderer.renderSplinePreview(
-			this.splineType,
-			screenPts,
-			curScreen,
-			this.ctx.isConstructionMode
-		);
-		this.checkmarkPos = checkmarkPos;
-		if (snap) {
-			this.ctx.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
-		}
-		if (checkmarkPos && dist(sPos, checkmarkPos) <= 15) {
-			this.ctx.setCursor('pointer');
-		} else {
-			this.ctx.setCursor(this.defaultCursor);
-		}
 	}
 }

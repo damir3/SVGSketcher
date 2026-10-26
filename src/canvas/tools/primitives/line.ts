@@ -1,6 +1,8 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
+import { createSvgLine, renderTooltip } from '../../svg';
+import { getPreviewStrokeAttrs } from '../../styles';
 
 export class LineTool extends BaseTool {
 	readonly id = 'line' as const;
@@ -76,28 +78,6 @@ export class LineTool extends BaseTool {
 		}
 	}
 
-	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.drawingStep === 1 && this.startWorldPos) {
-			const s1 = this.ctx.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
-			let effectiveWorld = e.effectiveWorld;
-			let axisBadge: 'H' | 'V' | undefined;
-
-			if (this.ctx.getAxisSnappedWorldPos) {
-				const axisSnap = this.ctx.getAxisSnappedWorldPos(this.startWorldPos, effectiveWorld, e.snap);
-				effectiveWorld = axisSnap.pos;
-				axisBadge = axisSnap.axis === 'horizontal' ? 'H' : axisSnap.axis === 'vertical' ? 'V' : undefined;
-			}
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-
-			const length = dist(this.startWorldPos, effectiveWorld);
-			const angleDeg =
-				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
-				Math.PI;
-
-			this.ctx.renderer.renderLinePreview(s1, s2, length, angleDeg, this.ctx.isConstructionMode, axisBadge);
-		}
-	}
-
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.startWorldPos) {
 			const s1 = ctx.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
@@ -116,7 +96,13 @@ export class LineTool extends BaseTool {
 				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
 				Math.PI;
 
-			this.ctx.renderer.renderLinePreview(s1, s2, length, angleDeg, ctx.isConstruction, axisBadge);
+			createSvgLine(s1.x, s1.y, s2.x, s2.y, getPreviewStrokeAttrs(ctx.isConstruction, false, true), ctx.targetGroup);
+
+			// Length & Angle Tooltip
+			const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 - 16 };
+			const badgeText = axisBadge ? ` [${axisBadge}]` : '';
+			const label = `${length.toFixed(1)} mm | ${angleDeg.toFixed(1)}°${badgeText}`;
+			renderTooltip(ctx.targetGroup, mid.x, mid.y, label);
 		}
 	}
 

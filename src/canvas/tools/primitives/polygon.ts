@@ -4,6 +4,15 @@ import { dist, vec, type Vec2 } from '../../../math/vector';
 import { PolygonPopup } from '../../../ui/polygon-popup';
 import type { SketchPoint, SketchLine } from '../../../model/types';
 import type { PatternCopyData, PointToLineDistanceConstraint } from '../../../solver/constraints';
+import { createSvgCircle, createSvgLine, createSvgPath } from '../../svg';
+import {
+	GUIDE_OUTLINE_ATTRS,
+	AUX_RAY_ATTRS,
+	POLYGON_VERTEX_ATTRS,
+	POLYGON_CENTER_ATTRS,
+	POLYGON_RADIUS_HANDLE_ATTRS,
+	getPreviewStrokeAttrs,
+} from '../../styles';
 
 export class PolygonTool extends BaseTool {
 	readonly id = 'polygon' as const;
@@ -28,23 +37,7 @@ export class PolygonTool extends BaseTool {
 				this.radiusLocked = true;
 			}
 			if (this.drawingStep === 1 && this.centerWorldPos) {
-				const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-				const curWorld = {
-					x: this.centerWorldPos.x + this.radius * Math.cos(this.currentAngle),
-					y: this.centerWorldPos.y + this.radius * Math.sin(this.currentAngle),
-				};
-				const s2 = this.ctx.viewport.worldToScreen(curWorld.x, curWorld.y);
-				this.ctx.renderer.renderPolygonPreview(
-					s1,
-					s2,
-					this.centerWorldPos,
-					curWorld,
-					this.sides,
-					this.radius,
-					this.currentAngle,
-					this.ctx.isConstructionMode,
-					this.ctx.viewport
-				);
+				this.ctx.requestRender();
 			}
 		};
 		this.popup.onCommit = () => {
@@ -128,7 +121,6 @@ export class PolygonTool extends BaseTool {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
 			const effectiveWorld = e.effectiveWorld;
 			const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 
 			if (!this.radiusLocked) {
 				this.radius = Math.max(1, dist(this.centerWorldPos, effectiveWorld));
@@ -137,17 +129,6 @@ export class PolygonTool extends BaseTool {
 			this.currentAngle = Math.atan2(
 				effectiveWorld.y - this.centerWorldPos.y,
 				effectiveWorld.x - this.centerWorldPos.x
-			);
-			this.ctx.renderer.renderPolygonPreview(
-				s1,
-				s2,
-				this.centerWorldPos,
-				effectiveWorld,
-				this.sides,
-				this.radius,
-				this.currentAngle,
-				this.ctx.isConstructionMode,
-				this.ctx.viewport
 			);
 
 			if (this.popup.isOpen()) {
@@ -158,20 +139,53 @@ export class PolygonTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
-			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			this.ctx.renderer.renderPolygonPreview(
-				s1,
-				s2,
-				this.centerWorldPos,
-				effectiveWorld,
-				this.sides,
-				this.radius,
-				this.currentAngle,
-				ctx.isConstruction,
-				ctx.viewport
-			);
+			const sCtr = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
+			const N = Math.max(3, Math.round(this.sides));
+			const R = this.radius / Math.cos(Math.PI / N);
+			const sInradius = this.radius * ctx.viewport.zoom;
+
+			// 1. Inscribed guide circle
+			createSvgCircle(sCtr.x, sCtr.y, sInradius, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
+
+			// 2. Auxiliary ray from center to current point
+			const midWorld: Vec2 = {
+				x: this.centerWorldPos.x + this.radius * Math.cos(this.currentAngle),
+				y: this.centerWorldPos.y + this.radius * Math.sin(this.currentAngle),
+			};
+			const midScreen = ctx.viewport.worldToScreen(midWorld.x, midWorld.y);
+			createSvgLine(sCtr.x, sCtr.y, midScreen.x, midScreen.y, AUX_RAY_ATTRS, ctx.targetGroup);
+
+			// 3. Polygon vertices in world coordinates, transformed to screen
+			const baseAngle = this.currentAngle - Math.PI / N;
+			const step = (2 * Math.PI) / N;
+			const pts: Vec2[] = [];
+			for (let i = 0; i < N; i++) {
+				const a = baseAngle + i * step;
+				const wx = this.centerWorldPos.x + R * Math.cos(a);
+				const wy = this.centerWorldPos.y + R * Math.sin(a);
+				pts.push(ctx.viewport.worldToScreen(wx, wy));
+			}
+
+			// 4. Polygon outline path
+			if (pts.length >= 3) {
+				let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+				for (let i = 1; i < pts.length; i++) {
+					d += ` L ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}`;
+				}
+				d += ' Z';
+				createSvgPath(d, getPreviewStrokeAttrs(ctx.isConstruction), ctx.targetGroup);
+			}
+
+			// 5. Draw vertex dots
+			for (const pt of pts) {
+				createSvgCircle(pt.x, pt.y, 2.5, POLYGON_VERTEX_ATTRS, ctx.targetGroup);
+			}
+
+			// 6. Center marker
+			createSvgCircle(sCtr.x, sCtr.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+
+			// 7. Midpoint marker on incircle
+			createSvgCircle(midScreen.x, midScreen.y, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, ctx.targetGroup);
 		}
 	}
 

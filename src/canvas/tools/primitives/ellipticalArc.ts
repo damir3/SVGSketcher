@@ -1,6 +1,12 @@
 import { BaseTool } from '../base';
-import type { ToolMouseEvent } from '../types';
+import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
+import {
+	renderEllipseMajorAxisPreviewVisual,
+	renderEllipsePreviewVisual,
+	renderEllipticalArcStartPreviewVisual,
+	renderEllipticalArcPreviewVisual,
+} from '../../previewHelpers';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -251,55 +257,7 @@ export class EllipticalArcTool extends BaseTool {
 	override onMouseMove(e: ToolMouseEvent): void {
 		const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
 
-		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			const rx = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderEllipseMajorAxisPreview(s1, s2, rx, this.ctx.isConstructionMode);
-		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-			const majLen = dist(centerWorld, majWorld);
-			if (majLen >= 0.1) {
-				const ux = (majWorld.x - centerWorld.x) / majLen;
-				const uy = (majWorld.y - centerWorld.y) / majLen;
-				const vx = -uy;
-				const vy = ux;
-
-				const dx = effectiveWorld.x - centerWorld.x;
-				const dy = effectiveWorld.y - centerWorld.y;
-				let ryVal = Math.abs(dx * vx + dy * vy);
-				if (ryVal < 1) ryVal = 1;
-
-				const sc = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-				const smaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const sminWorld = vec(centerWorld.x + ryVal * vx, centerWorld.y + ryVal * vy);
-				const smin = this.ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
-
-				this.ctx.renderer.renderEllipsePreview(sc, smaj, smin, majLen, ryVal, this.ctx.isConstructionMode);
-			}
-		} else if (this.drawingStep === 3 && this.centerWorldPos && this.majWorldPos && this.minWorldPos) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-			const minWorld = this.minWorldPos;
-			const rxVal = dist(centerWorld, majWorld);
-			const ryVal = dist(centerWorld, minWorld);
-
-			const sc = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const smaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-			const smin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
-			const ss = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-
-			this.ctx.renderer.renderEllipticalArcStartPreview(
-				sc,
-				smaj,
-				smin,
-				ss,
-				rxVal,
-				ryVal,
-				this.ctx.isConstructionMode
-			);
-		} else if (
+		if (
 			this.drawingStep === 4 &&
 			this.centerWorldPos &&
 			this.majWorldPos &&
@@ -316,7 +274,6 @@ export class EllipticalArcTool extends BaseTool {
 			if (rxVal >= 0.1 && ryVal >= 0.1) {
 				const sc = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 				const smaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const smin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
 				const ss = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
 				const se = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 
@@ -346,6 +303,96 @@ export class EllipticalArcTool extends BaseTool {
 				this.ellipticalArcTotalAngle += dAngle;
 				this.ellipticalArcPrevAngle = te;
 				this.ellipticalArcTotalAngle = this.ellipticalArcTotalAngle % TWO_PI;
+			}
+		}
+	}
+
+	override renderPreview(ctx: ToolRenderContext): void {
+		const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
+
+		if (this.drawingStep === 1 && this.centerWorldPos) {
+			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
+			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const rx = dist(this.centerWorldPos, effectiveWorld);
+			renderEllipseMajorAxisPreviewVisual(ctx.targetGroup, s1, s2, rx, ctx.isConstruction);
+		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
+			const centerWorld = this.centerWorldPos;
+			const majWorld = this.majWorldPos;
+			const majLen = dist(centerWorld, majWorld);
+			if (majLen >= 0.1) {
+				const ux = (majWorld.x - centerWorld.x) / majLen;
+				const uy = (majWorld.y - centerWorld.y) / majLen;
+				const vx = -uy;
+				const vy = ux;
+
+				const dx = effectiveWorld.x - centerWorld.x;
+				const dy = effectiveWorld.y - centerWorld.y;
+				let ryVal = Math.abs(dx * vx + dy * vy);
+				if (ryVal < 1) ryVal = 1;
+
+				const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+				const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+				const sminWorld = vec(centerWorld.x + ryVal * vx, centerWorld.y + ryVal * vy);
+				const smin = ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
+
+				renderEllipsePreviewVisual(ctx.targetGroup, sc, smaj, smin, majLen, ryVal, ctx.isConstruction);
+			}
+		} else if (this.drawingStep === 3 && this.centerWorldPos && this.majWorldPos && this.minWorldPos) {
+			const centerWorld = this.centerWorldPos;
+			const majWorld = this.majWorldPos;
+			const minWorld = this.minWorldPos;
+			const rxVal = dist(centerWorld, majWorld);
+			const ryVal = dist(centerWorld, minWorld);
+
+			const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+			const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+			const smin = ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
+			const ss = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+
+			renderEllipticalArcStartPreviewVisual(
+				ctx.targetGroup,
+				sc,
+				smaj,
+				smin,
+				ss,
+				rxVal,
+				ryVal,
+				ctx.isConstruction
+			);
+		} else if (
+			this.drawingStep === 4 &&
+			this.centerWorldPos &&
+			this.majWorldPos &&
+			this.minWorldPos &&
+			this.startWorldPtPos
+		) {
+			const centerWorld = this.centerWorldPos;
+			const majWorld = this.majWorldPos;
+			const minWorld = this.minWorldPos;
+			const startWorld = this.startWorldPtPos;
+
+			const rxVal = dist(centerWorld, majWorld);
+			const ryVal = dist(centerWorld, minWorld);
+			if (rxVal >= 0.1 && ryVal >= 0.1) {
+				const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
+				const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+				const smin = ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
+				const ss = ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
+				const se = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+
+				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+				const ux_s = Math.cos(theta);
+				const uy_s = Math.sin(theta);
+				const vx_s = -Math.sin(theta);
+				const vy_s = Math.cos(theta);
+
+				const us = (ss.x - sc.x) * ux_s + (ss.y - sc.y) * uy_s;
+				const vs = (ss.x - sc.x) * vx_s + (ss.y - sc.y) * vy_s;
+				const ue = (se.x - sc.x) * ux_s + (se.y - sc.y) * uy_s;
+				const ve = (se.x - sc.x) * vx_s + (se.y - sc.y) * vy_s;
+
+				const ts = Math.atan2(vs, us);
+				const te = Math.atan2(ve, ue);
 
 				let clockwise = this.ellipticalArcTotalAngle >= 0;
 				if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {
@@ -355,7 +402,8 @@ export class EllipticalArcTool extends BaseTool {
 					clockwise = delta >= 0;
 				}
 
-				this.ctx.renderer.renderEllipticalArcPreview(
+				renderEllipticalArcPreviewVisual(
+					ctx.targetGroup,
 					sc,
 					smaj,
 					smin,
@@ -364,7 +412,7 @@ export class EllipticalArcTool extends BaseTool {
 					rxVal,
 					ryVal,
 					clockwise,
-					this.ctx.isConstructionMode
+					ctx.isConstruction
 				);
 			}
 		}

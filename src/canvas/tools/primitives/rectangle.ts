@@ -1,6 +1,8 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import type { Vec2 } from '../../../math/vector';
+import { createSvgRect, renderTooltip } from '../../svg';
+import { getPreviewStrokeAttrs } from '../../styles';
 
 export class RectangleTool extends BaseTool {
 	readonly id = 'rectangle' as const;
@@ -68,17 +70,6 @@ export class RectangleTool extends BaseTool {
 		}
 	}
 
-	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.drawingStep === 1 && this.startWorldPos) {
-			const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
-			const s1 = this.ctx.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			const w = Math.abs(effectiveWorld.x - this.startWorldPos.x);
-			const h = Math.abs(effectiveWorld.y - this.startWorldPos.y);
-			this.ctx.renderer.renderRectanglePreview(s1, s2, w, h, this.ctx.isConstructionMode);
-		}
-	}
-
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.startWorldPos) {
 			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
@@ -86,7 +77,14 @@ export class RectangleTool extends BaseTool {
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const w = Math.abs(effectiveWorld.x - this.startWorldPos.x);
 			const h = Math.abs(effectiveWorld.y - this.startWorldPos.y);
-			this.ctx.renderer.renderRectanglePreview(s1, s2, w, h, ctx.isConstruction);
+
+			const rx = Math.min(s1.x, s2.x);
+			const ry = Math.min(s1.y, s2.y);
+			const rw = Math.abs(s2.x - s1.x);
+			const rh = Math.abs(s2.y - s1.y);
+
+			createSvgRect(rx, ry, rw, rh, getPreviewStrokeAttrs(ctx.isConstruction), ctx.targetGroup);
+			renderTooltip(ctx.targetGroup, s2.x + 12, s2.y - 12, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
 		}
 	}
 

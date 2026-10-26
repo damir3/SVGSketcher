@@ -19,15 +19,15 @@ export abstract class BaseTool implements ITool {
 		this.cancel();
 	}
 
-	onMouseDown?(e: ToolMouseEvent): boolean | void;
-	onMouseMove?(e: ToolMouseEvent): void;
-	onMouseUp?(e: ToolMouseEvent): void;
-	onDoubleClick?(e: ToolMouseEvent): void;
+	onMouseDown(_e: ToolMouseEvent): boolean | void {}
+	onMouseMove(_e: ToolMouseEvent): void {}
+	onMouseUp(_e: ToolMouseEvent): void {}
+	onDoubleClick(_e: ToolMouseEvent): void {}
 
-	onKeyDown?(e: KeyboardEvent): boolean | void;
-	onKeyUp?(e: KeyboardEvent): void;
+	onKeyDown(_e: KeyboardEvent): boolean | void {}
+	onKeyUp(_e: KeyboardEvent): void {}
 
-	renderPreview?(ctx: ToolRenderContext): void;
+	renderPreview(_ctx: ToolRenderContext): void {}
 
 	getRenderOptions(): Record<string, unknown> {
 		return {};

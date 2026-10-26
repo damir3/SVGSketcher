@@ -1,6 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
+import { renderEllipseMajorAxisPreviewVisual, renderEllipsePreviewVisual } from '../../previewHelpers';
 
 export class EllipseTool extends BaseTool {
 	readonly id = 'ellipse' as const;
@@ -100,47 +101,13 @@ export class EllipseTool extends BaseTool {
 		}
 	}
 
-	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
-			const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			const rx = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderEllipseMajorAxisPreview(s1, s2, rx, this.ctx.isConstructionMode);
-		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-			const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
-
-			const majLen = dist(centerWorld, majWorld);
-			if (majLen >= 0.1) {
-				const ux = (majWorld.x - centerWorld.x) / majLen;
-				const uy = (majWorld.y - centerWorld.y) / majLen;
-				const vx = -uy;
-				const vy = ux;
-
-				const dx = effectiveWorld.x - centerWorld.x;
-				const dy = effectiveWorld.y - centerWorld.y;
-				let ryVal = Math.abs(dx * vx + dy * vy);
-				if (ryVal < 1) ryVal = 1;
-
-				const sc = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-				const smaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const sminWorld = vec(centerWorld.x + ryVal * vx, centerWorld.y + ryVal * vy);
-				const smin = this.ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
-
-				this.ctx.renderer.renderEllipsePreview(sc, smaj, smin, majLen, ryVal, this.ctx.isConstructionMode);
-			}
-		}
-	}
-
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
 			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const rx = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderEllipseMajorAxisPreview(s1, s2, rx, ctx.isConstruction);
+			renderEllipseMajorAxisPreviewVisual(ctx.targetGroup, s1, s2, rx, ctx.isConstruction);
 		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
 			const centerWorld = this.centerWorldPos;
 			const majWorld = this.majWorldPos;
@@ -163,7 +130,7 @@ export class EllipseTool extends BaseTool {
 				const sminWorld = vec(centerWorld.x + ryVal * vx, centerWorld.y + ryVal * vy);
 				const smin = ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
 
-				this.ctx.renderer.renderEllipsePreview(sc, smaj, smin, majLen, ryVal, ctx.isConstruction);
+				renderEllipsePreviewVisual(ctx.targetGroup, sc, smaj, smin, majLen, ryVal, ctx.isConstruction);
 			}
 		}
 	}

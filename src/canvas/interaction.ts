@@ -419,6 +419,17 @@ export class CanvasInteraction {
 		};
 	}
 
+	updateToolPreview(): void {
+		this.renderer.clearPreviews();
+		if (this.activeTool !== 'select' && this.activeToolInstance) {
+			const screen = this.lastMouseScreen;
+			const world = this.viewport.screenToWorld(screen.x, screen.y);
+			const snap = isDrawingPrimitiveTool(this.activeTool) ? this.findSnap(screen) : null;
+			const renderCtx = this.createToolRenderContext(screen, world, snap);
+			this.activeToolInstance.renderPreview?.(renderCtx);
+		}
+	}
+
 	constructor(
 		svg: SVGSVGElement,
 		sketch: SketchDocument,
@@ -606,6 +617,8 @@ export class CanvasInteraction {
 				}
 			}
 		}
+
+		this.updateToolPreview();
 	}
 
 	private bindEvents(): void {
@@ -1379,6 +1392,7 @@ export class CanvasInteraction {
 			const toolEvent = this.createToolMouseEvent(e);
 			const handled = this.activeToolInstance.onMouseDown(toolEvent);
 			if (handled !== false) {
+				this.updateToolPreview();
 				return;
 			}
 		}
@@ -1711,6 +1725,8 @@ export class CanvasInteraction {
 			this.render();
 			return;
 		}
+
+		this.lastMouseScreen = screen;
 
 		// Gizmo drag handling (Rectangular pattern distance1 / distance2 in select mode)
 		if (this.gizmoDragState) {
@@ -2056,14 +2072,11 @@ export class CanvasInteraction {
 			return;
 		}
 
-		const snap = isDrawingPrimitiveTool(this.activeTool) ? this.findSnap(screen) : null;
-
 		// Delegate to active tool if not select
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
 			const toolEvent = this.createToolMouseEvent(e);
 			this.activeToolInstance.onMouseMove?.(toolEvent);
-			const renderCtx = this.createToolRenderContext(screen, world, snap);
-			this.activeToolInstance.renderPreview?.(renderCtx);
+			this.updateToolPreview();
 			return;
 		}
 
@@ -2082,6 +2095,7 @@ export class CanvasInteraction {
 			if (this.activeTool !== 'select' && this.activeToolInstance?.onMouseUp) {
 				const toolEvent = this.createToolMouseEvent(e);
 				this.activeToolInstance.onMouseUp(toolEvent);
+				this.updateToolPreview();
 			}
 		}
 		this.svg.classList.remove('is-dragging');

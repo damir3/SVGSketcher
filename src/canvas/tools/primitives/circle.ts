@@ -1,6 +1,8 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
+import { createSvgCircle, createSvgLine, renderTooltip } from '../../svg';
+import { getPreviewStrokeAttrs, AUX_RAY_ATTRS } from '../../styles';
 
 export class CircleTool extends BaseTool {
 	readonly id = 'circle' as const;
@@ -43,23 +45,17 @@ export class CircleTool extends BaseTool {
 		}
 	}
 
-	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
-			const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
-			const radius = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderCirclePreview(s1, s2, radius, this.ctx.isConstructionMode, false);
-		}
-	}
-
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
 			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const radius = dist(this.centerWorldPos, effectiveWorld);
-			this.ctx.renderer.renderCirclePreview(s1, s2, radius, ctx.isConstruction, false);
+			const rPx = Math.hypot(s2.x - s1.x, s2.y - s1.y);
+
+			createSvgCircle(s1.x, s1.y, rPx, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
+			createSvgLine(s1.x, s1.y, s2.x, s2.y, AUX_RAY_ATTRS, ctx.targetGroup);
+			renderTooltip(ctx.targetGroup, s2.x + 12, s2.y - 12, `R ${radius.toFixed(1)} mm`);
 		}
 	}
 
