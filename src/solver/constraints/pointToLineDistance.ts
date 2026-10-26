@@ -2,6 +2,7 @@ import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { computePointToLineDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
+import { distanceToLinearDimension } from '../../math/hitTest';
 
 /**
  * Dimensional constraint: distance from a point to a line segment (infinite line extension) equals value
@@ -94,5 +95,21 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
 		});
+	}
+
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const pt = sketch.points.get(this.pointId);
+		const p1 = sketch.points.get(this.lineP1Id);
+		const p2 = sketch.points.get(this.lineP2Id);
+		if (!pt || !p1 || !p2) return null;
+
+		const sp = viewport.worldToScreen(pt.x, pt.y);
+		const s1 = viewport.worldToScreen(p1.x, p1.y);
+		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
+		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
+		if (!geom) return null;
+
+		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
 }

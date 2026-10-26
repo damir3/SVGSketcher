@@ -2,6 +2,7 @@ import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
+import { distanceToLinearDimension } from '../../math/hitTest';
 
 /**
  * Dimensional constraint: distance between two points equals value
@@ -132,5 +133,19 @@ export class DistanceConstraint extends BaseConstraint {
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
 		});
+	}
+
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
+		if (!p1 || !p2) return null;
+
+		const s1 = viewport.worldToScreen(p1.x, p1.y);
+		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 32;
+		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
+		if (!geom) return null;
+
+		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
 }

@@ -254,7 +254,7 @@ export class SVGRenderer {
 		worldBisectorDir: Vec2;
 		radius: number;
 	} | null = null;
-	private previewGroup: SVGGElement;
+	public previewGroup: SVGGElement;
 	private overlayGroup: SVGGElement;
 	private filletGroup: SVGGElement;
 

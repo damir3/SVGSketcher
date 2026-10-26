@@ -1,66 +1,14 @@
 import type { IConstraint } from '../solver/types';
-
-export interface SketchPoint {
-	id: string;
-	x: number;
-	y: number;
-	fixed: boolean;
-}
-
-export interface SketchLine {
-	id: string;
-	p1Id: string;
-	p2Id: string;
-	isConstruction?: boolean;
-	isSplineHandle?: boolean;
-	parentSplineId?: string;
-}
-
-export interface SketchCircle {
-	id: string;
-	centerId: string;
-	radius: number;
-	isConstruction?: boolean;
-}
-
-export interface SketchArc {
-	id: string;
-	centerId: string;
-	startPointId: string;
-	endPointId: string;
-	radius: number;
-	clockwise?: boolean;
-	isConstruction?: boolean;
-}
-
-export interface SketchEllipse {
-	id: string;
-	centerId: string;
-	majorAxisPointId: string;
-	minorAxisPointId: string;
-	isConstruction?: boolean;
-}
-
-export interface SketchEllipticalArc {
-	id: string;
-	centerId: string;
-	majorAxisPointId: string;
-	minorAxisPointId: string;
-	startPointId: string;
-	endPointId: string;
-	clockwise?: boolean;
-	isConstruction?: boolean;
-}
-
-export interface SketchSpline {
-	id: string;
-	splineType: 'fit' | 'control';
-	pointIds: string[];
-	tangentLineIds?: string[];
-	knots?: number[];
-	isClosed?: boolean;
-	isConstruction?: boolean;
-}
+export * from './primitives';
+import type {
+	SketchPoint,
+	SketchLine,
+	SketchCircle,
+	SketchArc,
+	SketchEllipse,
+	SketchEllipticalArc,
+	SketchSpline,
+} from './primitives';
 
 export type SketchEntity =
 	| { type: 'point'; entity: SketchPoint }
@@ -82,4 +30,3 @@ export interface SelectionState {
 	splineIds: Set<string>;
 	constraintIds: Set<string>;
 }
-

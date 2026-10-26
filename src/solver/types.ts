@@ -68,6 +68,7 @@ export interface IConstraint {
 	evaluate(paramMap: Map<string, number>): number[];
 	jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[];
 	render?(context: any): void;
+	distanceTo?(screen: any, sketch: any, viewport: any, thresholdPx?: number): number | null;
 }
 
 export interface SolverOptions {

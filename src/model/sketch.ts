@@ -35,7 +35,16 @@ import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 } from '../solver/constraints';
-import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline, SelectionState } from './types';
+import {
+	SketchPoint,
+	SketchLine,
+	SketchCircle,
+	SketchArc,
+	SketchEllipse,
+	SketchEllipticalArc,
+	SketchSpline,
+	type SelectionState,
+} from './types';
 import { dist, type Vec2 } from '../math/vector';
 import { bsplineToBezier, fitPointsToBezier, computeNaturalFitHandles, getSplineSvgPath, type BezierSegment } from '../math/spline';
 import {
@@ -218,13 +227,13 @@ export class SketchDocument {
 
 	takeSnapshot(): SketchSnapshot {
 		return {
-			points: Array.from(this.points.values()).map(p => ({ ...p })),
-			lines: Array.from(this.lines.values()).map(l => ({ ...l })),
-			circles: Array.from(this.circles.values()).map(c => ({ ...c })),
-			arcs: Array.from(this.arcs.values()).map(a => ({ ...a })),
-			ellipses: Array.from(this.ellipses.values()).map(e => ({ ...e })),
-			ellipticalArcs: Array.from(this.ellipticalArcs.values()).map(a => ({ ...a })),
-			splines: Array.from(this.splines.values()).map(s => ({
+			points: Array.from(this.points.values()).map(p => new SketchPoint(p)),
+			lines: Array.from(this.lines.values()).map(l => new SketchLine(l)),
+			circles: Array.from(this.circles.values()).map(c => new SketchCircle(c)),
+			arcs: Array.from(this.arcs.values()).map(a => new SketchArc(a)),
+			ellipses: Array.from(this.ellipses.values()).map(e => new SketchEllipse(e)),
+			ellipticalArcs: Array.from(this.ellipticalArcs.values()).map(a => new SketchEllipticalArc(a)),
+			splines: Array.from(this.splines.values()).map(s => new SketchSpline({
 				...s,
 				pointIds: [...s.pointIds],
 				tangentLineIds: s.tangentLineIds ? [...s.tangentLineIds] : undefined,
@@ -238,42 +247,37 @@ export class SketchDocument {
 	restoreSnapshot(snapshot: SketchSnapshot): void {
 		this.points.clear();
 		for (const pt of snapshot.points) {
-			this.points.set(pt.id, { ...pt });
+			this.points.set(pt.id, new SketchPoint(pt));
 		}
 
 		this.lines.clear();
 		for (const l of snapshot.lines) {
-			this.lines.set(l.id, { ...l });
+			this.lines.set(l.id, new SketchLine(l));
 		}
 
 		this.circles.clear();
 		for (const c of snapshot.circles) {
-			this.circles.set(c.id, { ...c });
+			this.circles.set(c.id, new SketchCircle(c));
 		}
 
 		this.arcs.clear();
 		for (const a of snapshot.arcs) {
-			this.arcs.set(a.id, { ...a });
+			this.arcs.set(a.id, new SketchArc(a));
 		}
 
 		this.ellipses.clear();
 		for (const e of snapshot.ellipses ?? []) {
-			this.ellipses.set(e.id, { ...e });
+			this.ellipses.set(e.id, new SketchEllipse(e));
 		}
 
 		this.ellipticalArcs.clear();
 		for (const a of snapshot.ellipticalArcs ?? []) {
-			this.ellipticalArcs.set(a.id, { ...a });
+			this.ellipticalArcs.set(a.id, new SketchEllipticalArc(a));
 		}
 
 		this.splines.clear();
 		for (const s of snapshot.splines ?? []) {
-			this.splines.set(s.id, {
-				...s,
-				pointIds: [...s.pointIds],
-				tangentLineIds: s.tangentLineIds ? [...s.tangentLineIds] : undefined,
-				knots: s.knots ? [...s.knots] : undefined,
-			});
+			this.splines.set(s.id, new SketchSpline(s));
 		}
 
 		this.constraints.clear();
@@ -317,7 +321,7 @@ export class SketchDocument {
 	addPoint(x: number, y: number, fixed = false): SketchPoint {
 		this.pushHistory();
 		const id = this.nextId('Point');
-		const pt: SketchPoint = { id, x, y, fixed };
+		const pt = new SketchPoint({ id, x, y, fixed });
 		this.points.set(id, pt);
 		this.rebuildParamManager();
 		this.solve();
@@ -332,7 +336,7 @@ export class SketchDocument {
 	addLine(p1Id: string, p2Id: string, isConstruction = false): SketchLine {
 		this.pushHistory();
 		const id = this.nextId('Line');
-		const line: SketchLine = { id, p1Id, p2Id, isConstruction };
+		const line = new SketchLine({ id, p1Id, p2Id, isConstruction });
 		this.lines.set(id, line);
 		this.rebuildParamManager();
 		this.solve();
@@ -343,7 +347,7 @@ export class SketchDocument {
 	addCircle(centerId: string, radius: number, isConstruction = false): SketchCircle {
 		this.pushHistory();
 		const id = this.nextId('Circle');
-		const circle: SketchCircle = { id, centerId, radius, isConstruction };
+		const circle = new SketchCircle({ id, centerId, radius, isConstruction });
 		this.circles.set(id, circle);
 		this.rebuildParamManager();
 		this.solve();
@@ -361,7 +365,7 @@ export class SketchDocument {
 	): SketchArc {
 		this.pushHistory();
 		const id = this.nextId('Arc');
-		const arc: SketchArc = { id, centerId, startPointId, endPointId, radius, clockwise, isConstruction };
+		const arc = new SketchArc({ id, centerId, startPointId, endPointId, radius, clockwise, isConstruction });
 		this.arcs.set(id, arc);
 		this.rebuildParamManager();
 		const c = new ArcEndpointsConstraint(
@@ -385,13 +389,13 @@ export class SketchDocument {
 	): SketchEllipse {
 		this.pushHistory();
 		const id = this.nextId('Ellipse');
-		const ellipse: SketchEllipse = {
+		const ellipse = new SketchEllipse({
 			id,
 			centerId,
 			majorAxisPointId,
 			minorAxisPointId,
 			isConstruction,
-		};
+		});
 		this.ellipses.set(id, ellipse);
 		this.rebuildParamManager();
 		const c = new EllipseAxisConstraint(
@@ -418,7 +422,7 @@ export class SketchDocument {
 	): SketchEllipticalArc {
 		this.pushHistory();
 		const id = this.nextId('EllipticalArc');
-		const arc: SketchEllipticalArc = {
+		const arc = new SketchEllipticalArc({
 			id,
 			centerId,
 			majorAxisPointId,
@@ -427,7 +431,7 @@ export class SketchDocument {
 			endPointId,
 			clockwise,
 			isConstruction,
-		};
+		});
 		this.ellipticalArcs.set(id, arc);
 		this.rebuildParamManager();
 		const cAxis = new EllipseAxisConstraint(
@@ -493,18 +497,18 @@ export class SketchDocument {
 					const h = handles[i];
 					const pFit = pts[i];
 					const p1Id = this.nextId('Point');
-					this.points.set(p1Id, { id: p1Id, x: h.h1.x, y: h.h1.y, fixed: false });
+					this.points.set(p1Id, new SketchPoint(p1Id, h.h1.x, h.h1.y, false));
 					const p2Id = this.nextId('Point');
-					this.points.set(p2Id, { id: p2Id, x: h.h2.x, y: h.h2.y, fixed: false });
+					this.points.set(p2Id, new SketchPoint(p2Id, h.h2.x, h.h2.y, false));
 					const lineId = this.nextId('Line');
-					const hLine: SketchLine = {
+					const hLine = new SketchLine({
 						id: lineId,
 						p1Id,
 						p2Id,
 						isConstruction: true,
 						isSplineHandle: true,
 						parentSplineId: sid,
-					};
+					});
 					this.lines.set(lineId, hLine);
 					const d1 = Math.hypot(pFit.x - h.h1.x, pFit.y - h.h1.y);
 					const d2 = Math.hypot(h.h2.x - pFit.x, h.h2.y - pFit.y);
@@ -520,14 +524,14 @@ export class SketchDocument {
 			}
 		}
 
-		const spline: SketchSpline = {
+		const spline = new SketchSpline({
 			id: sid,
 			splineType: 'fit',
 			pointIds: actualPointIds,
 			tangentLineIds: actualTangentLineIds,
 			isClosed: closed,
 			isConstruction,
-		};
+		});
 		this.splines.set(sid, spline);
 
 		if (actualTangentLineIds) {
@@ -564,14 +568,14 @@ export class SketchDocument {
 				const p1Id = actualPointIds[i];
 				const p2Id = actualPointIds[i + 1];
 				const lineId = this.nextId('Line');
-				const hLine: SketchLine = {
+				const hLine = new SketchLine({
 					id: lineId,
 					p1Id,
 					p2Id,
 					isConstruction: true,
 					isSplineHandle: true,
 					parentSplineId: sid,
-				};
+				});
 				this.lines.set(lineId, hLine);
 				actualTangentLineIds.push(lineId);
 			}
@@ -585,7 +589,7 @@ export class SketchDocument {
 			}
 		}
 
-		const spline: SketchSpline = {
+		const spline = new SketchSpline({
 			id: sid,
 			splineType: 'control',
 			pointIds: actualPointIds,
@@ -593,7 +597,7 @@ export class SketchDocument {
 			knots: knots ? [...knots] : undefined,
 			isClosed: false,
 			isConstruction,
-		};
+		});
 		this.splines.set(sid, spline);
 		this.notify();
 		return spline;
@@ -2388,14 +2392,14 @@ export class SketchDocument {
 							spline.tangentLineIds = [];
 							for (let i = 0; i < remaining.length - 1; i++) {
 								const lineId = this.nextId('Line');
-								const hLine: SketchLine = {
+								const hLine = new SketchLine({
 									id: lineId,
 									p1Id: remaining[i],
 									p2Id: remaining[i + 1],
 									isConstruction: true,
 									isSplineHandle: true,
 									parentSplineId: sid,
-								};
+								});
 								this.lines.set(lineId, hLine);
 								spline.tangentLineIds.push(lineId);
 							}

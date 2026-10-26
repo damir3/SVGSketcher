@@ -3,6 +3,7 @@ import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgLine, createSvgRect, createSvgText } from '../../canvas/svg';
+import { distanceToRadiusDimension } from '../../math/hitTest';
 
 /**
  * Dimensional constraint: circle radius equals value
@@ -166,5 +167,46 @@ export class RadiusConstraint extends BaseConstraint {
 			'font-weight': 600,
 			'font-family': 'monospace',
 		}, g);
+	}
+
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const circle = sketch.circles.get(this.circleId);
+		const arc = sketch.arcs.get(this.circleId);
+		const entity = circle ?? arc;
+		if (!entity) return null;
+		const center = sketch.points.get(entity.centerId);
+		if (!center) return null;
+
+		const sc = viewport.worldToScreen(center.x, center.y);
+		const sr = entity.radius * viewport.zoom;
+
+		let screenAngle = -Math.PI / 4;
+		if (arc) {
+			const start = sketch.points.get(arc.startPointId);
+			const end = sketch.points.get(arc.endPointId);
+			if (start && end) {
+				const ss = viewport.worldToScreen(start.x, start.y);
+				const se = viewport.worldToScreen(end.x, end.y);
+				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
+				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+				const clockwise = !!arc.clockwise;
+				let sweepAngle = clockwise ? (ae - as) % (2 * Math.PI) : (as - ae) % (2 * Math.PI);
+				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
+				if (this.leaderAngle !== undefined) {
+					let rel = clockwise ? (this.leaderAngle - as) % (2 * Math.PI) : (as - this.leaderAngle) % (2 * Math.PI);
+					if (rel < 0) rel += 2 * Math.PI;
+					if (rel > sweepAngle) rel = rel - sweepAngle < (2 * Math.PI) - rel ? sweepAngle : 0;
+					screenAngle = clockwise ? as + rel : as - rel;
+				} else {
+					screenAngle = clockwise ? as + sweepAngle / 2 : as - sweepAngle / 2;
+				}
+			}
+		} else {
+			if (this.leaderAngle !== undefined) {
+				screenAngle = this.leaderAngle;
+			}
+		}
+
+		return distanceToRadiusDimension(screen, sc, sr, screenAngle);
 	}
 }

@@ -48,6 +48,10 @@ export class BaseConstraint implements IConstraint {
 		// Default: no visual representation
 	}
 
+	distanceTo(_screen: any, _sketch: any, _viewport: any, _thresholdPx?: number): number | null {
+		return null;
+	}
+
 	protected addJacobianEntry(
 		entries: JacobianEntry[],
 		paramIndices: Map<string, number>,
