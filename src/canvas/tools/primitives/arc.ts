@@ -714,9 +714,3 @@ export class ArcTool extends BaseTool {
 	}
 }
 
-/** Backwards-compatible alias for Centerpoint Arc Tool */
-export class ArcCenterTool extends ArcTool {
-	constructor() {
-		super('center');
-	}
-}

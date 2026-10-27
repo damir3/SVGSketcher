@@ -3,7 +3,6 @@ export * from './line';
 export * from './circle';
 export * from './rectangle';
 export * from './arc';
-export * from './arcCenter';
 export * from './polygon';
 export * from './ellipse';
 export * from './ellipticalArc';

@@ -54,7 +54,6 @@ export class MirrorTool extends BaseTool {
 	override cancel(): void {
 		this.state = null;
 		this.onStateChange?.();
-		this.ctx.setTool('select');
 		this.ctx.requestRender();
 	}
 

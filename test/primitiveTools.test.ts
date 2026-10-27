@@ -5,11 +5,13 @@ import { LineTool } from '../src/canvas/tools/primitives/line';
 import { CircleTool } from '../src/canvas/tools/primitives/circle';
 import { RectangleTool } from '../src/canvas/tools/primitives/rectangle';
 import { ArcTool } from '../src/canvas/tools/primitives/arc';
-import { ArcCenterTool } from '../src/canvas/tools/primitives/arcCenter';
 import { EllipseTool } from '../src/canvas/tools/primitives/ellipse';
 import { SplineTool } from '../src/canvas/tools/primitives/spline';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { TrimTool } from '../src/canvas/tools/modify/trim';
+import { CircularPatternTool } from '../src/canvas/tools/modify/circularPattern';
+import { MirrorTool } from '../src/canvas/tools/modify/mirror';
+import { RectangularPatternTool } from '../src/canvas/tools/modify/rectangularPattern';
 import {
 	TangentLineCircleConstraint,
 	TangentCircleCircleConstraint,
@@ -525,10 +527,10 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(sketch.lines.size, 8);
 	});
 
-	it('ArcCenterTool creates centerpoint arc', () => {
+	it('ArcTool creates centerpoint arc in center mode', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
-		const arcTool = new ArcCenterTool();
+		const arcTool = new ArcTool('center');
 		arcTool.activate(ctx);
 
 		// Click 1: center
@@ -946,5 +948,57 @@ describe('Primitive Tools Creation', () => {
 
 		assert.deepEqual(switchedModes, ['corner', 'center', 'three_point', 'rounded']);
 	});
+
+	it('CircularPatternTool cancel resets state without calling ctx.setTool', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		let setToolCalls = 0;
+		ctx.setTool = () => {
+			setToolCalls++;
+		};
+
+		const tool = new CircularPatternTool();
+		tool.activate(ctx);
+		assert.ok(tool.state);
+
+		tool.cancel();
+		assert.equal(tool.state, null);
+		assert.equal(setToolCalls, 0, 'cancel() must not call ctx.setTool');
+	});
+
+	it('MirrorTool cancel resets state without calling ctx.setTool', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		let setToolCalls = 0;
+		ctx.setTool = () => {
+			setToolCalls++;
+		};
+
+		const tool = new MirrorTool();
+		tool.activate(ctx);
+		assert.ok(tool.state);
+
+		tool.cancel();
+		assert.equal(tool.state, null);
+		assert.equal(setToolCalls, 0, 'cancel() must not call ctx.setTool');
+	});
+
+	it('RectangularPatternTool cancel resets state without calling ctx.setTool', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		let setToolCalls = 0;
+		ctx.setTool = () => {
+			setToolCalls++;
+		};
+
+		const tool = new RectangularPatternTool();
+		tool.activate(ctx);
+		assert.ok(tool.state);
+
+		tool.cancel();
+		assert.equal(tool.state, null);
+		assert.equal(setToolCalls, 0, 'cancel() must not call ctx.setTool');
+	});
 });
+
 

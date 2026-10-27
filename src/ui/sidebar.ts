@@ -184,7 +184,7 @@ export class Sidebar {
 	}
 
 	private renderArcToolCard(): string {
-		if (!this.interaction || (this.interaction.activeTool !== 'arc' && this.interaction.activeTool !== 'arc_center')) {
+		if (!this.interaction || this.interaction.activeTool !== 'arc') {
 			return '';
 		}
 

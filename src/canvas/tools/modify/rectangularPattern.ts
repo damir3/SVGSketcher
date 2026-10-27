@@ -94,7 +94,6 @@ export class RectangularPatternTool extends BaseTool {
 		this.state = null;
 		this.gizmoDragState = null;
 		this.onStateChange?.();
-		this.ctx.setTool('select');
 		this.ctx.requestRender();
 	}
 

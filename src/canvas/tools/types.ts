@@ -19,7 +19,6 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'circle',
 	'polygon',
 	'arc',
-	'arc_center',
 	'rectangle',
 	'ellipse',
 	'elliptical_arc',

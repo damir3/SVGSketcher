@@ -52,7 +52,6 @@ import {
 	RectangleTool,
 	type RectangleMode,
 	ArcTool,
-	ArcCenterTool,
 	type ArcMode,
 	PolygonTool,
 	EllipseTool,
@@ -204,6 +203,7 @@ export class CanvasInteraction {
 
 	readonly tools = new Map<ToolType, ITool>();
 	activeToolInstance: ITool | null = null;
+	private isSettingTool = false;
 
 	get mirrorState(): MirrorState | null {
 		return (this.tools.get('mirror') as MirrorTool)?.state ?? null;
@@ -263,6 +263,7 @@ export class CanvasInteraction {
 
 	cancelMirror(): void {
 		(this.tools.get('mirror') as MirrorTool)?.cancel();
+		this.setTool('select');
 	}
 
 	executeMirror(): boolean {
@@ -283,6 +284,7 @@ export class CanvasInteraction {
 
 	cancelCircularPattern(): void {
 		(this.tools.get('circular_pattern') as CircularPatternTool)?.cancel();
+		this.setTool('select');
 	}
 
 	executeCircularPattern(): boolean {
@@ -303,6 +305,7 @@ export class CanvasInteraction {
 
 	cancelRectangularPattern(): void {
 		(this.tools.get('rectangular_pattern') as RectangularPatternTool)?.cancel();
+		this.setTool('select');
 	}
 
 	executeRectangularPattern(): boolean {
@@ -377,7 +380,6 @@ export class CanvasInteraction {
 		};
 		arcTool.onStateChange = () => this.onArcStateChange?.();
 		this.tools.set('arc', arcTool);
-		this.tools.set('arc_center', new ArcCenterTool());
 		this.tools.set('polygon', new PolygonTool());
 		this.tools.set('ellipse', new EllipseTool());
 		this.tools.set('elliptical_arc', new EllipticalArcTool());
@@ -515,34 +517,38 @@ export class CanvasInteraction {
 	}
 
 	setTool(tool: ToolType): void {
-		if (tool === 'arc_center') {
-			this.getArcTool()?.setMode('center');
-			tool = 'arc';
-		}
-		if (this.activeToolInstance) {
-			this.activeToolInstance.deactivate();
-		}
-		this.activeTool = tool;
-		this.cancelDrawing();
+		if (this.isSettingTool) return;
+		this.isSettingTool = true;
+		try {
+			const prevTool = this.activeToolInstance;
+			this.activeToolInstance = null;
+			if (prevTool) {
+				prevTool.deactivate();
+			}
+			this.activeTool = tool;
+			this.cancelDrawing();
 
-		const nextTool = this.tools.get(tool) ?? null;
-		this.activeToolInstance = nextTool;
-		if (nextTool) {
-			nextTool.activate(this.createToolContext());
-		}
+			const nextTool = this.tools.get(tool) ?? null;
+			this.activeToolInstance = nextTool;
+			if (nextTool) {
+				nextTool.activate(this.createToolContext());
+			}
 
-		if (isConstraintTool(tool)) {
-			this.pruneIncompatibleSelection(tool);
+			if (isConstraintTool(tool)) {
+				this.pruneIncompatibleSelection(tool);
+			}
+			this.svg.classList.toggle('tool-constraint', isConstraintTool(tool));
+			this.svg.classList.toggle('tool-trim', tool === 'trim' || tool === 'break');
+			this.updateCursor();
+			this.onToolChange?.(tool);
+			this.onMirrorStateChange?.();
+			this.onCircularPatternStateChange?.();
+			this.onRectangularPatternStateChange?.();
+			this.onArcStateChange?.();
+			this.render();
+		} finally {
+			this.isSettingTool = false;
 		}
-		this.svg.classList.toggle('tool-constraint', isConstraintTool(tool));
-		this.svg.classList.toggle('tool-trim', tool === 'trim' || tool === 'break');
-		this.updateCursor();
-		this.onToolChange?.(tool);
-		this.onMirrorStateChange?.();
-		this.onCircularPatternStateChange?.();
-		this.onRectangularPatternStateChange?.();
-		this.onArcStateChange?.();
-		this.render();
 	}
 
 	toggleConstructionMode(): void {
@@ -779,7 +785,7 @@ export class CanvasInteraction {
 					showToast('Rounded Rectangle (Alt+4)');
 					return;
 				}
-			} else if (this.activeTool === 'arc' || this.activeTool === 'arc_center') {
+			} else if (this.activeTool === 'arc') {
 				if (isDigit1) {
 					e.preventDefault();
 					this.setArcMode('center');
