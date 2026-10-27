@@ -906,6 +906,127 @@ html, body {
   flex-shrink: 0;
 }
 
+/* --- RECTANGLE POPUP --- */
+.rectangle-popup {
+  position: fixed;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 6px 8px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: auto;
+  min-width: 175px;
+  user-select: none;
+  font-family: inherit;
+}
+
+.rectangle-popup.hidden {
+  display: none;
+}
+
+.rectangle-popup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rectangle-popup-row.hidden {
+  display: none;
+}
+
+.rectangle-popup-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  letter-spacing: 0.3px;
+}
+
+.rectangle-input-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface-elevated, #f8fafc);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 4px 2px 6px;
+  height: 26px;
+  box-sizing: border-box;
+  gap: 4px;
+}
+
+.rectangle-input-wrapper:focus-within {
+  border-color: var(--cad-blue, #0284c7);
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.rectangle-input-wrapper input {
+  width: 52px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: monospace;
+  padding: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.rectangle-input-wrapper input::-webkit-outer-spin-button,
+.rectangle-input-wrapper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.rectangle-input-wrapper input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.rectangle-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  margin-left: 2px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.rectangle-lock-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.rectangle-lock-btn:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-primary, #0f172a);
+}
+
+.rectangle-lock-btn.locked {
+  color: #0284c7;
+  background-color: rgba(2, 132, 199, 0.12);
+}
+
+.rectangle-lock-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
 /* --- FILLET POPUP --- */
 .fillet-popup {
   position: fixed;
@@ -1129,6 +1250,85 @@ html, body {
 }
 
 .arc-mode-hint {
+  font-size: 11px;
+  color: var(--cad-blue);
+  background-color: rgba(56, 189, 248, 0.08);
+  border-left: 2px solid var(--cad-blue);
+  padding: 6px 8px;
+  border-radius: 0 4px 4px 0;
+  line-height: 1.4;
+}
+
+/* --- RECTANGLE TOOL SIDEBAR CARD --- */
+.rectangle-tool-card {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+}
+
+.rectangle-mode-selector {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  background-color: var(--bg-surface);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.rectangle-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 2px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.rectangle-mode-btn:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.rectangle-mode-btn.active {
+  background-color: var(--cad-blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
+}
+
+.rectangle-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.rectangle-mode-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.rectangle-mode-btn.active .rectangle-mode-icon svg {
+  stroke: #fff;
+}
+
+.rectangle-mode-hint {
   font-size: 11px;
   color: var(--cad-blue);
   background-color: rgba(56, 189, 248, 0.08);

@@ -7,6 +7,9 @@ import arc from '../assets/icons/arc.svg?raw';
 import arcCenter from '../assets/icons/arc-center.svg?raw';
 import arcTangent from '../assets/icons/arc-tangent.svg?raw';
 import rectangle from '../assets/icons/rectangle.svg?raw';
+import rectangleCenter from '../assets/icons/rectangle-center.svg?raw';
+import rectangle3Point from '../assets/icons/rectangle-3point.svg?raw';
+import rectangleRounded from '../assets/icons/rectangle-rounded.svg?raw';
 import polygon from '../assets/icons/polygon.svg?raw';
 import ellipse from '../assets/icons/ellipse.svg?raw';
 import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
@@ -23,6 +26,7 @@ import rectangularPattern from '../assets/icons/rectangular-pattern.svg?raw';
 
 import coincident from '../assets/icons/coincident.svg?raw';
 import fixed from '../assets/icons/fixed.svg?raw';
+import unfixed from '../assets/icons/unfixed.svg?raw';
 import horizontal from '../assets/icons/horizontal.svg?raw';
 import vertical from '../assets/icons/vertical.svg?raw';
 import horizontalVertical from '../assets/icons/horizontal-vertical.svg?raw';
@@ -57,6 +61,11 @@ export const ICONS = {
 	arc_center: arcCenter,
 	arc_tangent: arcTangent,
 	rectangle,
+	rectangle_center: rectangleCenter,
+	rectangle_3point: rectangle3Point,
+	rectangle_rounded: rectangleRounded,
+	lock: fixed,
+	unlock: unfixed,
 	polygon,
 	ellipse,
 	elliptical_arc: ellipticalArc,

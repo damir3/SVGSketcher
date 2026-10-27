@@ -1,4 +1,5 @@
 export function showToast(msg: string): void {
+	if (typeof document === 'undefined') return;
 	const existing = document.getElementById('cad-toast');
 	if (existing) existing.remove();
 

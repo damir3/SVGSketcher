@@ -50,6 +50,7 @@ import {
 	LineTool,
 	CircleTool,
 	RectangleTool,
+	type RectangleMode,
 	ArcTool,
 	ArcCenterTool,
 	type ArcMode,
@@ -189,6 +190,8 @@ export class CanvasInteraction {
 	onRectangularPatternStateChange?: () => void;
 	onArcStateChange?: () => void;
 	onArcModeChange?: (mode: ArcMode) => void;
+	onRectangleStateChange?: () => void;
+	onRectangleModeChange?: (mode: RectangleMode) => void;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -228,6 +231,28 @@ export class CanvasInteraction {
 			} else {
 				this.updateToolPreview();
 				this.onArcStateChange?.();
+			}
+		}
+	}
+
+	getRectangleTool(): RectangleTool | undefined {
+		return this.tools.get('rectangle') as RectangleTool | undefined;
+	}
+
+	get rectangleMode(): RectangleMode {
+		return this.getRectangleTool()?.mode ?? 'corner';
+	}
+
+	setRectangleMode(mode: RectangleMode): void {
+		const rectTool = this.getRectangleTool();
+		if (rectTool) {
+			rectTool.setMode(mode);
+			this.onRectangleModeChange?.(mode);
+			if (this.activeTool !== 'rectangle') {
+				this.setTool('rectangle');
+			} else {
+				this.updateToolPreview();
+				this.onRectangleStateChange?.();
 			}
 		}
 	}
@@ -338,7 +363,13 @@ export class CanvasInteraction {
 		this.tools.set('point', new PointTool());
 		this.tools.set('line', new LineTool());
 		this.tools.set('circle', new CircleTool());
-		this.tools.set('rectangle', new RectangleTool());
+		const rectTool = new RectangleTool();
+		rectTool.onModeChange = mode => {
+			this.onRectangleModeChange?.(mode);
+			this.onRectangleStateChange?.();
+		};
+		rectTool.onStateChange = () => this.onRectangleStateChange?.();
+		this.tools.set('rectangle', rectTool);
 		const arcTool = new ArcTool('center');
 		arcTool.onModeChange = mode => {
 			this.onArcModeChange?.(mode);
@@ -456,6 +487,9 @@ export class CanvasInteraction {
 			const screen = this.lastMouseScreen;
 			const world = this.viewport.screenToWorld(screen.x, screen.y);
 			const snap = isDrawingPrimitiveTool(this.activeTool) ? this.findSnap(screen) : null;
+			if (snap) {
+				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
+			}
 			const renderCtx = this.createToolRenderContext(screen, world, snap);
 			this.activeToolInstance.renderPreview?.(renderCtx);
 		}
@@ -673,89 +707,7 @@ export class CanvasInteraction {
 			}
 		});
 
-		window.addEventListener('keydown', e => {
-			if (this.isMac ? (e.key === 'Meta' || e.metaKey) : (e.key === 'Control' || e.ctrlKey)) {
-				this.isSnapModifierPressed = true;
-				this.renderer.clearPreviews();
-				this.render();
-			}
-			if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
-				this.isSpacePressed = true;
-			}
-			if (e.key === 'Tab') {
-				if (this.activeToolInstance?.onKeyDown) {
-					const handled = this.activeToolInstance.onKeyDown(e);
-					if (handled) return;
-				}
-			}
-			if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-				return;
-			}
-			if (e.key === 'Escape') {
-				if (this.activeToolInstance?.isBusy?.()) {
-					this.activeToolInstance.cancel?.();
-					this.render();
-					return;
-				}
-				if (this.activeTool !== 'select') {
-					this.setTool('select');
-					this.render();
-					return;
-				}
-				this.cancelDrawing();
-				this.sketch.clearSelection();
-				this.render();
-				return;
-			} else if (e.key === 'Enter') {
-				if (this.activeToolInstance?.isBusy?.()) {
-					this.activeToolInstance.commit?.();
-					return;
-				}
-			} else if (e.key === 'Delete' || e.key === 'Backspace') {
-				this.sketch.deleteSelected();
-				this.render();
-			} else if (e.key === 'x' || e.key === 'X') {
-				this.toggleConstructionMode();
-			} else if (e.key === 'v' || e.key === 'V') {
-				this.setTool('select');
-			} else if (e.key === 'l' || e.key === 'L') {
-				this.setTool('line');
-			} else if (e.key === 'c' || e.key === 'C') {
-				this.setTool('circle');
-			} else if (e.key === 'a' || e.key === 'A') {
-				this.setTool('arc');
-			} else if (e.key === 'r' || e.key === 'R') {
-				this.setTool('rectangle');
-			} else if (e.key === 'g' || e.key === 'G') {
-				this.setTool('polygon');
-			} else if (e.key === 'p' || e.key === 'P') {
-				this.setTool('point');
-			} else if (e.key === 'e' || e.key === 'E') {
-				this.setTool('ellipse');
-			} else if (e.key === 't' || e.key === 'T') {
-				this.setTool(this.activeTool === 'trim' ? 'select' : 'trim');
-			} else if (e.key === 'b' || e.key === 'B') {
-				this.setTool(this.activeTool === 'break' ? 'select' : 'break');
-			} else if (e.key === 'm' || e.key === 'M' || e.code === 'KeyM') {
-				this.setTool(this.activeTool === 'mirror' ? 'select' : 'mirror');
-			} else if (e.key === 'h' || e.key === 'H') {
-				this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
-			} else if (e.key === 'd' || e.key === 'D') {
-				this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
-			} else if (e.key === 'i' || e.key === 'I') {
-				this.setTool(this.activeTool === 'coincident' ? 'select' : 'coincident');
-			} else if (e.key === 'f' || e.key === 'F') {
-				if (this.sketch.selection.pointIds.size > 0) {
-					this.applyConstraint('fixed');
-				} else {
-					this.setTool(this.activeTool === 'fixed' ? 'select' : 'fixed');
-				}
-			} else if (e.key === 's' || e.key === 'S') {
-				if (!e.ctrlKey && !e.metaKey) {
-					this.toggleSnapping();
-				}
-			}
-		});
+		window.addEventListener('keydown', this.handleKeyDown.bind(this));
 
 		window.addEventListener('keyup', e => {
 			if (e.code === 'Space') {
@@ -770,6 +722,146 @@ export class CanvasInteraction {
 			this.isSnapModifierPressed = false;
 			this.isSpacePressed = false;
 		});
+	}
+
+	public handleKeyDown(e: KeyboardEvent): void {
+		if (this.isMac ? (e.key === 'Meta' || e.metaKey) : (e.key === 'Control' || e.ctrlKey)) {
+			this.isSnapModifierPressed = true;
+			this.renderer.clearPreviews();
+			this.render();
+		}
+		const isInputTarget = Boolean(
+			e.target &&
+			((typeof HTMLInputElement !== 'undefined' && e.target instanceof HTMLInputElement) ||
+			(typeof HTMLTextAreaElement !== 'undefined' && e.target instanceof HTMLTextAreaElement) ||
+			(e.target as any).tagName === 'INPUT' ||
+			(e.target as any).tagName === 'TEXTAREA')
+		);
+		if (e.code === 'Space' && !isInputTarget) {
+			this.isSpacePressed = true;
+		}
+		if (e.key === 'Tab') {
+			if (this.activeToolInstance?.onKeyDown) {
+				const handled = this.activeToolInstance.onKeyDown(e);
+				if (handled) return;
+			}
+		}
+		if (isInputTarget) {
+			return;
+		}
+
+		// Alt + 1..4: Mode switching for Rectangle and Arc tools
+		if (e.altKey && !e.ctrlKey && !e.metaKey) {
+			const isDigit1 = e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1';
+			const isDigit2 = e.code === 'Digit2' || e.code === 'Numpad2' || e.key === '2';
+			const isDigit3 = e.code === 'Digit3' || e.code === 'Numpad3' || e.key === '3';
+			const isDigit4 = e.code === 'Digit4' || e.code === 'Numpad4' || e.key === '4';
+
+			if (this.activeTool === 'rectangle') {
+				if (isDigit1) {
+					e.preventDefault();
+					this.setRectangleMode('corner');
+					showToast('2-Point Rectangle (Alt+1)');
+					return;
+				} else if (isDigit2) {
+					e.preventDefault();
+					this.setRectangleMode('center');
+					showToast('Center Rectangle (Alt+2)');
+					return;
+				} else if (isDigit3) {
+					e.preventDefault();
+					this.setRectangleMode('three_point');
+					showToast('3-Point Rectangle (Alt+3)');
+					return;
+				} else if (isDigit4) {
+					e.preventDefault();
+					this.setRectangleMode('rounded');
+					showToast('Rounded Rectangle (Alt+4)');
+					return;
+				}
+			} else if (this.activeTool === 'arc' || this.activeTool === 'arc_center') {
+				if (isDigit1) {
+					e.preventDefault();
+					this.setArcMode('center');
+					showToast('Centerpoint Arc (Alt+1)');
+					return;
+				} else if (isDigit2) {
+					e.preventDefault();
+					this.setArcMode('three_point');
+					showToast('3-Point Arc (Alt+2)');
+					return;
+				} else if (isDigit3) {
+					e.preventDefault();
+					this.setArcMode('tangent');
+					showToast('Tangent Arc (Alt+3)');
+					return;
+				}
+			}
+		}
+		if (e.key === 'Escape') {
+			if (this.activeToolInstance?.isBusy?.()) {
+				this.activeToolInstance.cancel?.();
+				this.render();
+				return;
+			}
+			if (this.activeTool !== 'select') {
+				this.setTool('select');
+				this.render();
+				return;
+			}
+			this.cancelDrawing();
+			this.sketch.clearSelection();
+			this.render();
+			return;
+		} else if (e.key === 'Enter') {
+			if (this.activeToolInstance?.isBusy?.()) {
+				this.activeToolInstance.commit?.();
+				return;
+			}
+		} else if (e.key === 'Delete' || e.key === 'Backspace') {
+			this.sketch.deleteSelected();
+			this.render();
+		} else if (e.key === 'x' || e.key === 'X') {
+			this.toggleConstructionMode();
+		} else if (e.key === 'v' || e.key === 'V') {
+			this.setTool('select');
+		} else if (e.key === 'l' || e.key === 'L') {
+			this.setTool('line');
+		} else if (e.key === 'c' || e.key === 'C') {
+			this.setTool('circle');
+		} else if (e.key === 'a' || e.key === 'A') {
+			this.setTool('arc');
+		} else if (e.key === 'r' || e.key === 'R') {
+			this.setTool('rectangle');
+		} else if (e.key === 'g' || e.key === 'G') {
+			this.setTool('polygon');
+		} else if (e.key === 'p' || e.key === 'P') {
+			this.setTool('point');
+		} else if (e.key === 'e' || e.key === 'E') {
+			this.setTool('ellipse');
+		} else if (e.key === 't' || e.key === 'T') {
+			this.setTool(this.activeTool === 'trim' ? 'select' : 'trim');
+		} else if (e.key === 'b' || e.key === 'B') {
+			this.setTool(this.activeTool === 'break' ? 'select' : 'break');
+		} else if (e.key === 'm' || e.key === 'M' || e.code === 'KeyM') {
+			this.setTool(this.activeTool === 'mirror' ? 'select' : 'mirror');
+		} else if (e.key === 'h' || e.key === 'H') {
+			this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
+		} else if (e.key === 'd' || e.key === 'D') {
+			this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
+		} else if (e.key === 'i' || e.key === 'I') {
+			this.setTool(this.activeTool === 'coincident' ? 'select' : 'coincident');
+		} else if (e.key === 'f' || e.key === 'F') {
+			if (this.sketch.selection.pointIds.size > 0) {
+				this.applyConstraint('fixed');
+			} else {
+				this.setTool(this.activeTool === 'fixed' ? 'select' : 'fixed');
+			}
+		} else if (e.key === 's' || e.key === 'S') {
+			if (!e.ctrlKey && !e.metaKey) {
+				this.toggleSnapping();
+			}
+		}
 	}
 
 	private getScreenPos(e: MouseEvent): Vec2 {

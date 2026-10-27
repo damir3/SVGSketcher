@@ -5,6 +5,7 @@ import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDista
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
+import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 
 export class Sidebar {
 	private container: HTMLElement;
@@ -79,6 +80,9 @@ export class Sidebar {
 				<!-- Rectangular Pattern Tool Panel (when rectangular pattern tool is active) -->
 				${this.renderRectangularPatternToolCard()}
 
+				<!-- Rectangle Tool Panel (when rectangle tool is active) -->
+				${this.renderRectangleToolCard()}
+
 				<!-- Arc Tool Panel (when arc tool is active) -->
 				${this.renderArcToolCard()}
 
@@ -107,6 +111,78 @@ export class Sidebar {
 		this.bindEvents();
 	}
 
+	private renderRectangleToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'rectangle') {
+			return '';
+		}
+
+		const currentMode = this.interaction.rectangleMode;
+		const hint = this.getRectangleStepHint();
+
+		let modeIcon = ICONS.rectangle;
+		if (currentMode === 'center') modeIcon = ICONS.rectangle_center;
+		else if (currentMode === 'three_point') modeIcon = ICONS.rectangle_3point;
+		else if (currentMode === 'rounded') modeIcon = ICONS.rectangle_rounded;
+
+		return `
+			<div class="sidebar-panel-card rectangle-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${modeIcon}</span>
+						<span>Rectangle Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-rectangle-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Select rectangle creation method:
+				</div>
+				<div class="rectangle-mode-selector">
+					<button class="rectangle-mode-btn ${currentMode === 'corner' ? 'active' : ''}" data-rect-mode="corner" type="button" title="2-Point Rectangle (Alt+1)">
+						<span class="rectangle-mode-icon">${ICONS.rectangle}</span>
+						<span class="rectangle-mode-text">2-Point</span>
+					</button>
+					<button class="rectangle-mode-btn ${currentMode === 'center' ? 'active' : ''}" data-rect-mode="center" type="button" title="Center Rectangle (Alt+2)">
+						<span class="rectangle-mode-icon">${ICONS.rectangle_center}</span>
+						<span class="rectangle-mode-text">Center</span>
+					</button>
+					<button class="rectangle-mode-btn ${currentMode === 'three_point' ? 'active' : ''}" data-rect-mode="three_point" type="button" title="3-Point Rectangle (Alt+3)">
+						<span class="rectangle-mode-icon">${ICONS.rectangle_3point}</span>
+						<span class="rectangle-mode-text">3-Point</span>
+					</button>
+					<button class="rectangle-mode-btn ${currentMode === 'rounded' ? 'active' : ''}" data-rect-mode="rounded" type="button" title="Rounded Rectangle (Alt+4)">
+						<span class="rectangle-mode-icon">${ICONS.rectangle_rounded}</span>
+						<span class="rectangle-mode-text">Rounded</span>
+					</button>
+				</div>
+				<div class="rectangle-mode-hint">
+					${hint}
+				</div>
+			</div>
+		`;
+	}
+
+	private getRectangleStepHint(): string {
+		const rectTool = this.interaction?.getRectangleTool();
+		if (!rectTool) return '';
+		const mode = rectTool.mode;
+		const step = rectTool.step;
+		if (mode === 'corner') {
+			if (step === 0) return '1. Click to place first corner';
+			return '2. Click to place opposite corner';
+		} else if (mode === 'center') {
+			if (step === 0) return '1. Click to place center point';
+			return '2. Click to place corner point';
+		} else if (mode === 'three_point') {
+			if (step === 0) return '1. Click to place first corner';
+			if (step === 1) return '2. Click to place second corner (base line)';
+			return '3. Click to set rectangle height';
+		} else {
+			if (step === 0) return '1. Click to place first corner';
+			if (step === 1) return '2. Click to place opposite corner';
+			return '3. Click to set corner radius';
+		}
+	}
+
 	private renderArcToolCard(): string {
 		if (!this.interaction || (this.interaction.activeTool !== 'arc' && this.interaction.activeTool !== 'arc_center')) {
 			return '';
@@ -128,15 +204,15 @@ export class Sidebar {
 					Select arc creation method:
 				</div>
 				<div class="arc-mode-selector">
-					<button class="arc-mode-btn ${currentMode === 'center' ? 'active' : ''}" data-arc-mode="center" type="button" title="Centerpoint Arc">
+					<button class="arc-mode-btn ${currentMode === 'center' ? 'active' : ''}" data-arc-mode="center" type="button" title="Centerpoint Arc (Alt+1)">
 						<span class="arc-mode-icon">${ICONS.arc_center}</span>
 						<span class="arc-mode-text">Center</span>
 					</button>
-					<button class="arc-mode-btn ${currentMode === 'three_point' ? 'active' : ''}" data-arc-mode="three_point" type="button" title="3-Point Arc">
+					<button class="arc-mode-btn ${currentMode === 'three_point' ? 'active' : ''}" data-arc-mode="three_point" type="button" title="3-Point Arc (Alt+2)">
 						<span class="arc-mode-icon">${ICONS.arc}</span>
 						<span class="arc-mode-text">3-Point</span>
 					</button>
-					<button class="arc-mode-btn ${currentMode === 'tangent' ? 'active' : ''}" data-arc-mode="tangent" type="button" title="Tangent Arc">
+					<button class="arc-mode-btn ${currentMode === 'tangent' ? 'active' : ''}" data-arc-mode="tangent" type="button" title="Tangent Arc (Alt+3)">
 						<span class="arc-mode-icon">${ICONS.arc_tangent}</span>
 						<span class="arc-mode-text">Tangent</span>
 					</button>
@@ -1632,6 +1708,25 @@ export class Sidebar {
 		const btnCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-mirror-cancel-icon');
 		btnCancelIcon?.addEventListener('click', () => {
 			this.interaction?.cancelMirror();
+		});
+
+		// Rectangle Tool events
+		const rectModeBtns = this.container.querySelectorAll<HTMLButtonElement>('.rectangle-mode-btn');
+		rectModeBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const mode = btn.getAttribute('data-rect-mode') as RectangleMode;
+				if (mode && this.interaction) {
+					this.interaction.setRectangleMode(mode);
+					this.render();
+				}
+			});
+		});
+
+		const btnRectangleCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-rectangle-cancel-icon');
+		btnRectangleCancelIcon?.addEventListener('click', () => {
+			if (this.interaction) {
+				this.interaction.setTool('select');
+			}
 		});
 
 		// Arc Tool events

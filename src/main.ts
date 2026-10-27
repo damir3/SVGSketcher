@@ -136,6 +136,16 @@ function initApp(): void {
 
 	interaction.onArcModeChange = mode => {
 		toolbar.setArcMode(mode);
+		sidebar.render();
+	};
+
+	interaction.onRectangleModeChange = mode => {
+		toolbar.setRectangleMode(mode);
+		sidebar.render();
+	};
+
+	interaction.onRectangleStateChange = () => {
+		sidebar.render();
 	};
 
 	interaction.onConstructionChange = active => {

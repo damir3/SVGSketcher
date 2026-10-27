@@ -2,6 +2,7 @@ import { ICONS } from './icons';
 import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/interaction';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
+import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import { showToast } from './toast';
 export { showToast };
 
@@ -75,9 +76,9 @@ export class Toolbar {
 						${ICONS.line}
 						<span class="btn-tooltip">Line (L)</span>
 					</button>
-					<button class="tool-btn" data-tool="rectangle" title="Rectangle (R)">
+					<button class="tool-btn" data-tool="rectangle" title="2-Point Rectangle (R)">
 						${ICONS.rectangle}
-						<span class="btn-tooltip">Rectangle (R)</span>
+						<span class="btn-tooltip">2-Point Rectangle (R)</span>
 					</button>
 					<button class="tool-btn" data-tool="circle" title="Circle (C)">
 						${ICONS.circle}
@@ -269,6 +270,31 @@ export class Toolbar {
 		arcBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${tooltip}</span>
+		`;
+	}
+
+	setRectangleMode(mode: RectangleMode): void {
+		const rectBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="rectangle"]');
+		if (!rectBtn) return;
+
+		let icon = ICONS.rectangle;
+		let title = '2-Point Rectangle (R)';
+
+		if (mode === 'center') {
+			icon = ICONS.rectangle_center;
+			title = 'Center Rectangle (R)';
+		} else if (mode === 'three_point') {
+			icon = ICONS.rectangle_3point;
+			title = '3-Point Rectangle (R)';
+		} else if (mode === 'rounded') {
+			icon = ICONS.rectangle_rounded;
+			title = 'Rounded Rectangle (R)';
+		}
+
+		rectBtn.title = title;
+		rectBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${title}</span>
 		`;
 	}
 }
