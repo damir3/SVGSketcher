@@ -174,9 +174,12 @@ function initApp(): void {
 		const rect = svg.getBoundingClientRect();
 		const sx = e.clientX - rect.left;
 		const sy = e.clientY - rect.top;
-		const world = viewport.screenToWorld(sx, sy);
-		coordX.textContent = world.x.toFixed(1);
-		coordY.textContent = world.y.toFixed(1);
+		const snap = interaction.isSnappingEnabled ? interaction.findSnap({ x: sx, y: sy }) : null;
+		const world = snap ? snap.worldPos : viewport.screenToWorld(sx, sy);
+		const { subStep } = viewport.getGridStep();
+		const decimals = subStep < 0.1 ? 2 : 1;
+		coordX.textContent = world.x.toFixed(decimals);
+		coordY.textContent = world.y.toFixed(decimals);
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 	});
 

@@ -2756,9 +2756,12 @@ export class SketchDocument {
 
 	dragPoint(pointId: string, targetX: number, targetY: number): SolverResult {
 		const pt = this.points.get(pointId);
-		if (!pt) {
+		if (!pt || this.isPointFixed(pointId)) {
 			return this.solve();
 		}
+
+		pt.x = targetX;
+		pt.y = targetY;
 
 		// Soft spring constraint pulls point to mouse position while strictly preserving hard constraints
 		const dragConstraint = new DragPointConstraint(pointId, targetX, targetY, 0.005);
@@ -2775,6 +2778,17 @@ export class SketchDocument {
 		const line = this.lines.get(lineId);
 		if (!line) return this.solve();
 
+		const p1 = this.points.get(line.p1Id);
+		const p2 = this.points.get(line.p2Id);
+		if (p1 && !this.isPointFixed(line.p1Id)) {
+			p1.x = p1TargetX;
+			p1.y = p1TargetY;
+		}
+		if (p2 && !this.isPointFixed(line.p2Id)) {
+			p2.x = p2TargetX;
+			p2.y = p2TargetY;
+		}
+
 		const c1 = new DragPointConstraint(line.p1Id, p1TargetX, p1TargetY, 0.005);
 		const c2 = new DragPointConstraint(line.p2Id, p2TargetX, p2TargetY, 0.005);
 		return this.solve([c1, c2]);
@@ -2787,6 +2801,12 @@ export class SketchDocument {
 	): SolverResult {
 		const circle = this.circles.get(circleId);
 		if (!circle) return this.solve();
+
+		const center = this.points.get(circle.centerId);
+		if (center && !this.isPointFixed(circle.centerId)) {
+			center.x = targetCenterX;
+			center.y = targetCenterY;
+		}
 
 		const c = new DragPointConstraint(circle.centerId, targetCenterX, targetCenterY, 0.005);
 		return this.solve([c]);

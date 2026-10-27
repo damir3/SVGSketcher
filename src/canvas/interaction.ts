@@ -876,7 +876,7 @@ export class CanvasInteraction {
 	}
 
 
-	private findSnap(screenPos: Vec2, excludePointId?: string): SnapResult | null {
+	findSnap(screenPos: Vec2, excludePointId?: string): SnapResult | null {
 		// Suppress all snapping if snap modifier is held (metaKey on Mac, ctrlKey on Windows)
 		if (this.isSnapModifierPressed) {
 			return null;
@@ -1138,15 +1138,16 @@ export class CanvasInteraction {
 		const { step, subStep } = this.viewport.getGridStep();
 		const subStepPx = subStep * this.viewport.zoom;
 		const gridStep = subStepPx >= 6 ? subStep : step;
+		const gridStepPx = gridStep * this.viewport.zoom;
 
 		const world = this.viewport.screenToWorld(screenPos.x, screenPos.y);
-		const nearestWorldX = Math.round(world.x / gridStep) * gridStep;
-		const nearestWorldY = Math.round(world.y / gridStep) * gridStep;
+		const nearestWorldX = this.cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep);
+		const nearestWorldY = this.cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep);
 		const nearestWorld = vec(nearestWorldX, nearestWorldY);
 		const nearestScreen = this.viewport.worldToScreen(nearestWorld.x, nearestWorld.y);
 		const gridDist = dist(screenPos, nearestScreen);
 
-		const gridSnapDistPx = 4;
+		const gridSnapDistPx = Math.max(6, Math.min(10, gridStepPx * 0.45));
 		if (gridDist <= gridSnapDistPx) {
 			return {
 				type: 'grid',
@@ -1156,6 +1157,13 @@ export class CanvasInteraction {
 		}
 
 		return null;
+	}
+
+	private cleanGridCoordinate(val: number, step: number): number {
+		const stepStr = step.toString();
+		const decimalIdx = stepStr.indexOf('.');
+		const decimals = decimalIdx >= 0 ? Math.min(stepStr.length - decimalIdx - 1 + 4, 10) : 4;
+		return parseFloat(val.toFixed(decimals));
 	}
 
 	private applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void {
@@ -1226,7 +1234,7 @@ export class CanvasInteraction {
 		if (this.isSnapModifierPressed) {
 			return { pos: targetPos, axis: null };
 		}
-		if (snap && (snap.type === 'point' || snap.type === 'line' || snap.type === 'circle')) {
+		if (snap && (snap.type === 'point' || snap.type === 'line' || snap.type === 'circle' || snap.type === 'grid')) {
 			return { pos: targetPos, axis: null };
 		}
 
@@ -2285,6 +2293,12 @@ export class CanvasInteraction {
 							}
 						}
 						this.sketch.commitTransaction();
+					} else if (snap && snap.type === 'grid') {
+						const pt = this.sketch.getPoint(draggedPtId);
+						if (pt && !this.sketch.isPointFixed(draggedPtId)) {
+							pt.x = snap.worldPos.x;
+							pt.y = snap.worldPos.y;
+						}
 					}
 				}
 				// Final solve without soft drag constraint to ensure exact convergence
