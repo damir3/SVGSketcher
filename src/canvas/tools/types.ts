@@ -23,8 +23,7 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'slot',
 	'ellipse',
 	'elliptical_arc',
-	'spline_fit',
-	'spline_control',
+	'spline',
 ] as const;
 
 export const CONSTRAINT_TOOLS = [

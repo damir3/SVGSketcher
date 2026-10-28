@@ -567,18 +567,37 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(sketch.points.size, 3);
 	});
 
-	it('SplineTool creates fit and control splines', () => {
+	it('SplineTool creates fit and control splines and supports setMode', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 		const splineTool = new SplineTool('fit');
 		splineTool.activate(ctx);
 
+		assert.equal(splineTool.id, 'spline');
+		assert.equal(splineTool.mode, 'fit');
+
 		splineTool.onMouseDown(makeMouseEvent(0, 0));
 		splineTool.onMouseDown(makeMouseEvent(50, 50));
 		splineTool.onMouseDown(makeMouseEvent(100, 0));
+		assert.equal(splineTool.pointCount, 3);
 		splineTool.finishSpline(false);
-
+		assert.equal(splineTool.pointCount, 0);
 		assert.equal(sketch.splines.size, 1);
+
+		// Switch mode to control
+		const modeEvents: string[] = [];
+		splineTool.onModeChange = m => modeEvents.push(m);
+		splineTool.setMode('control');
+		assert.equal(splineTool.mode, 'control');
+		assert.deepEqual(modeEvents, ['control']);
+
+		splineTool.onMouseDown(makeMouseEvent(0, 100));
+		splineTool.onMouseDown(makeMouseEvent(30, 130));
+		splineTool.onMouseDown(makeMouseEvent(70, 130));
+		splineTool.onMouseDown(makeMouseEvent(100, 100));
+		assert.equal(splineTool.pointCount, 4);
+		splineTool.finishSpline(false);
+		assert.equal(sketch.splines.size, 2);
 	});
 
 	it('renderPreview calls preview visual rendering on targetGroup', () => {
@@ -1300,6 +1319,35 @@ describe('Primitive Tools Creation', () => {
 			'center_point_arc',
 		]);
 		assert.equal(prevented, 5);
+	});
+
+	it('CanvasInteraction handleKeyDown switches Spline modes with Alt+1..2', () => {
+		const switchedModes: string[] = [];
+		let prevented = 0;
+		const fakeInteraction = {
+			isMac: false,
+			activeTool: 'spline',
+			setSplineMode: (mode: string) => {
+				switchedModes.push(mode);
+			},
+		};
+
+		const makeAltKey = (code: string, key: string) => ({
+			altKey: true,
+			ctrlKey: false,
+			metaKey: false,
+			code,
+			key,
+			preventDefault: () => {
+				prevented++;
+			},
+		} as any);
+
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit1', '1'));
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit2', '2'));
+
+		assert.deepEqual(switchedModes, ['fit', 'control']);
+		assert.equal(prevented, 2);
 	});
 });
 

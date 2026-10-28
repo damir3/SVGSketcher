@@ -7,6 +7,7 @@ import { dist } from '../math/vector';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
+import type { SplineMode } from '../canvas/tools/primitives/spline';
 
 export class Sidebar {
 	private container: HTMLElement;
@@ -28,6 +29,7 @@ export class Sidebar {
 			this.interaction.onArcStateChange = () => this.render();
 			this.interaction.onRectangleStateChange = () => this.render();
 			this.interaction.onSlotStateChange = () => this.render();
+			this.interaction.onSplineStateChange = () => this.render();
 		}
 		this.render();
 	}
@@ -91,6 +93,9 @@ export class Sidebar {
 
 				<!-- Arc Tool Panel (when arc tool is active) -->
 				${this.renderArcToolCard()}
+
+				<!-- Spline Tool Panel (when spline tool is active) -->
+				${this.renderSplineToolCard()}
 
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
@@ -313,6 +318,62 @@ export class Sidebar {
 				</div>
 			</div>
 		`;
+	}
+
+	private renderSplineToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'spline') {
+			return '';
+		}
+
+		const currentMode = this.interaction.splineMode;
+		const hint = this.getSplineStepHint();
+		const modeIcon = currentMode === 'control' ? ICONS.spline_control : ICONS.spline_fit;
+
+		return `
+			<div class="sidebar-panel-card spline-tool-card rectangle-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${modeIcon}</span>
+						<span>Spline Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-spline-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Select spline creation method:
+				</div>
+				<div class="spline-mode-selector">
+					<button class="spline-mode-btn ${currentMode === 'fit' ? 'active' : ''}" data-spline-mode="fit" type="button" title="Fit Point Spline (Alt+1)">
+						<span class="spline-mode-icon">${ICONS.spline_fit}</span>
+						<span class="spline-mode-text">Fit Point</span>
+					</button>
+					<button class="spline-mode-btn ${currentMode === 'control' ? 'active' : ''}" data-spline-mode="control" type="button" title="Control Point Spline (Alt+2)">
+						<span class="spline-mode-icon">${ICONS.spline_control}</span>
+						<span class="spline-mode-text">Control Pt</span>
+					</button>
+				</div>
+				<div class="rectangle-mode-hint spline-mode-hint">
+					${hint}
+				</div>
+			</div>
+		`;
+	}
+
+	private getSplineStepHint(): string {
+		const splineTool = this.interaction?.getSplineTool();
+		if (!splineTool) return '';
+		const mode = splineTool.mode;
+		const count = splineTool.pointCount;
+
+		if (mode === 'fit') {
+			if (count === 0) return 'Click to place first fit point';
+			if (count === 1) return 'Click to place next fit point (min 2 points)';
+			if (count === 2) return 'Click to add points, or click ✓ / press Enter to finish';
+			return `Points: ${count}. Click first point to close, or click ✓ / Enter to finish`;
+		} else {
+			if (count === 0) return 'Click to place first control point (min 4 points)';
+			if (count < 4) return `Points: ${count}/4. Click to place ${4 - count} more control point${4 - count > 1 ? 's' : ''}`;
+			return `Points: ${count}. Click to add more, or click ✓ / Enter to finish`;
+		}
 	}
 
 	private getArcStepHint(): string {
@@ -1853,6 +1914,25 @@ export class Sidebar {
 
 		const btnArcCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-arc-cancel-icon');
 		btnArcCancelIcon?.addEventListener('click', () => {
+			if (this.interaction) {
+				this.interaction.setTool('select');
+			}
+		});
+
+		// Spline Tool events
+		const splineModeBtns = this.container.querySelectorAll<HTMLButtonElement>('.spline-mode-btn');
+		splineModeBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const mode = btn.getAttribute('data-spline-mode') as SplineMode;
+				if (mode && this.interaction) {
+					this.interaction.setSplineMode(mode);
+					this.render();
+				}
+			});
+		});
+
+		const btnSplineCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-spline-cancel-icon');
+		btnSplineCancelIcon?.addEventListener('click', () => {
 			if (this.interaction) {
 				this.interaction.setTool('select');
 			}

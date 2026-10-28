@@ -3,18 +3,41 @@ import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { renderSplinePreviewVisual } from '../../previewHelpers';
 
+export type SplineMode = 'fit' | 'control';
+
 export class SplineTool extends BaseTool {
-	readonly id: 'spline_fit' | 'spline_control';
-	private readonly splineType: 'fit' | 'control';
+	readonly id = 'spline' as const;
+	private _mode: SplineMode;
 
 	private points: Array<{ id: string; x: number; y: number }> = [];
 	private undonePoints: Array<{ id?: string; x: number; y: number }> = [];
 	private checkmarkPos?: Vec2;
 
-	constructor(type: 'fit' | 'control') {
+	onModeChange?: (mode: SplineMode) => void;
+	onStateChange?: () => void;
+
+	constructor(initialMode: SplineMode = 'fit') {
 		super();
-		this.splineType = type;
-		this.id = type === 'fit' ? 'spline_fit' : 'spline_control';
+		this._mode = initialMode;
+	}
+
+	get mode(): SplineMode {
+		return this._mode;
+	}
+
+	get pointCount(): number {
+		return this.points.length;
+	}
+
+	setMode(newMode: SplineMode): void {
+		if (this._mode === newMode) return;
+		if (this.isBusy()) {
+			this.cancel();
+		}
+		this._mode = newMode;
+		this.onModeChange?.(newMode);
+		this.onStateChange?.();
+		this.ctx?.requestRender();
 	}
 
 	override isBusy(): boolean {
@@ -42,7 +65,7 @@ export class SplineTool extends BaseTool {
 		}
 
 		// Check if clicking first point to close spline (only for fit splines; needs at least 3 points placed)
-		if (this.splineType === 'fit' && this.points.length >= 3) {
+		if (this._mode === 'fit' && this.points.length >= 3) {
 			const firstPointId = this.points[0].id;
 			if (snap && snap.type === 'point' && snap.id === firstPointId) {
 				this.finishSpline(true);
@@ -71,6 +94,7 @@ export class SplineTool extends BaseTool {
 
 		this.points.push({ id: pId, x: pPos.x, y: pPos.y });
 		this.undonePoints = [];
+		this.onStateChange?.();
 		this.ctx.requestRender();
 	}
 
@@ -94,7 +118,7 @@ export class SplineTool extends BaseTool {
 		const curScreen = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 		const { checkmarkPos } = renderSplinePreviewVisual(
 			ctx.targetGroup,
-			this.splineType,
+			this._mode,
 			screenPts,
 			curScreen,
 			ctx.isConstruction
@@ -125,6 +149,7 @@ export class SplineTool extends BaseTool {
 		if (this.points.length === 0) {
 			this.ctx.renderer.clearPreviews();
 		}
+		this.onStateChange?.();
 		this.ctx.requestRender();
 		return true;
 	}
@@ -138,6 +163,7 @@ export class SplineTool extends BaseTool {
 			ptId = pt.id;
 		}
 		this.points.push({ id: ptId, x: next.x, y: next.y });
+		this.onStateChange?.();
 		this.ctx.requestRender();
 		return true;
 	}
@@ -147,16 +173,20 @@ export class SplineTool extends BaseTool {
 	}
 
 	override cancel(): void {
+		const hadPoints = this.points.length > 0;
 		for (const p of this.points) {
-			if (!this.ctx.sketch.isPointUsed(p.id)) {
-				this.ctx.sketch.removeEntity(p.id);
+			if (!this.ctx?.sketch.isPointUsed(p.id)) {
+				this.ctx?.sketch.removeEntity(p.id);
 			}
 		}
 		this.points = [];
 		this.undonePoints = [];
 		this.checkmarkPos = undefined;
-		this.ctx.renderer.clearPreviews();
-		this.ctx.requestRender();
+		this.ctx?.renderer.clearPreviews();
+		if (hadPoints) {
+			this.onStateChange?.();
+		}
+		this.ctx?.requestRender();
 	}
 
 	finishSpline(isClosed = false): void {
@@ -164,12 +194,12 @@ export class SplineTool extends BaseTool {
 			this.cancel();
 			return;
 		}
-		if (this.splineType === 'control' && this.points.length < 4) {
+		if (this._mode === 'control' && this.points.length < 4) {
 			this.ctx.showToast('Control spline requires at least 4 points');
 			return;
 		}
 		const pointIds = this.points.map(p => p.id);
-		if (this.splineType === 'fit') {
+		if (this._mode === 'fit') {
 			this.ctx.sketch.addFitSpline(pointIds, undefined, this.ctx.isConstructionMode, undefined, isClosed);
 		} else {
 			this.ctx.sketch.addControlSpline(pointIds, this.ctx.isConstructionMode, undefined, false);
@@ -178,6 +208,7 @@ export class SplineTool extends BaseTool {
 		this.undonePoints = [];
 		this.checkmarkPos = undefined;
 		this.ctx.renderer.clearPreviews();
+		this.onStateChange?.();
 		this.ctx.requestRender();
 	}
 }

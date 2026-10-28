@@ -1396,6 +1396,64 @@ html, body {
   stroke: #fff;
 }
 
+/* --- SPLINE TOOL SIDEBAR CARD --- */
+.spline-mode-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  background-color: var(--bg-surface);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.spline-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.spline-mode-btn:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.spline-mode-btn.active {
+  background-color: var(--cad-blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
+}
+
+.spline-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.spline-mode-icon svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+}
+
+.spline-mode-btn.active .spline-mode-icon svg {
+  stroke: #fff;
+}
+
 /* --- MIRROR TOOL SIDEBAR CARD --- */
 .mirror-tool-card {
   background-color: var(--bg-surface-elevated);

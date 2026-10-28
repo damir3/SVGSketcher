@@ -4,6 +4,7 @@ import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/
 import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
+import type { SplineMode } from '../canvas/tools/primitives/spline';
 import { showToast } from './toast';
 export { showToast };
 
@@ -81,10 +82,6 @@ export class Toolbar {
 						${ICONS.rectangle}
 						<span class="btn-tooltip">2-Point Rectangle (R)</span>
 					</button>
-					<button class="tool-btn" data-tool="slot" title="Center-to-Center Slot">
-						${ICONS.slot_center_to_center}
-						<span class="btn-tooltip">Center-to-Center Slot</span>
-					</button>
 					<button class="tool-btn" data-tool="circle" title="Circle (C)">
 						${ICONS.circle}
 						<span class="btn-tooltip">Circle (C)</span>
@@ -97,6 +94,14 @@ export class Toolbar {
 						${ICONS.arc_center}
 						<span class="btn-tooltip">Center Arc (A)</span>
 					</button>
+					<button class="tool-btn" data-tool="slot" title="Center-to-Center Slot">
+						${ICONS.slot_center_to_center}
+						<span class="btn-tooltip">Center-to-Center Slot</span>
+					</button>
+					<button class="tool-btn" data-tool="spline" title="Fit Point Spline">
+						${ICONS.spline_fit}
+						<span class="btn-tooltip">Fit Spline</span>
+					</button>
 					<button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
 						${ICONS.ellipse}
 						<span class="btn-tooltip">Ellipse (E)</span>
@@ -104,14 +109,6 @@ export class Toolbar {
 					<button class="tool-btn" data-tool="elliptical_arc" title="Elliptical Arc">
 						${ICONS.elliptical_arc}
 						<span class="btn-tooltip">Elliptical Arc</span>
-					</button>
-					<button class="tool-btn" data-tool="spline_fit" title="Fit Point Spline">
-						${ICONS.spline_fit}
-						<span class="btn-tooltip">Fit Spline</span>
-					</button>
-					<button class="tool-btn" data-tool="spline_control" title="Control Point Spline">
-						${ICONS.spline_control}
-						<span class="btn-tooltip">Control Spline</span>
 					</button>
 				</div>
 			</div>
@@ -313,6 +310,21 @@ export class Toolbar {
 		slotBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${title}</span>
+		`;
+	}
+
+	setSplineMode(mode: SplineMode): void {
+		const splineBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="spline"]');
+		if (!splineBtn) return;
+
+		const icon = mode === 'control' ? ICONS.spline_control : ICONS.spline_fit;
+		const title = mode === 'control' ? 'Control Point Spline' : 'Fit Point Spline';
+		const tooltip = mode === 'control' ? 'Control Spline' : 'Fit Spline';
+
+		splineBtn.title = title;
+		splineBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${tooltip}</span>
 		`;
 	}
 }

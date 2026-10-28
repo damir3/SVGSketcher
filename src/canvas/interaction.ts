@@ -59,6 +59,7 @@ import {
 	EllipseTool,
 	EllipticalArcTool,
 	SplineTool,
+	type SplineMode,
 	TrimTool,
 	BreakTool,
 	FilletTool,
@@ -195,6 +196,8 @@ export class CanvasInteraction {
 	onRectangleModeChange?: (mode: RectangleMode) => void;
 	onSlotStateChange?: () => void;
 	onSlotModeChange?: (mode: SlotMode) => void;
+	onSplineStateChange?: () => void;
+	onSplineModeChange?: (mode: SplineMode) => void;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -279,6 +282,28 @@ export class CanvasInteraction {
 			} else {
 				this.updateToolPreview();
 				this.onSlotStateChange?.();
+			}
+		}
+	}
+
+	getSplineTool(): SplineTool | undefined {
+		return this.tools.get('spline') as SplineTool | undefined;
+	}
+
+	get splineMode(): SplineMode {
+		return this.getSplineTool()?.mode ?? 'fit';
+	}
+
+	setSplineMode(mode: SplineMode): void {
+		const splineTool = this.getSplineTool();
+		if (splineTool) {
+			splineTool.setMode(mode);
+			this.onSplineModeChange?.(mode);
+			if (this.activeTool !== 'spline') {
+				this.setTool('spline');
+			} else {
+				this.updateToolPreview();
+				this.onSplineStateChange?.();
 			}
 		}
 	}
@@ -416,8 +441,13 @@ export class CanvasInteraction {
 		this.tools.set('polygon', new PolygonTool());
 		this.tools.set('ellipse', new EllipseTool());
 		this.tools.set('elliptical_arc', new EllipticalArcTool());
-		this.tools.set('spline_fit', new SplineTool('fit'));
-		this.tools.set('spline_control', new SplineTool('control'));
+		const splineTool = new SplineTool('fit');
+		splineTool.onModeChange = mode => {
+			this.onSplineModeChange?.(mode);
+			this.onSplineStateChange?.();
+		};
+		splineTool.onStateChange = () => this.onSplineStateChange?.();
+		this.tools.set('spline', splineTool);
 
 		// Modify
 		this.tools.set('trim', new TrimTool());
@@ -586,6 +616,7 @@ export class CanvasInteraction {
 			this.onArcStateChange?.();
 			this.onRectangleStateChange?.();
 			this.onSlotStateChange?.();
+			this.onSplineStateChange?.();
 			this.render();
 		} finally {
 			this.isSettingTool = false;
@@ -882,6 +913,21 @@ export class CanvasInteraction {
 						e.preventDefault();
 						this.setSlotMode('center_point_arc');
 						showToast('Center Point Arc Slot (Alt+5)');
+						return;
+				}
+			} else if (this.activeTool === 'spline') {
+				switch (e.code) {
+					case 'Digit1':
+					case 'Numpad1':
+						e.preventDefault();
+						this.setSplineMode('fit');
+						showToast('Fit Point Spline (Alt+1)');
+						return;
+					case 'Digit2':
+					case 'Numpad2':
+						e.preventDefault();
+						this.setSplineMode('control');
+						showToast('Control Point Spline (Alt+2)');
 						return;
 				}
 			}

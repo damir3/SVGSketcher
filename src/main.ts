@@ -157,6 +157,15 @@ function initApp(): void {
 		sidebar.render();
 	};
 
+	interaction.onSplineModeChange = mode => {
+		toolbar.setSplineMode(mode);
+		sidebar.render();
+	};
+
+	interaction.onSplineStateChange = () => {
+		sidebar.render();
+	};
+
 	interaction.onConstructionChange = active => {
 		toolbar.setConstructionActive(active);
 	};
