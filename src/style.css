@@ -1845,8 +1845,13 @@ html, body {
 }
 
 .pattern-params-card.in-inspector {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.pattern-params-card.in-inspector .pattern-num-input {
+  width: 78px;
+  font-family: monospace;
 }
 
 .rectangular-pattern-gizmo-arrow {

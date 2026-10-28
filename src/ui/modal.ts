@@ -169,35 +169,7 @@ export class DimensionModal {
 		const newVal = parseFloat(input.value.trim().replace(',', '.'));
 		if (!isNaN(newVal) && newVal > 0) {
 			this.sketch.pushHistory();
-			if ('targetDistance' in this.currentConstraint) {
-				this.currentConstraint.targetDistance = newVal;
-				this.currentConstraint.value = newVal;
-				if ('orientation' in this.currentConstraint) {
-					this.currentConstraint.name = (this.currentConstraint as any).orientation === 'horizontal'
-							? 'Horizontal Distance'
-							: (this.currentConstraint as any).orientation === 'vertical'
-							? 'Vertical Distance'
-							: 'Distance';
-				} else {
-					this.currentConstraint.name = 'Point-to-Line Distance';
-				}
-			} else if ('targetAngle' in this.currentConstraint) {
-				const clampedAngle = Math.min(179.9, Math.max(0.1, newVal));
-				this.currentConstraint.targetAngle = clampedAngle;
-				this.currentConstraint.value = clampedAngle;
-				this.currentConstraint.name = 'Angle';
-			} else {
-				const radConstraint = this.currentConstraint as RadiusConstraint;
-				const targetRad = this.currentMode === 'diameter' ? newVal / 2 : newVal;
-				radConstraint.targetRadius = targetRad;
-				radConstraint.value = targetRad;
-				radConstraint.displayMode = this.currentMode;
-				radConstraint.name =
-					this.currentMode === 'diameter'
-						? `Diameter (${Number(newVal.toFixed(2))})`
-						: `Radius (${Number(targetRad.toFixed(2))})`;
-			}
-			this.sketch.solve();
+			this.sketch.updateDimensionalConstraint(this.currentConstraint.id, newVal, this.currentMode);
 		}
 
 		this.close();

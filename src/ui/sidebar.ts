@@ -814,8 +814,22 @@ export class Sidebar {
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${pt.id}</div>
-						<div class="inspector-row"><span>X:</span> <strong>${pt.x.toFixed(1)} mm</strong></div>
-						<div class="inspector-row"><span>Y:</span> <strong>${pt.y.toFixed(1)} mm</strong></div>
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-pt-x">X</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-pt-x" data-entity-id="${pt.id}" value="${Number(pt.x.toFixed(2))}" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-pt-y">Y</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-pt-y" data-entity-id="${pt.id}" value="${Number(pt.y.toFixed(2))}" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+						</div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this point')}
 					</div>
 				`;
@@ -833,12 +847,29 @@ export class Sidebar {
 			if (line) {
 				const p1 = this.sketch.points.get(line.p1Id);
 				const p2 = this.sketch.points.get(line.p2Id);
-				const length = p1 && p2 ? dist(p1, p2).toFixed(1) : '?';
+				const lengthVal = p1 && p2 ? Number(dist(p1, p2).toFixed(2)) : 0;
+				const angleVal =
+					p1 && p2 ? Number(((Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI).toFixed(2)) : 0;
 				const relatedConstraints = this.sketch.getConstraintsForEntity('line', line.id);
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${line.id}</div>
-						<div class="inspector-row"><span>Length:</span> <strong>${length} mm</strong></div>
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-line-length">Length</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-line-length" data-entity-id="${line.id}" value="${lengthVal}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-line-angle">Angle</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-line-angle" data-entity-id="${line.id}" value="${angleVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">°</span>
+								</div>
+							</div>
+						</div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this line')}
 					</div>
 				`;
@@ -858,8 +889,22 @@ export class Sidebar {
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${circ.id}</div>
-						<div class="inspector-row"><span>Radius:</span> <strong>${circ.radius.toFixed(1)} mm</strong></div>
-						<div class="inspector-row"><span>Diameter:</span> <strong>${(circ.radius * 2).toFixed(1)} mm</strong></div>
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-circle-radius">Radius</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-circle-radius" data-entity-id="${circ.id}" value="${Number(circ.radius.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-circle-diameter">Diameter</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-circle-diameter" data-entity-id="${circ.id}" value="${Number((circ.radius * 2).toFixed(2))}" min="0.02" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+						</div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this circle')}
 					</div>
 				`;
@@ -878,20 +923,34 @@ export class Sidebar {
 				const center = this.sketch.points.get(arc.centerId);
 				const start = this.sketch.points.get(arc.startPointId);
 				const end = this.sketch.points.get(arc.endPointId);
-				let angleDeg = '?';
+				let angleVal = 0;
 				if (center && start && end) {
 					const as = Math.atan2(start.y - center.y, start.x - center.x);
 					const ae = Math.atan2(end.y - center.y, end.x - center.x);
 					let sweep = arc.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
 					if (sweep < 0) sweep += 2 * Math.PI;
-					angleDeg = `${((sweep * 180) / Math.PI).toFixed(1)}°`;
+					angleVal = Number(((sweep * 180) / Math.PI).toFixed(2));
 				}
 				const relatedConstraints = this.sketch.getConstraintsForEntity('arc', arc.id);
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${arc.id}</div>
-						<div class="inspector-row"><span>Radius:</span> <strong>${arc.radius.toFixed(1)} mm</strong></div>
-						<div class="inspector-row"><span>Angle:</span> <strong>${angleDeg}</strong></div>
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-arc-radius">Radius</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-arc-radius" data-entity-id="${arc.id}" value="${Number(arc.radius.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-arc-angle">Angle</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-arc-angle" data-entity-id="${arc.id}" value="${angleVal}" min="0.1" max="359.9" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">°</span>
+								</div>
+							</div>
+						</div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this arc')}
 					</div>
 				`;
@@ -910,22 +969,41 @@ export class Sidebar {
 				const center = this.sketch.points.get(ellipse.centerId);
 				const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
 				const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
-				let rxStr = '?';
-				let ryStr = '?';
-				let rotStr = '?';
+				let rxVal = 0;
+				let ryVal = 0;
+				let rotVal = 0;
 				if (center && majorPt && minorPt) {
-					rxStr = dist(center, majorPt).toFixed(1);
-					ryStr = dist(center, minorPt).toFixed(1);
-					const angleDeg = (Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI;
-					rotStr = `${angleDeg.toFixed(1)}°`;
+					rxVal = Number(dist(center, majorPt).toFixed(2));
+					ryVal = Number(dist(center, minorPt).toFixed(2));
+					rotVal = Number(((Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI).toFixed(2));
 				}
 				const relatedConstraints = this.sketch.getConstraintsForEntity('ellipse', ellipse.id);
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${ellipse.id}</div>
-						<div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
-						<div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
-						<div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-ellipse-rx">Major Radius (Rx)</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-ellipse-rx" data-entity-id="${ellipse.id}" value="${rxVal}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-ellipse-ry">Minor Radius (Ry)</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-ellipse-ry" data-entity-id="${ellipse.id}" value="${ryVal}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-ellipse-rot">Rotation</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-ellipse-rot" data-entity-id="${ellipse.id}" value="${rotVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">°</span>
+								</div>
+							</div>
+						</div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this ellipse')}
 					</div>
 				`;
@@ -944,22 +1022,41 @@ export class Sidebar {
 				const center = this.sketch.points.get(arc.centerId);
 				const majorPt = this.sketch.points.get(arc.majorAxisPointId);
 				const minorPt = this.sketch.points.get(arc.minorAxisPointId);
-				let rxStr = '?';
-				let ryStr = '?';
-				let rotStr = '?';
+				let rxVal = 0;
+				let ryVal = 0;
+				let rotVal = 0;
 				if (center && majorPt && minorPt) {
-					rxStr = dist(center, majorPt).toFixed(1);
-					ryStr = dist(center, minorPt).toFixed(1);
-					const angleDeg = (Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI;
-					rotStr = `${angleDeg.toFixed(1)}°`;
+					rxVal = Number(dist(center, majorPt).toFixed(2));
+					ryVal = Number(dist(center, minorPt).toFixed(2));
+					rotVal = Number(((Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI).toFixed(2));
 				}
 				const relatedConstraints = this.sketch.getConstraintsForEntity('elliptical_arc', arc.id);
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${arc.id}</div>
-						<div class="inspector-row"><span>Major Radius (Rx):</span> <strong>${rxStr} mm</strong></div>
-						<div class="inspector-row"><span>Minor Radius (Ry):</span> <strong>${ryStr} mm</strong></div>
-						<div class="inspector-row"><span>Rotation:</span> <strong>${rotStr}</strong></div>
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-ellipse-rx">Major Radius (Rx)</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-ellipse-rx" data-entity-id="${arc.id}" value="${rxVal}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-ellipse-ry">Minor Radius (Ry)</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-ellipse-ry" data-entity-id="${arc.id}" value="${ryVal}" min="0.01" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">mm</span>
+								</div>
+							</div>
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-ellipse-rot">Rotation</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-ellipse-rot" data-entity-id="${arc.id}" value="${rotVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">°</span>
+								</div>
+							</div>
+						</div>
 						<div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
 						${this.renderConstraintsSublist(relatedConstraints, 'this elliptical arc')}
 					</div>
@@ -1014,6 +1111,37 @@ export class Sidebar {
 			sel.ellipticalArcIds.size === 0
 		) {
 			const lIds = [...sel.lineIds];
+			const l1 = this.sketch.lines.get(lIds[0]);
+			const l2 = this.sketch.lines.get(lIds[1]);
+			let angleRowHtml = '';
+			if (l1 && l2) {
+				const p1 = this.sketch.points.get(l1.p1Id);
+				const p2 = this.sketch.points.get(l1.p2Id);
+				const p3 = this.sketch.points.get(l2.p1Id);
+				const p4 = this.sketch.points.get(l2.p2Id);
+				if (p1 && p2 && p3 && p4) {
+					const existingAng = [...this.sketch.constraints.values()].find(
+						c =>
+							c instanceof AngleConstraint &&
+							((c.line1Id === l1.id && c.line2Id === l2.id) ||
+								(c.line1Id === l2.id && c.line2Id === l1.id))
+					) as AngleConstraint | undefined;
+					const angleVal = existingAng
+						? Number(existingAng.targetAngle.toFixed(2))
+						: Number(this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4).initialAngleDeg.toFixed(2));
+					angleRowHtml = `
+						<div class="pattern-params-card in-inspector">
+							<div class="pattern-param-row">
+								<label class="pattern-param-label" for="insp-two-lines-angle">Angle</label>
+								<div class="pattern-input-suffix-wrapper">
+									<input type="number" id="insp-two-lines-angle" data-line1-id="${l1.id}" data-line2-id="${l2.id}" value="${angleVal}" min="0.1" max="179.9" step="1" class="pattern-num-input" />
+									<span class="pattern-input-suffix">°</span>
+								</div>
+							</div>
+						</div>
+					`;
+				}
+			}
 			const related = [...new Set([
 				...this.sketch.getConstraintsForEntity('line', lIds[0]),
 				...this.sketch.getConstraintsForEntity('line', lIds[1]),
@@ -1021,6 +1149,7 @@ export class Sidebar {
 			detailsHtml = `
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: 2 Lines (${lIds.join(', ')})</div>
+					${angleRowHtml}
 					${this.renderConstraintsSublist(related, 'selected lines')}
 				</div>
 			`;
@@ -1283,7 +1412,7 @@ export class Sidebar {
 					`;
 				} else {
 					let title = c.name;
-					let valBadge = '';
+					let paramsHtml = '';
 					if (c instanceof DistanceConstraint) {
 						title =
 							c.orientation === 'horizontal'
@@ -1291,25 +1420,73 @@ export class Sidebar {
 								: c.orientation === 'vertical'
 								? 'Vertical Distance'
 								: 'Distance';
-						valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+						paramsHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+							</div>
+						`;
 					} else if (c instanceof PointToLineDistanceConstraint) {
 						title = 'Point-to-Line Distance';
-						valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+						paramsHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+							</div>
+						`;
 					} else if (c instanceof AngleConstraint) {
 						title = 'Angle';
-						valBadge = `<span class="val-badge">${c.targetAngle.toFixed(1)}°</span>`;
+						const maxAngle = c.line1Id === c.line2Id && this.sketch.arcs.has(c.line1Id) ? 359.9 : 179.9;
+						paramsHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-constraint-val">Angle</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetAngle.toFixed(2))}" min="0.1" max="${maxAngle}" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">°</span>
+									</div>
+								</div>
+							</div>
+						`;
 					} else if (c instanceof RadiusConstraint) {
 						title = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
 						const val = c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius;
-						valBadge = `<span class="val-badge">${c.displayMode === 'diameter' ? 'Ø ' : 'R '}${val.toFixed(1)} mm</span>`;
+						paramsHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label">Mode</label>
+									<div class="pattern-segmented-control">
+										<button type="button" class="seg-btn insp-rad-mode-btn ${c.displayMode !== 'diameter' ? 'active' : ''}" data-mode="radius" data-constraint-id="${c.id}">Radius (R)</button>
+										<button type="button" class="seg-btn insp-rad-mode-btn ${c.displayMode === 'diameter' ? 'active' : ''}" data-mode="diameter" data-constraint-id="${c.id}">Diameter (Ø)</button>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-constraint-val">${title}</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(val.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+							</div>
+						`;
 					}
 
 					detailsHtml = `
 						<div class="inspector-card">
 							<div class="inspector-card-title">
 								<span>${title}</span>
-								${valBadge}
 							</div>
+							${paramsHtml}
 							${this.renderPrimitivesSublist(relatedPrimitives)}
 						</div>
 					`;
@@ -1726,13 +1903,6 @@ export class Sidebar {
 				}
 
 				this.sketch.selectEntity(id, type, false);
-
-				if (type === 'constraint') {
-					const c = this.sketch.constraints.get(id);
-					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint || c instanceof PointToLineDistanceConstraint)) {
-						this.onEditDimension?.(c);
-					}
-				}
 			});
 
 			// Double-click on tree item to edit dimension / radius
@@ -2327,6 +2497,194 @@ export class Sidebar {
 				this.interaction?.render();
 			});
 		}
+
+		// Inspector Point X/Y editing
+		this.bindInspectorNumberInput('#insp-pt-x', (val, input) => {
+			const id = input.getAttribute('data-entity-id');
+			const pt = id ? this.sketch.points.get(id) : undefined;
+			if (pt) {
+				this.sketch.setPointCoords(pt.id, val, pt.y);
+			}
+		});
+		this.bindInspectorNumberInput('#insp-pt-y', (val, input) => {
+			const id = input.getAttribute('data-entity-id');
+			const pt = id ? this.sketch.points.get(id) : undefined;
+			if (pt) {
+				this.sketch.setPointCoords(pt.id, pt.x, val);
+			}
+		});
+
+		// Inspector Line Length / Angle editing
+		this.bindInspectorNumberInput(
+			'#insp-line-length',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setLineLength(id, val);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+		this.bindInspectorNumberInput('#insp-line-angle', (val, input) => {
+			const id = input.getAttribute('data-entity-id');
+			if (id) {
+				this.sketch.setLineAngle(id, val);
+			}
+		});
+		this.bindInspectorNumberInput(
+			'#insp-two-lines-angle',
+			(val, input) => {
+				const l1Id = input.getAttribute('data-line1-id');
+				const l2Id = input.getAttribute('data-line2-id');
+				if (l1Id && l2Id) {
+					this.sketch.setLinesRelativeAngle(l1Id, l2Id, val);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+
+		// Inspector Circle Radius / Diameter editing
+		this.bindInspectorNumberInput(
+			'#insp-circle-radius',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setCircleOrArcRadius(id, val);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+		this.bindInspectorNumberInput(
+			'#insp-circle-diameter',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setCircleOrArcRadius(id, val / 2);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+
+		// Inspector Arc Radius / Angle editing
+		this.bindInspectorNumberInput(
+			'#insp-arc-radius',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setCircleOrArcRadius(id, val);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+		this.bindInspectorNumberInput(
+			'#insp-arc-angle',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setArcAngle(id, val);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+
+		// Inspector Ellipse / EllipticalArc Rx / Ry / Rotation editing
+		this.bindInspectorNumberInput(
+			'#insp-ellipse-rx',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setEllipseParams(id, { rx: val });
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+		this.bindInspectorNumberInput(
+			'#insp-ellipse-ry',
+			(val, input) => {
+				const id = input.getAttribute('data-entity-id');
+				if (id) {
+					this.sketch.setEllipseParams(id, { ry: val });
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+		this.bindInspectorNumberInput('#insp-ellipse-rot', (val, input) => {
+			const id = input.getAttribute('data-entity-id');
+			if (id) {
+				this.sketch.setEllipseParams(id, { rotationDeg: val });
+			}
+		});
+
+		// Inspector Dimensional Constraint value & Radius/Diameter mode editing
+		this.bindInspectorNumberInput(
+			'#insp-constraint-val',
+			(val, input) => {
+				const cid = input.getAttribute('data-constraint-id');
+				if (cid) {
+					this.sketch.updateDimensionalConstraint(cid, val);
+				}
+			},
+			val => !isNaN(val) && isFinite(val) && val > 0
+		);
+
+		this.container.querySelectorAll<HTMLButtonElement>('.insp-rad-mode-btn').forEach(btn => {
+			btn.addEventListener('click', () => {
+				const cid = btn.getAttribute('data-constraint-id');
+				const mode = btn.getAttribute('data-mode') as 'radius' | 'diameter';
+				const c = cid ? this.sketch.constraints.get(cid) : undefined;
+				if (c instanceof RadiusConstraint && mode && c.displayMode !== mode) {
+					this.sketch.pushHistory();
+					const val = mode === 'diameter' ? c.targetRadius * 2 : c.targetRadius;
+					this.sketch.updateDimensionalConstraint(c.id, val, mode);
+					this.render();
+					this.interaction?.render();
+				}
+			});
+		});
+	}
+
+	private bindInspectorNumberInput(
+		selector: string,
+		onValidInput: (val: number, inputEl: HTMLInputElement) => void,
+		validate: (val: number) => boolean = val => !isNaN(val) && isFinite(val)
+	): void {
+		const input = this.container.querySelector<HTMLInputElement>(selector);
+		if (!input) return;
+
+		let committed = false;
+
+		input.addEventListener('focus', () => {
+			committed = false;
+			input.select();
+		});
+
+		input.addEventListener('keydown', e => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				e.stopPropagation();
+				const val = parseFloat(input.value.trim().replace(',', '.'));
+				committed = true;
+				if (validate(val)) {
+					this.sketch.pushHistory();
+					onValidInput(val, input);
+					this.render();
+					this.interaction?.render();
+				} else {
+					this.render();
+				}
+			} else if (e.key === 'Escape') {
+				e.preventDefault();
+				e.stopPropagation();
+				committed = true;
+				this.render();
+			}
+		});
+
+		input.addEventListener('blur', () => {
+			if (!committed) {
+				this.render();
+			}
+		});
 	}
 }
 

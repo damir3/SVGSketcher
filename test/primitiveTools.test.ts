@@ -1351,4 +1351,145 @@ describe('Primitive Tools Creation', () => {
 	});
 });
 
+describe('Inspector Primitive & Constraint Editing Methods', () => {
+	it('setPointCoords updates free point and fixed point coordinates', () => {
+		const sketch = new SketchDocument();
+		const p1 = sketch.addPoint(10, 20);
+		assert.ok(sketch.setPointCoords(p1.id, 35, -15));
+		assert.ok(Math.abs(p1.x - 35) < 1e-4);
+		assert.ok(Math.abs(p1.y - -15) < 1e-4);
+
+		// Fixed point
+		const fixC = sketch.addFixedConstraint(p1.id);
+		assert.ok(fixC);
+		assert.ok(sketch.setPointCoords(p1.id, 100, 200));
+		assert.ok(Math.abs(p1.x - 100) < 1e-4);
+		assert.ok(Math.abs(p1.y - 200) < 1e-4);
+		assert.equal(fixC!.targetX, 100);
+		assert.equal(fixC!.targetY, 200);
+	});
+
+	it('setLineLength and setLineAngle update line geometry and existing distance constraint', () => {
+		const sketch = new SketchDocument();
+		const p1 = sketch.addPoint(0, 0);
+		const p2 = sketch.addPoint(50, 0);
+		const line = sketch.addLine(p1.id, p2.id);
+
+		// Without distance constraint
+		assert.ok(sketch.setLineLength(line.id, 80));
+		assert.ok(Math.abs(Math.hypot(p2.x - p1.x, p2.y - p1.y) - 80) < 1e-3);
+
+		// With distance constraint
+		const distC = sketch.addDistanceConstraint(p1.id, p2.id, 80);
+		assert.ok(distC);
+		assert.ok(sketch.setLineLength(line.id, 120));
+		assert.equal(distC!.targetDistance, 120);
+		assert.ok(Math.abs(Math.hypot(p2.x - p1.x, p2.y - p1.y) - 120) < 1e-3);
+
+		// Angle update to 90 degrees
+		assert.ok(sketch.setLineAngle(line.id, 90));
+		const angleDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
+		assert.ok(Math.abs(angleDeg - 90) < 1e-2);
+		assert.ok(Math.abs(Math.hypot(p2.x - p1.x, p2.y - p1.y) - 120) < 1e-2);
+	});
+
+	it('setCircleOrArcRadius and setArcAngle update circle, arc, and attached constraints', () => {
+		const sketch = new SketchDocument();
+		const cPt = sketch.addPoint(0, 0);
+		const circle = sketch.addCircle(cPt.id, 25);
+
+		assert.ok(sketch.setCircleOrArcRadius(circle.id, 40));
+		assert.ok(Math.abs(circle.radius - 40) < 1e-4);
+
+		const radC = sketch.addRadiusConstraint(circle.id, 40);
+		assert.ok(radC);
+		assert.ok(sketch.setCircleOrArcRadius(circle.id, 65));
+		assert.equal(radC!.targetRadius, 65);
+		assert.ok(Math.abs(circle.radius - 65) < 1e-4);
+
+		// Arc radius and angle
+		const ac = sketch.addPoint(0, 0);
+		const as = sketch.addPoint(30, 0);
+		const ae = sketch.addPoint(0, 30);
+		const arc = sketch.addArc(ac.id, as.id, ae.id, 30, false);
+
+		assert.ok(sketch.setCircleOrArcRadius(arc.id, 50));
+		assert.ok(Math.abs(arc.radius - 50) < 1e-3);
+		assert.ok(Math.abs(Math.hypot(as.x - ac.x, as.y - ac.y) - 50) < 1e-3);
+		assert.ok(Math.abs(Math.hypot(ae.x - ac.x, ae.y - ac.y) - 50) < 1e-3);
+
+		assert.ok(sketch.setArcAngle(arc.id, 180));
+		const sweepRad = Math.atan2(ae.y - ac.y, ae.x - ac.x) - Math.atan2(as.y - ac.y, as.x - ac.x);
+		const sweepDeg = (((sweepRad < 0 ? sweepRad + 2 * Math.PI : sweepRad) * 180) / Math.PI);
+		assert.ok(Math.abs(sweepDeg - 180) < 1e-2);
+	});
+
+	it('setEllipseParams and updateDimensionalConstraint update ellipse and dimensional constraints', () => {
+		const sketch = new SketchDocument();
+		const ec = sketch.addPoint(0, 0);
+		const emaj = sketch.addPoint(40, 0);
+		const emin = sketch.addPoint(0, 20);
+		const ellipse = sketch.addEllipse(ec.id, emaj.id, emin.id);
+
+		assert.ok(sketch.setEllipseParams(ellipse.id, { rx: 60, ry: 30, rotationDeg: 45 }));
+		assert.ok(Math.abs(Math.hypot(emaj.x - ec.x, emaj.y - ec.y) - 60) < 1e-2);
+		assert.ok(Math.abs(Math.hypot(emin.x - ec.x, emin.y - ec.y) - 30) < 1e-2);
+		const rotDeg = (Math.atan2(emaj.y - ec.y, emaj.x - ec.x) * 180) / Math.PI;
+		assert.ok(Math.abs(rotDeg - 45) < 1e-2);
+
+		// Dimensional constraints update
+		const p1 = sketch.addPoint(0, 100);
+		const p2 = sketch.addPoint(50, 100);
+		const dc = sketch.addDistanceConstraint(p1.id, p2.id, 50);
+		assert.ok(dc);
+		assert.ok(sketch.updateDimensionalConstraint(dc!.id, 95));
+		assert.equal(dc!.targetDistance, 95);
+		assert.ok(Math.abs(Math.hypot(p2.x - p1.x, p2.y - p1.y) - 95) < 1e-2);
+	});
+
+	it('setLineLength and setCircleOrArcRadius achieve exact target values on EqualLength / EqualRadius constrained geometry', () => {
+		const sketch = new SketchDocument();
+		const pA = sketch.addPoint(-50, 0);
+		const pB = sketch.addPoint(50, 0);
+		const pC = sketch.addPoint(0, 80);
+		sketch.addFixedConstraint(pA.id);
+		sketch.addLine(pA.id, pB.id);
+		const lLeft = sketch.addLine(pA.id, pC.id);
+		const lRight = sketch.addLine(pB.id, pC.id);
+		sketch.addHorizontalConstraint(pA.id, pB.id);
+		sketch.addDistanceConstraint(pA.id, pB.id, 100);
+		sketch.addEqualLengthConstraint(lLeft.id, lRight.id);
+		sketch.solve();
+
+		assert.ok(sketch.setLineLength(lLeft.id, 120));
+		const lenLeft = Math.hypot(pC.x - pA.x, pC.y - pA.y);
+		const lenRight = Math.hypot(pC.x - pB.x, pC.y - pB.y);
+		assert.ok(Math.abs(lenLeft - 120) < 1e-3, `Expected 120, got ${lenLeft}`);
+		assert.ok(Math.abs(lenRight - 120) < 1e-3, `Expected 120, got ${lenRight}`);
+
+		// Changing line angle on 1-DoF EqualLength triangle adjusts side lengths to achieve exact angle
+		assert.ok(sketch.setLineAngle(lLeft.id, 45));
+		const angleLeft = (Math.atan2(pC.y - pA.y, pC.x - pA.x) * 180) / Math.PI;
+		assert.ok(Math.abs(angleLeft - 45) < 1e-3, `Expected 45°, got ${angleLeft}`);
+		assert.ok(Math.abs(Math.hypot(pC.x - pA.x, pC.y - pA.y) - Math.hypot(pC.x - pB.x, pC.y - pB.y)) < 1e-3);
+
+		// Changing relative angle between two lines on 1-DoF EqualLength triangle (60° -> equilateral triangle of side 100)
+		assert.ok(sketch.setLinesRelativeAngle(lLeft.id, lRight.id, 60));
+		assert.ok(Math.abs(Math.hypot(pC.x - pA.x, pC.y - pA.y) - 100) < 1e-2);
+		assert.ok(Math.abs(Math.hypot(pC.x - pB.x, pC.y - pB.y) - 100) < 1e-2);
+
+		// EqualRadius circles
+		const c1Pt = sketch.addPoint(-100, 0);
+		const c2Pt = sketch.addPoint(100, 0);
+		const c1 = sketch.addCircle(c1Pt.id, 25);
+		const c2 = sketch.addCircle(c2Pt.id, 25);
+		sketch.addEqualRadiusConstraint(c1.id, c2.id);
+		sketch.solve();
+
+		assert.ok(sketch.setCircleOrArcRadius(c1.id, 60));
+		assert.ok(Math.abs(c1.radius - 60) < 1e-3);
+		assert.ok(Math.abs(c2.radius - 60) < 1e-3);
+	});
+});
+
 
