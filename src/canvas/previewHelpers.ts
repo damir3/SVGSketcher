@@ -1,4 +1,4 @@
-import type { Vec2 } from '../math/vector';
+import { vec, type Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import {
@@ -230,7 +230,8 @@ export function renderEllipticalArcStartPreviewVisual(
 ): void {
 	const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
 	const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-	const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+	const thetaDeg = (theta * 180) / Math.PI;
 
 	createSvgEllipse(sc.x, sc.y, rx, ry, {
 		transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
@@ -240,9 +241,23 @@ export function renderEllipticalArcStartPreviewVisual(
 		fill: 'none',
 	}, parent);
 
-	createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_RAY_ATTRS, parent);
-	createSvgCircle(ss.x, ss.y, 4, { fill: COLORS.primary }, parent);
-	renderTooltip(parent, ss.x + 12, ss.y - 12, `Start Angle | Rx ${rxVal.toFixed(1)} Ry ${ryVal.toFixed(1)}`);
+	const ux = Math.cos(theta);
+	const uy = Math.sin(theta);
+	const vx = -Math.sin(theta);
+	const vy = Math.cos(theta);
+
+	const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+	const ts = Math.atan2(vs / ry, us / rx);
+
+	const projSs = vec(
+		sc.x + rx * Math.cos(ts) * ux + ry * Math.sin(ts) * vx,
+		sc.y + rx * Math.cos(ts) * uy + ry * Math.sin(ts) * vy
+	);
+
+	createSvgLine(sc.x, sc.y, projSs.x, projSs.y, AUX_RAY_ATTRS, parent);
+	createSvgCircle(projSs.x, projSs.y, 4, { fill: COLORS.primary }, parent);
+	renderTooltip(parent, projSs.x + 12, projSs.y - 12, `Start Angle | Rx ${rxVal.toFixed(1)} Ry ${ryVal.toFixed(1)}`);
 }
 
 export function renderEllipticalArcPreviewVisual(
@@ -291,14 +306,19 @@ export function renderEllipticalArcPreviewVisual(
 		if (sweepAngle < 0) sweepAngle += TWO_PI;
 	}
 
-	const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
+	const projSe = vec(
+		sc.x + rx * Math.cos(te) * ux + ry * Math.sin(te) * vx,
+		sc.y + rx * Math.cos(te) * uy + ry * Math.sin(te) * vy
+	);
+
+	const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, projSe, clockwise);
 	createSvgPath(d, getPreviewStrokeAttrs(isConstruction, false, true), parent);
 
 	createSvgLine(sc.x, sc.y, ss.x, ss.y, AUX_RAY_ATTRS, parent);
-	createSvgLine(sc.x, sc.y, se.x, se.y, AUX_RAY_ATTRS, parent);
+	createSvgLine(sc.x, sc.y, projSe.x, projSe.y, AUX_RAY_ATTRS, parent);
 
 	const sweepDeg = (sweepAngle * 180) / Math.PI;
-	renderTooltip(parent, se.x + 12, se.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
+	renderTooltip(parent, projSe.x + 12, projSe.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
 }
 
 export function renderSplinePreviewVisual(

@@ -1670,7 +1670,7 @@ export class SVGRenderer {
 
 		if (type === 'line' || type === 'circle' || type === 'spline') {
 			// Emerald diamond on object - enlarged so it clearly surrounds points
-			const d = 10;
+			const d = 7;
 			createSvgElement(
 				'polygon',
 				{
@@ -1681,14 +1681,14 @@ export class SVGRenderer {
 			);
 		} else if (type === 'grid') {
 			// Indigo square at grid intersection
-			const size = 7;
+			const size = 5;
 			createSvgRect(s.x - size, s.y - size, size * 2, size * 2, {
 				...SNAP_GRID_ATTRS,
 				rx: 1,
 			}, this.overlayGroup);
 		} else {
 			// Circular blue ring for point
-			createSvgCircle(s.x, s.y, 9, SNAP_POINT_ATTRS, this.overlayGroup);
+			createSvgCircle(s.x, s.y, 7, SNAP_POINT_ATTRS, this.overlayGroup);
 		}
 	}
 

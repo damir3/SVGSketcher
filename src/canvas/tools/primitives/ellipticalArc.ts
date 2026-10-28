@@ -25,13 +25,21 @@ export class EllipticalArcTool extends BaseTool {
 	private ellipticalArcPrevAngle: number | null = null;
 	private ellipticalArcTotalAngle = 0;
 
+	get step(): number {
+		return this.drawingStep;
+	}
+
 	override isBusy(): boolean {
 		return this.drawingStep > 0;
 	}
 
+	override shouldSnap(): boolean {
+		return this.drawingStep === 0;
+	}
+
 	override onMouseDown(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
+		const snap = this.shouldSnap() ? e.snap : null;
 		const world = e.world;
 
 		if (this.drawingStep === 0) {
@@ -150,7 +158,10 @@ export class EllipticalArcTool extends BaseTool {
 			this.startPtId = startPtId;
 			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 			const sMaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+			const sMin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
 			const sStart = this.ctx.viewport.worldToScreen(this.startWorldPtPos.x, this.startWorldPtPos.y);
+			const rx_s = Math.max(Math.hypot(sMaj.x - sCenter.x, sMaj.y - sCenter.y), 0.1);
+			const ry_s = Math.max(Math.hypot(sMin.x - sCenter.x, sMin.y - sCenter.y), 0.1);
 			const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
 			const ux_s = Math.cos(theta);
 			const uy_s = Math.sin(theta);
@@ -158,7 +169,7 @@ export class EllipticalArcTool extends BaseTool {
 			const vy_s = Math.cos(theta);
 			const us = (sStart.x - sCenter.x) * ux_s + (sStart.y - sCenter.y) * uy_s;
 			const vs = (sStart.x - sCenter.x) * vx_s + (sStart.y - sCenter.y) * vy_s;
-			this.ellipticalArcPrevAngle = Math.atan2(vs, us);
+			this.ellipticalArcPrevAngle = Math.atan2(vs / ry_s, us / rx_s);
 			this.ellipticalArcTotalAngle = 0;
 			this.drawingStep = 4;
 			this.ctx.requestRender();
@@ -190,8 +201,12 @@ export class EllipticalArcTool extends BaseTool {
 			// Screen orientation calculation for clockwise flag
 			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 			const sMaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+			const sMin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
 			const sStart = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
 			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+
+			const rx_s = Math.max(Math.hypot(sMaj.x - sCenter.x, sMaj.y - sCenter.y), 0.1);
+			const ry_s = Math.max(Math.hypot(sMin.x - sCenter.x, sMin.y - sCenter.y), 0.1);
 
 			const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
 			const ux_s = Math.cos(theta);
@@ -204,8 +219,8 @@ export class EllipticalArcTool extends BaseTool {
 			const ue = (sCur.x - sCenter.x) * ux_s + (sCur.y - sCenter.y) * uy_s;
 			const ve = (sCur.x - sCenter.x) * vx_s + (sCur.y - sCenter.y) * vy_s;
 
-			const ts_sc = Math.atan2(vs, us);
-			const te_sc = Math.atan2(ve, ue);
+			const ts_sc = Math.atan2(vs / ry_s, us / rx_s);
+			const te_sc = Math.atan2(ve / ry_s, ue / rx_s);
 			if (this.ellipticalArcPrevAngle !== null) {
 				let dAngle = te_sc - this.ellipticalArcPrevAngle;
 				while (dAngle > Math.PI) dAngle -= TWO_PI;
@@ -255,7 +270,7 @@ export class EllipticalArcTool extends BaseTool {
 	}
 
 	override onMouseMove(e: ToolMouseEvent): void {
-		const effectiveWorld = e.snap ? e.snap.worldPos : e.world;
+		const effectiveWorld = this.shouldSnap() && e.snap ? e.snap.worldPos : e.world;
 
 		if (
 			this.drawingStep === 4 &&
@@ -274,8 +289,12 @@ export class EllipticalArcTool extends BaseTool {
 			if (rxVal >= 0.1 && ryVal >= 0.1) {
 				const sc = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 				const smaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+				const smin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
 				const ss = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
 				const se = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+
+				const rx_s = Math.max(Math.hypot(smaj.x - sc.x, smaj.y - sc.y), 0.1);
+				const ry_s = Math.max(Math.hypot(smin.x - sc.x, smin.y - sc.y), 0.1);
 
 				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 				const ux_s = Math.cos(theta);
@@ -288,8 +307,8 @@ export class EllipticalArcTool extends BaseTool {
 				const ue = (se.x - sc.x) * ux_s + (se.y - sc.y) * uy_s;
 				const ve = (se.x - sc.x) * vx_s + (se.y - sc.y) * vy_s;
 
-				const ts = Math.atan2(vs, us);
-				const te = Math.atan2(ve, ue);
+				const ts = Math.atan2(vs / ry_s, us / rx_s);
+				const te = Math.atan2(ve / ry_s, ue / rx_s);
 
 				if (this.ellipticalArcPrevAngle === null) {
 					this.ellipticalArcPrevAngle = ts;
@@ -308,7 +327,7 @@ export class EllipticalArcTool extends BaseTool {
 	}
 
 	override renderPreview(ctx: ToolRenderContext): void {
-		const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
+		const effectiveWorld = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 
 		if (this.drawingStep === 1 && this.centerWorldPos) {
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
@@ -329,10 +348,11 @@ export class EllipticalArcTool extends BaseTool {
 				const dy = effectiveWorld.y - centerWorld.y;
 				let ryVal = Math.abs(dx * vx + dy * vy);
 				if (ryVal < 1) ryVal = 1;
+				const sign = dx * vx + dy * vy < 0 ? -1 : 1;
 
 				const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 				const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const sminWorld = vec(centerWorld.x + ryVal * vx, centerWorld.y + ryVal * vy);
+				const sminWorld = vec(centerWorld.x + sign * ryVal * vx, centerWorld.y + sign * ryVal * vy);
 				const smin = ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
 
 				renderEllipsePreviewVisual(ctx.targetGroup, sc, smaj, smin, majLen, ryVal, ctx.isConstruction);
@@ -391,8 +411,11 @@ export class EllipticalArcTool extends BaseTool {
 				const ue = (se.x - sc.x) * ux_s + (se.y - sc.y) * uy_s;
 				const ve = (se.x - sc.x) * vx_s + (se.y - sc.y) * vy_s;
 
-				const ts = Math.atan2(vs, us);
-				const te = Math.atan2(ve, ue);
+				const rx_s = Math.max(Math.hypot(smaj.x - sc.x, smaj.y - sc.y), 0.1);
+				const ry_s = Math.max(Math.hypot(smin.x - sc.x, smin.y - sc.y), 0.1);
+
+				const ts = Math.atan2(vs / ry_s, us / rx_s);
+				const te = Math.atan2(ve / ry_s, ue / rx_s);
 
 				let clockwise = this.ellipticalArcTotalAngle >= 0;
 				if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {

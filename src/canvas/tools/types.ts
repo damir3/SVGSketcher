@@ -129,7 +129,7 @@ export interface ToolContext {
 	onEditDimension?(constraint: any, screenPos: Vec2): void;
 
 	/** Snapping helper */
-	findSnap(screen: Vec2, excludePointId?: string): SnapResult | null;
+	findSnap(screen: Vec2, excludePointId?: string, allowGrid?: boolean): SnapResult | null;
 
 	/** Entity query / hit-testing helpers */
 	findPointNear(screen: Vec2, thresholdPx?: number): SketchPoint | null;
@@ -209,8 +209,8 @@ export interface ITool {
 	/** Returns true if tool is in the middle of a multi-step operation */
 	isBusy?(): boolean;
 
-	/** Returns false to temporarily suppress snapping on the current step (e.g. radius gizmos) */
-	shouldSnap?(): boolean;
+	/** Returns false to temporarily suppress snapping, or 'no-grid' to suppress only grid snapping (e.g. arc endpoints) */
+	shouldSnap?(): boolean | 'no-grid';
 
 	/** Cancel current operation (e.g. Esc key or tool switch) */
 	cancel?(): void;

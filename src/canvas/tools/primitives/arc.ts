@@ -125,6 +125,16 @@ export class ArcTool extends BaseTool {
 		return this.drawingStep > 0;
 	}
 
+	override shouldSnap(): boolean | 'no-grid' {
+		if (this._mode === 'three_point') {
+			return this.drawingStep < 2 ? 'no-grid' : false;
+		}
+		if (this._mode === 'tangent') {
+			return this.drawingStep === 0 ? true : 'no-grid';
+		}
+		return this.drawingStep === 0 ? true : 'no-grid';
+	}
+
 	override onMouseDown(e: ToolMouseEvent): void {
 		switch (this._mode) {
 			case 'three_point':
@@ -141,7 +151,8 @@ export class ArcTool extends BaseTool {
 
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this._mode === 'center' && this.drawingStep === 2 && this.centerWorldPos && this.arcPoint1WorldPos) {
-			this.updateCenterArcAngle(e.effectiveWorld);
+			const effectiveWorld = this.shouldSnap() !== false ? e.effectiveWorld : e.world;
+			this.updateCenterArcAngle(effectiveWorld);
 		}
 	}
 
@@ -200,7 +211,7 @@ export class ArcTool extends BaseTool {
 
 	private onMouseDownThreePoint(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
+		const snap = this.shouldSnap() !== false ? e.snap : null;
 		const world = e.world;
 
 		if (this.drawingStep === 0) {
@@ -287,7 +298,7 @@ export class ArcTool extends BaseTool {
 	private renderPreviewThreePoint(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.startWorldPos) {
 			const s1 = ctx.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
+			const effectiveWorld = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const length = dist(this.startWorldPos, effectiveWorld);
 			const angleDeg =
@@ -297,7 +308,7 @@ export class ArcTool extends BaseTool {
 		} else if (this.drawingStep === 2 && this.startWorldPos && this.arcPoint2WorldPos) {
 			const p1 = this.startWorldPos;
 			const p2 = this.arcPoint2WorldPos;
-			const p3 = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
+			const p3 = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const circum = getCircumcircle(p1, p2, p3);
 
 			const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
@@ -343,7 +354,7 @@ export class ArcTool extends BaseTool {
 
 	private onMouseDownCenter(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
+		const snap = this.shouldSnap() !== false ? e.snap : null;
 		const world = e.world;
 
 		if (this.drawingStep === 0) {
@@ -472,8 +483,8 @@ export class ArcTool extends BaseTool {
 	}
 
 	private renderPreviewCenter(ctx: ToolRenderContext): void {
+		const effectiveWorld = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const radius = dist(this.centerWorldPos, effectiveWorld);
@@ -482,7 +493,6 @@ export class ArcTool extends BaseTool {
 			const centerWorld = this.centerWorldPos;
 			const startWorld = this.arcPoint1WorldPos;
 			const radius = Math.max(1, dist(centerWorld, startWorld));
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 
 			const sCenter = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 			const sStart = ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
@@ -536,7 +546,7 @@ export class ArcTool extends BaseTool {
 
 	private onMouseDownTangent(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
+		const snap = this.shouldSnap() !== false ? e.snap : null;
 		const world = e.world;
 		const screen = e.screen;
 
@@ -687,7 +697,7 @@ export class ArcTool extends BaseTool {
 	private renderPreviewTangent(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.tangentStartWorldPos && this.tangentDir) {
 			const p1 = this.tangentStartWorldPos;
-			const p2 = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
+			const p2 = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const geom = this.computeTangentArcGeometry(p1, p2, this.tangentDir);
 
 			if (geom) {

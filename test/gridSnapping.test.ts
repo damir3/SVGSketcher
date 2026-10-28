@@ -117,6 +117,16 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(snap.worldPos.y, 0);
 			assert.equal(snap.screenPos.x, 400);
 			assert.equal(snap.screenPos.y, 300);
+
+			// When allowGrid is false, grid snap is suppressed
+			const snapNoGrid = interaction.findSnap(vec(405, 300), undefined, false);
+			assert.equal(snapNoGrid, null, 'Grid snap should be suppressed when allowGrid=false');
+
+			// But existing point is still found even when allowGrid=false
+			sketch.addPoint(0, 0);
+			const snapPt = interaction.findSnap(vec(405, 300), undefined, false);
+			assert.ok(snapPt, 'Point snap should still be found when allowGrid=false');
+			assert.equal(snapPt.type, 'point');
 		} finally {
 			cleanupDoc();
 		}

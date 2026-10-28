@@ -11,13 +11,21 @@ export class CircleTool extends BaseTool {
 	private centerId: string | null = null;
 	private centerWorldPos: Vec2 | null = null;
 
+	get step(): number {
+		return this.drawingStep;
+	}
+
 	override isBusy(): boolean {
 		return this.drawingStep > 0;
 	}
 
+	override shouldSnap(): boolean {
+		return this.drawingStep === 0;
+	}
+
 	override onMouseDown(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
+		const snap = this.shouldSnap() ? e.snap : null;
 		const world = e.world;
 
 		if (this.drawingStep === 0) {
@@ -47,7 +55,7 @@ export class CircleTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
+			const effectiveWorld = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const radius = dist(this.centerWorldPos, effectiveWorld);

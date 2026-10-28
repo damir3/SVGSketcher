@@ -7,6 +7,7 @@ import { RectangleTool } from '../src/canvas/tools/primitives/rectangle';
 import { SlotTool } from '../src/canvas/tools/primitives/slot';
 import { ArcTool } from '../src/canvas/tools/primitives/arc';
 import { EllipseTool } from '../src/canvas/tools/primitives/ellipse';
+import { EllipticalArcTool } from '../src/canvas/tools/primitives/ellipticalArc';
 import { SplineTool } from '../src/canvas/tools/primitives/spline';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { TrimTool } from '../src/canvas/tools/modify/trim';
@@ -1575,6 +1576,292 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		sketch.selectEntity(eqLinkedToL1[0].id, eqLinkedToL1[0].type, false);
 		assert.ok(!sketch.selection.lineIds.has(l1.id));
 		assert.ok(sketch.selection.lineIds.has(l2.id));
+	});
+
+	it('CircleTool snaps only when choosing center, disables snapping when choosing radius', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const circleTool = new CircleTool();
+		circleTool.activate(ctx);
+
+		assert.equal(circleTool.step, 0);
+		assert.equal(circleTool.shouldSnap(), true);
+
+		// Click 1: center at (10, 10)
+		circleTool.onMouseDown(makeMouseEvent(10, 10));
+		assert.equal(circleTool.step, 1);
+		assert.equal(circleTool.shouldSnap(), false);
+
+		// Click 2: radius at (40, 10), even if an artificial snap is in the event, it is ignored
+		const snappedEvt = makeMouseEvent(40, 10);
+		snappedEvt.snap = { type: 'point', worldPos: { x: 999, y: 999 }, screenPos: { x: 999, y: 999 } };
+		snappedEvt.effectiveWorld = { x: 999, y: 999 };
+		circleTool.onMouseDown(snappedEvt);
+
+		assert.equal(circleTool.step, 0);
+		assert.equal(sketch.circles.size, 1);
+		const c = Array.from(sketch.circles.values())[0];
+		assert.equal(c.radius, 30); // 40 - 10 = 30, not 999
+	});
+
+	it('EllipseTool snaps only when choosing center, disables snapping for major and minor axes', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const ellipseTool = new EllipseTool();
+		ellipseTool.activate(ctx);
+
+		assert.equal(ellipseTool.step, 0);
+		assert.equal(ellipseTool.shouldSnap(), true);
+
+		// Step 0 -> center at (0, 0)
+		ellipseTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(ellipseTool.step, 1);
+		assert.equal(ellipseTool.shouldSnap(), false);
+
+		// Step 1 -> major axis at (50, 0), ignores snap
+		const snappedEvt1 = makeMouseEvent(50, 0);
+		snappedEvt1.snap = { type: 'point', worldPos: { x: 888, y: 888 }, screenPos: { x: 888, y: 888 } };
+		snappedEvt1.effectiveWorld = { x: 888, y: 888 };
+		ellipseTool.onMouseDown(snappedEvt1);
+		assert.equal(ellipseTool.step, 2);
+		assert.equal(ellipseTool.shouldSnap(), false);
+
+		// Step 2 -> minor axis at (0, 20), ignores snap
+		const snappedEvt2 = makeMouseEvent(0, 20);
+		snappedEvt2.snap = { type: 'point', worldPos: { x: 777, y: 777 }, screenPos: { x: 777, y: 777 } };
+		snappedEvt2.effectiveWorld = { x: 777, y: 777 };
+		ellipseTool.onMouseDown(snappedEvt2);
+		assert.equal(ellipseTool.step, 0);
+		assert.equal(sketch.ellipses.size, 1);
+
+		const el = Array.from(sketch.ellipses.values())[0];
+		const majPt = sketch.points.get(el.majorAxisPointId)!;
+		const minPt = sketch.points.get(el.minorAxisPointId)!;
+		assert.equal(majPt.x, 50);
+		assert.equal(majPt.y, 0);
+		assert.equal(minPt.x, 0);
+		assert.equal(minPt.y, 20);
+	});
+
+	it('EllipseTool minor axis preview and creation follows the side user drags towards (positive and negative)', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const ellipseTool = new EllipseTool();
+		ellipseTool.activate(ctx);
+
+		// Center (100, 100), Major axis (200, 100) -> ux=(1, 0), vx=(0, 1)
+		ellipseTool.onMouseDown(makeMouseEvent(100, 100));
+		ellipseTool.onMouseDown(makeMouseEvent(200, 100));
+		assert.equal(ellipseTool.step, 2);
+
+		const createdLines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+		const origDoc = (globalThis as any).document;
+		(globalThis as any).document = {
+			...origDoc,
+			createElementNS: (_ns: string, tag: string) => {
+				const attrs: Record<string, any> = {};
+				return {
+					tag,
+					setAttribute: (k: string, v: any) => {
+						attrs[k] = v;
+						if (tag === 'line' && k === 'y2') {
+							createdLines.push({
+								x1: parseFloat(attrs['x1']),
+								y1: parseFloat(attrs['y1']),
+								x2: parseFloat(attrs['x2']),
+								y2: parseFloat(attrs['y2']),
+							});
+						}
+					},
+					style: {},
+					appendChild: () => {},
+					textContent: '',
+				};
+			},
+		};
+
+		try {
+			// Drag towards negative Y (100, 60) -> dy = -40, so sign = -1
+			const mockRenderCtx = {
+				viewport: ctx.viewport,
+				sketch,
+				targetGroup: {
+					appendChild: () => {},
+				} as any,
+				cursorScreen: { x: 100, y: 60 },
+				cursorWorld: { x: 100, y: 60 },
+				snap: null,
+				isConstruction: false,
+			};
+			ellipseTool.renderPreview(mockRenderCtx);
+
+			// In screen coordinates with default mock viewport (zoom=1, pan=0, sy=-wy or identity):
+			// The minor axis line should end at y=60, not y=140!
+			const axisLine = createdLines.find(l => Math.abs(l.x2 - 100) < 1 && Math.abs(l.y2 - 60) < 1);
+			assert.ok(axisLine, 'Minor axis preview ray should end on the dragged side (y=60)');
+		} finally {
+			(globalThis as any).document = origDoc;
+		}
+
+		// Click to create with minor axis on negative side
+		ellipseTool.onMouseDown(makeMouseEvent(100, 60));
+		assert.equal(sketch.ellipses.size, 1);
+		const el = Array.from(sketch.ellipses.values())[0];
+		const minPt = sketch.points.get(el.minorAxisPointId)!;
+		assert.equal(minPt.x, 100);
+		assert.equal(minPt.y, 60); // 100 - 40 = 60, not opposite (140)
+	});
+
+	it('ArcTool in center mode snaps center to all targets, and snaps boundary points (start/end) without grid', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+
+		const targetPt = sketch.addPoint(40, 0);
+		const targetPt2 = sketch.addPoint(0, 40);
+
+		const arcTool = new ArcTool('center');
+		arcTool.activate(ctx);
+
+		assert.equal(arcTool.step, 0);
+		assert.equal(arcTool.shouldSnap(), true);
+
+		// Step 0: Center at (0, 0)
+		arcTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(arcTool.step, 1);
+		assert.equal(arcTool.shouldSnap(), 'no-grid');
+
+		// Step 1: Start point / radius snapped to targetPt (40, 0)
+		const snappedEvt1 = makeMouseEvent(40, 0);
+		snappedEvt1.snap = { type: 'point', id: targetPt.id, worldPos: { x: 40, y: 0 }, screenPos: { x: 40, y: 0 } };
+		arcTool.onMouseDown(snappedEvt1);
+		assert.equal(arcTool.step, 2);
+		assert.equal(arcTool.shouldSnap(), 'no-grid');
+
+		// Step 2: End point / sweep angle snapped to targetPt2 (0, 40)
+		const snappedEvt2 = makeMouseEvent(0, 40);
+		snappedEvt2.snap = { type: 'point', id: targetPt2.id, worldPos: { x: 0, y: 40 }, screenPos: { x: 0, y: 40 } };
+		arcTool.onMouseDown(snappedEvt2);
+		assert.equal(arcTool.step, 0);
+		assert.equal(sketch.arcs.size, 1);
+		const arc = Array.from(sketch.arcs.values())[0];
+		assert.equal(arc.startPointId, targetPt.id);
+		assert.equal(arc.endPointId, targetPt2.id);
+		assert.equal(arc.radius, 40);
+	});
+
+	it('ArcTool in 3-point mode snaps boundary points with no-grid, disables snapping on curvature/radius point', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+
+		const pTarget1 = sketch.addPoint(0, 0);
+		const pTarget2 = sketch.addPoint(40, 0);
+
+		const arcTool = new ArcTool('three_point');
+		arcTool.activate(ctx);
+
+		assert.equal(arcTool.step, 0);
+		assert.equal(arcTool.shouldSnap(), 'no-grid');
+
+		// Step 0: First boundary point snapped to pTarget1
+		const snapEvt0 = makeMouseEvent(0, 0);
+		snapEvt0.snap = { type: 'point', id: pTarget1.id, worldPos: { x: 0, y: 0 }, screenPos: { x: 0, y: 0 } };
+		arcTool.onMouseDown(snapEvt0);
+		assert.equal(arcTool.step, 1);
+		assert.equal(arcTool.shouldSnap(), 'no-grid');
+
+		// Step 1: Second boundary point snapped to pTarget2
+		const snapEvt1 = makeMouseEvent(40, 0);
+		snapEvt1.snap = { type: 'point', id: pTarget2.id, worldPos: { x: 40, y: 0 }, screenPos: { x: 40, y: 0 } };
+		arcTool.onMouseDown(snapEvt1);
+		assert.equal(arcTool.step, 2);
+		assert.equal(arcTool.shouldSnap(), false);
+
+		// Step 2: Third point at (20, 20), ignores snap
+		const snappedEvt = makeMouseEvent(20, 20);
+		snappedEvt.snap = { type: 'point', worldPos: { x: 777, y: 777 }, screenPos: { x: 777, y: 777 } };
+		arcTool.onMouseDown(snappedEvt);
+		assert.equal(arcTool.step, 0);
+		assert.equal(sketch.arcs.size, 1);
+		const arc = Array.from(sketch.arcs.values())[0];
+		assert.equal(arc.startPointId, pTarget1.id);
+		assert.equal(arc.endPointId, pTarget2.id);
+	});
+
+	it('ArcTool in tangent mode snaps on attachment point and boundary end point without grid', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+
+		// Create an existing line from (0, 0) to (50, 0) and target point at (80, 30)
+		const p1 = sketch.addPoint(0, 0);
+		const p2 = sketch.addPoint(50, 0);
+		sketch.addLine(p1.id, p2.id);
+		const targetEndPt = sketch.addPoint(80, 30);
+
+		const arcTool = new ArcTool('tangent');
+		arcTool.activate(ctx);
+
+		assert.equal(arcTool.step, 0);
+		assert.equal(arcTool.shouldSnap(), true);
+
+		// Step 0: Click endpoint p2 (50, 0)
+		const snapEvt0 = makeMouseEvent(50, 0);
+		snapEvt0.snap = { type: 'point', id: p2.id, worldPos: { x: 50, y: 0 }, screenPos: { x: 50, y: 0 } };
+		arcTool.onMouseDown(snapEvt0);
+		assert.equal(arcTool.step, 1);
+		assert.equal(arcTool.shouldSnap(), 'no-grid');
+
+		// Step 1: End point at targetEndPt (80, 30), snaps to target point
+		const snappedEvt1 = makeMouseEvent(80, 30);
+		snappedEvt1.snap = { type: 'point', id: targetEndPt.id, worldPos: { x: 80, y: 30 }, screenPos: { x: 80, y: 30 } };
+		arcTool.onMouseDown(snappedEvt1);
+		assert.equal(arcTool.step, 0);
+		assert.equal(sketch.arcs.size, 1);
+		const arc = Array.from(sketch.arcs.values())[0];
+		assert.equal(arc.startPointId, p2.id);
+		assert.equal(arc.endPointId, targetEndPt.id);
+	});
+
+	it('EllipticalArcTool snaps only when choosing center, disables snapping on major/minor/angles', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const elArcTool = new EllipticalArcTool();
+		elArcTool.activate(ctx);
+
+		assert.equal(elArcTool.step, 0);
+		assert.equal(elArcTool.shouldSnap(), true);
+
+		// Step 0: Center at (0, 0)
+		elArcTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(elArcTool.step, 1);
+		assert.equal(elArcTool.shouldSnap(), false);
+
+		// Step 1: Major axis at (60, 0)
+		const evt1 = makeMouseEvent(60, 0);
+		evt1.snap = { type: 'point', worldPos: { x: 999, y: 999 }, screenPos: { x: 999, y: 999 } };
+		elArcTool.onMouseDown(evt1);
+		assert.equal(elArcTool.step, 2);
+		assert.equal(elArcTool.shouldSnap(), false);
+
+		// Step 2: Minor axis at (0, 30)
+		const evt2 = makeMouseEvent(0, 30);
+		evt2.snap = { type: 'point', worldPos: { x: 888, y: 888 }, screenPos: { x: 888, y: 888 } };
+		elArcTool.onMouseDown(evt2);
+		assert.equal(elArcTool.step, 3);
+		assert.equal(elArcTool.shouldSnap(), false);
+
+		// Step 3: Start point angle at (60, 0)
+		const evt3 = makeMouseEvent(60, 0);
+		evt3.snap = { type: 'point', worldPos: { x: 777, y: 777 }, screenPos: { x: 777, y: 777 } };
+		elArcTool.onMouseDown(evt3);
+		assert.equal(elArcTool.step, 4);
+		assert.equal(elArcTool.shouldSnap(), false);
+
+		// Step 4: End point angle at (0, 30)
+		const evt4 = makeMouseEvent(0, 30);
+		evt4.snap = { type: 'point', worldPos: { x: 666, y: 666 }, screenPos: { x: 666, y: 666 } };
+		elArcTool.onMouseDown(evt4);
+		assert.equal(elArcTool.step, 0);
+		assert.equal(sketch.ellipticalArcs.size, 1);
 	});
 });
 

@@ -493,7 +493,8 @@ export class CanvasInteraction {
 			},
 			showToast: (msg: string) => showToast(msg),
 			onEditDimension: (c, screenPos) => this.onEditDimension?.(c, screenPos),
-			findSnap: (screen: Vec2, excludePointId?: string) => this.findSnap(screen, excludePointId),
+			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
+				this.findSnap(screen, excludePointId, allowGrid),
 			findPointNear: (screen: Vec2, thresholdPx?: number) => this.findPointNearScreen(screen, thresholdPx),
 			findLineNear: (screen: Vec2, thresholdPx?: number) => this.findLineNearScreen(screen, thresholdPx),
 			findCircleNear: (screen: Vec2, thresholdPx?: number) => this.findCircleNearScreen(screen, thresholdPx),
@@ -520,8 +521,10 @@ export class CanvasInteraction {
 	createToolMouseEvent(e: MouseEvent): ToolMouseEvent {
 		const screen = this.getScreenPos(e);
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
-		const allowSnap = this.activeToolInstance?.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
-		const snap = allowSnap ? this.findSnap(screen) : null;
+		const snapMode = this.activeToolInstance?.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
+		const allowGrid = snapMode !== 'no-grid';
+		const allowSnap = snapMode !== false;
+		const snap = allowSnap ? this.findSnap(screen, undefined, allowGrid) : null;
 		const effectiveWorld = snap ? snap.worldPos : world;
 		const effectiveScreen = snap ? snap.screenPos : screen;
 		return {
@@ -552,8 +555,13 @@ export class CanvasInteraction {
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
 			const screen = this.lastMouseScreen;
 			const world = this.viewport.screenToWorld(screen.x, screen.y);
-			const allowSnap = this.activeToolInstance.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
-			const snap = isDrawingPrimitiveTool(this.activeTool) && allowSnap ? this.findSnap(screen) : null;
+			const snapMode = this.activeToolInstance.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
+			const allowGrid = snapMode !== 'no-grid';
+			const allowSnap = snapMode !== false;
+			const snap =
+				isDrawingPrimitiveTool(this.activeTool) && allowSnap
+					? this.findSnap(screen, undefined, allowGrid)
+					: null;
 			if (snap) {
 				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
 			}
@@ -1022,7 +1030,7 @@ export class CanvasInteraction {
 	}
 
 
-	findSnap(screenPos: Vec2, excludePointId?: string): SnapResult | null {
+	findSnap(screenPos: Vec2, excludePointId?: string, allowGrid = true): SnapResult | null {
 		// Suppress all snapping if snap modifier is held (metaKey on Mac, ctrlKey on Windows)
 		if (this.isSnapModifierPressed) {
 			return null;
@@ -1277,7 +1285,7 @@ export class CanvasInteraction {
 		}
 
 		// Priority 3: Grid snapping
-		if (!this.isSnappingEnabled) {
+		if (!this.isSnappingEnabled || !allowGrid) {
 			return null;
 		}
 

@@ -12,13 +12,21 @@ export class EllipseTool extends BaseTool {
 	private majPtId: string | null = null;
 	private majWorldPos: Vec2 | null = null;
 
+	get step(): number {
+		return this.drawingStep;
+	}
+
 	override isBusy(): boolean {
 		return this.drawingStep > 0;
 	}
 
+	override shouldSnap(): boolean {
+		return this.drawingStep === 0;
+	}
+
 	override onMouseDown(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
+		const snap = this.shouldSnap() ? e.snap : null;
 		const world = e.world;
 
 		if (this.drawingStep === 0) {
@@ -102,8 +110,8 @@ export class EllipseTool extends BaseTool {
 	}
 
 	override renderPreview(ctx: ToolRenderContext): void {
+		const effectiveWorld = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const rx = dist(this.centerWorldPos, effectiveWorld);
@@ -111,7 +119,6 @@ export class EllipseTool extends BaseTool {
 		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
 			const centerWorld = this.centerWorldPos;
 			const majWorld = this.majWorldPos;
-			const effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 
 			const majLen = dist(centerWorld, majWorld);
 			if (majLen >= 0.1) {
@@ -124,10 +131,11 @@ export class EllipseTool extends BaseTool {
 				const dy = effectiveWorld.y - centerWorld.y;
 				let ryVal = Math.abs(dx * vx + dy * vy);
 				if (ryVal < 1) ryVal = 1;
+				const sign = dx * vx + dy * vy < 0 ? -1 : 1;
 
 				const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
 				const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const sminWorld = vec(centerWorld.x + ryVal * vx, centerWorld.y + ryVal * vy);
+				const sminWorld = vec(centerWorld.x + sign * ryVal * vx, centerWorld.y + sign * ryVal * vy);
 				const smin = ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
 
 				renderEllipsePreviewVisual(ctx.targetGroup, sc, smaj, smin, majLen, ryVal, ctx.isConstruction);

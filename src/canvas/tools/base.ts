@@ -37,7 +37,7 @@ export abstract class BaseTool implements ITool {
 		return false;
 	}
 
-	shouldSnap(): boolean {
+	shouldSnap(): boolean | 'no-grid' {
 		return true;
 	}
 
