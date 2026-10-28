@@ -51,6 +51,8 @@ import {
 	CircleTool,
 	RectangleTool,
 	type RectangleMode,
+	SlotTool,
+	type SlotMode,
 	ArcTool,
 	type ArcMode,
 	PolygonTool,
@@ -191,6 +193,8 @@ export class CanvasInteraction {
 	onArcModeChange?: (mode: ArcMode) => void;
 	onRectangleStateChange?: () => void;
 	onRectangleModeChange?: (mode: RectangleMode) => void;
+	onSlotStateChange?: () => void;
+	onSlotModeChange?: (mode: SlotMode) => void;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -253,6 +257,28 @@ export class CanvasInteraction {
 			} else {
 				this.updateToolPreview();
 				this.onRectangleStateChange?.();
+			}
+		}
+	}
+
+	getSlotTool(): SlotTool | undefined {
+		return this.tools.get('slot') as SlotTool | undefined;
+	}
+
+	get slotMode(): SlotMode {
+		return this.getSlotTool()?.mode ?? 'center_to_center';
+	}
+
+	setSlotMode(mode: SlotMode): void {
+		const slotTool = this.getSlotTool();
+		if (slotTool) {
+			slotTool.setMode(mode);
+			this.onSlotModeChange?.(mode);
+			if (this.activeTool !== 'slot') {
+				this.setTool('slot');
+			} else {
+				this.updateToolPreview();
+				this.onSlotStateChange?.();
 			}
 		}
 	}
@@ -373,6 +399,13 @@ export class CanvasInteraction {
 		};
 		rectTool.onStateChange = () => this.onRectangleStateChange?.();
 		this.tools.set('rectangle', rectTool);
+		const slotTool = new SlotTool('center_to_center');
+		slotTool.onModeChange = mode => {
+			this.onSlotModeChange?.(mode);
+			this.onSlotStateChange?.();
+		};
+		slotTool.onStateChange = () => this.onSlotStateChange?.();
+		this.tools.set('slot', slotTool);
 		const arcTool = new ArcTool('center');
 		arcTool.onModeChange = mode => {
 			this.onArcModeChange?.(mode);
@@ -457,7 +490,8 @@ export class CanvasInteraction {
 	createToolMouseEvent(e: MouseEvent): ToolMouseEvent {
 		const screen = this.getScreenPos(e);
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
-		const snap = this.findSnap(screen);
+		const allowSnap = this.activeToolInstance?.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
+		const snap = allowSnap ? this.findSnap(screen) : null;
 		const effectiveWorld = snap ? snap.worldPos : world;
 		const effectiveScreen = snap ? snap.screenPos : screen;
 		return {
@@ -488,7 +522,8 @@ export class CanvasInteraction {
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
 			const screen = this.lastMouseScreen;
 			const world = this.viewport.screenToWorld(screen.x, screen.y);
-			const snap = isDrawingPrimitiveTool(this.activeTool) ? this.findSnap(screen) : null;
+			const allowSnap = this.activeToolInstance.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
+			const snap = isDrawingPrimitiveTool(this.activeTool) && allowSnap ? this.findSnap(screen) : null;
 			if (snap) {
 				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
 			}
@@ -520,6 +555,10 @@ export class CanvasInteraction {
 		if (this.isSettingTool) return;
 		this.isSettingTool = true;
 		try {
+			if (tool !== 'dimension' && this.canApplyConstraint(tool)) {
+				this.applyConstraint(tool);
+			}
+
 			const prevTool = this.activeToolInstance;
 			this.activeToolInstance = null;
 			if (prevTool) {
@@ -545,6 +584,8 @@ export class CanvasInteraction {
 			this.onCircularPatternStateChange?.();
 			this.onRectangularPatternStateChange?.();
 			this.onArcStateChange?.();
+			this.onRectangleStateChange?.();
+			this.onSlotStateChange?.();
 			this.render();
 		} finally {
 			this.isSettingTool = false;
@@ -731,7 +772,11 @@ export class CanvasInteraction {
 	}
 
 	public handleKeyDown(e: KeyboardEvent): void {
-		if (this.isMac ? (e.key === 'Meta' || e.metaKey) : (e.key === 'Control' || e.ctrlKey)) {
+		if (
+			this.isMac
+				? e.code === 'MetaLeft' || e.code === 'MetaRight' || e.metaKey
+				: e.code === 'ControlLeft' || e.code === 'ControlRight' || e.ctrlKey
+		) {
 			this.isSnapModifierPressed = true;
 			this.renderer.clearPreviews();
 			this.render();
@@ -746,7 +791,7 @@ export class CanvasInteraction {
 		if (e.code === 'Space' && !isInputTarget) {
 			this.isSpacePressed = true;
 		}
-		if (e.key === 'Tab') {
+		if (e.code === 'Tab') {
 			if (this.activeToolInstance?.onKeyDown) {
 				const handled = this.activeToolInstance.onKeyDown(e);
 				if (handled) return;
@@ -758,115 +803,170 @@ export class CanvasInteraction {
 
 		// Alt + 1..4: Mode switching for Rectangle and Arc tools
 		if (e.altKey && !e.ctrlKey && !e.metaKey) {
-			const isDigit1 = e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1';
-			const isDigit2 = e.code === 'Digit2' || e.code === 'Numpad2' || e.key === '2';
-			const isDigit3 = e.code === 'Digit3' || e.code === 'Numpad3' || e.key === '3';
-			const isDigit4 = e.code === 'Digit4' || e.code === 'Numpad4' || e.key === '4';
-
 			if (this.activeTool === 'rectangle') {
-				if (isDigit1) {
-					e.preventDefault();
-					this.setRectangleMode('corner');
-					showToast('2-Point Rectangle (Alt+1)');
-					return;
-				} else if (isDigit2) {
-					e.preventDefault();
-					this.setRectangleMode('center');
-					showToast('Center Rectangle (Alt+2)');
-					return;
-				} else if (isDigit3) {
-					e.preventDefault();
-					this.setRectangleMode('three_point');
-					showToast('3-Point Rectangle (Alt+3)');
-					return;
-				} else if (isDigit4) {
-					e.preventDefault();
-					this.setRectangleMode('rounded');
-					showToast('Rounded Rectangle (Alt+4)');
-					return;
+				switch (e.code) {
+					case 'Digit1':
+					case 'Numpad1':
+						e.preventDefault();
+						this.setRectangleMode('corner');
+						showToast('2-Point Rectangle (Alt+1)');
+						return;
+					case 'Digit2':
+					case 'Numpad2':
+						e.preventDefault();
+						this.setRectangleMode('center');
+						showToast('Center Rectangle (Alt+2)');
+						return;
+					case 'Digit3':
+					case 'Numpad3':
+						e.preventDefault();
+						this.setRectangleMode('three_point');
+						showToast('3-Point Rectangle (Alt+3)');
+						return;
+					case 'Digit4':
+					case 'Numpad4':
+						e.preventDefault();
+						this.setRectangleMode('rounded');
+						showToast('Rounded Rectangle (Alt+4)');
+						return;
 				}
 			} else if (this.activeTool === 'arc') {
-				if (isDigit1) {
-					e.preventDefault();
-					this.setArcMode('center');
-					showToast('Centerpoint Arc (Alt+1)');
-					return;
-				} else if (isDigit2) {
-					e.preventDefault();
-					this.setArcMode('three_point');
-					showToast('3-Point Arc (Alt+2)');
-					return;
-				} else if (isDigit3) {
-					e.preventDefault();
-					this.setArcMode('tangent');
-					showToast('Tangent Arc (Alt+3)');
-					return;
+				switch (e.code) {
+					case 'Digit1':
+					case 'Numpad1':
+						e.preventDefault();
+						this.setArcMode('center');
+						showToast('Centerpoint Arc (Alt+1)');
+						return;
+					case 'Digit2':
+					case 'Numpad2':
+						e.preventDefault();
+						this.setArcMode('three_point');
+						showToast('3-Point Arc (Alt+2)');
+						return;
+					case 'Digit3':
+					case 'Numpad3':
+						e.preventDefault();
+						this.setArcMode('tangent');
+						showToast('Tangent Arc (Alt+3)');
+						return;
+				}
+			} else if (this.activeTool === 'slot') {
+				switch (e.code) {
+					case 'Digit1':
+					case 'Numpad1':
+						e.preventDefault();
+						this.setSlotMode('center_to_center');
+						showToast('Center-to-Center Slot (Alt+1)');
+						return;
+					case 'Digit2':
+					case 'Numpad2':
+						e.preventDefault();
+						this.setSlotMode('center_point');
+						showToast('Center Point Slot (Alt+2)');
+						return;
+					case 'Digit3':
+					case 'Numpad3':
+						e.preventDefault();
+						this.setSlotMode('overall');
+						showToast('Overall Slot (Alt+3)');
+						return;
+					case 'Digit4':
+					case 'Numpad4':
+						e.preventDefault();
+						this.setSlotMode('three_point_arc');
+						showToast('3-Point Arc Slot (Alt+4)');
+						return;
+					case 'Digit5':
+					case 'Numpad5':
+						e.preventDefault();
+						this.setSlotMode('center_point_arc');
+						showToast('Center Point Arc Slot (Alt+5)');
+						return;
 				}
 			}
 		}
-		if (e.key === 'Escape') {
-			if (this.activeToolInstance?.isBusy?.()) {
-				this.activeToolInstance.cancel?.();
+
+		switch (e.code) {
+			case 'Escape':
+				if (this.activeToolInstance?.isBusy?.()) {
+					this.activeToolInstance.cancel?.();
+					this.render();
+					return;
+				}
+				if (this.activeTool !== 'select') {
+					this.setTool('select');
+					this.render();
+					return;
+				}
+				this.cancelDrawing();
+				this.sketch.clearSelection();
 				this.render();
 				return;
-			}
-			if (this.activeTool !== 'select') {
+			case 'Enter':
+			case 'NumpadEnter':
+				if (this.activeToolInstance?.isBusy?.()) {
+					this.activeToolInstance.commit?.();
+				}
+				return;
+			case 'Delete':
+			case 'Backspace':
+				this.sketch.deleteSelected();
+				this.render();
+				return;
+			case 'KeyX':
+				this.toggleConstructionMode();
+				return;
+			case 'KeyV':
 				this.setTool('select');
-				this.render();
 				return;
-			}
-			this.cancelDrawing();
-			this.sketch.clearSelection();
-			this.render();
-			return;
-		} else if (e.key === 'Enter') {
-			if (this.activeToolInstance?.isBusy?.()) {
-				this.activeToolInstance.commit?.();
+			case 'KeyL':
+				this.setTool('line');
 				return;
-			}
-		} else if (e.key === 'Delete' || e.key === 'Backspace') {
-			this.sketch.deleteSelected();
-			this.render();
-		} else if (e.key === 'x' || e.key === 'X') {
-			this.toggleConstructionMode();
-		} else if (e.key === 'v' || e.key === 'V') {
-			this.setTool('select');
-		} else if (e.key === 'l' || e.key === 'L') {
-			this.setTool('line');
-		} else if (e.key === 'c' || e.key === 'C') {
-			this.setTool('circle');
-		} else if (e.key === 'a' || e.key === 'A') {
-			this.setTool('arc');
-		} else if (e.key === 'r' || e.key === 'R') {
-			this.setTool('rectangle');
-		} else if (e.key === 'g' || e.key === 'G') {
-			this.setTool('polygon');
-		} else if (e.key === 'p' || e.key === 'P') {
-			this.setTool('point');
-		} else if (e.key === 'e' || e.key === 'E') {
-			this.setTool('ellipse');
-		} else if (e.key === 't' || e.key === 'T') {
-			this.setTool(this.activeTool === 'trim' ? 'select' : 'trim');
-		} else if (e.key === 'b' || e.key === 'B') {
-			this.setTool(this.activeTool === 'break' ? 'select' : 'break');
-		} else if (e.key === 'm' || e.key === 'M' || e.code === 'KeyM') {
-			this.setTool(this.activeTool === 'mirror' ? 'select' : 'mirror');
-		} else if (e.key === 'h' || e.key === 'H') {
-			this.setTool(this.activeTool === 'horizontal_vertical' ? 'select' : 'horizontal_vertical');
-		} else if (e.key === 'd' || e.key === 'D') {
-			this.setTool(this.activeTool === 'dimension' ? 'select' : 'dimension');
-		} else if (e.key === 'i' || e.key === 'I') {
-			this.setTool(this.activeTool === 'coincident' ? 'select' : 'coincident');
-		} else if (e.key === 'f' || e.key === 'F') {
-			if (this.sketch.selection.pointIds.size > 0) {
-				this.applyConstraint('fixed');
-			} else {
-				this.setTool(this.activeTool === 'fixed' ? 'select' : 'fixed');
-			}
-		} else if (e.key === 's' || e.key === 'S') {
-			if (!e.ctrlKey && !e.metaKey) {
-				this.toggleSnapping();
-			}
+			case 'KeyC':
+				this.setTool('circle');
+				return;
+			case 'KeyA':
+				this.setTool('arc');
+				return;
+			case 'KeyR':
+				this.setTool('rectangle');
+				return;
+			case 'KeyG':
+				this.setTool('polygon');
+				return;
+			case 'KeyP':
+				this.setTool('point');
+				return;
+			case 'KeyE':
+				this.setTool('ellipse');
+				return;
+			case 'KeyT':
+				this.setTool('trim');
+				return;
+			case 'KeyB':
+				this.setTool('break');
+				return;
+			case 'KeyM':
+				this.setTool('mirror');
+				return;
+			case 'KeyH':
+				this.setTool('horizontal_vertical');
+				return;
+			case 'KeyD':
+				this.setTool('dimension');
+				return;
+			case 'KeyI':
+				this.setTool('coincident');
+				return;
+			case 'KeyF':
+				this.setTool('fixed');
+				return;
+			case 'KeyS':
+				if (!e.ctrlKey && !e.metaKey) {
+					this.toggleSnapping();
+				}
+				return;
 		}
 	}
 
@@ -1967,28 +2067,26 @@ export class CanvasInteraction {
 				} else if (constraint instanceof AngleConstraint) {
 					const l1 = this.sketch.lines.get(constraint.line1Id);
 					const l2 = this.sketch.lines.get(constraint.line2Id);
-					if (l1 && l2) {
-						const p1 = this.sketch.points.get(l1.p1Id);
-						const p2 = this.sketch.points.get(l1.p2Id);
-						const p3 = this.sketch.points.get(l2.p1Id);
-						const p4 = this.sketch.points.get(l2.p2Id);
-						if (p1 && p2 && p3 && p4) {
-							const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world);
-							const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
-							constraint.arcRadius = arcRadiusWorld;
+					const p1 = this.sketch.points.get(l1 ? l1.p1Id : constraint.l1P1);
+					const p2 = this.sketch.points.get(l1 ? l1.p2Id : constraint.l1P2);
+					const p3 = this.sketch.points.get(l2 ? l2.p1Id : constraint.l2P1);
+					const p4 = this.sketch.points.get(l2 ? l2.p2Id : constraint.l2P2);
+					if (p1 && p2 && p3 && p4) {
+						const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world);
+						const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
+						constraint.arcRadius = arcRadiusWorld;
 
-							if (geom.s1 !== constraint.s1 || geom.s2 !== constraint.s2) {
-								constraint.s1 = geom.s1;
-								constraint.s2 = geom.s2;
-								constraint.sign = geom.sign;
-								const newAngle = Math.round(geom.initialAngleDeg * 10) / 10;
-								constraint.targetAngle = newAngle;
-								constraint.value = newAngle;
-								constraint.name = 'Angle';
-								this.sketch.solve();
-							}
-							this.render();
+						if (l1 && l2 && (geom.s1 !== constraint.s1 || geom.s2 !== constraint.s2)) {
+							constraint.s1 = geom.s1;
+							constraint.s2 = geom.s2;
+							constraint.sign = geom.sign;
+							const newAngle = Math.round(geom.initialAngleDeg * 10) / 10;
+							constraint.targetAngle = newAngle;
+							constraint.value = newAngle;
+							constraint.name = 'Angle';
+							this.sketch.solve();
 						}
+						this.render();
 					}
 				} else if (constraint instanceof RadiusConstraint) {
 					const entity = this.sketch.circles.get(constraint.circleId) ?? this.sketch.arcs.get(constraint.circleId);

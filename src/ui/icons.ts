@@ -10,6 +10,11 @@ import rectangle from '../assets/icons/rectangle.svg?raw';
 import rectangleCenter from '../assets/icons/rectangle-center.svg?raw';
 import rectangle3Point from '../assets/icons/rectangle-3point.svg?raw';
 import rectangleRounded from '../assets/icons/rectangle-rounded.svg?raw';
+import slotCenterToCenter from '../assets/icons/slot-center-to-center.svg?raw';
+import slotCenterPoint from '../assets/icons/slot-center-point.svg?raw';
+import slotOverall from '../assets/icons/slot-overall.svg?raw';
+import slotArc3Point from '../assets/icons/slot-arc-3point.svg?raw';
+import slotArcCenter from '../assets/icons/slot-arc-center.svg?raw';
 import polygon from '../assets/icons/polygon.svg?raw';
 import ellipse from '../assets/icons/ellipse.svg?raw';
 import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
@@ -64,6 +69,12 @@ export const ICONS = {
 	rectangle_center: rectangleCenter,
 	rectangle_3point: rectangle3Point,
 	rectangle_rounded: rectangleRounded,
+	slot: slotCenterToCenter,
+	slot_center_to_center: slotCenterToCenter,
+	slot_center_point: slotCenterPoint,
+	slot_overall: slotOverall,
+	slot_arc_3point: slotArc3Point,
+	slot_arc_center: slotArcCenter,
 	lock: fixed,
 	unlock: unfixed,
 	polygon,

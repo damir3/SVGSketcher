@@ -4,6 +4,7 @@ import { SketchDocument } from '../src/model/sketch';
 import { LineTool } from '../src/canvas/tools/primitives/line';
 import { CircleTool } from '../src/canvas/tools/primitives/circle';
 import { RectangleTool } from '../src/canvas/tools/primitives/rectangle';
+import { SlotTool } from '../src/canvas/tools/primitives/slot';
 import { ArcTool } from '../src/canvas/tools/primitives/arc';
 import { EllipseTool } from '../src/canvas/tools/primitives/ellipse';
 import { SplineTool } from '../src/canvas/tools/primitives/spline';
@@ -22,8 +23,10 @@ import {
 	EqualRadiusConstraint,
 	RadiusConstraint,
 	DistanceConstraint,
+	AngleConstraint,
 	CoincidentConstraint,
 	PointOnLineConstraint,
+	PointOnCircleConstraint,
 } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
 import { vec, type Vec2 } from '../src/math/vector';
@@ -998,6 +1001,305 @@ describe('Primitive Tools Creation', () => {
 		tool.cancel();
 		assert.equal(tool.state, null);
 		assert.equal(setToolCalls, 0, 'cancel() must not call ctx.setTool');
+	});
+
+	it('SlotTool creates Center-to-Center Slot with construction axis line, 2 side lines, 2 end-cap arcs, and tangent/equal constraints', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('center_to_center');
+		slotTool.activate(ctx);
+
+		assert.equal(slotTool.mode, 'center_to_center');
+
+		// Click 1: first arc center (0, 0)
+		slotTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(slotTool.step, 1);
+
+		// Click 2: second arc center (80, 0)
+		slotTool.onMouseMove(makeMouseEvent(80, 0));
+		slotTool.onMouseDown(makeMouseEvent(80, 0));
+		assert.equal(slotTool.step, 2);
+
+		// Click 3: slot radius = 15 (cursor at (80, 15))
+		slotTool.onMouseMove(makeMouseEvent(80, 15));
+		assert.equal(slotTool.radius, 15);
+		slotTool.onMouseDown(makeMouseEvent(80, 15));
+		assert.equal(slotTool.step, 0);
+
+		// 2 centers + 4 tangent points = 6 points
+		assert.equal(sketch.points.size, 6);
+		// 2 straight side lines + 1 construction axis line = 3 lines
+		assert.equal(sketch.lines.size, 3);
+		const constructionLines = [...sketch.lines.values()].filter(l => l.isConstruction);
+		assert.equal(constructionLines.length, 1);
+		// 2 end-cap arcs
+		assert.equal(sketch.arcs.size, 2);
+
+		const tangents = [...sketch.constraints.values()].filter(c => c instanceof TangentLineCircleConstraint);
+		const equalRadii = [...sketch.constraints.values()].filter(c => c instanceof EqualRadiusConstraint);
+		assert.equal(tangents.length, 4);
+		assert.equal(equalRadii.length, 1);
+	});
+
+	it('SlotTool locking distance fixes length while waiting for direction click, and locking radius on step 2 finishes immediately without mouse click', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('center_to_center');
+		slotTool.activate(ctx);
+
+		// Click 1: first center at (0, 0)
+		slotTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(slotTool.step, 1);
+
+		// Lock distance to 100 in popup -> stays on step 1 waiting for direction click
+		slotTool.lockDistance(100);
+		assert.equal(slotTool.step, 1);
+		assert.equal(slotTool.isDistanceLocked, true);
+
+		// Move mouse along (3, 4) direction -> click 2 sets direction at distance 100 -> (60, 80)
+		slotTool.onMouseMove(makeMouseEvent(30, 40));
+		slotTool.onMouseDown(makeMouseEvent(30, 40));
+		assert.equal(slotTool.step, 2);
+
+		// Now on step 2 (radius gizmo): lock radius to 12 -> immediately finishes slot without waiting for mouse click!
+		slotTool.lockRadius(12);
+		assert.equal(slotTool.step, 0);
+		assert.equal(sketch.arcs.size, 2);
+
+		const distConstraints = [...sketch.constraints.values()].filter(c => c instanceof DistanceConstraint);
+		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);
+		assert.equal(distConstraints.length, 1);
+		assert.equal(distConstraints[0].targetDistance, 100);
+		assert.equal(radConstraints.length, 1);
+		assert.equal(radConstraints[0].targetRadius, 12);
+	});
+
+	it('SlotTool creates Center Point Slot with MidpointConstraint and DistanceConstraint between center point and arc center', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('center_point');
+		slotTool.activate(ctx);
+
+		// Click 1: slot center point M at (50, 50)
+		slotTool.onMouseDown(makeMouseEvent(50, 50));
+		assert.equal(slotTool.step, 1);
+
+		// Lock both distance (40) and radius (10) before clicking direction
+		slotTool.lockDistance(40);
+		slotTool.lockRadius(10);
+		assert.equal(slotTool.step, 1);
+
+		// Click 2: sets direction along +X -> since radius is already locked, immediately finishes!
+		slotTool.onMouseMove(makeMouseEvent(100, 50));
+		slotTool.onMouseDown(makeMouseEvent(100, 50));
+		assert.equal(slotTool.step, 0);
+
+		// 1 midpoint + 2 arc centers + 4 tangent points = 7 points
+		assert.equal(sketch.points.size, 7);
+		assert.equal(sketch.lines.size, 3);
+		assert.equal(sketch.arcs.size, 2);
+
+		const midConstraints = [...sketch.constraints.values()].filter(c => c instanceof MidpointConstraint);
+		const distConstraints = [...sketch.constraints.values()].filter(c => c instanceof DistanceConstraint);
+		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);
+		assert.equal(midConstraints.length, 1);
+		assert.equal(distConstraints.length, 1);
+		assert.equal(distConstraints[0].targetDistance, 40);
+		assert.equal(radConstraints.length, 1);
+		assert.equal(radConstraints[0].targetRadius, 10);
+	});
+
+	it('SlotTool creates Overall Slot with outer edge points and DistanceConstraint on full length L', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('overall');
+		slotTool.activate(ctx);
+
+		// Click 1: first outer edge (0, 0)
+		slotTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(slotTool.step, 1);
+
+		// Lock overall length to 120
+		slotTool.lockDistance(120);
+
+		// Click 2: direction along +X -> second outer edge at (120, 0)
+		slotTool.onMouseMove(makeMouseEvent(120, 0));
+		slotTool.onMouseDown(makeMouseEvent(120, 0));
+		assert.equal(slotTool.step, 2);
+
+		// Lock radius to 20 -> immediately commits without waiting for mouse click!
+		slotTool.lockRadius(20);
+		assert.equal(slotTool.step, 0);
+
+		// 2 outer edge points + 2 arc centers + 4 tangent points = 8 points
+		assert.equal(sketch.points.size, 8);
+		assert.equal(sketch.arcs.size, 2);
+
+		// Arc centers should be at (20, 0) and (100, 0) (since L=120, R=20 -> center-to-center = 80)
+		const pts = [...sketch.points.values()];
+		assert.ok(pts.some(p => Math.abs(p.x - 20) < 1e-3 && Math.abs(p.y) < 1e-3));
+		assert.ok(pts.some(p => Math.abs(p.x - 100) < 1e-3 && Math.abs(p.y) < 1e-3));
+
+		const ptOnCircles = [...sketch.constraints.values()].filter(c => c instanceof PointOnCircleConstraint);
+		const ptOnLines = [...sketch.constraints.values()].filter(c => c instanceof PointOnLineConstraint);
+		const distConstraints = [...sketch.constraints.values()].filter(c => c instanceof DistanceConstraint);
+		assert.equal(ptOnCircles.length, 2);
+		assert.equal(ptOnLines.length, 2);
+		assert.equal(distConstraints.length, 1);
+		assert.equal(distConstraints[0].targetDistance, 120);
+	});
+
+	it('SlotTool creates 3-Point Arc Slot without radial construction lines, supports locking distance, and keeps final radius undefined until cursor move or input', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('three_point_arc');
+		slotTool.activate(ctx);
+
+		// Click 1: start center (50, 0)
+		slotTool.onMouseDown(makeMouseEvent(50, 0));
+		assert.equal(slotTool.step, 1);
+		assert.equal(slotTool.radius, null);
+		assert.equal(slotTool.popup.isRadiusVisible(), false);
+		assert.equal(slotTool.shouldSnap(), true);
+
+		// Lock chord distance between C1 and C2 to 50 * sqrt(2)
+		const chordLen = 50 * Math.SQRT2;
+		slotTool.lockDistance(chordLen);
+		assert.equal(slotTool.isDistanceLocked, true);
+
+		// Click 2: direction toward (0, 50) -> C2 placed at (0, 50)
+		slotTool.onMouseMove(makeMouseEvent(0, 50));
+		slotTool.onMouseDown(makeMouseEvent(0, 50));
+		assert.equal(slotTool.step, 2);
+		assert.equal(slotTool.radius, null);
+		assert.equal(slotTool.popup.isRadiusVisible(), false);
+		assert.equal(slotTool.shouldSnap(), false);
+
+		// Click 3: mid point on arc of radius 50 centered at (0, 0) -> (50 * cos(45), 50 * sin(45))
+		const midVal = 50 * Math.SQRT1_2;
+		slotTool.onMouseMove(makeMouseEvent(midVal, midVal));
+		slotTool.onMouseDown(makeMouseEvent(midVal, midVal));
+		assert.equal(slotTool.step, 3);
+		// Upon entering final radius step, radius is still null (undefined) until mouse moves or value is entered, and radius input is now visible
+		assert.equal(slotTool.radius, null);
+		assert.equal(slotTool.popup.isRadiusVisible(), true);
+		assert.equal(slotTool.shouldSnap(), false);
+
+		// Lock radius to 8 on step 3 -> immediately commits without waiting for mouse click!
+		slotTool.lockRadius(8);
+		assert.equal(slotTool.step, 0);
+
+		// 1 center + 2 cap centers + 4 tangent points = 7 points
+		assert.equal(sketch.points.size, 7);
+		// NO radial construction lines!
+		assert.equal(sketch.lines.size, 0);
+		// 1 construction centerline arc + 4 boundary arcs = 5 arcs
+		assert.equal(sketch.arcs.size, 5);
+
+		const circleTangents = [...sketch.constraints.values()].filter(c => c instanceof TangentCircleCircleConstraint);
+		const equalRadii = [...sketch.constraints.values()].filter(c => c instanceof EqualRadiusConstraint);
+		const distConstraints = [...sketch.constraints.values()].filter(c => c instanceof DistanceConstraint);
+		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);
+		assert.equal(circleTangents.length, 4);
+		assert.equal(equalRadii.length, 1);
+		assert.equal(distConstraints.length, 1);
+		assert.ok(Math.abs(distConstraints[0].targetDistance - chordLen) < 1e-3);
+		assert.equal(radConstraints.length, 1);
+		assert.equal(radConstraints[0].targetRadius, 8);
+	});
+
+	it('SlotTool Center Point Arc Slot supports locking arc radius, angle, and slot radius without radial construction lines', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('center_point_arc');
+		slotTool.activate(ctx);
+
+		// Click 1: arc center O at (0, 0)
+		slotTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(slotTool.step, 1);
+		assert.equal(slotTool.popup.isRadiusVisible(), false);
+
+		// Lock arc radius to 60 on step 1
+		slotTool.lockDistance(60);
+		assert.equal(slotTool.isDistanceLocked, true);
+
+		// Click 2: direction along +X -> start point C1 placed at (60, 0) with arcRadius = 60
+		slotTool.onMouseMove(makeMouseEvent(30, 0));
+		slotTool.onMouseDown(makeMouseEvent(30, 0));
+		assert.equal(slotTool.step, 2);
+		assert.equal(slotTool.popup.isRadiusVisible(), false);
+
+		// Move mouse into first quadrant to indicate CCW sweep, then lock angle to 90 deg:
+		// Must immediately advance from step 2 (angle gizmo) to step 3 (radius gizmo) without mouse click!
+		slotTool.onMouseMove(makeMouseEvent(40, 40));
+		slotTool.lockAngle(90);
+		assert.equal(slotTool.step, 3);
+		assert.equal(slotTool.radius, null);
+		assert.equal(slotTool.popup.isRadiusVisible(), true);
+		assert.equal(slotTool.shouldSnap(), false);
+
+		// Verify snapping is ignored on the radius step even if a snap point is present in the event
+		const snappedEvt = makeMouseEvent(0, 72);
+		snappedEvt.snap = { type: 'point', worldPos: { x: 0, y: 100 }, screenPos: { x: 0, y: 100 } };
+		snappedEvt.effectiveWorld = { x: 0, y: 100 };
+		slotTool.onMouseMove(snappedEvt);
+		assert.equal(slotTool.radius, 12);
+
+		// Now lock radius to 10 -> immediately finishes arc slot without mouse click!
+		slotTool.lockRadius(10);
+		assert.equal(slotTool.step, 0);
+
+		assert.equal(sketch.points.size, 7);
+		// NO radial construction lines!
+		assert.equal(sketch.lines.size, 0);
+		assert.equal(sketch.arcs.size, 5);
+
+		const angleConstraints = [...sketch.constraints.values()].filter(c => c instanceof AngleConstraint);
+		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);
+		assert.equal(angleConstraints.length, 1);
+		assert.equal(angleConstraints[0].targetAngle, 90);
+		// 2 RadiusConstraints: one for the centerline arc (60) and one for the slot cap radius (10)
+		assert.equal(radConstraints.length, 2);
+		assert.ok(radConstraints.some(c => Math.abs(c.targetRadius - 60) < 1e-3));
+		assert.ok(radConstraints.some(c => Math.abs(c.targetRadius - 10) < 1e-3));
+	});
+
+	it('CanvasInteraction handleKeyDown switches Slot modes with Alt+1..5', () => {
+		const switchedModes: string[] = [];
+		let prevented = 0;
+		const fakeInteraction = {
+			isMac: false,
+			activeTool: 'slot',
+			setSlotMode: (mode: string) => {
+				switchedModes.push(mode);
+			},
+		};
+
+		const makeAltKey = (code: string, key: string) => ({
+			altKey: true,
+			ctrlKey: false,
+			metaKey: false,
+			code,
+			key,
+			preventDefault: () => {
+				prevented++;
+			},
+		} as any);
+
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit1', '1'));
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit2', '2'));
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit3', '3'));
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit4', '4'));
+		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit5', '5'));
+
+		assert.deepEqual(switchedModes, [
+			'center_to_center',
+			'center_point',
+			'overall',
+			'three_point_arc',
+			'center_point_arc',
+		]);
+		assert.equal(prevented, 5);
 	});
 });
 

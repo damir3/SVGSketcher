@@ -20,6 +20,7 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'polygon',
 	'arc',
 	'rectangle',
+	'slot',
 	'ellipse',
 	'elliptical_arc',
 	'spline_fit',
@@ -208,6 +209,9 @@ export interface ITool {
 	// --- State & Commands ---
 	/** Returns true if tool is in the middle of a multi-step operation */
 	isBusy?(): boolean;
+
+	/** Returns false to temporarily suppress snapping on the current step (e.g. radius gizmos) */
+	shouldSnap?(): boolean;
 
 	/** Cancel current operation (e.g. Esc key or tool switch) */
 	cancel?(): void;

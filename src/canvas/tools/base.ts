@@ -37,6 +37,10 @@ export abstract class BaseTool implements ITool {
 		return false;
 	}
 
+	shouldSnap(): boolean {
+		return true;
+	}
+
 	cancel(): void {}
 	commit(): void {}
 

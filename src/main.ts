@@ -148,6 +148,15 @@ function initApp(): void {
 		sidebar.render();
 	};
 
+	interaction.onSlotModeChange = mode => {
+		toolbar.setSlotMode(mode);
+		sidebar.render();
+	};
+
+	interaction.onSlotStateChange = () => {
+		sidebar.render();
+	};
+
 	interaction.onConstructionChange = active => {
 		toolbar.setConstructionActive(active);
 	};
@@ -400,7 +409,7 @@ function initApp(): void {
 			}
 		}
 
-		if (e.key === 'z' || e.key === 'Z') {
+		if (e.code === 'KeyZ') {
 			if (!isCtrlOrCmd) {
 				fitToView();
 			}

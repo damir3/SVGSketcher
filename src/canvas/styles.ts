@@ -143,12 +143,14 @@ export const AUX_RAY_ATTRS: SvgAttrs = {
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.thin,
 	'stroke-dasharray': DASH_ARRAY.ray,
+	fill: 'none',
 };
 
 export const AUX_AXIS_ATTRS: SvgAttrs = {
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.thin,
 	'stroke-dasharray': DASH_ARRAY.axis,
+	fill: 'none',
 };
 
 export const GUIDE_OUTLINE_ATTRS: SvgAttrs = {

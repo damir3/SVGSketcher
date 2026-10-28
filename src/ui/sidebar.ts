@@ -6,6 +6,7 @@ import { ICONS } from './icons';
 import { dist } from '../math/vector';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
+import type { SlotMode } from '../canvas/tools/primitives/slot';
 
 export class Sidebar {
 	private container: HTMLElement;
@@ -25,6 +26,8 @@ export class Sidebar {
 			this.interaction.onCircularPatternStateChange = () => this.render();
 			this.interaction.onRectangularPatternStateChange = () => this.render();
 			this.interaction.onArcStateChange = () => this.render();
+			this.interaction.onRectangleStateChange = () => this.render();
+			this.interaction.onSlotStateChange = () => this.render();
 		}
 		this.render();
 	}
@@ -82,6 +85,9 @@ export class Sidebar {
 
 				<!-- Rectangle Tool Panel (when rectangle tool is active) -->
 				${this.renderRectangleToolCard()}
+
+				<!-- Slot Tool Panel (when slot tool is active) -->
+				${this.renderSlotToolCard()}
 
 				<!-- Arc Tool Panel (when arc tool is active) -->
 				${this.renderArcToolCard()}
@@ -180,6 +186,91 @@ export class Sidebar {
 			if (step === 0) return '1. Click to place first corner';
 			if (step === 1) return '2. Click to place opposite corner';
 			return '3. Click to set corner radius';
+		}
+	}
+
+	private renderSlotToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'slot') {
+			return '';
+		}
+
+		const currentMode = this.interaction.slotMode;
+		const hint = this.getSlotStepHint();
+
+		let modeIcon = ICONS.slot_center_to_center;
+		if (currentMode === 'center_point') modeIcon = ICONS.slot_center_point;
+		else if (currentMode === 'overall') modeIcon = ICONS.slot_overall;
+		else if (currentMode === 'three_point_arc') modeIcon = ICONS.slot_arc_3point;
+		else if (currentMode === 'center_point_arc') modeIcon = ICONS.slot_arc_center;
+
+		return `
+			<div class="sidebar-panel-card slot-tool-card rectangle-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${modeIcon}</span>
+						<span>Slot Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-slot-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Select slot creation method:
+				</div>
+				<div class="slot-mode-selector">
+					<button class="slot-mode-btn ${currentMode === 'center_to_center' ? 'active' : ''}" data-slot-mode="center_to_center" type="button" title="Center-to-Center Slot (Alt+1)">
+						<span class="slot-mode-icon">${ICONS.slot_center_to_center}</span>
+						<span class="slot-mode-text">Center-Center</span>
+					</button>
+					<button class="slot-mode-btn ${currentMode === 'center_point' ? 'active' : ''}" data-slot-mode="center_point" type="button" title="Center Point Slot (Alt+2)">
+						<span class="slot-mode-icon">${ICONS.slot_center_point}</span>
+						<span class="slot-mode-text">Center Pt</span>
+					</button>
+					<button class="slot-mode-btn ${currentMode === 'overall' ? 'active' : ''}" data-slot-mode="overall" type="button" title="Overall Slot (Alt+3)">
+						<span class="slot-mode-icon">${ICONS.slot_overall}</span>
+						<span class="slot-mode-text">Overall</span>
+					</button>
+					<button class="slot-mode-btn ${currentMode === 'three_point_arc' ? 'active' : ''}" data-slot-mode="three_point_arc" type="button" title="3-Point Arc Slot (Alt+4)">
+						<span class="slot-mode-icon">${ICONS.slot_arc_3point}</span>
+						<span class="slot-mode-text">3-Pt Arc</span>
+					</button>
+					<button class="slot-mode-btn ${currentMode === 'center_point_arc' ? 'active' : ''}" data-slot-mode="center_point_arc" type="button" title="Center Point Arc Slot (Alt+5)">
+						<span class="slot-mode-icon">${ICONS.slot_arc_center}</span>
+						<span class="slot-mode-text">Center Arc</span>
+					</button>
+				</div>
+				<div class="rectangle-mode-hint slot-mode-hint">
+					${hint}
+				</div>
+			</div>
+		`;
+	}
+
+	private getSlotStepHint(): string {
+		const slotTool = this.interaction?.getSlotTool();
+		if (!slotTool) return '';
+		const mode = slotTool.mode;
+		const step = slotTool.step;
+		if (mode === 'center_to_center') {
+			if (step === 0) return '1. Click to place first arc center';
+			if (step === 1) return '2. Click to place second arc center';
+			return '3. Click or lock radius to finish slot';
+		} else if (mode === 'center_point') {
+			if (step === 0) return '1. Click to place slot center point';
+			if (step === 1) return '2. Click to place one arc center';
+			return '3. Click or lock radius to finish slot';
+		} else if (mode === 'overall') {
+			if (step === 0) return '1. Click to place first outer edge';
+			if (step === 1) return '2. Click to place second outer edge';
+			return '3. Click or lock radius to finish slot';
+		} else if (mode === 'three_point_arc') {
+			if (step === 0) return '1. Click to place start arc center';
+			if (step === 1) return '2. Click to place end arc center';
+			if (step === 2) return '3. Click point on centerline arc';
+			return '4. Click or lock radius to finish arc slot';
+		} else {
+			if (step === 0) return '1. Click to place arc center point';
+			if (step === 1) return '2. Click to place start arc center';
+			if (step === 2) return '3. Click end point or lock sweep angle';
+			return '4. Click or lock radius to finish arc slot';
 		}
 	}
 
@@ -1724,6 +1815,25 @@ export class Sidebar {
 
 		const btnRectangleCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-rectangle-cancel-icon');
 		btnRectangleCancelIcon?.addEventListener('click', () => {
+			if (this.interaction) {
+				this.interaction.setTool('select');
+			}
+		});
+
+		// Slot Tool events
+		const slotModeBtns = this.container.querySelectorAll<HTMLButtonElement>('.slot-mode-btn');
+		slotModeBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const mode = btn.getAttribute('data-slot-mode') as SlotMode;
+				if (mode && this.interaction) {
+					this.interaction.setSlotMode(mode);
+					this.render();
+				}
+			});
+		});
+
+		const btnSlotCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-slot-cancel-icon');
+		btnSlotCancelIcon?.addEventListener('click', () => {
 			if (this.interaction) {
 				this.interaction.setTool('select');
 			}

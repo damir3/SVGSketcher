@@ -12,6 +12,7 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 	readonly circle2Id: string;
 	readonly isInternal: boolean;
 	readonly outerCircleId: string | null;
+	readonly sharedPointId: string | null;
 
 	constructor(
 		id: string,
@@ -21,19 +22,24 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		circle2Id: string,
 		isInternal = false,
 		outerCircleId: string | null = null,
-		weight = 1.0
+		weight = 1.0,
+		sharedPointId: string | null = null
 	) {
-		super(id, 'tangent_circle_circle', 'Tangent', [circle1CenterId, circle1Id, circle2CenterId, circle2Id], weight);
+		const entities = sharedPointId
+			? [circle1CenterId, circle1Id, circle2CenterId, circle2Id, sharedPointId]
+			: [circle1CenterId, circle1Id, circle2CenterId, circle2Id];
+		super(id, 'tangent_circle_circle', 'Tangent', entities, weight);
 		this.circle1CenterId = circle1CenterId;
 		this.circle1Id = circle1Id;
 		this.circle2CenterId = circle2CenterId;
 		this.circle2Id = circle2Id;
 		this.isInternal = isInternal;
 		this.outerCircleId = outerCircleId;
+		this.sharedPointId = sharedPointId;
 	}
 
 	override getEquationsCount(): number {
-		return 1;
+		return this.sharedPointId ? 2 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
@@ -58,11 +64,25 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 			targetDist = r2 - r1;
 		}
 
-		return [(dist - targetDist) * this.weight];
+		const eq0 = (dist - targetDist) * this.weight;
+		if (!this.sharedPointId) {
+			return [eq0];
+		}
+
+		const px = paramMap.get(`${this.sharedPointId}.x`) ?? 0;
+		const py = paramMap.get(`${this.sharedPointId}.y`) ?? 0;
+		const cross = ((px - c1x) * dy - (py - c1y) * dx) / dist;
+		return [eq0, cross * this.weight];
 	}
 
 	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
-		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+		if (!this.sharedPointId) {
+			return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+		}
+		return [
+			...computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap),
+			...computeNumericJacobianForEquation(this, paramIndices, baseRow + 1, 1, paramMap),
+		];
 	}
 
 	override render(ctx: ConstraintRenderContext): void {

@@ -2,6 +2,7 @@ export * from './point';
 export * from './line';
 export * from './circle';
 export * from './rectangle';
+export * from './slot';
 export * from './arc';
 export * from './polygon';
 export * from './ellipse';

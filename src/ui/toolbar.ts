@@ -3,6 +3,7 @@ import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/interaction';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
+import type { SlotMode } from '../canvas/tools/primitives/slot';
 import { showToast } from './toast';
 export { showToast };
 
@@ -79,6 +80,10 @@ export class Toolbar {
 					<button class="tool-btn" data-tool="rectangle" title="2-Point Rectangle (R)">
 						${ICONS.rectangle}
 						<span class="btn-tooltip">2-Point Rectangle (R)</span>
+					</button>
+					<button class="tool-btn" data-tool="slot" title="Center-to-Center Slot">
+						${ICONS.slot_center_to_center}
+						<span class="btn-tooltip">Center-to-Center Slot</span>
 					</button>
 					<button class="tool-btn" data-tool="circle" title="Circle (C)">
 						${ICONS.circle}
@@ -205,21 +210,6 @@ export class Toolbar {
 		this.container.querySelectorAll<HTMLButtonElement>('[data-constraint]').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const constraintType = btn.getAttribute('data-constraint') as ConstraintToolType;
-
-				// 1. Toggle off if already active
-				if (this.interaction.activeTool === constraintType) {
-					this.interaction.setTool('select');
-					return;
-				}
-
-				// 2. If required primitives are ALREADY selected, immediately apply constraint (except dimension which needs offset placement)!
-				if (constraintType !== 'dimension' && this.interaction.canApplyConstraint(constraintType)) {
-					this.interaction.applyConstraint(constraintType);
-					this.interaction.setTool('select');
-					return;
-				}
-
-				// 3. Toggle constraint tool on
 				this.interaction.setTool(constraintType);
 			});
 		});
@@ -293,6 +283,34 @@ export class Toolbar {
 
 		rectBtn.title = title;
 		rectBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${title}</span>
+		`;
+	}
+
+	setSlotMode(mode: SlotMode): void {
+		const slotBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="slot"]');
+		if (!slotBtn) return;
+
+		let icon = ICONS.slot_center_to_center;
+		let title = 'Center-to-Center Slot';
+
+		if (mode === 'center_point') {
+			icon = ICONS.slot_center_point;
+			title = 'Center Point Slot';
+		} else if (mode === 'overall') {
+			icon = ICONS.slot_overall;
+			title = 'Overall Slot';
+		} else if (mode === 'three_point_arc') {
+			icon = ICONS.slot_arc_3point;
+			title = '3-Point Arc Slot';
+		} else if (mode === 'center_point_arc') {
+			icon = ICONS.slot_arc_center;
+			title = 'Center Point Arc Slot';
+		}
+
+		slotBtn.title = title;
+		slotBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${title}</span>
 		`;

@@ -107,12 +107,11 @@ export class AngleConstraint extends BaseConstraint {
 	override render(ctx: ConstraintRenderContext): void {
 		const l1 = ctx.sketch.lines.get(this.line1Id);
 		const l2 = ctx.sketch.lines.get(this.line2Id);
-		if (!l1 || !l2) return;
 
-		const p1 = ctx.sketch.points.get(l1.p1Id);
-		const p2 = ctx.sketch.points.get(l1.p2Id);
-		const p3 = ctx.sketch.points.get(l2.p1Id);
-		const p4 = ctx.sketch.points.get(l2.p2Id);
+		const p1 = ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return;
 
 		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);

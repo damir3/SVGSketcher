@@ -1105,6 +1105,37 @@ export class SketchDocument {
 		return c;
 	}
 
+	addArcAngleConstraint(
+		arcId: string,
+		targetAngleDeg: number,
+		arcRadius = 40,
+		sweepSign = 1
+	): AngleConstraint | null {
+		const arc = this.arcs.get(arcId);
+		if (!arc) return null;
+		const pCenter = this.points.get(arc.centerId);
+		const pStart = this.points.get(arc.startPointId);
+		const pEnd = this.points.get(arc.endPointId);
+		if (!pCenter || !pStart || !pEnd) return null;
+
+		const c = new AngleConstraint(
+			this.nextId('c_ang'),
+			arc.id,
+			arc.id,
+			arc.centerId,
+			arc.startPointId,
+			arc.centerId,
+			arc.endPointId,
+			targetAngleDeg,
+			arcRadius,
+			1,
+			1,
+			sweepSign >= 0 ? 1 : -1
+		);
+		this.addConstraint(c);
+		return c;
+	}
+
 	addRadiusConstraint(
 		circleOrArcId: string,
 		targetRadius?: number,
@@ -2088,6 +2119,17 @@ export class SketchDocument {
 				outerCircleId = r1 >= r2 ? circ1.id : circ2.id;
 			}
 
+			let sharedPointId: string | null = null;
+			const arc1 = this.arcs.get(circ1.id);
+			const arc2 = this.arcs.get(circ2.id);
+			if (arc1 && arc2) {
+				if (arc1.startPointId === arc2.startPointId || arc1.startPointId === arc2.endPointId) {
+					sharedPointId = arc1.startPointId;
+				} else if (arc1.endPointId === arc2.startPointId || arc1.endPointId === arc2.endPointId) {
+					sharedPointId = arc1.endPointId;
+				}
+			}
+
 			const c = new TangentCircleCircleConstraint(
 				this.nextId('c_tang'),
 				circ1.centerId,
@@ -2095,7 +2137,9 @@ export class SketchDocument {
 				circ2.centerId,
 				circ2.id,
 				isInternal,
-				outerCircleId
+				outerCircleId,
+				1.0,
+				sharedPointId
 			);
 			this.addConstraint(c);
 			return c;

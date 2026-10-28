@@ -68,6 +68,7 @@ export interface SerializedConstraint {
 	circle2CenterId?: string;
 	isInternal?: boolean;
 	outerCircleId?: string | null;
+	sharedPointId?: string | null;
 	targetRadius?: number;
 	leaderAngle?: number;
 	displayMode?: 'radius' | 'diameter';
@@ -270,6 +271,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.circle2Id = c.circle2Id;
 		base.isInternal = c.isInternal;
 		base.outerCircleId = c.outerCircleId;
+		base.sharedPointId = c.sharedPointId;
 	} else if (c instanceof ConcentricConstraint) {
 		base.c1CenterId = c.c1CenterId;
 		base.c2CenterId = c.c2CenterId;
@@ -440,7 +442,8 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.circle2Id!,
 				d.isInternal ?? false,
 				d.outerCircleId ?? null,
-				d.weight
+				d.weight,
+				d.sharedPointId ?? null
 			);
 			break;
 		case 'concentric':
