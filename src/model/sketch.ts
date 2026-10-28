@@ -3671,7 +3671,7 @@ export class SketchDocument {
 	}
 
 	getConstraintsForEntity(
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc',
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
 		id: string
 	): IConstraint[] {
 		const res: IConstraint[] = [];
@@ -3687,6 +3687,8 @@ export class SketchDocument {
 					if (anyC.pointId === id) res.push(c);
 				} else if (c.type === 'point_on_circle') {
 					if (anyC.pointId === id) res.push(c);
+				} else if (c.type === 'point_to_line_distance') {
+					if (anyC.pointId === id) res.push(c);
 				} else if (c.type === 'midpoint') {
 					if (anyC.midId === id) res.push(c);
 				} else if (c.type === 'symmetry') {
@@ -3698,15 +3700,21 @@ export class SketchDocument {
 							res.push(c);
 						}
 					}
-				} else if (
-					c.type !== 'equal_length' &&
-					c.type !== 'parallel' &&
-					c.type !== 'collinear' &&
-					c.type !== 'perpendicular' &&
-					c.type !== 'tangent_line_circle' &&
-					c.type !== 'angle'
-				) {
-					if (c.entityIds.includes(id)) {
+				} else if (c.type === 'circular_pattern') {
+					const cpat = c as CircularPatternConstraint;
+					if (
+						cpat.centerPtId === id ||
+						cpat.sourceObjectIds?.includes(id) ||
+						cpat.copies?.some(cp => cp.createdEntityIds.some(e => e.type === 'point' && e.id === id))
+					) {
+						res.push(c);
+					}
+				} else if (c.type === 'rectangular_pattern') {
+					const rpat = c as RectangularPatternConstraint;
+					if (
+						rpat.sourceObjectIds?.includes(id) ||
+						rpat.copies?.some(cp => cp.createdEntityIds.some(e => e.type === 'point' && e.id === id))
+					) {
 						res.push(c);
 					}
 				}
@@ -3724,6 +3732,10 @@ export class SketchDocument {
 				}
 				if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
 					if (this.matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
+						res.push(c);
+					}
+				} else if (c.type === 'point_to_line_distance') {
+					if (anyC.lineId === id || this.matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
 						res.push(c);
 					}
 				} else if (c.type === 'equal_length') {
@@ -3805,6 +3817,8 @@ export class SketchDocument {
 					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
 				} else if (c.type === 'point_on_circle') {
 					if (anyC.circleId === id) res.push(c);
+				} else if (c.type === 'angle') {
+					if (anyC.line1Id === id || anyC.line2Id === id) res.push(c);
 				} else if (c.entityIds.includes(id)) {
 					res.push(c);
 				}
@@ -3827,21 +3841,55 @@ export class SketchDocument {
 					res.push(c);
 				}
 			}
+		} else if (type === 'spline') {
+			const spline = this.splines.get(id);
+			if (!spline) return [];
+			const seenIds = new Set<string>();
+			const pushUnique = (c: IConstraint) => {
+				if (!seenIds.has(c.id)) {
+					seenIds.add(c.id);
+					res.push(c);
+				}
+			};
+			if (spline.tangentLineIds) {
+				for (const lid of spline.tangentLineIds) {
+					for (const c of this.getConstraintsForEntity('line', lid)) {
+						pushUnique(c);
+					}
+				}
+			}
+			for (const c of this.constraints.values()) {
+				if (this.isSplineInternalConstraint(c)) continue;
+				if (c.type === 'circular_pattern') {
+					const cpat = c as CircularPatternConstraint;
+					if (cpat.sourceObjectIds?.includes(id)) pushUnique(c);
+				} else if (c.type === 'rectangular_pattern') {
+					const rpat = c as RectangularPatternConstraint;
+					if (rpat.sourceObjectIds?.includes(id)) pushUnique(c);
+				}
+			}
 		}
 		return res;
 	}
 
 	getEntitiesForConstraint(c: IConstraint): Array<{
 		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}> {
 		const res: Array<{
 			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 		}> = [];
 		const seen = new Set<string>();
 
-		const add = (id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc') => {
+		const add = (id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline') => {
+			if (type === 'line') {
+				const l = this.lines.get(id);
+				if (l?.isSplineHandle && l.parentSplineId && this.splines.has(l.parentSplineId)) {
+					id = l.parentSplineId;
+					type = 'spline';
+				}
+			}
 			const key = `${type}:${id}`;
 			if (!seen.has(key)) {
 				seen.add(key);
@@ -3865,6 +3913,14 @@ export class SketchDocument {
 			} else {
 				if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
 				if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
+			}
+		} else if (c.type === 'point_to_line_distance') {
+			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
+			if (anyC.lineId && this.lines.has(anyC.lineId)) {
+				add(anyC.lineId, 'line');
+			} else {
+				const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
+				if (line) add(line.id, 'line');
 			}
 		} else if (c.type === 'radius') {
 			const cid = anyC.circleId;
@@ -3906,6 +3962,7 @@ export class SketchDocument {
 					else if (this.arcs.has(id)) add(id, 'arc');
 					else if (this.ellipses.has(id)) add(id, 'ellipse');
 					else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
+					else if (this.splines.has(id)) add(id, 'spline');
 					else if (this.points.has(id)) add(id, 'point');
 				}
 			}
@@ -3932,6 +3989,7 @@ export class SketchDocument {
 					else if (this.arcs.has(id)) add(id, 'arc');
 					else if (this.ellipses.has(id)) add(id, 'ellipse');
 					else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
+					else if (this.splines.has(id)) add(id, 'spline');
 					else if (this.points.has(id)) add(id, 'point');
 				}
 			}
@@ -3948,13 +4006,17 @@ export class SketchDocument {
 				}
 			}
 		} else if (c.type === 'angle') {
-			if (anyC.line1Id && this.lines.has(anyC.line1Id)) {
+			if (anyC.line1Id && this.arcs.has(anyC.line1Id)) {
+				add(anyC.line1Id, 'arc');
+			} else if (anyC.line1Id && this.lines.has(anyC.line1Id)) {
 				add(anyC.line1Id, 'line');
 			} else {
 				const l1 = this.getLineBetween(anyC.l1P1, anyC.l1P2);
 				if (l1) add(l1.id, 'line');
 			}
-			if (anyC.line2Id && this.lines.has(anyC.line2Id)) {
+			if (anyC.line2Id && this.arcs.has(anyC.line2Id)) {
+				add(anyC.line2Id, 'arc');
+			} else if (anyC.line2Id && this.lines.has(anyC.line2Id)) {
 				add(anyC.line2Id, 'line');
 			} else {
 				const l2 = this.getLineBetween(anyC.l2P1, anyC.l2P2);
@@ -4035,6 +4097,9 @@ export class SketchDocument {
 		}
 		for (const ea of this.ellipticalArcs.values()) {
 			if (this.getConstraintsForEntity('elliptical_arc', ea.id).some(sc => sc.id === c.id)) add(ea.id, 'elliptical_arc');
+		}
+		for (const s of this.splines.values()) {
+			if (this.getConstraintsForEntity('spline', s.id).some(sc => sc.id === c.id)) add(s.id, 'spline');
 		}
 		for (const pt of this.points.values()) {
 			if (this.getConstraintsForEntity('point', pt.id).some(sc => sc.id === c.id)) add(pt.id, 'point');
@@ -4166,6 +4231,9 @@ export class SketchDocument {
 				}
 			} else if (item.type === 'spline') {
 				this.selection.splineIds.add(item.id);
+				for (const c of this.getConstraintsForEntity('spline', item.id)) {
+					this.selection.constraintIds.add(c.id);
+				}
 			} else if (item.type === 'constraint') {
 				this.selection.constraintIds.add(item.id);
 			}

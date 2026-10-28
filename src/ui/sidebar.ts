@@ -791,6 +791,7 @@ export class Sidebar {
 			sel.arcIds.size > 0 ||
 			sel.ellipseIds.size > 0 ||
 			sel.ellipticalArcIds.size > 0 ||
+			sel.splineIds.size > 0 ||
 			sel.constraintIds.size > 0;
 
 		if (!hasSelection) {
@@ -805,7 +806,8 @@ export class Sidebar {
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const pid = [...sel.pointIds][0];
 			const pt = this.sketch.points.get(pid);
@@ -830,7 +832,7 @@ export class Sidebar {
 								</div>
 							</div>
 						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this point')}
+						${this.renderConstraintsSublist(relatedConstraints, 'this point', [pt.id])}
 					</div>
 				`;
 			}
@@ -840,7 +842,8 @@ export class Sidebar {
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const lid = [...sel.lineIds][0];
 			const line = this.sketch.lines.get(lid);
@@ -870,7 +873,7 @@ export class Sidebar {
 								</div>
 							</div>
 						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this line')}
+						${this.renderConstraintsSublist(relatedConstraints, 'this line', [line.id])}
 					</div>
 				`;
 			}
@@ -880,7 +883,8 @@ export class Sidebar {
 			sel.lineIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const cid = [...sel.circleIds][0];
 			const circ = this.sketch.circles.get(cid);
@@ -905,7 +909,7 @@ export class Sidebar {
 								</div>
 							</div>
 						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this circle')}
+						${this.renderConstraintsSublist(relatedConstraints, 'this circle', [circ.id])}
 					</div>
 				`;
 			}
@@ -915,7 +919,8 @@ export class Sidebar {
 			sel.lineIds.size === 0 &&
 			sel.circleIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const aid = [...sel.arcIds][0];
 			const arc = this.sketch.arcs.get(aid);
@@ -951,7 +956,7 @@ export class Sidebar {
 								</div>
 							</div>
 						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this arc')}
+						${this.renderConstraintsSublist(relatedConstraints, 'this arc', [arc.id])}
 					</div>
 				`;
 			}
@@ -961,7 +966,8 @@ export class Sidebar {
 			sel.lineIds.size === 0 &&
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const eid = [...sel.ellipseIds][0];
 			const ellipse = this.sketch.ellipses.get(eid);
@@ -1004,7 +1010,7 @@ export class Sidebar {
 								</div>
 							</div>
 						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this ellipse')}
+						${this.renderConstraintsSublist(relatedConstraints, 'this ellipse', [ellipse.id])}
 					</div>
 				`;
 			}
@@ -1014,7 +1020,8 @@ export class Sidebar {
 			sel.lineIds.size === 0 &&
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
-			sel.ellipseIds.size === 0
+			sel.ellipseIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const eaid = [...sel.ellipticalArcIds][0];
 			const arc = this.sketch.ellipticalArcs.get(eaid);
@@ -1058,7 +1065,7 @@ export class Sidebar {
 							</div>
 						</div>
 						<div class="inspector-row"><span>Direction:</span> <strong>${arc.clockwise ? 'Clockwise' : 'Counter-Clockwise'}</strong></div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this elliptical arc')}
+						${this.renderConstraintsSublist(relatedConstraints, 'this elliptical arc', [arc.id])}
 					</div>
 				`;
 			}
@@ -1074,12 +1081,14 @@ export class Sidebar {
 			const sid = [...sel.splineIds][0];
 			const spline = this.sketch.splines.get(sid);
 			if (spline) {
+				const relatedConstraints = this.sketch.getConstraintsForEntity('spline', spline.id);
 				detailsHtml = `
 					<div class="inspector-card">
 						<div class="inspector-card-title">${spline.id}</div>
 						<div class="inspector-row"><span>Type:</span> <strong>${spline.splineType === 'fit' ? 'Fit Point Spline' : 'Control Point Spline'}</strong></div>
 						<div class="inspector-row"><span>Points:</span> <strong>${spline.pointIds.length} points</strong></div>
 						<div class="inspector-row"><span>Closed:</span> <strong>${spline.isClosed ? 'Yes' : 'No'}</strong></div>
+						${this.renderConstraintsSublist(relatedConstraints, 'this spline', [spline.id])}
 					</div>
 				`;
 			}
@@ -1089,7 +1098,8 @@ export class Sidebar {
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const pIds = [...sel.pointIds];
 			const related = [...new Set([
@@ -1099,7 +1109,7 @@ export class Sidebar {
 			detailsHtml = `
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: 2 Points (${pIds.join(', ')})</div>
-					${this.renderConstraintsSublist(related, 'selected points')}
+					${this.renderConstraintsSublist(related, 'selected points', pIds)}
 				</div>
 			`;
 		} else if (
@@ -1108,7 +1118,8 @@ export class Sidebar {
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const lIds = [...sel.lineIds];
 			const l1 = this.sketch.lines.get(lIds[0]);
@@ -1150,7 +1161,7 @@ export class Sidebar {
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: 2 Lines (${lIds.join(', ')})</div>
 					${angleRowHtml}
-					${this.renderConstraintsSublist(related, 'selected lines')}
+					${this.renderConstraintsSublist(related, 'selected lines', lIds)}
 				</div>
 			`;
 		} else if (
@@ -1159,7 +1170,8 @@ export class Sidebar {
 			sel.arcIds.size === 0 &&
 			sel.pointIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const lid = [...sel.lineIds][0];
 			const cid = [...sel.circleIds][0];
@@ -1170,7 +1182,7 @@ export class Sidebar {
 			detailsHtml = `
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: Line & Circle</div>
-					${this.renderConstraintsSublist(related, 'selected entities')}
+					${this.renderConstraintsSublist(related, 'selected entities', [lid, cid])}
 				</div>
 			`;
 		} else if (
@@ -1179,7 +1191,8 @@ export class Sidebar {
 			sel.pointIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const cIds = [...sel.circleIds];
 			const related = [...new Set([
@@ -1189,7 +1202,7 @@ export class Sidebar {
 			detailsHtml = `
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: 2 Circles (${cIds.join(', ')})</div>
-					${this.renderConstraintsSublist(related, 'selected circles')}
+					${this.renderConstraintsSublist(related, 'selected circles', cIds)}
 				</div>
 			`;
 		} else if (
@@ -1198,7 +1211,8 @@ export class Sidebar {
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const pid = [...sel.pointIds][0];
 			const lid = [...sel.lineIds][0];
@@ -1225,7 +1239,7 @@ export class Sidebar {
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: Point & Line</div>
 					${distHtml}
-					${this.renderConstraintsSublist(related, 'selected entities')}
+					${this.renderConstraintsSublist(related, 'selected entities', [pid, lid])}
 				</div>
 			`;
 		} else if (
@@ -1233,7 +1247,8 @@ export class Sidebar {
 			sel.circleIds.size + sel.arcIds.size === 1 &&
 			sel.lineIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const pid = [...sel.pointIds][0];
 			const cid = [...sel.circleIds, ...sel.arcIds][0];
@@ -1245,7 +1260,7 @@ export class Sidebar {
 			detailsHtml = `
 				<div class="inspector-card">
 					<div class="inspector-card-title">Selected: Point & ${isArc ? 'Arc' : 'Circle'}</div>
-					${this.renderConstraintsSublist(related, 'selected entities')}
+					${this.renderConstraintsSublist(related, 'selected entities', [pid, cid])}
 				</div>
 			`;
 		} else if (
@@ -1255,7 +1270,8 @@ export class Sidebar {
 			sel.circleIds.size === 0 &&
 			sel.arcIds.size === 0 &&
 			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
+			sel.ellipticalArcIds.size === 0 &&
+			sel.splineIds.size === 0
 		) {
 			const cid = [...sel.constraintIds][0];
 			const c = this.sketch.constraints.get(cid);
@@ -1500,7 +1516,7 @@ export class Sidebar {
 	private renderPrimitivesSublist(
 		primitives: Array<{
 			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 		}>
 	): string {
 		return `
@@ -1519,39 +1535,47 @@ export class Sidebar {
 
 	private renderPrimitiveSublistItem(entityRef: {
 		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}): string {
 		switch (entityRef.type) {
 			case 'line': {
 				const line = this.sketch.lines.get(entityRef.id);
-				return line ? this.renderLineItem(line) : '';
+				return line ? this.renderLineItem(line, false) : '';
 			}
 			case 'circle': {
 				const circle = this.sketch.circles.get(entityRef.id);
-				return circle ? this.renderCircleItem(circle) : '';
+				return circle ? this.renderCircleItem(circle, false) : '';
 			}
 			case 'arc': {
 				const arc = this.sketch.arcs.get(entityRef.id);
-				return arc ? this.renderArcItem(arc) : '';
+				return arc ? this.renderArcItem(arc, false) : '';
 			}
 			case 'ellipse': {
 				const ellipse = this.sketch.ellipses.get(entityRef.id);
-				return ellipse ? this.renderEllipseItem(ellipse) : '';
+				return ellipse ? this.renderEllipseItem(ellipse, false) : '';
 			}
 			case 'elliptical_arc': {
 				const elArc = this.sketch.ellipticalArcs.get(entityRef.id);
-				return elArc ? this.renderEllipticalArcItem(elArc) : '';
+				return elArc ? this.renderEllipticalArcItem(elArc, false) : '';
+			}
+			case 'spline': {
+				const spline = this.sketch.splines.get(entityRef.id);
+				return spline ? this.renderSplineItem(spline, false) : '';
 			}
 			case 'point': {
 				const pt = this.sketch.points.get(entityRef.id);
-				return pt ? this.renderPointItem(pt) : '';
+				return pt ? this.renderPointItem(pt, false) : '';
 			}
 			default:
 				return '';
 		}
 	}
 
-	private renderConstraintsSublist(constraints: any[], entityName: string): string {
+	private renderConstraintsSublist(
+		constraints: any[],
+		entityName: string,
+		currentEntityIds: string[] = []
+	): string {
 		const visibleConstraints = constraints.filter(
 			c => c.type !== 'arc_endpoints' && c.type !== 'elliptical_arc_endpoints'
 		);
@@ -1562,7 +1586,7 @@ export class Sidebar {
 					<span class="inspector-constraints-title">Constraints (${visibleConstraints.length})</span>
 				</div>
 				<div class="inspector-constraints-list">
-					${visibleConstraints.map(c => this.renderConstraintItem(c)).join('')}
+					${visibleConstraints.map(c => this.renderConstraintItem(c, currentEntityIds)).join('')}
 					${visibleConstraints.length === 0 ? `<div class="inspector-empty-constraints">No constraints on ${entityName}</div>` : ''}
 				</div>
 			</div>
@@ -1600,7 +1624,7 @@ export class Sidebar {
 		return { isSelected: false, extraClass: '' };
 	}
 
-	private renderLineItem(line: any): string {
+	private renderLineItem(line: any, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(line.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.lineIds.has(line.id);
 		const p1 = this.sketch.points.get(line.p1Id);
@@ -1614,12 +1638,12 @@ export class Sidebar {
 					<span class="tree-name">${line.id}</span>
 					<span class="tree-meta">${len} mm ${line.isConstruction ? '(aux)' : ''}</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${line.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${line.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderCircleItem(circle: any): string {
+	private renderCircleItem(circle: any, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(circle.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.circleIds.has(circle.id);
 		return `
@@ -1629,12 +1653,12 @@ export class Sidebar {
 					<span class="tree-name">${circle.id}</span>
 					<span class="tree-meta">R ${circle.radius.toFixed(1)} mm</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${circle.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${circle.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderArcItem(arc: any): string {
+	private renderArcItem(arc: any, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(arc.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.arcIds.has(arc.id);
 		return `
@@ -1644,12 +1668,12 @@ export class Sidebar {
 					<span class="tree-name">${arc.id}</span>
 					<span class="tree-meta">R ${arc.radius.toFixed(1)} mm ${arc.isConstruction ? '(aux)' : ''}</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderEllipseItem(ellipse: any): string {
+	private renderEllipseItem(ellipse: any, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(ellipse.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.ellipseIds.has(ellipse.id);
 		const center = this.sketch.points.get(ellipse.centerId);
@@ -1664,12 +1688,12 @@ export class Sidebar {
 					<span class="tree-name">${ellipse.id}</span>
 					<span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${ellipse.isConstruction ? '(aux)' : ''}</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${ellipse.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${ellipse.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderEllipticalArcItem(arc: any): string {
+	private renderEllipticalArcItem(arc: any, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(arc.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.ellipticalArcIds.has(arc.id);
 		const center = this.sketch.points.get(arc.centerId);
@@ -1684,12 +1708,12 @@ export class Sidebar {
 					<span class="tree-name">${arc.id}</span>
 					<span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${arc.isConstruction ? '(aux)' : ''}</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderSplineItem(spline: SketchSpline): string {
+	private renderSplineItem(spline: SketchSpline, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(spline.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.splineIds.has(spline.id);
 		const typeLabel = spline.splineType === 'fit' ? 'Fit Spline' : 'Control Spline';
@@ -1700,12 +1724,12 @@ export class Sidebar {
 					<span class="tree-name">${spline.id}</span>
 					<span class="tree-meta">${typeLabel} (${spline.pointIds.length} pts) ${spline.isConstruction ? '(aux)' : ''}</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${spline.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${spline.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderPointItem(pt: any): string {
+	private renderPointItem(pt: any, showDelete = true): string {
 		const mirror = this.isItemMirrorSelected(pt.id);
 		const isSelected = mirror.isSelected || this.sketch.selection.pointIds.has(pt.id);
 		return `
@@ -1715,12 +1739,12 @@ export class Sidebar {
 					<span class="tree-name">${pt.id}</span>
 					<span class="tree-meta">(${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}) ${pt.fixed ? '🔒' : ''}</span>
 				</div>
-				<button class="tree-delete-btn" data-delete-id="${pt.id}" title="Delete">${ICONS.delete}</button>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${pt.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
 
-	private renderConstraintItem(c: any): string {
+	private renderConstraintItem(c: any, currentEntityIds: string[] = []): string {
 		const isSelected = this.sketch.selection.constraintIds.has(c.id);
 		let valBadge = '';
 		let name = c.name;
@@ -1751,16 +1775,62 @@ export class Sidebar {
 			name = c.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern';
 		}
 
+		const allEntities = this.sketch.getEntitiesForConstraint(c);
+		const targetEntities =
+			currentEntityIds.length === 1
+				? allEntities.filter(e => e.id !== currentEntityIds[0])
+				: allEntities;
+
+		const linkedEntitiesHtml =
+			targetEntities.length > 0
+				? `<div class="constraint-linked-entities">${targetEntities
+						.map(
+							ent => `
+						<button type="button" class="constraint-entity-chip" data-entity-id="${ent.id}" data-entity-type="${ent.type}" title="Switch to ${ent.id}">
+							<span class="chip-icon">${this.getPrimitiveIcon(ent.type, ent.id)}</span>
+							<span>${ent.id}</span>
+						</button>
+					`
+						)
+						.join('')}</div>`
+				: '';
+
 		return `
 			<div class="tree-item constraint-item ${isSelected ? 'selected' : ''}" data-type="constraint" data-id="${c.id}">
 				<div class="tree-item-info">
 					<span class="tree-icon">${c instanceof CircularPatternConstraint && c.isReadOnly ? ICONS.polygon : this.getConstraintIcon(c.type)}</span>
 					<span class="tree-name">${name}</span>
 					${valBadge}
+					${linkedEntitiesHtml}
 				</div>
 				<button class="tree-delete-btn" data-delete-id="${c.id}" title="Delete">${ICONS.delete}</button>
 			</div>
 		`;
+	}
+
+	private getPrimitiveIcon(
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
+		id: string
+	): string {
+		switch (type) {
+			case 'line':
+				return ICONS.line;
+			case 'circle':
+				return ICONS.circle;
+			case 'arc':
+				return ICONS.arc;
+			case 'ellipse':
+				return ICONS.ellipse;
+			case 'elliptical_arc':
+				return ICONS.elliptical_arc;
+			case 'spline': {
+				const s = this.sketch.splines.get(id);
+				return s?.splineType === 'control' ? ICONS.spline_control : ICONS.spline_fit;
+			}
+			case 'point':
+			default:
+				return ICONS.point;
+		}
 	}
 
 	private getConstraintIcon(type: string): string {
@@ -1795,7 +1865,7 @@ export class Sidebar {
 		// Tree item selection
 		this.container.querySelectorAll<HTMLElement>('.tree-item').forEach(item => {
 			item.addEventListener('click', e => {
-				if ((e.target as HTMLElement).closest('.tree-delete-btn')) return;
+				if ((e.target as HTMLElement).closest('.tree-delete-btn, .constraint-entity-chip')) return;
 
 				const id = item.getAttribute('data-id')!;
 				const type = item.getAttribute('data-type')! as
@@ -1805,6 +1875,7 @@ export class Sidebar {
 					| 'arc'
 					| 'ellipse'
 					| 'elliptical_arc'
+					| 'spline'
 					| 'constraint';
 				if (this.interaction?.activeTool === 'mirror' && this.interaction.mirrorState) {
 					if (this.interaction.mirrorState.phase === 'mirror_line') {
@@ -1907,7 +1978,7 @@ export class Sidebar {
 
 			// Double-click on tree item to edit dimension / radius
 			item.addEventListener('dblclick', e => {
-				if ((e.target as HTMLElement).closest('.tree-delete-btn')) return;
+				if ((e.target as HTMLElement).closest('.tree-delete-btn, .constraint-entity-chip')) return;
 
 				const id = item.getAttribute('data-id')!;
 				const type = item.getAttribute('data-type')!;
@@ -1973,6 +2044,25 @@ export class Sidebar {
 						this.sketch.selectEntity(c.id, 'constraint', false);
 						this.onEditDimension?.(c);
 					}
+				}
+			});
+		});
+
+		// Quick-switch primitive chips inside constraint items
+		this.container.querySelectorAll<HTMLButtonElement>('.constraint-entity-chip').forEach(chip => {
+			chip.addEventListener('click', e => {
+				e.stopPropagation();
+				const entityId = chip.getAttribute('data-entity-id');
+				const entityType = chip.getAttribute('data-entity-type') as
+					| 'point'
+					| 'line'
+					| 'circle'
+					| 'arc'
+					| 'ellipse'
+					| 'elliptical_arc'
+					| 'spline';
+				if (entityId && entityType) {
+					this.sketch.selectEntity(entityId, entityType, false);
 				}
 			});
 		});

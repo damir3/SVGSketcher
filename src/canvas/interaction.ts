@@ -1783,8 +1783,8 @@ export class CanvasInteraction {
 				| 'constraint'
 				| undefined;
 
-			// Priority 1: Points ALWAYS have top priority! If cursor is near any point, select & drag the point!
-			const nearPoint = this.findPointNearScreen(screen, 16);
+			// Priority 1: Points have top priority over primitives (unless user explicitly clicked a constraint badge/dimension)
+			const nearPoint = type !== 'constraint' ? this.findPointNearScreen(screen, 16) : null;
 			if (nearPoint) {
 				id = nearPoint.id;
 				type = 'point';

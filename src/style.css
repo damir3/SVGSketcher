@@ -580,6 +580,10 @@ html, body {
   padding: 4px 0;
 }
 
+.inspector-primitives-list .tree-delete-btn {
+  display: none !important;
+}
+
 /* Tree groups */
 .tree-group {
   display: flex;
@@ -667,6 +671,58 @@ html, body {
   color: var(--cad-blue);
   padding: 1px 5px;
   border-radius: 3px;
+}
+
+.constraint-item .tree-item-info {
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.constraint-linked-entities {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.constraint-entity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--text-primary);
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  line-height: 1.3;
+}
+
+.constraint-entity-chip:hover {
+  background-color: var(--cad-blue);
+  border-color: var(--cad-blue);
+  color: #ffffff;
+}
+
+.constraint-entity-chip .chip-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.constraint-entity-chip:hover .chip-icon {
+  color: #ffffff;
+}
+
+.constraint-entity-chip .chip-icon svg {
+  width: 11px;
+  height: 11px;
 }
 
 .tree-delete-btn {

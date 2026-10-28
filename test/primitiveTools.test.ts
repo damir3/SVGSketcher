@@ -1490,6 +1490,92 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.ok(Math.abs(c1.radius - 60) < 1e-3);
 		assert.ok(Math.abs(c2.radius - 60) < 1e-3);
 	});
+
+	it('getEntitiesForConstraint and getConstraintsForEntity return accurate linked primitives', () => {
+		const sketch = new SketchDocument();
+
+		// Points & Lines
+		const p1 = sketch.addPoint(0, 0);
+		const p2 = sketch.addPoint(100, 0);
+		const p3 = sketch.addPoint(0, 100);
+		const p4 = sketch.addPoint(100, 100);
+		const l1 = sketch.addLine(p1.id, p2.id);
+		const l2 = sketch.addLine(p3.id, p4.id);
+
+		// EqualLength constraint between l1 and l2
+		const eqLen = sketch.addEqualLengthConstraint(l1.id, l2.id)!;
+		assert.ok(eqLen);
+		const eqEntities = sketch.getEntitiesForConstraint(eqLen);
+		assert.deepEqual(
+			eqEntities.map(e => ({ id: e.id, type: e.type })),
+			[
+				{ id: l1.id, type: 'line' },
+				{ id: l2.id, type: 'line' },
+			]
+		);
+
+		// PointToLineDistanceConstraint
+		const freePt = sketch.addPoint(50, 50);
+		const p2lDist = sketch.addPointToLineDistanceConstraint(freePt.id, l1.id, 50)!;
+		assert.ok(p2lDist);
+		const p2lEntities = sketch.getEntitiesForConstraint(p2lDist);
+		assert.deepEqual(
+			p2lEntities.map(e => ({ id: e.id, type: e.type })),
+			[
+				{ id: freePt.id, type: 'point' },
+				{ id: l1.id, type: 'line' },
+			]
+		);
+		// Verified line and point both find point_to_line_distance
+		const l1Constraints = sketch.getConstraintsForEntity('line', l1.id);
+		assert.ok(l1Constraints.some(c => c.id === p2lDist.id));
+		const ptConstraints = sketch.getConstraintsForEntity('point', freePt.id);
+		assert.ok(ptConstraints.some(c => c.id === p2lDist.id));
+
+		// Concentric circles
+		const cCenter1 = sketch.addPoint(200, 200);
+		const cCenter2 = sketch.addPoint(200, 200);
+		const c1 = sketch.addCircle(cCenter1.id, 30);
+		const c2 = sketch.addCircle(cCenter2.id, 60);
+		const conc = sketch.addConcentricConstraint(c1.id, c2.id)!;
+		assert.ok(conc);
+		const concEntities = sketch.getEntitiesForConstraint(conc);
+		assert.deepEqual(
+			concEntities.map(e => ({ id: e.id, type: e.type })),
+			[
+				{ id: c1.id, type: 'circle' },
+				{ id: c2.id, type: 'circle' },
+			]
+		);
+
+		// Arc Angle Constraint
+		const arcCenter = sketch.addPoint(300, 300);
+		const arcStart = sketch.addPoint(350, 300);
+		const arcEnd = sketch.addPoint(300, 350);
+		const arc = sketch.addArc(arcCenter.id, arcStart.id, arcEnd.id, 50);
+		const arcAngle = sketch.addArcAngleConstraint(arc.id, 90)!;
+		assert.ok(arcAngle);
+		const arcAngleEntities = sketch.getEntitiesForConstraint(arcAngle);
+		assert.deepEqual(
+			arcAngleEntities.map(e => ({ id: e.id, type: e.type })),
+			[{ id: arc.id, type: 'arc' }]
+		);
+
+		// Verified dependent primitive filtering when one primitive is selected
+		const eqLinkedToL1 = sketch.getEntitiesForConstraint(eqLen).filter(e => e.id !== l1.id);
+		assert.deepEqual(eqLinkedToL1, [{ id: l2.id, type: 'line' }]);
+		const eqLinkedToL2 = sketch.getEntitiesForConstraint(eqLen).filter(e => e.id !== l2.id);
+		assert.deepEqual(eqLinkedToL2, [{ id: l1.id, type: 'line' }]);
+
+		// Selection switching to linked primitive
+		sketch.selectEntity(l1.id, 'line', false);
+		assert.ok(sketch.selection.lineIds.has(l1.id));
+		assert.ok(!sketch.selection.lineIds.has(l2.id));
+
+		sketch.selectEntity(eqLinkedToL1[0].id, eqLinkedToL1[0].type, false);
+		assert.ok(!sketch.selection.lineIds.has(l1.id));
+		assert.ok(sketch.selection.lineIds.has(l2.id));
+	});
 });
 
 
