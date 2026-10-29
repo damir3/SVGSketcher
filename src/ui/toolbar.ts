@@ -38,6 +38,14 @@ export class Toolbar {
 						${ICONS.construction}
 						<span class="btn-tooltip">Construction (X)</span>
 					</button>
+					<button class="tool-btn" data-tool="delete" title="Delete">
+						${ICONS.delete}
+						<span class="btn-tooltip">Delete</span>
+					</button>
+					<button class="tool-btn" data-tool="break" title="Break (B)">
+						${ICONS.break}
+						<span class="btn-tooltip">Break (B)</span>
+					</button>
 					<button class="tool-btn" data-tool="trim" title="Trim (T)">
 						${ICONS.trim}
 						<span class="btn-tooltip">Trim (T)</span>
@@ -45,10 +53,6 @@ export class Toolbar {
 					<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
 						${ICONS.fillet}
 						<span class="btn-tooltip">Fillet</span>
-					</button>
-					<button class="tool-btn" data-tool="break" title="Break (B)">
-						${ICONS.break}
-						<span class="btn-tooltip">Break (B)</span>
 					</button>
 					<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
 						${ICONS.mirror}

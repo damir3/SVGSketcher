@@ -204,4 +204,69 @@ export class AngleConstraint extends BaseConstraint {
 			'font-family': 'ui-monospace, monospace',
 		}, g);
 	}
+
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = 18): number | null {
+		const l1 = sketch.lines.get(this.line1Id);
+		const l2 = sketch.lines.get(this.line2Id);
+		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		if (!p1 || !p2 || !p3 || !p4) return null;
+
+		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
+		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+		const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
+		const l2Len = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
+
+		const s1Factor = this.s1 ?? geom.s1;
+		const s2Factor = this.s2 ?? geom.s2;
+
+		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
+		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
+
+		const sCenter = viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
+		const sRay1 = viewport.worldToScreen(geom.pInt.x + u1.x * 20, geom.pInt.y + u1.y * 20);
+		const sRay2 = viewport.worldToScreen(geom.pInt.x + u2.x * 20, geom.pInt.y + u2.y * 20);
+
+		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
+		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+
+		const TWO_PI = 2 * Math.PI;
+		let delta = a2 - a1;
+		while (delta > Math.PI) delta -= TWO_PI;
+		while (delta < -Math.PI) delta += TWO_PI;
+
+		const rWorld = this.arcRadius ?? 40;
+		const rScreen = Math.max(28, rWorld * viewport.zoom);
+
+		const midAngle = a1 + delta * 0.5;
+		const midX = sCenter.x + rScreen * Math.cos(midAngle);
+		const midY = sCenter.y + rScreen * Math.sin(midAngle);
+
+		// 1. Check distance to badge / text box
+		const dLabel = Math.hypot(screen.x - midX, screen.y - midY);
+		if (dLabel <= 20) return dLabel;
+
+		// 2. Check distance to angle arc
+		const dCenter = Math.hypot(screen.x - sCenter.x, screen.y - sCenter.y);
+		const dRadial = Math.abs(dCenter - rScreen);
+		if (dRadial <= 18) {
+			const pAngle = Math.atan2(screen.y - sCenter.y, screen.x - sCenter.x);
+			const sweepAngle = delta;
+			let ptSweep = pAngle - a1;
+			if (sweepAngle > 0) {
+				while (ptSweep < 0) ptSweep += TWO_PI;
+				while (ptSweep > TWO_PI) ptSweep -= TWO_PI;
+				if (ptSweep <= sweepAngle) return dRadial;
+			} else {
+				while (ptSweep > 0) ptSweep -= TWO_PI;
+				while (ptSweep < -TWO_PI) ptSweep += TWO_PI;
+				if (ptSweep >= sweepAngle) return dRadial;
+			}
+		}
+
+		return null;
+	}
 }

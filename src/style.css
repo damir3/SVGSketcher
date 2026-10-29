@@ -352,80 +352,151 @@ html, body {
 }
 
 #cad-svg .visible-point {
+  stroke-width: 1px;
   transition: fill 0.08s ease, stroke 0.08s ease, r 0.08s ease;
 }
 
-/* Hover highlighting on unselected primitives and spline handles when not dragging */
-#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected):hover .visible-primitive,
-#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected):hover .visible-spline-handle {
+#cad-svg .constraint-badge rect {
+  stroke-width: 1px;
+}
+
+/* --- Select Tool Hover Highlighting (Sky Blue) --- */
+#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected).select-hover .visible-primitive,
+#cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected).select-hover .visible-spline-handle {
   stroke: #0ea5e9 !important;
-  stroke-width: 2.5px !important;
-  filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45));
+  stroke-width: 2px !important;
+  filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45)) !important;
 }
 
-/* Hover highlighting on unselected points */
-#cad-svg:not(.is-dragging) .sketch-point:not(.is-selected):hover .visible-point {
-  fill: #38bdf8 !important;
-  stroke: #ffffff !important;
-  r: 4.5px !important;
-  filter: drop-shadow(0 0 3px rgba(56, 189, 248, 0.8));
-}
-
-/* Hover highlighting on already selected primitives and spline handles */
-#cad-svg:not(.is-dragging) .sketch-entity.is-selected:hover .visible-primitive,
-#cad-svg:not(.is-dragging) .sketch-entity.is-selected:hover .visible-spline-handle {
-  stroke: #38bdf8 !important;
-  stroke-width: 3.5px !important;
-  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.85));
-}
-
-#cad-svg:not(.is-dragging) .sketch-point.is-selected:hover .visible-point {
-  fill: #7dd3fc !important;
+#cad-svg:not(.is-dragging) .sketch-point:not(.is-selected).select-hover .visible-point {
+  stroke: #0ea5e9 !important;
+  fill: #0ea5e9 !important;
+  stroke-width: 1px !important;
   r: 5px !important;
-  filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.9));
+  filter: drop-shadow(0 0 5px rgba(14, 165, 233, 0.85)) !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-entity.is-selected.select-hover .visible-primitive,
+#cad-svg:not(.is-dragging) .sketch-entity.is-selected.select-hover .visible-spline-handle {
+  stroke: #38bdf8 !important;
+  stroke-width: 3px !important;
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.85)) !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-point.is-selected.select-hover .visible-point {
+  stroke: #38bdf8 !important;
+  fill: #38bdf8 !important;
+  stroke-width: 1px !important;
+  r: 5.5px !important;
+  filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9)) !important;
 }
 
 /* When a constraint tool is active, spline curves cannot be constrained directly:
-   disable hover highlighting and pointer-events on splines while keeping points and handles active */
+   disable pointer-events on splines while keeping points and handles active */
 #cad-svg.tool-constraint .sketch-spline,
 #cad-svg.tool-constraint .sketch-spline * {
   pointer-events: none !important;
 }
-#cad-svg.tool-constraint .sketch-spline:hover .visible-primitive {
-  stroke: initial !important;
-  stroke-width: initial !important;
-  filter: none !important;
-}
 
-/* When trim or break tool is active, spline tangent handles cannot be trimmed:
-   disable hover highlighting and pointer-events on tangent handles */
+/* When trim, break, or delete tool is active, spline tangent handles cannot be trimmed or deleted directly:
+   disable pointer-events on tangent handles */
 #cad-svg.tool-trim .sketch-spline-handle,
-#cad-svg.tool-trim .sketch-spline-handle * {
+#cad-svg.tool-trim .sketch-spline-handle *,
+#cad-svg.tool-delete .sketch-spline-handle,
+#cad-svg.tool-delete .sketch-spline-handle * {
   pointer-events: none !important;
 }
-#cad-svg.tool-trim .sketch-spline-handle:hover .visible-spline-handle {
-  stroke: initial !important;
-  stroke-width: initial !important;
-  filter: none !important;
+
+/* Hover highlighting on dimension annotations (Select mode) */
+#cad-svg:not(.is-dragging) .dimension-item.select-hover line,
+#cad-svg:not(.is-dragging) .dimension-item.select-hover path {
+  stroke: #0284c7 !important;
+  stroke-width: 2px !important;
 }
 
-/* Hover highlighting on dimension annotations */
-#cad-svg:not(.is-dragging) .dimension-item:hover line {
-  stroke: #0ea5e9 !important;
+#cad-svg:not(.is-dragging) .dimension-item.select-hover [marker-start] {
+  marker-start: url(#dim-arrow-selected) !important;
 }
 
-#cad-svg:not(.is-dragging) .dimension-item:hover rect {
-  stroke: #0ea5e9 !important;
-  filter: drop-shadow(0 0 2px rgba(14, 165, 233, 0.4));
+#cad-svg:not(.is-dragging) .dimension-item.select-hover [marker-end] {
+  marker-end: url(#dim-arrow-selected) !important;
 }
 
-#cad-svg:not(.is-dragging) .dimension-item:hover text {
-  fill: #0ea5e9 !important;
+#cad-svg:not(.is-dragging) .dimension-item.select-hover rect {
+  stroke: #0284c7 !important;
+  fill: #e0f2fe !important;
+  stroke-width: 1px !important;
+  filter: drop-shadow(0 0 2px rgba(2, 132, 199, 0.35)) !important;
 }
 
-#cad-svg:not(.is-dragging) .constraint-badge:hover rect {
-  stroke: #0ea5e9 !important;
-  filter: drop-shadow(0 0 2px rgba(14, 165, 233, 0.4));
+#cad-svg:not(.is-dragging) .dimension-item.select-hover text {
+  fill: #0284c7 !important;
+}
+
+#cad-svg:not(.is-dragging) .constraint-badge.select-hover rect {
+  stroke: #0284c7 !important;
+  fill: #e0f2fe !important;
+  stroke-width: 1px !important;
+  filter: drop-shadow(0 0 2px rgba(2, 132, 199, 0.35)) !important;
+}
+
+#cad-svg:not(.is-dragging) .constraint-badge.select-hover text,
+#cad-svg:not(.is-dragging) .constraint-badge.select-hover path {
+  fill: #0284c7 !important;
+  stroke: #0284c7 !important;
+}
+
+/* --- Delete Tool Hover Highlighting (Red) --- */
+#cad-svg.tool-delete .sketch-entity.delete-hover .visible-primitive {
+  stroke: rgba(255, 0, 0, 0.85) !important;
+  stroke-width: 2px !important;
+  filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.4)) !important;
+}
+
+#cad-svg.tool-delete .sketch-point.delete-hover .visible-point {
+  stroke: rgba(255, 0, 0, 0.95) !important;
+  fill: rgba(255, 0, 0, 0.95) !important;
+  stroke-width: 1px !important;
+  r: 5px !important;
+  filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.85)) !important;
+}
+
+#cad-svg.tool-delete .constraint-badge.delete-hover rect {
+  stroke: rgba(255, 0, 0, 0.85) !important;
+  fill: rgba(255, 220, 220, 0.95) !important;
+  stroke-width: 1px !important;
+  filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.4)) !important;
+}
+
+#cad-svg.tool-delete .constraint-badge.delete-hover text,
+#cad-svg.tool-delete .constraint-badge.delete-hover path {
+  fill: rgba(255, 0, 0, 0.85) !important;
+  stroke: rgba(255, 0, 0, 0.85) !important;
+}
+
+#cad-svg.tool-delete .dimension-item.delete-hover line,
+#cad-svg.tool-delete .dimension-item.delete-hover path {
+  stroke: rgba(255, 0, 0, 0.85) !important;
+  stroke-width: 2px !important;
+}
+
+#cad-svg.tool-delete .dimension-item.delete-hover [marker-start] {
+  marker-start: url(#dim-arrow-delete) !important;
+}
+
+#cad-svg.tool-delete .dimension-item.delete-hover [marker-end] {
+  marker-end: url(#dim-arrow-delete) !important;
+}
+
+#cad-svg.tool-delete .dimension-item.delete-hover rect {
+  stroke: rgba(255, 0, 0, 0.85) !important;
+  fill: rgba(255, 220, 220, 0.95) !important;
+  stroke-width: 1px !important;
+  filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.4)) !important;
+}
+
+#cad-svg.tool-delete .dimension-item.delete-hover text {
+  fill: rgba(255, 0, 0, 0.85) !important;
 }
 
 /* --- RIGHT SIDEBAR --- */

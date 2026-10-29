@@ -228,6 +228,7 @@ export class SVGRenderer {
 
 		createArrowMarker('dim-arrow', COLORS.primary);
 		createArrowMarker('dim-arrow-selected', COLORS.selected);
+		createArrowMarker('dim-arrow-delete', 'rgba(255, 0, 0, 0.9)');
 	}
 
 	render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
@@ -784,7 +785,7 @@ export class SVGRenderer {
 				class: 'entity-visible visible-point',
 				fill: fillColor,
 				stroke: strokeColor,
-				'stroke-width': STROKE_WIDTH.normal,
+				'stroke-width': STROKE_WIDTH.thin,
 				'pointer-events': 'all',
 			}, ptG);
 		}
@@ -917,7 +918,7 @@ export class SVGRenderer {
 				rx: 4,
 				fill: COLORS.white,
 				stroke: color,
-				'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
+				'stroke-width': STROKE_WIDTH.thin,
 			}, g);
 
 			createSvgText(mid.x, mid.y + 4, label, {
@@ -1537,7 +1538,7 @@ export class SVGRenderer {
 			rx: 3,
 			fill: isSelected ? COLORS.selectedBg : COLORS.white,
 			stroke: isSelected ? COLORS.primary : COLORS.badgeBorder,
-			'stroke-width': isSelected ? STROKE_WIDTH.dimension : STROKE_WIDTH.thin,
+			'stroke-width': STROKE_WIDTH.thin,
 		}, g);
 
 		if (icon) {

@@ -3,6 +3,7 @@ import type { Viewport } from '../viewport';
 import type { SVGRenderer } from '../renderer';
 import type { Vec2 } from '../../math/vector';
 import type { GeoCurve } from '../../math/intersection';
+import type { IConstraint } from '../../solver/types';
 import type {
 	SketchPoint,
 	SketchLine,
@@ -64,6 +65,7 @@ export type ToolType =
 	| 'pan'
 	| 'trim'
 	| 'break'
+	| 'delete'
 	| 'mirror'
 	| 'circular_pattern'
 	| 'rectangular_pattern'
@@ -139,6 +141,7 @@ export interface ToolContext {
 	findEllipseNear?(screen: Vec2, thresholdPx?: number): SketchEllipse | null;
 	findEllipticalArcNear?(screen: Vec2, thresholdPx?: number): SketchEllipticalArc | null;
 	findSplineNear(screen: Vec2, thresholdPx?: number): SketchSpline | null;
+	findConstraintNear?(screen: Vec2, thresholdPx?: number): IConstraint | null;
 	toGeoCurve(type: 'line' | 'circle' | 'arc' | 'spline' | 'ellipse' | 'elliptical_arc', id: string): GeoCurve | null;
 	findTrimTarget?(screen: Vec2, thresholdPx?: number): GeoCurve | null;
 

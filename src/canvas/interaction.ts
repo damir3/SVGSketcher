@@ -62,6 +62,7 @@ import {
 	type SplineMode,
 	TrimTool,
 	BreakTool,
+	DeleteTool,
 	FilletTool,
 	MirrorTool,
 	CircularPatternTool,
@@ -453,6 +454,7 @@ export class CanvasInteraction {
 		// Modify
 		this.tools.set('trim', new TrimTool());
 		this.tools.set('break', new BreakTool());
+		this.tools.set('delete', new DeleteTool());
 		this.tools.set('fillet', new FilletTool());
 		const mirrorTool = new MirrorTool();
 		mirrorTool.onStateChange = () => this.onMirrorStateChange?.();
@@ -504,6 +506,8 @@ export class CanvasInteraction {
 			findEllipticalArcNear: (screen: Vec2, thresholdPx?: number) =>
 				this.findEllipticalArcNearScreen(screen, thresholdPx),
 			findSplineNear: (screen: Vec2, thresholdPx?: number) => this.findSplineNearScreen(screen, thresholdPx),
+			findConstraintNear: (screen: Vec2, thresholdPx?: number) =>
+				this.findConstraintNearScreen(screen, thresholdPx),
 			toGeoCurve: (type, id) => this.sketch.toGeoCurve(id, type),
 			findTrimTarget: (screen: Vec2, thresholdPx?: number) =>
 				this.findTrimTargetNearScreen(screen, thresholdPx),
@@ -617,6 +621,8 @@ export class CanvasInteraction {
 			}
 			this.svg.classList.toggle('tool-constraint', isConstraintTool(tool));
 			this.svg.classList.toggle('tool-trim', tool === 'trim' || tool === 'break');
+			this.svg.classList.toggle('tool-delete', tool === 'delete');
+			this.svg.classList.toggle('tool-select', tool === 'select');
 			this.updateCursor();
 			this.onToolChange?.(tool);
 			this.onMirrorStateChange?.();
@@ -740,6 +746,7 @@ export class CanvasInteraction {
 	}
 
 	render(): void {
+		(this.activeToolInstance as any)?.clearHover?.();
 		const toolRenderOptions = this.activeToolInstance?.getRenderOptions?.() ?? {};
 		this.renderer.render(this.sketch, this.viewport, {
 			showSplineHandles: isConstraintTool(this.activeTool),
@@ -881,6 +888,9 @@ export class CanvasInteraction {
 		window.addEventListener('mouseup', this.handleMouseUp.bind(this));
 		this.svg.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
 		this.svg.addEventListener('dblclick', this.handleDoubleClick.bind(this));
+		this.svg.addEventListener('mouseleave', () => {
+			(this.activeToolInstance as any)?.clearHover?.();
+		});
 
 		// Prevent default context menu for smooth right-click panning
 		this.svg.addEventListener('contextmenu', e => {
@@ -1749,6 +1759,7 @@ export class CanvasInteraction {
 
 	private handleMouseDown(e: MouseEvent): void {
 		this.cancelAnimation();
+		(this.activeToolInstance as any)?.clearHover?.();
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const clientPos = vec(e.clientX, e.clientY);
@@ -2473,13 +2484,12 @@ export class CanvasInteraction {
 			return;
 		}
 
-		// Hover cursor in select mode
-		const nearPt = this.findPointNearScreen(screen, 16);
-		if (nearPt) {
-			this.svg.style.cursor = 'move';
-		} else {
-			this.svg.style.cursor = 'default';
+		if (this.activeTool === 'select' && this.activeToolInstance) {
+			const toolEvent = this.createToolMouseEvent(e);
+			this.activeToolInstance.onMouseMove?.(toolEvent);
 		}
+
+		this.svg.style.cursor = 'default';
 	}
 
 	private handleMouseUp(e?: MouseEvent): void {
@@ -2490,6 +2500,10 @@ export class CanvasInteraction {
 				this.activeToolInstance.onMouseUp(toolEvent);
 				this.updateToolPreview();
 			}
+		}
+		if (this.activeTool === 'select' && this.activeToolInstance && !this.isPanning && !this.isBoxSelecting) {
+			const toolEvent = this.createToolMouseEvent(e ?? ({ clientX: this.lastMouseScreen.x, clientY: this.lastMouseScreen.y } as any));
+			this.activeToolInstance.onMouseMove?.(toolEvent);
 		}
 		this.svg.classList.remove('is-dragging');
 		if (this.gizmoDragState) {

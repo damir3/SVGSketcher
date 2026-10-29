@@ -108,6 +108,7 @@ export const FILTERS = {
 export const DIM_ARROWS = {
 	default: 'url(#dim-arrow)',
 	selected: 'url(#dim-arrow-selected)',
+	delete: 'url(#dim-arrow-delete)',
 } as const;
 
 export type SvgAttrs = Record<string, string | number | boolean | undefined | null>;
