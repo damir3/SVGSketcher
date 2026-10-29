@@ -6,6 +6,8 @@ import {
 	getSplinePointAtParam,
 	getSplineParamAtPoint,
 	evaluateBezier,
+	evaluateBezierDerivative,
+	splitBezier,
 	extractSplineInterval,
 	type BezierSegment,
 } from './spline';
@@ -568,7 +570,7 @@ export function intersectEllipseEllipse(
 		const min = { x: e2.minorAxisPoint.x, y: -e2.minorAxisPoint.y };
 		rx2 = Math.hypot(maj.x - sc2.x, maj.y - sc2.y);
 		ry2 = Math.hypot(min.x - sc2.x, min.y - sc2.y);
-		theta2 = Math.atan2(maj.y - sc2.x, maj.x - sc2.x);
+		theta2 = Math.atan2(maj.y - sc2.y, maj.x - sc2.x);
 	}
 	if (rx2 < 1e-6 || ry2 < 1e-6) return [];
 
@@ -695,22 +697,112 @@ function findBezierImplicitRoots(b: BezierSegment, f: (p: Vec2) => number): Vec2
 	return roots.map(t => evaluateBezier(b, t));
 }
 
-function bezierBBoxesOverlap(b1: BezierSegment, b2: BezierSegment): boolean {
-	let minX1 = Infinity, maxX1 = -Infinity, minY1 = Infinity, maxY1 = -Infinity;
-	for (const p of b1) {
-		if (p.x < minX1) minX1 = p.x;
-		if (p.x > maxX1) maxX1 = p.x;
-		if (p.y < minY1) minY1 = p.y;
-		if (p.y > maxY1) maxY1 = p.y;
+/**
+ * Computes all intersection points between two cubic Bezier segments using recursive bounding box subdivision
+ * and Newton-Raphson parameter refinement.
+ */
+export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
+	const pts: Vec2[] = [];
+
+	function getBBox(b: BezierSegment) {
+		let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+		for (let i = 0; i < 4; i++) {
+			const p = b[i];
+			if (p.x < minX) minX = p.x;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.y > maxY) maxY = p.y;
+		}
+		return { minX, maxX, minY, maxY };
 	}
-	let minX2 = Infinity, maxX2 = -Infinity, minY2 = Infinity, maxY2 = -Infinity;
-	for (const p of b2) {
-		if (p.x < minX2) minX2 = p.x;
-		if (p.x > maxX2) maxX2 = p.x;
-		if (p.y < minY2) minY2 = p.y;
-		if (p.y > maxY2) maxY2 = p.y;
+
+	interface Task {
+		seg1: BezierSegment;
+		t0: number;
+		t1: number;
+		seg2: BezierSegment;
+		u0: number;
+		u1: number;
+		depth: number;
 	}
-	return !(maxX1 < minX2 - 1e-4 || minX1 > maxX2 + 1e-4 || maxY1 < minY2 - 1e-4 || minY1 > maxY2 + 1e-4);
+
+	const stack: Task[] = [{ seg1: b1, t0: 0, t1: 1, seg2: b2, u0: 0, u1: 1, depth: 0 }];
+
+	while (stack.length > 0 && pts.length < 16) {
+		const { seg1, t0, t1, seg2, u0, u1, depth } = stack.pop()!;
+		const box1 = getBBox(seg1);
+		const box2 = getBBox(seg2);
+
+		if (
+			box1.maxX < box2.minX - 1e-4 ||
+			box1.minX > box2.maxX + 1e-4 ||
+			box1.maxY < box2.minY - 1e-4 ||
+			box1.minY > box2.maxY + 1e-4
+		) {
+			continue;
+		}
+
+		const span1 = Math.max(box1.maxX - box1.minX, box1.maxY - box1.minY);
+		const span2 = Math.max(box2.maxX - box2.minX, box2.maxY - box2.minY);
+
+		if ((span1 < 1e-4 && span2 < 1e-4) || depth >= 15) {
+			let t = (t0 + t1) * 0.5;
+			let u = (u0 + u1) * 0.5;
+
+			// Newton-Raphson refinement on the full segments b1 and b2
+			for (let iter = 0; iter < 4; iter++) {
+				const p1 = evaluateBezier(b1, t);
+				const p2 = evaluateBezier(b2, u);
+				const fx = p1.x - p2.x;
+				const fy = p1.y - p2.y;
+				if (Math.hypot(fx, fy) < 1e-11) break;
+
+				const d1 = evaluateBezierDerivative(b1, t);
+				const d2 = evaluateBezierDerivative(b2, u);
+				const det = -d1.x * d2.y + d1.y * d2.x;
+				if (Math.abs(det) < 1e-12) break;
+
+				const dt = (-d2.y * fx + d2.x * fy) / det;
+				const du = (-d1.y * fx + d1.x * fy) / det;
+
+				t = Math.max(0, Math.min(1, t - dt));
+				u = Math.max(0, Math.min(1, u - du));
+			}
+
+			const p1 = evaluateBezier(b1, t);
+			const p2 = evaluateBezier(b2, u);
+			if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-3) {
+				pts.push({ x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 });
+			}
+			continue;
+		}
+
+		const split1 = span1 >= 1e-4;
+		const split2 = span2 >= 1e-4;
+
+		if (split1 && split2) {
+			const s1 = splitBezier(seg1, 0.5);
+			const s2 = splitBezier(seg2, 0.5);
+			const tm = (t0 + t1) * 0.5;
+			const um = (u0 + u1) * 0.5;
+			stack.push({ seg1: s1.left, t0, t1: tm, seg2: s2.left, u0, u1: um, depth: depth + 1 });
+			stack.push({ seg1: s1.left, t0, t1: tm, seg2: s2.right, u0: um, u1, depth: depth + 1 });
+			stack.push({ seg1: s1.right, t0: tm, t1, seg2: s2.left, u0, u1: um, depth: depth + 1 });
+			stack.push({ seg1: s1.right, t0: tm, t1, seg2: s2.right, u0: um, u1, depth: depth + 1 });
+		} else if (split1) {
+			const s1 = splitBezier(seg1, 0.5);
+			const tm = (t0 + t1) * 0.5;
+			stack.push({ seg1: s1.left, t0, t1: tm, seg2, u0, u1, depth: depth + 1 });
+			stack.push({ seg1: s1.right, t0: tm, t1, seg2, u0, u1, depth: depth + 1 });
+		} else {
+			const s2 = splitBezier(seg2, 0.5);
+			const um = (u0 + u1) * 0.5;
+			stack.push({ seg1, t0, t1, seg2: s2.left, u0, u1: um, depth: depth + 1 });
+			stack.push({ seg1, t0, t1, seg2: s2.right, u0, u1, depth: depth + 1 });
+		}
+	}
+
+	return deduplicatePoints(pts, 1e-3);
 }
 
 export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[] {
@@ -770,15 +862,9 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 			}
 		} else if (other.type === 'spline') {
 			for (const b2 of other.bezierSegments) {
-				if (!bezierBBoxesOverlap(b, b2)) continue;
-				const N = 16;
-				for (let i = 0; i <= N; i++) {
-					const t = i / N;
-					const ptOnB = evaluateBezier(b, t);
-					const proj = getSplineParamAtPoint([b2], ptOnB);
-					if (proj.distance < 1e-3) {
-						pts.push(ptOnB);
-					}
+				const bPts = intersectBezierBezier(b, b2);
+				for (const pt of bPts) {
+					pts.push(pt);
 				}
 			}
 		}
@@ -844,8 +930,13 @@ export function getCurveIntersections(
 		const pts = intersectCurves(target, other);
 		for (const pt of pts) {
 			const param = getParamAtPoint(target, pt);
-			// For open curves (segment, arc, elliptical_arc), ignore intersections right at the endpoints
-			if (target.type === 'segment' || target.type === 'arc' || target.type === 'elliptical_arc') {
+			// For open curves (segment, arc, elliptical_arc, open spline), ignore intersections right at the endpoints
+			if (
+				target.type === 'segment' ||
+				target.type === 'arc' ||
+				target.type === 'elliptical_arc' ||
+				(target.type === 'spline' && !target.isClosed)
+			) {
 				if (param < 1e-4 || param > 1 - 1e-4) {
 					continue;
 				}

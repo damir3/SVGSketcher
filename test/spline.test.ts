@@ -17,11 +17,13 @@ import { MidpointConstraint } from '../src/solver/constraints';
 import {
 	getAllGeoCurves,
 	intersectSplineCurve,
+	intersectEllipseEllipse,
 	getTrimCandidate,
 	executeTrim,
 	executeBreak,
 	type GeoSpline,
 	type GeoSegment,
+	type GeoEllipse,
 } from '../src/math/intersection';
 
 describe('Spline Mathematics', () => {
@@ -709,5 +711,136 @@ describe('Spline Intersections, Trim, and Break', () => {
 			assert.equal(sp.isClosed, false);
 			assert.ok(sp.bezierSegments.length > 0);
 		}
+	});
+
+	it('intersectSplineCurve finds intersections between two crossing splines', () => {
+		// Spline 1: Horizontal S-curve from (-50, 0) to (50, 0)
+		const b1: BezierSegment = [
+			{ x: -50, y: 0 },
+			{ x: -20, y: 40 },
+			{ x: 20, y: -40 },
+			{ x: 50, y: 0 },
+		];
+		const sp1: GeoSpline = {
+			type: 'spline',
+			id: 'sp1',
+			splineType: 'fit',
+			pointIds: ['p0', 'p1', 'p2', 'p3'],
+			points: [{ x: -50, y: 0 }, { x: 50, y: 0 }],
+			bezierSegments: [b1],
+		};
+
+		// Spline 2: Vertical curve from (0, -50) to (0, 50) crossing at (0, 0)
+		const b2: BezierSegment = [
+			{ x: 0, y: -50 },
+			{ x: 0, y: -20 },
+			{ x: 0, y: 20 },
+			{ x: 0, y: 50 },
+		];
+		const sp2: GeoSpline = {
+			type: 'spline',
+			id: 'sp2',
+			splineType: 'fit',
+			pointIds: ['q0', 'q1', 'q2', 'q3'],
+			points: [{ x: 0, y: -50 }, { x: 0, y: 50 }],
+			bezierSegments: [b2],
+		};
+
+		const pts = intersectSplineCurve(sp1, sp2);
+		assert.equal(pts.length, 1, 'Should find 1 intersection between perpendicular crossing splines');
+		assert.ok(Math.abs(pts[0].x) < 1e-2, `Expected x near 0, got ${pts[0].x}`);
+		assert.ok(Math.abs(pts[0].y) < 1e-2, `Expected y near 0, got ${pts[0].y}`);
+	});
+
+	it('executeTrim trims a spline intersected by another spline', () => {
+		const sketch = new SketchDocument();
+		// Horizontal spline
+		const h1 = sketch.addPoint(-50, 0);
+		const h2 = sketch.addPoint(0, 0);
+		const h3 = sketch.addPoint(50, 0);
+		const spHorizontal = sketch.addFitSpline([h1.id, h2.id, h3.id]);
+
+		// Vertical spline crossing at (0, 0)
+		const v1 = sketch.addPoint(0, -50);
+		const v2 = sketch.addPoint(0, 0);
+		const v3 = sketch.addPoint(0, 50);
+		sketch.addFitSpline([v1.id, v2.id, v3.id]);
+
+		const curves = getAllGeoCurves(sketch);
+		const targetCurve = curves.find(c => c.id === spHorizontal.id) as GeoSpline;
+		assert.ok(targetCurve);
+
+		// Click at (-25, 0) to trim off left branch of horizontal spline
+		const candidate = getTrimCandidate(targetCurve, curves, { x: -25, y: 0 });
+		assert.ok(candidate, 'Trim candidate found for left branch of spline');
+		assert.equal(candidate.curve.id, spHorizontal.id);
+
+		executeTrim(sketch, candidate);
+		// Remaining right branch should exist
+		assert.equal(sketch.splines.size, 2, 'One branch of horizontal spline + vertical spline remain');
+	});
+
+	it('intersectEllipseEllipse finds intersections when ellipse centers are not at (0, 0)', () => {
+		// Ellipse 1: center (100, 100), major axis point (150, 100), minor axis point (100, 130) -> rx=50, ry=30
+		const e1: GeoEllipse = {
+			type: 'ellipse',
+			id: 'el1',
+			center: { x: 100, y: 100 },
+			centerId: 'c1',
+			majorAxisPoint: { x: 150, y: 100 },
+			majorAxisPointId: 'maj1',
+			minorAxisPoint: { x: 100, y: 130 },
+			minorAxisPointId: 'min1',
+		};
+
+		// Ellipse 2: center (140, 100), major axis point (190, 100), minor axis point (140, 130) -> rx=50, ry=30
+		const e2: GeoEllipse = {
+			type: 'ellipse',
+			id: 'el2',
+			center: { x: 140, y: 100 },
+			centerId: 'c2',
+			majorAxisPoint: { x: 190, y: 100 },
+			majorAxisPointId: 'maj2',
+			minorAxisPoint: { x: 140, y: 130 },
+			minorAxisPointId: 'min2',
+		};
+
+		const pts = intersectEllipseEllipse(e1, e2);
+		assert.equal(pts.length, 2, `Expected 2 intersections, got ${pts.length}`);
+
+		// Both intersection points should have x = 120 and y = 100 ± sqrt(756) ≈ 100 ± 27.495
+		for (const pt of pts) {
+			assert.ok(Math.abs(pt.x - 120) < 0.1, `Expected x ≈ 120, got ${pt.x}`);
+			const expectedY1 = 100 + Math.sqrt(756);
+			const expectedY2 = 100 - Math.sqrt(756);
+			const matchesY = Math.abs(pt.y - expectedY1) < 0.1 || Math.abs(pt.y - expectedY2) < 0.1;
+			assert.ok(matchesY, `Expected y ≈ ${expectedY1} or ${expectedY2}, got ${pt.y}`);
+		}
+	});
+
+	it('executeTrim trims an ellipse intersected by another ellipse with non-zero centers', () => {
+		const sketch = new SketchDocument();
+		const c1 = sketch.addPoint(100, 100);
+		const maj1 = sketch.addPoint(150, 100);
+		const min1 = sketch.addPoint(100, 130);
+		const el1 = sketch.addEllipse(c1.id, maj1.id, min1.id);
+
+		const c2 = sketch.addPoint(140, 100);
+		const maj2 = sketch.addPoint(190, 100);
+		const min2 = sketch.addPoint(140, 130);
+		sketch.addEllipse(c2.id, maj2.id, min2.id);
+
+		const curves = getAllGeoCurves(sketch);
+		const targetCurve = curves.find(c => c.id === el1.id) as GeoEllipse;
+		assert.ok(targetCurve);
+
+		// Click inside the overlapping region: (130, 100)
+		const candidate = getTrimCandidate(targetCurve, curves, { x: 130, y: 100 });
+		assert.ok(candidate, 'Trim candidate found for overlapping segment of ellipse');
+
+		executeTrim(sketch, candidate);
+		// Ellipse 1 should be converted to an elliptical arc
+		assert.equal(sketch.ellipses.size, 1, 'Only second ellipse remains full ellipse');
+		assert.equal(sketch.ellipticalArcs.size, 1, 'Trimmed ellipse is now an elliptical arc');
 	});
 });
