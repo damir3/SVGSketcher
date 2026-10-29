@@ -22,7 +22,13 @@ export class Viewport {
 		this.panY = this.height / 2;
 	}
 
-	fitToBounds(minX: number, minY: number, maxX: number, maxY: number, padding = 80): void {
+	getTargetFit(
+		minX: number,
+		minY: number,
+		maxX: number,
+		maxY: number,
+		padding = 80
+	): { panX: number; panY: number; zoom: number } {
 		const boxWidth = maxX - minX;
 		const boxHeight = maxY - minY;
 
@@ -36,13 +42,22 @@ export class Viewport {
 		const zoomY = availHeight / effectiveHeight;
 		const fitZoom = Math.min(zoomX, zoomY);
 
-		this.zoom = Math.min(Math.max(fitZoom, 0.05), 50.0);
+		const zoom = Math.min(Math.max(fitZoom, 0.05), 50.0);
 
 		const centerX = (minX + maxX) / 2;
 		const centerY = (minY + maxY) / 2;
 
-		this.panX = this.width / 2 - centerX * this.zoom;
-		this.panY = this.height / 2 + centerY * this.zoom;
+		const panX = this.width / 2 - centerX * zoom;
+		const panY = this.height / 2 + centerY * zoom;
+
+		return { panX, panY, zoom };
+	}
+
+	fitToBounds(minX: number, minY: number, maxX: number, maxY: number, padding = 80): void {
+		const target = this.getTargetFit(minX, minY, maxX, maxY, padding);
+		this.zoom = target.zoom;
+		this.panX = target.panX;
+		this.panY = target.panY;
 	}
 
 	screenToWorld(sx: number, sy: number): Vec2 {

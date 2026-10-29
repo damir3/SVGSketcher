@@ -42,18 +42,18 @@ function initApp(): void {
 			</div>
 
 			<div class="header-actions">
-				<button class="btn-header" id="btn-undo" title="Undo (Ctrl+Z / Cmd+Z)" disabled>
-					${ICONS.undo} Undo
+				<button class="btn-header btn-icon" id="btn-undo" title="Undo (Ctrl+Z / Cmd+Z)" aria-label="Undo" disabled>
+					${ICONS.undo}
 				</button>
-				<button class="btn-header" id="btn-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled>
-					${ICONS.redo} Redo
+				<button class="btn-header btn-icon" id="btn-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" aria-label="Redo" disabled>
+					${ICONS.redo}
 				</button>
 				<div class="header-divider"></div>
-				<button class="btn-header" id="btn-fit-view" title="Fit to View (Z)">
-					${ICONS.fitView} Fit to View
+				<button class="btn-header btn-icon" id="btn-fit-view" title="Fit to View (Z)" aria-label="Fit to View">
+					${ICONS.fitView}
 				</button>
-				<button class="btn-header" id="btn-clear" title="Clear Sketch">
-					${ICONS.clear} Clear
+				<button class="btn-header btn-icon" id="btn-clear" title="Clear Sketch" aria-label="Clear Sketch">
+					${ICONS.clear}
 				</button>
 				<button class="btn-header" id="btn-import" title="Open SVG (with CAD metadata)">
 					${ICONS.open} Open SVG
@@ -132,6 +132,10 @@ function initApp(): void {
 	interaction.onToolChange = tool => {
 		toolbar.setActiveButton(tool);
 		sidebar.render();
+	};
+
+	interaction.onViewportChange = () => {
+		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 	};
 
 	interaction.onArcModeChange = mode => {
@@ -256,19 +260,11 @@ function initApp(): void {
 		}
 	});
 
-	function fitToView(): void {
-		const bbox = sketch.getBoundingBox();
-		if (bbox) {
-			viewport.fitToBounds(bbox.minX, bbox.minY, bbox.maxX, bbox.maxY);
-		} else {
-			viewport.centerOrigin();
-			viewport.zoom = 1.0;
-		}
-		renderer.render(sketch, viewport);
-		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
+	function fitToView(smooth = true): void {
+		interaction.fitToView(smooth);
 	}
 
-	btnFitView.addEventListener('click', fitToView);
+	btnFitView.addEventListener('click', () => fitToView(true));
 
 	const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
 	btnSnapHeader?.addEventListener('click', () => {
@@ -318,10 +314,11 @@ function initApp(): void {
 					viewport.panX = result.viewport.panX;
 					viewport.panY = result.viewport.panY;
 					viewport.zoom = result.viewport.zoom;
+					renderer.render(sketch, viewport);
+					zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 				} else {
-					fitToView();
+					fitToView(false);
 				}
-				renderer.render(sketch, viewport);
 				presetSelector.value = 'blank';
 				showToast(`Opened: ${file.name}`);
 			} else {

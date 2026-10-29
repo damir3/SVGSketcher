@@ -4771,5 +4771,180 @@ export class SketchDocument {
 		}
 		return { minX, minY, maxX, maxY };
 	}
+
+	getSelectionBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		let count = 0;
+
+		const includePoint = (p?: SketchPoint | null) => {
+			if (!p) return;
+			if (p.x < minX) minX = p.x;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.y > maxY) maxY = p.y;
+			count++;
+		};
+
+		for (const pid of this.selection.pointIds) {
+			includePoint(this.points.get(pid));
+		}
+
+		for (const lid of this.selection.lineIds) {
+			const l = this.lines.get(lid);
+			if (l) {
+				includePoint(this.points.get(l.p1Id));
+				includePoint(this.points.get(l.p2Id));
+			}
+		}
+
+		for (const cid of this.selection.circleIds) {
+			const c = this.circles.get(cid);
+			if (c) {
+				const center = this.points.get(c.centerId);
+				if (center) {
+					if (center.x - c.radius < minX) minX = center.x - c.radius;
+					if (center.x + c.radius > maxX) maxX = center.x + c.radius;
+					if (center.y - c.radius < minY) minY = center.y - c.radius;
+					if (center.y + c.radius > maxY) maxY = center.y + c.radius;
+					count++;
+				}
+			}
+		}
+
+		for (const aid of this.selection.arcIds) {
+			const a = this.arcs.get(aid);
+			if (a) {
+				const center = this.points.get(a.centerId);
+				if (center) {
+					if (center.x - a.radius < minX) minX = center.x - a.radius;
+					if (center.x + a.radius > maxX) maxX = center.x + a.radius;
+					if (center.y - a.radius < minY) minY = center.y - a.radius;
+					if (center.y + a.radius > maxY) maxY = center.y + a.radius;
+					count++;
+				}
+				includePoint(this.points.get(a.startPointId));
+				includePoint(this.points.get(a.endPointId));
+			}
+		}
+
+		for (const eid of this.selection.ellipseIds) {
+			const e = this.ellipses.get(eid);
+			if (e) {
+				const center = this.points.get(e.centerId);
+				const maj = this.points.get(e.majorAxisPointId);
+				const min = this.points.get(e.minorAxisPointId);
+				if (center && maj && min) {
+					const ux = maj.x - center.x;
+					const uy = maj.y - center.y;
+					const vx = min.x - center.x;
+					const vy = min.y - center.y;
+					const dx = Math.sqrt(ux * ux + vx * vx);
+					const dy = Math.sqrt(uy * uy + vy * vy);
+					if (center.x - dx < minX) minX = center.x - dx;
+					if (center.x + dx > maxX) maxX = center.x + dx;
+					if (center.y - dy < minY) minY = center.y - dy;
+					if (center.y + dy > maxY) maxY = center.y + dy;
+					count++;
+				}
+			}
+		}
+
+		for (const eaid of this.selection.ellipticalArcIds) {
+			const ea = this.ellipticalArcs.get(eaid);
+			if (ea) {
+				const center = this.points.get(ea.centerId);
+				const maj = this.points.get(ea.majorAxisPointId);
+				const min = this.points.get(ea.minorAxisPointId);
+				if (center && maj && min) {
+					const ux = maj.x - center.x;
+					const uy = maj.y - center.y;
+					const vx = min.x - center.x;
+					const vy = min.y - center.y;
+					const dx = Math.sqrt(ux * ux + vx * vx);
+					const dy = Math.sqrt(uy * uy + vy * vy);
+					if (center.x - dx < minX) minX = center.x - dx;
+					if (center.x + dx > maxX) maxX = center.x + dx;
+					if (center.y - dy < minY) minY = center.y - dy;
+					if (center.y + dy > maxY) maxY = center.y + dy;
+					count++;
+				}
+				includePoint(this.points.get(ea.startPointId));
+				includePoint(this.points.get(ea.endPointId));
+			}
+		}
+
+		for (const sid of this.selection.splineIds) {
+			const s = this.splines.get(sid);
+			if (s) {
+				for (const pid of s.pointIds) {
+					includePoint(this.points.get(pid));
+				}
+				if (s.tangentLineIds) {
+					for (const lid of s.tangentLineIds) {
+						const l = this.lines.get(lid);
+						if (l) {
+							includePoint(this.points.get(l.p1Id));
+							includePoint(this.points.get(l.p2Id));
+						}
+					}
+				}
+			}
+		}
+
+		if (count === 0 && this.selection.constraintIds.size > 0) {
+			for (const cid of this.selection.constraintIds) {
+				const c = this.constraints.get(cid);
+				if (c) {
+					const entities = this.getEntitiesForConstraint(c);
+					for (const ent of entities) {
+						if (ent.type === 'point') {
+							includePoint(this.points.get(ent.id));
+						} else if (ent.type === 'line') {
+							const l = this.lines.get(ent.id);
+							if (l) {
+								includePoint(this.points.get(l.p1Id));
+								includePoint(this.points.get(l.p2Id));
+							}
+						} else if (ent.type === 'circle') {
+							const circle = this.circles.get(ent.id);
+							if (circle) {
+								const center = this.points.get(circle.centerId);
+								if (center) {
+									if (center.x - circle.radius < minX) minX = center.x - circle.radius;
+									if (center.x + circle.radius > maxX) maxX = center.x + circle.radius;
+									if (center.y - circle.radius < minY) minY = center.y - circle.radius;
+									if (center.y + circle.radius > maxY) maxY = center.y + circle.radius;
+									count++;
+								}
+							}
+						} else if (ent.type === 'arc') {
+							const arc = this.arcs.get(ent.id);
+							if (arc) {
+								const center = this.points.get(arc.centerId);
+								if (center) {
+									if (center.x - arc.radius < minX) minX = center.x - arc.radius;
+									if (center.x + arc.radius > maxX) maxX = center.x + arc.radius;
+									if (center.y - arc.radius < minY) minY = center.y - arc.radius;
+									if (center.y + arc.radius > maxY) maxY = center.y + arc.radius;
+									count++;
+								}
+								includePoint(this.points.get(arc.startPointId));
+								includePoint(this.points.get(arc.endPointId));
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (count === 0 || !isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+			return null;
+		}
+
+		return { minX, minY, maxX, maxY };
+	}
 }
 

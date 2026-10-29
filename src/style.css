@@ -130,12 +130,26 @@ html, body {
   font-size: 12px;
   font-weight: 500;
   padding: 6px 12px;
+  height: 32px;
+  box-sizing: border-box;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition: all 0.15s ease;
+}
+
+.btn-header.btn-icon {
+  padding: 6px;
+  width: 32px;
+}
+
+.btn-header svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .btn-header:hover {

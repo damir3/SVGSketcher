@@ -198,6 +198,7 @@ export class CanvasInteraction {
 	onSlotModeChange?: (mode: SlotMode) => void;
 	onSplineStateChange?: () => void;
 	onSplineModeChange?: (mode: SplineMode) => void;
+	onViewportChange?: () => void;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -775,6 +776,103 @@ export class CanvasInteraction {
 		}
 
 		this.updateToolPreview();
+	}
+
+	private animationFrameId: number | null = null;
+
+	cancelAnimation(): void {
+		if (this.animationFrameId !== null) {
+			if (typeof cancelAnimationFrame !== 'undefined') {
+				cancelAnimationFrame(this.animationFrameId);
+			}
+			this.animationFrameId = null;
+		}
+	}
+
+	animateViewportTo(targetPanX: number, targetPanY: number, targetZoom: number, duration = 500): void {
+		this.cancelAnimation();
+
+		const startPanX = this.viewport.panX;
+		const startPanY = this.viewport.panY;
+		const startZoom = this.viewport.zoom;
+
+		const dPanX = Math.abs(startPanX - targetPanX);
+		const dPanY = Math.abs(startPanY - targetPanY);
+		const dZoom = Math.abs(startZoom - targetZoom);
+
+		if (dPanX < 0.5 && dPanY < 0.5 && dZoom < 0.001) {
+			this.viewport.panX = targetPanX;
+			this.viewport.panY = targetPanY;
+			this.viewport.zoom = targetZoom;
+			this.render();
+			this.onViewportChange?.();
+			return;
+		}
+
+		if (typeof requestAnimationFrame === 'undefined' || typeof performance === 'undefined') {
+			this.viewport.panX = targetPanX;
+			this.viewport.panY = targetPanY;
+			this.viewport.zoom = targetZoom;
+			this.render();
+			this.onViewportChange?.();
+			return;
+		}
+
+		const startTime = performance.now();
+		const logStartZoom = Math.log(Math.max(startZoom, 0.001));
+		const logTargetZoom = Math.log(Math.max(targetZoom, 0.001));
+
+		const step = (now: number) => {
+			const elapsed = now - startTime;
+			const progress = Math.min(1, Math.max(0, elapsed / duration));
+			const eased = 1 - Math.pow(1 - progress, 3);
+
+			this.viewport.panX = startPanX + (targetPanX - startPanX) * eased;
+			this.viewport.panY = startPanY + (targetPanY - startPanY) * eased;
+			this.viewport.zoom = Math.exp(logStartZoom + (logTargetZoom - logStartZoom) * eased);
+
+			this.render();
+			this.onViewportChange?.();
+
+			if (progress < 1) {
+				this.animationFrameId = requestAnimationFrame(step);
+			} else {
+				this.viewport.panX = targetPanX;
+				this.viewport.panY = targetPanY;
+				this.viewport.zoom = targetZoom;
+				this.render();
+				this.onViewportChange?.();
+				this.animationFrameId = null;
+			}
+		};
+
+		this.animationFrameId = requestAnimationFrame(step);
+	}
+
+	fitToView(smooth = true): void {
+		const bbox = this.sketch.getSelectionBoundingBox() ?? this.sketch.getBoundingBox();
+		let target: { panX: number; panY: number; zoom: number };
+		if (bbox) {
+			target = this.viewport.getTargetFit(bbox.minX, bbox.minY, bbox.maxX, bbox.maxY);
+		} else {
+			target = {
+				panX: this.viewport.width / 2,
+				panY: this.viewport.height / 2,
+				zoom: 1.0,
+			};
+		}
+
+		if (!smooth || typeof requestAnimationFrame === 'undefined') {
+			this.cancelAnimation();
+			this.viewport.panX = target.panX;
+			this.viewport.panY = target.panY;
+			this.viewport.zoom = target.zoom;
+			this.render();
+			this.onViewportChange?.();
+			return;
+		}
+
+		this.animateViewportTo(target.panX, target.panY, target.zoom);
 	}
 
 	private bindEvents(): void {
@@ -1650,6 +1748,7 @@ export class CanvasInteraction {
 	}
 
 	private handleMouseDown(e: MouseEvent): void {
+		this.cancelAnimation();
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const clientPos = vec(e.clientX, e.clientY);
@@ -2625,12 +2724,14 @@ export class CanvasInteraction {
 	}
 
 	private handleWheel(e: WheelEvent): void {
+		this.cancelAnimation();
 		e.preventDefault();
 		const screen = this.getScreenPos(e);
 		// Smooth continuous zoom factor depending exponentially on deltaY via Math.pow
 		const zoomFactor = Math.pow(2, -e.deltaY * 0.0015);
 		this.viewport.zoomAt(screen.x, screen.y, zoomFactor);
 		this.render();
+		this.onViewportChange?.();
 	}
 
 	private triggerDimensionEditAt(e: MouseEvent, screen: Vec2, clientPos: Vec2): boolean {
