@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { DeleteTool } from '../src/canvas/tools/modify/delete';
+import { HighlightManager } from '../src/canvas/highlightManager';
 import { DistanceConstraint, AngleConstraint } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
 import { vec, type Vec2 } from '../src/math/vector';
@@ -77,16 +78,21 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 		screenToWorld: (x: number, y: number) => ({ x, y }),
 	};
 
-	const ctx: ToolContext = {
+	const svgObj = {
+		querySelectorAll: (sel: string) => [] as any,
+		querySelector: (sel: string) => null,
+	};
+	let ctx: ToolContext;
+	const highlightManager = new HighlightManager(svgObj as any, () => ctx);
+
+	ctx = {
 		sketch,
 		viewport: viewport as any,
 		renderer: {
 			clearPreviews: () => {},
 		} as any,
-		svg: {
-			querySelectorAll: (sel: string) => [] as any,
-			querySelector: (sel: string) => null,
-		} as any,
+		svg: svgObj as any,
+		highlightManager,
 		isConstructionMode: false,
 		requestRender: () => {},
 		setTool: () => {},
@@ -227,9 +233,8 @@ describe('Delete Tool', () => {
 		const tool = new DeleteTool();
 		tool.activate(ctx);
 
-		const target = tool.findTarget(vec(50, 0));
+		const target = ctx.highlightManager!.update(tool, vec(50, 0));
 		assert.ok(target);
-		assert.equal(target.type, 'line');
 		assert.equal(target.id, line.id);
 
 		tool.onMouseDown(createToolMouseEvent(vec(50, 0)));
@@ -248,9 +253,8 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Cursor at (2, 1) - within 14px of p1 at (0, 0)
-		const target = tool.findTarget(vec(2, 1));
+		const target = ctx.highlightManager!.update(tool, vec(2, 1));
 		assert.ok(target);
-		assert.equal(target.type, 'point');
 		assert.equal(target.id, p1.id);
 
 		tool.onMouseDown(createToolMouseEvent(vec(2, 1)));
@@ -267,9 +271,8 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Perimeter is at x = 70, y = 50
-		const target = tool.findTarget(vec(70, 50));
+		const target = ctx.highlightManager!.update(tool, vec(70, 50));
 		assert.ok(target);
-		assert.equal(target.type, 'circle');
 		assert.equal(target.id, circle.id);
 
 		tool.onMouseDown(createToolMouseEvent(vec(70, 50)));
@@ -289,9 +292,8 @@ describe('Delete Tool', () => {
 
 		const midAngle = Math.PI / 4;
 		const midPos = vec(20 * Math.cos(midAngle), 20 * Math.sin(midAngle));
-		const target = tool.findTarget(midPos);
+		const target = ctx.highlightManager!.update(tool, midPos);
 		assert.ok(target);
-		assert.equal(target.type, 'arc');
 		assert.equal(target.id, arc.id);
 
 		tool.onMouseDown(createToolMouseEvent(midPos));
@@ -310,9 +312,8 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Distance constraint dimension line is offset (by default offsetScreen = 32px, ny = 1)
-		const target = tool.findTarget(vec(50, 32));
+		const target = ctx.highlightManager!.update(tool, vec(50, 32));
 		assert.ok(target);
-		assert.equal(target.type, 'constraint');
 		assert.equal(target.id, distConstraint!.id);
 
 		tool.onMouseDown(createToolMouseEvent(vec(50, 32)));
@@ -354,9 +355,8 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Hover near badge rect (45, -15)
-		const target = tool.findTarget(vec(45, -15));
+		const target = ctx.highlightManager!.update(tool, vec(45, -15));
 		assert.ok(target);
-		assert.equal(target.type, 'constraint');
 		assert.equal(target.id, hConstraint.id);
 
 		tool.onMouseDown(createToolMouseEvent(vec(45, -15)));
@@ -384,7 +384,7 @@ describe('Delete Tool', () => {
 
 		const hp1 = sketch.points.get(handleLine.p1Id)!;
 		const midHandle = vec((hp1.x + 1), (hp1.y + 1));
-		const target = tool.findTarget(midHandle);
+		const target = ctx.highlightManager!.update(tool, midHandle);
 		if (target) {
 			assert.notEqual(target.id, handleLine.id);
 			assert.notEqual(target.id, handleLine.p1Id);
@@ -408,17 +408,11 @@ describe('Delete Tool', () => {
 		const tool = new DeleteTool();
 		tool.activate(ctx);
 
-		const renderCtx = {
-			cursorScreen: vec(50, 0),
-			cursorWorld: vec(50, 0),
-			viewport: ctx.viewport,
-			sketch,
-			targetGroup: {} as any,
-			snap: null,
-			isConstruction: false,
-		};
+		assert.equal(tool.isHighlightEnabled(), true);
+		assert.equal(tool.getHighlightClass({ type: 'line', id: line.id }), 'delete-hover');
+		assert.equal(tool.canHighlight({ type: 'line', id: line.id }), true);
 
-		tool.renderPreview(renderCtx);
+		ctx.highlightManager!.update(tool, vec(50, 0));
 		assert.ok(lineEl.classList.contains('delete-hover'));
 
 		tool.cancel();

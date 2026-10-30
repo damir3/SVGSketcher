@@ -1,5 +1,7 @@
 import type { ITool, ToolContext, ToolMouseEvent, ToolRenderContext } from './types';
 import type { ToolType } from './types';
+import type { HoverTarget, FindHoverTargetOptions } from './hoverTarget';
+import type { Vec2 } from '../../math/vector';
 
 /**
  * Abstract base class providing common default implementations for tools.
@@ -30,6 +32,26 @@ export abstract class BaseTool implements ITool {
 	renderPreview(_ctx: ToolRenderContext): void {}
 
 	getRenderOptions(): Record<string, unknown> {
+		return {};
+	}
+
+	isHighlightEnabled(_screen?: Vec2): boolean {
+		return false;
+	}
+
+	canHighlight(_target: HoverTarget): boolean {
+		return true;
+	}
+
+	getHighlightClass(_target: HoverTarget): string {
+		return 'select-hover';
+	}
+
+	getHighlightColor?(_target: HoverTarget): string | null {
+		return null;
+	}
+
+	getHoverTargetOptions(): FindHoverTargetOptions {
 		return {};
 	}
 

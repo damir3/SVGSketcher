@@ -2,6 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { FilletPopup } from '../../../ui/fillet-popup';
+import type { HoverTarget } from '../hoverTarget';
 import {
 	getConnectedPrimitivesForPoint,
 	calculateFilletGeometry,
@@ -19,7 +20,6 @@ export class FilletTool extends BaseTool {
 	pendingFillets: FilletCandidate[] = [];
 	activeFilletId: string | null = null;
 	filletFirstPrimitive: { type: 'line' | 'arc' | 'spline'; id: string; clickPos: Vec2 } | null = null;
-	private hoveredId: string | null = null;
 	filletGizmoDragState: {
 		startMouseWorld: Vec2;
 		startRadius: number;
@@ -227,31 +227,6 @@ export class FilletTool extends BaseTool {
 			return;
 		}
 
-		// Corner point & line/curve highlight using standard select-hover (only in selection mode)
-		if (this.pendingFillets.length === 0) {
-			let targetId: string | null = null;
-			if (!this.filletFirstPrimitive) {
-				const nearPt = this.ctx.findPointNear(screen, 16);
-				if (nearPt) {
-					const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, nearPt.id);
-					if (conn.valid) {
-						targetId = nearPt.id;
-					}
-				}
-			}
-
-			if (!targetId) {
-				const hitPrim = this.findFilletPrimitiveNearScreen(screen);
-				if (hitPrim) {
-					targetId = hitPrim.id;
-				}
-			}
-
-			this.updateHoverHighlight(targetId);
-		} else {
-			this.updateHoverHighlight(null);
-		}
-
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
 		const isOverGizmo =
 			this.ctx.renderer.filletGizmoHandle &&
@@ -333,7 +308,7 @@ export class FilletTool extends BaseTool {
 	}
 
 	override cancel(): void {
-		this.updateHoverHighlight(null);
+		this.ctx?.highlightManager?.clear();
 		if (this.filletFirstPrimitive !== null) {
 			this.filletFirstPrimitive = null;
 			this.ctx.requestRender();
@@ -351,29 +326,25 @@ export class FilletTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
-	clearHover(): void {
-		this.updateHoverHighlight(null);
+	override isHighlightEnabled(): boolean {
+		return this.pendingFillets.length === 0 && !this.filletGizmoDragState;
 	}
 
-	getHoveredId(): string | null {
-		return this.hoveredId;
-	}
-
-	updateHoverHighlight(targetId: string | null): void {
-		if (this.hoveredId === targetId) return;
-		if (this.ctx?.svg && typeof this.ctx.svg.querySelectorAll === 'function') {
-			if (this.hoveredId) {
-				for (const el of Array.from(this.ctx.svg.querySelectorAll(`[data-id="${this.hoveredId}"]`))) {
-					el.classList?.remove?.('select-hover');
-				}
-			}
-			if (targetId) {
-				for (const el of Array.from(this.ctx.svg.querySelectorAll(`[data-id="${targetId}"]`))) {
-					el.classList?.add?.('select-hover');
-				}
-			}
+	override canHighlight(target: HoverTarget): boolean {
+		if (this.pendingFillets.length > 0 || this.filletGizmoDragState) return false;
+		if (target.type === 'point') {
+			if (this.filletFirstPrimitive) return false;
+			const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, target.id);
+			return conn.valid;
 		}
-		this.hoveredId = targetId;
+		if (target.type === 'line' || target.type === 'arc' || target.type === 'spline') {
+			if (target.type === 'line') {
+				const line = this.ctx.sketch.lines.get(target.id);
+				if (line?.isSplineHandle) return false;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	private findFilletPrimitiveNearScreen(screen: Vec2): { type: 'line' | 'arc' | 'spline'; id: string } | null {

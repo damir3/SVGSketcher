@@ -1,5 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
+import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
+import type { Vec2 } from '../../../math/vector';
 
 export interface CircularPatternState {
 	phase: 'objects' | 'center_point';
@@ -57,8 +59,32 @@ export class CircularPatternTool extends BaseTool {
 		if (this.state) {
 			this.state.phase = phase;
 			this.onStateChange?.();
+			this.ctx?.highlightManager?.refresh(this);
 			this.ctx.requestRender();
 		}
+	}
+
+	override isHighlightEnabled(screen?: Vec2): boolean {
+		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
+			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
+				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	override canHighlight(target: HoverTarget): boolean {
+		if (target.type === 'constraint') return false;
+		if (this.state?.phase === 'center_point') {
+			return target.type === 'point';
+		}
+		return true;
+	}
+
+	override getHoverTargetOptions(): FindHoverTargetOptions {
+		return { allowSplineHandles: false };
 	}
 
 	override cancel(): void {

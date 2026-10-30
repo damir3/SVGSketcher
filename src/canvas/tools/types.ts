@@ -4,6 +4,8 @@ import type { SVGRenderer } from '../renderer';
 import type { Vec2 } from '../../math/vector';
 import type { GeoCurve } from '../../math/intersection';
 import type { IConstraint } from '../../solver/types';
+import type { HoverTarget, FindHoverTargetOptions } from './hoverTarget';
+import type { IHighlightManager } from '../highlightManager';
 import type {
 	SketchPoint,
 	SketchLine,
@@ -160,6 +162,7 @@ export interface ToolContext {
 	): { pos: Vec2; axis: 'horizontal' | 'vertical' | null };
 
 	readonly isSnapModifierPressed?: boolean;
+	readonly highlightManager?: IHighlightManager;
 }
 
 /**
@@ -208,6 +211,22 @@ export interface ITool {
 
 	/** Optional render options to pass into SVGRenderer.render (e.g. filletState, patternHighlight) */
 	getRenderOptions?(): Record<string, unknown>;
+
+	// --- Cursor & Hover Highlighting ---
+	/** Returns true if entity/constraint hover highlight is currently enabled for this tool */
+	isHighlightEnabled?(screen?: Vec2): boolean;
+
+	/** Predicate to check if a specific target can be highlighted by this tool */
+	canHighlight?(target: HoverTarget): boolean;
+
+	/** Returns CSS class for highlighting (e.g. 'select-hover', 'delete-hover') */
+	getHighlightClass?(target: HoverTarget): string;
+
+	/** Optional custom highlight color (hex/rgb/hsl string or null) */
+	getHighlightColor?(target: HoverTarget): string | null;
+
+	/** Optional options to configure hover target discovery (e.g. allowSplineHandles) */
+	getHoverTargetOptions?(): FindHoverTargetOptions;
 
 	// --- State & Commands ---
 	/** Returns true if tool is in the middle of a multi-step operation */

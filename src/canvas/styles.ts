@@ -20,7 +20,7 @@ export const COLORS = {
 	hitTransparent: 'rgba(0, 0, 0, 0.001)',
 	guideFaint: 'rgba(2, 132, 199, 0.25)',
 	guideStartEllipse: 'rgba(2, 132, 199, 0.3)',
-	extLineDim: 'rgba(2, 132, 199, 0.45)',
+	extLineDim: 'rgba(2, 132, 199, 1)',
 	selectionBoxFill: 'rgba(14, 165, 233, 0.12)',
 	pointSnapFill: 'rgba(2, 132, 199, 0.2)',
 	objectSnapFill: 'rgba(16, 185, 129, 0.25)',
@@ -170,7 +170,6 @@ export const EXTENSION_LINE_ATTRS: SvgAttrs = {
 export const PREVIEW_EXTENSION_LINE_ATTRS: SvgAttrs = {
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.thin,
-	'stroke-dasharray': DASH_ARRAY.ray,
 };
 
 export const TRIM_STROKE_ATTRS: SvgAttrs = {

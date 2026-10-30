@@ -37,6 +37,7 @@ import {
 	type BezierSegment,
 } from '../math/spline';
 import { calculateObjectsCentroid } from './tools/modify/utils';
+import { HighlightManager } from './highlightManager';
 
 import {
 	type ToolType,
@@ -87,6 +88,7 @@ export class CanvasInteraction {
 	private sketch: SketchDocument;
 	private viewport: Viewport;
 	private renderer: SVGRenderer;
+	readonly highlightManager: HighlightManager;
 
 	activeTool: ToolType = 'select';
 	isConstructionMode = false;
@@ -549,6 +551,9 @@ export class CanvasInteraction {
 			get isSnapModifierPressed() {
 				return self.isSnapModifierPressed;
 			},
+			get highlightManager() {
+				return self.highlightManager;
+			},
 		};
 	}
 
@@ -614,6 +619,7 @@ export class CanvasInteraction {
 		this.sketch = sketch;
 		this.viewport = viewport;
 		this.renderer = renderer;
+		this.highlightManager = new HighlightManager(this.svg, () => this.createToolContext());
 
 		this.initTools();
 		this.bindEvents();
@@ -637,6 +643,7 @@ export class CanvasInteraction {
 				prevTool.deactivate();
 			}
 			this.activeTool = tool;
+			this.highlightManager.clear();
 			this.cancelDrawing();
 
 			const nextTool = this.tools.get(tool) ?? null;
@@ -713,6 +720,7 @@ export class CanvasInteraction {
 
 	cancelDrawing(): void {
 		this.activeToolInstance?.cancel?.();
+		this.highlightManager.clear();
 
 		this.isDraggingPoint = false;
 		this.draggedPointId = null;
@@ -775,12 +783,12 @@ export class CanvasInteraction {
 	}
 
 	render(): void {
-		(this.activeToolInstance as any)?.clearHover?.();
 		const toolRenderOptions = this.activeToolInstance?.getRenderOptions?.() ?? {};
 		this.renderer.render(this.sketch, this.viewport, {
 			showSplineHandles: isConstraintTool(this.activeTool),
 			...toolRenderOptions,
 		});
+		this.highlightManager.refresh(this.activeToolInstance);
 
 		// Update popup positions on screen during zoom / pan
 		const polygonTool = this.tools.get('polygon') as PolygonTool | undefined;
@@ -834,7 +842,7 @@ export class CanvasInteraction {
 		}
 	}
 
-	animateViewportTo(targetPanX: number, targetPanY: number, targetZoom: number, duration = 500): void {
+	animateViewportTo(targetPanX: number, targetPanY: number, targetZoom: number, duration = 700): void {
 		this.cancelAnimation();
 
 		const startPanX = this.viewport.panX;
@@ -864,17 +872,20 @@ export class CanvasInteraction {
 		}
 
 		const startTime = performance.now();
-		const logStartZoom = Math.log(Math.max(startZoom, 0.001));
-		const logTargetZoom = Math.log(Math.max(targetZoom, 0.001));
+		const easeInOut = (t: number, power: number) => {
+			return t < 0.5
+			  ? Math.pow(2 * t, power) / 2
+			  : 1 - Math.pow(-2 * t + 2, power) / 2;
+		};
 
 		const step = (now: number) => {
 			const elapsed = now - startTime;
 			const progress = Math.min(1, Math.max(0, elapsed / duration));
-			const eased = 1 - Math.pow(1 - progress, 3);
+			const eased = easeInOut(progress, 3); // cubic ease-in-out
 
 			this.viewport.panX = startPanX + (targetPanX - startPanX) * eased;
 			this.viewport.panY = startPanY + (targetPanY - startPanY) * eased;
-			this.viewport.zoom = Math.exp(logStartZoom + (logTargetZoom - logStartZoom) * eased);
+			this.viewport.zoom = startZoom + (targetZoom - startZoom) * eased;
 
 			this.render();
 			this.onViewportChange?.();
@@ -927,7 +938,7 @@ export class CanvasInteraction {
 		this.svg.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
 		this.svg.addEventListener('dblclick', this.handleDoubleClick.bind(this));
 		this.svg.addEventListener('mouseleave', () => {
-			(this.activeToolInstance as any)?.clearHover?.();
+			this.highlightManager.clear();
 		});
 
 		// Prevent default context menu for smooth right-click panning
@@ -953,6 +964,7 @@ export class CanvasInteraction {
 		window.addEventListener('blur', () => {
 			this.isSnapModifierPressed = false;
 			this.isSpacePressed = false;
+			this.highlightManager.clear();
 		});
 	}
 
@@ -1818,7 +1830,7 @@ export class CanvasInteraction {
 
 	private handleMouseDown(e: MouseEvent): void {
 		this.cancelAnimation();
-		(this.activeToolInstance as any)?.clearHover?.();
+		this.highlightManager.clear();
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const clientPos = vec(e.clientX, e.clientY);
@@ -2535,6 +2547,13 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// Centralized hover highlight
+		if (this.isPanning || this.isDraggingPoint || this.isBoxSelecting || this.gizmoDragState) {
+			this.highlightManager.clear();
+		} else {
+			this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
+		}
+
 		// Delegate to active tool if not select
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
 			const toolEvent = this.createToolMouseEvent(e);
@@ -2794,6 +2813,7 @@ export class CanvasInteraction {
 			this.render();
 		}
 		this.pendingExclusiveSelection = null;
+		this.highlightManager.update(this.activeToolInstance, this.lastMouseScreen);
 	}
 
 	private handleWheel(e: WheelEvent): void {

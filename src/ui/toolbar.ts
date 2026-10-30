@@ -76,10 +76,6 @@ export class Toolbar {
 			<div class="toolbar-section">
 				<div class="toolbar-title">Tools</div>
 				<div class="toolbar-grid">
-					<button class="tool-btn active" data-tool="select" title="Select & Drag (V)">
-						${ICONS.select}
-						<span class="btn-tooltip">Select (V)</span>
-					</button>
 					<button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
 						${ICONS.snap}
 						<span class="btn-tooltip">Snap (S)</span>
@@ -87,6 +83,10 @@ export class Toolbar {
 					<button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
 						${ICONS.construction}
 						<span class="btn-tooltip">Construction (X)</span>
+					</button>
+					<button class="tool-btn active" data-tool="select" title="Select & Drag (V)">
+						${ICONS.select}
+						<span class="btn-tooltip">Select (V)</span>
 					</button>
 					<button class="tool-btn" data-tool="delete" title="Delete">
 						${ICONS.delete}
@@ -100,17 +100,13 @@ export class Toolbar {
 						${ICONS.trim}
 						<span class="btn-tooltip">Trim (T)</span>
 					</button>
-					<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
-						${ICONS.fillet}
-						<span class="btn-tooltip">Fillet</span>
-					</button>
 					<button class="tool-btn" data-tool="chamfer" id="tool-chamfer" title="Chamfer">
 						${ICONS.chamferEqual}
 						<span class="btn-tooltip">Chamfer</span>
 					</button>
-					<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
-						${ICONS.mirror}
-						<span class="btn-tooltip">Mirror (M)</span>
+					<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
+						${ICONS.fillet}
+						<span class="btn-tooltip">Fillet</span>
 					</button>
 					<button class="tool-btn" data-tool="circular_pattern" id="tool-circular-pattern" title="Circular Pattern">
 						${ICONS.circular_pattern}
@@ -119,6 +115,10 @@ export class Toolbar {
 					<button class="tool-btn" data-tool="rectangular_pattern" id="tool-rectangular-pattern" title="Rectangular Pattern">
 						${ICONS.rectangular_pattern}
 						<span class="btn-tooltip">Rectangular Pattern</span>
+					</button>
+					<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
+						${ICONS.mirror}
+						<span class="btn-tooltip">Mirror (M)</span>
 					</button>
 				</div>
 			</div>

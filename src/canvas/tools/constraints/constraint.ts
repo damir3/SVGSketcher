@@ -1,5 +1,6 @@
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent } from '../types';
+import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 
 export class ConstraintTool extends BaseTool {
 	readonly id: ConstraintToolType;
@@ -17,6 +18,19 @@ export class ConstraintTool extends BaseTool {
 	override cancel(): void {
 		this.ctx.sketch.clearSelection();
 		this.ctx.requestRender();
+	}
+
+	override isHighlightEnabled(): boolean {
+		return true;
+	}
+
+	override canHighlight(target: HoverTarget): boolean {
+		if (target.type === 'constraint') return false;
+		return this.isEntityCompatibleWithConstraint(target.type as any);
+	}
+
+	override getHoverTargetOptions(): FindHoverTargetOptions {
+		return { allowSplineHandles: true };
 	}
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {

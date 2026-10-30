@@ -261,9 +261,9 @@ export class ChamferPopup {
 	}
 
 	private focusInput(el: HTMLElement): void {
-		el.focus();
-		if (el instanceof HTMLInputElement && el.type !== 'checkbox') {
-			el.select();
+		el.focus?.();
+		if ((typeof HTMLInputElement !== 'undefined' && el instanceof HTMLInputElement) || el.tagName === 'INPUT') {
+			(el as HTMLInputElement).select?.();
 		}
 	}
 

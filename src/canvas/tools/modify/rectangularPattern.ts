@@ -1,5 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
+import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { dist, type Vec2 } from '../../../math/vector';
 import {
 	computeRectangularPatternDirections,
@@ -86,8 +87,40 @@ export class RectangularPatternTool extends BaseTool {
 		if (this.state) {
 			this.state.phase = phase;
 			this.onStateChange?.();
+			this.ctx?.highlightManager?.refresh(this);
 			this.ctx.requestRender();
 		}
+	}
+
+	override isHighlightEnabled(screen?: Vec2): boolean {
+		if (this.gizmoDragState !== null) return false;
+		if (screen && this.ctx?.renderer?.rectangularGizmoHandles) {
+			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
+				if (!handle.constraintId && dist(screen, { x: handle.x, y: handle.y }) <= 18) {
+					return false;
+				}
+			}
+		}
+		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
+			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
+				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	override canHighlight(target: HoverTarget): boolean {
+		if (target.type === 'constraint') return false;
+		if (this.state?.phase === 'direction1' || this.state?.phase === 'direction2') {
+			return target.type === 'line';
+		}
+		return true;
+	}
+
+	override getHoverTargetOptions(): FindHoverTargetOptions {
+		return { allowSplineHandles: false };
 	}
 
 	override cancel(): void {

@@ -239,15 +239,16 @@ export class SVGRenderer {
 		const createArrowMarker = (id: string, color: string) => {
 			const marker = createSvgElement('marker', {
 				id,
-				viewBox: '0 0 12.5 10',
-				refX: '12.5',
+				viewBox: '0 0 16 10',
+				refX: '16',
 				refY: '5',
-				markerWidth: '7.5',
-				markerHeight: '6',
+				markerWidth: '16',
+				markerHeight: '10',
+				markerUnits: 'userSpaceOnUse',
 				orient: 'auto-start-reverse',
 			}, this.defsEl);
 
-			createSvgPath('M 0 1.5 L 12.5 5 L 0 8.5 z', { fill: color }, marker);
+			createSvgPath('M 0 1.5 L 16 5 L 0 8.5 z', { fill: color }, marker);
 		};
 
 		createArrowMarker('dim-arrow', COLORS.primary);
@@ -948,7 +949,7 @@ export class SVGRenderer {
 			stroke: color,
 			'stroke-width': STROKE_WIDTH.dimension,
 		};
-		if (screenDist >= 20) {
+		if (screenDist >= 32) {
 			lineAttrs['marker-start'] = arrowUrl;
 			lineAttrs['marker-end'] = arrowUrl;
 		}

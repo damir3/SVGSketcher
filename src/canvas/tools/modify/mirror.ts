@@ -1,5 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
+import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 
 export interface MirrorState {
 	phase: 'objects' | 'mirror_line';
@@ -47,6 +48,7 @@ export class MirrorTool extends BaseTool {
 		if (this.state) {
 			this.state.phase = phase;
 			this.onStateChange?.();
+			this.ctx?.highlightManager?.refresh(this);
 			this.ctx.requestRender();
 		}
 	}
@@ -55,6 +57,22 @@ export class MirrorTool extends BaseTool {
 		this.state = null;
 		this.onStateChange?.();
 		this.ctx.requestRender();
+	}
+
+	override isHighlightEnabled(): boolean {
+		return true;
+	}
+
+	override canHighlight(target: HoverTarget): boolean {
+		if (target.type === 'constraint') return false;
+		if (this.state?.phase === 'mirror_line') {
+			return target.type === 'line';
+		}
+		return true;
+	}
+
+	override getHoverTargetOptions(): FindHoverTargetOptions {
+		return { allowSplineHandles: false };
 	}
 
 	override commit(): void {

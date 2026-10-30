@@ -2,6 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, normalize, vec, type Vec2 } from '../../../math/vector';
 import { ChamferPopup } from '../../../ui/chamfer-popup';
+import type { HoverTarget } from '../hoverTarget';
 import {
 	type ChamferMode,
 	type ChamferCandidate,
@@ -28,7 +29,6 @@ export class ChamferTool extends BaseTool {
 	// Single corner candidate at a time
 	candidate: ChamferCandidate | null = null;
 	firstLine: { id: string; clickPos: Vec2 } | null = null;
-	private hoveredId: string | null = null;
 
 	gizmoDragState: {
 		handle: ChamferGizmoHandle;
@@ -85,7 +85,7 @@ export class ChamferTool extends BaseTool {
 	}
 
 	override cancel(): void {
-		this.updateHoverHighlight(null);
+		this.ctx?.highlightManager?.clear();
 		this.candidate = null;
 		this.firstLine = null;
 		this.gizmoDragState = null;
@@ -95,29 +95,24 @@ export class ChamferTool extends BaseTool {
 		this.ctx?.requestRender();
 	}
 
-	clearHover(): void {
-		this.updateHoverHighlight(null);
+	override isHighlightEnabled(): boolean {
+		return !this.candidate && !this.gizmoDragState;
 	}
 
-	getHoveredId(): string | null {
-		return this.hoveredId;
-	}
-
-	updateHoverHighlight(targetId: string | null): void {
-		if (this.hoveredId === targetId) return;
-		if (this.ctx?.svg && typeof this.ctx.svg.querySelectorAll === 'function') {
-			if (this.hoveredId) {
-				for (const el of Array.from(this.ctx.svg.querySelectorAll(`[data-id="${this.hoveredId}"]`))) {
-					el.classList?.remove?.('select-hover');
-				}
-			}
-			if (targetId) {
-				for (const el of Array.from(this.ctx.svg.querySelectorAll(`[data-id="${targetId}"]`))) {
-					el.classList?.add?.('select-hover');
-				}
-			}
+	override canHighlight(target: HoverTarget): boolean {
+		if (this.candidate !== null || this.gizmoDragState !== null) return false;
+		if (target.type === 'point') {
+			if (this.firstLine) return false;
+			const conn = getConnectedLinesForPoint(this.ctx.sketch, target.id);
+			return conn.valid;
 		}
-		this.hoveredId = targetId;
+		if (target.type === 'line') {
+			const line = this.ctx.sketch.lines.get(target.id);
+			if (!line || line.isSplineHandle) return false;
+			if (this.firstLine && target.id === this.firstLine.id) return false;
+			return true;
+		}
+		return false;
 	}
 
 	setMode(mode: ChamferMode): void {
@@ -168,7 +163,7 @@ export class ChamferTool extends BaseTool {
 			this.ctx.showToast('Chamfer created');
 		}
 
-		this.updateHoverHighlight(null);
+		this.ctx?.highlightManager?.clear();
 		this.candidate = null;
 		this.firstLine = null;
 		this.gizmoDragState = null;
@@ -278,6 +273,7 @@ export class ChamferTool extends BaseTool {
 
 		// 1. Gizmo drag handling
 		if (this.gizmoDragState && this.candidate && this.candidate.result) {
+			this.ctx.setCursor('grabbing');
 			const { handle, startMouseWorld, startValue } = this.gizmoDragState;
 
 			if (handle.type === 'dist1' || handle.type === 'dist2') {
@@ -352,31 +348,6 @@ export class ChamferTool extends BaseTool {
 				}
 				return;
 			}
-		}
-
-		// 2. Corner hover point & line hover highlight detection (only during selection)
-		if (!this.candidate) {
-			let targetId: string | null = null;
-			if (!this.firstLine) {
-				const nearPt = this.ctx.findPointNear(screen, 16);
-				if (nearPt) {
-					const conn = getConnectedLinesForPoint(this.ctx.sketch, nearPt.id);
-					if (conn.valid) {
-						targetId = nearPt.id;
-					}
-				}
-			}
-
-			if (!targetId) {
-				const hitLine = this.ctx.findLineNear(screen, 14);
-				if (hitLine && !hitLine.isSplineHandle) {
-					targetId = hitLine.id;
-				}
-			}
-
-			this.updateHoverHighlight(targetId);
-		} else {
-			this.updateHoverHighlight(null);
 		}
 
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)

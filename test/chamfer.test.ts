@@ -893,7 +893,7 @@ describe('ChamferTool UI and Workflow', () => {
 						screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
 					},
 					renderer: {
-						chamferGizmoHandles: [{ screenX: 420, screenY: 300, currentValue: 10, type: 'dist1' }],
+						chamferGizmoHandles: [] as any[],
 					},
 					findPointNear: (s: any) => (s.x === 400 && s.y === 300 ? p0 : null),
 					findLineNear: () => null,
@@ -917,6 +917,9 @@ describe('ChamferTool UI and Workflow', () => {
 				});
 				assert.ok(tool.candidate);
 				assert.equal(currentCursor, 'default');
+
+				// Gizmo handles now present in renderer
+				mockCtx.renderer.chamferGizmoHandles = [{ screenX: 420, screenY: 300, currentValue: 10, type: 'dist1' }];
 
 				// 3. Move mouse over canvas away from gizmo: stays default
 				tool.onMouseMove({ screen: { x: 50, y: 50 }, world: { x: 0, y: 0 }, raw: {} as any });

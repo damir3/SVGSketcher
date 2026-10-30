@@ -1,5 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
+import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { dist, type Vec2 } from '../../../math/vector';
 
 export interface DimensionState {
@@ -160,6 +161,37 @@ export class DimensionTool extends BaseTool {
 		this.ctx.renderer.clearPreviews();
 		this.ctx.sketch.clearSelection();
 		this.ctx.requestRender();
+	}
+
+	override isHighlightEnabled(): boolean {
+		return this.state.step < 2;
+	}
+
+	override canHighlight(target: HoverTarget): boolean {
+		if (target.type === 'constraint') return false;
+		if (this.state.step === 0) {
+			return (
+				target.type === 'point' ||
+				target.type === 'line' ||
+				target.type === 'circle' ||
+				target.type === 'arc' ||
+				target.type === 'ellipse' ||
+				target.type === 'elliptical_arc'
+			);
+		}
+		if (this.state.step === 1) {
+			if (this.state.point1Id) {
+				return (target.type === 'point' && target.id !== this.state.point1Id) || target.type === 'line';
+			}
+			if (this.state.line1Id) {
+				return (target.type === 'line' && target.id !== this.state.line1Id) || target.type === 'point';
+			}
+		}
+		return false;
+	}
+
+	override getHoverTargetOptions(): FindHoverTargetOptions {
+		return { allowSplineHandles: false };
 	}
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {

@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { SelectTool } from '../src/canvas/tools/selection/select';
+import { HighlightManager } from '../src/canvas/highlightManager';
 import { DistanceConstraint } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
 import { vec, type Vec2 } from '../src/math/vector';
@@ -81,11 +82,15 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		clearPreviews: () => {},
 	} as any;
 
-	return {
+	let ctx: ToolContext;
+	const highlightManager = new HighlightManager(svgRoot as any, () => ctx);
+
+	ctx = {
 		sketch,
 		viewport,
 		renderer,
 		svg: svgRoot as any,
+		highlightManager,
 		isConstructionMode: false,
 		requestRender: () => {},
 		setCursor: () => {},
@@ -162,6 +167,7 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		getAxisSnappedWorldPos: (_s, t) => t,
 		isSnapModifierPressed: false,
 	};
+	return ctx;
 }
 
 describe('Select Tool Hover Mechanism', () => {
@@ -195,17 +201,17 @@ describe('Select Tool Hover Mechanism', () => {
 			effectiveScreen: vec(50, 2),
 		};
 
-		tool.onMouseMove(toolEvent);
-		assert.strictEqual(tool.getHoveredId(), line.id);
+		assert.strictEqual(tool.isHighlightEnabled(), true);
+		assert.strictEqual(tool.getHighlightClass({ type: 'line', id: line.id }), 'select-hover');
+		assert.strictEqual(tool.canHighlight({ type: 'line', id: line.id }), true);
+
+		ctx.highlightManager!.update(tool, toolEvent.screen, toolEvent.raw?.target as SVGElement);
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), line.id);
 		assert.strictEqual(lineG.classList.contains('select-hover'), true);
 
 		// Move mouse away
-		tool.onMouseMove({
-			...toolEvent,
-			screen: vec(50, 80),
-			world: vec(50, 80),
-		});
-		assert.strictEqual(tool.getHoveredId(), null);
+		ctx.highlightManager!.update(tool, vec(50, 80));
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 		assert.strictEqual(lineG.classList.contains('select-hover'), false);
 	});
 
@@ -220,7 +226,7 @@ describe('Select Tool Hover Mechanism', () => {
 		const tool = new SelectTool();
 		tool.activate(ctx);
 
-		const target = tool.findTarget(vec(2, 1));
+		const target = ctx.highlightManager!.update(tool, vec(2, 1));
 		assert.ok(target);
 		assert.strictEqual(target.type, 'point');
 		assert.strictEqual(target.id, p1.id);
@@ -265,14 +271,14 @@ describe('Select Tool Hover Mechanism', () => {
 			effectiveScreen: vec(25, -2),
 		};
 
-		tool.onMouseMove(toolEvent);
-		assert.strictEqual(tool.getHoveredId(), c.id);
+		ctx.highlightManager!.update(tool, toolEvent.screen, toolEvent.raw?.target as SVGElement);
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), c.id);
 		assert.strictEqual(badge1.classList.contains('select-hover'), true);
 		assert.strictEqual(badge2.classList.contains('select-hover'), true);
 
 		// Clear hover
-		tool.clearHover();
-		assert.strictEqual(tool.getHoveredId(), null);
+		ctx.highlightManager!.clear();
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 		assert.strictEqual(badge1.classList.contains('select-hover'), false);
 		assert.strictEqual(badge2.classList.contains('select-hover'), false);
 	});
@@ -294,7 +300,7 @@ describe('Select Tool Hover Mechanism', () => {
 		const handleLine = sketch.lines.get(handleLineId)!;
 		const handlePt = sketch.points.get(handleLine.p1Id)!;
 
-		const target = tool.findTarget(vec(handlePt.x, handlePt.y));
+		const target = ctx.highlightManager!.update(tool, vec(handlePt.x, handlePt.y));
 		assert.ok(target);
 		assert.strictEqual(target.type, 'point');
 		assert.strictEqual(target.id, handlePt.id);
