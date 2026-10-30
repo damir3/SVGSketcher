@@ -1287,6 +1287,232 @@ html, body {
   cursor: grabbing;
 }
 
+/* --- CHAMFER POPUP --- */
+.chamfer-popup {
+  position: fixed;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: auto;
+  min-width: 170px;
+  user-select: none;
+  font-family: inherit;
+}
+
+.chamfer-popup.hidden {
+  display: none;
+}
+
+/* --- CHAMFER TOOL SIDEBAR CARD --- */
+.chamfer-tool-card {
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid #38bdf8;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
+}
+
+.chamfer-mode-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  background-color: var(--bg-surface);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.chamfer-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.chamfer-mode-btn:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.chamfer-mode-btn.active {
+  background-color: var(--cad-blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
+}
+
+.chamfer-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.chamfer-mode-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chamfer-mode-btn.active .chamfer-mode-icon svg line[stroke="#0284c7"],
+.chamfer-mode-btn.active .chamfer-mode-icon svg path[stroke="#0284c7"] {
+  stroke: #fff;
+}
+
+.chamfer-mode-btn.active .chamfer-mode-icon svg circle[fill="#0284c7"] {
+  fill: #fff;
+}
+
+.chamfer-mode-hint {
+  font-size: 11px;
+  color: var(--cad-blue);
+  background-color: rgba(56, 189, 248, 0.08);
+  border-left: 2px solid var(--cad-blue);
+  padding: 6px 8px;
+  border-radius: 0 4px 4px 0;
+  line-height: 1.4;
+}
+
+.chamfer-popup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chamfer-popup-row.hidden {
+  display: none;
+}
+
+.chamfer-popup-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #64748b);
+  letter-spacing: 0.3px;
+}
+
+.chamfer-input-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-surface-elevated, #f8fafc);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 2px 6px;
+  height: 26px;
+  box-sizing: border-box;
+}
+
+.chamfer-input-wrapper:focus-within {
+  border-color: var(--cad-blue, #0284c7);
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.chamfer-input-wrapper.error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+}
+
+.chamfer-input-wrapper.error input {
+  color: #ef4444;
+}
+
+.chamfer-input-wrapper input {
+  width: 52px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary, #0f172a);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: monospace;
+  padding: 0;
+  margin: 0;
+  text-align: right;
+}
+
+.chamfer-input-wrapper input::-webkit-outer-spin-button,
+.chamfer-input-wrapper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.chamfer-input-wrapper input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+.chamfer-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  margin-left: 4px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.chamfer-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  user-select: none;
+}
+
+.chamfer-checkbox-label input[type='checkbox'] {
+  cursor: pointer;
+  accent-color: #0284c7;
+}
+
+.chamfer-popup-error {
+  font-size: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  text-align: right;
+  margin-top: -1px;
+}
+
+.chamfer-popup-error.hidden {
+  display: none;
+}
+
+.chamfer-gizmo-arrow,
+.chamfer-gizmo-circle {
+  cursor: grab;
+  transition: transform 0.1s ease, filter 0.15s ease;
+}
+
+.chamfer-gizmo-arrow:hover,
+.chamfer-gizmo-circle:hover {
+  filter: drop-shadow(0 2px 8px rgba(2, 132, 199, 0.6)) brightness(1.15) !important;
+  cursor: grab;
+}
+
+.chamfer-gizmo-arrow:active,
+.chamfer-gizmo-circle:active {
+  cursor: grabbing;
+}
+
 
 
 /* Toast */

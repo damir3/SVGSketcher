@@ -70,6 +70,7 @@ export type ToolType =
 	| 'circular_pattern'
 	| 'rectangular_pattern'
 	| 'fillet'
+	| 'chamfer'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 

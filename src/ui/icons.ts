@@ -24,6 +24,9 @@ import construction from '../assets/icons/construction.svg?raw';
 import snap from '../assets/icons/snap.svg?raw';
 import trim from '../assets/icons/trim.svg?raw';
 import fillet from '../assets/icons/fillet.svg?raw';
+import chamferEqual from '../assets/icons/chamfer-equal.svg?raw';
+import chamferTwoDistance from '../assets/icons/chamfer-two-distance.svg?raw';
+import chamferDistanceAngle from '../assets/icons/chamfer-distance-angle.svg?raw';
 import breakIcon from '../assets/icons/break.svg?raw';
 import mirror from '../assets/icons/mirror.svg?raw';
 import circularPattern from '../assets/icons/circular-pattern.svg?raw';
@@ -86,6 +89,9 @@ export const ICONS = {
 	snap,
 	trim,
 	fillet,
+	chamferEqual,
+	chamferTwoDistance,
+	chamferDistanceAngle,
 	break: breakIcon,
 	mirror,
 	circular_pattern: circularPattern,

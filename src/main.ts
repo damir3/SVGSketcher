@@ -52,9 +52,11 @@ function initApp(): void {
 				<button class="btn-header btn-icon" id="btn-fit-view" title="Fit to View (Z)" aria-label="Fit to View">
 					${ICONS.fitView}
 				</button>
+				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-clear" title="Clear Sketch" aria-label="Clear Sketch">
 					${ICONS.clear}
 				</button>
+				<div class="header-divider"></div>
 				<button class="btn-header" id="btn-import" title="Open SVG (with CAD metadata)">
 					${ICONS.open} Open SVG
 				</button>
@@ -167,6 +169,15 @@ function initApp(): void {
 	};
 
 	interaction.onSplineStateChange = () => {
+		sidebar.render();
+	};
+
+	interaction.onChamferModeChange = mode => {
+		toolbar.setChamferMode(mode);
+		sidebar.render();
+	};
+
+	interaction.onChamferStateChange = () => {
 		sidebar.render();
 	};
 

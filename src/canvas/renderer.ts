@@ -7,7 +7,7 @@ import {
 	computeRectangularPatternDirections,
 	type ConstraintRenderContext,
 } from '../solver/constraints';
-import type { Vec2 } from '../math/vector';
+import { normalize, type Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
 import {
 	bsplineToBezier,
@@ -67,14 +67,18 @@ import {
 	CHECKBOX_SUPPRESSED_DASH_ATTRS,
 	RECT_PATTERN_PILL_ATTRS,
 	RECT_PATTERN_PILL_TEXT_ATTRS,
-	FILLET_HIGHLIGHT_ATTRS,
-	FILLET_HOVER_POINT_ATTRS,
 	FILLET_WEDGE_ATTRS,
 	FILLET_ARC_ATTRS,
 	FILLET_GIZMO_CENTER_ATTRS,
 	FILLET_GIZMO_RADIAL_ATTRS,
 	FILLET_GIZMO_SQUARE_ATTRS,
 	FILLET_GIZMO_ARROW_ATTRS,
+	CHAMFER_HIGHLIGHT_ATTRS,
+	CHAMFER_CUT_LINE_ATTRS,
+	CHAMFER_GIZMO_ARROW_ATTRS,
+	CHAMFER_GIZMO_CIRCLE_ATTRS,
+	CHAMFER_GIZMO_ARC_ATTRS,
+	CHAMFER_GIZMO_POINT_ATTRS,
 	SNAP_POINT_ATTRS,
 	SNAP_GRID_ATTRS,
 	SNAP_OBJECT_ATTRS,
@@ -138,6 +142,22 @@ export interface RenderOptions {
 		selectedPrimitive1?: { type: 'line' | 'arc' | 'spline'; id: string } | null;
 		hoverPointId?: string | null;
 	};
+	chamferState?: {
+		candidate: import('../math/chamfer').ChamferCandidate | null;
+		firstLine: { id: string; clickPos: Vec2 } | null;
+		hoverPointId: string | null;
+		mode: import('../math/chamfer').ChamferMode;
+		flip: boolean;
+	};
+}
+
+export interface ChamferGizmoHandle {
+	type: 'dist1' | 'dist2' | 'angle';
+	screenX: number;
+	screenY: number;
+	worldPos: Vec2;
+	dir?: Vec2;
+	currentValue: number;
 }
 
 export class SVGRenderer {
@@ -152,6 +172,7 @@ export class SVGRenderer {
 	private patternCheckboxGroup: SVGGElement;
 	readonly patternCheckboxPositions = new Map<string, { x: number; y: number; copyIndex: number; constraintId?: string }>();
 	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
+	readonly chamferGizmoHandles: ChamferGizmoHandle[] = [];
 	filletGizmoHandle: {
 		screenX: number;
 		screenY: number;
@@ -163,6 +184,7 @@ export class SVGRenderer {
 	public previewGroup: SVGGElement;
 	private overlayGroup: SVGGElement;
 	private filletGroup: SVGGElement;
+	private chamferGroup: SVGGElement;
 
 	constructor(svgElement: SVGSVGElement) {
 		this.svg = svgElement;
@@ -188,6 +210,7 @@ export class SVGRenderer {
 		this.patternCheckboxGroup = this.createGroup('pattern-checkbox-layer');
 
 		this.filletGroup = this.createGroup('fillet-layer');
+		this.chamferGroup = this.createGroup('chamfer-layer');
 
 		this.previewGroup = this.createGroup('preview-layer');
 		this.previewGroup.style.pointerEvents = 'none';
@@ -203,6 +226,7 @@ export class SVGRenderer {
 		this.svg.appendChild(this.patternGroup);
 		this.svg.appendChild(this.patternCheckboxGroup);
 		this.svg.appendChild(this.filletGroup);
+		this.svg.appendChild(this.chamferGroup);
 		this.svg.appendChild(this.previewGroup);
 		this.svg.appendChild(this.overlayGroup);
 	}
@@ -274,6 +298,11 @@ export class SVGRenderer {
 		this.filletGroup.innerHTML = '';
 		if (options.filletState) {
 			this.renderFilletPreviews(sketch, viewport, options.filletState);
+		}
+		this.chamferGizmoHandles.length = 0;
+		this.chamferGroup.innerHTML = '';
+		if (options.chamferState) {
+			this.renderChamferPreviews(sketch, viewport, options.chamferState);
 		}
 	}
 
@@ -458,7 +487,16 @@ export class SVGRenderer {
 			const isPatternSelected =
 				options.patternHighlight?.selectedObjectIds.has(line.id) ||
 				options.rectangularPatternHighlight?.selectedObjectIds.has(line.id);
-			const isSelected = sketch.selection.lineIds.has(line.id) || !!isMirrorSelected || !!isPatternSelected;
+			const isChamferSelected = options.chamferState?.firstLine?.id === line.id;
+			const isFilletSelected =
+				options.filletState?.selectedPrimitive1?.type === 'line' &&
+				options.filletState.selectedPrimitive1.id === line.id;
+			const isSelected =
+				sketch.selection.lineIds.has(line.id) ||
+				!!isMirrorSelected ||
+				!!isPatternSelected ||
+				isChamferSelected ||
+				isFilletSelected;
 
 			const lineG = createSvgElement('g', {
 				'data-id': line.id,
@@ -528,11 +566,15 @@ export class SVGRenderer {
 			const ss = viewport.worldToScreen(start.x, start.y);
 			const se = viewport.worldToScreen(end.x, end.y);
 			const sr = arc.radius * viewport.zoom;
+			const isFilletSelected =
+				options.filletState?.selectedPrimitive1?.type === 'arc' &&
+				options.filletState.selectedPrimitive1.id === arc.id;
 			const isSelected =
 				sketch.selection.arcIds.has(arc.id) ||
 				!!options.mirrorHighlight?.selectedObjectIds.has(arc.id) ||
 				!!options.patternHighlight?.selectedObjectIds.has(arc.id) ||
-				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id);
+				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id) ||
+				isFilletSelected;
 
 			const clockwise = !!arc.clockwise;
 			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
@@ -677,13 +719,17 @@ export class SVGRenderer {
 				bezierSegments = fitPointsToBezier(pts, handles);
 			}
 
+			const isFilletSelected =
+				options.filletState?.selectedPrimitive1?.type === 'spline' &&
+				options.filletState.selectedPrimitive1.id === spline.id;
 			const isSelected =
 				sketch.selection.splineIds.has(spline.id) ||
 				spline.pointIds.some(pid => sketch.selection.pointIds.has(pid)) ||
 				(spline.tangentLineIds && spline.tangentLineIds.some(lid => {
 					const line = sketch.lines.get(lid);
 					return line && (sketch.selection.lineIds.has(lid) || sketch.selection.pointIds.has(line.p1Id) || sketch.selection.pointIds.has(line.p2Id));
-				}));
+				})) ||
+				isFilletSelected;
 
 			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
 
@@ -2108,54 +2154,11 @@ export class SVGRenderer {
 	}
 
 	renderFilletPreviews(
-		sketch: SketchDocument,
+		_sketch: SketchDocument,
 		viewport: Viewport,
 		state: NonNullable<RenderOptions['filletState']>
 	): void {
 		// 1. Highlight selected first primitive if any
-		if (state.selectedPrimitive1) {
-			const { type, id } = state.selectedPrimitive1;
-			if (type === 'line') {
-				const line = sketch.lines.get(id);
-				if (line) {
-					const p1 = sketch.points.get(line.p1Id);
-					const p2 = sketch.points.get(line.p2Id);
-					if (p1 && p2) {
-						const s1 = viewport.worldToScreen(p1.x, p1.y);
-						const s2 = viewport.worldToScreen(p2.x, p2.y);
-						createSvgLine(s1.x, s1.y, s2.x, s2.y, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);
-					}
-				}
-			} else if (type === 'arc') {
-				const arc = sketch.arcs.get(id);
-				if (arc) {
-					const sc = viewport.worldToScreen(sketch.points.get(arc.centerId)!.x, sketch.points.get(arc.centerId)!.y);
-					const ss = viewport.worldToScreen(sketch.points.get(arc.startPointId)!.x, sketch.points.get(arc.startPointId)!.y);
-					const se = viewport.worldToScreen(sketch.points.get(arc.endPointId)!.x, sketch.points.get(arc.endPointId)!.y);
-					const sr = arc.radius * viewport.zoom;
-					const d = getArcSvgPath(sc, ss, se, sr, !!arc.clockwise);
-					createSvgPath(d, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);
-				}
-			} else if (type === 'spline') {
-				const spline = sketch.splines.get(id);
-				if (spline) {
-					const geoCurve = spline.toGeoCurve(sketch);
-					if (geoCurve) {
-						const d = getSplineSvgPath(geoCurve.bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
-						createSvgPath(d, FILLET_HIGHLIGHT_ATTRS, this.filletGroup);
-					}
-				}
-			}
-		}
-
-		// 2. Highlight hovered eligible point
-		if (state.hoverPointId) {
-			const pt = sketch.points.get(state.hoverPointId);
-			if (pt) {
-				const s = viewport.worldToScreen(pt.x, pt.y);
-				createSvgCircle(s.x, s.y, 8, FILLET_HOVER_POINT_ATTRS, this.filletGroup);
-			}
-		}
 
 		// 3. Render all pending fillets
 		for (const pf of state.pendingFillets) {
@@ -2231,11 +2234,268 @@ export class SVGRenderer {
 		}
 	}
 
+	renderChamferPreviews(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		state: NonNullable<RenderOptions['chamferState']>
+	): void {
+		// 1. Render candidate preview and gizmos
+		const cand = state.candidate;
+		if (!cand || !cand.result) return;
+		const res = cand.result;
+
+		const sV = viewport.worldToScreen(cand.vertexPos.x, cand.vertexPos.y);
+		const sT1 = viewport.worldToScreen(res.t1.x, res.t1.y);
+		const sT2 = viewport.worldToScreen(res.t2.x, res.t2.y);
+
+		// Cut lines from T1 to V and T2 to V
+		createSvgLine(sT1.x, sT1.y, sV.x, sV.y, CHAMFER_CUT_LINE_ATTRS, this.chamferGroup);
+		createSvgLine(sT2.x, sT2.y, sV.x, sV.y, CHAMFER_CUT_LINE_ATTRS, this.chamferGroup);
+
+		// Vertex V point
+		createSvgCircle(sV.x, sV.y, 3.5, CHAMFER_GIZMO_POINT_ATTRS, this.chamferGroup);
+
+		// Chamfer line
+		createSvgLine(sT1.x, sT1.y, sT2.x, sT2.y, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
+
+		// Highlight remaining parts of the two lines to their other endpoints
+		const pOther1 = sketch.points.get(cand.line1.otherPointId);
+		const pOther2 = sketch.points.get(cand.line2.otherPointId);
+		if (pOther1) {
+			const sOther1 = viewport.worldToScreen(pOther1.x, pOther1.y);
+			createSvgLine(sT1.x, sT1.y, sOther1.x, sOther1.y, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
+		}
+		if (pOther2) {
+			const sOther2 = viewport.worldToScreen(pOther2.x, pOther2.y);
+			createSvgLine(sT2.x, sT2.y, sOther2.x, sOther2.y, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
+		}
+
+		// Cut points T1 and T2
+		createSvgCircle(sT1.x, sT1.y, 3, CHAMFER_GIZMO_POINT_ATTRS, this.chamferGroup);
+		createSvgCircle(sT2.x, sT2.y, 3, CHAMFER_GIZMO_POINT_ATTRS, this.chamferGroup);
+
+		// Helper to draw an arrow head
+		const drawArrow = (tipX: number, tipY: number, dirX: number, dirY: number) => {
+			const arrowLen = 16;
+			const arrowHalfWidth = 6.5;
+			const apx = -dirY;
+			const apy = dirX;
+			const baseCenterX = tipX - arrowLen * dirX;
+			const baseCenterY = tipY - arrowLen * dirY;
+			const b1X = baseCenterX + arrowHalfWidth * apx;
+			const b1Y = baseCenterY + arrowHalfWidth * apy;
+			const b2X = baseCenterX - arrowHalfWidth * apx;
+			const b2Y = baseCenterY - arrowHalfWidth * apy;
+			const arrowPath = `M ${tipX} ${tipY} L ${b1X} ${b1Y} L ${b2X} ${b2Y} Z`;
+			createSvgPath(arrowPath, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
+		};
+
+		// Unit screen directions for line 1 and line 2 (pointing away from V)
+		const sDir1 = {
+			x: cand.dir1.x * viewport.zoom,
+			y: -cand.dir1.y * viewport.zoom,
+		};
+		const lenSDir1 = Math.hypot(sDir1.x, sDir1.y) || 1;
+		const uSDir1 = { x: sDir1.x / lenSDir1, y: sDir1.y / lenSDir1 };
+
+		const sDir2 = {
+			x: cand.dir2.x * viewport.zoom,
+			y: -cand.dir2.y * viewport.zoom,
+		};
+		const lenSDir2 = Math.hypot(sDir2.x, sDir2.y) || 1;
+		const uSDir2 = { x: sDir2.x / lenSDir2, y: sDir2.y / lenSDir2 };
+
+		if (state.mode === 'equal_distance') {
+			// Mode 1: 1 arrow gizmo along the angle bisector, shifted back so tip points at chamfer midpoint
+			const sMid = {
+				x: (sT1.x + sT2.x) / 2,
+				y: (sT1.y + sT2.y) / 2,
+			};
+			const vBis = { x: sMid.x - sV.x, y: sMid.y - sV.y };
+			const lenBis = Math.hypot(vBis.x, vBis.y) || 1;
+			const uSBis = { x: vBis.x / lenBis, y: vBis.y / lenBis };
+
+			// Arrow tip points towards sMid
+			const tipX = sMid.x - uSBis.x * 2;
+			const tipY = sMid.y - uSBis.y * 2;
+			drawArrow(tipX, tipY, uSBis.x, uSBis.y);
+
+			// Dashed guide line from vertex V to the base of the arrow along bisector
+			const baseCenterX = tipX - 16 * uSBis.x;
+			const baseCenterY = tipY - 16 * uSBis.y;
+			if (Math.hypot(baseCenterX - sV.x, baseCenterY - sV.y) > 4) {
+				createSvgLine(sV.x, sV.y, baseCenterX, baseCenterY, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+			}
+
+			const bisectorWorld = normalize({
+				x: cand.dir1.x + cand.dir2.x,
+				y: cand.dir1.y + cand.dir2.y,
+			});
+
+			this.chamferGizmoHandles.push({
+				type: 'dist1',
+				screenX: tipX - uSBis.x * 8,
+				screenY: tipY - uSBis.y * 8,
+				worldPos: res.midPoint,
+				dir: bisectorWorld,
+				currentValue: res.dist1,
+			});
+		} else if (state.mode === 'two_distance') {
+			// Mode 2: 2 arrow gizmos shifted back so their tips point directly at T1 and T2
+			const tip1X = sT1.x - uSDir1.x * 3.5;
+			const tip1Y = sT1.y - uSDir1.y * 3.5;
+			drawArrow(tip1X, tip1Y, uSDir1.x, uSDir1.y);
+			this.chamferGizmoHandles.push({
+				type: 'dist1',
+				screenX: tip1X - uSDir1.x * 8,
+				screenY: tip1Y - uSDir1.y * 8,
+				worldPos: res.t1,
+				dir: cand.dir1,
+				currentValue: res.dist1,
+			});
+
+			const tip2X = sT2.x - uSDir2.x * 3.5;
+			const tip2Y = sT2.y - uSDir2.y * 3.5;
+			drawArrow(tip2X, tip2Y, uSDir2.x, uSDir2.y);
+			this.chamferGizmoHandles.push({
+				type: 'dist2',
+				screenX: tip2X - uSDir2.x * 8,
+				screenY: tip2Y - uSDir2.y * 8,
+				worldPos: res.t2,
+				dir: cand.dir2,
+				currentValue: res.dist2,
+			});
+		} else if (state.mode === 'distance_angle') {
+			// Mode 3: 1 distance arrow on reference line + 1 angle circle at 100px from reference vertex
+			if (!state.flip) {
+				// Reference line is line 1 (vertex A = T1)
+				const tip1X = sT1.x - uSDir1.x * 3.5;
+				const tip1Y = sT1.y - uSDir1.y * 3.5;
+				drawArrow(tip1X, tip1Y, uSDir1.x, uSDir1.y);
+				this.chamferGizmoHandles.push({
+					type: 'dist1',
+					screenX: tip1X - uSDir1.x * 8,
+					screenY: tip1Y - uSDir1.y * 8,
+					worldPos: res.t1,
+					dir: cand.dir1,
+					currentValue: res.dist1,
+				});
+
+				// Direction along chamfer line from T1 to T2
+				const vChamfer = { x: sT2.x - sT1.x, y: sT2.y - sT1.y };
+				const lenChamfer = Math.hypot(vChamfer.x, vChamfer.y) || 1;
+				const uSChamfer = { x: vChamfer.x / lenChamfer, y: vChamfer.y / lenChamfer };
+
+				// Circle handle at exactly 100px from point A (T1)
+				const circleX = sT1.x + uSChamfer.x * 100;
+				const circleY = sT1.y + uSChamfer.y * 100;
+
+				// Guide line along the angle ray to the circle handle
+				createSvgLine(sT1.x, sT1.y, circleX, circleY, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+
+				// Visual arc showing the angle at T1 between ray towards V and ray towards T2 at 100px
+				const vV = { x: sV.x - sT1.x, y: sV.y - sT1.y };
+				const lenV = Math.hypot(vV.x, vV.y);
+				if (lenV > 1e-4) {
+					const angV = Math.atan2(vV.y, vV.x);
+					const angChamfer = Math.atan2(uSChamfer.y, uSChamfer.x);
+					let diff = angChamfer - angV;
+					while (diff > Math.PI) diff -= 2 * Math.PI;
+					while (diff < -Math.PI) diff += 2 * Math.PI;
+
+					const arcR = 100;
+					const startX = sT1.x + arcR * Math.cos(angV);
+					const startY = sT1.y + arcR * Math.sin(angV);
+					const endX = circleX;
+					const endY = circleY;
+
+					// Guide line along reference arm towards V out to 100px
+					createSvgLine(sT1.x, sT1.y, startX, startY, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+
+					if (Math.abs(diff) > 1e-3) {
+						const sweepFlag = diff > 0 ? 1 : 0;
+						const arcD = `M ${startX} ${startY} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${endX} ${endY}`;
+						createSvgPath(arcD, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+					}
+				}
+
+				// Angle adjustment circle handle (100px from A)
+				createSvgCircle(circleX, circleY, 6, CHAMFER_GIZMO_CIRCLE_ATTRS, this.chamferGroup);
+				this.chamferGizmoHandles.push({
+					type: 'angle',
+					screenX: circleX,
+					screenY: circleY,
+					worldPos: res.t1,
+					currentValue: res.angleDeg,
+				});
+			} else {
+				// Reference line is line 2 (flipped: reference vertex is B = T2)
+				const tip2X = sT2.x - uSDir2.x * 3.5;
+				const tip2Y = sT2.y - uSDir2.y * 3.5;
+				drawArrow(tip2X, tip2Y, uSDir2.x, uSDir2.y);
+				this.chamferGizmoHandles.push({
+					type: 'dist2',
+					screenX: tip2X - uSDir2.x * 8,
+					screenY: tip2Y - uSDir2.y * 8,
+					worldPos: res.t2,
+					dir: cand.dir2,
+					currentValue: res.dist2,
+				});
+
+				// Direction along chamfer line from T2 to T1
+				const vChamfer = { x: sT1.x - sT2.x, y: sT1.y - sT2.y };
+				const lenChamfer = Math.hypot(vChamfer.x, vChamfer.y) || 1;
+				const uSChamfer = { x: vChamfer.x / lenChamfer, y: vChamfer.y / lenChamfer };
+
+				// Circle handle at exactly 100px from point B (T2)
+				const circleX = sT2.x + uSChamfer.x * 100;
+				const circleY = sT2.y + uSChamfer.y * 100;
+
+				// Guide line along the angle ray to the circle handle
+				createSvgLine(sT2.x, sT2.y, circleX, circleY, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+
+				// Visual arc showing the angle at T2 between ray towards V and ray towards T1 at 100px
+				const vV = { x: sV.x - sT2.x, y: sV.y - sT2.y };
+				const lenV = Math.hypot(vV.x, vV.y);
+				if (lenV > 1e-4) {
+					const angV = Math.atan2(vV.y, vV.x);
+					const angChamfer = Math.atan2(uSChamfer.y, uSChamfer.x);
+					let diff = angChamfer - angV;
+					while (diff > Math.PI) diff -= 2 * Math.PI;
+					while (diff < -Math.PI) diff += 2 * Math.PI;
+
+					const arcR = 100;
+					const startX = sT2.x + arcR * Math.cos(angV);
+					const startY = sT2.y + arcR * Math.sin(angV);
+					const endX = circleX;
+					const endY = circleY;
+
+					// Guide line along reference arm towards V out to 100px
+					createSvgLine(sT2.x, sT2.y, startX, startY, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+
+					if (Math.abs(diff) > 1e-3) {
+						const sweepFlag = diff > 0 ? 1 : 0;
+						const arcD = `M ${startX} ${startY} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${endX} ${endY}`;
+						createSvgPath(arcD, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+					}
+				}
+
+				// Angle adjustment circle handle (100px from B)
+				createSvgCircle(circleX, circleY, 6, CHAMFER_GIZMO_CIRCLE_ATTRS, this.chamferGroup);
+				this.chamferGizmoHandles.push({
+					type: 'angle',
+					screenX: circleX,
+					screenY: circleY,
+					worldPos: res.t2,
+					currentValue: res.angleDeg,
+				});
+			}
+		}
+	}
+
 	clearPreviews(): void {
 		this.previewGroup.innerHTML = '';
 		this.overlayGroup.innerHTML = '';
-		this.filletGroup.innerHTML = '';
-		this.filletGizmoHandle = null;
 	}
 
 	renderTooltip(x: number, y: number, textStr: string): void {

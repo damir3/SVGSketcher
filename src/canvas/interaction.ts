@@ -28,6 +28,7 @@ import { showToast } from '../ui/toast';
 import { PolygonPopup } from '../ui/polygon-popup';
 import { FilletPopup } from '../ui/fillet-popup';
 import type { FilletCandidate } from '../math/fillet';
+import type { ChamferMode } from '../math/chamfer';
 import type { GeoCurve } from '../math/intersection';
 import {
 	bsplineToBezier,
@@ -64,6 +65,7 @@ import {
 	BreakTool,
 	DeleteTool,
 	FilletTool,
+	ChamferTool,
 	MirrorTool,
 	CircularPatternTool,
 	RectangularPatternTool,
@@ -199,6 +201,8 @@ export class CanvasInteraction {
 	onSlotModeChange?: (mode: SlotMode) => void;
 	onSplineStateChange?: () => void;
 	onSplineModeChange?: (mode: SplineMode) => void;
+	onChamferStateChange?: () => void;
+	onChamferModeChange?: (mode: ChamferMode) => void;
 	onViewportChange?: () => void;
 
 	gizmoDragState: {
@@ -307,6 +311,24 @@ export class CanvasInteraction {
 				this.updateToolPreview();
 				this.onSplineStateChange?.();
 			}
+		}
+	}
+
+	getChamferTool(): ChamferTool | undefined {
+		return this.tools.get('chamfer') as ChamferTool | undefined;
+	}
+
+	get chamferMode(): ChamferMode {
+		return this.getChamferTool()?.mode ?? 'equal_distance';
+	}
+
+	setChamferMode(mode: ChamferMode): void {
+		const chamferTool = this.getChamferTool();
+		if (chamferTool) {
+			chamferTool.setMode(mode);
+			this.onChamferModeChange?.(mode);
+			this.onChamferStateChange?.();
+			this.render();
 		}
 	}
 
@@ -456,6 +478,13 @@ export class CanvasInteraction {
 		this.tools.set('break', new BreakTool());
 		this.tools.set('delete', new DeleteTool());
 		this.tools.set('fillet', new FilletTool());
+		const chamferTool = new ChamferTool();
+		chamferTool.onModeChange = mode => {
+			this.onChamferModeChange?.(mode);
+			this.onChamferStateChange?.();
+		};
+		chamferTool.onStateChange = () => this.onChamferStateChange?.();
+		this.tools.set('chamfer', chamferTool);
 		const mirrorTool = new MirrorTool();
 		mirrorTool.onStateChange = () => this.onMirrorStateChange?.();
 		this.tools.set('mirror', mirrorTool);
@@ -782,6 +811,15 @@ export class CanvasInteraction {
 			}
 		}
 
+		const chamferTool = this.tools.get('chamfer') as ChamferTool | undefined;
+		if (chamferTool?.popup.isOpen() && chamferTool.candidate) {
+			const sPos = this.viewport.worldToScreen(
+				chamferTool.candidate.vertexPos.x,
+				chamferTool.candidate.vertexPos.y
+			);
+			chamferTool.popup.updatePosition(sPos);
+		}
+
 		this.updateToolPreview();
 	}
 
@@ -1044,6 +1082,27 @@ export class CanvasInteraction {
 						e.preventDefault();
 						this.setSplineMode('control');
 						showToast('Control Point Spline (Alt+2)');
+						return;
+				}
+			} else if (this.activeTool === 'chamfer') {
+				switch (e.code) {
+					case 'Digit1':
+					case 'Numpad1':
+						e.preventDefault();
+						this.setChamferMode('equal_distance');
+						showToast('Equal Distance Chamfer (Alt+1)');
+						return;
+					case 'Digit2':
+					case 'Numpad2':
+						e.preventDefault();
+						this.setChamferMode('two_distance');
+						showToast('Two Distance Chamfer (Alt+2)');
+						return;
+					case 'Digit3':
+					case 'Numpad3':
+						e.preventDefault();
+						this.setChamferMode('distance_angle');
+						showToast('Distance & Angle Chamfer (Alt+3)');
 						return;
 				}
 			}

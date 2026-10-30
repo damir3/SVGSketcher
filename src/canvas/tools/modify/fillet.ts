@@ -19,7 +19,7 @@ export class FilletTool extends BaseTool {
 	pendingFillets: FilletCandidate[] = [];
 	activeFilletId: string | null = null;
 	filletFirstPrimitive: { type: 'line' | 'arc' | 'spline'; id: string; clickPos: Vec2 } | null = null;
-	filletHoverPointId: string | null = null;
+	private hoveredId: string | null = null;
 	filletGizmoDragState: {
 		startMouseWorld: Vec2;
 		startRadius: number;
@@ -117,6 +117,7 @@ export class FilletTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.ctx.sketch.clearSelection();
 		if (this.filletRadius <= 0.1 || !isFinite(this.filletRadius)) {
 			this.filletRadius = 10.0;
 		}
@@ -133,7 +134,6 @@ export class FilletTool extends BaseTool {
 				pendingFillets: this.pendingFillets,
 				activeFilletId: this.activeFilletId,
 				selectedPrimitive1: this.filletFirstPrimitive,
-				hoverPointId: this.filletHoverPointId,
 			},
 		};
 	}
@@ -227,38 +227,44 @@ export class FilletTool extends BaseTool {
 			return;
 		}
 
-		// Hover corner highlight
-		let needsRender = false;
-		if (!this.filletFirstPrimitive) {
-			const nearPt = this.ctx.findPointNear(screen, 16);
-			if (nearPt) {
-				const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, nearPt.id);
-				const newHover = conn.valid ? nearPt.id : null;
-				if (newHover !== this.filletHoverPointId) {
-					this.filletHoverPointId = newHover;
-					needsRender = true;
+		// Corner point & line/curve highlight using standard select-hover (only in selection mode)
+		if (this.pendingFillets.length === 0) {
+			let targetId: string | null = null;
+			if (!this.filletFirstPrimitive) {
+				const nearPt = this.ctx.findPointNear(screen, 16);
+				if (nearPt) {
+					const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, nearPt.id);
+					if (conn.valid) {
+						targetId = nearPt.id;
+					}
 				}
-			} else if (this.filletHoverPointId !== null) {
-				this.filletHoverPointId = null;
-				needsRender = true;
 			}
+
+			if (!targetId) {
+				const hitPrim = this.findFilletPrimitiveNearScreen(screen);
+				if (hitPrim) {
+					targetId = hitPrim.id;
+				}
+			}
+
+			this.updateHoverHighlight(targetId);
 		} else {
-			if (this.filletHoverPointId !== null) {
-				this.filletHoverPointId = null;
-				needsRender = true;
-			}
+			this.updateHoverHighlight(null);
 		}
 
-		// Update cursor
-		if (
+		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
+		const isOverGizmo =
 			this.ctx.renderer.filletGizmoHandle &&
-			dist(screen, { x: this.ctx.renderer.filletGizmoHandle.screenX, y: this.ctx.renderer.filletGizmoHandle.screenY }) <= 20
-		) {
+			dist(screen, { x: this.ctx.renderer.filletGizmoHandle.screenX, y: this.ctx.renderer.filletGizmoHandle.screenY }) <= 20;
+
+		if (this.filletGizmoDragState) {
+			this.ctx.setCursor('grabbing');
+		} else if (isOverGizmo) {
 			this.ctx.setCursor('grab');
-		} else if (this.filletHoverPointId) {
-			this.ctx.setCursor('pointer');
-		} else {
+		} else if (this.pendingFillets.length === 0 || this.filletFirstPrimitive) {
 			this.ctx.setCursor('crosshair');
+		} else {
+			this.ctx.setCursor('default');
 		}
 
 		// Update popup position
@@ -281,10 +287,6 @@ export class FilletTool extends BaseTool {
 					this.popup.updatePosition(sPos);
 				}
 			}
-		}
-
-		if (needsRender) {
-			this.ctx.requestRender();
 		}
 	}
 
@@ -331,6 +333,7 @@ export class FilletTool extends BaseTool {
 	}
 
 	override cancel(): void {
+		this.updateHoverHighlight(null);
 		if (this.filletFirstPrimitive !== null) {
 			this.filletFirstPrimitive = null;
 			this.ctx.requestRender();
@@ -341,11 +344,36 @@ export class FilletTool extends BaseTool {
 		}
 		this.pendingFillets = [];
 		this.activeFilletId = null;
-		this.filletHoverPointId = null;
 		this.filletGizmoDragState = null;
 		this.popup.hide();
 		this.ctx.renderer.clearPreviews();
+		this.ctx?.setCursor(this.defaultCursor);
 		this.ctx.requestRender();
+	}
+
+	clearHover(): void {
+		this.updateHoverHighlight(null);
+	}
+
+	getHoveredId(): string | null {
+		return this.hoveredId;
+	}
+
+	updateHoverHighlight(targetId: string | null): void {
+		if (this.hoveredId === targetId) return;
+		if (this.ctx?.svg && typeof this.ctx.svg.querySelectorAll === 'function') {
+			if (this.hoveredId) {
+				for (const el of Array.from(this.ctx.svg.querySelectorAll(`[data-id="${this.hoveredId}"]`))) {
+					el.classList?.remove?.('select-hover');
+				}
+			}
+			if (targetId) {
+				for (const el of Array.from(this.ctx.svg.querySelectorAll(`[data-id="${targetId}"]`))) {
+					el.classList?.add?.('select-hover');
+				}
+			}
+		}
+		this.hoveredId = targetId;
 	}
 
 	private findFilletPrimitiveNearScreen(screen: Vec2): { type: 'line' | 'arc' | 'spline'; id: string } | null {
@@ -374,6 +402,7 @@ export class FilletTool extends BaseTool {
 			if (this.pendingFillets.length === 0) {
 				this.popup.hide();
 				this.activeFilletId = null;
+				this.ctx.setCursor(this.defaultCursor);
 			} else {
 				this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
 			}
@@ -420,6 +449,7 @@ export class FilletTool extends BaseTool {
 		candidate.result = candidateResult;
 		this.pendingFillets.push(candidate);
 		this.activeFilletId = candidate.id;
+		this.ctx.setCursor('default');
 
 		const sPos = candidate.result
 			? this.ctx.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
@@ -450,6 +480,7 @@ export class FilletTool extends BaseTool {
 			if (this.pendingFillets.length === 0) {
 				this.popup.hide();
 				this.activeFilletId = null;
+				this.ctx.setCursor(this.defaultCursor);
 			} else {
 				this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
 			}
@@ -533,6 +564,7 @@ export class FilletTool extends BaseTool {
 		candidate.result = candidateResult;
 		this.pendingFillets.push(candidate);
 		this.activeFilletId = candidate.id;
+		this.ctx.setCursor('default');
 
 		const sPos = candidate.result
 			? this.ctx.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)

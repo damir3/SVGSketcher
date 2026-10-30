@@ -2,6 +2,7 @@ export * from './trim';
 export * from './break';
 export * from './delete';
 export * from './fillet';
+export * from './chamfer';
 export * from './mirror';
 export * from './circularPattern';
 export * from './rectangularPattern';

@@ -393,6 +393,63 @@ export const FILLET_GIZMO_ARROW_ATTRS: SvgAttrs = {
 	filter: FILTERS.filletGizmoArrow,
 };
 
+// Chamfer Previews & Gizmos
+export const CHAMFER_HIGHLIGHT_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.heavy,
+	opacity: 0.9,
+	fill: 'none',
+	'stroke-linecap': 'round',
+	'pointer-events': 'none',
+};
+
+export const CHAMFER_CUT_LINE_ATTRS: SvgAttrs = {
+	stroke: COLORS.construction,
+	'stroke-width': STROKE_WIDTH.normal,
+	'stroke-dasharray': DASH_ARRAY.ray,
+	fill: 'none',
+	'pointer-events': 'none',
+};
+
+export const CHAMFER_HOVER_POINT_ATTRS: SvgAttrs = {
+	fill: COLORS.guideFaint,
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.normal,
+	'pointer-events': 'none',
+};
+
+export const CHAMFER_GIZMO_ARROW_ATTRS: SvgAttrs = {
+	fill: COLORS.primary,
+	stroke: COLORS.white,
+	'stroke-width': STROKE_WIDTH.dimension,
+	'stroke-linejoin': 'round',
+	class: 'chamfer-gizmo-arrow',
+	filter: FILTERS.filletGizmoArrow,
+};
+
+export const CHAMFER_GIZMO_CIRCLE_ATTRS: SvgAttrs = {
+	fill: COLORS.white,
+	stroke: COLORS.primary,
+	'stroke-width': 2,
+	class: 'chamfer-gizmo-circle',
+	filter: FILTERS.filletGizmoArrow,
+};
+
+export const CHAMFER_GIZMO_ARC_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.dimension,
+	'stroke-dasharray': DASH_ARRAY.filletGizmo,
+	fill: 'none',
+	'pointer-events': 'none',
+};
+
+export const CHAMFER_GIZMO_POINT_ATTRS: SvgAttrs = {
+	fill: COLORS.white,
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.normal,
+	'pointer-events': 'none',
+};
+
 // Snap Indicators
 export const SNAP_POINT_ATTRS: SvgAttrs = {
 	fill: COLORS.pointSnapFill,

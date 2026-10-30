@@ -2,7 +2,6 @@
   <line x1="22.00" y1="22.00" x2="22.00" y2="12.00" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
   <line x1="2.00" y1="2.00" x2="12.00" y2="2.00" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
   <path d="M 12.00 2.00 A 10.00 10.00 0 0 1 22.00 12.00" stroke="#0284c7" stroke-width="2" stroke-linecap="round" fill="none" />
-
-  <circle cx="22" cy="12" r="2.5" fill="#0284c7"/>
-  <circle cx="12" cy="2" r="2.5" fill="#0284c7"/>
+  <circle cx="22" cy="12" r="2" fill="#0284c7" stroke="#0f172a" stroke-width="0.5"/>
+  <circle cx="12" cy="2" r="2" fill="#0284c7" stroke="#0f172a" stroke-width="0.5"/>
 </svg>

@@ -8,6 +8,7 @@ import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
 import type { SplineMode } from '../canvas/tools/primitives/spline';
+import type { ChamferMode } from '../math/chamfer';
 
 export class Sidebar {
 	private container: HTMLElement;
@@ -30,6 +31,8 @@ export class Sidebar {
 			this.interaction.onRectangleStateChange = () => this.render();
 			this.interaction.onSlotStateChange = () => this.render();
 			this.interaction.onSplineStateChange = () => this.render();
+			this.interaction.onChamferStateChange = () => this.render();
+			this.interaction.onChamferModeChange = () => this.render();
 		}
 		this.render();
 	}
@@ -96,6 +99,9 @@ export class Sidebar {
 
 				<!-- Spline Tool Panel (when spline tool is active) -->
 				${this.renderSplineToolCard()}
+
+				<!-- Chamfer Tool Panel (when chamfer tool is active) -->
+				${this.renderChamferToolCard()}
 
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
@@ -227,7 +233,7 @@ export class Sidebar {
 					</button>
 					<button class="slot-mode-btn ${currentMode === 'center_point' ? 'active' : ''}" data-slot-mode="center_point" type="button" title="Center Point Slot (Alt+2)">
 						<span class="slot-mode-icon">${ICONS.slot_center_point}</span>
-						<span class="slot-mode-text">Center Pt</span>
+						<span class="slot-mode-text">Center Point</span>
 					</button>
 					<button class="slot-mode-btn ${currentMode === 'overall' ? 'active' : ''}" data-slot-mode="overall" type="button" title="Overall Slot (Alt+3)">
 						<span class="slot-mode-icon">${ICONS.slot_overall}</span>
@@ -235,7 +241,7 @@ export class Sidebar {
 					</button>
 					<button class="slot-mode-btn ${currentMode === 'three_point_arc' ? 'active' : ''}" data-slot-mode="three_point_arc" type="button" title="3-Point Arc Slot (Alt+4)">
 						<span class="slot-mode-icon">${ICONS.slot_arc_3point}</span>
-						<span class="slot-mode-text">3-Pt Arc</span>
+						<span class="slot-mode-text">3-Point Arc</span>
 					</button>
 					<button class="slot-mode-btn ${currentMode === 'center_point_arc' ? 'active' : ''}" data-slot-mode="center_point_arc" type="button" title="Center Point Arc Slot (Alt+5)">
 						<span class="slot-mode-icon">${ICONS.slot_arc_center}</span>
@@ -348,7 +354,7 @@ export class Sidebar {
 					</button>
 					<button class="spline-mode-btn ${currentMode === 'control' ? 'active' : ''}" data-spline-mode="control" type="button" title="Control Point Spline (Alt+2)">
 						<span class="spline-mode-icon">${ICONS.spline_control}</span>
-						<span class="spline-mode-text">Control Pt</span>
+						<span class="spline-mode-text">Control Point</span>
 					</button>
 				</div>
 				<div class="rectangle-mode-hint spline-mode-hint">
@@ -374,6 +380,63 @@ export class Sidebar {
 			if (count < 4) return `Points: ${count}/4. Click to place ${4 - count} more control point${4 - count > 1 ? 's' : ''}`;
 			return `Points: ${count}. Click to add more, or click ✓ / Enter to finish`;
 		}
+	}
+
+	private renderChamferToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'chamfer') {
+			return '';
+		}
+
+		const chamferTool = this.interaction.getChamferTool();
+		const currentMode = this.interaction.chamferMode;
+
+		const modeIcon =
+			currentMode === 'equal_distance'
+				? ICONS.chamferEqual
+				: currentMode === 'two_distance'
+				? ICONS.chamferTwoDistance
+				: ICONS.chamferDistanceAngle;
+
+		let hint = 'Click a vertex point with 2 lines, or click two lines sharing a vertex.';
+		if (chamferTool) {
+			if (chamferTool.candidate) {
+				hint = 'Corner selected. Drag gizmo arrows or enter values in popup. Press Enter to apply.';
+			} else if (chamferTool.firstLine) {
+				hint = 'First line selected. Click the second line sharing a vertex.';
+			}
+		}
+
+		return `
+			<div class="sidebar-panel-card chamfer-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${modeIcon}</span>
+						<span>Chamfer Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-chamfer-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Select chamfer mode:
+				</div>
+				<div class="chamfer-mode-selector">
+					<button class="chamfer-mode-btn ${currentMode === 'equal_distance' ? 'active' : ''}" data-chamfer-mode="equal_distance" type="button" title="Equal Distance (Alt+1)">
+						<span class="chamfer-mode-icon">${ICONS.chamferEqual}</span>
+						<span class="chamfer-mode-text">Equal</span>
+					</button>
+					<button class="chamfer-mode-btn ${currentMode === 'two_distance' ? 'active' : ''}" data-chamfer-mode="two_distance" type="button" title="Two Distance (Alt+2)">
+						<span class="chamfer-mode-icon">${ICONS.chamferTwoDistance}</span>
+						<span class="chamfer-mode-text">Two Dist</span>
+					</button>
+					<button class="chamfer-mode-btn ${currentMode === 'distance_angle' ? 'active' : ''}" data-chamfer-mode="distance_angle" type="button" title="Distance & Angle (Alt+3)">
+						<span class="chamfer-mode-icon">${ICONS.chamferDistanceAngle}</span>
+						<span class="chamfer-mode-text">Dist & Angle</span>
+					</button>
+				</div>
+				<div class="chamfer-mode-hint">
+					${hint}
+				</div>
+			</div>
+		`;
 	}
 
 	private getArcStepHint(): string {
@@ -466,8 +529,8 @@ export class Sidebar {
 					</button>
 				</div>
 				<div class="mirror-hint">
-					${!mirrorLineId && objCount === 0 
-						? 'Select objects first, then pick a mirror line.' 
+					${!mirrorLineId && objCount === 0
+						? 'Select objects first, then pick a mirror line.'
 						: (!mirrorLineId ? 'Click a centerline in the canvas to reflect across.' : (objCount === 0 ? 'Pick geometry in the canvas to mirror.' : 'Ready to apply! Press Enter or click Apply Mirror.'))}
 				</div>
 			</div>
@@ -586,8 +649,8 @@ export class Sidebar {
 					</button>
 				</div>
 				<div class="mirror-hint">
-					${!centerPointId && objCount === 0 
-						? 'Select objects first, then pick a center point.' 
+					${!centerPointId && objCount === 0
+						? 'Select objects first, then pick a center point.'
 						: (!centerPointId ? 'Click a point in the canvas to set the rotation center.' : (objCount === 0 ? 'Pick geometry in the canvas to pattern.' : 'Ready to apply! Press Enter or click Apply Pattern.'))}
 				</div>
 			</div>
@@ -1302,7 +1365,7 @@ export class Sidebar {
 								<span class="panel-card-icon">${ICONS.circular_pattern}</span>
 								<span>Circular Pattern</span>
 							</div>
-							
+
 							<div class="pattern-params-card in-inspector">
 								<div class="pattern-param-row">
 									<label class="pattern-param-label">Distribution</label>
@@ -2193,6 +2256,25 @@ export class Sidebar {
 
 		const btnSplineCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-spline-cancel-icon');
 		btnSplineCancelIcon?.addEventListener('click', () => {
+			if (this.interaction) {
+				this.interaction.setTool('select');
+			}
+		});
+
+		// Chamfer Tool events
+		const chamferModeBtns = this.container.querySelectorAll<HTMLButtonElement>('.chamfer-mode-btn');
+		chamferModeBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const mode = btn.getAttribute('data-chamfer-mode') as ChamferMode;
+				if (mode && this.interaction) {
+					this.interaction.setChamferMode(mode);
+					this.render();
+				}
+			});
+		});
+
+		const btnChamferCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-chamfer-cancel-icon');
+		btnChamferCancelIcon?.addEventListener('click', () => {
 			if (this.interaction) {
 				this.interaction.setTool('select');
 			}

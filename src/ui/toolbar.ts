@@ -5,6 +5,7 @@ import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
 import type { SplineMode } from '../canvas/tools/primitives/spline';
+import type { ChamferMode } from '../math/chamfer';
 import { showToast } from './toast';
 export { showToast };
 
@@ -23,6 +24,55 @@ export class Toolbar {
 
 	render(): void {
 		this.container.innerHTML = `
+
+		<div class="toolbar-section">
+		<div class="toolbar-title">Create</div>
+			<div class="toolbar-grid">
+				<button class="tool-btn" data-tool="point" title="Point (P)">
+					${ICONS.point}
+					<span class="btn-tooltip">Point (P)</span>
+				</button>
+				<button class="tool-btn" data-tool="line" title="Line (L)">
+					${ICONS.line}
+					<span class="btn-tooltip">Line (L)</span>
+				</button>
+				<button class="tool-btn" data-tool="rectangle" title="2-Point Rectangle (R)">
+					${ICONS.rectangle}
+					<span class="btn-tooltip">2-Point Rectangle (R)</span>
+				</button>
+				<button class="tool-btn" data-tool="circle" title="Circle (C)">
+					${ICONS.circle}
+					<span class="btn-tooltip">Circle (C)</span>
+				</button>
+				<button class="tool-btn" data-tool="polygon" title="Polygon (G)">
+					${ICONS.polygon}
+					<span class="btn-tooltip">Polygon (G)</span>
+				</button>
+				<button class="tool-btn" data-tool="arc" title="Centerpoint Arc (A)">
+					${ICONS.arc_center}
+					<span class="btn-tooltip">Center Arc (A)</span>
+				</button>
+				<button class="tool-btn" data-tool="slot" title="Center-to-Center Slot">
+					${ICONS.slot_center_to_center}
+					<span class="btn-tooltip">Center-to-Center Slot</span>
+				</button>
+				<button class="tool-btn" data-tool="spline" title="Fit Point Spline">
+					${ICONS.spline_fit}
+					<span class="btn-tooltip">Fit Spline</span>
+				</button>
+				<button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
+					${ICONS.ellipse}
+					<span class="btn-tooltip">Ellipse (E)</span>
+				</button>
+				<button class="tool-btn" data-tool="elliptical_arc" title="Elliptical Arc">
+					${ICONS.elliptical_arc}
+					<span class="btn-tooltip">Elliptical Arc</span>
+				</button>
+			</div>
+		</div>
+
+		<div class="toolbar-divider"></div>
+
 			<div class="toolbar-section">
 				<div class="toolbar-title">Tools</div>
 				<div class="toolbar-grid">
@@ -54,6 +104,10 @@ export class Toolbar {
 						${ICONS.fillet}
 						<span class="btn-tooltip">Fillet</span>
 					</button>
+					<button class="tool-btn" data-tool="chamfer" id="tool-chamfer" title="Chamfer">
+						${ICONS.chamferEqual}
+						<span class="btn-tooltip">Chamfer</span>
+					</button>
 					<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
 						${ICONS.mirror}
 						<span class="btn-tooltip">Mirror (M)</span>
@@ -65,54 +119,6 @@ export class Toolbar {
 					<button class="tool-btn" data-tool="rectangular_pattern" id="tool-rectangular-pattern" title="Rectangular Pattern">
 						${ICONS.rectangular_pattern}
 						<span class="btn-tooltip">Rectangular Pattern</span>
-					</button>
-				</div>
-			</div>
-
-			<div class="toolbar-divider"></div>
-
-			<div class="toolbar-section">
-				<div class="toolbar-title">Draw</div>
-				<div class="toolbar-grid">
-					<button class="tool-btn" data-tool="point" title="Point (P)">
-						${ICONS.point}
-						<span class="btn-tooltip">Point (P)</span>
-					</button>
-					<button class="tool-btn" data-tool="line" title="Line (L)">
-						${ICONS.line}
-						<span class="btn-tooltip">Line (L)</span>
-					</button>
-					<button class="tool-btn" data-tool="rectangle" title="2-Point Rectangle (R)">
-						${ICONS.rectangle}
-						<span class="btn-tooltip">2-Point Rectangle (R)</span>
-					</button>
-					<button class="tool-btn" data-tool="circle" title="Circle (C)">
-						${ICONS.circle}
-						<span class="btn-tooltip">Circle (C)</span>
-					</button>
-					<button class="tool-btn" data-tool="polygon" title="Polygon (G)">
-						${ICONS.polygon}
-						<span class="btn-tooltip">Polygon (G)</span>
-					</button>
-					<button class="tool-btn" data-tool="arc" title="Centerpoint Arc (A)">
-						${ICONS.arc_center}
-						<span class="btn-tooltip">Center Arc (A)</span>
-					</button>
-					<button class="tool-btn" data-tool="slot" title="Center-to-Center Slot">
-						${ICONS.slot_center_to_center}
-						<span class="btn-tooltip">Center-to-Center Slot</span>
-					</button>
-					<button class="tool-btn" data-tool="spline" title="Fit Point Spline">
-						${ICONS.spline_fit}
-						<span class="btn-tooltip">Fit Spline</span>
-					</button>
-					<button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
-						${ICONS.ellipse}
-						<span class="btn-tooltip">Ellipse (E)</span>
-					</button>
-					<button class="tool-btn" data-tool="elliptical_arc" title="Elliptical Arc">
-						${ICONS.elliptical_arc}
-						<span class="btn-tooltip">Elliptical Arc</span>
 					</button>
 				</div>
 			</div>
@@ -327,6 +333,31 @@ export class Toolbar {
 
 		splineBtn.title = title;
 		splineBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${tooltip}</span>
+		`;
+	}
+
+	setChamferMode(mode: ChamferMode): void {
+		const chamferBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="chamfer"]');
+		if (!chamferBtn) return;
+
+		let icon = ICONS.chamferEqual;
+		let title = 'Equal Distance Chamfer';
+		let tooltip = 'Equal Chamfer';
+
+		if (mode === 'two_distance') {
+			icon = ICONS.chamferTwoDistance;
+			title = 'Two Distance Chamfer';
+			tooltip = 'Two Dist Chamfer';
+		} else if (mode === 'distance_angle') {
+			icon = ICONS.chamferDistanceAngle;
+			title = 'Distance and Angle Chamfer';
+			tooltip = 'Dist & Angle Chamfer';
+		}
+
+		chamferBtn.title = title;
+		chamferBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${tooltip}</span>
 		`;
