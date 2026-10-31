@@ -27,6 +27,9 @@ import fillet from '../assets/icons/fillet.svg?raw';
 import chamferEqual from '../assets/icons/chamfer-equal.svg?raw';
 import chamferTwoDistance from '../assets/icons/chamfer-two-distance.svg?raw';
 import chamferDistanceAngle from '../assets/icons/chamfer-distance-angle.svg?raw';
+import offsetOneSide from '../assets/icons/offset-one-side.svg?raw';
+import offsetTwoSides from '../assets/icons/offset-two-sides.svg?raw';
+import offsetSymmetric from '../assets/icons/offset-symmetric.svg?raw';
 import breakIcon from '../assets/icons/break.svg?raw';
 import mirror from '../assets/icons/mirror.svg?raw';
 import circularPattern from '../assets/icons/circular-pattern.svg?raw';
@@ -92,6 +95,9 @@ export const ICONS = {
 	chamferEqual,
 	chamferTwoDistance,
 	chamferDistanceAngle,
+	offsetOneSide,
+	offsetTwoSides,
+	offsetSymmetric,
 	break: breakIcon,
 	mirror,
 	circular_pattern: circularPattern,

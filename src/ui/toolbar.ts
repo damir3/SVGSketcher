@@ -6,6 +6,7 @@ import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
 import type { SplineMode } from '../canvas/tools/primitives/spline';
 import type { ChamferMode } from '../math/chamfer';
+import type { OffsetDirection } from '../math/offset';
 import { showToast } from './toast';
 export { showToast };
 
@@ -107,6 +108,10 @@ export class Toolbar {
 					<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
 						${ICONS.fillet}
 						<span class="btn-tooltip">Fillet</span>
+					</button>
+					<button class="tool-btn" data-tool="offset" id="tool-offset" title="Offset (O)">
+						${ICONS.offsetOneSide}
+						<span class="btn-tooltip">Offset (O)</span>
 					</button>
 					<button class="tool-btn" data-tool="circular_pattern" id="tool-circular-pattern" title="Circular Pattern">
 						${ICONS.circular_pattern}
@@ -358,6 +363,31 @@ export class Toolbar {
 
 		chamferBtn.title = title;
 		chamferBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${tooltip}</span>
+		`;
+	}
+
+	setOffsetDirection(direction: OffsetDirection): void {
+		const offsetBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="offset"]');
+		if (!offsetBtn) return;
+
+		let icon = ICONS.offsetOneSide;
+		let title = 'One Side Offset';
+		let tooltip = 'One Side';
+
+		if (direction === 'two_sides') {
+			icon = ICONS.offsetTwoSides;
+			title = 'Two Sides Offset';
+			tooltip = 'Two Sides';
+		} else if (direction === 'symmetric') {
+			icon = ICONS.offsetSymmetric;
+			title = 'Symmetric Offset';
+			tooltip = 'Symmetric';
+		}
+
+		offsetBtn.title = title;
+		offsetBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${tooltip}</span>
 		`;

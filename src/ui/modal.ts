@@ -1,11 +1,11 @@
-import type { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint } from '../solver/constraints';
+import type { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, OffsetConstraint } from '../solver/constraints';
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from '../math/vector';
 
 export class DimensionModal {
 	private modalEl: HTMLElement;
 	private sketch: SketchDocument;
-	private currentConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | null = null;
+	private currentConstraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | OffsetConstraint | null = null;
 	private currentMode: 'radius' | 'diameter' = 'radius';
 	private openedTime = 0;
 
@@ -19,7 +19,7 @@ export class DimensionModal {
 		this.bindEvents();
 	}
 
-	open(constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint, screenPos?: Vec2): void {
+	open(constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | OffsetConstraint, screenPos?: Vec2): void {
 		this.currentConstraint = constraint;
 		this.openedTime = performance.now();
 

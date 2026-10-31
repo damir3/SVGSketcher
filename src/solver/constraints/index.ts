@@ -26,3 +26,4 @@ export * from './dragPoint';
 export * from './arcEndpoints';
 export * from './ellipseAxis';
 export * from './ellipticalArcEndpoints';
+export * from './offset';

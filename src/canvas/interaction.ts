@@ -11,6 +11,7 @@ import {
 	HorizontalConstraint,
 	VerticalConstraint,
 	PointToLineDistanceConstraint,
+	OffsetConstraint,
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
 	computeRectangularPatternDirections,
@@ -29,6 +30,7 @@ import { PolygonPopup } from '../ui/polygon-popup';
 import { FilletPopup } from '../ui/fillet-popup';
 import type { FilletCandidate } from '../math/fillet';
 import type { ChamferMode } from '../math/chamfer';
+import type { OffsetDirection } from '../math/offset';
 import type { GeoCurve } from '../math/intersection';
 import {
 	bsplineToBezier,
@@ -67,6 +69,7 @@ import {
 	DeleteTool,
 	FilletTool,
 	ChamferTool,
+	OffsetTool,
 	MirrorTool,
 	CircularPatternTool,
 	RectangularPatternTool,
@@ -184,7 +187,7 @@ export class CanvasInteraction {
 
 	// Dimension edit callback
 	onEditDimension?: (
-		constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint,
+		constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | OffsetConstraint,
 		screenPos: Vec2
 	) => void;
 	onToolChange?: (tool: ToolType) => void;
@@ -205,6 +208,8 @@ export class CanvasInteraction {
 	onSplineModeChange?: (mode: SplineMode) => void;
 	onChamferStateChange?: () => void;
 	onChamferModeChange?: (mode: ChamferMode) => void;
+	onOffsetStateChange?: () => void;
+	onOffsetDirectionChange?: (direction: OffsetDirection) => void;
 	onViewportChange?: () => void;
 
 	gizmoDragState: {
@@ -330,6 +335,37 @@ export class CanvasInteraction {
 			chamferTool.setMode(mode);
 			this.onChamferModeChange?.(mode);
 			this.onChamferStateChange?.();
+			this.render();
+		}
+	}
+
+	getOffsetTool(): OffsetTool | undefined {
+		return this.tools.get('offset') as OffsetTool | undefined;
+	}
+
+	get offsetDirection(): OffsetDirection {
+		return this.getOffsetTool()?.direction ?? 'one_side';
+	}
+
+	setOffsetDirection(direction: OffsetDirection): void {
+		const offsetTool = this.getOffsetTool();
+		if (offsetTool) {
+			offsetTool.setDirection(direction);
+			this.onOffsetDirectionChange?.(direction);
+			this.onOffsetStateChange?.();
+			this.render();
+		}
+	}
+
+	get offsetChainSelection(): boolean {
+		return this.getOffsetTool()?.chainSelection ?? true;
+	}
+
+	setOffsetChainSelection(chainSelection: boolean): void {
+		const offsetTool = this.getOffsetTool();
+		if (offsetTool) {
+			offsetTool.setChainSelection(chainSelection);
+			this.onOffsetStateChange?.();
 			this.render();
 		}
 	}
@@ -487,6 +523,14 @@ export class CanvasInteraction {
 		};
 		chamferTool.onStateChange = () => this.onChamferStateChange?.();
 		this.tools.set('chamfer', chamferTool);
+		const offsetTool = new OffsetTool();
+		offsetTool.onDirectionChange = direction => {
+			this.onOffsetDirectionChange?.(direction);
+			this.onOffsetStateChange?.();
+		};
+		offsetTool.onChainSelectionChange = () => this.onOffsetStateChange?.();
+		offsetTool.onStateChange = () => this.onOffsetStateChange?.();
+		this.tools.set('offset', offsetTool);
 		const mirrorTool = new MirrorTool();
 		mirrorTool.onStateChange = () => this.onMirrorStateChange?.();
 		this.tools.set('mirror', mirrorTool);
@@ -828,6 +872,14 @@ export class CanvasInteraction {
 			chamferTool.popup.updatePosition(sPos);
 		}
 
+		const offsetTool = this.tools.get('offset') as OffsetTool | undefined;
+		if (offsetTool?.popup.isOpen() && offsetTool.geomResult) {
+			const bbox = offsetTool.getGizmoBoundingBox();
+			if (bbox) {
+				offsetTool.popup.updatePosition(bbox);
+			}
+		}
+
 		this.updateToolPreview();
 	}
 
@@ -944,10 +996,6 @@ export class CanvasInteraction {
 		// Prevent default context menu for smooth right-click panning
 		this.svg.addEventListener('contextmenu', e => {
 			e.preventDefault();
-			if (this.activeToolInstance?.isBusy?.()) {
-				this.cancelDrawing();
-				this.setTool('select');
-			}
 		});
 
 		window.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -1117,6 +1165,27 @@ export class CanvasInteraction {
 						showToast('Distance & Angle Chamfer (Alt+3)');
 						return;
 				}
+			} else if (this.activeTool === 'offset') {
+				switch (e.code) {
+					case 'Digit1':
+					case 'Numpad1':
+						e.preventDefault();
+						this.setOffsetDirection('one_side');
+						showToast('One Side Offset (Alt+1)');
+						return;
+					case 'Digit2':
+					case 'Numpad2':
+						e.preventDefault();
+						this.setOffsetDirection('two_sides');
+						showToast('Two Sides Offset (Alt+2)');
+						return;
+					case 'Digit3':
+					case 'Numpad3':
+						e.preventDefault();
+						this.setOffsetDirection('symmetric');
+						showToast('Symmetric Offset (Alt+3)');
+						return;
+				}
 			}
 		}
 
@@ -1182,6 +1251,9 @@ export class CanvasInteraction {
 				return;
 			case 'KeyM':
 				this.setTool('mirror');
+				return;
+			case 'KeyO':
+				this.setTool('offset');
 				return;
 			case 'KeyH':
 				this.setTool('horizontal_vertical');
@@ -2160,6 +2232,7 @@ export class CanvasInteraction {
 					if (
 						constraint instanceof DistanceConstraint ||
 						constraint instanceof PointToLineDistanceConstraint ||
+						constraint instanceof OffsetConstraint ||
 						constraint instanceof AngleConstraint ||
 						constraint instanceof RadiusConstraint
 					) {
@@ -2867,6 +2940,7 @@ export class CanvasInteraction {
 			if (
 				(constraint instanceof DistanceConstraint ||
 					constraint instanceof PointToLineDistanceConstraint ||
+					constraint instanceof OffsetConstraint ||
 					constraint instanceof RadiusConstraint ||
 					constraint instanceof AngleConstraint) &&
 				this.onEditDimension

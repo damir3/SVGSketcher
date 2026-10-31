@@ -3,6 +3,7 @@ export * from './break';
 export * from './delete';
 export * from './fillet';
 export * from './chamfer';
+export * from './offset';
 export * from './mirror';
 export * from './circularPattern';
 export * from './rectangularPattern';

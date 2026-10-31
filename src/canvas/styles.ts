@@ -449,6 +449,41 @@ export const CHAMFER_GIZMO_POINT_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
+// Offset Previews & Gizmos
+export const OFFSET_CHAIN_ATTRS: SvgAttrs = {
+	stroke: COLORS.selected,
+	'stroke-width': 2.5,
+	fill: 'none',
+	'stroke-linecap': 'round',
+	'pointer-events': 'none',
+};
+
+export const OFFSET_PREVIEW_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.thick,
+	'stroke-dasharray': '5 3',
+	fill: 'none',
+	'stroke-linecap': 'round',
+	'pointer-events': 'none',
+};
+
+export const OFFSET_GIZMO_ARROW_ATTRS: SvgAttrs = {
+	fill: COLORS.primary,
+	stroke: COLORS.white,
+	'stroke-width': STROKE_WIDTH.dimension,
+	'stroke-linejoin': 'round',
+	class: 'offset-gizmo-arrow chamfer-gizmo-arrow',
+	filter: FILTERS.filletGizmoArrow,
+};
+
+export const OFFSET_GIZMO_LINE_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.dimension,
+	'stroke-dasharray': DASH_ARRAY.filletGizmo,
+	fill: 'none',
+	'pointer-events': 'none',
+};
+
 // Snap Indicators
 export const SNAP_POINT_ATTRS: SvgAttrs = {
 	fill: COLORS.pointSnapFill,

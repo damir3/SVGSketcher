@@ -23,6 +23,7 @@ import {
 	EllipseAxisConstraint,
 	EllipticalArcEndpointsConstraint,
 	PointToLineDistanceConstraint,
+	OffsetConstraint,
 	SymmetryConstraint,
 	CircularPatternConstraint,
 	type PatternCopyData,
@@ -42,6 +43,8 @@ export interface SerializedConstraint {
 
 	// Specific constraint properties
 	pointId?: string;
+	pairs?: any[];
+	dimPairIndex?: number;
 	targetX?: number;
 	targetY?: number;
 
@@ -124,6 +127,10 @@ export interface SerializedConstraint {
 	distance2?: number;
 	direction2?: 'one_direction' | 'symmetric';
 	isReadOnly?: boolean;
+	sourceChain?: any;
+	direction?: any;
+	flip?: boolean;
+	cornerPointIds?: string[];
 }
 
 export interface SketchSnapshot {
@@ -297,6 +304,14 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.minorAxisPointId = c.minorAxisPointId;
 		base.startPointId = c.startPointId;
 		base.endPointId = c.endPointId;
+	} else if (c instanceof OffsetConstraint) {
+		base.targetDistance = c.targetDistance;
+		base.pairs = JSON.parse(JSON.stringify(c.pairs));
+		base.dimPairIndex = c.dimPairIndex;
+		base.sourceChain = c.sourceChain ? JSON.parse(JSON.stringify(c.sourceChain)) : undefined;
+		base.direction = c.direction;
+		base.flip = c.flip;
+		base.cornerPointIds = c.cornerPointIds ? [...c.cornerPointIds] : undefined;
 	}
 
 	return base;
@@ -482,6 +497,19 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.startPointId!,
 				d.endPointId!,
 				d.weight
+			);
+			break;
+		case 'offset':
+			c = new OffsetConstraint(
+				d.id,
+				d.pairs || [],
+				d.targetDistance ?? d.value ?? 10,
+				d.dimPairIndex ?? 0,
+				d.weight,
+				(d as any).sourceChain,
+				(d as any).direction,
+				(d as any).flip,
+				(d as any).cornerPointIds
 			);
 			break;
 		default:

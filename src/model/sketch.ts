@@ -24,6 +24,7 @@ import {
 	EllipseAxisConstraint,
 	EllipticalArcEndpointsConstraint,
 	PointToLineDistanceConstraint,
+	OffsetConstraint,
 	SymmetryConstraint,
 	CircularPatternConstraint,
 	computePatternCopyAngle,
@@ -49,6 +50,7 @@ import {
 import type { GeoCurve } from '../math/intersection';
 import { dist, type Vec2 } from '../math/vector';
 import { bsplineToBezier, fitPointsToBezier, computeNaturalFitHandles, getSplineSvgPath, type BezierSegment } from '../math/spline';
+import { calculateOffsetGeometry } from '../math/offset';
 import {
 	HistoryManager,
 	type SketchSnapshot,
@@ -2896,6 +2898,41 @@ export class SketchDocument {
 			return true;
 		}
 
+		if (c instanceof OffsetConstraint) {
+			c.targetDistance = Math.abs(newValue);
+			c.value = Math.abs(newValue);
+			c.name = 'Offset';
+
+			if (c.sourceChain) {
+				const newGeom = calculateOffsetGeometry(
+					this,
+					c.sourceChain,
+					c.direction || 'one_side',
+					c.targetDistance,
+					c.targetDistance,
+					c.flip || false
+				);
+				if (newGeom.isValid && newGeom.sides.length > 0) {
+					this.applyOffsetGeometryUpdate(c, newGeom);
+				}
+			} else {
+				for (const pair of c.pairs) {
+					if (pair.kind === 'spline') {
+						for (const sp of pair.points) {
+							const pt = this.points.get(sp.pointId);
+							if (pt && !this.isPointFixed(sp.pointId)) {
+								pt.x = sp.basePos.x + sp.side * c.targetDistance * sp.normal.x;
+								pt.y = sp.basePos.y + sp.side * c.targetDistance * sp.normal.y;
+							}
+						}
+					}
+				}
+			}
+
+			this.solve();
+			return true;
+		}
+
 		if (c instanceof AngleConstraint) {
 			const isArcAngle = c.line1Id === c.line2Id && this.arcs.has(c.line1Id);
 			const maxAngle = isArcAngle ? 359.9 : 179.9;
@@ -2957,6 +2994,87 @@ export class SketchDocument {
 		}
 
 		return false;
+	}
+
+	private applyOffsetGeometryUpdate(c: OffsetConstraint, geom: any): void {
+		if (!geom.sides || !geom.sides.length) return;
+		const side = geom.sides[0];
+		const numPrims = side.primitives.length;
+
+		// 1. Update corner points if present
+		if (c.cornerPointIds && c.cornerPointIds.length > 0) {
+			for (let i = 0; i < c.cornerPointIds.length; i++) {
+				const pt = this.points.get(c.cornerPointIds[i]);
+				if (!pt || this.isPointFixed(pt.id)) continue;
+				const prim = side.primitives[i % numPrims];
+				const pos = prim.type === 'line' ? prim.p1 : prim.type === 'arc' ? prim.start : prim.fitPoints?.[0];
+				if (pos) {
+					pt.x = pos.x;
+					pt.y = pos.y;
+				}
+			}
+		}
+
+		// 2. Update primitives
+		for (let i = 0; i < numPrims; i++) {
+			const prim = side.primitives[i];
+			const pair = c.pairs[i];
+			if (!pair) continue;
+
+			if (pair.kind === 'line') {
+				if (numPrims === 1 && prim.p1 && prim.p2) {
+					const p1 = this.points.get(pair.offP1Id);
+					const p2 = this.points.get(pair.offP2Id);
+					if (p1 && !this.isPointFixed(p1.id)) {
+						p1.x = prim.p1.x;
+						p1.y = prim.p1.y;
+					}
+					if (p2 && !this.isPointFixed(p2.id)) {
+						p2.x = prim.p2.x;
+						p2.y = prim.p2.y;
+					}
+				}
+			} else if (pair.kind === 'circle') {
+				const circ = this.circles.get(pair.offId);
+				if (circ && prim.circleRadius) circ.radius = prim.circleRadius;
+				const arc = this.arcs.get(pair.offId);
+				if (arc && prim.radius) arc.radius = prim.radius;
+			} else if (pair.kind === 'spline') {
+				const spline = this.splines.get(pair.offSplineId);
+				if (spline && prim.fitPoints) {
+					const ptsCount = spline.pointIds.length;
+					const startIdx = numPrims > 1 ? 1 : 0;
+					const endIdx = numPrims > 1 ? ptsCount - 1 : ptsCount;
+					for (let k = startIdx; k < endIdx; k++) {
+						const pt = this.points.get(spline.pointIds[k]);
+						if (pt && !this.isPointFixed(pt.id) && prim.fitPoints[k]) {
+							pt.x = prim.fitPoints[k].x;
+							pt.y = prim.fitPoints[k].y;
+						}
+					}
+					// Update tangent handle points
+					const fitPts = spline.pointIds.map(pid => this.points.get(pid)).filter((p): p is SketchPoint => !!p);
+					if (fitPts.length >= 2 && spline.tangentLineIds && spline.tangentLineIds.length > 0) {
+						const handles = prim.handles || computeNaturalFitHandles(fitPts);
+						for (let h = 0; h < spline.tangentLineIds.length; h++) {
+							const tLine = this.lines.get(spline.tangentLineIds[h]);
+							if (tLine && handles[h]) {
+								const h1 = this.points.get(tLine.p1Id);
+								const h2 = this.points.get(tLine.p2Id);
+								if (h1 && !this.isPointFixed(h1.id)) {
+									h1.x = handles[h].h1.x;
+									h1.y = handles[h].h1.y;
+								}
+								if (h2 && !this.isPointFixed(h2.id)) {
+									h2.x = handles[h].h2.x;
+									h2.y = handles[h].h2.y;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	private tryHardSolve(
@@ -4079,6 +4197,16 @@ export class SketchDocument {
 		} else if (c.type === 'elliptical_arc_endpoints') {
 			if (anyC.arcId && this.ellipticalArcs.has(anyC.arcId)) {
 				add(anyC.arcId, 'elliptical_arc');
+			}
+		} else if (c.type === 'offset') {
+			for (const id of c.entityIds) {
+				if (this.lines.has(id)) add(id, 'line');
+				else if (this.circles.has(id)) add(id, 'circle');
+				else if (this.arcs.has(id)) add(id, 'arc');
+				else if (this.ellipses.has(id)) add(id, 'ellipse');
+				else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
+				else if (this.splines.has(id)) add(id, 'spline');
+				else if (this.points.has(id)) add(id, 'point');
 			}
 		}
 

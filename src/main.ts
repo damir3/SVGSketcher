@@ -181,6 +181,15 @@ function initApp(): void {
 		sidebar.render();
 	};
 
+	interaction.onOffsetDirectionChange = direction => {
+		toolbar.setOffsetDirection(direction);
+		sidebar.render();
+	};
+
+	interaction.onOffsetStateChange = () => {
+		sidebar.render();
+	};
+
 	interaction.onConstructionChange = active => {
 		toolbar.setConstructionActive(active);
 	};

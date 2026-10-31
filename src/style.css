@@ -1379,6 +1379,10 @@ html, body {
   stroke: #fff;
 }
 
+.chamfer-mode-btn.active .chamfer-mode-icon svg path[fill="#0284c7"] {
+  fill: #fff;
+}
+
 .chamfer-mode-btn.active .chamfer-mode-icon svg circle[fill="#0284c7"] {
   fill: #fff;
 }
@@ -1497,6 +1501,7 @@ html, body {
 }
 
 .chamfer-gizmo-arrow,
+.offset-gizmo-arrow,
 .chamfer-gizmo-circle {
   cursor: grab;
   transition: transform 0.1s ease, filter 0.15s ease;

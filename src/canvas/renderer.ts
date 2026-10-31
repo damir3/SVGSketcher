@@ -79,6 +79,10 @@ import {
 	CHAMFER_GIZMO_CIRCLE_ATTRS,
 	CHAMFER_GIZMO_ARC_ATTRS,
 	CHAMFER_GIZMO_POINT_ATTRS,
+	OFFSET_CHAIN_ATTRS,
+	OFFSET_PREVIEW_ATTRS,
+	OFFSET_GIZMO_ARROW_ATTRS,
+	OFFSET_GIZMO_LINE_ATTRS,
 	SNAP_POINT_ATTRS,
 	SNAP_GRID_ATTRS,
 	SNAP_OBJECT_ATTRS,
@@ -149,6 +153,23 @@ export interface RenderOptions {
 		mode: import('../math/chamfer').ChamferMode;
 		flip: boolean;
 	};
+	offsetState?: {
+		chain: import('../math/offset').OffsetChain | null;
+		geomResult: import('../math/offset').OffsetGeometryResult | null;
+		direction: import('../math/offset').OffsetDirection;
+		dist1: number;
+		dist2: number;
+		flip: boolean;
+	};
+}
+
+export interface OffsetGizmoHandle {
+	type: 'dist1' | 'dist2';
+	screenX: number;
+	screenY: number;
+	worldPos: Vec2;
+	normal: Vec2;
+	currentValue: number;
 }
 
 export interface ChamferGizmoHandle {
@@ -173,6 +194,7 @@ export class SVGRenderer {
 	readonly patternCheckboxPositions = new Map<string, { x: number; y: number; copyIndex: number; constraintId?: string }>();
 	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
 	readonly chamferGizmoHandles: ChamferGizmoHandle[] = [];
+	readonly offsetGizmoHandles: OffsetGizmoHandle[] = [];
 	filletGizmoHandle: {
 		screenX: number;
 		screenY: number;
@@ -185,6 +207,7 @@ export class SVGRenderer {
 	private overlayGroup: SVGGElement;
 	private filletGroup: SVGGElement;
 	private chamferGroup: SVGGElement;
+	private offsetGroup: SVGGElement;
 
 	constructor(svgElement: SVGSVGElement) {
 		this.svg = svgElement;
@@ -211,6 +234,7 @@ export class SVGRenderer {
 
 		this.filletGroup = this.createGroup('fillet-layer');
 		this.chamferGroup = this.createGroup('chamfer-layer');
+		this.offsetGroup = this.createGroup('offset-layer');
 
 		this.previewGroup = this.createGroup('preview-layer');
 		this.previewGroup.style.pointerEvents = 'none';
@@ -227,6 +251,7 @@ export class SVGRenderer {
 		this.svg.appendChild(this.patternCheckboxGroup);
 		this.svg.appendChild(this.filletGroup);
 		this.svg.appendChild(this.chamferGroup);
+		this.svg.appendChild(this.offsetGroup);
 		this.svg.appendChild(this.previewGroup);
 		this.svg.appendChild(this.overlayGroup);
 	}
@@ -304,6 +329,11 @@ export class SVGRenderer {
 		this.chamferGroup.innerHTML = '';
 		if (options.chamferState) {
 			this.renderChamferPreviews(sketch, viewport, options.chamferState);
+		}
+		this.offsetGizmoHandles.length = 0;
+		this.offsetGroup.innerHTML = '';
+		if (options.offsetState) {
+			this.renderOffsetPreviews(sketch, viewport, options.offsetState);
 		}
 	}
 
@@ -2491,6 +2521,190 @@ export class SVGRenderer {
 					currentValue: res.angleDeg,
 				});
 			}
+		}
+	}
+
+	renderOffsetPreviews(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		state: NonNullable<RenderOptions['offsetState']>
+	): void {
+		const { chain, geomResult, direction, dist1, dist2, flip } = state;
+		if (!chain || !geomResult) return;
+
+		// 1. Highlight the selected chain primitives
+		for (const it of chain.items) {
+			if (it.type === 'line') {
+				const l = sketch.lines.get(it.id);
+				if (l) {
+					const p1 = sketch.points.get(l.p1Id);
+					const p2 = sketch.points.get(l.p2Id);
+					if (p1 && p2) {
+						const s1 = viewport.worldToScreen(p1.x, p1.y);
+						const s2 = viewport.worldToScreen(p2.x, p2.y);
+						createSvgLine(s1.x, s1.y, s2.x, s2.y, OFFSET_CHAIN_ATTRS, this.offsetGroup);
+					}
+				}
+			} else if (it.type === 'circle') {
+				const c = sketch.circles.get(it.id);
+				if (c) {
+					const center = sketch.points.get(c.centerId);
+					if (center) {
+						const sc = viewport.worldToScreen(center.x, center.y);
+						createSvgCircle(sc.x, sc.y, c.radius * viewport.zoom, OFFSET_CHAIN_ATTRS, this.offsetGroup);
+					}
+				}
+			} else if (it.type === 'arc') {
+				const a = sketch.arcs.get(it.id);
+				if (a) {
+					const center = sketch.points.get(a.centerId);
+					const start = sketch.points.get(a.startPointId);
+					const end = sketch.points.get(a.endPointId);
+					if (center && start && end) {
+						const sc = viewport.worldToScreen(center.x, center.y);
+						const ss = viewport.worldToScreen(start.x, start.y);
+						const se = viewport.worldToScreen(end.x, end.y);
+						const d = getArcSvgPath(sc, ss, se, a.radius * viewport.zoom, !!a.clockwise);
+						createSvgPath(d, OFFSET_CHAIN_ATTRS, this.offsetGroup);
+					}
+				}
+			} else if (it.type === 'ellipse') {
+				const el = sketch.ellipses.get(it.id);
+				if (el) {
+					const center = sketch.points.get(el.centerId);
+					const maj = sketch.points.get(el.majorAxisPointId);
+					const min = sketch.points.get(el.minorAxisPointId);
+					if (center && maj && min) {
+						const sc = viewport.worldToScreen(center.x, center.y);
+						const rx = Math.hypot(maj.x - center.x, maj.y - center.y) * viewport.zoom;
+						const ry = Math.hypot(min.x - center.x, min.y - center.y) * viewport.zoom;
+						const thetaDeg = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
+						createSvgEllipse(sc.x, sc.y, rx, ry, {
+							transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+							...OFFSET_CHAIN_ATTRS,
+						}, this.offsetGroup);
+					}
+				}
+			} else if (it.type === 'elliptical_arc') {
+				const ea = sketch.ellipticalArcs.get(it.id);
+				if (ea) {
+					const center = sketch.points.get(ea.centerId);
+					const maj = sketch.points.get(ea.majorAxisPointId);
+					const min = sketch.points.get(ea.minorAxisPointId);
+					const start = sketch.points.get(ea.startPointId);
+					const end = sketch.points.get(ea.endPointId);
+					if (center && maj && min && start && end) {
+						const sc = viewport.worldToScreen(center.x, center.y);
+						const smaj = viewport.worldToScreen(maj.x, maj.y);
+						const smin = viewport.worldToScreen(min.x, min.y);
+						const ss = viewport.worldToScreen(start.x, start.y);
+						const se = viewport.worldToScreen(end.x, end.y);
+						const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, !!ea.clockwise);
+						createSvgPath(d, OFFSET_CHAIN_ATTRS, this.offsetGroup);
+					}
+				}
+			} else if (it.type === 'spline') {
+				const s = sketch.splines.get(it.id);
+				if (s) {
+					const geo = s.toGeoCurve(sketch);
+					if (geo && geo.bezierSegments.length > 0) {
+						const d = getSplineSvgPath(geo.bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!s.isClosed);
+						createSvgPath(d, OFFSET_CHAIN_ATTRS, this.offsetGroup);
+					}
+				}
+			}
+		}
+
+		// 2. Render computed offset curves for each side
+		for (const side of geomResult.sides) {
+			for (const prim of side.primitives) {
+				if (prim.type === 'line' && prim.p1 && prim.p2) {
+					const s1 = viewport.worldToScreen(prim.p1.x, prim.p1.y);
+					const s2 = viewport.worldToScreen(prim.p2.x, prim.p2.y);
+					createSvgLine(s1.x, s1.y, s2.x, s2.y, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
+				} else if (prim.type === 'circle' && prim.circleCenter && prim.circleRadius) {
+					const sc = viewport.worldToScreen(prim.circleCenter.x, prim.circleCenter.y);
+					createSvgCircle(sc.x, sc.y, prim.circleRadius * viewport.zoom, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
+				} else if (prim.type === 'arc' && prim.center && prim.start && prim.end && prim.radius) {
+					const sc = viewport.worldToScreen(prim.center.x, prim.center.y);
+					const ss = viewport.worldToScreen(prim.start.x, prim.start.y);
+					const se = viewport.worldToScreen(prim.end.x, prim.end.y);
+					const d = getArcSvgPath(sc, ss, se, prim.radius * viewport.zoom, !!prim.clockwise);
+					createSvgPath(d, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
+				} else if (prim.type === 'spline' && prim.fitPoints && prim.fitPoints.length >= 2) {
+					const beziers = fitPointsToBezier(prim.fitPoints, prim.handles);
+					const d = getSplineSvgPath(beziers, p => viewport.worldToScreen(p.x, p.y), !!prim.isSplineClosed);
+					createSvgPath(d, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
+				}
+			}
+		}
+
+		// 3. Helper to draw arrow
+		const drawArrow = (tipX: number, tipY: number, dirX: number, dirY: number) => {
+			const arrowLen = 16;
+			const arrowHalfWidth = 6.5;
+			const apx = -dirY;
+			const apy = dirX;
+			const baseCenterX = tipX - arrowLen * dirX;
+			const baseCenterY = tipY - arrowLen * dirY;
+			const b1X = baseCenterX + arrowHalfWidth * apx;
+			const b1Y = baseCenterY + arrowHalfWidth * apy;
+			const b2X = baseCenterX - arrowHalfWidth * apx;
+			const b2Y = baseCenterY - arrowHalfWidth * apy;
+			const arrowPath = `M ${tipX} ${tipY} L ${b1X} ${b1Y} L ${b2X} ${b2Y} Z`;
+			createSvgPath(arrowPath, OFFSET_GIZMO_ARROW_ATTRS, this.offsetGroup);
+		};
+
+		// 4. Render gizmo arrow(s) at gizmoAnchor along gizmoNormal
+		const anchor = geomResult.gizmoAnchor;
+		const norm = geomResult.gizmoNormal;
+		const sAnchor = viewport.worldToScreen(anchor.x, anchor.y);
+
+		const renderGizmoArrowForSide = (
+			type: 'dist1' | 'dist2',
+			offsetVal: number,
+			sign: number
+		) => {
+			const targetWorld = {
+				x: anchor.x + sign * offsetVal * norm.x,
+				y: anchor.y + sign * offsetVal * norm.y,
+			};
+			const sTarget = viewport.worldToScreen(targetWorld.x, targetWorld.y);
+
+			// Screen direction from anchor to target
+			const vDir = { x: sTarget.x - sAnchor.x, y: sTarget.y - sAnchor.y };
+			const lenDir = Math.hypot(vDir.x, vDir.y) || 1;
+			const uDir = { x: vDir.x / lenDir, y: vDir.y / lenDir };
+
+			// Dashed guide line from anchor to target
+			createSvgLine(sAnchor.x, sAnchor.y, sTarget.x, sTarget.y, OFFSET_GIZMO_LINE_ATTRS, this.offsetGroup);
+
+			// Tip points towards sTarget
+			const tipX = sTarget.x;
+			const tipY = sTarget.y;
+			drawArrow(tipX, tipY, uDir.x, uDir.y);
+
+			this.offsetGizmoHandles.push({
+				type,
+				screenX: tipX - uDir.x * 8,
+				screenY: tipY - uDir.y * 8,
+				worldPos: targetWorld,
+				normal: { x: sign * norm.x, y: sign * norm.y },
+				currentValue: offsetVal,
+			});
+		};
+
+		if (direction === 'one_side') {
+			const sign = flip ? -1 : 1;
+			renderGizmoArrowForSide('dist1', dist1, sign);
+		} else if (direction === 'two_sides') {
+			const sign1 = !flip ? 1 : -1;
+			const sign2 = !flip ? -1 : 1;
+			renderGizmoArrowForSide('dist1', dist1, sign1);
+			renderGizmoArrowForSide('dist2', dist2, sign2);
+		} else if (direction === 'symmetric') {
+			renderGizmoArrowForSide('dist1', dist1, 1);
+			renderGizmoArrowForSide('dist1', dist1, -1);
 		}
 	}
 

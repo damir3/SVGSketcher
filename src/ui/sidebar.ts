@@ -1,7 +1,7 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
-import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, CircularPatternConstraint, RectangularPatternConstraint } from '../solver/constraints';
+import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, OffsetConstraint, CircularPatternConstraint, RectangularPatternConstraint } from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
@@ -15,7 +15,7 @@ export class Sidebar {
 	private sketch: SketchDocument;
 	private interaction?: CanvasInteraction;
 
-	onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint) => void;
+	onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | OffsetConstraint) => void;
 
 	constructor(container: HTMLElement, sketch: SketchDocument, interaction?: CanvasInteraction) {
 		this.container = container;
@@ -33,6 +33,8 @@ export class Sidebar {
 			this.interaction.onSplineStateChange = () => this.render();
 			this.interaction.onChamferStateChange = () => this.render();
 			this.interaction.onChamferModeChange = () => this.render();
+			this.interaction.onOffsetStateChange = () => this.render();
+			this.interaction.onOffsetDirectionChange = () => this.render();
 		}
 		this.render();
 	}
@@ -102,6 +104,9 @@ export class Sidebar {
 
 				<!-- Chamfer Tool Panel (when chamfer tool is active) -->
 				${this.renderChamferToolCard()}
+
+				<!-- Offset Tool Panel (when offset tool is active) -->
+				${this.renderOffsetToolCard()}
 
 				<!-- Selected item inspector -->
 				${this.renderInspector()}
@@ -433,6 +438,71 @@ export class Sidebar {
 					</button>
 				</div>
 				<div class="chamfer-mode-hint">
+					${hint}
+				</div>
+			</div>
+		`;
+	}
+
+	private renderOffsetToolCard(): string {
+		if (!this.interaction || this.interaction.activeTool !== 'offset') {
+			return '';
+		}
+
+		const offsetTool = this.interaction.getOffsetTool();
+		const currentDir = this.interaction.offsetDirection;
+		const chainSelection = this.interaction.offsetChainSelection;
+
+		const dirIcon =
+			currentDir === 'one_side'
+				? ICONS.offsetOneSide
+				: currentDir === 'two_sides'
+				? ICONS.offsetTwoSides
+				: ICONS.offsetSymmetric;
+
+		let hint = 'Click a curve to start chain.';
+		if (offsetTool && offsetTool.chain) {
+			const count = offsetTool.chain.items.length;
+			if (offsetTool.chain.isClosed) {
+				hint = `Closed loop (${count} items). Drag arrow or enter values. Enter to commit.`;
+			} else {
+				hint = `Open chain (${count} items). Click connected curve or press Enter to commit.`;
+			}
+		}
+
+		return `
+			<div class="sidebar-panel-card chamfer-tool-card offset-tool-card">
+				<div class="panel-card-header">
+					<div class="panel-card-title">
+						<span class="panel-card-icon">${dirIcon}</span>
+						<span>Offset Tool</span>
+					</div>
+					<button class="btn-panel-close" id="btn-offset-cancel-icon" title="Cancel (Esc)">✕</button>
+				</div>
+				<div class="panel-card-desc">
+					Select direction:
+				</div>
+				<div class="chamfer-mode-selector">
+					<button class="chamfer-mode-btn ${currentDir === 'one_side' ? 'active' : ''}" data-offset-direction="one_side" type="button" title="One Side (Alt+1)">
+						<span class="chamfer-mode-icon">${ICONS.offsetOneSide}</span>
+						<span class="chamfer-mode-text">One Side</span>
+					</button>
+					<button class="chamfer-mode-btn ${currentDir === 'two_sides' ? 'active' : ''}" data-offset-direction="two_sides" type="button" title="Two Sides (Alt+2)">
+						<span class="chamfer-mode-icon">${ICONS.offsetTwoSides}</span>
+						<span class="chamfer-mode-text">Two Sides</span>
+					</button>
+					<button class="chamfer-mode-btn ${currentDir === 'symmetric' ? 'active' : ''}" data-offset-direction="symmetric" type="button" title="Symmetric (Alt+3)">
+						<span class="chamfer-mode-icon">${ICONS.offsetSymmetric}</span>
+						<span class="chamfer-mode-text">Symmetric</span>
+					</button>
+				</div>
+				<div style="margin-top: 6px;">
+					<label class="chamfer-checkbox-label">
+						<input type="checkbox" id="offset-chain-selection-checkbox" ${chainSelection ? 'checked' : ''} />
+						<span>Chain selection</span>
+					</label>
+				</div>
+				<div class="chamfer-mode-hint" style="margin-top: 8px;">
 					${hint}
 				</div>
 			</div>
@@ -1523,6 +1593,19 @@ export class Sidebar {
 								</div>
 							</div>
 						`;
+					} else if (c instanceof OffsetConstraint) {
+						title = 'Offset Distance';
+						paramsHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+							</div>
+						`;
 					} else if (c instanceof AngleConstraint) {
 						title = 'Angle';
 						const maxAngle = c.line1Id === c.line2Id && this.sketch.arcs.has(c.line1Id) ? 359.9 : 179.9;
@@ -1822,6 +1905,9 @@ export class Sidebar {
 		} else if (c instanceof PointToLineDistanceConstraint) {
 			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
 			name = 'Point-Line Distance';
+		} else if (c instanceof OffsetConstraint) {
+			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+			name = 'Offset';
 		} else if (c instanceof AngleConstraint) {
 			valBadge = `<span class="val-badge">${c.targetAngle.toFixed(1)}°</span>`;
 			name = 'Angle';
@@ -2103,7 +2189,7 @@ export class Sidebar {
 					this.sketch.selectEntity(id, 'elliptical_arc', false);
 				} else if (type === 'constraint') {
 					const c = this.sketch.constraints.get(id);
-					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint || c instanceof PointToLineDistanceConstraint)) {
+					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint || c instanceof PointToLineDistanceConstraint || c instanceof OffsetConstraint)) {
 						this.sketch.selectEntity(c.id, 'constraint', false);
 						this.onEditDimension?.(c);
 					}
@@ -2275,6 +2361,33 @@ export class Sidebar {
 
 		const btnChamferCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-chamfer-cancel-icon');
 		btnChamferCancelIcon?.addEventListener('click', () => {
+			if (this.interaction) {
+				this.interaction.setTool('select');
+			}
+		});
+
+		// Offset Tool events
+		const offsetDirBtns = this.container.querySelectorAll<HTMLButtonElement>('[data-offset-direction]');
+		offsetDirBtns.forEach(btn => {
+			btn.addEventListener('click', () => {
+				const dir = btn.getAttribute('data-offset-direction') as any;
+				if (dir && this.interaction) {
+					this.interaction.setOffsetDirection(dir);
+					this.render();
+				}
+			});
+		});
+
+		const offsetChainSelectionCheckbox = this.container.querySelector<HTMLInputElement>('#offset-chain-selection-checkbox');
+		offsetChainSelectionCheckbox?.addEventListener('change', () => {
+			if (this.interaction) {
+				this.interaction.setOffsetChainSelection(offsetChainSelectionCheckbox.checked);
+				this.render();
+			}
+		});
+
+		const btnOffsetCancelIcon = this.container.querySelector<HTMLButtonElement>('#btn-offset-cancel-icon');
+		btnOffsetCancelIcon?.addEventListener('click', () => {
 			if (this.interaction) {
 				this.interaction.setTool('select');
 			}

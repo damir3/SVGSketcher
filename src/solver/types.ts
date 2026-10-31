@@ -24,7 +24,8 @@ export type ConstraintType =
 	| 'point_to_line_distance'
 	| 'symmetry'
 	| 'circular_pattern'
-	| 'rectangular_pattern';
+	| 'rectangular_pattern'
+	| 'offset';
 
 export interface ParamRef {
 	id: string;
