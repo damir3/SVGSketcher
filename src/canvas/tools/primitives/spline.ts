@@ -82,7 +82,7 @@ export class SplineTool extends BaseTool {
 
 		let pId: string;
 		let pPos: Vec2;
-		if (snap && snap.type === 'point' && snap.id) {
+		if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 			pId = snap.id;
 			pPos = snap.worldPos;
 		} else {

@@ -15,6 +15,10 @@ export class DeleteTool extends BaseTool {
 		return true;
 	}
 
+	override canHighlight(target: HoverTarget): boolean {
+		return target.id !== 'origin' && target.id !== 'axis_x' && target.id !== 'axis_y';
+	}
+
 	override getHighlightClass(_target: HoverTarget): string {
 		return 'delete-hover';
 	}
@@ -28,6 +32,7 @@ export class DeleteTool extends BaseTool {
 			this.ctx?.highlightManager?.getHoveredTarget() ??
 			findHoverTarget(this.ctx, e.screen, e.raw?.target as SVGElement, this.getHoverTargetOptions());
 		if (!target) return;
+		if (target.id === 'origin' || target.id === 'axis_x' || target.id === 'axis_y') return;
 
 		this.ctx?.highlightManager?.clear();
 		this.ctx.sketch.beginTransaction();

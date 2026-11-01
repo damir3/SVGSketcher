@@ -103,6 +103,9 @@ export class HighlightManager implements IHighlightManager {
 
 		const ctx = this.getToolContext();
 		const exists =
+			this.currentTarget.id === 'origin' ||
+			this.currentTarget.id === 'axis_x' ||
+			this.currentTarget.id === 'axis_y' ||
 			ctx.sketch.points.has(this.currentTarget.id) ||
 			ctx.sketch.lines.has(this.currentTarget.id) ||
 			ctx.sketch.circles.has(this.currentTarget.id) ||

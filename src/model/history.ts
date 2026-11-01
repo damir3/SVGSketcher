@@ -29,6 +29,8 @@ import {
 	type PatternCopyData,
 	RectangularPatternConstraint,
 	type RectangularPatternCopyData,
+	OriginDistanceConstraint,
+	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 
 export interface SerializedConstraint {
@@ -58,6 +60,9 @@ export interface SerializedConstraint {
 	line1Id?: string | null;
 	line2Id?: string | null;
 	lineId?: string;
+	axis?: 'x' | 'y';
+	isCoincident?: boolean;
+	isCollinear?: boolean;
 	side?: number;
 	s1?: number;
 	s2?: number;
@@ -312,6 +317,22 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.direction = c.direction;
 		base.flip = c.flip;
 		base.cornerPointIds = c.cornerPointIds ? [...c.cornerPointIds] : undefined;
+	} else if (c instanceof OriginDistanceConstraint) {
+		base.pointId = c.pointId;
+		base.targetDistance = c.targetDistance;
+		base.orientation = c.orientation;
+		base.side = c.side;
+		base.offset = c.offset;
+		base.isCoincident = c.isCoincident;
+	} else if (c instanceof LineToAxisDistanceConstraint) {
+		base.lineId = c.lineId;
+		base.lineP1Id = c.lineP1Id;
+		base.lineP2Id = c.lineP2Id;
+		base.axis = c.axis;
+		base.targetDistance = c.targetDistance;
+		base.side = c.side;
+		base.offset = c.offset;
+		base.isCollinear = c.isCollinear;
 	}
 
 	return base;
@@ -319,7 +340,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 
 export function deserializeConstraint(d: SerializedConstraint): IConstraint | null {
 	let c: IConstraint | null = null;
-	switch (d.type) {
+	switch (d.type as string) {
 		case 'fixed':
 			c = new FixedConstraint(d.id, d.pointId!, d.targetX ?? 0, d.targetY ?? 0, d.weight);
 			break;
@@ -510,6 +531,44 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				(d as any).direction,
 				(d as any).flip,
 				(d as any).cornerPointIds
+			);
+			break;
+		case 'origin_distance':
+			c = new OriginDistanceConstraint(
+				d.id,
+				d.pointId!,
+				d.targetDistance ?? d.value ?? 0,
+				d.orientation ?? 'aligned',
+				d.offset,
+				d.isCoincident ?? false,
+				d.side ?? 1,
+				d.weight
+			);
+			break;
+		case 'point_to_axis_distance':
+			c = new OriginDistanceConstraint(
+				d.id,
+				d.pointId!,
+				d.targetDistance ?? d.value ?? 0,
+				d.axis === 'x' ? 'vertical' : 'horizontal',
+				d.offset,
+				d.isCoincident ?? false,
+				d.side ?? 1,
+				d.weight
+			);
+			break;
+		case 'line_to_axis_distance':
+			c = new LineToAxisDistanceConstraint(
+				d.id,
+				d.lineId!,
+				d.lineP1Id!,
+				d.lineP2Id!,
+				d.axis ?? 'x',
+				d.targetDistance ?? d.value ?? 0,
+				d.side ?? 1,
+				d.offset,
+				d.isCollinear ?? false,
+				d.weight
 			);
 			break;
 		default:

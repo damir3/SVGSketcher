@@ -102,6 +102,15 @@ export class ConstraintTool extends BaseTool {
 							if (hitEllipticalArc) {
 								id = hitEllipticalArc.id;
 								type = 'elliptical_arc';
+							} else if (this.isEntityCompatibleWithConstraint('line')) {
+								const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
+								if (Math.abs(screen.y - sOrigin.y) <= 18) {
+									id = 'axis_x';
+									type = 'line';
+								} else if (Math.abs(screen.x - sOrigin.x) <= 18) {
+									id = 'axis_y';
+									type = 'line';
+								}
 							}
 						}
 					}
@@ -414,16 +423,32 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'coincident': {
 				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0) {
-					this.ctx.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
-					applied = true;
-					toastMsg = 'Coincident constraint applied';
-				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0) {
-					const c = this.ctx.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-					if (c) {
+					if (pIds.includes('origin')) {
+						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
+						this.ctx.sketch.addOriginCoincidentConstraint(userPtId);
 						applied = true;
-						toastMsg = 'Point on line constraint applied';
+						toastMsg = 'Coincident with (0,0) applied';
 					} else {
-						this.ctx.showToast('Cannot constrain point to this line');
+						this.ctx.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
+						applied = true;
+						toastMsg = 'Coincident constraint applied';
+					}
+				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0) {
+					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
+						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
+						const c = this.ctx.sketch.addPointOnAxisConstraint(pIds[0], axis);
+						if (c) {
+							applied = true;
+							toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
+						}
+					} else {
+						const c = this.ctx.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+						if (c) {
+							applied = true;
+							toastMsg = 'Point on line constraint applied';
+						} else {
+							this.ctx.showToast('Cannot constrain point to this line');
+						}
 					}
 				} else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0) {
 					const c = this.ctx.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
@@ -529,9 +554,19 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'collinear': {
 				if (lIds.length === 2) {
-					this.ctx.sketch.addCollinearConstraint(lIds[0], lIds[1]);
-					applied = true;
-					toastMsg = 'Collinear constraint applied';
+					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
+						const axis = lIds.includes('axis_x') ? 'x' : 'y';
+						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
+						const c = this.ctx.sketch.addLineCollinearWithAxisConstraint(userLineId, axis);
+						if (c) {
+							applied = true;
+							toastMsg = `Line collinear with ${axis.toUpperCase()}-axis`;
+						}
+					} else {
+						this.ctx.sketch.addCollinearConstraint(lIds[0], lIds[1]);
+						applied = true;
+						toastMsg = 'Collinear constraint applied';
+					}
 				}
 				break;
 			}
@@ -557,12 +592,21 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'point_on_line': {
 				if (pIds.length === 1 && lIds.length === 1) {
-					const c = this.ctx.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-					if (c) {
-						applied = true;
-						toastMsg = 'Point on line constraint applied';
+					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
+						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
+						const c = this.ctx.sketch.addPointOnAxisConstraint(pIds[0], axis);
+						if (c) {
+							applied = true;
+							toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
+						}
 					} else {
-						this.ctx.showToast('Cannot constrain point to this line');
+						const c = this.ctx.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+						if (c) {
+							applied = true;
+							toastMsg = 'Point on line constraint applied';
+						} else {
+							this.ctx.showToast('Cannot constrain point to this line');
+						}
 					}
 				}
 				break;

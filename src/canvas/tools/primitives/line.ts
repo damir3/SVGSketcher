@@ -24,7 +24,7 @@ export class LineTool extends BaseTool {
 			sketch.beginTransaction();
 			// Step 1: Start Point
 			let pId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				pId = snap.id;
 				this.startWorldPos = snap.worldPos;
 			} else {
@@ -39,7 +39,7 @@ export class LineTool extends BaseTool {
 		} else {
 			// Step 2: End Point
 			let p2Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId && sketch.points.has(snap.id)) {
 				p2Id = snap.id;
 			} else {
 				let ptPos = snap ? snap.worldPos : world;

@@ -28,6 +28,12 @@ export function findHoverTarget(
 		if (targetEl) {
 			const id = targetEl.getAttribute('data-id');
 			const type = targetEl.getAttribute('data-type');
+			if (id === 'origin' && type === 'point') {
+				return { type: 'point', id: 'origin' };
+			}
+			if ((id === 'axis_x' || id === 'axis_y') && type === 'line') {
+				return { type: 'line', id };
+			}
 			if (type === 'constraint' && id && ctx.sketch.constraints.has(id)) {
 				const c = ctx.sketch.constraints.get(id);
 				if (
@@ -72,6 +78,10 @@ export function findHoverTarget(
 	const pt = ctx.findPointNear(screen, pointRadius);
 	if (pt && (allowSplineHandles || !ctx.sketch.isSplineHandlePoint(pt.id))) {
 		return { type: 'point', id: pt.id };
+	}
+	const sOrigin = ctx.viewport.worldToScreen(0, 0);
+	if (Math.hypot(screen.x - sOrigin.x, screen.y - sOrigin.y) <= pointRadius) {
+		return { type: 'point', id: 'origin' };
 	}
 
 	// 4. Dimensional constraints vs curve geometry by proximity
@@ -144,6 +154,17 @@ export function findHoverTarget(
 			bestDist = d;
 			bestTarget = { type: 'spline', id: spline.id };
 		}
+	}
+
+	const dAxisX = Math.abs(screen.y - sOrigin.y);
+	if (dAxisX < bestDist) {
+		bestDist = dAxisX;
+		bestTarget = { type: 'line', id: 'axis_x' };
+	}
+	const dAxisY = Math.abs(screen.x - sOrigin.x);
+	if (dAxisY < bestDist) {
+		bestDist = dAxisY;
+		bestTarget = { type: 'line', id: 'axis_y' };
 	}
 
 	if (bestTarget) {

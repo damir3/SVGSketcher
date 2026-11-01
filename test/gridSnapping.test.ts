@@ -104,27 +104,27 @@ describe('Grid Snapping & Drag Precision', () => {
 			} as any;
 			const interaction = new CanvasInteraction(fakeSvg, sketch, viewport, renderer);
 
-			// Origin (0,0) on screen is at (400, 300)
-			const originScreen = viewport.worldToScreen(0, 0);
-			assert.equal(originScreen.x, 400);
-			assert.equal(originScreen.y, 300);
+			// Test grid point at (20, 20) in world space (away from origin and axes)
+			const gridPointScreen = viewport.worldToScreen(20, 20);
+			assert.equal(gridPointScreen.x, 480);
+			assert.equal(gridPointScreen.y, 220);
 
-			// Cursor 5px away from (0,0) on screen (within adaptive snap radius of ~9px)
-			const snap = interaction.findSnap(vec(405, 300));
+			// Cursor 5px away from (20,20) on screen (within adaptive snap radius of ~9px)
+			const snap = interaction.findSnap(vec(gridPointScreen.x + 5, gridPointScreen.y));
 			assert.ok(snap, 'Snap should be found');
 			assert.equal(snap.type, 'grid');
-			assert.equal(snap.worldPos.x, 0);
-			assert.equal(snap.worldPos.y, 0);
-			assert.equal(snap.screenPos.x, 400);
-			assert.equal(snap.screenPos.y, 300);
+			assert.equal(snap.worldPos.x, 20);
+			assert.equal(snap.worldPos.y, 20);
+			assert.equal(snap.screenPos.x, 480);
+			assert.equal(snap.screenPos.y, 220);
 
 			// When allowGrid is false, grid snap is suppressed
-			const snapNoGrid = interaction.findSnap(vec(405, 300), undefined, false);
+			const snapNoGrid = interaction.findSnap(vec(gridPointScreen.x + 5, gridPointScreen.y), undefined, false);
 			assert.equal(snapNoGrid, null, 'Grid snap should be suppressed when allowGrid=false');
 
 			// But existing point is still found even when allowGrid=false
-			sketch.addPoint(0, 0);
-			const snapPt = interaction.findSnap(vec(405, 300), undefined, false);
+			sketch.addPoint(20, 20);
+			const snapPt = interaction.findSnap(vec(gridPointScreen.x + 5, gridPointScreen.y), undefined, false);
 			assert.ok(snapPt, 'Point snap should still be found when allowGrid=false');
 			assert.equal(snapPt.type, 'point');
 		} finally {

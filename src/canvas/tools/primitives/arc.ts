@@ -217,7 +217,7 @@ export class ArcTool extends BaseTool {
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
 			let pId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				pId = snap.id;
 				this.startWorldPos = snap.worldPos;
 			} else {
@@ -239,7 +239,7 @@ export class ArcTool extends BaseTool {
 			}
 
 			let p2Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId && sketch.points.has(snap.id)) {
 				p2Id = snap.id;
 				this.arcPoint2WorldPos = snap.worldPos;
 			} else {
@@ -360,7 +360,7 @@ export class ArcTool extends BaseTool {
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
 			let cId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				cId = snap.id;
 				this.centerWorldPos = snap.worldPos;
 			} else {
@@ -382,7 +382,7 @@ export class ArcTool extends BaseTool {
 			}
 
 			let p1Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && sketch.points.has(snap.id)) {
 				p1Id = snap.id;
 				this.arcPoint1WorldPos = snap.worldPos;
 			} else {
@@ -434,7 +434,7 @@ export class ArcTool extends BaseTool {
 			const endWorldY = centerWorld.y + radius * Math.sin(worldAngle);
 
 			let endPointId: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && snap.id !== this.arcPoint1Id) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && snap.id !== this.arcPoint1Id && sketch.points.has(snap.id)) {
 				endPointId = snap.id;
 			} else {
 				const pt = sketch.addPoint(endWorldX, endWorldY);
@@ -594,7 +594,7 @@ export class ArcTool extends BaseTool {
 			}
 
 			let endPointId: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.tangentStartPointId) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.tangentStartPointId && sketch.points.has(snap.id)) {
 				endPointId = snap.id;
 			} else {
 				const pt = sketch.addPoint(p2.x, p2.y);

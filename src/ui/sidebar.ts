@@ -1,7 +1,17 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
-import { DistanceConstraint, RadiusConstraint, AngleConstraint, PointToLineDistanceConstraint, OffsetConstraint, CircularPatternConstraint, RectangularPatternConstraint } from '../solver/constraints';
+import {
+	DistanceConstraint,
+	RadiusConstraint,
+	AngleConstraint,
+	PointToLineDistanceConstraint,
+	OffsetConstraint,
+	CircularPatternConstraint,
+	RectangularPatternConstraint,
+	OriginDistanceConstraint,
+	LineToAxisDistanceConstraint,
+} from '../solver/constraints';
 import { ICONS } from './icons';
 import { dist } from '../math/vector';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
@@ -15,7 +25,16 @@ export class Sidebar {
 	private sketch: SketchDocument;
 	private interaction?: CanvasInteraction;
 
-	onEditDimension?: (constraint: DistanceConstraint | RadiusConstraint | AngleConstraint | PointToLineDistanceConstraint | OffsetConstraint) => void;
+	onEditDimension?: (
+		constraint:
+			| DistanceConstraint
+			| RadiusConstraint
+			| AngleConstraint
+			| PointToLineDistanceConstraint
+			| OffsetConstraint
+			| OriginDistanceConstraint
+			| LineToAxisDistanceConstraint
+	) => void;
 
 	constructor(container: HTMLElement, sketch: SketchDocument, interaction?: CanvasInteraction) {
 		this.container = container;
@@ -943,31 +962,42 @@ export class Sidebar {
 			sel.splineIds.size === 0
 		) {
 			const pid = [...sel.pointIds][0];
-			const pt = this.sketch.points.get(pid);
-			if (pt) {
-				const relatedConstraints = this.sketch.getConstraintsForEntity('point', pt.id);
+			if (pid === 'origin') {
+				const relatedConstraints = this.sketch.getConstraintsForEntity('point', 'origin');
 				detailsHtml = `
 					<div class="inspector-card">
-						<div class="inspector-card-title">${pt.id}</div>
-						<div class="pattern-params-card in-inspector">
-							<div class="pattern-param-row">
-								<label class="pattern-param-label" for="insp-pt-x">X</label>
-								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-pt-x" data-entity-id="${pt.id}" value="${Number(pt.x.toFixed(2))}" step="1" class="pattern-num-input" />
-									<span class="pattern-input-suffix">mm</span>
-								</div>
-							</div>
-							<div class="pattern-param-row">
-								<label class="pattern-param-label" for="insp-pt-y">Y</label>
-								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-pt-y" data-entity-id="${pt.id}" value="${Number(pt.y.toFixed(2))}" step="1" class="pattern-num-input" />
-									<span class="pattern-input-suffix">mm</span>
-								</div>
-							</div>
-						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this point', [pt.id])}
+						<div class="inspector-card-title">Origin (0,0)</div>
+						<div class="inspector-row"><span>Position:</span> <strong>(0.00, 0.00) mm</strong></div>
+						${this.renderConstraintsSublist(relatedConstraints, 'origin', ['origin'])}
 					</div>
 				`;
+			} else {
+				const pt = this.sketch.points.get(pid);
+				if (pt) {
+					const relatedConstraints = this.sketch.getConstraintsForEntity('point', pt.id);
+					detailsHtml = `
+						<div class="inspector-card">
+							<div class="inspector-card-title">${pt.id}</div>
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-pt-x">X</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-pt-x" data-entity-id="${pt.id}" value="${Number(pt.x.toFixed(2))}" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-pt-y">Y</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-pt-y" data-entity-id="${pt.id}" value="${Number(pt.y.toFixed(2))}" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+							</div>
+							${this.renderConstraintsSublist(relatedConstraints, 'this point', [pt.id])}
+						</div>
+					`;
+				}
 			}
 		} else if (
 			sel.lineIds.size === 1 &&
@@ -979,36 +1009,50 @@ export class Sidebar {
 			sel.splineIds.size === 0
 		) {
 			const lid = [...sel.lineIds][0];
-			const line = this.sketch.lines.get(lid);
-			if (line) {
-				const p1 = this.sketch.points.get(line.p1Id);
-				const p2 = this.sketch.points.get(line.p2Id);
-				const lengthVal = p1 && p2 ? Number(dist(p1, p2).toFixed(2)) : 0;
-				const angleVal =
-					p1 && p2 ? Number(((Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI).toFixed(2)) : 0;
-				const relatedConstraints = this.sketch.getConstraintsForEntity('line', line.id);
+			if (lid === 'axis_x' || lid === 'axis_y') {
+				const isX = lid === 'axis_x';
+				const axisName = isX ? 'X-Axis' : 'Y-Axis';
+				const equation = isX ? 'Y = 0' : 'X = 0';
+				const relatedConstraints = this.sketch.getConstraintsForEntity('line', lid);
 				detailsHtml = `
 					<div class="inspector-card">
-						<div class="inspector-card-title">${line.id}</div>
-						<div class="pattern-params-card in-inspector">
-							<div class="pattern-param-row">
-								<label class="pattern-param-label" for="insp-line-length">Length</label>
-								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-line-length" data-entity-id="${line.id}" value="${lengthVal}" min="0.01" step="1" class="pattern-num-input" />
-									<span class="pattern-input-suffix">mm</span>
-								</div>
-							</div>
-							<div class="pattern-param-row">
-								<label class="pattern-param-label" for="insp-line-angle">Angle</label>
-								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-line-angle" data-entity-id="${line.id}" value="${angleVal}" min="-180" max="180" step="1" class="pattern-num-input" />
-									<span class="pattern-input-suffix">°</span>
-								</div>
-							</div>
-						</div>
-						${this.renderConstraintsSublist(relatedConstraints, 'this line', [line.id])}
+						<div class="inspector-card-title">${axisName}</div>
+						<div class="inspector-row"><span>Equation:</span> <strong>${equation}</strong></div>
+						${this.renderConstraintsSublist(relatedConstraints, 'this axis', [lid])}
 					</div>
 				`;
+			} else {
+				const line = this.sketch.lines.get(lid);
+				if (line) {
+					const p1 = this.sketch.points.get(line.p1Id);
+					const p2 = this.sketch.points.get(line.p2Id);
+					const lengthVal = p1 && p2 ? Number(dist(p1, p2).toFixed(2)) : 0;
+					const angleVal =
+						p1 && p2 ? Number(((Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI).toFixed(2)) : 0;
+					const relatedConstraints = this.sketch.getConstraintsForEntity('line', line.id);
+					detailsHtml = `
+						<div class="inspector-card">
+							<div class="inspector-card-title">${line.id}</div>
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-line-length">Length</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-line-length" data-entity-id="${line.id}" value="${lengthVal}" min="0.01" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">mm</span>
+									</div>
+								</div>
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-line-angle">Angle</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-line-angle" data-entity-id="${line.id}" value="${angleVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">°</span>
+									</div>
+								</div>
+							</div>
+							${this.renderConstraintsSublist(relatedConstraints, 'this line', [line.id])}
+						</div>
+					`;
+				}
 			}
 		} else if (
 			sel.circleIds.size === 1 &&
@@ -1235,13 +1279,32 @@ export class Sidebar {
 			sel.splineIds.size === 0
 		) {
 			const pIds = [...sel.pointIds];
+			const hasOrigin = pIds.includes('origin');
+			const title = hasOrigin ? 'Selected: Point & Origin (0,0)' : `Selected: 2 Points (${pIds.join(', ')})`;
+			let distHtml = '';
+			if (hasOrigin) {
+				const userPtId = pIds.find(id => id !== 'origin');
+				const userPt = userPtId ? this.sketch.points.get(userPtId) : undefined;
+				if (userPt) {
+					const dVal = Number(Math.hypot(userPt.x, userPt.y).toFixed(2));
+					distHtml = `<div class="inspector-row"><span>Distance to (0,0):</span> <strong>${dVal} mm</strong></div>`;
+				}
+			} else {
+				const pt1 = this.sketch.points.get(pIds[0]);
+				const pt2 = this.sketch.points.get(pIds[1]);
+				if (pt1 && pt2) {
+					const dVal = Number(dist(pt1, pt2).toFixed(2));
+					distHtml = `<div class="inspector-row"><span>Distance:</span> <strong>${dVal} mm</strong></div>`;
+				}
+			}
 			const related = [...new Set([
 				...this.sketch.getConstraintsForEntity('point', pIds[0]),
 				...this.sketch.getConstraintsForEntity('point', pIds[1]),
 			])];
 			detailsHtml = `
 				<div class="inspector-card">
-					<div class="inspector-card-title">Selected: 2 Points (${pIds.join(', ')})</div>
+					<div class="inspector-card-title">${title}</div>
+					${distHtml}
 					${this.renderConstraintsSublist(related, 'selected points', pIds)}
 				</div>
 			`;
@@ -1255,35 +1318,73 @@ export class Sidebar {
 			sel.splineIds.size === 0
 		) {
 			const lIds = [...sel.lineIds];
-			const l1 = this.sketch.lines.get(lIds[0]);
-			const l2 = this.sketch.lines.get(lIds[1]);
+			const axisId = lIds.find(id => id === 'axis_x' || id === 'axis_y');
+			const userLineId = lIds.find(id => id !== 'axis_x' && id !== 'axis_y');
 			let angleRowHtml = '';
-			if (l1 && l2) {
-				const p1 = this.sketch.points.get(l1.p1Id);
-				const p2 = this.sketch.points.get(l1.p2Id);
-				const p3 = this.sketch.points.get(l2.p1Id);
-				const p4 = this.sketch.points.get(l2.p2Id);
-				if (p1 && p2 && p3 && p4) {
-					const existingAng = [...this.sketch.constraints.values()].find(
-						c =>
-							c instanceof AngleConstraint &&
-							((c.line1Id === l1.id && c.line2Id === l2.id) ||
-								(c.line1Id === l2.id && c.line2Id === l1.id))
-					) as AngleConstraint | undefined;
-					const angleVal = existingAng
-						? Number(existingAng.targetAngle.toFixed(2))
-						: Number(this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4).initialAngleDeg.toFixed(2));
-					angleRowHtml = `
-						<div class="pattern-params-card in-inspector">
-							<div class="pattern-param-row">
-								<label class="pattern-param-label" for="insp-two-lines-angle">Angle</label>
-								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-two-lines-angle" data-line1-id="${l1.id}" data-line2-id="${l2.id}" value="${angleVal}" min="0.1" max="179.9" step="1" class="pattern-num-input" />
-									<span class="pattern-input-suffix">°</span>
+			let cardTitle = `Selected: 2 Lines (${lIds.join(', ')})`;
+
+			if (axisId && userLineId) {
+				const isX = axisId === 'axis_x';
+				cardTitle = `Selected: Line & ${isX ? 'X-Axis' : 'Y-Axis'}`;
+				const userLine = this.sketch.lines.get(userLineId);
+				if (userLine) {
+					const p1 = this.sketch.points.get(userLine.p1Id);
+					const p2 = this.sketch.points.get(userLine.p2Id);
+					if (p1 && p2) {
+						const p3 = { id: axisId, x: 0, y: 0 } as any;
+						const p4 = { id: axisId, x: isX ? 1 : 0, y: isX ? 0 : 1 } as any;
+						const existingAng = [...this.sketch.constraints.values()].find(
+							c =>
+								c instanceof AngleConstraint &&
+								((c.line1Id === userLineId && c.line2Id === axisId) ||
+									(c.line1Id === axisId && c.line2Id === userLineId))
+						) as AngleConstraint | undefined;
+						const angleVal = existingAng
+							? Number(existingAng.targetAngle.toFixed(2))
+							: Number(this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, userLineId, axisId).initialAngleDeg.toFixed(2));
+						angleRowHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-two-lines-angle">Angle</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-two-lines-angle" data-line1-id="${userLineId}" data-line2-id="${axisId}" value="${angleVal}" min="0.1" max="179.9" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">°</span>
+									</div>
 								</div>
 							</div>
-						</div>
-					`;
+						`;
+					}
+				}
+			} else {
+				const l1 = this.sketch.lines.get(lIds[0]);
+				const l2 = this.sketch.lines.get(lIds[1]);
+				if (l1 && l2) {
+					const p1 = this.sketch.points.get(l1.p1Id);
+					const p2 = this.sketch.points.get(l1.p2Id);
+					const p3 = this.sketch.points.get(l2.p1Id);
+					const p4 = this.sketch.points.get(l2.p2Id);
+					if (p1 && p2 && p3 && p4) {
+						const existingAng = [...this.sketch.constraints.values()].find(
+							c =>
+								c instanceof AngleConstraint &&
+								((c.line1Id === l1.id && c.line2Id === l2.id) ||
+									(c.line1Id === l2.id && c.line2Id === l1.id))
+						) as AngleConstraint | undefined;
+						const angleVal = existingAng
+							? Number(existingAng.targetAngle.toFixed(2))
+							: Number(this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4).initialAngleDeg.toFixed(2));
+						angleRowHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="pattern-param-row">
+									<label class="pattern-param-label" for="insp-two-lines-angle">Angle</label>
+									<div class="pattern-input-suffix-wrapper">
+										<input type="number" id="insp-two-lines-angle" data-line1-id="${l1.id}" data-line2-id="${l2.id}" value="${angleVal}" min="0.1" max="179.9" step="1" class="pattern-num-input" />
+										<span class="pattern-input-suffix">°</span>
+									</div>
+								</div>
+							</div>
+						`;
+					}
 				}
 			}
 			const related = [...new Set([
@@ -1292,7 +1393,7 @@ export class Sidebar {
 			])];
 			detailsHtml = `
 				<div class="inspector-card">
-					<div class="inspector-card-title">Selected: 2 Lines (${lIds.join(', ')})</div>
+					<div class="inspector-card-title">${cardTitle}</div>
 					${angleRowHtml}
 					${this.renderConstraintsSublist(related, 'selected lines', lIds)}
 				</div>
@@ -1349,19 +1450,30 @@ export class Sidebar {
 		) {
 			const pid = [...sel.pointIds][0];
 			const lid = [...sel.lineIds][0];
-			const pt = this.sketch.points.get(pid);
-			const line = this.sketch.lines.get(lid);
+			const pt = pid === 'origin' ? { id: 'origin', x: 0, y: 0 } : this.sketch.points.get(pid);
 			let distHtml = '';
-			if (pt && line) {
-				const lp1 = this.sketch.points.get(line.p1Id);
-				const lp2 = this.sketch.points.get(line.p2Id);
-				if (lp1 && lp2) {
-					const dx = lp2.x - lp1.x;
-					const dy = lp2.y - lp1.y;
-					const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
-					const cross = (pt.x - lp1.x) * dy - (pt.y - lp1.y) * dx;
-					const perpDist = Math.abs(cross) / lineLen;
+			let cardTitle = 'Selected: Point & Line';
+
+			if (lid === 'axis_x' || lid === 'axis_y') {
+				const isX = lid === 'axis_x';
+				cardTitle = `Selected: Point & ${isX ? 'X-Axis' : 'Y-Axis'}`;
+				if (pt) {
+					const perpDist = isX ? Math.abs(pt.y) : Math.abs(pt.x);
 					distHtml = `<div class="inspector-row"><span>Perpendicular Distance:</span> <strong>${perpDist.toFixed(1)} mm</strong></div>`;
+				}
+			} else {
+				const line = this.sketch.lines.get(lid);
+				if (pt && line) {
+					const lp1 = this.sketch.points.get(line.p1Id);
+					const lp2 = this.sketch.points.get(line.p2Id);
+					if (lp1 && lp2) {
+						const dx = lp2.x - lp1.x;
+						const dy = lp2.y - lp1.y;
+						const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+						const cross = (pt.x - lp1.x) * dy - (pt.y - lp1.y) * dx;
+						const perpDist = Math.abs(cross) / lineLen;
+						distHtml = `<div class="inspector-row"><span>Perpendicular Distance:</span> <strong>${perpDist.toFixed(1)} mm</strong></div>`;
+					}
 				}
 			}
 			const related = [...new Set([
@@ -1370,7 +1482,7 @@ export class Sidebar {
 			])];
 			detailsHtml = `
 				<div class="inspector-card">
-					<div class="inspector-card-title">Selected: Point & Line</div>
+					<div class="inspector-card-title">${cardTitle}</div>
 					${distHtml}
 					${this.renderConstraintsSublist(related, 'selected entities', [pid, lid])}
 				</div>
@@ -1620,27 +1732,52 @@ export class Sidebar {
 								</div>
 							</div>
 						`;
-					} else if (c instanceof RadiusConstraint) {
-						title = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
-						const val = c.displayMode === 'diameter' ? c.targetRadius * 2 : c.targetRadius;
-						paramsHtml = `
-							<div class="pattern-params-card in-inspector">
-								<div class="pattern-param-row">
-									<label class="pattern-param-label">Mode</label>
-									<div class="pattern-segmented-control">
-										<button type="button" class="seg-btn insp-rad-mode-btn ${c.displayMode !== 'diameter' ? 'active' : ''}" data-mode="radius" data-constraint-id="${c.id}">Radius (R)</button>
-										<button type="button" class="seg-btn insp-rad-mode-btn ${c.displayMode === 'diameter' ? 'active' : ''}" data-mode="diameter" data-constraint-id="${c.id}">Diameter (Ø)</button>
+					} else if (c instanceof OriginDistanceConstraint) {
+						if (c.isCoincident) {
+							title = 'Coincident with Origin (0,0)';
+							paramsHtml = `<div class="inspector-row"><span>Position:</span> <strong>(0.00, 0.00)</strong></div>`;
+						} else if (c.targetDistance === 0) {
+							const axisName = c.orientation === 'vertical' ? 'X-Axis' : 'Y-Axis';
+							title = `Point on ${axisName}`;
+							paramsHtml = `<div class="inspector-row"><span>Axis:</span> <strong>${axisName} (${c.orientation === 'vertical' ? 'Y = 0' : 'X = 0'})</strong></div>`;
+						} else {
+							title =
+								c.orientation === 'horizontal'
+									? 'Distance to Y-Axis'
+									: c.orientation === 'vertical'
+									? 'Distance to X-Axis'
+									: 'Distance to (0,0)';
+							paramsHtml = `
+								<div class="pattern-params-card in-inspector">
+									<div class="pattern-param-row">
+										<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
+										<div class="pattern-input-suffix-wrapper">
+											<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+											<span class="pattern-input-suffix">mm</span>
+										</div>
 									</div>
 								</div>
-								<div class="pattern-param-row">
-									<label class="pattern-param-label" for="insp-constraint-val">${title}</label>
-									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(val.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
-										<span class="pattern-input-suffix">mm</span>
+							`;
+						}
+					} else if (c instanceof LineToAxisDistanceConstraint) {
+						const axisName = c.axis === 'x' ? 'X-Axis' : 'Y-Axis';
+						if (c.isCollinear) {
+							title = `Line Collinear with ${axisName}`;
+							paramsHtml = `<div class="inspector-row"><span>Axis:</span> <strong>${axisName} (${c.axis === 'x' ? 'Y = 0' : 'X = 0'})</strong></div>`;
+						} else {
+							title = `Distance to ${axisName}`;
+							paramsHtml = `
+								<div class="pattern-params-card in-inspector">
+									<div class="pattern-param-row">
+										<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
+										<div class="pattern-input-suffix-wrapper">
+											<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+											<span class="pattern-input-suffix">mm</span>
+										</div>
 									</div>
 								</div>
-							</div>
-						`;
+							`;
+						}
 					}
 
 					detailsHtml = `
@@ -1922,6 +2059,29 @@ export class Sidebar {
 				: (c.distribution === 'full' ? `${c.quantity}x Full` : `${c.quantity}x ${c.totalAngle.toFixed(1)}°`);
 			valBadge = `<span class="val-badge">${label}</span>`;
 			name = c.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern';
+		} else if (c instanceof OriginDistanceConstraint) {
+			if (c.isCoincident) {
+				name = 'Coincident with (0,0)';
+			} else if (c.targetDistance === 0) {
+				const axisName = c.orientation === 'vertical' ? 'X-Axis' : 'Y-Axis';
+				name = `Point on ${axisName}`;
+			} else {
+				valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+				name =
+					c.orientation === 'horizontal'
+						? 'Distance to Y-Axis'
+						: c.orientation === 'vertical'
+						? 'Distance to X-Axis'
+						: 'Distance to (0,0)';
+			}
+		} else if (c instanceof LineToAxisDistanceConstraint) {
+			const axisName = c.axis === 'x' ? 'X-Axis' : 'Y-Axis';
+			if (c.isCollinear) {
+				name = `Collinear with ${axisName}`;
+			} else {
+				valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
+				name = `Distance to ${axisName}`;
+			}
 		}
 
 		const allEntities = this.sketch.getEntitiesForConstraint(c);
@@ -2006,6 +2166,8 @@ export class Sidebar {
 			case 'symmetry': return ICONS.symmetry;
 			case 'circular_pattern': return ICONS.circular_pattern;
 			case 'rectangular_pattern': return ICONS.rectangular_pattern;
+			case 'origin_distance': return ICONS.distance;
+			case 'line_to_axis_distance': return ICONS.distance;
 			default: return ICONS.coincident;
 		}
 	}
@@ -2189,7 +2351,16 @@ export class Sidebar {
 					this.sketch.selectEntity(id, 'elliptical_arc', false);
 				} else if (type === 'constraint') {
 					const c = this.sketch.constraints.get(id);
-					if (c && (c instanceof DistanceConstraint || c instanceof RadiusConstraint || c instanceof AngleConstraint || c instanceof PointToLineDistanceConstraint || c instanceof OffsetConstraint)) {
+					if (
+						c &&
+						(c instanceof DistanceConstraint ||
+							c instanceof RadiusConstraint ||
+							c instanceof AngleConstraint ||
+							c instanceof PointToLineDistanceConstraint ||
+							c instanceof OffsetConstraint ||
+							(c instanceof OriginDistanceConstraint && !c.isCoincident) ||
+							(c instanceof LineToAxisDistanceConstraint && !c.isCollinear))
+					) {
 						this.sketch.selectEntity(c.id, 'constraint', false);
 						this.onEditDimension?.(c);
 					}

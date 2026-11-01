@@ -31,7 +31,7 @@ export class CircleTool extends BaseTool {
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
 			let pId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				pId = snap.id;
 				this.centerWorldPos = snap.worldPos;
 			} else {

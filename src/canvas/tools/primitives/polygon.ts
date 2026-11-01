@@ -81,7 +81,7 @@ export class PolygonTool extends BaseTool {
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
 			let cId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				cId = snap.id;
 				this.centerWorldPos = snap.worldPos;
 			} else {

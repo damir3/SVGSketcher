@@ -32,7 +32,7 @@ export class EllipseTool extends BaseTool {
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
 			let cId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				cId = snap.id;
 				this.centerWorldPos = snap.worldPos;
 			} else {
@@ -53,7 +53,7 @@ export class EllipseTool extends BaseTool {
 			}
 
 			let p1Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && sketch.points.has(snap.id)) {
 				p1Id = snap.id;
 				this.majWorldPos = snap.worldPos;
 			} else {
@@ -88,7 +88,7 @@ export class EllipseTool extends BaseTool {
 			const minY = centerWorld.y + sign * ryVal * vy;
 
 			let p2Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && snap.id !== this.majPtId) {
+			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && snap.id !== this.majPtId && sketch.points.has(snap.id)) {
 				p2Id = snap.id;
 			} else {
 				const pt = sketch.addPoint(minX, minY);

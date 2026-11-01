@@ -185,6 +185,7 @@ export class SVGRenderer {
 	private svg: SVGSVGElement;
 	private defsEl: SVGDefsElement;
 	private gridGroup: SVGGElement;
+	private originAxisGroup: SVGGElement;
 	private geometryGroup: SVGGElement;
 	private constraintGroup: SVGGElement;
 	private pointGroup: SVGGElement;
@@ -220,6 +221,8 @@ export class SVGRenderer {
 		this.gridGroup = this.createGroup('grid-layer');
 		this.gridGroup.style.pointerEvents = 'none';
 
+		this.originAxisGroup = this.createGroup('origin-axis-layer');
+
 		this.geometryGroup = this.createGroup('geometry-layer');
 		this.constraintGroup = this.createGroup('constraint-layer');
 		this.pointGroup = this.createGroup('point-layer');
@@ -243,6 +246,7 @@ export class SVGRenderer {
 		this.overlayGroup.style.pointerEvents = 'none';
 
 		this.svg.appendChild(this.gridGroup);
+		this.svg.appendChild(this.originAxisGroup);
 		this.svg.appendChild(this.geometryGroup);
 		this.svg.appendChild(this.constraintGroup);
 		this.svg.appendChild(this.pointGroup);
@@ -285,7 +289,7 @@ export class SVGRenderer {
 		this.patternCheckboxPositions.clear();
 		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
-		this.renderGrid(viewport, options.showGrid ?? true);
+		this.renderGrid(sketch, viewport, options.showGrid ?? true);
 		this.renderGeometry(sketch, viewport, options);
 		if (options.showConstraints !== false) {
 			this.renderConstraints(sketch, viewport);
@@ -337,134 +341,166 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderGrid(viewport: Viewport, showGrid: boolean): void {
+	private renderGrid(sketch: SketchDocument, viewport: Viewport, showGrid: boolean): void {
 		this.gridGroup.innerHTML = '';
-		if (!showGrid) return;
-
-		const { step, subStep } = viewport.getGridStep();
-		const minWorld = viewport.screenToWorld(0, viewport.height);
-		const maxWorld = viewport.screenToWorld(viewport.width, 0);
-
-		const startX = Math.floor(minWorld.x / subStep) * subStep;
-		const endX = Math.ceil(maxWorld.x / subStep) * subStep;
-		const startY = Math.floor(minWorld.y / subStep) * subStep;
-		const endY = Math.ceil(maxWorld.y / subStep) * subStep;
-
-		const subStepPx = subStep * viewport.zoom;
-		const showSubGrid = subStepPx >= 6;
-
-		// 1. Minor grid lines (every subStep)
-		let dMinor = '';
-		// 2. Major grid lines (every step = 5 * subStep)
-		let dMajor = '';
 
 		const origin = viewport.worldToScreen(0, 0);
-		const axisY = Math.max(8, Math.min(viewport.height - 40, origin.y));
-		const axisX = Math.max(8, Math.min(viewport.width - 30, origin.x));
 
-		const labelsG = createSvgElement('g', { class: 'grid-labels' });
+		if (showGrid) {
+			const { step, subStep } = viewport.getGridStep();
+			const minWorld = viewport.screenToWorld(0, viewport.height);
+			const maxWorld = viewport.screenToWorld(viewport.width, 0);
 
-		const labelStyle: SvgAttrs = {
-			'dominant-baseline': 'central',
-			'font-size': 11,
-			'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-			fill: COLORS.gridLabel,
-			'paint-order': 'stroke fill',
-			stroke: COLORS.white,
-			'stroke-width': 3,
-			'stroke-linejoin': 'round',
-		};
+			const startX = Math.floor(minWorld.x / subStep) * subStep;
+			const endX = Math.ceil(maxWorld.x / subStep) * subStep;
+			const startY = Math.floor(minWorld.y / subStep) * subStep;
+			const endY = Math.ceil(maxWorld.y / subStep) * subStep;
 
-		for (let x = startX; x <= endX; x += subStep) {
-			const s = viewport.worldToScreen(x, 0);
-			const isMajor = Math.abs(Math.round(x / subStep) % 5) === 0;
-			if (isMajor) {
-				dMajor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
+			const subStepPx = subStep * viewport.zoom;
+			const showSubGrid = subStepPx >= 6;
 
-				const cleanVal = parseFloat((Math.round(x / step) * step).toFixed(6));
-				if (Math.abs(cleanVal) > 1e-4) {
-					const anchorX = s.x;
-					const anchorY = axisY + 4;
-					createSvgText(anchorX, anchorY, cleanVal.toString(), {
-						transform: `rotate(-90 ${anchorX.toFixed(1)} ${anchorY.toFixed(1)})`,
-						'text-anchor': 'end',
-						...labelStyle,
-					}, labelsG);
+			// 1. Minor grid lines (every subStep)
+			let dMinor = '';
+			// 2. Major grid lines (every step = 5 * subStep)
+			let dMajor = '';
+
+			const axisY = Math.max(8, Math.min(viewport.height - 40, origin.y));
+			const axisX = Math.max(8, Math.min(viewport.width - 30, origin.x));
+
+			const labelsG = createSvgElement('g', { class: 'grid-labels' });
+
+			const labelStyle: SvgAttrs = {
+				'dominant-baseline': 'central',
+				'font-size': 11,
+				'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+				fill: COLORS.gridLabel,
+				'paint-order': 'stroke fill',
+				stroke: COLORS.white,
+				'stroke-width': 3,
+				'stroke-linejoin': 'round',
+			};
+
+			for (let x = startX; x <= endX; x += subStep) {
+				const s = viewport.worldToScreen(x, 0);
+				const isMajor = Math.abs(Math.round(x / subStep) % 5) === 0;
+				if (isMajor) {
+					dMajor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
+
+					const cleanVal = parseFloat((Math.round(x / step) * step).toFixed(6));
+					if (Math.abs(cleanVal) > 1e-4) {
+						const anchorX = s.x;
+						const anchorY = axisY + 4;
+						createSvgText(anchorX, anchorY, cleanVal.toString(), {
+							transform: `rotate(-90 ${anchorX.toFixed(1)} ${anchorY.toFixed(1)})`,
+							'text-anchor': 'end',
+							...labelStyle,
+						}, labelsG);
+					}
+				} else if (showSubGrid) {
+					dMinor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
 				}
-			} else if (showSubGrid) {
-				dMinor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
 			}
-		}
 
-		for (let y = startY; y <= endY; y += subStep) {
-			const s = viewport.worldToScreen(0, y);
-			const isMajor = Math.abs(Math.round(y / subStep) % 5) === 0;
-			if (isMajor) {
-				dMajor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
+			for (let y = startY; y <= endY; y += subStep) {
+				const s = viewport.worldToScreen(0, y);
+				const isMajor = Math.abs(Math.round(y / subStep) % 5) === 0;
+				if (isMajor) {
+					dMajor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
 
-				const cleanVal = parseFloat((Math.round(y / step) * step).toFixed(6));
-				if (Math.abs(cleanVal) > 1e-4) {
-					createSvgText(axisX + 8, s.y, cleanVal.toString(), {
-						'text-anchor': 'start',
-						...labelStyle,
-					}, labelsG);
+					const cleanVal = parseFloat((Math.round(y / step) * step).toFixed(6));
+					if (Math.abs(cleanVal) > 1e-4) {
+						createSvgText(axisX + 8, s.y, cleanVal.toString(), {
+							'text-anchor': 'start',
+							...labelStyle,
+						}, labelsG);
+					}
+				} else if (showSubGrid) {
+					dMinor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
 				}
-			} else if (showSubGrid) {
-				dMinor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
 			}
+
+			// Minor grid (subStep) - light subtle lines
+			if (showSubGrid && dMinor) {
+				createSvgPath(dMinor, {
+					stroke: COLORS.gridMinor,
+					'stroke-width': STROKE_WIDTH.minorGrid,
+					fill: 'none',
+				}, this.gridGroup);
+			}
+
+			// Major grid (step = 5 * subStep) - distinct darker lines
+			if (dMajor) {
+				createSvgPath(dMajor, {
+					stroke: COLORS.gridMajor,
+					'stroke-width': STROKE_WIDTH.majorGrid,
+					fill: 'none',
+				}, this.gridGroup);
+			}
+
+			// Coordinate labels
+			this.gridGroup.appendChild(labelsG);
 		}
 
-		// Minor grid (subStep) - light subtle lines
-		if (showSubGrid && dMinor) {
-			createSvgPath(dMinor, {
-				stroke: COLORS.gridMinor,
-				'stroke-width': STROKE_WIDTH.minorGrid,
-				fill: 'none',
-			}, this.gridGroup);
-		}
+		// Origin Axes & Marker
+		this.originAxisGroup.innerHTML = '';
 
-		// Major grid (step = 5 * subStep) - distinct darker lines
-		if (dMajor) {
-			createSvgPath(dMajor, {
-				stroke: COLORS.gridMajor,
-				'stroke-width': STROKE_WIDTH.majorGrid,
-				fill: 'none',
-			}, this.gridGroup);
-		}
-
-		// Coordinate labels
-		this.gridGroup.appendChild(labelsG);
-
-		// Origin Axes
-		const originG = createSvgElement('g', undefined, this.gridGroup);
+		const isXSelected = sketch.selection.lineIds.has('axis_x');
+		const isYSelected = sketch.selection.lineIds.has('axis_y');
+		const isOriginSelected = sketch.selection.pointIds.has('origin');
 
 		// X Axis (Red)
+		const axisXG = createSvgElement('g', {
+			'data-id': 'axis_x',
+			'data-type': 'line',
+			class: 'sketch-entity sketch-line sketch-axis-line' + (isXSelected ? ' is-selected selected' : ''),
+		}, this.originAxisGroup);
+
+		createSvgLine(0, origin.y, viewport.width, origin.y, HIT_AREA_STROKE_ATTRS, axisXG);
 		createSvgLine(0, origin.y, viewport.width, origin.y, {
-			stroke: COLORS.xAxis,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, originG);
+			stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
+			'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+		}, axisXG);
 
 		// Y Axis (Green)
+		const axisYG = createSvgElement('g', {
+			'data-id': 'axis_y',
+			'data-type': 'line',
+			class: 'sketch-entity sketch-line sketch-axis-line' + (isYSelected ? ' is-selected selected' : ''),
+		}, this.originAxisGroup);
+
+		createSvgLine(origin.x, 0, origin.x, viewport.height, HIT_AREA_STROKE_ATTRS, axisYG);
 		createSvgLine(origin.x, 0, origin.x, viewport.height, {
-			stroke: COLORS.yAxis,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, originG);
+			stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
+			'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+		}, axisYG);
 
 		// Origin marker target (CAD surveyor style matching reference image)
+		const originMarkerG = createSvgElement('g', {
+			'data-id': 'origin',
+			'data-type': 'point',
+			class: 'sketch-entity sketch-point sketch-origin-marker' + (isOriginSelected ? ' is-selected selected' : ''),
+		}, this.originAxisGroup);
+
 		const r = 8;
 		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`, {
-			fill: COLORS.originQuarter,
-		}, originG);
+			fill: isOriginSelected ? COLORS.selected : COLORS.originQuarter,
+		}, originMarkerG);
 
 		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`, {
-			fill: COLORS.originQuarter,
-		}, originG);
+			fill: isOriginSelected ? COLORS.selected : COLORS.originQuarter,
+		}, originMarkerG);
 
 		createSvgCircle(origin.x, origin.y, r, {
 			fill: 'none',
-			stroke: COLORS.construction,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, originG);
+			stroke: isOriginSelected ? COLORS.selected : COLORS.construction,
+			'stroke-width': isOriginSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+		}, originMarkerG);
+
+		// Transparent hit target circle so clicking/hovering near (0,0) is easy
+		createSvgCircle(origin.x, origin.y, 14, {
+			fill: COLORS.hitTransparent,
+			stroke: 'none',
+		}, originMarkerG);
 	}
 
 	private renderGeometry(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {

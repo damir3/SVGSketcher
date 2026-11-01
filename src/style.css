@@ -410,6 +410,52 @@ html, body {
   filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9)) !important;
 }
 
+/* Axis & Origin Hover & Selection Highlighting */
+.sketch-axis-line,
+.sketch-origin-marker {
+  cursor: pointer;
+}
+
+#cad-svg:not(.is-dragging) .sketch-axis-line.select-hover line:not(.hit-area) {
+  stroke: #0ea5e9 !important;
+  stroke-width: 2.5px !important;
+  filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45)) !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-axis-line.selected line:not(.hit-area),
+#cad-svg:not(.is-dragging) .sketch-axis-line.is-selected line:not(.hit-area) {
+  stroke: #0284c7 !important;
+  stroke-width: 2.5px !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-origin-marker.select-hover path,
+#cad-svg:not(.is-dragging) .sketch-origin-marker.select-hover circle {
+  stroke: #0ea5e9 !important;
+  filter: drop-shadow(0 0 5px rgba(14, 165, 233, 0.85)) !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-origin-marker.select-hover path {
+  fill: #0ea5e9 !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-origin-marker.selected path,
+#cad-svg:not(.is-dragging) .sketch-origin-marker.is-selected path,
+#cad-svg:not(.is-dragging) .sketch-origin-marker.selected circle,
+#cad-svg:not(.is-dragging) .sketch-origin-marker.is-selected circle {
+  stroke: #0284c7 !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-origin-marker.selected path,
+#cad-svg:not(.is-dragging) .sketch-origin-marker.is-selected path {
+  fill: #0284c7 !important;
+}
+
+#cad-svg.tool-delete .sketch-axis-line,
+#cad-svg.tool-delete .sketch-origin-marker {
+  cursor: not-allowed;
+  pointer-events: none !important;
+}
+
 /* When a constraint tool is active, spline curves cannot be constrained directly:
    disable pointer-events on splines while keeping points and handles active */
 #cad-svg.tool-constraint .sketch-spline,

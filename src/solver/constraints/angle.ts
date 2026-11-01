@@ -39,7 +39,7 @@ export class AngleConstraint extends BaseConstraint {
 			id,
 			'angle',
 			'Angle',
-			[line1Id, line2Id, l1P1, l1P2, l2P1, l2P2],
+			[line1Id, line2Id, l1P1, l1P2, l2P1, l2P2].filter(Boolean),
 			weight,
 			false,
 			true,
@@ -63,14 +63,33 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p1x = paramMap.get(`${this.l1P1}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.l1P1}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.l1P2}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.l1P2}.y`) ?? 0;
-		const p3x = paramMap.get(`${this.l2P1}.x`) ?? 0;
-		const p3y = paramMap.get(`${this.l2P1}.y`) ?? 0;
-		const p4x = paramMap.get(`${this.l2P2}.x`) ?? 0;
-		const p4y = paramMap.get(`${this.l2P2}.y`) ?? 0;
+		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
+		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
+
+		let p1x: number, p1y: number, p2x: number, p2y: number;
+		let p3x: number, p3y: number, p4x: number, p4y: number;
+
+		if (this.line1Id === 'axis_x') {
+			p1x = 0; p1y = 0; p2x = 1; p2y = 0;
+		} else if (this.line1Id === 'axis_y') {
+			p1x = 0; p1y = 0; p2x = 0; p2y = 1;
+		} else {
+			p1x = paramMap.get(`${this.l1P1}.x`) ?? 0;
+			p1y = paramMap.get(`${this.l1P1}.y`) ?? 0;
+			p2x = paramMap.get(`${this.l1P2}.x`) ?? 0;
+			p2y = paramMap.get(`${this.l1P2}.y`) ?? 0;
+		}
+
+		if (this.line2Id === 'axis_x') {
+			p3x = 0; p3y = 0; p4x = 1; p4y = 0;
+		} else if (this.line2Id === 'axis_y') {
+			p3x = 0; p3y = 0; p4x = 0; p4y = 1;
+		} else {
+			p3x = paramMap.get(`${this.l2P1}.x`) ?? 0;
+			p3y = paramMap.get(`${this.l2P1}.y`) ?? 0;
+			p4x = paramMap.get(`${this.l2P2}.x`) ?? 0;
+			p4y = paramMap.get(`${this.l2P2}.y`) ?? 0;
+		}
 
 		const dx1 = (p2x - p1x) * this.s1;
 		const dy1 = (p2y - p1y) * this.s1;
@@ -79,7 +98,7 @@ export class AngleConstraint extends BaseConstraint {
 
 		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
 		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
-		const avgL = (l1 + l2) * 0.5;
+		const avgL = isAxis1 ? l2 : (isAxis2 ? l1 : (l1 + l2) * 0.5);
 
 		const u1x = dx1 / l1;
 		const u1y = dy1 / l1;
@@ -105,16 +124,27 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const l1 = ctx.sketch.lines.get(this.line1Id);
-		const l2 = ctx.sketch.lines.get(this.line2Id);
+		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
+		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
 
-		const p1 = ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		const l1 = isAxis1 ? null : ctx.sketch.lines.get(this.line1Id);
+		const l2 = isAxis2 ? null : ctx.sketch.lines.get(this.line2Id);
+
+		const p1 = isAxis1
+			? ({ id: this.line1Id, x: 0, y: 0 } as any)
+			: ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = isAxis1
+			? ({ id: this.line1Id, x: this.line1Id === 'axis_x' ? 1 : 0, y: this.line1Id === 'axis_x' ? 0 : 1 } as any)
+			: ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = isAxis2
+			? ({ id: this.line2Id, x: 0, y: 0 } as any)
+			: ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = isAxis2
+			? ({ id: this.line2Id, x: this.line2Id === 'axis_x' ? 1 : 0, y: this.line2Id === 'axis_x' ? 0 : 1 } as any)
+			: ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return;
 
-		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
 
 		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
 		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
@@ -167,8 +197,8 @@ export class AngleConstraint extends BaseConstraint {
 		const sp4 = ctx.viewport.worldToScreen(p4.x, p4.y);
 
 		if (ctx.renderDashedExtensionLines) {
-			ctx.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, sp2, color);
-			ctx.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
+			if (!isAxis1) ctx.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, sp2, color);
+			if (!isAxis2) ctx.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
 		}
 
 		// Arc path with arrowheads
@@ -206,15 +236,26 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = 18): number | null {
-		const l1 = sketch.lines.get(this.line1Id);
-		const l2 = sketch.lines.get(this.line2Id);
-		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
+		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
+
+		const l1 = isAxis1 ? null : sketch.lines.get(this.line1Id);
+		const l2 = isAxis2 ? null : sketch.lines.get(this.line2Id);
+		const p1 = isAxis1
+			? ({ id: this.line1Id, x: 0, y: 0 } as any)
+			: sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = isAxis1
+			? ({ id: this.line1Id, x: this.line1Id === 'axis_x' ? 1 : 0, y: this.line1Id === 'axis_x' ? 0 : 1 } as any)
+			: sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = isAxis2
+			? ({ id: this.line2Id, x: 0, y: 0 } as any)
+			: sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = isAxis2
+			? ({ id: this.line2Id, x: this.line2Id === 'axis_x' ? 1 : 0, y: this.line2Id === 'axis_x' ? 0 : 1 } as any)
+			: sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return null;
 
-		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
+		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
 		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
 		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
 		const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);

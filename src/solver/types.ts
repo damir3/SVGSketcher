@@ -25,7 +25,9 @@ export type ConstraintType =
 	| 'symmetry'
 	| 'circular_pattern'
 	| 'rectangular_pattern'
-	| 'offset';
+	| 'offset'
+	| 'origin_distance'
+	| 'line_to_axis_distance';
 
 export interface ParamRef {
 	id: string;
