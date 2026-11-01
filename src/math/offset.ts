@@ -1373,7 +1373,8 @@ export function commitOffsetToSketch(
 	_direction?: OffsetDirection,
 	_dist1?: number,
 	_dist2?: number,
-	_flip?: boolean
+	_flip?: boolean,
+	expressions?: { dist1?: string; dist2?: string }
 ): { createdIds: string[]; constraintIds: string[] } | null {
 	if (!geomResult.isValid || geomResult.sides.length === 0) return null;
 
@@ -1382,7 +1383,8 @@ export function commitOffsetToSketch(
 	const createdIds: string[] = [];
 	const constraintIds: string[] = [];
 
-	for (const side of geomResult.sides) {
+	for (let sideIdx = 0; sideIdx < geomResult.sides.length; sideIdx++) {
+		const side = geomResult.sides[sideIdx];
 		const offsetPairs: OffsetPair[] = [];
 		const cornerPoints: SketchPoint[] = [];
 
@@ -1542,6 +1544,10 @@ export function commitOffsetToSketch(
 				_flip || false,
 				cornerPointIds
 			);
+			if (expressions) {
+				const expr = sideIdx === 0 ? expressions.dist1 : (expressions.dist2 ?? expressions.dist1);
+				if (expr) offC.expression = expr;
+			}
 			sketch.addConstraint(offC);
 			constraintIds.push(offC.id);
 		}

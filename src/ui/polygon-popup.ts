@@ -1,4 +1,7 @@
 import type { Vec2 } from '../math/vector';
+import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
+import type { SketchDocument } from '../model/sketch';
+import { updateExpressionPreview } from './expression-preview';
 
 export class PolygonPopup {
 	private container: HTMLElement;
@@ -6,12 +9,18 @@ export class PolygonPopup {
 	private radiusInput: HTMLInputElement;
 	private _isOpen = false;
 	private _isRadiusUserModified = false;
+	private sketch?: SketchDocument;
+
+	public setSketch(sketch: SketchDocument): void {
+		this.sketch = sketch;
+	}
 
 	public onValuesChange?: (sides: number, radius: number, isRadiusChanged: boolean) => void;
 	public onCommit?: () => void;
 	public onCancel?: () => void;
 
-	constructor() {
+	constructor(sketch?: SketchDocument) {
+		this.sketch = sketch;
 		this.container = document.createElement('div');
 		this.container.className = 'polygon-popup hidden';
 		this.container.innerHTML = `
@@ -24,9 +33,10 @@ export class PolygonPopup {
 			<div class="polygon-popup-row">
 				<label class="polygon-popup-label" for="poly-radius-input">Radius</label>
 				<div class="polygon-input-wrapper">
-					<input type="number" id="poly-radius-input" min="0.1" step="0.5" value="50.0" autocomplete="off" />
+					<input type="text" id="poly-radius-input" value="50.0" autocomplete="off" spellcheck="false" />
 					<span class="polygon-unit">mm</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="poly-radius-eval-preview"></div>
 			</div>
 		`;
 		document.body.appendChild(this.container);
@@ -55,6 +65,7 @@ export class PolygonPopup {
 
 		this.radiusInput.addEventListener('input', () => {
 			this._isRadiusUserModified = true;
+			this.updateEvalPreviews();
 			const sides = this.getSides();
 			const radius = this.getRadius();
 			this.onValuesChange?.(sides, radius, true);
@@ -116,15 +127,25 @@ export class PolygonPopup {
 	}
 
 	public getRadius(): number {
-		const val = parseFloat(this.radiusInput.value);
+		const val = parseNumericOrExpression(
+			this.radiusInput.value,
+			50,
+			this.sketch?.getParameterValuesMap()
+		);
 		if (isNaN(val) || val <= 0.01) return 1;
 		return val;
+	}
+
+	public getRadiusExpression(): string | undefined {
+		if (!this.radiusInput) return undefined;
+		return getExpressionIfValid(this.radiusInput.value, this.sketch?.getParameterValuesMap());
 	}
 
 	public show(screenPos: Vec2, sides: number, radius: number): void {
 		this._isRadiusUserModified = false;
 		this.sidesInput.value = Math.max(3, Math.round(sides)).toString();
 		this.radiusInput.value = Number(radius.toFixed(1)).toString();
+		this.updateEvalPreviews();
 		this.container.classList.remove('hidden');
 		this._isOpen = true;
 		this.updatePosition(screenPos);
@@ -152,6 +173,16 @@ export class PolygonPopup {
 	public updateRadius(radius: number): void {
 		if (!this._isOpen || this._isRadiusUserModified) return;
 		this.radiusInput.value = Number(radius.toFixed(1)).toString();
+		this.updateEvalPreviews();
+	}
+
+	public updateEvalPreviews(): void {
+		const scope = this.sketch?.getParameterValuesMap();
+		const prev = this.container?.querySelector<HTMLElement>('#poly-radius-eval-preview');
+		const wrap = typeof this.radiusInput?.closest === 'function' ? this.radiusInput.closest<HTMLElement>('.polygon-input-wrapper') : null;
+		if (this.radiusInput) {
+			updateExpressionPreview(this.radiusInput.value, 'mm', prev ?? null, scope, wrap);
+		}
 	}
 
 	public cycleFocus(reverse = false): void {

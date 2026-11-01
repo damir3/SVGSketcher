@@ -216,7 +216,8 @@ export class AngleConstraint extends BaseConstraint {
 		);
 
 		// Text label badge with background
-		const textVal = `${this.targetAngle.toFixed(1)}°`;
+		const prefix = this.expression ? 'fx: ' : '';
+		const textVal = `${prefix}${this.targetAngle.toFixed(1)}°`;
 		const textLen = textVal.length * 8 + 14;
 
 		createSvgRect(midX - textLen * 0.5, midY - 10, textLen, 20, {

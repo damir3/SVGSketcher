@@ -2763,6 +2763,15 @@ export class CanvasInteraction {
 			return;
 		}
 
+		// If mouse is outside the canvas SVG (e.g. over modals, dialogs, header, toolbar, sidebar),
+		// clear hover highlights and tool previews, and do not process hover under overlays.
+		const isOverCanvas = e.target === this.svg || (e.target instanceof Node && this.svg.contains(e.target));
+		if (!isOverCanvas) {
+			this.highlightManager.clear();
+			this.renderer.clearPreviews();
+			return;
+		}
+
 		// Centralized hover highlight
 		if (this.isPanning || this.isDraggingPoint || this.isBoxSelecting || this.gizmoDragState) {
 			this.highlightManager.clear();

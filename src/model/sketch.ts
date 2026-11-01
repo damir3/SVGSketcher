@@ -59,6 +59,15 @@ import {
 	serializeConstraint,
 	deserializeConstraint,
 } from './history';
+import {
+	evaluateExpression,
+	validateExpression,
+	evaluateParameterGraph,
+	isValidParameterName,
+	renameParameterInExpression,
+	type SketchParameter,
+	type ParameterGraphResult,
+} from '../math/expression';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -82,6 +91,7 @@ export class SketchDocument {
 	ellipticalArcs = new Map<string, SketchEllipticalArc>();
 	splines = new Map<string, SketchSpline>();
 	constraints = new Map<string, IConstraint>();
+	parameters = new Map<string, SketchParameter>();
 
 	selection: SelectionState = {
 		pointIds: new Set(),
@@ -246,6 +256,7 @@ export class SketchDocument {
 				knots: s.knots ? [...s.knots] : undefined,
 			})),
 			constraints: Array.from(this.constraints.values()).map(c => serializeConstraint(c)),
+			parameters: Array.from(this.parameters.values()).map(p => ({ ...p })),
 			idCounter: this.idCounter,
 		};
 	}
@@ -318,6 +329,15 @@ export class SketchDocument {
 
 		this.idCounter = snapshot.idCounter;
 		this.clearSelection();
+
+		this.parameters.clear();
+		if (snapshot.parameters) {
+			for (const p of snapshot.parameters) {
+				this.parameters.set(p.name, { ...p });
+			}
+		}
+
+		this.recomputeParametersAndConstraints(false);
 		this.rebuildParamManager();
 		this.solve();
 		this.notify();
@@ -3140,13 +3160,12 @@ export class SketchDocument {
 		return this.solve();
 	}
 
-	updateDimensionalConstraint(
-		constraintId: string,
+	applyConstraintValueDirectly(
+		c: IConstraint,
 		newValue: number,
 		displayMode?: 'radius' | 'diameter'
 	): boolean {
-		const c = this.constraints.get(constraintId);
-		if (!c || !isFinite(newValue) || newValue <= 0) return false;
+		if (!isFinite(newValue) || newValue <= 0) return false;
 
 		if (c instanceof DistanceConstraint) {
 			c.targetDistance = newValue;
@@ -3157,7 +3176,6 @@ export class SketchDocument {
 					: c.orientation === 'vertical'
 					? 'Vertical Distance'
 					: 'Distance';
-			this.solve();
 			return true;
 		}
 
@@ -3165,21 +3183,18 @@ export class SketchDocument {
 			c.targetDistance = newValue;
 			c.value = newValue;
 			c.name = 'Point-to-Line Distance';
-			this.solve();
 			return true;
 		}
 
 		if (c instanceof OriginDistanceConstraint && !c.isCoincident) {
 			c.targetDistance = newValue;
 			c.value = newValue;
-			this.solve();
 			return true;
 		}
 
 		if (c instanceof LineToAxisDistanceConstraint && !c.isCollinear) {
 			c.targetDistance = newValue;
 			c.value = newValue;
-			this.solve();
 			return true;
 		}
 
@@ -3213,8 +3228,6 @@ export class SketchDocument {
 					}
 				}
 			}
-
-			this.solve();
 			return true;
 		}
 
@@ -3240,7 +3253,6 @@ export class SketchDocument {
 					}
 				}
 			}
-			this.solve();
 			return true;
 		}
 
@@ -3274,11 +3286,184 @@ export class SketchDocument {
 					}
 				}
 			}
-			this.solve();
 			return true;
 		}
 
 		return false;
+	}
+
+	updateDimensionalConstraint(
+		constraintId: string,
+		newValue: number | string,
+		displayMode?: 'radius' | 'diameter'
+	): boolean {
+		const c = this.constraints.get(constraintId);
+		if (!c) return false;
+
+		let val: number;
+		let expr: string | undefined;
+
+		if (typeof newValue === 'string') {
+			const trimmed = newValue.trim();
+			const evalRes = this.evaluateExpression(trimmed);
+			if (!evalRes.isValid || !evalRes.value || !isFinite(evalRes.value) || evalRes.value <= 0) {
+				return false;
+			}
+			val = evalRes.value;
+			if (evalRes.referencedVars.length > 0 || isNaN(Number(trimmed.replace(',', '.')))) {
+				expr = trimmed;
+			}
+		} else {
+			if (!isFinite(newValue) || newValue <= 0) return false;
+			val = newValue;
+			expr = undefined;
+		}
+
+		c.expression = expr;
+		const applied = this.applyConstraintValueDirectly(c, val, displayMode);
+		if (applied) {
+			this.solve();
+			return true;
+		}
+		return false;
+	}
+
+	getParameterValuesMap(): Map<string, number> {
+		const map = new Map<string, number>();
+		for (const [name, p] of this.parameters) {
+			map.set(name, p.value);
+		}
+		return map;
+	}
+
+	evaluateExpression(expr: string): {
+		value?: number;
+		isValid: boolean;
+		error?: string;
+		referencedVars: string[];
+	} {
+		return validateExpression(expr, this.getParameterValuesMap());
+	}
+
+	getParameter(name: string): SketchParameter | undefined {
+		return this.parameters.get(name);
+	}
+
+	getAllParameters(): SketchParameter[] {
+		return Array.from(this.parameters.values());
+	}
+
+	getParameterMap(): ReadonlyMap<string, SketchParameter> {
+		return this.parameters;
+	}
+
+	evaluateParameterGraph(): ParameterGraphResult {
+		return evaluateParameterGraph(this.parameters);
+	}
+
+	addParameter(
+		name: string,
+		expression: string,
+		comment?: string
+	): { success: boolean; error?: string; parameter?: SketchParameter } {
+		const nameCheck = isValidParameterName(name);
+		if (!nameCheck.isValid) {
+			return { success: false, error: nameCheck.error };
+		}
+		if (this.parameters.has(name)) {
+			return { success: false, error: `Parameter '${name}' already exists` };
+		}
+		this.pushHistory();
+		const p: SketchParameter = {
+			id: this.nextId('Param'),
+			name,
+			expression,
+			value: 0,
+			comment,
+		};
+		this.parameters.set(name, p);
+		this.recomputeParametersAndConstraints(false);
+		return { success: true, parameter: p };
+	}
+
+	updateParameter(
+		name: string,
+		newName: string,
+		newExpr: string,
+		comment?: string
+	): { success: boolean; error?: string } {
+		const existing = this.parameters.get(name);
+		if (!existing) {
+			return { success: false, error: `Parameter '${name}' not found` };
+		}
+		if (newName !== name) {
+			const nameCheck = isValidParameterName(newName);
+			if (!nameCheck.isValid) {
+				return { success: false, error: nameCheck.error };
+			}
+			if (this.parameters.has(newName)) {
+				return { success: false, error: `Parameter '${newName}' already exists` };
+			}
+		}
+		this.pushHistory();
+		existing.expression = newExpr;
+		existing.comment = comment;
+		if (newName !== name) {
+			this.parameters.delete(name);
+			existing.name = newName;
+			this.parameters.set(newName, existing);
+
+			// Rename in other parameters and constraint expressions
+			for (const other of this.parameters.values()) {
+				if (other.name !== newName) {
+					other.expression = renameParameterInExpression(other.expression, name, newName);
+				}
+			}
+			for (const c of this.constraints.values()) {
+				if (c.expression) {
+					c.expression = renameParameterInExpression(c.expression, name, newName);
+				}
+			}
+		}
+		this.recomputeParametersAndConstraints(false);
+		return { success: true };
+	}
+
+	deleteParameter(name: string): { success: boolean; error?: string } {
+		if (!this.parameters.has(name)) {
+			return { success: false, error: `Parameter '${name}' not found` };
+		}
+		this.pushHistory();
+		this.parameters.delete(name);
+		this.recomputeParametersAndConstraints(false);
+		return { success: true };
+	}
+
+	recomputeParametersAndConstraints(pushHistory = false): { success: boolean; errors: Map<string, string> } {
+		if (pushHistory) {
+			this.pushHistory();
+		}
+		const graphRes = evaluateParameterGraph(this.parameters);
+		for (const [pName, val] of graphRes.values) {
+			const p = this.parameters.get(pName);
+			if (p) p.value = val;
+		}
+
+		for (const c of this.constraints.values()) {
+			if (!c.expression) continue;
+			try {
+				const val = evaluateExpression(c.expression, graphRes.values);
+				if (Number.isFinite(val) && val > 0) {
+					this.applyConstraintValueDirectly(c, val);
+				}
+			} catch {
+				// Expression failed to evaluate, keep previous value
+			}
+		}
+
+		this.solve();
+		this.notify();
+		return { success: graphRes.errors.size === 0, errors: graphRes.errors };
 	}
 
 	private applyOffsetGeometryUpdate(c: OffsetConstraint, geom: any): void {
@@ -4739,6 +4924,7 @@ export class SketchDocument {
 		this.ellipticalArcs.clear();
 		this.splines.clear();
 		this.constraints.clear();
+		this.parameters.clear();
 		this.selection.pointIds.clear();
 		this.selection.lineIds.clear();
 		this.selection.circleIds.clear();
@@ -5135,44 +5321,65 @@ export class SketchDocument {
 		error?: string;
 	} {
 		try {
-			const parser = new DOMParser();
-			const doc = parser.parseFromString(svgString, 'image/svg+xml');
-			const parserError = doc.querySelector('parsererror');
-			if (parserError) {
-				return { success: false, error: 'Invalid SVG XML structure' };
-			}
+			if (typeof DOMParser !== 'undefined') {
+				const parser = new DOMParser();
+				const doc = parser.parseFromString(svgString, 'image/svg+xml');
+				const parserError = doc.querySelector('parsererror');
+				if (parserError) {
+					return { success: false, error: 'Invalid SVG XML structure' };
+				}
 
-			// Find sketcher metadata element
-			let metaEl: Element | null = doc.getElementById('sketcher-metadata') || doc.querySelector('metadata#sketcher-metadata');
-			if (!metaEl) {
-				const allMetadata = doc.querySelectorAll('metadata');
-				for (let i = 0; i < allMetadata.length; i++) {
-					const el = allMetadata[i];
-					if (el.textContent && el.textContent.includes('"format"') && el.textContent.includes('svg-sketcher')) {
-						metaEl = el;
-						break;
+				// Find sketcher metadata element
+				let metaEl: Element | null = doc.getElementById('sketcher-metadata') || doc.querySelector('metadata#sketcher-metadata');
+				if (!metaEl) {
+					const allMetadata = doc.querySelectorAll('metadata');
+					for (let i = 0; i < allMetadata.length; i++) {
+						const el = allMetadata[i];
+						if (el.textContent && el.textContent.includes('"format"') && el.textContent.includes('svg-sketcher')) {
+							metaEl = el;
+							break;
+						}
 					}
 				}
+
+				if (!metaEl || !metaEl.textContent) {
+					return { success: false, error: 'No parametric CAD metadata found in SVG' };
+				}
+
+				const rawText = metaEl.textContent.trim();
+				const data = JSON.parse(rawText) as SketchFileMetadata;
+
+				if (data.format !== 'svg-sketcher' || !data.snapshot) {
+					return { success: false, error: 'Unsupported sketch metadata format' };
+				}
+
+				this.restoreSnapshot(data.snapshot);
+				this.clearHistory();
+
+				return {
+					success: true,
+					viewport: data.viewport,
+				};
 			}
 
-			if (!metaEl || !metaEl.textContent) {
-				return { success: false, error: 'No parametric CAD metadata found in SVG' };
+			// Fallback (e.g. Node.js environment where DOMParser is not in global scope)
+			const match =
+				svgString.match(/<metadata[^>]*id="sketcher-metadata"[^>]*>([\s\S]*?)<\/metadata>/i) ||
+				svgString.match(/<metadata[^>]*>([\s\S]*?)<\/metadata>/i);
+			if (match) {
+				let text = match[1].trim();
+				const cdataMatch = text.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
+				if (cdataMatch) {
+					text = cdataMatch[1].trim();
+				}
+				const data = JSON.parse(text) as SketchFileMetadata;
+				if (data.format === 'svg-sketcher' && data.snapshot) {
+					this.restoreSnapshot(data.snapshot);
+					this.clearHistory();
+					return { success: true, viewport: data.viewport };
+				}
 			}
-
-			const rawText = metaEl.textContent.trim();
-			const data = JSON.parse(rawText) as SketchFileMetadata;
-
-			if (data.format !== 'svg-sketcher' || !data.snapshot) {
-				return { success: false, error: 'Unsupported sketch metadata format' };
-			}
-
-			this.restoreSnapshot(data.snapshot);
-			this.clearHistory();
-
-			return {
-				success: true,
-				viewport: data.viewport,
-			};
+			return { success: false, error: 'No parametric CAD metadata found in SVG' };
 		} catch (err) {
 			return {
 				success: false,

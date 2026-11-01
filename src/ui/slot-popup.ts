@@ -1,4 +1,7 @@
 import type { Vec2 } from '../math/vector';
+import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
+import type { SketchDocument } from '../model/sketch';
+import { updateExpressionPreview } from './expression-preview';
 
 const LOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></svg>`;
 const UNLOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M240-640h360v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85h-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640Zm0 480h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM240-160v-400 400Z"/></svg>`;
@@ -14,6 +17,11 @@ export type SlotPopupField = 'distance' | 'angle' | 'radius';
 
 export class SlotPopup {
 	private container!: HTMLElement;
+	private sketch?: SketchDocument;
+
+	public setSketch(sketch: SketchDocument): void {
+		this.sketch = sketch;
+	}
 	private distanceRow!: HTMLElement;
 	private distanceLabel!: HTMLElement;
 	private angleRow!: HTMLElement;
@@ -46,7 +54,8 @@ export class SlotPopup {
 	public onCommit?: () => void;
 	public onCancel?: () => void;
 
-	constructor() {
+	constructor(sketch?: SketchDocument) {
+		this.sketch = sketch;
 		if (typeof document === 'undefined') {
 			return;
 		}
@@ -57,32 +66,35 @@ export class SlotPopup {
 			<div class="rectangle-popup-row" data-row="distance">
 				<label class="rectangle-popup-label" id="slot-distance-label" for="slot-distance-input">Length</label>
 				<div class="rectangle-input-wrapper">
-					<input type="number" id="slot-distance-input" min="0.1" step="0.5" value="50.0" autocomplete="off" />
+					<input type="text" id="slot-distance-input" value="50.0" autocomplete="off" spellcheck="false" />
 					<span class="rectangle-unit">mm</span>
 					<button type="button" class="rectangle-lock-btn" id="slot-distance-lock" title="Lock distance dimension">
 						${UNLOCK_ICON}
 					</button>
 				</div>
+				<div class="dim-eval-preview hidden" id="slot-distance-eval-preview"></div>
 			</div>
 			<div class="rectangle-popup-row hidden" data-row="angle">
 				<label class="rectangle-popup-label" for="slot-angle-input">Angle</label>
 				<div class="rectangle-input-wrapper">
-					<input type="number" id="slot-angle-input" min="0.1" max="359.9" step="1" value="90.0" autocomplete="off" />
+					<input type="text" id="slot-angle-input" value="90.0" autocomplete="off" spellcheck="false" />
 					<span class="rectangle-unit">°</span>
 					<button type="button" class="rectangle-lock-btn" id="slot-angle-lock" title="Lock sweep angle">
 						${UNLOCK_ICON}
 					</button>
 				</div>
+				<div class="dim-eval-preview hidden" id="slot-angle-eval-preview"></div>
 			</div>
 			<div class="rectangle-popup-row hidden" data-row="radius">
 				<label class="rectangle-popup-label" for="slot-radius-input">Radius</label>
 				<div class="rectangle-input-wrapper">
-					<input type="number" id="slot-radius-input" min="0.1" step="0.5" value="" placeholder="—" autocomplete="off" />
+					<input type="text" id="slot-radius-input" value="" placeholder="—" autocomplete="off" spellcheck="false" />
 					<span class="rectangle-unit">mm</span>
 					<button type="button" class="rectangle-lock-btn" id="slot-radius-lock" title="Lock slot radius">
 						${UNLOCK_ICON}
 					</button>
 				</div>
+				<div class="dim-eval-preview hidden" id="slot-radius-eval-preview"></div>
 			</div>
 		`;
 		document.body.appendChild(this.container);
@@ -113,12 +125,14 @@ export class SlotPopup {
 		this.distanceInput.addEventListener('input', () => {
 			this._isDistanceLocked = true;
 			this.updateLockVisual(this.distanceLockBtn, true);
+			this.updateEvalPreviews();
 			this.emitValuesChange();
 		});
 
 		this.angleInput.addEventListener('input', () => {
 			this._isAngleLocked = true;
 			this.updateLockVisual(this.angleLockBtn, true);
+			this.updateEvalPreviews();
 			this.emitValuesChange();
 		});
 
@@ -128,6 +142,7 @@ export class SlotPopup {
 				this._isRadiusLocked = true;
 				this.updateLockVisual(this.radiusLockBtn, true);
 			}
+			this.updateEvalPreviews();
 			this.emitValuesChange();
 		});
 
@@ -308,13 +323,21 @@ export class SlotPopup {
 
 	public getDistance(): number {
 		if (!this.distanceInput) return 50;
-		const val = parseFloat(this.distanceInput.value);
+		const val = parseNumericOrExpression(
+			this.distanceInput.value,
+			50,
+			this.sketch?.getParameterValuesMap()
+		);
 		return isNaN(val) || val <= 0.01 ? 1 : val;
 	}
 
 	public getAngle(): number {
 		if (!this.angleInput) return 90;
-		const val = parseFloat(this.angleInput.value);
+		const val = parseNumericOrExpression(
+			this.angleInput.value,
+			90,
+			this.sketch?.getParameterValuesMap()
+		);
 		if (isNaN(val) || val <= 0.1) return 1;
 		if (val >= 359.9) return 359.9;
 		return val;
@@ -324,8 +347,27 @@ export class SlotPopup {
 		if (!this.radiusInput) return null;
 		const raw = this.radiusInput.value.trim();
 		if (raw === '') return null;
-		const val = parseFloat(raw);
+		const val = parseNumericOrExpression(
+			raw,
+			NaN,
+			this.sketch?.getParameterValuesMap()
+		);
 		return isNaN(val) || val <= 0.01 ? null : val;
+	}
+
+	public getDistanceExpression(): string | undefined {
+		if (!this.distanceInput) return undefined;
+		return getExpressionIfValid(this.distanceInput.value, this.sketch?.getParameterValuesMap());
+	}
+
+	public getAngleExpression(): string | undefined {
+		if (!this.angleInput) return undefined;
+		return getExpressionIfValid(this.angleInput.value, this.sketch?.getParameterValuesMap());
+	}
+
+	public getRadiusExpression(): string | undefined {
+		if (!this.radiusInput) return undefined;
+		return getExpressionIfValid(this.radiusInput.value, this.sketch?.getParameterValuesMap());
 	}
 
 	public setMode(mode: SlotMode): void {
@@ -369,6 +411,7 @@ export class SlotPopup {
 		if (this.radiusInput) {
 			this.radiusInput.value = radius !== null ? Number(Math.max(0.1, radius).toFixed(1)).toString() : '';
 		}
+		this.updateEvalPreviews();
 	}
 
 	public show(
@@ -390,6 +433,7 @@ export class SlotPopup {
 		if (this.radiusInput) {
 			this.radiusInput.value = radius !== null ? Number(Math.max(0.1, radius).toFixed(1)).toString() : '';
 		}
+		this.updateEvalPreviews();
 
 		this.container.classList.remove('hidden');
 		this.updatePosition(screenPos);
@@ -426,6 +470,28 @@ export class SlotPopup {
 		}
 		if (radius !== undefined && !this._isRadiusLocked && this.radiusInput) {
 			this.radiusInput.value = radius !== null ? Number(Math.max(0.1, radius).toFixed(1)).toString() : '';
+		}
+		this.updateEvalPreviews();
+	}
+
+	public updateEvalPreviews(): void {
+		const scope = this.sketch?.getParameterValuesMap();
+		const distPrev = this.container?.querySelector<HTMLElement>('#slot-distance-eval-preview');
+		const distWrap = typeof this.distanceInput?.closest === 'function' ? this.distanceInput.closest<HTMLElement>('.rectangle-input-wrapper') : null;
+		if (this.distanceInput) {
+			updateExpressionPreview(this.distanceInput.value, 'mm', distPrev ?? null, scope, distWrap);
+		}
+
+		const angPrev = this.container?.querySelector<HTMLElement>('#slot-angle-eval-preview');
+		const angWrap = typeof this.angleInput?.closest === 'function' ? this.angleInput.closest<HTMLElement>('.rectangle-input-wrapper') : null;
+		if (this.angleInput) {
+			updateExpressionPreview(this.angleInput.value, '°', angPrev ?? null, scope, angWrap);
+		}
+
+		const radPrev = this.container?.querySelector<HTMLElement>('#slot-radius-eval-preview');
+		const radWrap = typeof this.radiusInput?.closest === 'function' ? this.radiusInput.closest<HTMLElement>('.rectangle-input-wrapper') : null;
+		if (this.radiusInput) {
+			updateExpressionPreview(this.radiusInput.value, 'mm', radPrev ?? null, scope, radWrap);
 		}
 	}
 }

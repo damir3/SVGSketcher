@@ -6,6 +6,7 @@ import { CanvasInteraction } from './canvas/interaction';
 import { Toolbar, showToast } from './ui/toolbar';
 import { Sidebar } from './ui/sidebar';
 import { DimensionModal } from './ui/modal';
+import { ParametersPopup } from './ui/parameters-popup';
 import {
 	loadTrianglePreset,
 	loadBracketPreset,
@@ -17,6 +18,11 @@ import { ICONS } from './ui/icons';
 function initApp(): void {
 	const app = document.getElementById('app');
 	if (!app) return;
+
+	const isMac =
+		typeof navigator !== 'undefined' &&
+		(/Mac|iPhone|iPod|iPad/.test(navigator.platform) ||
+			/Macintosh|Mac OS X/.test(navigator.userAgent));
 
 	app.innerHTML = `
 		<!-- TOP HEADER -->
@@ -58,6 +64,10 @@ function initApp(): void {
 				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-fit-view" title="Fit to View (Z)" aria-label="Fit to View">
 					${ICONS.fitView}
+				</button>
+				<div class="header-divider"></div>
+				<button class="btn-header btn-icon" id="btn-parameters" title="Parameters (${isMac ? 'Cmd+P' : 'Ctrl+P'})" aria-label="Parameters">
+					${ICONS.parameters}
 				</button>
 				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-clear" title="Clear Sketch" aria-label="Clear Sketch">
@@ -130,14 +140,20 @@ function initApp(): void {
 	const toolbar = new Toolbar(toolbarContainer, sketch, interaction);
 	const sidebar = new Sidebar(sidebarContainer, sketch, interaction);
 	const dimModal = new DimensionModal(sketch);
+	const paramModal = new ParametersPopup(sketch);
+
+	const btnParameters = document.getElementById('btn-parameters') as HTMLButtonElement;
+	btnParameters?.addEventListener('click', () => {
+		paramModal.toggle();
+	});
 
 	// Connect callbacks
 	interaction.onEditDimension = (constraint, screenPos) => {
 		dimModal.open(constraint, screenPos);
 	};
 
-	sidebar.onEditDimension = constraint => {
-		dimModal.open(constraint);
+	sidebar.onEditDimension = (constraint, screenPos) => {
+		dimModal.open(constraint, screenPos);
 	};
 
 	interaction.onToolChange = tool => {
@@ -453,6 +469,11 @@ function initApp(): void {
 			if (!isCtrlOrCmd) {
 				fitToView();
 			}
+		}
+
+		if (e.code === 'KeyP' && (isMac ? e.metaKey : e.ctrlKey)) {
+			e.preventDefault();
+			paramModal.toggle();
 		}
 	});
 

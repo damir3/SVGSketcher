@@ -5,10 +5,11 @@ import type {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint
+	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from '../math/vector';
+import { updateExpressionPreview } from './expression-preview';
 
 export type EditableConstraint =
 	| DistanceConstraint
@@ -62,21 +63,25 @@ export class DimensionModal {
 
 		const unit = isAngle ? '°' : 'mm';
 		const displayVal = Number(curVal.toFixed(2)).toString();
+		const initialVal = constraint.expression ?? displayVal;
 
 		this.modalEl.innerHTML = `
-			${
-				isRadius
-					? `
-				<div class="dim-mode-switch-compact" role="group" aria-label="Dimension mode">
-					<button type="button" class="btn-dim-mode-compact ${this.currentMode === 'radius' ? 'active' : ''}" id="btn-mode-radius" title="Radius (R)">R</button>
-					<button type="button" class="btn-dim-mode-compact ${this.currentMode === 'diameter' ? 'active' : ''}" id="btn-mode-diameter" title="Diameter (Ø)">Ø</button>
+			<div class="dim-popup-content">
+				${
+					isRadius
+						? `
+					<div class="dim-mode-switch-compact" role="group" aria-label="Dimension mode">
+						<button type="button" class="btn-dim-mode-compact ${this.currentMode === 'radius' ? 'active' : ''}" id="btn-mode-radius" title="Radius (R)">R</button>
+						<button type="button" class="btn-dim-mode-compact ${this.currentMode === 'diameter' ? 'active' : ''}" id="btn-mode-diameter" title="Diameter (Ø)">Ø</button>
+					</div>
+				`
+						: ''
+				}
+				<div class="dim-input-wrapper">
+					<input type="text" autocomplete="off" spellcheck="false" id="dim-input-val" value="${initialVal}" autofocus />
+					<span class="dim-unit">${unit}</span>
 				</div>
-			`
-					: ''
-			}
-			<div class="dim-input-wrapper">
-				<input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="dim-input-val" value="${displayVal}" autofocus />
-				<span class="dim-unit">${unit}</span>
+				<div class="dim-eval-preview hidden" id="dim-eval-preview"></div>
 			</div>
 		`;
 
@@ -84,8 +89,8 @@ export class DimensionModal {
 
 		// Position near click or center
 		if (screenPos) {
-			const left = Math.min(Math.max(screenPos.x, 20), window.innerWidth - 200);
-			const top = Math.min(Math.max(screenPos.y, 20), window.innerHeight - 80);
+			const left = Math.min(Math.max(screenPos.x, 20), window.innerWidth - 240);
+			const top = Math.min(Math.max(screenPos.y, 20), window.innerHeight - 100);
 			this.modalEl.style.left = `${left}px`;
 			this.modalEl.style.top = `${top}px`;
 			this.modalEl.style.transform = 'none';
@@ -101,27 +106,33 @@ export class DimensionModal {
 				setTimeout(() => this.focusAndSelect(), 0);
 			});
 
+			input.addEventListener('input', () => {
+				this.updateEvalPreview(input.value, unit);
+			});
+
 			input.addEventListener('keydown', e => {
 				if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
 					e.preventDefault();
 					const stepVal = isAngle ? 0.5 : 0.1;
 					const delta = (e.key === 'ArrowUp' ? 1 : -1) * stepVal;
-					const cur = parseFloat(input.value.trim().replace(',', '.')) || 0;
+					const evalRes = this.sketch.evaluateExpression(input.value.trim());
+					const cur = evalRes.isValid && evalRes.value ? evalRes.value : (parseFloat(input.value.trim().replace(',', '.')) || 0);
 					const min = isAngle ? 0.1 : 0.01;
-					const max = isAngle ? 179.9 : Infinity;
+					const max = isAngle ? (constraint.name.includes('Arc') ? 359.9 : 179.9) : Infinity;
 					const nextVal = Math.min(max, Math.max(min, Number((cur + delta).toFixed(2))));
 					input.value = nextVal.toString();
+					this.updateEvalPreview(input.value, unit);
 					this.focusAndSelect();
 				}
 			});
 		}
 
+		this.updateEvalPreview(initialVal, unit);
 		this.focusAndSelect();
 		requestAnimationFrame(() => this.focusAndSelect());
 		setTimeout(() => this.focusAndSelect(), 25);
 		setTimeout(() => this.focusAndSelect(), 80);
 
-		// If mouse was still pressed down when opening, ensure selection upon mouse release
 		const onMouseUp = () => {
 			window.removeEventListener('mouseup', onMouseUp);
 			if (!this.modalEl.classList.contains('hidden')) {
@@ -131,6 +142,12 @@ export class DimensionModal {
 		window.addEventListener('mouseup', onMouseUp);
 
 		this.bindInnerButtons(isRadius);
+	}
+
+	private updateEvalPreview(text: string, unit: string): void {
+		const previewEl = this.modalEl.querySelector<HTMLElement>('#dim-eval-preview');
+		const wrapper = this.modalEl.querySelector<HTMLElement>('.dim-input-wrapper');
+		updateExpressionPreview(text, unit, previewEl, this.sketch.getParameterValuesMap(), wrapper);
 	}
 
 	private focusAndSelect(): void {
@@ -160,7 +177,8 @@ export class DimensionModal {
 
 		const input = this.modalEl.querySelector<HTMLInputElement>('#dim-input-val');
 		if (input) {
-			const val = parseFloat(input.value.trim().replace(',', '.'));
+			const evalRes = this.sketch.evaluateExpression(input.value.trim());
+			const val = evalRes.isValid && evalRes.value ? evalRes.value : parseFloat(input.value.trim().replace(',', '.'));
 			if (!isNaN(val) && val > 0) {
 				if (newMode === 'diameter') {
 					input.value = Number((val * 2).toFixed(2)).toString();
@@ -168,6 +186,7 @@ export class DimensionModal {
 					input.value = Number((val / 2).toFixed(2)).toString();
 				}
 			}
+			this.updateEvalPreview(input.value, 'mm');
 			this.focusAndSelect();
 		}
 	}
@@ -183,13 +202,24 @@ export class DimensionModal {
 		const input = this.modalEl.querySelector<HTMLInputElement>('#dim-input-val');
 		if (!input) return;
 
-		const newVal = parseFloat(input.value.trim().replace(',', '.'));
-		if (!isNaN(newVal) && newVal > 0) {
+		const text = input.value.trim();
+		const evalRes = this.sketch.evaluateExpression(text);
+		if (evalRes.isValid && evalRes.value !== undefined && Number.isFinite(evalRes.value) && evalRes.value > 0) {
 			this.sketch.pushHistory();
-			this.sketch.updateDimensionalConstraint(this.currentConstraint.id, newVal, this.currentMode);
+			this.sketch.updateDimensionalConstraint(this.currentConstraint.id, text, this.currentMode);
+			this.close();
+		} else {
+			// Do not close if expression is invalid; show error in UI
+			const wrapper = this.modalEl.querySelector<HTMLElement>('.dim-input-wrapper');
+			wrapper?.classList.add('error');
+			const previewEl = this.modalEl.querySelector<HTMLElement>('#dim-eval-preview');
+			if (previewEl) {
+				previewEl.textContent = evalRes.error ? `! ${evalRes.error}` : '! Invalid expression';
+				previewEl.classList.remove('hidden');
+				previewEl.classList.add('error');
+			}
+			this.focusAndSelect();
 		}
-
-		this.close();
 	}
 
 	private bindInnerButtons(isRadius: boolean): void {

@@ -716,7 +716,8 @@ export function commitFilletToSketch(
 	sketch: SketchDocument,
 	fillet: FilletCandidate,
 	isFirstFillet: boolean,
-	firstArcId?: string
+	firstArcId?: string,
+	expression?: string
 ): { arcId: string; centerId: string; p1Id: string; p2Id: string } | null {
 	const res = fillet.result;
 	if (!res) return null;
@@ -793,7 +794,10 @@ export function commitFilletToSketch(
 
 	// 7. Add Radius Constraint / EqualRadius Constraint
 	if (isFirstFillet) {
-		sketch.addRadiusConstraint(filletArc.id, res.radius);
+		const c = sketch.addRadiusConstraint(filletArc.id, res.radius);
+		if (c && expression) {
+			c.expression = expression;
+		}
 	} else if (firstArcId) {
 		sketch.addEqualRadiusConstraint(firstArcId, filletArc.id);
 	}

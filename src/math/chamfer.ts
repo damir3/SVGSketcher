@@ -346,7 +346,8 @@ export function commitChamferToSketch(
 	dist1: number,
 	dist2: number,
 	angleDeg: number,
-	flip: boolean
+	flip: boolean,
+	expressions?: { dist1?: string; dist2?: string; angle?: string }
 ): {
 	chamferLineId: string;
 	p1Id: string;
@@ -399,11 +400,15 @@ export function commitChamferToSketch(
 
 	// 6. Add Distance / Angle constraints
 	if (mode === 'equal_distance') {
-		sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
-		sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+		if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
+		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+		if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
 	} else if (mode === 'two_distance') {
-		sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
-		sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+		if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
+		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+		if (c2 && expressions?.dist2) c2.expression = expressions.dist2;
 	} else if (mode === 'distance_angle') {
 		const centroid = {
 			x: (candidate.vertexPos.x + res.t1.x + res.t2.x) / 3,
@@ -411,17 +416,21 @@ export function commitChamferToSketch(
 		};
 		if (!flip) {
 			// Distance along line 1
-			sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+			const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+			if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
 			// Angle between chamfer line and line 1
 			if (l1) {
-				sketch.addAngleConstraint(chamferLine.id, l1.id, res.angleDeg, 30, centroid);
+				const cAng = sketch.addAngleConstraint(chamferLine.id, l1.id, res.angleDeg, 30, centroid);
+				if (cAng && expressions?.angle) cAng.expression = expressions.angle;
 			}
 		} else {
 			// Distance along line 2 (offset on other side of line)
-			sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+			const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+			if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
 			// Angle between chamfer line and line 2
 			if (l2) {
-				sketch.addAngleConstraint(chamferLine.id, l2.id, res.angleDeg, 30, centroid);
+				const cAng = sketch.addAngleConstraint(chamferLine.id, l2.id, res.angleDeg, 30, centroid);
+				if (cAng && expressions?.angle) cAng.expression = expressions.angle;
 			}
 		}
 	}

@@ -1,6 +1,7 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
+import { parseNumericOrExpression } from '../math/expression';
 import {
 	DistanceConstraint,
 	RadiusConstraint,
@@ -13,7 +14,7 @@ import {
 	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import { ICONS } from './icons';
-import { dist } from '../math/vector';
+import { dist, vec, type Vec2 } from '../math/vector';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
@@ -33,7 +34,8 @@ export class Sidebar {
 			| PointToLineDistanceConstraint
 			| OffsetConstraint
 			| OriginDistanceConstraint
-			| LineToAxisDistanceConstraint
+			| LineToAxisDistanceConstraint,
+		screenPos?: Vec2
 	) => void;
 
 	constructor(container: HTMLElement, sketch: SketchDocument, interaction?: CanvasInteraction) {
@@ -982,14 +984,14 @@ export class Sidebar {
 								<div class="pattern-param-row">
 									<label class="pattern-param-label" for="insp-pt-x">X</label>
 									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-pt-x" data-entity-id="${pt.id}" value="${Number(pt.x.toFixed(2))}" step="1" class="pattern-num-input" />
+										<input type="text" id="insp-pt-x" data-entity-id="${pt.id}" value="${Number(pt.x.toFixed(2))}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 										<span class="pattern-input-suffix">mm</span>
 									</div>
 								</div>
 								<div class="pattern-param-row">
 									<label class="pattern-param-label" for="insp-pt-y">Y</label>
 									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-pt-y" data-entity-id="${pt.id}" value="${Number(pt.y.toFixed(2))}" step="1" class="pattern-num-input" />
+										<input type="text" id="insp-pt-y" data-entity-id="${pt.id}" value="${Number(pt.y.toFixed(2))}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 										<span class="pattern-input-suffix">mm</span>
 									</div>
 								</div>
@@ -1037,14 +1039,14 @@ export class Sidebar {
 								<div class="pattern-param-row">
 									<label class="pattern-param-label" for="insp-line-length">Length</label>
 									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-line-length" data-entity-id="${line.id}" value="${lengthVal}" min="0.01" step="1" class="pattern-num-input" />
+										<input type="text" id="insp-line-length" data-entity-id="${line.id}" value="${lengthVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 										<span class="pattern-input-suffix">mm</span>
 									</div>
 								</div>
 								<div class="pattern-param-row">
 									<label class="pattern-param-label" for="insp-line-angle">Angle</label>
 									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-line-angle" data-entity-id="${line.id}" value="${angleVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+										<input type="text" id="insp-line-angle" data-entity-id="${line.id}" value="${angleVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 										<span class="pattern-input-suffix">°</span>
 									</div>
 								</div>
@@ -1074,14 +1076,14 @@ export class Sidebar {
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-circle-radius">Radius</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-circle-radius" data-entity-id="${circ.id}" value="${Number(circ.radius.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-circle-radius" data-entity-id="${circ.id}" value="${Number(circ.radius.toFixed(2))}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-circle-diameter">Diameter</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-circle-diameter" data-entity-id="${circ.id}" value="${Number((circ.radius * 2).toFixed(2))}" min="0.02" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-circle-diameter" data-entity-id="${circ.id}" value="${Number((circ.radius * 2).toFixed(2))}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
@@ -1121,14 +1123,14 @@ export class Sidebar {
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-arc-radius">Radius</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-arc-radius" data-entity-id="${arc.id}" value="${Number(arc.radius.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-arc-radius" data-entity-id="${arc.id}" value="${Number(arc.radius.toFixed(2))}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-arc-angle">Angle</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-arc-angle" data-entity-id="${arc.id}" value="${angleVal}" min="0.1" max="359.9" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-arc-angle" data-entity-id="${arc.id}" value="${angleVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">°</span>
 								</div>
 							</div>
@@ -1168,21 +1170,21 @@ export class Sidebar {
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-ellipse-rx">Major Radius (Rx)</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-ellipse-rx" data-entity-id="${ellipse.id}" value="${rxVal}" min="0.01" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-ellipse-rx" data-entity-id="${ellipse.id}" value="${rxVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-ellipse-ry">Minor Radius (Ry)</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-ellipse-ry" data-entity-id="${ellipse.id}" value="${ryVal}" min="0.01" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-ellipse-ry" data-entity-id="${ellipse.id}" value="${ryVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-ellipse-rot">Rotation</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-ellipse-rot" data-entity-id="${ellipse.id}" value="${rotVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-ellipse-rot" data-entity-id="${ellipse.id}" value="${rotVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">°</span>
 								</div>
 							</div>
@@ -1222,21 +1224,21 @@ export class Sidebar {
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-ellipse-rx">Major Radius (Rx)</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-ellipse-rx" data-entity-id="${arc.id}" value="${rxVal}" min="0.01" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-ellipse-rx" data-entity-id="${arc.id}" value="${rxVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-ellipse-ry">Minor Radius (Ry)</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-ellipse-ry" data-entity-id="${arc.id}" value="${ryVal}" min="0.01" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-ellipse-ry" data-entity-id="${arc.id}" value="${ryVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">mm</span>
 								</div>
 							</div>
 							<div class="pattern-param-row">
 								<label class="pattern-param-label" for="insp-ellipse-rot">Rotation</label>
 								<div class="pattern-input-suffix-wrapper">
-									<input type="number" id="insp-ellipse-rot" data-entity-id="${arc.id}" value="${rotVal}" min="-180" max="180" step="1" class="pattern-num-input" />
+									<input type="text" id="insp-ellipse-rot" data-entity-id="${arc.id}" value="${rotVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 									<span class="pattern-input-suffix">°</span>
 								</div>
 							</div>
@@ -1347,7 +1349,7 @@ export class Sidebar {
 								<div class="pattern-param-row">
 									<label class="pattern-param-label" for="insp-two-lines-angle">Angle</label>
 									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-two-lines-angle" data-line1-id="${userLineId}" data-line2-id="${axisId}" value="${angleVal}" min="0.1" max="179.9" step="1" class="pattern-num-input" />
+										<input type="text" id="insp-two-lines-angle" data-line1-id="${userLineId}" data-line2-id="${axisId}" value="${angleVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 										<span class="pattern-input-suffix">°</span>
 									</div>
 								</div>
@@ -1378,7 +1380,7 @@ export class Sidebar {
 								<div class="pattern-param-row">
 									<label class="pattern-param-label" for="insp-two-lines-angle">Angle</label>
 									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-two-lines-angle" data-line1-id="${l1.id}" data-line2-id="${l2.id}" value="${angleVal}" min="0.1" max="179.9" step="1" class="pattern-num-input" />
+										<input type="text" id="insp-two-lines-angle" data-line1-id="${l1.id}" data-line2-id="${l2.id}" value="${angleVal}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
 										<span class="pattern-input-suffix">°</span>
 									</div>
 								</div>
@@ -1681,53 +1683,119 @@ export class Sidebar {
 								: c.orientation === 'vertical'
 								? 'Vertical Distance'
 								: 'Distance';
+						const numVal = Number(c.targetDistance.toFixed(2));
+						paramsHtml = `
+							<div class="pattern-params-card in-inspector">
+								<div class="inspector-param-row">
+									<span class="inspector-param-label">Distance:</span>
+									<div class="inspector-value-group">
+										<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+											<strong>${numVal} mm</strong>
+											${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+										</span>
+										<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+											<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+												<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+											</svg>
+										</button>
+									</div>
+								</div>
+							</div>
+						`;
+					} else if (c instanceof RadiusConstraint) {
+						const isDiameter = c.displayMode === 'diameter';
+						title = isDiameter ? 'Diameter' : 'Radius';
+						const mode = c.displayMode ?? 'radius';
+						const numVal = isDiameter ? Number((c.targetRadius * 2).toFixed(2)) : Number(c.targetRadius.toFixed(2));
 						paramsHtml = `
 							<div class="pattern-params-card in-inspector">
 								<div class="pattern-param-row">
-									<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
-									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
-										<span class="pattern-input-suffix">mm</span>
+									<label class="pattern-param-label">Mode</label>
+									<div class="pattern-segmented-control">
+										<button type="button" class="seg-btn insp-rad-mode-btn ${mode === 'radius' ? 'active' : ''}" data-constraint-id="${c.id}" data-mode="radius">Radius</button>
+										<button type="button" class="seg-btn insp-rad-mode-btn ${mode === 'diameter' ? 'active' : ''}" data-constraint-id="${c.id}" data-mode="diameter">Diameter</button>
+									</div>
+								</div>
+								<div class="inspector-param-row">
+									<span class="inspector-param-label">${isDiameter ? 'Diameter:' : 'Radius:'}</span>
+									<div class="inspector-value-group">
+										<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+											<strong>${numVal} mm</strong>
+											${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+										</span>
+										<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+											<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+												<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+											</svg>
+										</button>
 									</div>
 								</div>
 							</div>
 						`;
 					} else if (c instanceof PointToLineDistanceConstraint) {
 						title = 'Point-to-Line Distance';
+						const numVal = Number(c.targetDistance.toFixed(2));
 						paramsHtml = `
 							<div class="pattern-params-card in-inspector">
-								<div class="pattern-param-row">
-									<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
-									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
-										<span class="pattern-input-suffix">mm</span>
+								<div class="inspector-param-row">
+									<span class="inspector-param-label">Distance:</span>
+									<div class="inspector-value-group">
+										<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+											<strong>${numVal} mm</strong>
+											${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+										</span>
+										<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+											<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+												<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+											</svg>
+										</button>
 									</div>
 								</div>
 							</div>
 						`;
 					} else if (c instanceof OffsetConstraint) {
 						title = 'Offset Distance';
+						const numVal = Number(c.targetDistance.toFixed(2));
 						paramsHtml = `
 							<div class="pattern-params-card in-inspector">
-								<div class="pattern-param-row">
-									<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
-									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
-										<span class="pattern-input-suffix">mm</span>
+								<div class="inspector-param-row">
+									<span class="inspector-param-label">Distance:</span>
+									<div class="inspector-value-group">
+										<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+											<strong>${numVal} mm</strong>
+											${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+										</span>
+										<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+											<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+												<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+											</svg>
+										</button>
 									</div>
 								</div>
 							</div>
 						`;
 					} else if (c instanceof AngleConstraint) {
 						title = 'Angle';
-						const maxAngle = c.line1Id === c.line2Id && this.sketch.arcs.has(c.line1Id) ? 359.9 : 179.9;
+						const numVal = Number(c.targetAngle.toFixed(2));
 						paramsHtml = `
 							<div class="pattern-params-card in-inspector">
-								<div class="pattern-param-row">
-									<label class="pattern-param-label" for="insp-constraint-val">Angle</label>
-									<div class="pattern-input-suffix-wrapper">
-										<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetAngle.toFixed(2))}" min="0.1" max="${maxAngle}" step="1" class="pattern-num-input" />
-										<span class="pattern-input-suffix">°</span>
+								<div class="inspector-param-row">
+									<span class="inspector-param-label">Angle:</span>
+									<div class="inspector-value-group">
+										<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+											<strong>${numVal}°</strong>
+											${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+										</span>
+										<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+											<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+												<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+											</svg>
+										</button>
 									</div>
 								</div>
 							</div>
@@ -1747,13 +1815,22 @@ export class Sidebar {
 									: c.orientation === 'vertical'
 									? 'Distance to X-Axis'
 									: 'Distance to (0,0)';
+							const numVal = Number(c.targetDistance.toFixed(2));
 							paramsHtml = `
 								<div class="pattern-params-card in-inspector">
-									<div class="pattern-param-row">
-										<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
-										<div class="pattern-input-suffix-wrapper">
-											<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
-											<span class="pattern-input-suffix">mm</span>
+									<div class="inspector-param-row">
+										<span class="inspector-param-label">Distance:</span>
+										<div class="inspector-value-group">
+											<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+												<strong>${numVal} mm</strong>
+												${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+											</span>
+											<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+												<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+													<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+													<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+												</svg>
+											</button>
 										</div>
 									</div>
 								</div>
@@ -1766,13 +1843,22 @@ export class Sidebar {
 							paramsHtml = `<div class="inspector-row"><span>Axis:</span> <strong>${axisName} (${c.axis === 'x' ? 'Y = 0' : 'X = 0'})</strong></div>`;
 						} else {
 							title = `Distance to ${axisName}`;
+							const numVal = Number(c.targetDistance.toFixed(2));
 							paramsHtml = `
 								<div class="pattern-params-card in-inspector">
-									<div class="pattern-param-row">
-										<label class="pattern-param-label" for="insp-constraint-val">Distance</label>
-										<div class="pattern-input-suffix-wrapper">
-											<input type="number" id="insp-constraint-val" data-constraint-id="${c.id}" value="${Number(c.targetDistance.toFixed(2))}" min="0.01" step="1" class="pattern-num-input" />
-											<span class="pattern-input-suffix">mm</span>
+									<div class="inspector-param-row">
+										<span class="inspector-param-label">Distance:</span>
+										<div class="inspector-value-group">
+											<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
+												<strong>${numVal} mm</strong>
+												${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
+											</span>
+											<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
+												<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+													<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+													<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+												</svg>
+											</button>
 										</div>
 									</div>
 								</div>
@@ -3071,17 +3157,32 @@ export class Sidebar {
 			}
 		});
 
-		// Inspector Dimensional Constraint value & Radius/Diameter mode editing
-		this.bindInspectorNumberInput(
-			'#insp-constraint-val',
-			(val, input) => {
-				const cid = input.getAttribute('data-constraint-id');
-				if (cid) {
-					this.sketch.updateDimensionalConstraint(cid, val);
+		// Inspector Dimensional Constraint edit button & double click
+		this.container.querySelectorAll<HTMLButtonElement>('.btn-insp-edit-dim').forEach(btn => {
+			btn.addEventListener('click', e => {
+				e.stopPropagation();
+				const cid = btn.getAttribute('data-constraint-id');
+				const c = cid ? this.sketch.constraints.get(cid) : undefined;
+				if (c) {
+					const btnRect = btn.getBoundingClientRect();
+					const screenPos = vec(btnRect.left - 240, btnRect.top - 10);
+					this.onEditDimension?.(c as any, screenPos);
 				}
-			},
-			val => !isNaN(val) && isFinite(val) && val > 0
-		);
+			});
+		});
+
+		this.container.querySelectorAll<HTMLElement>('.inspector-value-display').forEach(el => {
+			el.addEventListener('dblclick', e => {
+				e.stopPropagation();
+				const cid = el.getAttribute('data-constraint-id');
+				const c = cid ? this.sketch.constraints.get(cid) : undefined;
+				if (c) {
+					const elRect = el.getBoundingClientRect();
+					const screenPos = vec(elRect.left - 240, elRect.top - 10);
+					this.onEditDimension?.(c as any, screenPos);
+				}
+			});
+		});
 
 		this.container.querySelectorAll<HTMLButtonElement>('.insp-rad-mode-btn').forEach(btn => {
 			btn.addEventListener('click', () => {
@@ -3118,7 +3219,8 @@ export class Sidebar {
 			if (e.key === 'Enter') {
 				e.preventDefault();
 				e.stopPropagation();
-				const val = parseFloat(input.value.trim().replace(',', '.'));
+				const text = input.value.trim();
+				const val = parseNumericOrExpression(text, NaN, this.sketch.getParameterValuesMap());
 				committed = true;
 				if (validate(val)) {
 					this.sketch.pushHistory();

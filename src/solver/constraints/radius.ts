@@ -149,7 +149,8 @@ export class RadiusConstraint extends BaseConstraint {
 		const isDiameter = this.displayMode === 'diameter';
 		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
 		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
-		const textVal = isDiameter ? `Ø ${numStr}` : `R ${numStr}`;
+		const prefix = this.expression ? 'fx: ' : '';
+		const textVal = isDiameter ? `${prefix}Ø ${numStr}` : `${prefix}R ${numStr}`;
 		const textLen = textVal.length * 8 + 14;
 
 		const rectX = dirX > 0 ? tip.x : tip.x - textLen;

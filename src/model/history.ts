@@ -1,5 +1,6 @@
 import type { IConstraint, ConstraintType } from '../solver/types';
 import type { SketchPoint, SketchLine, SketchCircle, SketchArc, SketchEllipse, SketchEllipticalArc, SketchSpline } from './types';
+import type { SketchParameter } from '../math/expression';
 import {
 	FixedConstraint,
 	CoincidentConstraint,
@@ -42,6 +43,7 @@ export interface SerializedConstraint {
 	isSoft?: boolean;
 	isDimensional?: boolean;
 	value?: number;
+	expression?: string;
 
 	// Specific constraint properties
 	pointId?: string;
@@ -147,6 +149,7 @@ export interface SketchSnapshot {
 	ellipticalArcs: SketchEllipticalArc[];
 	splines?: SketchSpline[];
 	constraints: SerializedConstraint[];
+	parameters?: SketchParameter[];
 	idCounter: number;
 }
 
@@ -160,6 +163,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		isSoft: c.isSoft,
 		isDimensional: c.isDimensional,
 		value: c.value,
+		expression: (c as any).expression,
 	};
 
 	if (c instanceof FixedConstraint) {
@@ -576,6 +580,9 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 	}
 	if (c && d.name) {
 		(c as any).name = d.name;
+	}
+	if (c && d.expression !== undefined) {
+		(c as any).expression = d.expression;
 	}
 	return c;
 }

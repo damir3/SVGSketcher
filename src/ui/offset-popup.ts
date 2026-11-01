@@ -1,5 +1,8 @@
 import type { Vec2 } from '../math/vector';
 import type { OffsetDirection } from '../math/offset';
+import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
+import type { SketchDocument } from '../model/sketch';
+import { updateExpressionPreview } from './expression-preview';
 
 export interface ScreenBoundingBox {
 	minX: number;
@@ -10,6 +13,7 @@ export interface ScreenBoundingBox {
 
 export class OffsetPopup {
 	private container: HTMLElement;
+	private sketch?: SketchDocument;
 
 	private labelDist1: HTMLElement;
 	private dist1Input: HTMLInputElement;
@@ -36,24 +40,31 @@ export class OffsetPopup {
 	public onCancel?: () => void;
 	public onModeSwitchRequested?: (direction: OffsetDirection) => void;
 
-	constructor() {
+	public setSketch(sketch: SketchDocument): void {
+		this.sketch = sketch;
+	}
+
+	constructor(sketch?: SketchDocument) {
+		this.sketch = sketch;
 		this.container = document.createElement('div');
 		this.container.className = 'offset-popup chamfer-popup hidden';
 		this.container.innerHTML = `
 			<div class="chamfer-popup-row offset-row-dist1">
 				<label class="chamfer-popup-label" id="offset-label-dist1" for="offset-dist1-input">Distance</label>
 				<div class="chamfer-input-wrapper">
-					<input type="number" id="offset-dist1-input" step="0.5" value="10.0" autocomplete="off" />
+					<input type="text" id="offset-dist1-input" value="10.0" autocomplete="off" spellcheck="false" />
 					<span class="chamfer-unit">mm</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="offset-dist1-eval-preview"></div>
 			</div>
 
 			<div class="chamfer-popup-row offset-row-dist2 hidden">
 				<label class="chamfer-popup-label" id="offset-label-dist2" for="offset-dist2-input">Distance 2</label>
 				<div class="chamfer-input-wrapper">
-					<input type="number" id="offset-dist2-input" step="0.5" value="10.0" autocomplete="off" />
+					<input type="text" id="offset-dist2-input" value="10.0" autocomplete="off" spellcheck="false" />
 					<span class="chamfer-unit">mm</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="offset-dist2-eval-preview"></div>
 			</div>
 
 			<div class="chamfer-popup-row offset-row-flip">
@@ -86,7 +97,10 @@ export class OffsetPopup {
 		this.container.addEventListener('mousedown', e => e.stopPropagation());
 		this.container.addEventListener('click', e => e.stopPropagation());
 
-		const handleInput = () => this.notifyChange();
+		const handleInput = () => {
+			this.updateEvalPreviews();
+			this.notifyChange();
+		};
 
 		this.dist1Input.addEventListener('input', handleInput);
 		this.dist2Input.addEventListener('input', handleInput);
@@ -173,10 +187,9 @@ export class OffsetPopup {
 		dist2: number;
 		flip: boolean;
 	} {
-		const rawD1 = parseFloat(this.dist1Input.value);
-		const rawD2 = parseFloat(this.dist2Input.value);
-		const d1 = isNaN(rawD1) ? 10 : rawD1;
-		const d2 = isNaN(rawD2) ? 10 : rawD2;
+		const scope = this.sketch?.getParameterValuesMap();
+		const d1 = parseNumericOrExpression(this.dist1Input.value, 10, scope);
+		const d2 = parseNumericOrExpression(this.dist2Input.value, 10, scope);
 		const flip = this.flipCheckbox.checked;
 
 		return {
@@ -187,12 +200,21 @@ export class OffsetPopup {
 		};
 	}
 
+	public getExpressions(): { dist1?: string; dist2?: string } {
+		const scope = this.sketch?.getParameterValuesMap();
+		return {
+			dist1: this.dist1Input ? getExpressionIfValid(this.dist1Input.value, scope) : undefined,
+			dist2: this.dist2Input ? getExpressionIfValid(this.dist2Input.value, scope) : undefined,
+		};
+	}
+
 	public updateValues(dist1: number, dist2: number, flip?: boolean): void {
 		this.dist1Input.value = Number(dist1.toFixed(1)).toString();
 		this.dist2Input.value = Number(dist2.toFixed(1)).toString();
 		if (flip !== undefined) {
 			this.flipCheckbox.checked = flip;
 		}
+		this.updateEvalPreviews();
 	}
 
 	public show(
@@ -205,9 +227,25 @@ export class OffsetPopup {
 		this.setDirection(direction);
 		this.updateValues(dist1, dist2, flip);
 		this.setError(false);
+		this.updateEvalPreviews();
 		this.container.classList.remove('hidden');
 		this._isOpen = true;
 		this.updatePosition(posOrBBox);
+	}
+
+	public updateEvalPreviews(): void {
+		const scope = this.sketch?.getParameterValuesMap();
+		const d1Prev = this.container?.querySelector<HTMLElement>('#offset-dist1-eval-preview');
+		const d1Wrap = typeof this.dist1Input?.closest === 'function' ? this.dist1Input.closest<HTMLElement>('.chamfer-input-wrapper') : null;
+		if (this.dist1Input) {
+			updateExpressionPreview(this.dist1Input.value, 'mm', d1Prev ?? null, scope, d1Wrap);
+		}
+
+		const d2Prev = this.container?.querySelector<HTMLElement>('#offset-dist2-eval-preview');
+		const d2Wrap = typeof this.dist2Input?.closest === 'function' ? this.dist2Input.closest<HTMLElement>('.chamfer-input-wrapper') : null;
+		if (this.dist2Input) {
+			updateExpressionPreview(this.dist2Input.value, 'mm', d2Prev ?? null, scope, d2Wrap);
+		}
 	}
 
 	public hide(): void {

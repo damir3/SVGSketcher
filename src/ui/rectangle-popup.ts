@@ -1,4 +1,7 @@
 import type { Vec2 } from '../math/vector';
+import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
+import type { SketchDocument } from '../model/sketch';
+import { updateExpressionPreview } from './expression-preview';
 
 const LOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></svg>`;
 const UNLOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" height="14px" viewBox="0 -960 960 960" width="14px" fill="currentColor"><path d="M240-640h360v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85h-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640Zm0 480h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM240-160v-400 400Z"/></svg>`;
@@ -7,6 +10,7 @@ export type RectangleMode = 'corner' | 'center' | 'three_point' | 'rounded';
 
 export class RectanglePopup {
 	private container!: HTMLElement;
+	private sketch?: SketchDocument;
 	private radiusRow!: HTMLElement;
 	private widthInput!: HTMLInputElement;
 	private heightInput!: HTMLInputElement;
@@ -32,7 +36,12 @@ export class RectanglePopup {
 	public onCommit?: () => void;
 	public onCancel?: () => void;
 
-	constructor() {
+	public setSketch(sketch: SketchDocument): void {
+		this.sketch = sketch;
+	}
+
+	constructor(sketch?: SketchDocument) {
+		this.sketch = sketch;
 		if (typeof document === 'undefined') {
 			return;
 		}
@@ -43,32 +52,35 @@ export class RectanglePopup {
 			<div class="rectangle-popup-row" data-row="width">
 				<label class="rectangle-popup-label" for="rect-width-input">Width</label>
 				<div class="rectangle-input-wrapper">
-					<input type="number" id="rect-width-input" min="0.1" step="0.5" value="50.0" autocomplete="off" />
+					<input type="text" id="rect-width-input" value="50.0" autocomplete="off" spellcheck="false" />
 					<span class="rectangle-unit">mm</span>
 					<button type="button" class="rectangle-lock-btn" id="rect-width-lock" title="Lock width dimension">
 						${UNLOCK_ICON}
 					</button>
 				</div>
+				<div class="dim-eval-preview hidden" id="rect-width-eval-preview"></div>
 			</div>
 			<div class="rectangle-popup-row" data-row="height">
 				<label class="rectangle-popup-label" for="rect-height-input">Height</label>
 				<div class="rectangle-input-wrapper">
-					<input type="number" id="rect-height-input" min="0.1" step="0.5" value="30.0" autocomplete="off" />
+					<input type="text" id="rect-height-input" value="30.0" autocomplete="off" spellcheck="false" />
 					<span class="rectangle-unit">mm</span>
 					<button type="button" class="rectangle-lock-btn" id="rect-height-lock" title="Lock height dimension">
 						${UNLOCK_ICON}
 					</button>
 				</div>
+				<div class="dim-eval-preview hidden" id="rect-height-eval-preview"></div>
 			</div>
 			<div class="rectangle-popup-row hidden" data-row="radius">
 				<label class="rectangle-popup-label" for="rect-radius-input">Radius</label>
 				<div class="rectangle-input-wrapper">
-					<input type="number" id="rect-radius-input" min="0" step="0.5" value="0.0" autocomplete="off" />
+					<input type="text" id="rect-radius-input" value="0.0" autocomplete="off" spellcheck="false" />
 					<span class="rectangle-unit">mm</span>
 					<button type="button" class="rectangle-lock-btn" id="rect-radius-lock" title="Lock corner radius">
 						${UNLOCK_ICON}
 					</button>
 				</div>
+				<div class="dim-eval-preview hidden" id="rect-radius-eval-preview"></div>
 			</div>
 		`;
 		document.body.appendChild(this.container);
@@ -96,18 +108,21 @@ export class RectanglePopup {
 		this.widthInput.addEventListener('input', () => {
 			this._isWidthLocked = true;
 			this.updateLockVisual(this.widthLockBtn, true);
+			this.updateEvalPreviews();
 			this.emitValuesChange();
 		});
 
 		this.heightInput.addEventListener('input', () => {
 			this._isHeightLocked = true;
 			this.updateLockVisual(this.heightLockBtn, true);
+			this.updateEvalPreviews();
 			this.emitValuesChange();
 		});
 
 		this.radiusInput.addEventListener('input', () => {
 			this._isRadiusLocked = true;
 			this.updateLockVisual(this.radiusLockBtn, true);
+			this.updateEvalPreviews();
 			this.emitValuesChange();
 		});
 
@@ -262,20 +277,47 @@ export class RectanglePopup {
 
 	public getWidth(): number {
 		if (!this.widthInput) return 1;
-		const val = parseFloat(this.widthInput.value);
+		const val = parseNumericOrExpression(
+			this.widthInput.value,
+			50,
+			this.sketch?.getParameterValuesMap()
+		);
 		return isNaN(val) || val <= 0.01 ? 1 : val;
 	}
 
 	public getHeight(): number {
 		if (!this.heightInput) return 1;
-		const val = parseFloat(this.heightInput.value);
+		const val = parseNumericOrExpression(
+			this.heightInput.value,
+			30,
+			this.sketch?.getParameterValuesMap()
+		);
 		return isNaN(val) || val <= 0.01 ? 1 : val;
 	}
 
 	public getRadius(): number {
 		if (!this.radiusInput) return 0;
-		const val = parseFloat(this.radiusInput.value);
+		const val = parseNumericOrExpression(
+			this.radiusInput.value,
+			0,
+			this.sketch?.getParameterValuesMap()
+		);
 		return isNaN(val) || val <= 0 ? 0 : val;
+	}
+
+	public getWidthExpression(): string | undefined {
+		if (!this.widthInput) return undefined;
+		return getExpressionIfValid(this.widthInput.value, this.sketch?.getParameterValuesMap());
+	}
+
+	public getHeightExpression(): string | undefined {
+		if (!this.heightInput) return undefined;
+		return getExpressionIfValid(this.heightInput.value, this.sketch?.getParameterValuesMap());
+	}
+
+	public getRadiusExpression(): string | undefined {
+		if (!this.radiusInput) return undefined;
+		return getExpressionIfValid(this.radiusInput.value, this.sketch?.getParameterValuesMap());
 	}
 
 	public setMode(mode: RectangleMode): void {
@@ -299,6 +341,7 @@ export class RectanglePopup {
 		if (this.widthInput) this.widthInput.value = Number(width.toFixed(1)).toString();
 		if (this.heightInput) this.heightInput.value = Number(height.toFixed(1)).toString();
 		if (this.radiusInput) this.radiusInput.value = Number(Math.max(0, radius).toFixed(1)).toString();
+		this.updateEvalPreviews();
 	}
 
 	public show(
@@ -317,6 +360,7 @@ export class RectanglePopup {
 		if (this.widthInput) this.widthInput.value = Number(Math.max(0.1, width).toFixed(1)).toString();
 		if (this.heightInput) this.heightInput.value = Number(Math.max(0.1, height).toFixed(1)).toString();
 		if (this.radiusInput) this.radiusInput.value = Number(Math.max(0, radius).toFixed(1)).toString();
+		this.updateEvalPreviews();
 
 		this.container.classList.remove('hidden');
 		this.updatePosition(screenPos);
@@ -355,6 +399,28 @@ export class RectanglePopup {
 		}
 		if (radius !== undefined && !this._isRadiusLocked && this.radiusInput && active !== this.radiusInput) {
 			this.radiusInput.value = Number(Math.max(0, radius).toFixed(1)).toString();
+		}
+		this.updateEvalPreviews();
+	}
+
+	public updateEvalPreviews(): void {
+		const scope = this.sketch?.getParameterValuesMap();
+		const wPrev = this.container?.querySelector<HTMLElement>('#rect-width-eval-preview');
+		const wWrap = typeof this.widthInput?.closest === 'function' ? this.widthInput.closest<HTMLElement>('.rectangle-input-wrapper') : null;
+		if (this.widthInput) {
+			updateExpressionPreview(this.widthInput.value, 'mm', wPrev ?? null, scope, wWrap);
+		}
+
+		const hPrev = this.container?.querySelector<HTMLElement>('#rect-height-eval-preview');
+		const hWrap = typeof this.heightInput?.closest === 'function' ? this.heightInput.closest<HTMLElement>('.rectangle-input-wrapper') : null;
+		if (this.heightInput) {
+			updateExpressionPreview(this.heightInput.value, 'mm', hPrev ?? null, scope, hWrap);
+		}
+
+		const rPrev = this.container?.querySelector<HTMLElement>('#rect-radius-eval-preview');
+		const rWrap = typeof this.radiusInput?.closest === 'function' ? this.radiusInput.closest<HTMLElement>('.rectangle-input-wrapper') : null;
+		if (this.radiusInput) {
+			updateExpressionPreview(this.radiusInput.value, 'mm', rPrev ?? null, scope, rWrap);
 		}
 	}
 }

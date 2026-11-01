@@ -10,6 +10,7 @@ export class BaseConstraint implements IConstraint {
 	isSoft: boolean;
 	isDimensional: boolean;
 	value?: number;
+	expression?: string;
 	entityIds: string[];
 
 	constructor(

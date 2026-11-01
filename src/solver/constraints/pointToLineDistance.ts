@@ -89,7 +89,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		ctx.renderLinearDimensionVisual({
 			d1: geom.d1,
 			d2: geom.d2,
-			label: formatDimensionValue(this.targetDistance),
+			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
 			extensionLines: geom.extensionLines,
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,

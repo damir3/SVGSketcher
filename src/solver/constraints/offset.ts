@@ -264,7 +264,7 @@ export class OffsetConstraint extends BaseConstraint {
 		ctx.renderLinearDimensionVisual({
 			d1,
 			d2,
-			label: formatDimensionValue(this.targetDistance),
+			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
 			extensionLines: [],
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,

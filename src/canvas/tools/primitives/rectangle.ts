@@ -85,6 +85,7 @@ export class RectangleTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.popup.setSketch(this.ctx.sketch);
 		this.popup.setMode(this._mode);
 		this.updateToastHint();
 	}
@@ -554,10 +555,14 @@ export class RectangleTool extends BaseTool {
 		sketch.addVerticalConstraint(p0.id, p3.id);
 
 		if (this.isWidthLocked || this.popup.isWidthLocked()) {
-			sketch.addDistanceConstraint(p0.id, p1.id, this.width);
+			const c = sketch.addDistanceConstraint(p0.id, p1.id, this.width);
+			const expr = this.popup.getWidthExpression();
+			if (c && expr) c.expression = expr;
 		}
 		if (this.isHeightLocked || this.popup.isHeightLocked()) {
-			sketch.addDistanceConstraint(p1.id, p2.id, this.height);
+			const c = sketch.addDistanceConstraint(p1.id, p2.id, this.height);
+			const expr = this.popup.getHeightExpression();
+			if (c && expr) c.expression = expr;
 		}
 
 		sketch.commitTransaction();
@@ -631,10 +636,14 @@ export class RectangleTool extends BaseTool {
 		sketch.addMidpointConstraint(centerPtId, d1.id);
 
 		if (this.isWidthLocked || this.popup.isWidthLocked()) {
-			sketch.addDistanceConstraint(p0.id, p1.id, this.width);
+			const c = sketch.addDistanceConstraint(p0.id, p1.id, this.width);
+			const expr = this.popup.getWidthExpression();
+			if (c && expr) c.expression = expr;
 		}
 		if (this.isHeightLocked || this.popup.isHeightLocked()) {
-			sketch.addDistanceConstraint(p1.id, p2.id, this.height);
+			const c = sketch.addDistanceConstraint(p1.id, p2.id, this.height);
+			const expr = this.popup.getHeightExpression();
+			if (c && expr) c.expression = expr;
 		}
 
 		sketch.commitTransaction();
@@ -682,10 +691,14 @@ export class RectangleTool extends BaseTool {
 		sketch.addEqualLengthConstraint(l0.id, l2.id);
 
 		if (this.isWidthLocked || this.popup.isWidthLocked()) {
-			sketch.addDistanceConstraint(pCorner0.id, pCorner1.id, this.width);
+			const c = sketch.addDistanceConstraint(pCorner0.id, pCorner1.id, this.width);
+			const expr = this.popup.getWidthExpression();
+			if (c && expr) c.expression = expr;
 		}
 		if (this.isHeightLocked || this.popup.isHeightLocked()) {
-			sketch.addDistanceConstraint(pCorner1.id, pCorner2.id, this.height);
+			const c = sketch.addDistanceConstraint(pCorner1.id, pCorner2.id, this.height);
+			const expr = this.popup.getHeightExpression();
+			if (c && expr) c.expression = expr;
 		}
 
 		sketch.commitTransaction();
@@ -765,13 +778,19 @@ export class RectangleTool extends BaseTool {
 		sketch.addEqualRadiusConstraint(blArc.id, tlArc.id);
 
 		if (this.isRadiusLocked || this.popup.isRadiusLocked()) {
-			sketch.addRadiusConstraint(trArc.id, r);
+			const c = sketch.addRadiusConstraint(trArc.id, r);
+			const expr = this.popup.getRadiusExpression();
+			if (c && expr) c.expression = expr;
 		}
 		if (this.isWidthLocked || this.popup.isWidthLocked()) {
-			sketch.addDistanceConstraint(ptTopStart.id, ptTopEnd.id, Math.max(0.1, w - 2 * r));
+			const c = sketch.addDistanceConstraint(ptTopStart.id, ptTopEnd.id, Math.max(0.1, w - 2 * r));
+			const expr = this.popup.getWidthExpression();
+			if (c && expr) c.expression = expr;
 		}
 		if (this.isHeightLocked || this.popup.isHeightLocked()) {
-			sketch.addDistanceConstraint(ptLeftStart.id, ptLeftEnd.id, Math.max(0.1, h - 2 * r));
+			const c = sketch.addDistanceConstraint(ptLeftStart.id, ptLeftEnd.id, Math.max(0.1, h - 2 * r));
+			const expr = this.popup.getHeightExpression();
+			if (c && expr) c.expression = expr;
 		}
 
 		sketch.commitTransaction();

@@ -62,6 +62,7 @@ import clear from '../assets/icons/clear.svg?raw';
 import fitView from '../assets/icons/fit-view.svg?raw';
 import exportIcon from '../assets/icons/export.svg?raw';
 import openIcon from '../assets/icons/open.svg?raw';
+import parameters from '../assets/icons/parameters.svg?raw';
 
 export const ICONS = {
 	select,
@@ -132,4 +133,5 @@ export const ICONS = {
 	fitView,
 	export: exportIcon,
 	open: openIcon,
+	parameters,
 };

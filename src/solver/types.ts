@@ -65,6 +65,7 @@ export interface IConstraint {
 	isSoft?: boolean;
 	isDimensional?: boolean;
 	value?: number;
+	expression?: string;
 	entityIds: string[];
 
 	getEquationsCount(): number;

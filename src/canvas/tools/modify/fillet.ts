@@ -117,6 +117,7 @@ export class FilletTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.popup.setSketch(this.ctx.sketch);
 		this.ctx.sketch.clearSelection();
 		if (this.filletRadius <= 0.1 || !isFinite(this.filletRadius)) {
 			this.filletRadius = 10.0;
@@ -294,7 +295,8 @@ export class FilletTool extends BaseTool {
 		for (let i = 0; i < this.pendingFillets.length; i++) {
 			const pf = this.pendingFillets[i];
 			if (!pf.result) continue;
-			const res = commitFilletToSketch(this.ctx.sketch, pf, i === 0, firstArcId);
+			const expr = this.popup.getRadiusExpression();
+			const res = commitFilletToSketch(this.ctx.sketch, pf, i === 0, firstArcId, expr);
 			if (res && i === 0) {
 				firstArcId = res.arcId;
 			}

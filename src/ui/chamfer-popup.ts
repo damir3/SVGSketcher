@@ -1,8 +1,12 @@
 import type { Vec2 } from '../math/vector';
 import type { ChamferMode } from '../math/chamfer';
+import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
+import type { SketchDocument } from '../model/sketch';
+import { updateExpressionPreview } from './expression-preview';
 
 export class ChamferPopup {
 	private container: HTMLElement;
+	private sketch?: SketchDocument;
 
 	private labelDist1: HTMLElement;
 	private dist1Input: HTMLInputElement;
@@ -32,32 +36,40 @@ export class ChamferPopup {
 	public onCancel?: () => void;
 	public onModeSwitchRequested?: (mode: ChamferMode) => void;
 
-	constructor() {
+	public setSketch(sketch: SketchDocument): void {
+		this.sketch = sketch;
+	}
+
+	constructor(sketch?: SketchDocument) {
+		this.sketch = sketch;
 		this.container = document.createElement('div');
 		this.container.className = 'chamfer-popup hidden';
 		this.container.innerHTML = `
 			<div class="chamfer-popup-row chamfer-row-dist1">
 				<label class="chamfer-popup-label" id="chamfer-label-dist1" for="chamfer-dist1-input">Distance</label>
 				<div class="chamfer-input-wrapper">
-					<input type="number" id="chamfer-dist1-input" min="0.1" step="0.5" value="10.0" autocomplete="off" />
+					<input type="text" id="chamfer-dist1-input" value="10.0" autocomplete="off" spellcheck="false" />
 					<span class="chamfer-unit">mm</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="chamfer-dist1-eval-preview"></div>
 			</div>
 
 			<div class="chamfer-popup-row chamfer-row-dist2 hidden">
 				<label class="chamfer-popup-label" for="chamfer-dist2-input">Distance 2</label>
 				<div class="chamfer-input-wrapper">
-					<input type="number" id="chamfer-dist2-input" min="0.1" step="0.5" value="10.0" autocomplete="off" />
+					<input type="text" id="chamfer-dist2-input" value="10.0" autocomplete="off" spellcheck="false" />
 					<span class="chamfer-unit">mm</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="chamfer-dist2-eval-preview"></div>
 			</div>
 
 			<div class="chamfer-popup-row chamfer-row-angle hidden">
 				<label class="chamfer-popup-label" for="chamfer-angle-input">Angle</label>
 				<div class="chamfer-input-wrapper">
-					<input type="number" id="chamfer-angle-input" min="0" max="179.9" step="1.0" value="45.0" autocomplete="off" />
+					<input type="text" id="chamfer-angle-input" value="45.0" autocomplete="off" spellcheck="false" />
 					<span class="chamfer-unit">°</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="chamfer-angle-eval-preview"></div>
 			</div>
 
 			<div class="chamfer-popup-row chamfer-row-flip hidden">
@@ -92,7 +104,10 @@ export class ChamferPopup {
 		this.container.addEventListener('mousedown', e => e.stopPropagation());
 		this.container.addEventListener('click', e => e.stopPropagation());
 
-		const handleInput = () => this.notifyChange();
+		const handleInput = () => {
+			this.updateEvalPreviews();
+			this.notifyChange();
+		};
 
 		this.dist1Input.addEventListener('input', handleInput);
 		this.dist2Input.addEventListener('input', handleInput);
@@ -178,10 +193,10 @@ export class ChamferPopup {
 		angleDeg: number;
 		flip: boolean;
 	} {
-		const d1 = parseFloat(this.dist1Input.value) || 10;
-		const d2 = parseFloat(this.dist2Input.value) || 10;
-		const parsedA = parseFloat(this.angleInput.value);
-		const a = isNaN(parsedA) ? 45 : parsedA;
+		const scope = this.sketch?.getParameterValuesMap();
+		const d1 = parseNumericOrExpression(this.dist1Input.value, 10, scope);
+		const d2 = parseNumericOrExpression(this.dist2Input.value, 10, scope);
+		const a = parseNumericOrExpression(this.angleInput.value, 45, scope);
 		const flip = this.flipCheckbox.checked;
 
 		return {
@@ -193,10 +208,20 @@ export class ChamferPopup {
 		};
 	}
 
+	public getExpressions(): { dist1?: string; dist2?: string; angle?: string } {
+		const scope = this.sketch?.getParameterValuesMap();
+		return {
+			dist1: this.dist1Input ? getExpressionIfValid(this.dist1Input.value, scope) : undefined,
+			dist2: this.dist2Input ? getExpressionIfValid(this.dist2Input.value, scope) : undefined,
+			angle: this.angleInput ? getExpressionIfValid(this.angleInput.value, scope) : undefined,
+		};
+	}
+
 	public updateValues(dist1: number, dist2: number, angleDeg: number): void {
 		this.dist1Input.value = Number(dist1.toFixed(1)).toString();
 		this.dist2Input.value = Number(dist2.toFixed(1)).toString();
 		this.angleInput.value = Number(angleDeg.toFixed(1)).toString();
+		this.updateEvalPreviews();
 	}
 
 	public show(
@@ -211,9 +236,31 @@ export class ChamferPopup {
 		this.updateValues(dist1, dist2, angleDeg);
 		this.flipCheckbox.checked = flip;
 		this.setError(false);
+		this.updateEvalPreviews();
 		this.container.classList.remove('hidden');
 		this._isOpen = true;
 		this.updatePosition(screenPos);
+	}
+
+	public updateEvalPreviews(): void {
+		const scope = this.sketch?.getParameterValuesMap();
+		const d1Prev = this.container?.querySelector<HTMLElement>('#chamfer-dist1-eval-preview');
+		const d1Wrap = typeof this.dist1Input?.closest === 'function' ? this.dist1Input.closest<HTMLElement>('.chamfer-input-wrapper') : null;
+		if (this.dist1Input) {
+			updateExpressionPreview(this.dist1Input.value, 'mm', d1Prev ?? null, scope, d1Wrap);
+		}
+
+		const d2Prev = this.container?.querySelector<HTMLElement>('#chamfer-dist2-eval-preview');
+		const d2Wrap = typeof this.dist2Input?.closest === 'function' ? this.dist2Input.closest<HTMLElement>('.chamfer-input-wrapper') : null;
+		if (this.dist2Input) {
+			updateExpressionPreview(this.dist2Input.value, 'mm', d2Prev ?? null, scope, d2Wrap);
+		}
+
+		const aPrev = this.container?.querySelector<HTMLElement>('#chamfer-angle-eval-preview');
+		const aWrap = typeof this.angleInput?.closest === 'function' ? this.angleInput.closest<HTMLElement>('.chamfer-input-wrapper') : null;
+		if (this.angleInput) {
+			updateExpressionPreview(this.angleInput.value, '°', aPrev ?? null, scope, aWrap);
+		}
 	}
 
 	public hide(): void {

@@ -10,6 +10,7 @@ import {
 	getPreviewStrokeAttrs,
 } from '../../styles';
 import { SlotPopup, type SlotMode, type SlotPopupField } from '../../../ui/slot-popup';
+import { parseNumericOrExpression } from '../../../math/expression';
 export type { SlotMode };
 
 const TWO_PI = 2 * Math.PI;
@@ -69,6 +70,9 @@ export class SlotTool extends BaseTool {
 	distance = 50;
 	angle = 90;
 	radius: number | null = null;
+	distanceExpression?: string;
+	angleExpression?: string;
+	radiusExpression?: string;
 	isDistanceLocked = false;
 	isAngleLocked = false;
 	isRadiusLocked = false;
@@ -85,6 +89,9 @@ export class SlotTool extends BaseTool {
 			this.distance = distVal;
 			this.angle = angleVal;
 			this.radius = radVal;
+			this.distanceExpression = this.popup.getDistanceExpression();
+			this.angleExpression = this.popup.getAngleExpression();
+			this.radiusExpression = this.popup.getRadiusExpression();
 			this.isDistanceLocked = isDistLocked;
 			this.isAngleLocked = isAngLocked;
 			this.isRadiusLocked = isRadLocked;
@@ -162,6 +169,7 @@ export class SlotTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.popup.setSketch(this.ctx.sketch);
 		this.popup.setMode(this._mode);
 		this.updateToastHint();
 	}
@@ -175,8 +183,12 @@ export class SlotTool extends BaseTool {
 	/**
 	 * Locks the distance parameter (or arc radius in center_point_arc mode) and advances focus.
 	 */
-	public lockDistance(value?: number): void {
-		if (value !== undefined) {
+	public lockDistance(value?: number | string): void {
+		if (typeof value === 'string') {
+			this.distanceExpression = value;
+			const parsed = parseNumericOrExpression(value, this.distance, this.ctx?.sketch?.getParameterValuesMap());
+			this.distance = Math.max(0.1, parsed);
+		} else if (value !== undefined) {
 			this.distance = Math.max(0.1, value);
 		}
 		if (this._mode === 'center_point_arc') {
@@ -192,8 +204,12 @@ export class SlotTool extends BaseTool {
 	 * Locks the sweep angle parameter (for center_point_arc mode) and immediately switches
 	 * to the next gizmo (radius) without waiting for a mouse click if on the angle step.
 	 */
-	public lockAngle(value?: number): void {
-		if (value !== undefined) {
+	public lockAngle(value?: number | string): void {
+		if (typeof value === 'string') {
+			this.angleExpression = value;
+			const parsed = parseNumericOrExpression(value, this.angle, this.ctx?.sketch?.getParameterValuesMap());
+			this.angle = Math.max(0.1, Math.min(359.9, parsed));
+		} else if (value !== undefined) {
 			this.angle = Math.max(0.1, Math.min(359.9, value));
 		}
 		this.isAngleLocked = true;
@@ -206,8 +222,12 @@ export class SlotTool extends BaseTool {
 	 * Locks the slot radius parameter and immediately commits the slot if on the radius step,
 	 * or switches to the next gizmo without waiting for a mouse click on the radius step.
 	 */
-	public lockRadius(value?: number): void {
-		if (value !== undefined) {
+	public lockRadius(value?: number | string): void {
+		if (typeof value === 'string') {
+			this.radiusExpression = value;
+			const parsed = parseNumericOrExpression(value, this.radius ?? 10, this.ctx?.sketch?.getParameterValuesMap());
+			this.radius = Math.max(0.1, parsed);
+		} else if (value !== undefined) {
 			this.radius = Math.max(0.1, value);
 		} else if (this.radius === null) {
 			const popupRad = this.popup.getRadius();
@@ -1266,17 +1286,26 @@ export class SlotTool extends BaseTool {
 
 		// Dimensional constraints when locked
 		if (distLocked) {
+			let cDist: any = null;
 			if (this._mode === 'center_to_center') {
-				sketch.addDistanceConstraint(c1Id, c2Id, this.distance);
+				cDist = sketch.addDistanceConstraint(c1Id, c2Id, this.distance);
 			} else if (this._mode === 'center_point' && centerMidPtId) {
-				sketch.addDistanceConstraint(centerMidPtId, c2Id, this.distance);
+				cDist = sketch.addDistanceConstraint(centerMidPtId, c2Id, this.distance);
 			} else if (this._mode === 'overall' && edge1PtId && edge2PtId) {
-				sketch.addDistanceConstraint(edge1PtId, edge2PtId, this.distance);
+				cDist = sketch.addDistanceConstraint(edge1PtId, edge2PtId, this.distance);
+			}
+			const distExpr = this.distanceExpression ?? this.popup.getDistanceExpression();
+			if (cDist && distExpr) {
+				cDist.expression = distExpr;
 			}
 		}
 
 		if (radLocked) {
-			sketch.addRadiusConstraint(arc1.id, effectiveR);
+			const cRad = sketch.addRadiusConstraint(arc1.id, effectiveR);
+			const radExpr = this.radiusExpression ?? this.popup.getRadiusExpression();
+			if (cRad && radExpr) {
+				cRad.expression = radExpr;
+			}
 		}
 
 		sketch.commitTransaction();
@@ -1346,19 +1375,34 @@ export class SlotTool extends BaseTool {
 
 		// Dimensional constraints when locked
 		if (distLocked) {
+			const distExpr = this.distanceExpression ?? this.popup.getDistanceExpression();
 			if (this._mode === 'three_point_arc') {
-				sketch.addDistanceConstraint(c1Id, c2Id, this.distance);
+				const cDist = sketch.addDistanceConstraint(c1Id, c2Id, this.distance);
+				if (cDist && distExpr) {
+					cDist.expression = distExpr;
+				}
 			} else if (this._mode === 'center_point_arc') {
-				sketch.addRadiusConstraint(centerArc.id, rArc);
+				const cRad = sketch.addRadiusConstraint(centerArc.id, rArc);
+				if (cRad && distExpr) {
+					cRad.expression = distExpr;
+				}
 			}
 		}
 
 		if (this._mode === 'center_point_arc' && angleLocked) {
-			sketch.addArcAngleConstraint(centerArc.id, this.angle, rArc * 0.5, sweepSign);
+			const cAng = sketch.addArcAngleConstraint(centerArc.id, this.angle, rArc * 0.5, sweepSign);
+			const angExpr = this.angleExpression ?? this.popup.getAngleExpression();
+			if (cAng && angExpr) {
+				cAng.expression = angExpr;
+			}
 		}
 
 		if (radLocked) {
-			sketch.addRadiusConstraint(cap1.id, geom.effectiveR);
+			const cRad = sketch.addRadiusConstraint(cap1.id, geom.effectiveR);
+			const radExpr = this.radiusExpression ?? this.popup.getRadiusExpression();
+			if (cRad && radExpr) {
+				cRad.expression = radExpr;
+			}
 		}
 
 		sketch.commitTransaction();

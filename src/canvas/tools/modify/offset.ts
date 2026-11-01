@@ -77,6 +77,7 @@ export class OffsetTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.popup.setSketch(this.ctx.sketch);
 		this.ctx.sketch.clearSelection();
 		if (Math.abs(this.dist1) <= 0.001 || !isFinite(this.dist1)) this.dist1 = 10.0;
 		if (Math.abs(this.dist2) <= 0.001 || !isFinite(this.dist2)) this.dist2 = 10.0;
@@ -234,7 +235,8 @@ export class OffsetTool extends BaseTool {
 			this.direction,
 			this.dist1,
 			this.dist2,
-			this.flip
+			this.flip,
+			this.popup.getExpressions()
 		);
 
 		if (res) {

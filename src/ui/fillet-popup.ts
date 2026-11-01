@@ -1,4 +1,7 @@
 import type { Vec2 } from '../math/vector';
+import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
+import type { SketchDocument } from '../model/sketch';
+import { updateExpressionPreview } from './expression-preview';
 
 export class FilletPopup {
 	private container: HTMLElement;
@@ -6,6 +9,11 @@ export class FilletPopup {
 	private errorEl: HTMLElement;
 	private _isOpen = false;
 	private _isRadiusUserModified = false;
+	private sketch?: SketchDocument;
+
+	public setSketch(sketch: SketchDocument): void {
+		this.sketch = sketch;
+	}
 
 	public isRadiusUserModified(): boolean {
 		return this._isRadiusUserModified;
@@ -15,16 +23,18 @@ export class FilletPopup {
 	public onCommit?: () => void;
 	public onCancel?: () => void;
 
-	constructor() {
+	constructor(sketch?: SketchDocument) {
+		this.sketch = sketch;
 		this.container = document.createElement('div');
 		this.container.className = 'fillet-popup hidden';
 		this.container.innerHTML = `
 			<div class="fillet-popup-row">
 				<label class="fillet-popup-label" for="fillet-radius-input">Radius</label>
 				<div class="fillet-input-wrapper">
-					<input type="number" id="fillet-radius-input" min="0.1" step="0.5" value="10.0" autocomplete="off" />
+					<input type="text" id="fillet-radius-input" value="10.0" autocomplete="off" spellcheck="false" />
 					<span class="fillet-unit">mm</span>
 				</div>
+				<div class="dim-eval-preview hidden" id="fillet-eval-preview"></div>
 			</div>
 			<div class="fillet-popup-error hidden"></div>
 		`;
@@ -47,6 +57,7 @@ export class FilletPopup {
 		// Live update on input
 		this.radiusInput.addEventListener('input', () => {
 			this._isRadiusUserModified = true;
+			this.updateEvalPreviews();
 			const radius = this.getRadius();
 			this.onRadiusChange?.(radius);
 		});
@@ -75,15 +86,25 @@ export class FilletPopup {
 	}
 
 	public getRadius(): number {
-		const val = parseFloat(this.radiusInput.value);
+		const val = parseNumericOrExpression(
+			this.radiusInput.value,
+			10,
+			this.sketch?.getParameterValuesMap()
+		);
 		if (isNaN(val) || val <= 0.01) return 1;
 		return val;
+	}
+
+	public getRadiusExpression(): string | undefined {
+		if (!this.radiusInput) return undefined;
+		return getExpressionIfValid(this.radiusInput.value, this.sketch?.getParameterValuesMap());
 	}
 
 	public show(screenPos: Vec2, radius: number): void {
 		this._isRadiusUserModified = false;
 		this.setError(false);
 		this.radiusInput.value = Number(radius.toFixed(1)).toString();
+		this.updateEvalPreviews();
 		this.container.classList.remove('hidden');
 		this._isOpen = true;
 		this.updatePosition(screenPos);
@@ -127,5 +148,15 @@ export class FilletPopup {
 	public updateRadius(radius: number): void {
 		if (!this._isOpen) return;
 		this.radiusInput.value = Number(radius.toFixed(1)).toString();
+		this.updateEvalPreviews();
+	}
+
+	public updateEvalPreviews(): void {
+		const scope = this.sketch?.getParameterValuesMap();
+		const prev = this.container?.querySelector<HTMLElement>('#fillet-eval-preview');
+		const wrap = typeof this.radiusInput?.closest === 'function' ? this.radiusInput.closest<HTMLElement>('.fillet-input-wrapper') : null;
+		if (this.radiusInput) {
+			updateExpressionPreview(this.radiusInput.value, 'mm', prev ?? null, scope, wrap);
+		}
 	}
 }

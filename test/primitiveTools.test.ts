@@ -1284,6 +1284,45 @@ describe('Primitive Tools Creation', () => {
 		assert.ok(radConstraints.some(c => Math.abs(c.targetRadius - 10) < 1e-3));
 	});
 
+	it('SlotTool preserves mathematical expressions in DistanceConstraint and RadiusConstraint', () => {
+		const sketch = new SketchDocument();
+		sketch.addParameter('slot_len', '120');
+		sketch.addParameter('slot_rad', '15');
+		const { ctx } = createMockContext(sketch);
+		const slotTool = new SlotTool('center_to_center');
+		slotTool.activate(ctx);
+
+		slotTool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(slotTool.step, 1);
+
+		// Lock distance with expression
+		slotTool.lockDistance('slot_len / 2');
+
+		slotTool.onMouseDown(makeMouseEvent(100, 0));
+		assert.equal(slotTool.step, 2);
+
+		// Lock radius with expression
+		slotTool.lockRadius('slot_rad + 5');
+
+		const distConstraints = [...sketch.constraints.values()].filter(c => c instanceof DistanceConstraint) as DistanceConstraint[];
+		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint) as RadiusConstraint[];
+
+		assert.equal(distConstraints.length, 1);
+		assert.equal(distConstraints[0].targetDistance, 60);
+		assert.equal(distConstraints[0].expression, 'slot_len / 2');
+
+		assert.equal(radConstraints.length, 1);
+		assert.equal(radConstraints[0].targetRadius, 20);
+		assert.equal(radConstraints[0].expression, 'slot_rad + 5');
+
+		// Changing parameter recalculates constraints!
+		sketch.updateParameter('slot_len', 'slot_len', '200');
+		assert.equal(distConstraints[0].targetDistance, 100);
+
+		sketch.updateParameter('slot_rad', 'slot_rad', '30');
+		assert.equal(radConstraints[0].targetRadius, 35);
+	});
+
 	it('CanvasInteraction handleKeyDown switches Slot modes with Alt+1..5', () => {
 		const switchedModes: string[] = [];
 		let prevented = 0;

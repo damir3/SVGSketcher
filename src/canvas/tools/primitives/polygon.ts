@@ -65,6 +65,7 @@ export class PolygonTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.popup.setSketch(this.ctx.sketch);
 		this.ctx.showToast('Polygon: Click center point');
 	}
 
@@ -285,6 +286,10 @@ export class PolygonTool extends BaseTool {
 		let distConstraint: PointToLineDistanceConstraint | null = null;
 		if (addDistanceConstraint && lines.length > 0) {
 			distConstraint = this.ctx.sketch.addPointToLineDistanceConstraint(centerPtId, lines[0].id, r);
+			const expr = this.popup.getRadiusExpression();
+			if (distConstraint && expr) {
+				distConstraint.expression = expr;
+			}
 		}
 
 		this.ctx.sketch.commitTransaction();

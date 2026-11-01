@@ -73,6 +73,7 @@ export class ChamferTool extends BaseTool {
 
 	override activate(ctx: any): void {
 		super.activate(ctx);
+		this.popup.setSketch(this.ctx.sketch);
 		this.ctx.sketch.clearSelection();
 		if (this.dist1 <= 0.1 || !isFinite(this.dist1)) this.dist1 = 10.0;
 		if (this.dist2 <= 0.1 || !isFinite(this.dist2)) this.dist2 = 10.0;
@@ -156,7 +157,8 @@ export class ChamferTool extends BaseTool {
 			this.dist1,
 			this.dist2,
 			this.angleDeg,
-			this.flip
+			this.flip,
+			this.popup.getExpressions()
 		);
 
 		if (res) {
