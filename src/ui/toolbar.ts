@@ -27,7 +27,7 @@ export class Toolbar {
 		this.container.innerHTML = `
 
 		<div class="toolbar-section">
-		<div class="toolbar-title">Create</div>
+			<div class="toolbar-title">Create</div>
 			<div class="toolbar-grid">
 				<button class="tool-btn" data-tool="point" title="Point (P)">
 					${ICONS.point}
@@ -69,121 +69,124 @@ export class Toolbar {
 					${ICONS.elliptical_arc}
 					<span class="btn-tooltip">Elliptical Arc</span>
 				</button>
+				<button class="tool-btn" data-tool="circular_pattern" id="tool-circular-pattern" title="Circular Pattern">
+					${ICONS.circular_pattern}
+					<span class="btn-tooltip">Circular Pattern</span>
+				</button>
+				<button class="tool-btn" data-tool="rectangular_pattern" id="tool-rectangular-pattern" title="Rectangular Pattern">
+					${ICONS.rectangular_pattern}
+					<span class="btn-tooltip">Rectangular Pattern</span>
+				</button>
+				<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
+					${ICONS.mirror}
+					<span class="btn-tooltip">Mirror (M)</span>
+				</button>
 			</div>
 		</div>
 
 		<div class="toolbar-divider"></div>
 
-			<div class="toolbar-section">
-				<div class="toolbar-title">Tools</div>
-				<div class="toolbar-grid">
-					<button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
-						${ICONS.snap}
-						<span class="btn-tooltip">Snap (S)</span>
-					</button>
-					<button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
-						${ICONS.construction}
-						<span class="btn-tooltip">Construction (X)</span>
-					</button>
-					<button class="tool-btn active" data-tool="select" title="Select & Drag (V)">
-						${ICONS.select}
-						<span class="btn-tooltip">Select (V)</span>
-					</button>
-					<button class="tool-btn" data-tool="delete" title="Delete">
-						${ICONS.delete}
-						<span class="btn-tooltip">Delete</span>
-					</button>
-					<button class="tool-btn" data-tool="break" title="Break (B)">
-						${ICONS.break}
-						<span class="btn-tooltip">Break (B)</span>
-					</button>
-					<button class="tool-btn" data-tool="trim" title="Trim (T)">
-						${ICONS.trim}
-						<span class="btn-tooltip">Trim (T)</span>
-					</button>
-					<button class="tool-btn" data-tool="chamfer" id="tool-chamfer" title="Chamfer">
-						${ICONS.chamferEqual}
-						<span class="btn-tooltip">Chamfer</span>
-					</button>
-					<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
-						${ICONS.fillet}
-						<span class="btn-tooltip">Fillet</span>
-					</button>
-					<button class="tool-btn" data-tool="offset" id="tool-offset" title="Offset (O)">
-						${ICONS.offsetOneSide}
-						<span class="btn-tooltip">Offset (O)</span>
-					</button>
-					<button class="tool-btn" data-tool="circular_pattern" id="tool-circular-pattern" title="Circular Pattern">
-						${ICONS.circular_pattern}
-						<span class="btn-tooltip">Circular Pattern</span>
-					</button>
-					<button class="tool-btn" data-tool="rectangular_pattern" id="tool-rectangular-pattern" title="Rectangular Pattern">
-						${ICONS.rectangular_pattern}
-						<span class="btn-tooltip">Rectangular Pattern</span>
-					</button>
-					<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
-						${ICONS.mirror}
-						<span class="btn-tooltip">Mirror (M)</span>
-					</button>
-				</div>
+		<div class="toolbar-section">
+			<div class="toolbar-title">Tools</div>
+			<div class="toolbar-grid">
+				<button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
+					${ICONS.snap}
+					<span class="btn-tooltip">Snap (S)</span>
+				</button>
+				<button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
+					${ICONS.construction}
+					<span class="btn-tooltip">Construction (X)</span>
+				</button>
+				<button class="tool-btn active" data-tool="select" title="Select & Drag (V)">
+					${ICONS.select}
+					<span class="btn-tooltip">Select (V)</span>
+				</button>
+				<button class="tool-btn" data-tool="delete" title="Delete">
+					${ICONS.delete}
+					<span class="btn-tooltip">Delete</span>
+				</button>
+				<button class="tool-btn" data-tool="break" title="Break (B)">
+					${ICONS.break}
+					<span class="btn-tooltip">Break (B)</span>
+				</button>
+				<button class="tool-btn" data-tool="trim" title="Trim (T)">
+					${ICONS.trim}
+					<span class="btn-tooltip">Trim (T)</span>
+				</button>
+				<button class="tool-btn" data-tool="extend" title="Extend">
+					${ICONS.extend}
+					<span class="btn-tooltip">Extend</span>
+				</button>
+				<button class="tool-btn" data-tool="offset" id="tool-offset" title="Offset (O)">
+					${ICONS.offsetOneSide}
+					<span class="btn-tooltip">Offset (O)</span>
+				</button>
+				<button class="tool-btn" data-tool="chamfer" id="tool-chamfer" title="Chamfer">
+					${ICONS.chamferEqual}
+					<span class="btn-tooltip">Chamfer</span>
+				</button>
+				<button class="tool-btn" data-tool="fillet" id="tool-fillet" title="Fillet">
+					${ICONS.fillet}
+					<span class="btn-tooltip">Fillet</span>
+				</button>
 			</div>
+		</div>
 
-			<div class="toolbar-divider"></div>
+		<div class="toolbar-divider"></div>
 
-			<div class="toolbar-section">
-				<div class="toolbar-title">Constraints</div>
-				<div class="toolbar-grid">
-					<button class="tool-btn" data-constraint="coincident" title="Coincident / Point on Object (I)">
-						${ICONS.coincident}
-						<span class="btn-tooltip">Coincident (I)</span>
-					</button>
-					<button class="tool-btn" data-constraint="fixed" title="Fix Point (F)">
-						${ICONS.fixed}
-						<span class="btn-tooltip">Fix Point (F)</span>
-					</button>
-					<button class="tool-btn" data-constraint="horizontal_vertical" title="Horizontal / Vertical (H)">
-						${ICONS.horizontalVertical}
-						<span class="btn-tooltip">Horiz / Vert (H)</span>
-					</button>
-					<button class="tool-btn" data-constraint="dimension" title="Dimension (D)">
-						${ICONS.dimension}
-						<span class="btn-tooltip">Dimension (D)</span>
-					</button>
-					<button class="tool-btn" data-constraint="equal" title="Equal Length or Radius">
-						${ICONS.equal}
-						<span class="btn-tooltip">Equal</span>
-					</button>
-					<button class="tool-btn" data-constraint="parallel" title="Parallel (2 lines)">
-						${ICONS.parallel}
-						<span class="btn-tooltip">Parallel</span>
-					</button>
-					<button class="tool-btn" data-constraint="collinear" title="Collinear (2 lines)">
-						${ICONS.collinear}
-						<span class="btn-tooltip">Collinear</span>
-					</button>
-					<button class="tool-btn" data-constraint="perpendicular" title="Perpendicular (2 lines)">
-						${ICONS.perpendicular}
-						<span class="btn-tooltip">Perpendicular</span>
-					</button>
-					<button class="tool-btn" data-constraint="tangent" title="Tangent (1 line + 1 circle, or 2 circles)">
-						${ICONS.tangent}
-						<span class="btn-tooltip">Tangent</span>
-					</button>
-					<button class="tool-btn" data-constraint="concentric" title="Concentric (2 circles)">
-						${ICONS.concentric}
-						<span class="btn-tooltip">Concentric</span>
-					</button>
-					<button class="tool-btn" data-constraint="midpoint" title="Midpoint (1 point + 1 line)">
-						${ICONS.midpoint}
-						<span class="btn-tooltip">Midpoint</span>
-					</button>
-					<button class="tool-btn" data-constraint="symmetry" id="constraint-symmetry" title="Symmetry (2 points/circles + 1 line)">
-						${ICONS.symmetry}
-						<span class="btn-tooltip">Symmetry</span>
-					</button>
-				</div>
+		<div class="toolbar-section">
+			<div class="toolbar-title">Constraints</div>
+			<div class="toolbar-grid">
+				<button class="tool-btn" data-constraint="coincident" title="Coincident / Point on Object (I)">
+					${ICONS.coincident}
+					<span class="btn-tooltip">Coincident (I)</span>
+				</button>
+				<button class="tool-btn" data-constraint="fixed" title="Fix Point (F)">
+					${ICONS.fixed}
+					<span class="btn-tooltip">Fix Point (F)</span>
+				</button>
+				<button class="tool-btn" data-constraint="horizontal_vertical" title="Horizontal / Vertical (H)">
+					${ICONS.horizontalVertical}
+					<span class="btn-tooltip">Horiz / Vert (H)</span>
+				</button>
+				<button class="tool-btn" data-constraint="dimension" title="Dimension (D)">
+					${ICONS.dimension}
+					<span class="btn-tooltip">Dimension (D)</span>
+				</button>
+				<button class="tool-btn" data-constraint="equal" title="Equal Length or Radius">
+					${ICONS.equal}
+					<span class="btn-tooltip">Equal</span>
+				</button>
+				<button class="tool-btn" data-constraint="parallel" title="Parallel (2 lines)">
+					${ICONS.parallel}
+					<span class="btn-tooltip">Parallel</span>
+				</button>
+				<button class="tool-btn" data-constraint="collinear" title="Collinear (2 lines)">
+					${ICONS.collinear}
+					<span class="btn-tooltip">Collinear</span>
+				</button>
+				<button class="tool-btn" data-constraint="perpendicular" title="Perpendicular (2 lines)">
+					${ICONS.perpendicular}
+					<span class="btn-tooltip">Perpendicular</span>
+				</button>
+				<button class="tool-btn" data-constraint="tangent" title="Tangent (1 line + 1 circle, or 2 circles)">
+					${ICONS.tangent}
+					<span class="btn-tooltip">Tangent</span>
+				</button>
+				<button class="tool-btn" data-constraint="concentric" title="Concentric (2 circles)">
+					${ICONS.concentric}
+					<span class="btn-tooltip">Concentric</span>
+				</button>
+				<button class="tool-btn" data-constraint="midpoint" title="Midpoint (1 point + 1 line)">
+					${ICONS.midpoint}
+					<span class="btn-tooltip">Midpoint</span>
+				</button>
+				<button class="tool-btn" data-constraint="symmetry" id="constraint-symmetry" title="Symmetry (2 points/circles + 1 line)">
+					${ICONS.symmetry}
+					<span class="btn-tooltip">Symmetry</span>
+				</button>
 			</div>
-		`;
+		</div>`;
 
 		this.bindClicks();
 	}

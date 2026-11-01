@@ -1,6 +1,7 @@
 import { vec, type Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
+import type { ExtendCandidate } from '../math/extend';
 import {
 	createSvgElement,
 	createSvgLine,
@@ -464,6 +465,103 @@ export function renderBreakPreviewVisual(parent: SVGElement, candidate: TrimCand
 		if (interval[1] < 1 - 1e-4) {
 			const sEnd = viewport.worldToScreen(cutEndWorld.x, cutEndWorld.y);
 			renderCutMarkerVisual(parent, sEnd);
+		}
+	}
+}
+
+export function renderExtendPreviewVisual(
+	parent: SVGElement,
+	candidate: ExtendCandidate,
+	viewport: Viewport
+): void {
+	const EXTEND_PREVIEW_ATTRS = {
+		stroke: '#0284c7',
+		'stroke-width': 2,
+		'stroke-dasharray': '5 3',
+		fill: 'none',
+		'stroke-linecap': 'round',
+		'pointer-events': 'none',
+	};
+
+	const sFrom = viewport.worldToScreen(candidate.fromPoint.x, candidate.fromPoint.y);
+	const sTo = viewport.worldToScreen(candidate.toPoint.x, candidate.toPoint.y);
+
+	if (candidate.previewType === 'line' || candidate.previewType === 'spline') {
+		createSvgLine(sFrom.x, sFrom.y, sTo.x, sTo.y, EXTEND_PREVIEW_ATTRS, parent);
+		createSvgCircle(
+			sTo.x,
+			sTo.y,
+			4,
+			{
+				fill: '#0284c7',
+				stroke: '#ffffff',
+				'stroke-width': 1.5,
+				'pointer-events': 'none',
+			},
+			parent
+		);
+	} else if (candidate.previewType === 'arc') {
+		if (candidate.becomesFullLoop) {
+			if (candidate.previewData.becomesFullCircle) {
+				const c = candidate.previewData.center;
+				const r = candidate.previewData.radius;
+				const sc = viewport.worldToScreen(c.x, c.y);
+				createSvgCircle(sc.x, sc.y, r * viewport.zoom, EXTEND_PREVIEW_ATTRS, parent);
+			} else if (candidate.previewData.becomesFullEllipse) {
+				const c = candidate.previewData.center;
+				const maj = candidate.previewData.majorAxisPoint;
+				const min = candidate.previewData.minorAxisPoint;
+				const sc = viewport.worldToScreen(c.x, c.y);
+				const smaj = viewport.worldToScreen(maj.x, maj.y);
+				const smin = viewport.worldToScreen(min.x, min.y);
+				const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+				const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+				const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+				createSvgEllipse(
+					sc.x,
+					sc.y,
+					rx,
+					ry,
+					{
+						transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+						...EXTEND_PREVIEW_ATTRS,
+					},
+					parent
+				);
+			}
+		} else {
+			if (candidate.targetType === 'arc') {
+				const c = candidate.previewData.center;
+				const r = candidate.previewData.radius;
+				const sc = viewport.worldToScreen(c.x, c.y);
+				const ss = viewport.worldToScreen(candidate.fromPoint.x, candidate.fromPoint.y);
+				const se = viewport.worldToScreen(candidate.toPoint.x, candidate.toPoint.y);
+				const d = getArcSvgPath(sc, ss, se, r * viewport.zoom, !!candidate.previewData.clockwise);
+				createSvgPath(d, EXTEND_PREVIEW_ATTRS, parent);
+			} else if (candidate.targetType === 'elliptical_arc') {
+				const c = candidate.previewData.center;
+				const maj = candidate.previewData.majorAxisPoint;
+				const min = candidate.previewData.minorAxisPoint;
+				const sc = viewport.worldToScreen(c.x, c.y);
+				const smaj = viewport.worldToScreen(maj.x, maj.y);
+				const smin = viewport.worldToScreen(min.x, min.y);
+				const ss = viewport.worldToScreen(candidate.fromPoint.x, candidate.fromPoint.y);
+				const se = viewport.worldToScreen(candidate.toPoint.x, candidate.toPoint.y);
+				const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, !!candidate.previewData.clockwise);
+				createSvgPath(d, EXTEND_PREVIEW_ATTRS, parent);
+			}
+			createSvgCircle(
+				sTo.x,
+				sTo.y,
+				4,
+				{
+					fill: '#0284c7',
+					stroke: '#ffffff',
+					'stroke-width': 1.5,
+					'pointer-events': 'none',
+				},
+				parent
+			);
 		}
 	}
 }

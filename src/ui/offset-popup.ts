@@ -296,7 +296,7 @@ export class OffsetPopup {
 			centerY = posOrBBox.y;
 		}
 
-		let left = refX + 120;
+		let left = refX + 100;
 		if (left + popupWidth > window.innerWidth - 16) {
 			const leftAlt = minBoxX - 100 - popupWidth;
 			if (leftAlt >= 16) {
@@ -308,7 +308,7 @@ export class OffsetPopup {
 		left = Math.max(16, left);
 
 		const top = Math.min(
-			Math.max(centerY, 16),
+			Math.max(centerY - popupHeight / 2, 16),
 			window.innerHeight - popupHeight - 16
 		);
 

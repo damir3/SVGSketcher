@@ -65,6 +65,7 @@ import {
 	SplineTool,
 	type SplineMode,
 	TrimTool,
+	ExtendTool,
 	BreakTool,
 	DeleteTool,
 	FilletTool,
@@ -513,6 +514,7 @@ export class CanvasInteraction {
 
 		// Modify
 		this.tools.set('trim', new TrimTool());
+		this.tools.set('extend', new ExtendTool());
 		this.tools.set('break', new BreakTool());
 		this.tools.set('delete', new DeleteTool());
 		this.tools.set('fillet', new FilletTool());
@@ -700,7 +702,7 @@ export class CanvasInteraction {
 				this.pruneIncompatibleSelection(tool);
 			}
 			this.svg.classList.toggle('tool-constraint', isConstraintTool(tool));
-			this.svg.classList.toggle('tool-trim', tool === 'trim' || tool === 'break');
+			this.svg.classList.toggle('tool-trim', tool === 'trim' || tool === 'extend' || tool === 'break');
 			this.svg.classList.toggle('tool-delete', tool === 'delete');
 			this.svg.classList.toggle('tool-select', tool === 'select');
 			this.updateCursor();

@@ -66,6 +66,7 @@ export type ToolType =
 	| 'select'
 	| 'pan'
 	| 'trim'
+	| 'extend'
 	| 'break'
 	| 'delete'
 	| 'mirror'

@@ -30,6 +30,7 @@ import chamferDistanceAngle from '../assets/icons/chamfer-distance-angle.svg?raw
 import offsetOneSide from '../assets/icons/offset-one-side.svg?raw';
 import offsetTwoSides from '../assets/icons/offset-two-sides.svg?raw';
 import offsetSymmetric from '../assets/icons/offset-symmetric.svg?raw';
+import extend from '../assets/icons/extend.svg?raw';
 import breakIcon from '../assets/icons/break.svg?raw';
 import mirror from '../assets/icons/mirror.svg?raw';
 import circularPattern from '../assets/icons/circular-pattern.svg?raw';
@@ -91,6 +92,7 @@ export const ICONS = {
 	construction,
 	snap,
 	trim,
+	extend,
 	fillet,
 	chamferEqual,
 	chamferTwoDistance,

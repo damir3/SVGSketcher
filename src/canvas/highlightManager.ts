@@ -65,8 +65,11 @@ export class HighlightManager implements IHighlightManager {
 
 		if (this.svg && typeof this.svg.querySelectorAll === 'function') {
 			const elements = this.svg.querySelectorAll(`[data-id="${target.id}"]`);
+			const classes = highlightClass.split(/\s+/).filter(Boolean);
 			for (const el of Array.from(elements)) {
-				el.classList?.add?.(highlightClass);
+				for (const cls of classes) {
+					el.classList?.add?.(cls);
+				}
 				if (highlightColor) {
 					(el as HTMLElement).style?.setProperty?.('--custom-hover-color', highlightColor);
 				}
@@ -79,9 +82,10 @@ export class HighlightManager implements IHighlightManager {
 
 		if (this.svg && typeof this.svg.querySelectorAll === 'function') {
 			const elements = this.svg.querySelectorAll(`[data-id="${this.currentTarget.id}"]`);
+			const classes = this.currentClass ? this.currentClass.split(/\s+/).filter(Boolean) : [];
 			for (const el of Array.from(elements)) {
-				if (this.currentClass) {
-					el.classList?.remove?.(this.currentClass);
+				for (const cls of classes) {
+					el.classList?.remove?.(cls);
 				}
 				if (this.currentColor) {
 					(el as HTMLElement).style?.removeProperty?.('--custom-hover-color');

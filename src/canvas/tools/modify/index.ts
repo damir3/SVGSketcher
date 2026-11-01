@@ -1,4 +1,5 @@
 export * from './trim';
+export * from './extend';
 export * from './break';
 export * from './delete';
 export * from './fillet';
