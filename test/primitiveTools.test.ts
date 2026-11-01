@@ -1023,7 +1023,7 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(setToolCalls, 0, 'cancel() must not call ctx.setTool');
 	});
 
-	it('SlotTool creates Center-to-Center Slot with construction axis line, 2 side lines, 2 end-cap arcs, and tangent/equal constraints', () => {
+	it('SlotTool creates Center to Center Slot with construction axis line, 2 side lines, 2 end-cap arcs, and tangent/equal constraints', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 		const slotTool = new SlotTool('center_to_center');

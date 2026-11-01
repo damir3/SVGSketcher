@@ -13,6 +13,7 @@ export { showToast };
 export class Toolbar {
 	private container: HTMLElement;
 	private interaction: CanvasInteraction;
+	private tooltipEl: HTMLElement | null = null;
 
 	constructor(container: HTMLElement, _sketch: SketchDocument, interaction: CanvasInteraction) {
 		this.container = container;
@@ -20,6 +21,7 @@ export class Toolbar {
 
 		this.render();
 		this.setupListeners();
+		this.setupTooltip();
 		this.setConstructionActive(this.interaction.getEffectiveConstructionState());
 	}
 
@@ -53,9 +55,9 @@ export class Toolbar {
 					${ICONS.arc_center}
 					<span class="btn-tooltip">Center Arc (A)</span>
 				</button>
-				<button class="tool-btn" data-tool="slot" title="Center-to-Center Slot">
+				<button class="tool-btn" data-tool="slot" title="Center to Center Slot (S)">
 					${ICONS.slot_center_to_center}
-					<span class="btn-tooltip">Center-to-Center Slot</span>
+					<span class="btn-tooltip">Center to Center Slot (S)</span>
 				</button>
 				<button class="tool-btn" data-tool="spline" title="Fit Point Spline">
 					${ICONS.spline_fit}
@@ -89,14 +91,6 @@ export class Toolbar {
 		<div class="toolbar-section">
 			<div class="toolbar-title">Tools</div>
 			<div class="toolbar-grid">
-				<button class="tool-btn active" id="btn-snap" title="Toggle Snapping (S)">
-					${ICONS.snap}
-					<span class="btn-tooltip">Snap (S)</span>
-				</button>
-				<button class="tool-btn" id="btn-construction" title="Toggle Construction Mode (X)">
-					${ICONS.construction}
-					<span class="btn-tooltip">Construction (X)</span>
-				</button>
 				<button class="tool-btn active" data-tool="select" title="Select & Drag (V)">
 					${ICONS.select}
 					<span class="btn-tooltip">Select (V)</span>
@@ -201,7 +195,7 @@ export class Toolbar {
 	}
 
 	private bindClicks(): void {
-		// Tool buttons (select, point, line, circle, rectangle)
+		// Tool buttons (select, point, line, circle, rectangle, etc.)
 		this.container.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const tool = btn.getAttribute('data-tool') as ToolType;
@@ -209,13 +203,13 @@ export class Toolbar {
 			});
 		});
 
-		// Construction toggle
+		// Construction toggle (if present in container)
 		const constrBtn = this.container.querySelector('#btn-construction');
 		constrBtn?.addEventListener('click', () => {
 			this.interaction.toggleConstructionMode();
 		});
 
-		// Snap toggle
+		// Snap toggle (if present in container)
 		const snapBtn = this.container.querySelector('#btn-snap');
 		snapBtn?.addEventListener('click', () => {
 			this.interaction.toggleSnapping();
@@ -228,6 +222,51 @@ export class Toolbar {
 				this.interaction.setTool(constraintType);
 			});
 		});
+	}
+
+	private setupTooltip(): void {
+		if (typeof document === 'undefined') return;
+
+		this.tooltipEl = document.createElement('div');
+		this.tooltipEl.className = 'cad-floating-tooltip';
+		document.body.appendChild(this.tooltipEl);
+
+		const hideTooltip = () => {
+			if (!this.tooltipEl) return;
+			this.tooltipEl.classList.remove('visible');
+		};
+
+		this.container.addEventListener('mouseover', (e: MouseEvent) => {
+			const target = (e.target as HTMLElement).closest<HTMLButtonElement>('.tool-btn');
+			if (!target || !this.tooltipEl) return;
+
+			const span = target.querySelector('.btn-tooltip');
+			const text = span?.textContent?.trim() || target.getAttribute('title') || '';
+			if (!text) return;
+
+			this.tooltipEl.textContent = text;
+			const rect = target.getBoundingClientRect();
+			this.tooltipEl.style.top = `${rect.top + rect.height / 2}px`;
+			this.tooltipEl.style.left = `${rect.right + 8}px`;
+			this.tooltipEl.classList.add('visible');
+		});
+
+		this.container.addEventListener('mouseout', (e: MouseEvent) => {
+			const target = (e.target as HTMLElement).closest<HTMLButtonElement>('.tool-btn');
+			const related = (e.relatedTarget as HTMLElement | null)?.closest<HTMLButtonElement>('.tool-btn');
+			if (target && target === related) return;
+			hideTooltip();
+		});
+
+		this.container.addEventListener('scroll', hideTooltip, { passive: true });
+		this.container.addEventListener('click', hideTooltip);
+	}
+
+	destroy(): void {
+		if (this.tooltipEl && this.tooltipEl.parentNode) {
+			this.tooltipEl.parentNode.removeChild(this.tooltipEl);
+			this.tooltipEl = null;
+		}
 	}
 
 	setActiveButton(tool: ToolType): void {
@@ -308,20 +347,20 @@ export class Toolbar {
 		if (!slotBtn) return;
 
 		let icon = ICONS.slot_center_to_center;
-		let title = 'Center-to-Center Slot';
+		let title = 'Center to Center Slot (S)';
 
 		if (mode === 'center_point') {
 			icon = ICONS.slot_center_point;
-			title = 'Center Point Slot';
+			title = 'Center Point Slot (S)';
 		} else if (mode === 'overall') {
 			icon = ICONS.slot_overall;
-			title = 'Overall Slot';
+			title = 'Overall Slot (S)';
 		} else if (mode === 'three_point_arc') {
 			icon = ICONS.slot_arc_3point;
-			title = '3-Point Arc Slot';
+			title = '3-Point Arc Slot (S)';
 		} else if (mode === 'center_point_arc') {
 			icon = ICONS.slot_arc_center;
-			title = 'Center Point Arc Slot';
+			title = 'Center Point Arc Slot (S)';
 		}
 
 		slotBtn.title = title;

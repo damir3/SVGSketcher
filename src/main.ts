@@ -49,6 +49,13 @@ function initApp(): void {
 					${ICONS.redo}
 				</button>
 				<div class="header-divider"></div>
+				<button class="btn-header btn-icon active" id="btn-snap-header" title="Toggle Snapping" aria-label="Toggle Snapping">
+					${ICONS.snap}
+				</button>
+				<button class="btn-header btn-icon" id="btn-construction-header" title="Toggle Construction Mode (X)" aria-label="Toggle Construction Mode">
+					${ICONS.construction}
+				</button>
+				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-fit-view" title="Fit to View (Z)" aria-label="Fit to View">
 					${ICONS.fitView}
 				</button>
@@ -101,6 +108,8 @@ function initApp(): void {
 	const presetSelector = document.getElementById('preset-selector') as HTMLSelectElement;
 	const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
 	const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
+	const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
+	const btnConstructionHeader = document.getElementById('btn-construction-header') as HTMLButtonElement;
 	const btnFitView = document.getElementById('btn-fit-view') as HTMLButtonElement;
 	const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
 	const btnImport = document.getElementById('btn-import') as HTMLButtonElement;
@@ -192,14 +201,16 @@ function initApp(): void {
 
 	interaction.onConstructionChange = active => {
 		toolbar.setConstructionActive(active);
+		btnConstructionHeader?.classList.toggle('active', active);
 	};
 	interaction.updateConstructionState();
 
 	interaction.onSnappingChange = active => {
 		toolbar.setSnappingActive(active);
-		const btnSnapHeader = document.getElementById('btn-snap-header');
 		btnSnapHeader?.classList.toggle('active', active);
 	};
+	btnSnapHeader?.classList.toggle('active', interaction.isSnappingEnabled);
+	btnConstructionHeader?.classList.toggle('active', interaction.getEffectiveConstructionState());
 
 	// Resize handling
 	function handleResize(): void {
@@ -286,9 +297,12 @@ function initApp(): void {
 
 	btnFitView.addEventListener('click', () => fitToView(true));
 
-	const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
 	btnSnapHeader?.addEventListener('click', () => {
 		interaction.toggleSnapping();
+	});
+
+	btnConstructionHeader?.addEventListener('click', () => {
+		interaction.toggleConstructionMode();
 	});
 
 	btnClear.addEventListener('click', () => {

@@ -341,9 +341,9 @@ export class SlotTool extends BaseTool {
 		if (!this.ctx) return;
 		switch (this._mode) {
 			case 'center_to_center':
-				if (this.drawingStep === 0) this.ctx.showToast('Center-to-Center Slot: Click first arc center');
-				else if (this.drawingStep === 1) this.ctx.showToast('Center-to-Center Slot: Click second arc center');
-				else this.ctx.showToast('Center-to-Center Slot: Move cursor and click or enter radius');
+				if (this.drawingStep === 0) this.ctx.showToast('Center to Center Slot: Click first arc center');
+				else if (this.drawingStep === 1) this.ctx.showToast('Center to Center Slot: Click second arc center');
+				else this.ctx.showToast('Center to Center Slot: Move cursor and click or enter radius');
 				break;
 			case 'center_point':
 				if (this.drawingStep === 0) this.ctx.showToast('Center Point Slot: Click slot center point');

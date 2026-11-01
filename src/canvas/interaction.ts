@@ -1104,7 +1104,7 @@ export class CanvasInteraction {
 					case 'Numpad1':
 						e.preventDefault();
 						this.setSlotMode('center_to_center');
-						showToast('Center-to-Center Slot (Alt+1)');
+						showToast('Center to Center Slot (Alt+1)');
 						return;
 					case 'Digit2':
 					case 'Numpad2':
@@ -1227,12 +1227,6 @@ export class CanvasInteraction {
 			case 'KeyL':
 				this.setTool('line');
 				return;
-			case 'KeyC':
-				this.setTool('circle');
-				return;
-			case 'KeyA':
-				this.setTool('arc');
-				return;
 			case 'KeyR':
 				this.setTool('rectangle');
 				return;
@@ -1242,8 +1236,17 @@ export class CanvasInteraction {
 			case 'KeyP':
 				this.setTool('point');
 				return;
+			case 'KeyC':
+				this.setTool('circle');
+				return;
+			case 'KeyA':
+				this.setTool('arc');
+				return;
 			case 'KeyE':
 				this.setTool('ellipse');
+				return;
+			case 'KeyS':
+				this.setTool('slot');
 				return;
 			case 'KeyT':
 				this.setTool('trim');
@@ -1268,11 +1271,6 @@ export class CanvasInteraction {
 				return;
 			case 'KeyF':
 				this.setTool('fixed');
-				return;
-			case 'KeyS':
-				if (!e.ctrlKey && !e.metaKey) {
-					this.toggleSnapping();
-				}
 				return;
 		}
 	}

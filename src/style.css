@@ -171,6 +171,12 @@ html, body {
   box-shadow: 0 0 0 1px #0284c7;
 }
 
+.btn-header.active:hover {
+  background-color: #bae6fd;
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
 .btn-header.primary:hover {
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 }
@@ -199,21 +205,37 @@ html, body {
 /* --- LEFT TOOLBAR (2 COLUMNS) --- */
 .cad-toolbar {
   width: var(--toolbar-width);
+  height: 100%;
+  min-height: 0;
   background-color: var(--bg-surface);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 6px;
+  padding: 12px 6px 24px 6px;
   gap: 6px;
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
   z-index: 5;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
 
-@media (max-height: 550px) {
-  .cad-toolbar {
-    overflow-y: auto;
-  }
+.cad-toolbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.cad-toolbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cad-toolbar::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.cad-toolbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--text-muted);
 }
 
 .toolbar-section {
@@ -278,10 +300,13 @@ html, body {
 }
 
 .tool-btn .btn-tooltip {
-  visibility: hidden;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  display: none;
+}
+
+.cad-floating-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
   background-color: #0f172a;
   color: #fff;
   font-size: 11px;
@@ -291,23 +316,17 @@ html, body {
   border: 1px solid #1e293b;
   white-space: nowrap;
   pointer-events: none;
-  opacity: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
   transition: opacity 0.15s ease;
-  z-index: 1000;
+  z-index: 10000;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%);
 }
 
-.toolbar-grid .tool-btn:nth-child(odd) .btn-tooltip {
-  left: 96px;
-}
-
-.toolbar-grid .tool-btn:nth-child(even) .btn-tooltip {
-  left: 52px;
-}
-
-.tool-btn:hover .btn-tooltip {
-  visibility: visible;
+.cad-floating-tooltip.visible {
   opacity: 1;
+  visibility: visible;
 }
 
 /* --- CANVAS AREA (PURE WHITE) --- */

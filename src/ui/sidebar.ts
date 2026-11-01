@@ -232,7 +232,7 @@ export class Sidebar {
 					Select slot creation method:
 				</div>
 				<div class="slot-mode-selector">
-					<button class="slot-mode-btn ${currentMode === 'center_to_center' ? 'active' : ''}" data-slot-mode="center_to_center" type="button" title="Center-to-Center Slot (Alt+1)">
+					<button class="slot-mode-btn ${currentMode === 'center_to_center' ? 'active' : ''}" data-slot-mode="center_to_center" type="button" title="Center to Center Slot (Alt+1)">
 						<span class="slot-mode-icon">${ICONS.slot_center_to_center}</span>
 						<span class="slot-mode-text">Center-Center</span>
 					</button>
