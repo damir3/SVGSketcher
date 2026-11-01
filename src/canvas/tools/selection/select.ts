@@ -9,12 +9,16 @@ export class SelectTool extends BaseTool {
 		return true;
 	}
 
+	override canHighlight(target: HoverTarget): boolean {
+		return target.id !== 'origin' && target.id !== 'axis_x' && target.id !== 'axis_y';
+	}
+
 	override getHighlightClass(_target: HoverTarget): string {
 		return 'select-hover';
 	}
 
 	override getHoverTargetOptions(): FindHoverTargetOptions {
-		return { allowSplineHandles: true };
+		return { allowSplineHandles: true, allowAxes: false, allowOrigin: false };
 	}
 
 	override cancel(): void {

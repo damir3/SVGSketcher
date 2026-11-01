@@ -8,6 +8,8 @@ export interface HoverTarget {
 
 export interface FindHoverTargetOptions {
 	allowSplineHandles?: boolean;
+	allowAxes?: boolean;
+	allowOrigin?: boolean;
 	maxProximityDist?: number;
 	pointRadius?: number;
 }
@@ -19,6 +21,8 @@ export function findHoverTarget(
 	options: FindHoverTargetOptions = {}
 ): HoverTarget | null {
 	const allowSplineHandles = options.allowSplineHandles ?? false;
+	const allowAxes = options.allowAxes ?? true;
+	const allowOrigin = options.allowOrigin ?? true;
 	const pointRadius = options.pointRadius ?? 14;
 	const maxProximityDist = options.maxProximityDist ?? 18;
 
@@ -28,10 +32,10 @@ export function findHoverTarget(
 		if (targetEl) {
 			const id = targetEl.getAttribute('data-id');
 			const type = targetEl.getAttribute('data-type');
-			if (id === 'origin' && type === 'point') {
+			if (allowOrigin && id === 'origin' && type === 'point') {
 				return { type: 'point', id: 'origin' };
 			}
-			if ((id === 'axis_x' || id === 'axis_y') && type === 'line') {
+			if (allowAxes && (id === 'axis_x' || id === 'axis_y') && type === 'line') {
 				return { type: 'line', id };
 			}
 			if (type === 'constraint' && id && ctx.sketch.constraints.has(id)) {
@@ -80,7 +84,7 @@ export function findHoverTarget(
 		return { type: 'point', id: pt.id };
 	}
 	const sOrigin = ctx.viewport.worldToScreen(0, 0);
-	if (Math.hypot(screen.x - sOrigin.x, screen.y - sOrigin.y) <= pointRadius) {
+	if (allowOrigin && Math.hypot(screen.x - sOrigin.x, screen.y - sOrigin.y) <= pointRadius) {
 		return { type: 'point', id: 'origin' };
 	}
 
@@ -156,15 +160,17 @@ export function findHoverTarget(
 		}
 	}
 
-	const dAxisX = Math.abs(screen.y - sOrigin.y);
-	if (dAxisX < bestDist) {
-		bestDist = dAxisX;
-		bestTarget = { type: 'line', id: 'axis_x' };
-	}
-	const dAxisY = Math.abs(screen.x - sOrigin.x);
-	if (dAxisY < bestDist) {
-		bestDist = dAxisY;
-		bestTarget = { type: 'line', id: 'axis_y' };
+	if (allowAxes) {
+		const dAxisX = Math.abs(screen.y - sOrigin.y);
+		if (dAxisX < bestDist) {
+			bestDist = dAxisX;
+			bestTarget = { type: 'line', id: 'axis_x' };
+		}
+		const dAxisY = Math.abs(screen.x - sOrigin.x);
+		if (dAxisY < bestDist) {
+			bestDist = dAxisY;
+			bestTarget = { type: 'line', id: 'axis_y' };
+		}
 	}
 
 	if (bestTarget) {
@@ -178,7 +184,13 @@ export function findHoverTarget(
 			const id = targetEl.getAttribute('data-id');
 			const type = targetEl.getAttribute('data-type') as HoverTarget['type'] | null;
 			if (id && type) {
-				return { type, id };
+				if (!allowOrigin && id === 'origin') {
+					// skip
+				} else if (!allowAxes && (id === 'axis_x' || id === 'axis_y')) {
+					// skip
+				} else {
+					return { type, id };
+				}
 			}
 		}
 	}

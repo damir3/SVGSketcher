@@ -64,6 +64,12 @@ function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {})
 			collect({ children });
 			return res;
 		},
+		closest: function (sel: string) {
+			if (sel === '[data-id]' && attributes.has('data-id')) {
+				return this;
+			}
+			return null;
+		},
 		children,
 	};
 }
@@ -304,5 +310,42 @@ describe('Select Tool Hover Mechanism', () => {
 		assert.ok(target);
 		assert.strictEqual(target.type, 'point');
 		assert.strictEqual(target.id, handlePt.id);
+	});
+
+	it('does not highlight origin or coordinate axes on hover', () => {
+		const sketch = new SketchDocument();
+		const svgRoot = createMockSvgElement('svg');
+		const axisXG = createMockSvgElement('g', { 'data-id': 'axis_x', 'data-type': 'line', class: 'sketch-entity sketch-line sketch-axis-line' });
+		const axisYG = createMockSvgElement('g', { 'data-id': 'axis_y', 'data-type': 'line', class: 'sketch-entity sketch-line sketch-axis-line' });
+		const originG = createMockSvgElement('g', { 'data-id': 'origin', 'data-type': 'point', class: 'sketch-origin-marker' });
+		svgRoot.appendChild(axisXG);
+		svgRoot.appendChild(axisYG);
+		svgRoot.appendChild(originG);
+
+		const ctx = createMockContext(sketch, svgRoot);
+		const tool = new SelectTool();
+		tool.activate(ctx);
+
+		assert.strictEqual(tool.canHighlight({ type: 'point', id: 'origin' }), false);
+		assert.strictEqual(tool.canHighlight({ type: 'line', id: 'axis_x' }), false);
+		assert.strictEqual(tool.canHighlight({ type: 'line', id: 'axis_y' }), false);
+
+		// Hover directly over origin (0, 0)
+		const targetOrigin = ctx.highlightManager!.update(tool, vec(0, 0), originG as unknown as SVGElement);
+		assert.strictEqual(targetOrigin, null);
+		assert.strictEqual(originG.classList.contains('select-hover'), false);
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
+
+		// Hover over X axis (100, 0)
+		const targetAxisX = ctx.highlightManager!.update(tool, vec(100, 0), axisXG as unknown as SVGElement);
+		assert.strictEqual(targetAxisX, null);
+		assert.strictEqual(axisXG.classList.contains('select-hover'), false);
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
+
+		// Hover over Y axis (0, 100)
+		const targetAxisY = ctx.highlightManager!.update(tool, vec(0, 100), axisYG as unknown as SVGElement);
+		assert.strictEqual(targetAxisY, null);
+		assert.strictEqual(axisYG.classList.contains('select-hover'), false);
+		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 	});
 });
