@@ -28,9 +28,6 @@ import type {
 	SketchSpline,
 } from '../model/types';
 import { showToast } from '../ui/toast';
-import { PolygonPopup } from '../ui/polygon-popup';
-import { FilletPopup } from '../ui/fillet-popup';
-import type { FilletCandidate } from '../math/fillet';
 import type { ChamferMode } from '../math/chamfer';
 import type { OffsetDirection } from '../math/offset';
 import type { GeoCurve } from '../math/intersection';
@@ -81,9 +78,6 @@ import {
 	SelectTool,
 	PanTool,
 	CONSTRAINT_TOOLS,
-	type MirrorState,
-	type CircularPatternState,
-	type RectangularPatternState,
 } from './tools';
 export * from './tools';
 
@@ -235,20 +229,8 @@ export class CanvasInteraction {
 	activeToolInstance: ITool | null = null;
 	private isSettingTool = false;
 
-	get mirrorState(): MirrorState | null {
-		return (this.tools.get('mirror') as MirrorTool)?.state ?? null;
-	}
-	set mirrorState(state: MirrorState | null) {
-		const tool = this.tools.get('mirror') as MirrorTool;
-		if (tool) tool.state = state;
-	}
-
 	getArcTool(): ArcTool | undefined {
 		return this.tools.get('arc') as ArcTool | undefined;
-	}
-
-	get arcMode(): ArcMode {
-		return this.getArcTool()?.mode ?? 'center';
 	}
 
 	setArcMode(mode: ArcMode): void {
@@ -269,10 +251,6 @@ export class CanvasInteraction {
 		return this.tools.get('rectangle') as RectangleTool | undefined;
 	}
 
-	get rectangleMode(): RectangleMode {
-		return this.getRectangleTool()?.mode ?? 'corner';
-	}
-
 	setRectangleMode(mode: RectangleMode): void {
 		const rectTool = this.getRectangleTool();
 		if (rectTool) {
@@ -289,10 +267,6 @@ export class CanvasInteraction {
 
 	getSlotTool(): SlotTool | undefined {
 		return this.tools.get('slot') as SlotTool | undefined;
-	}
-
-	get slotMode(): SlotMode {
-		return this.getSlotTool()?.mode ?? 'center_to_center';
 	}
 
 	setSlotMode(mode: SlotMode): void {
@@ -313,10 +287,6 @@ export class CanvasInteraction {
 		return this.tools.get('spline') as SplineTool | undefined;
 	}
 
-	get splineMode(): SplineMode {
-		return this.getSplineTool()?.mode ?? 'fit';
-	}
-
 	setSplineMode(mode: SplineMode): void {
 		const splineTool = this.getSplineTool();
 		if (splineTool) {
@@ -335,10 +305,6 @@ export class CanvasInteraction {
 		return this.tools.get('chamfer') as ChamferTool | undefined;
 	}
 
-	get chamferMode(): ChamferMode {
-		return this.getChamferTool()?.mode ?? 'equal_distance';
-	}
-
 	setChamferMode(mode: ChamferMode): void {
 		const chamferTool = this.getChamferTool();
 		if (chamferTool) {
@@ -353,10 +319,6 @@ export class CanvasInteraction {
 		return this.tools.get('offset') as OffsetTool | undefined;
 	}
 
-	get offsetDirection(): OffsetDirection {
-		return this.getOffsetTool()?.direction ?? 'one_side';
-	}
-
 	setOffsetDirection(direction: OffsetDirection): void {
 		const offsetTool = this.getOffsetTool();
 		if (offsetTool) {
@@ -367,10 +329,6 @@ export class CanvasInteraction {
 		}
 	}
 
-	get offsetChainSelection(): boolean {
-		return this.getOffsetTool()?.chainSelection ?? true;
-	}
-
 	setOffsetChainSelection(chainSelection: boolean): void {
 		const offsetTool = this.getOffsetTool();
 		if (offsetTool) {
@@ -378,6 +336,18 @@ export class CanvasInteraction {
 			this.onOffsetStateChange?.();
 			this.render();
 		}
+	}
+
+	getMirrorTool(): MirrorTool | undefined {
+		return this.tools.get('mirror') as MirrorTool | undefined;
+	}
+
+	getCircularPatternTool(): CircularPatternTool | undefined {
+		return this.tools.get('circular_pattern') as CircularPatternTool | undefined;
+	}
+
+	getRectangularPatternTool(): RectangularPatternTool | undefined {
+		return this.tools.get('rectangular_pattern') as RectangularPatternTool | undefined;
 	}
 
 	setMirrorPhase(phase: 'objects' | 'mirror_line'): void {
@@ -393,14 +363,6 @@ export class CanvasInteraction {
 		return (this.tools.get('mirror') as MirrorTool)?.executeMirror() ?? false;
 	}
 
-	get circularPatternState(): CircularPatternState | null {
-		return (this.tools.get('circular_pattern') as CircularPatternTool)?.state ?? null;
-	}
-	set circularPatternState(state: CircularPatternState | null) {
-		const tool = this.tools.get('circular_pattern') as CircularPatternTool;
-		if (tool) tool.state = state;
-	}
-
 	setCircularPatternPhase(phase: 'objects' | 'center_point'): void {
 		(this.tools.get('circular_pattern') as CircularPatternTool)?.setPhase(phase);
 	}
@@ -412,14 +374,6 @@ export class CanvasInteraction {
 
 	executeCircularPattern(): boolean {
 		return (this.tools.get('circular_pattern') as CircularPatternTool)?.executeCircularPattern() ?? false;
-	}
-
-	get rectangularPatternState(): RectangularPatternState | null {
-		return (this.tools.get('rectangular_pattern') as RectangularPatternTool)?.state ?? null;
-	}
-	set rectangularPatternState(state: RectangularPatternState | null) {
-		const tool = this.tools.get('rectangular_pattern') as RectangularPatternTool;
-		if (tool) tool.state = state;
 	}
 
 	setRectangularPatternPhase(phase: 'objects' | 'direction1' | 'direction2'): void {
@@ -435,26 +389,6 @@ export class CanvasInteraction {
 		return (this.tools.get('rectangular_pattern') as RectangularPatternTool)?.executeRectangularPattern() ?? false;
 	}
 
-	get polygonPopup(): PolygonPopup | undefined {
-		return (this.tools.get('polygon') as PolygonTool)?.popup;
-	}
-
-	get filletPopup(): FilletPopup | undefined {
-		return (this.tools.get('fillet') as FilletTool)?.popup;
-	}
-
-	get filletRadius(): number {
-		return (this.tools.get('fillet') as FilletTool)?.filletRadius ?? 10.0;
-	}
-	set filletRadius(r: number) {
-		const tool = this.tools.get('fillet') as FilletTool;
-		if (tool) tool.filletRadius = r;
-	}
-
-	get pendingFillets(): FilletCandidate[] {
-		return (this.tools.get('fillet') as FilletTool)?.pendingFillets ?? [];
-	}
-
 	isDrawingSpline(): boolean {
 		const tool = this.activeToolInstance;
 		return tool instanceof SplineTool && tool.isBusy();
@@ -468,20 +402,6 @@ export class CanvasInteraction {
 	redoSplinePoint(): boolean {
 		const tool = this.activeToolInstance;
 		return tool instanceof SplineTool ? tool.redoPoint() : false;
-	}
-
-	finishSpline(isClosed = false): void {
-		const tool = this.activeToolInstance;
-		if (tool instanceof SplineTool) {
-			tool.finishSpline(isClosed);
-		}
-	}
-
-	cancelSpline(): void {
-		const tool = this.activeToolInstance;
-		if (tool instanceof SplineTool) {
-			tool.cancel();
-		}
 	}
 
 	private initTools(): void {
@@ -762,15 +682,6 @@ export class CanvasInteraction {
 		this.onSnappingChange?.(this.isSnappingEnabled);
 		this.renderer.clearPreviews();
 		this.render();
-	}
-
-	setSnapping(enabled: boolean): void {
-		if (this.isSnappingEnabled !== enabled) {
-			this.isSnappingEnabled = enabled;
-			this.onSnappingChange?.(this.isSnappingEnabled);
-			this.renderer.clearPreviews();
-			this.render();
-		}
 	}
 
 	cancelDrawing(): void {
@@ -1415,33 +1326,6 @@ export class CanvasInteraction {
 			}
 		}
 
-		// Snap to coordinate axes:
-		const sOriginAxis = this.viewport.worldToScreen(0, 0);
-		const dAxisX = Math.abs(screenPos.y - sOriginAxis.y);
-		if (dAxisX < closestGeomDist) {
-			closestGeomDist = dAxisX;
-			const projScreen = vec(screenPos.x, sOriginAxis.y);
-			const worldPos = this.viewport.screenToWorld(projScreen.x, projScreen.y);
-			foundGeom = {
-				type: 'line',
-				id: 'axis_x',
-				worldPos: vec(worldPos.x, 0),
-				screenPos: projScreen,
-			};
-		}
-		const dAxisY = Math.abs(screenPos.x - sOriginAxis.x);
-		if (dAxisY < closestGeomDist) {
-			closestGeomDist = dAxisY;
-			const projScreen = vec(sOriginAxis.x, screenPos.y);
-			const worldPos = this.viewport.screenToWorld(projScreen.x, projScreen.y);
-			foundGeom = {
-				type: 'line',
-				id: 'axis_y',
-				worldPos: vec(0, worldPos.y),
-				screenPos: projScreen,
-			};
-		}
-
 		for (const circle of this.sketch.circles.values()) {
 			if (excludePointId && circle.centerId === excludePointId) {
 				continue;
@@ -1710,28 +1594,49 @@ export class CanvasInteraction {
 			};
 		}
 
-		// Priority 3: Grid snapping
+		// Priority 3: Coordinate axes & grid snapping
 		if (!this.isSnappingEnabled || !allowGrid) {
 			return null;
 		}
 
+		const sOrigin = this.viewport.worldToScreen(0, 0);
+		const dAxisX = Math.abs(screenPos.y - sOrigin.y);
+		const dAxisY = Math.abs(screenPos.x - sOrigin.x);
+
+		const world = this.viewport.screenToWorld(screenPos.x, screenPos.y);
 		const { step, subStep } = this.viewport.getGridStep();
 		const subStepPx = subStep * this.viewport.zoom;
 		const gridStep = subStepPx >= 6 ? subStep : step;
-		const gridStepPx = gridStep * this.viewport.zoom;
-
-		const world = this.viewport.screenToWorld(screenPos.x, screenPos.y);
 		const nearestWorldX = this.cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep);
 		const nearestWorldY = this.cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep);
-		const nearestWorld = vec(nearestWorldX, nearestWorldY);
-		const nearestScreen = this.viewport.worldToScreen(nearestWorld.x, nearestWorld.y);
-		const gridDist = dist(screenPos, nearestScreen);
+		const nearestScreen = this.viewport.worldToScreen(nearestWorldX, nearestWorldY);
 
-		const gridSnapDistPx = Math.max(6, Math.min(10, gridStepPx * 0.45));
-		if (gridDist <= gridSnapDistPx) {
+		if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
+			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= 4 ? nearestWorldX : world.x;
+			const snapScreenX = Math.abs(screenPos.x - nearestScreen.x) <= 4 ? nearestScreen.x : screenPos.x;
+			return {
+				type: 'line',
+				id: 'axis_x',
+				worldPos: vec(snapX, 0),
+				screenPos: vec(snapScreenX, sOrigin.y),
+			};
+		}
+
+		if (dAxisY < geomSnapDistPx) {
+			const snapY = Math.abs(screenPos.y - nearestScreen.y) <= 4 ? nearestWorldY : world.y;
+			const snapScreenY = Math.abs(screenPos.y - nearestScreen.y) <= 4 ? nearestScreen.y : screenPos.y;
+			return {
+				type: 'line',
+				id: 'axis_y',
+				worldPos: vec(0, snapY),
+				screenPos: vec(sOrigin.x, snapScreenY),
+			};
+		}
+
+		if (dist(screenPos, nearestScreen) <= 4) {
 			return {
 				type: 'grid',
-				worldPos: nearestWorld,
+				worldPos: vec(nearestWorldX, nearestWorldY),
 				screenPos: nearestScreen,
 			};
 		}
@@ -3414,50 +3319,6 @@ export class CanvasInteraction {
 		}
 	}
 
-	isEntityCompatibleWithConstraint(
-		constraintType: string,
-		entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
-	): boolean {
-		switch (constraintType) {
-			case 'fixed':
-				return entityType === 'point';
-			case 'coincident':
-				return (
-					entityType === 'point' ||
-					entityType === 'line' ||
-					entityType === 'circle' ||
-					entityType === 'arc' ||
-					entityType === 'ellipse' ||
-					entityType === 'elliptical_arc' ||
-					entityType === 'spline'
-				);
-			case 'horizontal_vertical':
-			case 'horizontal':
-			case 'vertical':
-				return entityType === 'line' || entityType === 'point';
-			case 'dimension':
-			case 'distance':
-				return entityType === 'line' || entityType === 'circle' || entityType === 'arc' || entityType === 'point';
-			case 'equal':
-				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
-			case 'parallel':
-			case 'collinear':
-			case 'perpendicular':
-				return entityType === 'line';
-			case 'tangent':
-				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
-			case 'concentric':
-				return entityType === 'circle' || entityType === 'arc';
-			case 'point_on_line':
-			case 'midpoint':
-				return entityType === 'point' || entityType === 'line';
-			case 'symmetry':
-				return entityType === 'point' || entityType === 'line' || entityType === 'circle' || entityType === 'arc';
-			default:
-				return false;
-		}
-	}
-
 	canApplyConstraint(type: string): boolean {
 		const sel = this.sketch.selection;
 		const pCount = sel.pointIds.size;
@@ -3968,54 +3829,6 @@ export class CanvasInteraction {
 		}
 
 		return applied;
-	}
-
-	deselectEntity(id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'): void {
-		if (type === 'point') {
-			this.sketch.selection.pointIds.delete(id);
-		} else if (type === 'line') {
-			this.sketch.selection.lineIds.delete(id);
-		} else if (type === 'circle') {
-			this.sketch.selection.circleIds.delete(id);
-		} else if (type === 'arc') {
-			this.sketch.selection.arcIds.delete(id);
-		} else if (type === 'ellipse') {
-			this.sketch.selection.ellipseIds.delete(id);
-		} else if (type === 'elliptical_arc') {
-			this.sketch.selection.ellipticalArcIds.delete(id);
-		}
-		this.sketch.selection.constraintIds.clear();
-		for (const pid of this.sketch.selection.pointIds) {
-			for (const c of this.sketch.getConstraintsForEntity('point', pid)) {
-				this.sketch.selection.constraintIds.add(c.id);
-			}
-		}
-		for (const lid of this.sketch.selection.lineIds) {
-			for (const c of this.sketch.getConstraintsForEntity('line', lid)) {
-				this.sketch.selection.constraintIds.add(c.id);
-			}
-		}
-		for (const cid of this.sketch.selection.circleIds) {
-			for (const c of this.sketch.getConstraintsForEntity('circle', cid)) {
-				this.sketch.selection.constraintIds.add(c.id);
-			}
-		}
-		for (const aid of this.sketch.selection.arcIds) {
-			for (const c of this.sketch.getConstraintsForEntity('arc', aid)) {
-				this.sketch.selection.constraintIds.add(c.id);
-			}
-		}
-		for (const eid of this.sketch.selection.ellipseIds) {
-			for (const c of this.sketch.getConstraintsForEntity('ellipse', eid)) {
-				this.sketch.selection.constraintIds.add(c.id);
-			}
-		}
-		for (const eaid of this.sketch.selection.ellipticalArcIds) {
-			for (const c of this.sketch.getConstraintsForEntity('elliptical_arc', eaid)) {
-				this.sketch.selection.constraintIds.add(c.id);
-			}
-		}
-		this.sketch.notify();
 	}
 
 	private finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {

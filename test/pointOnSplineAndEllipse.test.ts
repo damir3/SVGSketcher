@@ -595,7 +595,6 @@ describe('Snapping with Ellipse and Spline', () => {
 				effectiveWorld: vec(50, 50),
 				effectiveScreen: sStart,
 			});
-			assert.equal(tool.isBusy(), true, 'Line tool is in step 1');
 
 			// Step 2: Snap to ellipse at perimeter
 			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
@@ -917,7 +916,6 @@ describe('Snapping with Ellipse and Spline', () => {
 				effectiveWorld: vec(50, 50),
 				effectiveScreen: sStart,
 			});
-			assert.equal(tool.isBusy(), true);
 
 			const sOrigin = vp.worldToScreen(0, 0);
 			const snapOrigin = interaction.findSnap(sOrigin);
@@ -949,7 +947,6 @@ describe('Snapping with Ellipse and Spline', () => {
 				effectiveWorld: vec(50, 50),
 				effectiveScreen: sStart,
 			});
-			assert.equal(tool.isBusy(), true);
 
 			const sAxis = vp.worldToScreen(100, 0);
 			const snapAxis = interaction.findSnap(sAxis);

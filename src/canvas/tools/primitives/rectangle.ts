@@ -7,13 +7,14 @@ import {
 	POLYGON_CENTER_ATTRS,
 	getPreviewStrokeAttrs,
 } from '../../styles';
-import { RectanglePopup, type RectangleMode } from '../../../ui/rectangle-popup';
-export type { RectangleMode };
+import { ToolPopup } from '../../../ui/tool-popup';
+
+export type RectangleMode = 'corner' | 'center' | 'three_point' | 'rounded';
 
 export class RectangleTool extends BaseTool {
 	readonly id = 'rectangle' as const;
 
-	readonly popup: RectanglePopup;
+	readonly popup: ToolPopup<'width' | 'height' | 'radius'>;
 	private _mode: RectangleMode = 'corner';
 	private drawingStep: 0 | 1 | 2 = 0;
 
@@ -36,17 +37,50 @@ export class RectangleTool extends BaseTool {
 	constructor(initialMode: RectangleMode = 'corner') {
 		super();
 		this._mode = initialMode;
-		this.popup = new RectanglePopup();
+		this.popup = new ToolPopup<'width' | 'height' | 'radius'>({
+			className: 'rectangle-popup',
+			defaultOffset: { x: 150, y: 40 },
+			fields: [
+				{
+					id: 'width',
+					label: 'Width',
+					type: 'dimension',
+					unit: 'mm',
+					lockable: true,
+					defaultValue: 50.0,
+				},
+				{
+					id: 'height',
+					label: 'Height',
+					type: 'dimension',
+					unit: 'mm',
+					lockable: true,
+					defaultValue: 30.0,
+				},
+				{
+					id: 'radius',
+					label: 'Radius',
+					type: 'dimension',
+					unit: 'mm',
+					lockable: true,
+					defaultValue: 0.0,
+					visible: this._mode === 'rounded',
+				},
+			],
+		});
 
-		this.popup.onValuesChange = (w, h, r, isWLocked, isHLocked, isRLocked) => {
-			this.width = w;
-			this.height = h;
-			this.radius = r;
-			this.isWidthLocked = isWLocked;
-			this.isHeightLocked = isHLocked;
-			this.isRadiusLocked = isRLocked;
+		const syncValuesFromPopup = () => {
+			this.width = this.popup.getNumericValue('width', 50);
+			this.height = this.popup.getNumericValue('height', 30);
+			this.radius = this.popup.getNumericValue('radius', 0);
+			this.isWidthLocked = this.popup.isLocked('width');
+			this.isHeightLocked = this.popup.isLocked('height');
+			this.isRadiusLocked = this.popup.isLocked('radius');
 			this.ctx?.requestRender();
 		};
+
+		this.popup.onChange = () => syncValuesFromPopup();
+		this.popup.onLockChange = () => syncValuesFromPopup();
 
 		this.popup.onCommit = () => {
 			if (this.drawingStep > 0 && this.startWorldPos) {
@@ -73,20 +107,16 @@ export class RectangleTool extends BaseTool {
 		if (this._mode === newMode) return;
 		this.cancel();
 		this._mode = newMode;
-		this.popup.setMode(newMode);
+		this.popup.setFieldVisible('radius', newMode === 'rounded');
 		this.onModeChange?.(newMode);
 		this.onStateChange?.();
 		this.ctx?.requestRender();
 	}
 
-	override isBusy(): boolean {
-		return this.drawingStep > 0;
-	}
-
 	override activate(ctx: any): void {
 		super.activate(ctx);
 		this.popup.setSketch(this.ctx.sketch);
-		this.popup.setMode(this._mode);
+		this.popup.setFieldVisible('radius', this._mode === 'rounded');
 		this.updateToastHint();
 	}
 
@@ -134,10 +164,13 @@ export class RectangleTool extends BaseTool {
 			this.width = 0.1;
 			this.height = 0.1;
 			this.radius = 0;
-			this.popup.resetValues(0.1, 0.1, 0);
+			this.popup.resetField('width', 0.1);
+			this.popup.resetField('height', 0.1);
+			this.popup.resetField('radius', 0);
 
 			this.drawingStep = 1;
-			this.popup.show(e.screen, this.width, this.height, this.radius, this._mode);
+			this.popup.setFieldVisible('radius', this._mode === 'rounded');
+			this.popup.show(e.screen);
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -163,13 +196,13 @@ export class RectangleTool extends BaseTool {
 			} else if (this._mode === 'rounded') {
 				const c2 = this.computeCornerSecondPoint(effectiveWorld);
 				this.secondSnap = snap ?? null;
-				if (this.isRadiusLocked || this.popup.isRadiusLocked()) {
+				if (this.isRadiusLocked || this.popup.isLocked('radius')) {
 					this.commitRounded(this.startWorldPos!, c2, this.radius, this.secondSnap);
 				} else {
 					this.secondWorldPos = c2;
 					this.radius = 0;
 					this.drawingStep = 2;
-					this.popup.updateDimensions(this.width, this.height, 0);
+					this.updatePopupDimensions(this.width, this.height, 0);
 					this.updateToastHint();
 					this.onStateChange?.();
 					this.ctx.requestRender();
@@ -190,6 +223,14 @@ export class RectangleTool extends BaseTool {
 		}
 	}
 
+	private updatePopupDimensions(w: number, h: number, r?: number): void {
+		this.popup.updateValueIfUnlocked('width', w);
+		this.popup.updateValueIfUnlocked('height', h);
+		if (r !== undefined) {
+			this.popup.updateValueIfUnlocked('radius', r);
+		}
+	}
+
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this.drawingStep === 0 || !this.startWorldPos) return;
 
@@ -201,20 +242,20 @@ export class RectangleTool extends BaseTool {
 			const dy = effectiveWorld.y - this.startWorldPos.y;
 			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dx));
 			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dy));
-			this.popup.updateDimensions(this.width, this.height);
+			this.updatePopupDimensions(this.width, this.height);
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'center') {
 			const dx = effectiveWorld.x - this.startWorldPos.x;
 			const dy = effectiveWorld.y - this.startWorldPos.y;
 			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dx) * 2);
 			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dy) * 2);
-			this.popup.updateDimensions(this.width, this.height);
+			this.updatePopupDimensions(this.width, this.height);
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'three_point') {
 			if (this.drawingStep === 1) {
 				const d = dist(this.startWorldPos, effectiveWorld);
 				if (!this.isWidthLocked) this.width = Math.max(0.1, d);
-				this.popup.updateDimensions(this.width, this.height);
+				this.updatePopupDimensions(this.width, this.height);
 			} else if (this.drawingStep === 2 && this.secondWorldPos) {
 				const V = vec(this.secondWorldPos.x - this.startWorldPos.x, this.secondWorldPos.y - this.startWorldPos.y);
 				const baseLen = Math.hypot(V.x, V.y);
@@ -222,7 +263,7 @@ export class RectangleTool extends BaseTool {
 				const offset = vec(effectiveWorld.x - this.secondWorldPos.x, effectiveWorld.y - this.secondWorldPos.y);
 				const proj = offset.x * n.x + offset.y * n.y;
 				if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(proj));
-				this.popup.updateDimensions(this.width, this.height);
+				this.updatePopupDimensions(this.width, this.height);
 			}
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'rounded') {
@@ -237,7 +278,7 @@ export class RectangleTool extends BaseTool {
 				} else {
 					this.radius = Math.min(this.radius, maxR);
 				}
-				this.popup.updateDimensions(this.width, this.height, this.radius);
+				this.updatePopupDimensions(this.width, this.height, this.radius);
 			} else if (this.drawingStep === 2 && this.secondWorldPos) {
 				const c1 = this.startWorldPos;
 				const c2 = this.secondWorldPos;
@@ -270,7 +311,7 @@ export class RectangleTool extends BaseTool {
 						}
 					}
 				}
-				this.popup.updateDimensions(this.width, this.height, this.radius);
+				this.updatePopupDimensions(this.width, this.height, this.radius);
 			}
 			this.popup.updatePosition(e.screen);
 		}
@@ -402,7 +443,9 @@ export class RectangleTool extends BaseTool {
 		this.width = 50;
 		this.height = 30;
 		this.radius = 0;
-		this.popup.resetValues(50, 30, 0);
+		this.popup.resetField('width', 50);
+		this.popup.resetField('height', 30);
+		this.popup.resetField('radius', 0);
 		this.updateToastHint();
 		this.onStateChange?.();
 	}
@@ -554,14 +597,14 @@ export class RectangleTool extends BaseTool {
 		sketch.addHorizontalConstraint(p3.id, p2.id);
 		sketch.addVerticalConstraint(p0.id, p3.id);
 
-		if (this.isWidthLocked || this.popup.isWidthLocked()) {
+		if (this.isWidthLocked || this.popup.isLocked('width')) {
 			const c = sketch.addDistanceConstraint(p0.id, p1.id, this.width);
-			const expr = this.popup.getWidthExpression();
+			const expr = this.popup.getExpression('width');
 			if (c && expr) c.expression = expr;
 		}
-		if (this.isHeightLocked || this.popup.isHeightLocked()) {
+		if (this.isHeightLocked || this.popup.isLocked('height')) {
 			const c = sketch.addDistanceConstraint(p1.id, p2.id, this.height);
-			const expr = this.popup.getHeightExpression();
+			const expr = this.popup.getExpression('height');
 			if (c && expr) c.expression = expr;
 		}
 
@@ -635,14 +678,14 @@ export class RectangleTool extends BaseTool {
 
 		sketch.addMidpointConstraint(centerPtId, d1.id);
 
-		if (this.isWidthLocked || this.popup.isWidthLocked()) {
+		if (this.isWidthLocked || this.popup.isLocked('width')) {
 			const c = sketch.addDistanceConstraint(p0.id, p1.id, this.width);
-			const expr = this.popup.getWidthExpression();
+			const expr = this.popup.getExpression('width');
 			if (c && expr) c.expression = expr;
 		}
-		if (this.isHeightLocked || this.popup.isHeightLocked()) {
+		if (this.isHeightLocked || this.popup.isLocked('height')) {
 			const c = sketch.addDistanceConstraint(p1.id, p2.id, this.height);
-			const expr = this.popup.getHeightExpression();
+			const expr = this.popup.getExpression('height');
 			if (c && expr) c.expression = expr;
 		}
 
@@ -690,14 +733,14 @@ export class RectangleTool extends BaseTool {
 		sketch.addPerpendicularConstraint(l0.id, l1.id);
 		sketch.addEqualLengthConstraint(l0.id, l2.id);
 
-		if (this.isWidthLocked || this.popup.isWidthLocked()) {
+		if (this.isWidthLocked || this.popup.isLocked('width')) {
 			const c = sketch.addDistanceConstraint(pCorner0.id, pCorner1.id, this.width);
-			const expr = this.popup.getWidthExpression();
+			const expr = this.popup.getExpression('width');
 			if (c && expr) c.expression = expr;
 		}
-		if (this.isHeightLocked || this.popup.isHeightLocked()) {
+		if (this.isHeightLocked || this.popup.isLocked('height')) {
 			const c = sketch.addDistanceConstraint(pCorner1.id, pCorner2.id, this.height);
-			const expr = this.popup.getHeightExpression();
+			const expr = this.popup.getExpression('height');
 			if (c && expr) c.expression = expr;
 		}
 
@@ -777,19 +820,19 @@ export class RectangleTool extends BaseTool {
 		sketch.addEqualRadiusConstraint(brArc.id, blArc.id);
 		sketch.addEqualRadiusConstraint(blArc.id, tlArc.id);
 
-		if (this.isRadiusLocked || this.popup.isRadiusLocked()) {
+		if (this.isRadiusLocked || this.popup.isLocked('radius')) {
 			const c = sketch.addRadiusConstraint(trArc.id, r);
-			const expr = this.popup.getRadiusExpression();
+			const expr = this.popup.getExpression('radius');
 			if (c && expr) c.expression = expr;
 		}
-		if (this.isWidthLocked || this.popup.isWidthLocked()) {
+		if (this.isWidthLocked || this.popup.isLocked('width')) {
 			const c = sketch.addDistanceConstraint(ptTopStart.id, ptTopEnd.id, Math.max(0.1, w - 2 * r));
-			const expr = this.popup.getWidthExpression();
+			const expr = this.popup.getExpression('width');
 			if (c && expr) c.expression = expr;
 		}
-		if (this.isHeightLocked || this.popup.isHeightLocked()) {
+		if (this.isHeightLocked || this.popup.isLocked('height')) {
 			const c = sketch.addDistanceConstraint(ptLeftStart.id, ptLeftEnd.id, Math.max(0.1, h - 2 * r));
-			const expr = this.popup.getHeightExpression();
+			const expr = this.popup.getExpression('height');
 			if (c && expr) c.expression = expr;
 		}
 

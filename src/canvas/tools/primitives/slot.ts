@@ -9,9 +9,17 @@ import {
 	POLYGON_CENTER_ATTRS,
 	getPreviewStrokeAttrs,
 } from '../../styles';
-import { SlotPopup, type SlotMode, type SlotPopupField } from '../../../ui/slot-popup';
+import { ToolPopup } from '../../../ui/tool-popup';
 import { parseNumericOrExpression } from '../../../math/expression';
-export type { SlotMode };
+
+export type SlotMode =
+	| 'center_to_center'
+	| 'center_point'
+	| 'overall'
+	| 'three_point_arc'
+	| 'center_point_arc';
+
+export type SlotPopupField = 'distance' | 'angle' | 'radius';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -46,7 +54,7 @@ function isArcClockwiseThroughPoint(
 export class SlotTool extends BaseTool {
 	readonly id = 'slot' as const;
 
-	readonly popup: SlotPopup;
+	readonly popup: ToolPopup<'distance' | 'angle' | 'radius'>;
 	private _mode: SlotMode = 'center_to_center';
 	private drawingStep: 0 | 1 | 2 | 3 = 0;
 
@@ -83,20 +91,52 @@ export class SlotTool extends BaseTool {
 	constructor(initialMode: SlotMode = 'center_to_center') {
 		super();
 		this._mode = initialMode;
-		this.popup = new SlotPopup();
+		const isArc = this._mode === 'three_point_arc' || this._mode === 'center_point_arc';
+		this.popup = new ToolPopup<'distance' | 'angle' | 'radius'>({
+			className: 'slot-popup rectangle-popup',
+			defaultOffset: { x: 150, y: 40 },
+			fields: [
+				{
+					id: 'distance',
+					label: isArc ? 'Chord' : 'Length',
+					type: 'dimension',
+					unit: 'mm',
+					lockable: true,
+					defaultValue: 50.0,
+				},
+				{
+					id: 'angle',
+					label: 'Angle',
+					type: 'dimension',
+					unit: '°',
+					lockable: true,
+					defaultValue: 90.0,
+					visible: isArc,
+				},
+				{
+					id: 'radius',
+					label: 'Radius',
+					type: 'dimension',
+					unit: 'mm',
+					lockable: true,
+					placeholder: '—',
+					visible: false,
+				},
+			],
+		});
 
-		this.popup.onValuesChange = (distVal, angleVal, radVal, isDistLocked, isAngLocked, isRadLocked) => {
-			this.distance = distVal;
-			this.angle = angleVal;
-			this.radius = radVal;
-			this.distanceExpression = this.popup.getDistanceExpression();
-			this.angleExpression = this.popup.getAngleExpression();
-			this.radiusExpression = this.popup.getRadiusExpression();
-			this.isDistanceLocked = isDistLocked;
-			this.isAngleLocked = isAngLocked;
-			this.isRadiusLocked = isRadLocked;
+		this.popup.onChange = () => {
+			this.distance = this.popup.getNumericValue('distance', 50);
+			this.angle = this.popup.getNumericValue('angle', 90);
+			this.radius = this.getPopupRadius();
+			this.distanceExpression = this.popup.getExpression('distance');
+			this.angleExpression = this.popup.getExpression('angle');
+			this.radiusExpression = this.popup.getExpression('radius');
+			this.isDistanceLocked = this.popup.isLocked('distance');
+			this.isAngleLocked = this.popup.isLocked('angle');
+			this.isRadiusLocked = this.popup.isLocked('radius');
 
-			if (this._mode === 'center_point_arc' && isDistLocked) {
+			if (this._mode === 'center_point_arc' && this.isDistanceLocked) {
 				this.arcRadius = this.distance;
 				this.updateCenterArcEndpointsForRadius();
 			}
@@ -111,8 +151,10 @@ export class SlotTool extends BaseTool {
 			this.ctx?.requestRender();
 		};
 
-		this.popup.onFieldLocked = (field: SlotPopupField) => {
-			this.handleFieldLocked(field);
+		this.popup.onLockChange = (field, locked) => {
+			if (locked) {
+				this.handleFieldLocked(field);
+			}
 		};
 
 		this.popup.onCommit = () => {
@@ -126,6 +168,29 @@ export class SlotTool extends BaseTool {
 			this.ctx?.setTool('select');
 			this.ctx?.requestRender();
 		};
+	}
+
+	private updatePopupValues(distVal: number, angleVal: number, radVal: number | null): void {
+		this.popup.updateValueIfUnlocked('distance', distVal);
+		this.popup.updateValueIfUnlocked('angle', angleVal);
+		if (radVal !== null) {
+			this.popup.updateValueIfUnlocked('radius', radVal);
+		}
+	}
+
+	private resetPopupValues(distVal = 50, angleVal = 90, radVal: number | null = null): void {
+		this.popup.resetField('distance', distVal);
+		this.popup.resetField('angle', angleVal);
+		this.popup.resetField('radius', radVal);
+		this.popup.setFieldVisible('radius', false);
+	}
+
+	private getPopupRadius(): number | null {
+		const raw = this.popup.getStringValue('radius').trim();
+		if (!raw || raw === '—') return null;
+		const val = this.popup.getNumericValue('radius', NaN);
+		if (isNaN(val) || val <= 0.01) return null;
+		return val;
 	}
 
 	get mode(): SlotMode {
@@ -157,20 +222,20 @@ export class SlotTool extends BaseTool {
 		if (this._mode === newMode) return;
 		this.cancel();
 		this._mode = newMode;
-		this.popup.setMode(newMode);
+		const isArc = newMode === 'three_point_arc' || newMode === 'center_point_arc';
+		this.popup.setFieldLabel('distance', isArc ? 'Chord' : 'Length');
+		this.popup.setFieldVisible('angle', isArc);
 		this.onModeChange?.(newMode);
 		this.onStateChange?.();
 		this.ctx?.requestRender();
 	}
 
-	override isBusy(): boolean {
-		return this.drawingStep > 0;
-	}
-
 	override activate(ctx: any): void {
 		super.activate(ctx);
 		this.popup.setSketch(this.ctx.sketch);
-		this.popup.setMode(this._mode);
+		const isArc = this._mode === 'three_point_arc' || this._mode === 'center_point_arc';
+		this.popup.setFieldLabel('distance', isArc ? 'Chord' : 'Length');
+		this.popup.setFieldVisible('angle', isArc);
 		this.updateToastHint();
 	}
 
@@ -195,8 +260,8 @@ export class SlotTool extends BaseTool {
 			this.arcRadius = this.distance;
 		}
 		this.isDistanceLocked = true;
-		this.popup.setDistanceLocked(true);
-		this.popup.updateValues(this.distance, this.angle, this.radius);
+		this.popup.setLocked('distance', true, true);
+		this.updatePopupValues(this.distance, this.angle, this.radius);
 		this.handleFieldLocked('distance');
 	}
 
@@ -213,8 +278,8 @@ export class SlotTool extends BaseTool {
 			this.angle = Math.max(0.1, Math.min(359.9, value));
 		}
 		this.isAngleLocked = true;
-		this.popup.setAngleLocked(true);
-		this.popup.updateValues(this.distance, this.angle, this.radius);
+		this.popup.setLocked('angle', true, true);
+		this.updatePopupValues(this.distance, this.angle, this.radius);
 		this.handleFieldLocked('angle');
 	}
 
@@ -230,25 +295,25 @@ export class SlotTool extends BaseTool {
 		} else if (value !== undefined) {
 			this.radius = Math.max(0.1, value);
 		} else if (this.radius === null) {
-			const popupRad = this.popup.getRadius();
+			const popupRad = this.getPopupRadius();
 			if (popupRad === null) return;
 			this.radius = popupRad;
 		}
 		this.isRadiusLocked = true;
-		this.popup.setRadiusVisible(true);
-		this.popup.setRadiusLocked(true);
-		this.popup.updateValues(this.distance, this.angle, this.radius);
+		this.popup.setFieldVisible('radius', true);
+		this.popup.setLocked('radius', true, true);
+		this.updatePopupValues(this.distance, this.angle, this.radius);
 		this.handleFieldLocked('radius');
 	}
 
 	private enterRadiusStep(): void {
 		this.drawingStep = this.isLinearMode() ? 2 : 3;
-		if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+		if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 			this.radius = null;
 		}
-		this.popup.setRadiusVisible(true);
-		this.popup.updateValues(this.distance, this.angle, this.radius);
-		this.popup.focusField('radius');
+		this.popup.setFieldVisible('radius', true);
+		this.updatePopupValues(this.distance, this.angle, this.radius);
+		this.popup.focus('radius');
 		this.updateToastHint();
 		this.onStateChange?.();
 		this.ctx?.requestRender();
@@ -282,7 +347,7 @@ export class SlotTool extends BaseTool {
 	private handleFieldLocked(field: SlotPopupField): void {
 		if (field === 'distance') {
 			this.isDistanceLocked = true;
-			this.popup.setDistanceLocked(true);
+			this.popup.setLocked('distance', true);
 
 			if ((this.isLinearMode() || this._mode === 'three_point_arc') && this.drawingStep >= 2 && this.firstWorldPos && this.secondWorldPos) {
 				this.secondWorldPos = this.computeLinearSecondPoint(this.secondWorldPos);
@@ -292,9 +357,9 @@ export class SlotTool extends BaseTool {
 			}
 
 			if (this._mode === 'center_point_arc' && !this.isAngleLocked) {
-				this.popup.focusField('angle');
+				this.popup.focus('angle');
 			} else if (this.popup.isRadiusVisible()) {
-				this.popup.focusField('radius');
+				this.popup.focus('radius');
 			}
 			this.onStateChange?.();
 			this.ctx?.requestRender();
@@ -303,14 +368,14 @@ export class SlotTool extends BaseTool {
 
 		if (field === 'angle') {
 			this.isAngleLocked = true;
-			this.popup.setAngleLocked(true);
+			this.popup.setLocked('angle', true);
 
 			if (this._mode === 'center_point_arc') {
 				if (this.drawingStep === 2 && this.arcCenterWorld && this.arcStartWorld) {
 					// Immediately compute arc end & mid points and advance to step 3 (radius gizmo) without mouse click!
 					this.applyLockedCenterArcAngle();
 					this.thirdSnap = null;
-					if ((this.isRadiusLocked || this.popup.isRadiusLocked()) && this.radius !== null) {
+					if ((this.isRadiusLocked || this.popup.isLocked('radius')) && this.radius !== null) {
 						this.commitArcSlot();
 					} else {
 						this.enterRadiusStep();
@@ -320,7 +385,7 @@ export class SlotTool extends BaseTool {
 			}
 
 			if (this.popup.isRadiusVisible()) {
-				this.popup.focusField('radius');
+				this.popup.focus('radius');
 			}
 			this.onStateChange?.();
 			this.ctx?.requestRender();
@@ -329,12 +394,12 @@ export class SlotTool extends BaseTool {
 
 		if (field === 'radius') {
 			if (this.radius === null) {
-				const popupRad = this.popup.getRadius();
+				const popupRad = this.getPopupRadius();
 				if (popupRad === null) return;
 				this.radius = popupRad;
 			}
 			this.isRadiusLocked = true;
-			this.popup.setRadiusLocked(true);
+			this.popup.setLocked('radius', true);
 
 			// If currently on the radius gizmo step, finish immediately without waiting for mouse click!
 			if (this.isLinearMode() && this.drawingStep === 2 && this.firstWorldPos && this.secondWorldPos) {
@@ -348,9 +413,9 @@ export class SlotTool extends BaseTool {
 
 			// Otherwise focus the remaining unlocked field
 			if (!this.isDistanceLocked) {
-				this.popup.focusField('distance');
+				this.popup.focus('distance');
 			} else if (this._mode === 'center_point_arc' && !this.isAngleLocked) {
-				this.popup.focusField('angle');
+				this.popup.focus('angle');
 			}
 			this.onStateChange?.();
 			this.ctx?.requestRender();
@@ -409,15 +474,15 @@ export class SlotTool extends BaseTool {
 		if (this.isLinearMode()) {
 			if (this.drawingStep === 1) {
 				const d = dist(this.firstWorldPos, effectiveWorld);
-				if (!this.isDistanceLocked && !this.popup.isDistanceLocked()) {
+				if (!this.isDistanceLocked && !this.popup.isLocked('distance')) {
 					this.distance = Math.max(0.1, d);
 				}
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			} else if (this.drawingStep === 2 && this.secondWorldPos) {
-				if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+				if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 					this.radius = this.computeLinearRadiusFromCursor(e.world);
 				}
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			}
 			this.popup.updatePosition(e.screen);
 			return;
@@ -426,15 +491,15 @@ export class SlotTool extends BaseTool {
 		if (this._mode === 'three_point_arc') {
 			if (this.drawingStep === 1) {
 				const d = dist(this.firstWorldPos, effectiveWorld);
-				if (!this.isDistanceLocked && !this.popup.isDistanceLocked()) {
+				if (!this.isDistanceLocked && !this.popup.isLocked('distance')) {
 					this.distance = Math.max(0.1, d);
 				}
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			} else if (this.drawingStep === 3 && this.arcCenterWorld) {
-				if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+				if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 					this.radius = this.computeArcSlotRadiusFromCursor(e.world);
 				}
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			}
 			this.popup.updatePosition(e.screen);
 			return;
@@ -443,19 +508,19 @@ export class SlotTool extends BaseTool {
 		if (this._mode === 'center_point_arc') {
 			if (this.drawingStep === 1 && this.arcCenterWorld) {
 				const d = dist(this.arcCenterWorld, effectiveWorld);
-				if (!this.isDistanceLocked && !this.popup.isDistanceLocked()) {
+				if (!this.isDistanceLocked && !this.popup.isLocked('distance')) {
 					this.distance = Math.max(0.1, d);
 					this.arcRadius = this.distance;
 				}
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			} else if (this.drawingStep === 2 && this.arcCenterWorld && this.arcStartWorld) {
 				this.updateCenterArcSweep(effectiveWorld);
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			} else if (this.drawingStep === 3 && this.arcCenterWorld) {
-				if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+				if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 					this.radius = this.computeArcSlotRadiusFromCursor(e.world);
 				}
-				this.popup.updateValues(this.distance, this.angle, this.radius);
+				this.updatePopupValues(this.distance, this.angle, this.radius);
 			}
 			this.popup.updatePosition(e.screen);
 		}
@@ -480,11 +545,11 @@ export class SlotTool extends BaseTool {
 			this.isRadiusLocked = false;
 			this.distance = 50;
 			this.radius = null;
-			this.popup.resetValues(50, 90, null);
+			this.resetPopupValues(50, 90, null);
 
 			this.drawingStep = 1;
-			this.popup.show(e.screen, this.distance, this.angle, null, this._mode);
-			this.popup.focusField('distance');
+			this.popup.show(e.screen);
+			this.popup.focus('distance');
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -498,10 +563,10 @@ export class SlotTool extends BaseTool {
 			if (d < 0.5) return;
 
 			this.secondWorldPos = p2;
-			this.secondSnap = this.isDistanceLocked || this.popup.isDistanceLocked() ? null : (snap ?? null);
+			this.secondSnap = this.isDistanceLocked || this.popup.isLocked('distance') ? null : (snap ?? null);
 			this.distance = d;
 
-			if ((this.isRadiusLocked || this.popup.isRadiusLocked()) && this.radius !== null) {
+			if ((this.isRadiusLocked || this.popup.isLocked('radius')) && this.radius !== null) {
 				this.commitLinearSlot();
 			} else {
 				this.enterRadiusStep();
@@ -510,7 +575,7 @@ export class SlotTool extends BaseTool {
 		}
 
 		if (this.drawingStep === 2) {
-			if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+			if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 				if (this.radius === null) {
 					this.radius = this.computeLinearRadiusFromCursor(world);
 				}
@@ -535,11 +600,11 @@ export class SlotTool extends BaseTool {
 			this.isRadiusLocked = false;
 			this.distance = 50;
 			this.radius = null;
-			this.popup.resetValues(50, 90, null);
+			this.resetPopupValues(50, 90, null);
 
 			this.drawingStep = 1;
-			this.popup.show(e.screen, this.distance, this.angle, null, this._mode);
-			this.popup.focusField('distance');
+			this.popup.show(e.screen);
+			this.popup.focus('distance');
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -553,10 +618,10 @@ export class SlotTool extends BaseTool {
 			if (d < 1) return;
 
 			this.secondWorldPos = p2;
-			this.secondSnap = this.isDistanceLocked || this.popup.isDistanceLocked() ? null : (snap ?? null);
+			this.secondSnap = this.isDistanceLocked || this.popup.isLocked('distance') ? null : (snap ?? null);
 			this.distance = d;
 			this.drawingStep = 2;
-			this.popup.updateValues(this.distance, this.angle, this.radius);
+			this.updatePopupValues(this.distance, this.angle, this.radius);
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -588,7 +653,7 @@ export class SlotTool extends BaseTool {
 			const ccwMid = ((theta3 - theta1) % TWO_PI + TWO_PI) % TWO_PI;
 			this.arcWorldSweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;
 
-			if ((this.isRadiusLocked || this.popup.isRadiusLocked()) && this.radius !== null) {
+			if ((this.isRadiusLocked || this.popup.isLocked('radius')) && this.radius !== null) {
 				this.commitArcSlot();
 			} else {
 				this.enterRadiusStep();
@@ -597,7 +662,7 @@ export class SlotTool extends BaseTool {
 		}
 
 		if (this.drawingStep === 3) {
-			if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+			if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 				if (this.radius === null) {
 					this.radius = this.computeArcSlotRadiusFromCursor(world);
 				}
@@ -625,11 +690,11 @@ export class SlotTool extends BaseTool {
 			this.arcRadius = 50;
 			this.angle = 90;
 			this.radius = null;
-			this.popup.resetValues(50, 90, null);
+			this.resetPopupValues(50, 90, null);
 
 			this.drawingStep = 1;
-			this.popup.show(e.screen, this.distance, this.angle, null, this._mode);
-			this.popup.focusField('distance');
+			this.popup.show(e.screen);
+			this.popup.focus('distance');
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -643,7 +708,7 @@ export class SlotTool extends BaseTool {
 			if (rArc < 1) return;
 
 			this.secondWorldPos = p1;
-			this.secondSnap = this.isDistanceLocked || this.popup.isDistanceLocked() ? null : (snap ?? null);
+			this.secondSnap = this.isDistanceLocked || this.popup.isLocked('distance') ? null : (snap ?? null);
 			this.arcStartWorld = p1;
 			this.arcRadius = rArc;
 			this.distance = rArc;
@@ -653,18 +718,18 @@ export class SlotTool extends BaseTool {
 			this.arcCenterTotalAngle = 0;
 			this.arcWorldSweepSign = 1;
 
-			if (this.isAngleLocked || this.popup.isAngleLocked()) {
+			if (this.isAngleLocked || this.popup.isLocked('angle')) {
 				this.applyLockedCenterArcAngle();
 				this.thirdSnap = null;
-				if ((this.isRadiusLocked || this.popup.isRadiusLocked()) && this.radius !== null) {
+				if ((this.isRadiusLocked || this.popup.isLocked('radius')) && this.radius !== null) {
 					this.commitArcSlot();
 				} else {
 					this.enterRadiusStep();
 				}
 			} else {
 				this.drawingStep = 2;
-				this.popup.updateValues(this.distance, this.angle, this.radius);
-				this.popup.focusField('angle');
+				this.updatePopupValues(this.distance, this.angle, this.radius);
+				this.popup.focus('angle');
 				this.updateToastHint();
 				this.onStateChange?.();
 				this.ctx.requestRender();
@@ -676,11 +741,11 @@ export class SlotTool extends BaseTool {
 			const effectiveWorld = snap ? snap.worldPos : world;
 			this.updateCenterArcSweep(effectiveWorld);
 			this.thirdSnap =
-				this.isAngleLocked || this.popup.isAngleLocked() || this.isDistanceLocked || this.popup.isDistanceLocked()
+				this.isAngleLocked || this.popup.isLocked('angle') || this.isDistanceLocked || this.popup.isLocked('distance')
 					? null
 					: (snap ?? null);
 
-			if ((this.isRadiusLocked || this.popup.isRadiusLocked()) && this.radius !== null) {
+			if ((this.isRadiusLocked || this.popup.isLocked('radius')) && this.radius !== null) {
 				this.commitArcSlot();
 			} else {
 				this.enterRadiusStep();
@@ -689,7 +754,7 @@ export class SlotTool extends BaseTool {
 		}
 
 		if (this.drawingStep === 3) {
-			if (!this.isRadiusLocked && !this.popup.isRadiusLocked()) {
+			if (!this.isRadiusLocked && !this.popup.isLocked('radius')) {
 				if (this.radius === null) {
 					this.radius = this.computeArcSlotRadiusFromCursor(world);
 				}
@@ -709,7 +774,7 @@ export class SlotTool extends BaseTool {
 		const vy = effectiveWorld.y - p1.y;
 		const d = Math.hypot(vx, vy);
 
-		if (this.isDistanceLocked || this.popup.isDistanceLocked()) {
+		if (this.isDistanceLocked || this.popup.isLocked('distance')) {
 			const dirX = d > 1e-4 ? vx / d : 1;
 			const dirY = d > 1e-4 ? vy / d : 0;
 			return vec(p1.x + dirX * this.distance, p1.y + dirY * this.distance);
@@ -794,7 +859,7 @@ export class SlotTool extends BaseTool {
 		}
 		this.arcWorldSweepSign = sweepSign;
 
-		if (!this.isAngleLocked && !this.popup.isAngleLocked()) {
+		if (!this.isAngleLocked && !this.popup.isLocked('angle')) {
 			const rawSweep =
 				sweepSign > 0
 					? ((thetaCur - theta1) % TWO_PI + TWO_PI) % TWO_PI
@@ -923,7 +988,7 @@ export class SlotTool extends BaseTool {
 				createSvgCircle(se2.x, se2.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 			}
 
-			if (hasRadius && (this.drawingStep === 2 || this.isRadiusLocked || this.popup.isRadiusLocked())) {
+			if (hasRadius && (this.drawingStep === 2 || this.isRadiusLocked || this.popup.isLocked('radius'))) {
 				const pt1 = vec(c1.x + effectiveR * n.x, c1.y + effectiveR * n.y);
 				const pt2 = vec(c2.x + effectiveR * n.x, c2.y + effectiveR * n.y);
 				const pt3 = vec(c2.x - effectiveR * n.x, c2.y - effectiveR * n.y);
@@ -989,7 +1054,7 @@ export class SlotTool extends BaseTool {
 					circum.radius,
 					sweepSign,
 					this.radius,
-					this.radius !== null && (this.isRadiusLocked || this.popup.isRadiusLocked())
+					this.radius !== null && (this.isRadiusLocked || this.popup.isLocked('radius'))
 				);
 				return;
 			}
@@ -1034,7 +1099,7 @@ export class SlotTool extends BaseTool {
 					this.arcRadius,
 					this.arcWorldSweepSign,
 					this.radius,
-					this.radius !== null && (this.isRadiusLocked || this.popup.isRadiusLocked())
+					this.radius !== null && (this.isRadiusLocked || this.popup.isLocked('radius'))
 				);
 				return;
 			}
@@ -1153,7 +1218,7 @@ export class SlotTool extends BaseTool {
 		this.distance = 50;
 		this.angle = 90;
 		this.radius = null;
-		this.popup.resetValues(50, 90, null);
+		this.resetPopupValues(50, 90, null);
 		this.updateToastHint();
 		this.onStateChange?.();
 	}
@@ -1214,8 +1279,8 @@ export class SlotTool extends BaseTool {
 		const { c1, c2, u, n, effectiveR } = this.computeLinearCenters(p1, p2, this.radius);
 
 		const isConst = this.ctx.isConstructionMode;
-		const distLocked = this.isDistanceLocked || this.popup.isDistanceLocked();
-		const radLocked = this.isRadiusLocked || this.popup.isRadiusLocked();
+		const distLocked = this.isDistanceLocked || this.popup.isLocked('distance');
+		const radLocked = this.isRadiusLocked || this.popup.isLocked('radius');
 
 		let c1Id: string;
 		let c2Id: string;
@@ -1294,7 +1359,7 @@ export class SlotTool extends BaseTool {
 			} else if (this._mode === 'overall' && edge1PtId && edge2PtId) {
 				cDist = sketch.addDistanceConstraint(edge1PtId, edge2PtId, this.distance);
 			}
-			const distExpr = this.distanceExpression ?? this.popup.getDistanceExpression();
+			const distExpr = this.distanceExpression ?? this.popup.getExpression('distance');
 			if (cDist && distExpr) {
 				cDist.expression = distExpr;
 			}
@@ -1302,7 +1367,7 @@ export class SlotTool extends BaseTool {
 
 		if (radLocked) {
 			const cRad = sketch.addRadiusConstraint(arc1.id, effectiveR);
-			const radExpr = this.radiusExpression ?? this.popup.getRadiusExpression();
+			const radExpr = this.radiusExpression ?? this.popup.getExpression('radius');
 			if (cRad && radExpr) {
 				cRad.expression = radExpr;
 			}
@@ -1328,9 +1393,9 @@ export class SlotTool extends BaseTool {
 
 		const geom = this.computeArcSlotGeometry(center, c1, c2, rArc, sweepSign, this.radius);
 		const isConst = this.ctx.isConstructionMode;
-		const distLocked = this.isDistanceLocked || this.popup.isDistanceLocked();
-		const angleLocked = this.isAngleLocked || this.popup.isAngleLocked();
-		const radLocked = this.isRadiusLocked || this.popup.isRadiusLocked();
+		const distLocked = this.isDistanceLocked || this.popup.isLocked('distance');
+		const angleLocked = this.isAngleLocked || this.popup.isLocked('angle');
+		const radLocked = this.isRadiusLocked || this.popup.isLocked('radius');
 
 		let centerId: string;
 		let c1Id: string;
@@ -1375,7 +1440,7 @@ export class SlotTool extends BaseTool {
 
 		// Dimensional constraints when locked
 		if (distLocked) {
-			const distExpr = this.distanceExpression ?? this.popup.getDistanceExpression();
+			const distExpr = this.distanceExpression ?? this.popup.getExpression('distance');
 			if (this._mode === 'three_point_arc') {
 				const cDist = sketch.addDistanceConstraint(c1Id, c2Id, this.distance);
 				if (cDist && distExpr) {
@@ -1391,7 +1456,7 @@ export class SlotTool extends BaseTool {
 
 		if (this._mode === 'center_point_arc' && angleLocked) {
 			const cAng = sketch.addArcAngleConstraint(centerArc.id, this.angle, rArc * 0.5, sweepSign);
-			const angExpr = this.angleExpression ?? this.popup.getAngleExpression();
+			const angExpr = this.angleExpression ?? this.popup.getExpression('angle');
 			if (cAng && angExpr) {
 				cAng.expression = angExpr;
 			}
@@ -1399,7 +1464,7 @@ export class SlotTool extends BaseTool {
 
 		if (radLocked) {
 			const cRad = sketch.addRadiusConstraint(cap1.id, geom.effectiveR);
-			const radExpr = this.radiusExpression ?? this.popup.getRadiusExpression();
+			const radExpr = this.radiusExpression ?? this.popup.getExpression('radius');
 			if (cRad && radExpr) {
 				cRad.expression = radExpr;
 			}

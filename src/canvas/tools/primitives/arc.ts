@@ -121,10 +121,6 @@ export class ArcTool extends BaseTool {
 		this.ctx?.requestRender();
 	}
 
-	override isBusy(): boolean {
-		return this.drawingStep > 0;
-	}
-
 	override shouldSnap(): boolean | 'no-grid' {
 		if (this._mode === 'three_point') {
 			return this.drawingStep < 2 ? 'no-grid' : false;

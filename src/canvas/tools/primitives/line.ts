@@ -11,10 +11,6 @@ export class LineTool extends BaseTool {
 	private startPointId: string | null = null;
 	private startWorldPos: Vec2 | null = null;
 
-	override isBusy(): boolean {
-		return this.drawingStep > 0;
-	}
-
 	override onMouseDown(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
 		const snap = e.snap;

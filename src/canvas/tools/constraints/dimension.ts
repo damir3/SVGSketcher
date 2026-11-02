@@ -148,10 +148,6 @@ export class DimensionTool extends BaseTool {
 		this.cancel();
 	}
 
-	override isBusy(): boolean {
-		return this.state.step > 0;
-	}
-
 	override cancel(): void {
 		this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 		this.ctx.renderer.clearPreviews();

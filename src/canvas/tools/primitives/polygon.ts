@@ -1,7 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
-import { PolygonPopup } from '../../../ui/polygon-popup';
+import { ToolPopup } from '../../../ui/tool-popup';
 import type { SketchPoint, SketchLine } from '../../../model/types';
 import type { PatternCopyData, PointToLineDistanceConstraint } from '../../../solver/constraints';
 import { createSvgCircle, createSvgLine, createSvgPath } from '../../svg';
@@ -17,9 +17,9 @@ import {
 export class PolygonTool extends BaseTool {
 	readonly id = 'polygon' as const;
 
-	readonly popup: PolygonPopup;
+	readonly popup: ToolPopup<'sides' | 'radius'>;
 	sides = 6;
-	radius = 50;
+	radius = 0;
 	radiusLocked = false;
 	currentAngle = 0;
 
@@ -29,11 +29,33 @@ export class PolygonTool extends BaseTool {
 
 	constructor() {
 		super();
-		this.popup = new PolygonPopup();
-		this.popup.onValuesChange = (sides, radius, isRadiusChanged) => {
-			this.sides = sides;
-			if (isRadiusChanged) {
-				this.radius = radius;
+		this.popup = new ToolPopup<'sides' | 'radius'>({
+			className: 'polygon-popup',
+			defaultOffset: { x: 150, y: 40 },
+			fields: [
+				{
+					id: 'sides',
+					label: 'Sides',
+					type: 'integer',
+					defaultValue: 6,
+					min: 3,
+					max: 100,
+					step: 1,
+				},
+				{
+					id: 'radius',
+					label: 'Radius',
+					type: 'dimension',
+					unit: 'mm',
+					defaultValue: 0.0,
+				},
+			],
+		});
+		this.popup.onChange = id => {
+			this.sides = this.popup.getNumericValue('sides', 6);
+			if (id === 'radius') {
+				const r = this.popup.getNumericValue('radius', 50);
+				this.radius = r <= 0.01 ? 1 : r;
 				this.radiusLocked = true;
 			}
 			if (this.drawingStep === 1 && this.centerWorldPos) {
@@ -42,7 +64,7 @@ export class PolygonTool extends BaseTool {
 		};
 		this.popup.onCommit = () => {
 			if (this.drawingStep === 1 && this.centerPtId) {
-				const hasRadiusConstraint = this.radiusLocked || this.popup.isRadiusLocked();
+				const hasRadiusConstraint = this.radiusLocked || this.popup.isLocked('radius');
 				this.commitPolygon(
 					this.centerPtId,
 					this.sides,
@@ -57,10 +79,6 @@ export class PolygonTool extends BaseTool {
 			this.ctx.setTool('select');
 			this.ctx.requestRender();
 		};
-	}
-
-	override isBusy(): boolean {
-		return this.drawingStep > 0;
 	}
 
 	override activate(ctx: any): void {
@@ -97,8 +115,10 @@ export class PolygonTool extends BaseTool {
 			this.currentAngle = 0;
 			this.drawingStep = 1;
 
-			const sCtr = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			this.popup.show(sCtr, this.sides, 50);
+			this.popup.setLocked('radius', false);
+			this.popup.setValue('sides', this.sides);
+			this.popup.setValue('radius', 50);
+			this.popup.show(e.screen);
 			this.ctx.requestRender();
 		} else {
 			const curPos = snap ? snap.worldPos : world;
@@ -121,11 +141,10 @@ export class PolygonTool extends BaseTool {
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
 			const effectiveWorld = e.effectiveWorld;
-			const s1 = this.ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
 
 			if (!this.radiusLocked) {
 				this.radius = Math.max(1, dist(this.centerWorldPos, effectiveWorld));
-				this.popup.updateRadius(this.radius);
+				this.popup.setValue('radius', this.radius);
 			}
 			this.currentAngle = Math.atan2(
 				effectiveWorld.y - this.centerWorldPos.y,
@@ -133,7 +152,7 @@ export class PolygonTool extends BaseTool {
 			);
 
 			if (this.popup.isOpen()) {
-				this.popup.updatePosition(s1);
+				this.popup.updatePosition(e.screen);
 			}
 		}
 	}
@@ -200,7 +219,7 @@ export class PolygonTool extends BaseTool {
 		} else if (e.key === 'Enter') {
 			if (this.drawingStep === 1 && this.centerPtId) {
 				e.preventDefault();
-				const hasRadiusConstraint = this.radiusLocked || this.popup.isRadiusLocked();
+				const hasRadiusConstraint = this.radiusLocked || this.popup.isLocked('radius');
 				this.commitPolygon(
 					this.centerPtId,
 					this.sides,
@@ -286,7 +305,7 @@ export class PolygonTool extends BaseTool {
 		let distConstraint: PointToLineDistanceConstraint | null = null;
 		if (addDistanceConstraint && lines.length > 0) {
 			distConstraint = this.ctx.sketch.addPointToLineDistanceConstraint(centerPtId, lines[0].id, r);
-			const expr = this.popup.getRadiusExpression();
+			const expr = this.popup.getExpression('radius');
 			if (distConstraint && expr) {
 				distConstraint.expression = expr;
 			}

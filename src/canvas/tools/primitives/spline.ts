@@ -40,10 +40,6 @@ export class SplineTool extends BaseTool {
 		this.ctx?.requestRender();
 	}
 
-	override isBusy(): boolean {
-		return this.points.length > 0;
-	}
-
 	override deactivate(): void {
 		this.cancel();
 		super.deactivate();

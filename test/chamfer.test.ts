@@ -491,7 +491,6 @@ describe('ChamferTool UI and Workflow', () => {
 
 			assert.ok(tool.candidate);
 			assert.equal(tool.candidate.vertexPointId, p0.id);
-			assert.equal(tool.isBusy(), true);
 
 			tool.deactivate();
 		} finally {

@@ -26,6 +26,18 @@ export class Sidebar {
 	private sketch: SketchDocument;
 	private interaction?: CanvasInteraction;
 
+	private get mirrorState() {
+		return this.interaction?.getMirrorTool()?.state ?? null;
+	}
+
+	private get circularPatternState() {
+		return this.interaction?.getCircularPatternTool()?.state ?? null;
+	}
+
+	private get rectangularPatternState() {
+		return this.interaction?.getRectangularPatternTool()?.state ?? null;
+	}
+
 	onEditDimension?: (
 		constraint:
 			| DistanceConstraint
@@ -159,7 +171,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const currentMode = this.interaction.rectangleMode;
+		const currentMode = this.interaction.getRectangleTool()?.mode ?? 'corner';
 		const hint = this.getRectangleStepHint();
 
 		let modeIcon = ICONS.rectangle;
@@ -231,7 +243,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const currentMode = this.interaction.slotMode;
+		const currentMode = this.interaction.getSlotTool()?.mode ?? 'center_to_center';
 		const hint = this.getSlotStepHint();
 
 		let modeIcon = ICONS.slot_center_to_center;
@@ -316,7 +328,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const currentMode = this.interaction.arcMode;
+		const currentMode = this.interaction.getArcTool()?.mode ?? 'center';
 		const hint = this.getArcStepHint();
 
 		return `
@@ -357,7 +369,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const currentMode = this.interaction.splineMode;
+		const currentMode = this.interaction.getSplineTool()?.mode ?? 'fit';
 		const hint = this.getSplineStepHint();
 		const modeIcon = currentMode === 'control' ? ICONS.spline_control : ICONS.spline_fit;
 
@@ -414,7 +426,7 @@ export class Sidebar {
 		}
 
 		const chamferTool = this.interaction.getChamferTool();
-		const currentMode = this.interaction.chamferMode;
+		const currentMode = chamferTool?.mode ?? 'equal_distance';
 
 		const modeIcon =
 			currentMode === 'equal_distance'
@@ -471,8 +483,8 @@ export class Sidebar {
 		}
 
 		const offsetTool = this.interaction.getOffsetTool();
-		const currentDir = this.interaction.offsetDirection;
-		const chainSelection = this.interaction.offsetChainSelection;
+		const currentDir = offsetTool?.direction ?? 'one_side';
+		const chainSelection = offsetTool?.chainSelection ?? true;
 
 		const dirIcon =
 			currentDir === 'one_side'
@@ -554,7 +566,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const state = this.interaction.mirrorState;
+		const state = this.mirrorState;
 		const objCount = state ? state.selectedObjectIds.size : 0;
 		const mirrorLineId = state?.mirrorLineId ?? null;
 		const phase = state?.phase ?? 'objects';
@@ -633,7 +645,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const state = this.interaction.circularPatternState;
+		const state = this.circularPatternState;
 		const objCount = state ? state.selectedObjectIds.size : 0;
 		const centerPointId = state?.centerPointId ?? null;
 		const phase = state?.phase ?? 'objects';
@@ -753,7 +765,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const state = this.interaction.rectangularPatternState;
+		const state = this.rectangularPatternState;
 		const objCount = state ? state.selectedObjectIds.size : 0;
 		const line1Id = state?.line1Id ?? null;
 		const line2Id = state?.line2Id ?? null;
@@ -1963,30 +1975,33 @@ export class Sidebar {
 	}
 
 	private isItemMirrorSelected(id: string): { isSelected: boolean; extraClass: string } {
-		if (this.interaction?.activeTool === 'mirror' && this.interaction.mirrorState) {
-			if (this.interaction.mirrorState.mirrorLineId === id) {
+		const mirrorState = this.mirrorState;
+		if (this.interaction?.activeTool === 'mirror' && mirrorState) {
+			if (mirrorState.mirrorLineId === id) {
 				return { isSelected: true, extraClass: 'is-mirror-line' };
 			}
-			if (this.interaction.mirrorState.selectedObjectIds.has(id)) {
+			if (mirrorState.selectedObjectIds.has(id)) {
 				return { isSelected: true, extraClass: 'is-mirror-obj' };
 			}
 		}
-		if (this.interaction?.activeTool === 'circular_pattern' && this.interaction.circularPatternState) {
-			if (this.interaction.circularPatternState.centerPointId === id) {
+		const circularPatternState = this.circularPatternState;
+		if (this.interaction?.activeTool === 'circular_pattern' && circularPatternState) {
+			if (circularPatternState.centerPointId === id) {
 				return { isSelected: true, extraClass: 'is-pattern-center' };
 			}
-			if (this.interaction.circularPatternState.selectedObjectIds.has(id)) {
+			if (circularPatternState.selectedObjectIds.has(id)) {
 				return { isSelected: true, extraClass: 'is-pattern-obj' };
 			}
 		}
-		if (this.interaction?.activeTool === 'rectangular_pattern' && this.interaction.rectangularPatternState) {
-			if (this.interaction.rectangularPatternState.line1Id === id) {
+		const rectangularPatternState = this.rectangularPatternState;
+		if (this.interaction?.activeTool === 'rectangular_pattern' && rectangularPatternState) {
+			if (rectangularPatternState.line1Id === id) {
 				return { isSelected: true, extraClass: 'is-dir1-line' };
 			}
-			if (this.interaction.rectangularPatternState.line2Id === id) {
+			if (rectangularPatternState.line2Id === id) {
 				return { isSelected: true, extraClass: 'is-dir2-line' };
 			}
-			if (this.interaction.rectangularPatternState.selectedObjectIds.has(id)) {
+			if (rectangularPatternState.selectedObjectIds.has(id)) {
 				return { isSelected: true, extraClass: 'is-pattern-obj' };
 			}
 		}
@@ -2276,23 +2291,24 @@ export class Sidebar {
 					| 'elliptical_arc'
 					| 'spline'
 					| 'constraint';
-				if (this.interaction?.activeTool === 'mirror' && this.interaction.mirrorState) {
-					if (this.interaction.mirrorState.phase === 'mirror_line') {
+				const mirrorState = this.mirrorState;
+				if (this.interaction?.activeTool === 'mirror' && mirrorState) {
+					if (mirrorState.phase === 'mirror_line') {
 						if (type === 'line') {
-							this.interaction.mirrorState.mirrorLineId = id;
-							this.interaction.mirrorState.selectedObjectIds.delete(id);
+							mirrorState.mirrorLineId = id;
+							mirrorState.selectedObjectIds.delete(id);
 							this.interaction.onMirrorStateChange?.();
 							this.interaction.render();
 						}
 					} else {
 						if (type !== 'constraint') {
-							if (this.interaction.mirrorState.selectedObjectIds.has(id)) {
-								this.interaction.mirrorState.selectedObjectIds.delete(id);
+							if (mirrorState.selectedObjectIds.has(id)) {
+								mirrorState.selectedObjectIds.delete(id);
 							} else {
-								if (this.interaction.mirrorState.mirrorLineId === id) {
-									this.interaction.mirrorState.mirrorLineId = null;
+								if (mirrorState.mirrorLineId === id) {
+									mirrorState.mirrorLineId = null;
 								}
-								this.interaction.mirrorState.selectedObjectIds.add(id);
+								mirrorState.selectedObjectIds.add(id);
 							}
 							this.interaction.onMirrorStateChange?.();
 							this.interaction.render();
@@ -2301,19 +2317,20 @@ export class Sidebar {
 					return;
 				}
 
-				if (this.interaction?.activeTool === 'circular_pattern' && this.interaction.circularPatternState) {
-					if (this.interaction.circularPatternState.phase === 'center_point') {
+				const circularPatternState = this.circularPatternState;
+				if (this.interaction?.activeTool === 'circular_pattern' && circularPatternState) {
+					if (circularPatternState.phase === 'center_point') {
 						if (type === 'point') {
-							this.interaction.circularPatternState.centerPointId = id;
+							circularPatternState.centerPointId = id;
 							this.interaction.onCircularPatternStateChange?.();
 							this.interaction.render();
 						}
 					} else {
 						if (type !== 'constraint') {
-							if (this.interaction.circularPatternState.selectedObjectIds.has(id)) {
-								this.interaction.circularPatternState.selectedObjectIds.delete(id);
+							if (circularPatternState.selectedObjectIds.has(id)) {
+								circularPatternState.selectedObjectIds.delete(id);
 							} else {
-								this.interaction.circularPatternState.selectedObjectIds.add(id);
+								circularPatternState.selectedObjectIds.add(id);
 							}
 							this.interaction.onCircularPatternStateChange?.();
 							this.interaction.render();
@@ -2322,31 +2339,32 @@ export class Sidebar {
 					return;
 				}
 
-				if (this.interaction?.activeTool === 'rectangular_pattern' && this.interaction.rectangularPatternState) {
-					if (this.interaction.rectangularPatternState.phase === 'direction1') {
+				const rectangularPatternState = this.rectangularPatternState;
+				if (this.interaction?.activeTool === 'rectangular_pattern' && rectangularPatternState) {
+					if (rectangularPatternState.phase === 'direction1') {
 						if (type === 'line') {
-							if (this.interaction.rectangularPatternState.line1Id === id) {
-								this.interaction.rectangularPatternState.line1Id = null;
+							if (rectangularPatternState.line1Id === id) {
+								rectangularPatternState.line1Id = null;
 							} else {
-								this.interaction.rectangularPatternState.line1Id = id;
-								this.interaction.rectangularPatternState.selectedObjectIds.delete(id);
-								if (this.interaction.rectangularPatternState.line2Id === id) {
-									this.interaction.rectangularPatternState.line2Id = null;
+								rectangularPatternState.line1Id = id;
+								rectangularPatternState.selectedObjectIds.delete(id);
+								if (rectangularPatternState.line2Id === id) {
+									rectangularPatternState.line2Id = null;
 								}
-								this.interaction.rectangularPatternState.phase = 'direction2';
+								rectangularPatternState.phase = 'direction2';
 							}
 							this.interaction.onRectangularPatternStateChange?.();
 							this.interaction.render();
 						}
-					} else if (this.interaction.rectangularPatternState.phase === 'direction2') {
+					} else if (rectangularPatternState.phase === 'direction2') {
 						if (type === 'line') {
-							if (this.interaction.rectangularPatternState.line2Id === id) {
-								this.interaction.rectangularPatternState.line2Id = null;
+							if (rectangularPatternState.line2Id === id) {
+								rectangularPatternState.line2Id = null;
 							} else {
-								this.interaction.rectangularPatternState.line2Id = id;
-								this.interaction.rectangularPatternState.selectedObjectIds.delete(id);
-								if (this.interaction.rectangularPatternState.line1Id === id) {
-									this.interaction.rectangularPatternState.line1Id = null;
+								rectangularPatternState.line2Id = id;
+								rectangularPatternState.selectedObjectIds.delete(id);
+								if (rectangularPatternState.line1Id === id) {
+									rectangularPatternState.line1Id = null;
 								}
 							}
 							this.interaction.onRectangularPatternStateChange?.();
@@ -2354,16 +2372,16 @@ export class Sidebar {
 						}
 					} else {
 						if (type !== 'constraint') {
-							if (this.interaction.rectangularPatternState.selectedObjectIds.has(id)) {
-								this.interaction.rectangularPatternState.selectedObjectIds.delete(id);
+							if (rectangularPatternState.selectedObjectIds.has(id)) {
+								rectangularPatternState.selectedObjectIds.delete(id);
 							} else {
-								if (this.interaction.rectangularPatternState.line1Id === id) {
-									this.interaction.rectangularPatternState.line1Id = null;
+								if (rectangularPatternState.line1Id === id) {
+									rectangularPatternState.line1Id = null;
 								}
-								if (this.interaction.rectangularPatternState.line2Id === id) {
-									this.interaction.rectangularPatternState.line2Id = null;
+								if (rectangularPatternState.line2Id === id) {
+									rectangularPatternState.line2Id = null;
 								}
-								this.interaction.rectangularPatternState.selectedObjectIds.add(id);
+								rectangularPatternState.selectedObjectIds.add(id);
 							}
 							this.interaction.onRectangularPatternStateChange?.();
 							this.interaction.render();
@@ -2498,20 +2516,22 @@ export class Sidebar {
 		const btnClearObjects = this.container.querySelector<HTMLButtonElement>('#btn-mirror-clear-objects');
 		btnClearObjects?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.mirrorState) {
-				this.interaction.mirrorState.selectedObjectIds.clear();
-				this.interaction.onMirrorStateChange?.();
-				this.interaction.render();
+			const mirrorState = this.mirrorState;
+			if (mirrorState) {
+				mirrorState.selectedObjectIds.clear();
+				this.interaction?.onMirrorStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
 		const btnClearLine = this.container.querySelector<HTMLButtonElement>('#btn-mirror-clear-line');
 		btnClearLine?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.mirrorState) {
-				this.interaction.mirrorState.mirrorLineId = null;
-				this.interaction.onMirrorStateChange?.();
-				this.interaction.render();
+			const mirrorState = this.mirrorState;
+			if (mirrorState) {
+				mirrorState.mirrorLineId = null;
+				this.interaction?.onMirrorStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
@@ -2666,20 +2686,22 @@ export class Sidebar {
 		const btnCpatClearObjects = this.container.querySelector<HTMLButtonElement>('#btn-cpat-clear-objects');
 		btnCpatClearObjects?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.circularPatternState) {
-				this.interaction.circularPatternState.selectedObjectIds.clear();
-				this.interaction.onCircularPatternStateChange?.();
-				this.interaction.render();
+			const circularPatternState = this.circularPatternState;
+			if (circularPatternState) {
+				circularPatternState.selectedObjectIds.clear();
+				this.interaction?.onCircularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
 		const btnCpatClearCenter = this.container.querySelector<HTMLButtonElement>('#btn-cpat-clear-center');
 		btnCpatClearCenter?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.circularPatternState) {
-				this.interaction.circularPatternState.centerPointId = null;
-				this.interaction.onCircularPatternStateChange?.();
-				this.interaction.render();
+			const circularPatternState = this.circularPatternState;
+			if (circularPatternState) {
+				circularPatternState.centerPointId = null;
+				this.interaction?.onCircularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
@@ -2687,10 +2709,11 @@ export class Sidebar {
 		this.container.querySelectorAll<HTMLButtonElement>('.pattern-segmented-control .seg-btn').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const dist = btn.getAttribute('data-dist') as 'full' | 'partial' | 'symmetric';
-				if (dist && this.interaction?.circularPatternState) {
-					this.interaction.circularPatternState.distribution = dist;
-					this.interaction.onCircularPatternStateChange?.();
-					this.interaction.render();
+				const circularPatternState = this.circularPatternState;
+				if (dist && circularPatternState) {
+					circularPatternState.distribution = dist;
+					this.interaction?.onCircularPatternStateChange?.();
+					this.interaction?.render();
 				}
 			});
 		});
@@ -2699,16 +2722,18 @@ export class Sidebar {
 		const inputAngle = this.container.querySelector<HTMLInputElement>('#input-cpat-angle');
 		inputAngle?.addEventListener('input', () => {
 			const val = parseFloat(inputAngle.value);
-			if (!isNaN(val) && isFinite(val) && this.interaction?.circularPatternState) {
-				this.interaction.circularPatternState.angle = val;
-				this.interaction.render();
+			const circularPatternState = this.circularPatternState;
+			if (!isNaN(val) && isFinite(val) && circularPatternState) {
+				circularPatternState.angle = val;
+				this.interaction?.render();
 			}
 		});
 		inputAngle?.addEventListener('change', () => {
 			const val = parseFloat(inputAngle.value);
 			if (isNaN(val) || !isFinite(val)) {
-				if (this.interaction?.circularPatternState) {
-					inputAngle.value = String(this.interaction.circularPatternState.angle);
+				const circularPatternState = this.circularPatternState;
+				if (circularPatternState) {
+					inputAngle.value = String(circularPatternState.angle);
 				}
 			}
 			this.render();
@@ -2718,14 +2743,15 @@ export class Sidebar {
 		const inputQty = this.container.querySelector<HTMLInputElement>('#input-cpat-quantity');
 		inputQty?.addEventListener('input', () => {
 			const val = parseInt(inputQty.value, 10);
-			if (!isNaN(val) && val >= 2 && this.interaction?.circularPatternState) {
-				this.interaction.circularPatternState.quantity = val;
-				for (const idx of this.interaction.circularPatternState.suppressedIndices) {
+			const circularPatternState = this.circularPatternState;
+			if (!isNaN(val) && val >= 2 && circularPatternState) {
+				circularPatternState.quantity = val;
+				for (const idx of circularPatternState.suppressedIndices) {
 					if (idx >= val) {
-						this.interaction.circularPatternState.suppressedIndices.delete(idx);
+						circularPatternState.suppressedIndices.delete(idx);
 					}
 				}
-				this.interaction.render();
+				this.interaction?.render();
 			}
 		});
 		inputQty?.addEventListener('change', () => {
@@ -2735,10 +2761,11 @@ export class Sidebar {
 		// Suppression checkbox
 		const checkSuppression = this.container.querySelector<HTMLInputElement>('#check-cpat-suppression');
 		checkSuppression?.addEventListener('change', () => {
-			if (this.interaction?.circularPatternState) {
-				this.interaction.circularPatternState.suppression = checkSuppression.checked;
-				this.interaction.onCircularPatternStateChange?.();
-				this.interaction.render();
+			const circularPatternState = this.circularPatternState;
+			if (circularPatternState) {
+				circularPatternState.suppression = checkSuppression.checked;
+				this.interaction?.onCircularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
@@ -2835,30 +2862,33 @@ export class Sidebar {
 		const btnRpatClearObjects = this.container.querySelector<HTMLButtonElement>('#btn-rpat-clear-objects');
 		btnRpatClearObjects?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.selectedObjectIds.clear();
-				this.interaction.onRectangularPatternStateChange?.();
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (rectangularPatternState) {
+				rectangularPatternState.selectedObjectIds.clear();
+				this.interaction?.onRectangularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
 		const btnRpatClearDir1 = this.container.querySelector<HTMLButtonElement>('#btn-rpat-clear-dir1');
 		btnRpatClearDir1?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.line1Id = null;
-				this.interaction.onRectangularPatternStateChange?.();
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (rectangularPatternState) {
+				rectangularPatternState.line1Id = null;
+				this.interaction?.onRectangularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
 		const btnRpatClearDir2 = this.container.querySelector<HTMLButtonElement>('#btn-rpat-clear-dir2');
 		btnRpatClearDir2?.addEventListener('click', e => {
 			e.stopPropagation();
-			if (this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.line2Id = null;
-				this.interaction.onRectangularPatternStateChange?.();
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (rectangularPatternState) {
+				rectangularPatternState.line2Id = null;
+				this.interaction?.onRectangularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 
@@ -2866,10 +2896,11 @@ export class Sidebar {
 		this.container.querySelectorAll<HTMLButtonElement>('.rpat-dir1-btn').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const dir = btn.getAttribute('data-dir') as 'one_direction' | 'symmetric';
-				if (dir && this.interaction?.rectangularPatternState) {
-					this.interaction.rectangularPatternState.direction1 = dir;
-					this.interaction.onRectangularPatternStateChange?.();
-					this.interaction.render();
+				const rectangularPatternState = this.rectangularPatternState;
+				if (dir && rectangularPatternState) {
+					rectangularPatternState.direction1 = dir;
+					this.interaction?.onRectangularPatternStateChange?.();
+					this.interaction?.render();
 				}
 			});
 		});
@@ -2878,9 +2909,10 @@ export class Sidebar {
 		const inputDist1 = this.container.querySelector<HTMLInputElement>('#input-rpat-dist1');
 		inputDist1?.addEventListener('input', () => {
 			const val = parseFloat(inputDist1.value);
-			if (!isNaN(val) && isFinite(val) && this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.distance1 = val;
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (!isNaN(val) && isFinite(val) && rectangularPatternState) {
+				rectangularPatternState.distance1 = val;
+				this.interaction?.render();
 			}
 		});
 		inputDist1?.addEventListener('change', () => {
@@ -2891,9 +2923,10 @@ export class Sidebar {
 		const inputQty1 = this.container.querySelector<HTMLInputElement>('#input-rpat-qty1');
 		inputQty1?.addEventListener('input', () => {
 			const val = parseInt(inputQty1.value, 10);
-			if (!isNaN(val) && val >= 1 && this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.quantity1 = val;
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (!isNaN(val) && val >= 1 && rectangularPatternState) {
+				rectangularPatternState.quantity1 = val;
+				this.interaction?.render();
 			}
 		});
 		inputQty1?.addEventListener('change', () => {
@@ -2904,10 +2937,11 @@ export class Sidebar {
 		this.container.querySelectorAll<HTMLButtonElement>('.rpat-dir2-btn').forEach(btn => {
 			btn.addEventListener('click', () => {
 				const dir = btn.getAttribute('data-dir') as 'one_direction' | 'symmetric';
-				if (dir && this.interaction?.rectangularPatternState) {
-					this.interaction.rectangularPatternState.direction2 = dir;
-					this.interaction.onRectangularPatternStateChange?.();
-					this.interaction.render();
+				const rectangularPatternState = this.rectangularPatternState;
+				if (dir && rectangularPatternState) {
+					rectangularPatternState.direction2 = dir;
+					this.interaction?.onRectangularPatternStateChange?.();
+					this.interaction?.render();
 				}
 			});
 		});
@@ -2916,9 +2950,10 @@ export class Sidebar {
 		const inputDist2 = this.container.querySelector<HTMLInputElement>('#input-rpat-dist2');
 		inputDist2?.addEventListener('input', () => {
 			const val = parseFloat(inputDist2.value);
-			if (!isNaN(val) && isFinite(val) && this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.distance2 = val;
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (!isNaN(val) && isFinite(val) && rectangularPatternState) {
+				rectangularPatternState.distance2 = val;
+				this.interaction?.render();
 			}
 		});
 		inputDist2?.addEventListener('change', () => {
@@ -2929,9 +2964,10 @@ export class Sidebar {
 		const inputQty2 = this.container.querySelector<HTMLInputElement>('#input-rpat-qty2');
 		inputQty2?.addEventListener('input', () => {
 			const val = parseInt(inputQty2.value, 10);
-			if (!isNaN(val) && val >= 1 && this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.quantity2 = val;
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (!isNaN(val) && val >= 1 && rectangularPatternState) {
+				rectangularPatternState.quantity2 = val;
+				this.interaction?.render();
 			}
 		});
 		inputQty2?.addEventListener('change', () => {
@@ -2941,10 +2977,11 @@ export class Sidebar {
 		// Suppression checkbox
 		const checkRpatSuppression = this.container.querySelector<HTMLInputElement>('#check-rpat-suppression');
 		checkRpatSuppression?.addEventListener('change', () => {
-			if (this.interaction?.rectangularPatternState) {
-				this.interaction.rectangularPatternState.suppression = checkRpatSuppression.checked;
-				this.interaction.onRectangularPatternStateChange?.();
-				this.interaction.render();
+			const rectangularPatternState = this.rectangularPatternState;
+			if (rectangularPatternState) {
+				rectangularPatternState.suppression = checkRpatSuppression.checked;
+				this.interaction?.onRectangularPatternStateChange?.();
+				this.interaction?.render();
 			}
 		});
 

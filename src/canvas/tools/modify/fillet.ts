@@ -1,7 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
-import { FilletPopup } from '../../../ui/fillet-popup';
+import { ToolPopup } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import {
 	getConnectedPrimitivesForPoint,
@@ -15,7 +15,7 @@ import {
 export class FilletTool extends BaseTool {
 	readonly id = 'fillet' as const;
 
-	readonly popup: FilletPopup;
+	readonly popup: ToolPopup<'radius'>;
 	filletRadius = 10.0;
 	pendingFillets: FilletCandidate[] = [];
 	activeFilletId: string | null = null;
@@ -29,9 +29,22 @@ export class FilletTool extends BaseTool {
 
 	constructor() {
 		super();
-		this.popup = new FilletPopup();
-		this.popup.onRadiusChange = radius => {
-			this.filletRadius = radius;
+		this.popup = new ToolPopup<'radius'>({
+			className: 'fillet-popup',
+			defaultOffset: { x: 150, y: 40 },
+			fields: [
+				{
+					id: 'radius',
+					label: 'Radius',
+					type: 'dimension',
+					unit: 'mm',
+					defaultValue: 10.0,
+				},
+			],
+		});
+		this.popup.onChange = () => {
+			const radius = this.popup.getNumericValue('radius', 10);
+			this.filletRadius = radius <= 0.01 ? 1 : radius;
 			this.recalculatePendingFillets();
 			const activePf =
 				this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
@@ -95,7 +108,7 @@ export class FilletTool extends BaseTool {
 				if (maxR !== null) {
 					this.filletRadius = maxR;
 					this.recalculatePendingFillets();
-					this.popup.updateRadius(maxR);
+					this.popup.setValue('radius', maxR);
 					this.popup.setError(false);
 					this.commit();
 					this.ctx.showToast(`Committed with maximum possible radius (${maxR.toFixed(1)} mm)`);
@@ -109,10 +122,6 @@ export class FilletTool extends BaseTool {
 		this.popup.onCancel = () => {
 			this.cancel();
 		};
-	}
-
-	override isBusy(): boolean {
-		return this.pendingFillets.length > 0 || this.filletFirstPrimitive !== null;
 	}
 
 	override activate(ctx: any): void {
@@ -222,7 +231,7 @@ export class FilletTool extends BaseTool {
 					this.filletRadius = oldRadius;
 					this.recalculatePendingFillets();
 				}
-				this.popup.updateRadius(this.filletRadius);
+				this.popup.setValue('radius', this.filletRadius);
 				this.ctx.requestRender();
 			}
 			return;
@@ -295,7 +304,7 @@ export class FilletTool extends BaseTool {
 		for (let i = 0; i < this.pendingFillets.length; i++) {
 			const pf = this.pendingFillets[i];
 			if (!pf.result) continue;
-			const expr = this.popup.getRadiusExpression();
+			const expr = this.popup.getExpression('radius');
 			const res = commitFilletToSketch(this.ctx.sketch, pf, i === 0, firstArcId, expr);
 			if (res && i === 0) {
 				firstArcId = res.arcId;
@@ -429,7 +438,9 @@ export class FilletTool extends BaseTool {
 			: this.ctx.viewport.worldToScreen(pt.x, pt.y);
 
 		if (this.pendingFillets.length === 1) {
-			this.popup.show(sPos, this.filletRadius);
+			this.popup.setLocked('radius', false);
+			this.popup.setValue('radius', this.filletRadius);
+			this.popup.show(sPos);
 		} else {
 			this.popup.updatePosition(sPos);
 		}
@@ -546,7 +557,9 @@ export class FilletTool extends BaseTool {
 			: this.ctx.viewport.worldToScreen(clickPos1.x, clickPos1.y);
 
 		if (this.pendingFillets.length === 1) {
-			this.popup.show(sPos, this.filletRadius);
+			this.popup.setLocked('radius', false);
+			this.popup.setValue('radius', this.filletRadius);
+			this.popup.show(sPos);
 		} else {
 			this.popup.updatePosition(sPos);
 		}

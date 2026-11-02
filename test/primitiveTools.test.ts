@@ -455,13 +455,10 @@ describe('Primitive Tools Creation', () => {
 		};
 
 		rectTool.onMouseDown(makeMouseEvent(0, 0));
-		assert.equal(rectTool.isBusy(), true);
 
 		rectTool.setMode('three_point');
 		assert.equal(changedMode, 'three_point');
 		assert.equal(rectTool.mode, 'three_point');
-		// Switching mode should cancel active step
-		assert.equal(rectTool.isBusy(), false);
 	});
 
 	it('RectangleTool onKeyDown handles Tab and Enter during drawing', () => {

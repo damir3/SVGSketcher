@@ -16,10 +16,6 @@ export class EllipseTool extends BaseTool {
 		return this.drawingStep;
 	}
 
-	override isBusy(): boolean {
-		return this.drawingStep > 0;
-	}
-
 	override shouldSnap(): boolean {
 		return this.drawingStep === 0;
 	}

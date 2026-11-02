@@ -1,7 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
-import { OffsetPopup, type ScreenBoundingBox } from '../../../ui/offset-popup';
+import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import {
 	type OffsetDirection,
@@ -17,7 +17,7 @@ import type { OffsetGizmoHandle } from '../../renderer';
 export class OffsetTool extends BaseTool {
 	readonly id = 'offset' as const;
 
-	readonly popup: OffsetPopup;
+	readonly popup: ToolPopup<'dist1' | 'dist2' | 'flip'>;
 
 	// Persistent settings
 	direction: OffsetDirection = 'one_side';
@@ -42,13 +42,70 @@ export class OffsetTool extends BaseTool {
 
 	constructor() {
 		super();
-		this.popup = new OffsetPopup();
+		this.popup = new ToolPopup<'dist1' | 'dist2' | 'flip'>({
+			className: 'offset-popup chamfer-popup',
+			fields: [
+				{
+					id: 'dist1',
+					label: 'Distance',
+					type: 'dimension',
+					unit: 'mm',
+					defaultValue: 10.0,
+				},
+				{
+					id: 'dist2',
+					label: 'Distance 2',
+					type: 'dimension',
+					unit: 'mm',
+					defaultValue: 10.0,
+					visible: false,
+				},
+				{
+					id: 'flip',
+					label: 'Flip direction',
+					type: 'checkbox',
+					defaultValue: false,
+					visible: true,
+				},
+			],
+			onKeyDown: e => {
+				if (e.altKey && !e.ctrlKey && !e.metaKey) {
+					if (e.code === 'Digit1' || e.code === 'Numpad1') {
+						e.preventDefault();
+						e.stopPropagation();
+						this.setDirection('one_side');
+						return true;
+					} else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+						e.preventDefault();
+						e.stopPropagation();
+						this.setDirection('two_sides');
+						return true;
+					} else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+						e.preventDefault();
+						e.stopPropagation();
+						this.setDirection('symmetric');
+						return true;
+					}
+				}
+			},
+		});
 
-		this.popup.onParamsChange = (direction, dist1, dist2, flip) => {
-			this.direction = direction;
-			this.dist1 = dist1;
-			this.dist2 = dist2;
-			this.flip = flip;
+		// Ensure compatibility with test/offsetTool.test.ts accessing popup.getParams()
+		const origGetParams = this.popup.getParams.bind(this.popup);
+		(this.popup as any).getParams = () => ({
+			direction: this.direction,
+			...origGetParams(),
+		});
+
+		this.popup.onChange = () => {
+			const v1 = this.popup.getStringValue('dist1').trim();
+			if (v1 === '-' || v1 === '' || v1 === '.') return;
+			const v2 = this.popup.getStringValue('dist2').trim();
+			if (v2 === '-' || v2 === '' || v2 === '.') return;
+
+			this.dist1 = this.popup.getNumericValue('dist1', 10);
+			this.dist2 = this.popup.getNumericValue('dist2', 10);
+			this.flip = this.popup.getBooleanValue('flip');
 
 			this.recalculate();
 			const bbox = this.getGizmoBoundingBox();
@@ -56,10 +113,6 @@ export class OffsetTool extends BaseTool {
 				this.popup.updatePosition(bbox);
 			}
 			this.ctx?.requestRender();
-		};
-
-		this.popup.onModeSwitchRequested = direction => {
-			this.setDirection(direction);
 		};
 
 		this.popup.onCommit = () => {
@@ -127,7 +180,20 @@ export class OffsetTool extends BaseTool {
 
 	setDirection(direction: OffsetDirection): void {
 		this.direction = direction;
-		this.popup.setDirection(direction);
+		if (direction === 'one_side') {
+			this.popup.setFieldLabel('dist1', 'Distance');
+			this.popup.setFieldVisible('dist2', false);
+			this.popup.setFieldVisible('flip', true);
+		} else if (direction === 'two_sides') {
+			this.popup.setFieldLabel('dist1', 'Distance 1');
+			this.popup.setFieldLabel('dist2', 'Distance 2');
+			this.popup.setFieldVisible('dist2', true);
+			this.popup.setFieldVisible('flip', true);
+		} else if (direction === 'symmetric') {
+			this.popup.setFieldLabel('dist1', 'Distance');
+			this.popup.setFieldVisible('dist2', false);
+			this.popup.setFieldVisible('flip', false);
+		}
 		this.recalculate();
 		const bbox = this.getGizmoBoundingBox();
 		if (bbox) {
@@ -338,7 +404,11 @@ export class OffsetTool extends BaseTool {
 			if (this.chain && this.geomResult) {
 				const bbox = this.getGizmoBoundingBox();
 				if (bbox) {
-					this.popup.show(bbox, this.direction, this.dist1, this.dist2, this.flip);
+					this.setDirection(this.direction);
+					this.popup.setValue('dist1', this.dist1);
+					this.popup.setValue('dist2', this.dist2);
+					this.popup.setValue('flip', this.flip);
+					this.popup.show(bbox);
 				}
 			} else {
 				this.popup.hide();
