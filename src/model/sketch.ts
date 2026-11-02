@@ -29,17 +29,54 @@ import {
 	OffsetConstraint,
 	SymmetryConstraint,
 	CircularPatternConstraint,
-	computePatternCopyAngle,
 	type PatternCopyData,
-	type PatternPointPair,
-	type PatternRadiusPair,
 	RectangularPatternConstraint,
-	computeRectangularPatternOffset,
-	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 	OriginDistanceConstraint,
 	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
+import {
+	generateCircularPatternCopy,
+	deletePatternCopy,
+	addCircularPatternConstraint,
+	updateCircularPattern,
+	generateRectangularPatternCopy,
+	addRectangularPatternConstraint,
+	updateRectangularPattern,
+} from './patterns';
+import {
+	setPointCoords,
+	setLineLength,
+	setLineAngle,
+	setLinesRelativeAngle,
+	setCircleOrArcRadius,
+	setArcAngle,
+	setEllipseParams,
+} from './inspectorOperations';
+import {
+	isEntitySelected,
+	deselectEntity,
+	toggleEntitySelection,
+	selectEntities,
+	selectEntity,
+	clearSelection,
+	getSelectedPrimitives,
+	getSelectedConstructionState,
+	deleteSelected,
+	getBoundingBox,
+	getSelectionBoundingBox,
+	type SelectableEntityType,
+} from './selection';
+import {
+	hasRadiusConstraint,
+	hasAngleConstraint,
+	isPointFixed,
+	matchesEndpoints,
+	getLineBetween,
+	isPointUsed,
+	getConstraintsForEntity,
+	getEntitiesForConstraint,
+} from './constraintLinks';
 import {
 	SketchPoint,
 	SketchLine,
@@ -53,7 +90,7 @@ import {
 } from './types';
 import type { GeoCurve } from '../math/intersection';
 import { dist, type Vec2 } from '../math/vector';
-import { bsplineToBezier, fitPointsToBezier, computeNaturalFitHandles, getSplineSvgPath, type BezierSegment } from '../math/spline';
+import { computeNaturalFitHandles } from '../math/spline';
 import { calculateOffsetGeometry } from '../math/offset';
 import {
 	HistoryManager,
@@ -70,19 +107,9 @@ import {
 	type SketchParameter,
 	type ParameterGraphResult,
 } from '../math/expression';
+import { exportSketchToSVG, importSketchFromSVG, type SketchFileMetadata } from './io/svgIO';
 
-export interface SketchFileMetadata {
-	format: 'svg-sketcher';
-	version: number;
-	generator?: string;
-	createdAt?: string;
-	viewport?: {
-		panX: number;
-		panY: number;
-		zoom: number;
-	};
-	snapshot: SketchSnapshot;
-}
+export type { SketchFileMetadata };
 
 export class SketchDocument {
 	points = new Map<string, SketchPoint>();
@@ -107,7 +134,7 @@ export class SketchDocument {
 	};
 
 	private idCounter = 1;
-	private paramManager = new ParamManager();
+	paramManager = new ParamManager();
 	private solver = new NumericalSolver();
 	lastSolverResult: SolverResult | null = null;
 
@@ -1591,154 +1618,19 @@ export class SketchDocument {
 		distribution: 'full' | 'partial' | 'symmetric',
 		totalAngle: number
 	): PatternCopyData | null {
-		const centerPt = this.points.get(centerPtId);
-		if (!centerPt) return null;
-
-		const angleDeg = computePatternCopyAngle(copyIndex, quantity, distribution, totalAngle);
-		const rad = (angleDeg * Math.PI) / 180;
-		const cosA = Math.cos(rad);
-		const sinA = Math.sin(rad);
-
-		const pointMap = new Map<string, string>();
-		const pointPairs: PatternPointPair[] = [];
-		const radiusPairs: PatternRadiusPair[] = [];
-		const createdEntityIds: Array<{
-			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
-		}> = [];
-
-		const getOrRotatePoint = (origPtId: string): string => {
-			if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
-			if (origPtId === centerPtId) {
-				pointMap.set(origPtId, centerPtId);
-				return centerPtId;
-			}
-			const pt = this.points.get(origPtId);
-			if (!pt) return origPtId;
-
-			const distToCenter = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
-			if (distToCenter < 1e-3) {
-				pointMap.set(origPtId, centerPtId);
-				return centerPtId;
-			}
-
-			const dx = pt.x - centerPt.x;
-			const dy = pt.y - centerPt.y;
-			const rx = centerPt.x + dx * cosA - dy * sinA;
-			const ry = centerPt.y + dx * sinA + dy * cosA;
-
-			const newPt = this.addPoint(rx, ry, false);
-			pointMap.set(origPtId, newPt.id);
-			pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
-			createdEntityIds.push({ id: newPt.id, type: 'point' });
-			return newPt.id;
-		};
-
-		for (const objId of sourceObjectIds) {
-			const line = this.lines.get(objId);
-			if (line) {
-				const np1Id = getOrRotatePoint(line.p1Id);
-				const np2Id = getOrRotatePoint(line.p2Id);
-				if (np1Id !== np2Id) {
-					const newLine = this.addLine(np1Id, np2Id, line.isConstruction);
-					createdEntityIds.push({ id: newLine.id, type: 'line' });
-				}
-				continue;
-			}
-
-			const circle = this.circles.get(objId);
-			if (circle) {
-				const nCenterId = getOrRotatePoint(circle.centerId);
-				const newCircle = this.addCircle(nCenterId, circle.radius, circle.isConstruction);
-				radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
-				createdEntityIds.push({ id: newCircle.id, type: 'circle' });
-				continue;
-			}
-
-			const arc = this.arcs.get(objId);
-			if (arc) {
-				const nCenterId = getOrRotatePoint(arc.centerId);
-				const nStartId = getOrRotatePoint(arc.startPointId);
-				const nEndId = getOrRotatePoint(arc.endPointId);
-				const newArc = this.addArc(
-					nCenterId,
-					nStartId,
-					nEndId,
-					arc.radius,
-					arc.clockwise,
-					arc.isConstruction
-				);
-				radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
-				createdEntityIds.push({ id: newArc.id, type: 'arc' });
-				continue;
-			}
-
-			const ellipse = this.ellipses.get(objId);
-			if (ellipse) {
-				const nCenterId = getOrRotatePoint(ellipse.centerId);
-				const nMajorId = getOrRotatePoint(ellipse.majorAxisPointId);
-				const nMinorId = getOrRotatePoint(ellipse.minorAxisPointId);
-				const newEllipse = this.addEllipse(
-					nCenterId,
-					nMajorId,
-					nMinorId,
-					ellipse.isConstruction
-				);
-				createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
-				continue;
-			}
-
-			const elArc = this.ellipticalArcs.get(objId);
-			if (elArc) {
-				const nCenterId = getOrRotatePoint(elArc.centerId);
-				const nMajorId = getOrRotatePoint(elArc.majorAxisPointId);
-				const nMinorId = getOrRotatePoint(elArc.minorAxisPointId);
-				const nStartId = getOrRotatePoint(elArc.startPointId);
-				const nEndId = getOrRotatePoint(elArc.endPointId);
-				const newElArc = this.addEllipticalArc(
-					nCenterId,
-					nMajorId,
-					nMinorId,
-					nStartId,
-					nEndId,
-					elArc.clockwise,
-					elArc.isConstruction
-				);
-				createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
-				continue;
-			}
-
-			const pt = this.points.get(objId);
-			if (pt) {
-				getOrRotatePoint(pt.id);
-				continue;
-			}
-		}
-
-		return {
+		return generateCircularPatternCopy(
+			this,
+			centerPtId,
+			sourceObjectIds,
 			copyIndex,
-			pointPairs,
-			radiusPairs,
-			createdEntityIds,
-		};
+			quantity,
+			distribution,
+			totalAngle
+		);
 	}
 
 	deletePatternCopy(copy: PatternCopyData): void {
-		for (const item of copy.createdEntityIds) {
-			if (item.type === 'line') this.lines.delete(item.id);
-			else if (item.type === 'circle') this.circles.delete(item.id);
-			else if (item.type === 'arc') this.arcs.delete(item.id);
-			else if (item.type === 'ellipse') this.ellipses.delete(item.id);
-			else if (item.type === 'elliptical_arc') this.ellipticalArcs.delete(item.id);
-			else if (item.type === 'point') this.points.delete(item.id);
-
-			this.selection.pointIds.delete(item.id);
-			this.selection.lineIds.delete(item.id);
-			this.selection.circleIds.delete(item.id);
-			this.selection.arcIds.delete(item.id);
-			this.selection.ellipseIds.delete(item.id);
-			this.selection.ellipticalArcIds.delete(item.id);
-		}
+		deletePatternCopy(this, copy);
 	}
 
 	addCircularPatternConstraint(
@@ -1753,11 +1645,8 @@ export class SketchDocument {
 		id?: string,
 		isReadOnly?: boolean
 	): CircularPatternConstraint | null {
-		if (!this.points.has(centerPtId)) return null;
-
-		const cid = id || this.nextId('c_cpat');
-		const c = new CircularPatternConstraint(
-			cid,
+		return addCircularPatternConstraint(
+			this,
 			centerPtId,
 			sourceObjectIds,
 			distribution,
@@ -1766,11 +1655,9 @@ export class SketchDocument {
 			suppression,
 			suppressedIndices,
 			copies,
-			1.0,
+			id,
 			isReadOnly
 		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	updateCircularPattern(
@@ -1783,102 +1670,7 @@ export class SketchDocument {
 			suppressedIndices?: number[];
 		}
 	): boolean {
-		const c = this.constraints.get(constraintId);
-		if (!c || !(c instanceof CircularPatternConstraint) || c.isReadOnly) return false;
-
-		this.beginTransaction();
-
-		const oldDist = c.distribution;
-		const oldAngle = c.totalAngle;
-		const oldQty = c.quantity;
-		const oldSuppression = c.suppression;
-		const oldSuppressed = new Set(c.suppressedIndices);
-
-		const newDist = updates.distribution ?? oldDist;
-		const newAngle = updates.totalAngle !== undefined ? updates.totalAngle : oldAngle;
-		const newQty = updates.quantity !== undefined ? Math.max(2, Math.round(updates.quantity)) : oldQty;
-		const newSuppression = updates.suppression !== undefined ? updates.suppression : oldSuppression;
-		const newSuppressed = updates.suppressedIndices !== undefined ? new Set(updates.suppressedIndices) : oldSuppressed;
-
-		c.distribution = newDist;
-		c.totalAngle = newAngle;
-		c.quantity = newQty;
-		c.suppression = newSuppression;
-		c.suppressedIndices = Array.from(newSuppressed);
-
-		// 1. Delete excess copies if quantity decreased
-		for (let i = c.copies.length - 1; i >= 0; i--) {
-			const copy = c.copies[i];
-			if (copy.copyIndex >= newQty) {
-				this.deletePatternCopy(copy);
-				c.copies.splice(i, 1);
-			}
-		}
-
-		// 2. Add or remove copies based on quantity and suppression
-		for (let k = 1; k < newQty; k++) {
-			const shouldBeSuppressed = newSuppression && newSuppressed.has(k);
-			const existingIndex = c.copies.findIndex(cp => cp.copyIndex === k);
-
-			if (shouldBeSuppressed) {
-				if (existingIndex >= 0) {
-					this.deletePatternCopy(c.copies[existingIndex]);
-					c.copies.splice(existingIndex, 1);
-				}
-			} else {
-				if (existingIndex < 0) {
-					const newCopy = this.generatePatternCopy(
-						c.centerPtId,
-						c.sourceObjectIds,
-						k,
-						newQty,
-						newDist,
-						newAngle
-					);
-					if (newCopy) {
-						c.copies.push(newCopy);
-					}
-				}
-			}
-		}
-
-		// 3. Update coordinates of existing copies to new angle/distribution positions
-		const centerPt = this.points.get(c.centerPtId);
-		if (centerPt) {
-			for (const copy of c.copies) {
-				const aDeg = computePatternCopyAngle(copy.copyIndex, newQty, newDist, newAngle);
-				const rad = (aDeg * Math.PI) / 180;
-				const cosA = Math.cos(rad);
-				const sinA = Math.sin(rad);
-
-				for (const pair of copy.pointPairs) {
-					const sPt = this.points.get(pair.sourcePtId);
-					const pPt = this.points.get(pair.patternPtId);
-					if (sPt && pPt) {
-						const dx = sPt.x - centerPt.x;
-						const dy = sPt.y - centerPt.y;
-						pPt.x = centerPt.x + dx * cosA - dy * sinA;
-						pPt.y = centerPt.y + dx * sinA + dy * cosA;
-					}
-				}
-			}
-		}
-
-		// 4. Update pointIds on BaseConstraint
-		const pointIdSet = new Set<string>();
-		pointIdSet.add(c.centerPtId);
-		for (const copy of c.copies) {
-			for (const pair of copy.pointPairs) {
-				pointIdSet.add(pair.sourcePtId);
-				pointIdSet.add(pair.patternPtId);
-			}
-		}
-		(c as any).entityIds = Array.from(pointIdSet);
-
-		this.rebuildParamManager();
-		this.solve();
-		this.commitTransaction();
-		return true;
+		return updateCircularPattern(this, constraintId, updates);
 	}
 
 	addPolygon(
@@ -1976,119 +1768,18 @@ export class SketchDocument {
 		u1: { x: number; y: number },
 		u2: { x: number; y: number }
 	): RectangularPatternCopyData | null {
-		const offset = computeRectangularPatternOffset(i, j, distance1, direction1, distance2, direction2, u1, u2);
-		const pointMap = new Map<string, string>();
-		const pointPairs: PatternPointPair[] = [];
-		const radiusPairs: PatternRadiusPair[] = [];
-		const createdEntityIds: Array<{
-			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
-		}> = [];
-
-		const getOrTranslatePoint = (origPtId: string): string => {
-			if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
-			const pt = this.points.get(origPtId);
-			if (!pt) return origPtId;
-
-			const tx = pt.x + offset.dx;
-			const ty = pt.y + offset.dy;
-
-			const newPt = this.addPoint(tx, ty, false);
-			pointMap.set(origPtId, newPt.id);
-			pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
-			createdEntityIds.push({ id: newPt.id, type: 'point' });
-			return newPt.id;
-		};
-
-		for (const objId of sourceObjectIds) {
-			const line = this.lines.get(objId);
-			if (line) {
-				const np1Id = getOrTranslatePoint(line.p1Id);
-				const np2Id = getOrTranslatePoint(line.p2Id);
-				if (np1Id !== np2Id) {
-					const newLine = this.addLine(np1Id, np2Id, line.isConstruction);
-					createdEntityIds.push({ id: newLine.id, type: 'line' });
-				}
-				continue;
-			}
-
-			const circle = this.circles.get(objId);
-			if (circle) {
-				const nCenterId = getOrTranslatePoint(circle.centerId);
-				const newCircle = this.addCircle(nCenterId, circle.radius, circle.isConstruction);
-				radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
-				createdEntityIds.push({ id: newCircle.id, type: 'circle' });
-				continue;
-			}
-
-			const arc = this.arcs.get(objId);
-			if (arc) {
-				const nCenterId = getOrTranslatePoint(arc.centerId);
-				const nStartId = getOrTranslatePoint(arc.startPointId);
-				const nEndId = getOrTranslatePoint(arc.endPointId);
-				const newArc = this.addArc(
-					nCenterId,
-					nStartId,
-					nEndId,
-					arc.radius,
-					arc.clockwise,
-					arc.isConstruction
-				);
-				radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
-				createdEntityIds.push({ id: newArc.id, type: 'arc' });
-				continue;
-			}
-
-			const ellipse = this.ellipses.get(objId);
-			if (ellipse) {
-				const nCenterId = getOrTranslatePoint(ellipse.centerId);
-				const nMajorId = getOrTranslatePoint(ellipse.majorAxisPointId);
-				const nMinorId = getOrTranslatePoint(ellipse.minorAxisPointId);
-				const newEllipse = this.addEllipse(
-					nCenterId,
-					nMajorId,
-					nMinorId,
-					ellipse.isConstruction
-				);
-				createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
-				continue;
-			}
-
-			const elArc = this.ellipticalArcs.get(objId);
-			if (elArc) {
-				const nCenterId = getOrTranslatePoint(elArc.centerId);
-				const nMajorId = getOrTranslatePoint(elArc.majorAxisPointId);
-				const nMinorId = getOrTranslatePoint(elArc.minorAxisPointId);
-				const nStartId = getOrTranslatePoint(elArc.startPointId);
-				const nEndId = getOrTranslatePoint(elArc.endPointId);
-				const newElArc = this.addEllipticalArc(
-					nCenterId,
-					nMajorId,
-					nMinorId,
-					nStartId,
-					nEndId,
-					elArc.clockwise,
-					elArc.isConstruction
-				);
-				createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
-				continue;
-			}
-
-			const pt = this.points.get(objId);
-			if (pt) {
-				getOrTranslatePoint(pt.id);
-				continue;
-			}
-		}
-
-		return {
-			copyIndex: i * 1000 + j,
+		return generateRectangularPatternCopy(
+			this,
+			sourceObjectIds,
 			i,
 			j,
-			pointPairs,
-			radiusPairs,
-			createdEntityIds,
-		};
+			distance1,
+			direction1,
+			distance2,
+			direction2,
+			u1,
+			u2
+		);
 	}
 
 	addRectangularPatternConstraint(
@@ -2106,19 +1797,11 @@ export class SketchDocument {
 		copies: RectangularPatternCopyData[],
 		id?: string
 	): RectangularPatternConstraint | null {
-		const line1 = line1Id ? this.lines.get(line1Id) : null;
-		const line2 = line2Id ? this.lines.get(line2Id) : null;
-
-		const cid = id || this.nextId('c_rpat');
-		const c = new RectangularPatternConstraint(
-			cid,
+		return addRectangularPatternConstraint(
+			this,
 			sourceObjectIds,
 			line1Id,
-			line1?.p1Id,
-			line1?.p2Id,
 			line2Id,
-			line2?.p1Id,
-			line2?.p2Id,
 			quantity1,
 			distance1,
 			direction1,
@@ -2128,10 +1811,8 @@ export class SketchDocument {
 			suppression,
 			suppressedIndices,
 			copies,
-			1.0
+			id
 		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	updateRectangularPattern(
@@ -2149,140 +1830,7 @@ export class SketchDocument {
 			suppressedIndices?: number[];
 		}
 	): boolean {
-		const c = this.constraints.get(constraintId);
-		if (!c || !(c instanceof RectangularPatternConstraint)) return false;
-
-		this.beginTransaction();
-
-		const newLine1Id = updates.line1Id !== undefined ? updates.line1Id : c.line1Id;
-		const newLine2Id = updates.line2Id !== undefined ? updates.line2Id : c.line2Id;
-		const newQty1 = updates.quantity1 !== undefined ? Math.max(1, Math.round(updates.quantity1)) : c.quantity1;
-		const newDist1 = updates.distance1 !== undefined ? updates.distance1 : c.distance1;
-		const newDir1 = updates.direction1 !== undefined ? updates.direction1 : c.direction1;
-		const newQty2 = updates.quantity2 !== undefined ? Math.max(1, Math.round(updates.quantity2)) : c.quantity2;
-		const newDist2 = updates.distance2 !== undefined ? updates.distance2 : c.distance2;
-		const newDir2 = updates.direction2 !== undefined ? updates.direction2 : c.direction2;
-		const newSuppression = updates.suppression !== undefined ? updates.suppression : c.suppression;
-		const newSuppressed = updates.suppressedIndices !== undefined ? new Set(updates.suppressedIndices) : new Set(c.suppressedIndices);
-
-		const line1 = newLine1Id ? this.lines.get(newLine1Id) : null;
-		const line2 = newLine2Id ? this.lines.get(newLine2Id) : null;
-
-		c.line1Id = newLine1Id;
-		c.line1P1Id = line1?.p1Id ?? null;
-		c.line1P2Id = line1?.p2Id ?? null;
-		c.line2Id = newLine2Id;
-		c.line2P1Id = line2?.p1Id ?? null;
-		c.line2P2Id = line2?.p2Id ?? null;
-		c.quantity1 = newQty1;
-		c.distance1 = newDist1;
-		c.direction1 = newDir1;
-		c.quantity2 = newQty2;
-		c.distance2 = newDist2;
-		c.direction2 = newDir2;
-		c.suppression = newSuppression;
-		c.suppressedIndices = Array.from(newSuppressed);
-
-		const paramMap = new Map<string, number>();
-		for (const [pid, pt] of this.points.entries()) {
-			paramMap.set(`${pid}.x`, pt.x);
-			paramMap.set(`${pid}.y`, pt.y);
-		}
-		const { u1, u2 } = computeRectangularPatternDirections(
-			paramMap,
-			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-		);
-
-		const maxI = Math.abs(newDist1) > 1e-6 ? newQty1 : 1;
-		const maxJ = Math.abs(newDist2) > 1e-6 ? newQty2 : 1;
-
-		const neededKeys = new Map<number, { i: number; j: number }>();
-		for (let i = 0; i < maxI; i++) {
-			for (let j = 0; j < maxJ; j++) {
-				if (i === 0 && j === 0) continue;
-				const key = i * 1000 + j;
-				if (newSuppression && newSuppressed.has(key)) continue;
-				neededKeys.set(key, { i, j });
-			}
-		}
-
-		// 1. Remove copies that are no longer needed
-		for (let idx = c.copies.length - 1; idx >= 0; idx--) {
-			const copy = c.copies[idx];
-			if (!neededKeys.has(copy.copyIndex)) {
-				this.deletePatternCopy(copy);
-				c.copies.splice(idx, 1);
-			}
-		}
-
-		// 2. Add newly needed copies
-		for (const [key, coords] of neededKeys.entries()) {
-			const existingIndex = c.copies.findIndex(cp => cp.copyIndex === key);
-			if (existingIndex < 0) {
-				const newCopy = this.generateRectangularPatternCopy(
-					c.sourceObjectIds,
-					coords.i,
-					coords.j,
-					newDist1,
-					newDir1,
-					newDist2,
-					newDir2,
-					u1,
-					u2
-				);
-				if (newCopy) {
-					c.copies.push(newCopy);
-				}
-			}
-		}
-
-		// 3. Update coordinates of existing copies
-		for (const copy of c.copies) {
-			const offset = computeRectangularPatternOffset(
-				copy.i,
-				copy.j,
-				newDist1,
-				newDir1,
-				newDist2,
-				newDir2,
-				u1,
-				u2
-			);
-			for (const pair of copy.pointPairs) {
-				const sPt = this.points.get(pair.sourcePtId);
-				const pPt = this.points.get(pair.patternPtId);
-				if (sPt && pPt) {
-					pPt.x = sPt.x + offset.dx;
-					pPt.y = sPt.y + offset.dy;
-				}
-			}
-		}
-
-		// 4. Update entityIds on BaseConstraint
-		const entityIdSet = new Set<string>();
-		if (c.line1P1Id) entityIdSet.add(c.line1P1Id);
-		if (c.line1P2Id) entityIdSet.add(c.line1P2Id);
-		if (c.line2P1Id) entityIdSet.add(c.line2P1Id);
-		if (c.line2P2Id) entityIdSet.add(c.line2P2Id);
-		for (const copy of c.copies) {
-			for (const pair of copy.pointPairs) {
-				entityIdSet.add(pair.sourcePtId);
-				entityIdSet.add(pair.patternPtId);
-			}
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					entityIdSet.add(pair.sourceCircleId);
-					entityIdSet.add(pair.patternCircleId);
-				}
-			}
-		}
-		(c as any).entityIds = Array.from(entityIdSet);
-
-		this.rebuildParamManager();
-		this.solve();
-		this.commitTransaction();
-		return true;
+		return updateRectangularPattern(this, constraintId, updates);
 	}
 
 	addPerpendicularConstraint(line1Id: string, line2Id: string): PerpendicularConstraint | null {
@@ -2554,39 +2102,7 @@ export class SketchDocument {
 
 	// Helper: check if a point is used by any remaining primitive
 	isPointUsed(pointId: string): boolean {
-		for (const line of this.lines.values()) {
-			if (line.p1Id === pointId || line.p2Id === pointId) return true;
-		}
-		for (const circle of this.circles.values()) {
-			if (circle.centerId === pointId) return true;
-		}
-		for (const arc of this.arcs.values()) {
-			if (arc.centerId === pointId || arc.startPointId === pointId || arc.endPointId === pointId) return true;
-		}
-		for (const el of this.ellipses.values()) {
-			if (el.centerId === pointId || el.majorAxisPointId === pointId || el.minorAxisPointId === pointId) return true;
-		}
-		for (const elarc of this.ellipticalArcs.values()) {
-			if (
-				elarc.centerId === pointId ||
-				elarc.majorAxisPointId === pointId ||
-				elarc.minorAxisPointId === pointId ||
-				elarc.startPointId === pointId ||
-				elarc.endPointId === pointId
-			) {
-				return true;
-			}
-		}
-		for (const spline of this.splines.values()) {
-			if (spline.pointIds.includes(pointId)) return true;
-			if (spline.tangentLineIds) {
-				for (const lid of spline.tangentLineIds) {
-					const line = this.lines.get(lid);
-					if (line && (line.p1Id === pointId || line.p2Id === pointId)) return true;
-				}
-			}
-		}
-		return false;
+		return isPointUsed(this, pointId);
 	}
 
 	isSplineHandleLine(lineId: string): boolean {
@@ -3619,7 +3135,7 @@ export class SketchDocument {
 		}
 	}
 
-	private tryHardSolve(
+	tryHardSolve(
 		tempHardConstraints: IConstraint[],
 		extraValidator?: () => boolean
 	): boolean {
@@ -3675,7 +3191,7 @@ export class SketchDocument {
 		return solvedOk;
 	}
 
-	private solveWithTemporaryHardConstraints(
+	solveWithTemporaryHardConstraints(
 		tempHardConstraints: IConstraint[],
 		fallbackSoftConstraints: IConstraint[] = [],
 		extraValidator?: () => boolean
@@ -3688,1318 +3204,107 @@ export class SketchDocument {
 	}
 
 	setPointCoords(pointId: string, targetX: number, targetY: number): boolean {
-		const pt = this.points.get(pointId);
-		if (!pt || !isFinite(targetX) || !isFinite(targetY)) return false;
-
-		const dx = targetX - pt.x;
-		const dy = targetY - pt.y;
-
-		let hadFixed = false;
-		for (const c of this.constraints.values()) {
-			if (c instanceof FixedConstraint && c.pointId === pointId) {
-				c.targetX = targetX;
-				c.targetY = targetY;
-				hadFixed = true;
-			}
-		}
-
-		pt.x = targetX;
-		pt.y = targetY;
-
-		// Translate free endpoints of any arc/ellipse centered at this point so they move rigidly
-		const extraDrags: IConstraint[] = [];
-		if (!hadFixed) {
-			extraDrags.push(new DragPointConstraint(pointId, targetX, targetY, 0.005));
-		}
-		for (const arc of this.arcs.values()) {
-			if (arc.centerId === pointId) {
-				const sPt = this.points.get(arc.startPointId);
-				const ePt = this.points.get(arc.endPointId);
-				if (sPt && !this.isPointFixed(arc.startPointId)) {
-					sPt.x += dx;
-					sPt.y += dy;
-					extraDrags.push(new DragPointConstraint(arc.startPointId, sPt.x, sPt.y, 0.005));
-				}
-				if (ePt && !this.isPointFixed(arc.endPointId)) {
-					ePt.x += dx;
-					ePt.y += dy;
-					extraDrags.push(new DragPointConstraint(arc.endPointId, ePt.x, ePt.y, 0.005));
-				}
-			}
-		}
-		for (const el of [...this.ellipses.values(), ...this.ellipticalArcs.values()]) {
-			if (el.centerId === pointId) {
-				const majPt = this.points.get(el.majorAxisPointId);
-				const minPt = this.points.get(el.minorAxisPointId);
-				if (majPt && !this.isPointFixed(el.majorAxisPointId)) {
-					majPt.x += dx;
-					majPt.y += dy;
-					extraDrags.push(new DragPointConstraint(el.majorAxisPointId, majPt.x, majPt.y, 0.005));
-				}
-				if (minPt && !this.isPointFixed(el.minorAxisPointId)) {
-					minPt.x += dx;
-					minPt.y += dy;
-					extraDrags.push(new DragPointConstraint(el.minorAxisPointId, minPt.x, minPt.y, 0.005));
-				}
-				if ('startPointId' in el) {
-					const sPt = this.points.get(el.startPointId);
-					const ePt = this.points.get(el.endPointId);
-					if (sPt && !this.isPointFixed(el.startPointId)) {
-						sPt.x += dx;
-						sPt.y += dy;
-						extraDrags.push(new DragPointConstraint(el.startPointId, sPt.x, sPt.y, 0.005));
-					}
-					if (ePt && !this.isPointFixed(el.endPointId)) {
-						ePt.x += dx;
-						ePt.y += dy;
-						extraDrags.push(new DragPointConstraint(el.endPointId, ePt.x, ePt.y, 0.005));
-					}
-				}
-			}
-		}
-
-		if (hadFixed) {
-			if (extraDrags.length > 0) {
-				this.solve(extraDrags);
-			}
-			this.solve();
-		} else {
-			this.solveWithTemporaryHardConstraints(
-				[new FixedConstraint('__temp_fix', pointId, targetX, targetY, 1.0)],
-				extraDrags
-			);
-		}
-		return true;
+		return setPointCoords(this, pointId, targetX, targetY);
 	}
 
 	setLineLength(lineId: string, newLength: number): boolean {
-		const line = this.lines.get(lineId);
-		if (!line || !isFinite(newLength) || newLength <= 0) return false;
-		const p1 = this.points.get(line.p1Id);
-		const p2 = this.points.get(line.p2Id);
-		if (!p1 || !p2) return false;
-
-		const dx = p2.x - p1.x;
-		const dy = p2.y - p1.y;
-		const len = Math.hypot(dx, dy);
-		const ux = len > 1e-9 ? dx / len : 1;
-		const uy = len > 1e-9 ? dy / len : 0;
-
-		// Update any existing distance constraint on this line
-		let updatedExisting = false;
-		for (const c of this.constraints.values()) {
-			if (
-				c instanceof DistanceConstraint &&
-				((c.p1Id === line.p1Id && c.p2Id === line.p2Id) ||
-					(c.p1Id === line.p2Id && c.p2Id === line.p1Id))
-			) {
-				const orient = c.orientation ?? 'aligned';
-				if (
-					orient === 'aligned' ||
-					(orient === 'horizontal' && Math.abs(uy) < 1e-4) ||
-					(orient === 'vertical' && Math.abs(ux) < 1e-4)
-				) {
-					c.targetDistance = newLength;
-					c.value = newLength;
-					updatedExisting = true;
-				}
-			}
-		}
-
-		const p1Fixed = this.isPointFixed(line.p1Id);
-		const p2Fixed = this.isPointFixed(line.p2Id);
-		if (p2Fixed && !p1Fixed) {
-			p1.x = p2.x - ux * newLength;
-			p1.y = p2.y - uy * newLength;
-		} else if (!p2Fixed) {
-			p2.x = p1.x + ux * newLength;
-			p2.y = p1.y + uy * newLength;
-		}
-
-		const fallbackDrags = [
-			new DragPointConstraint(line.p1Id, p1.x, p1.y, 0.005),
-			new DragPointConstraint(line.p2Id, p2.x, p2.y, 0.005),
-		];
-
-		if (updatedExisting) {
-			this.solve();
-		} else {
-			this.solveWithTemporaryHardConstraints(
-				[new DistanceConstraint('__temp_dist', line.p1Id, line.p2Id, newLength, 1.0)],
-				fallbackDrags
-			);
-		}
-		return true;
+		return setLineLength(this, lineId, newLength);
 	}
 
 	setLineAngle(lineId: string, newAngleDeg: number): boolean {
-		const line = this.lines.get(lineId);
-		if (!line || !isFinite(newAngleDeg)) return false;
-		const p1 = this.points.get(line.p1Id);
-		const p2 = this.points.get(line.p2Id);
-		if (!p1 || !p2) return false;
-
-		const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-		if (len < 1e-9) return false;
-		const rad = (newAngleDeg * Math.PI) / 180;
-		const ux = Math.cos(rad);
-		const uy = Math.sin(rad);
-
-		const origValues = this.paramManager.getCurrentValues();
-
-		const p1Fixed = this.isPointFixed(line.p1Id);
-		const p2Fixed = this.isPointFixed(line.p2Id);
-		if (p2Fixed && !p1Fixed) {
-			p1.x = p2.x - ux * len;
-			p1.y = p2.y - uy * len;
-		} else if (!p2Fixed) {
-			p2.x = p1.x + ux * len;
-			p2.y = p1.y + uy * len;
-		}
-		const targetP1 = { x: p1.x, y: p1.y };
-		const targetP2 = { x: p2.x, y: p2.y };
-
-		const tempAngleConstraint: IConstraint = {
-			id: '__temp_line_angle',
-			type: 'angle',
-			name: 'Temp Line Angle',
-			entityIds: [line.p1Id, line.p2Id],
-			weight: 1.0,
-			isSoft: false,
-			isDimensional: false,
-			getEquationsCount: () => 1,
-			evaluate: paramMap => {
-				const x1 = paramMap.get(`${line.p1Id}.x`) ?? p1.x;
-				const y1 = paramMap.get(`${line.p1Id}.y`) ?? p1.y;
-				const x2 = paramMap.get(`${line.p2Id}.x`) ?? p2.x;
-				const y2 = paramMap.get(`${line.p2Id}.y`) ?? p2.y;
-				return [(y2 - y1) * ux - (x2 - x1) * uy];
-			},
-			jacobian: (paramIndices, baseRow) => {
-				const entries = [];
-				const idxX1 = paramIndices.get(`${line.p1Id}.x`);
-				if (idxX1 !== undefined) entries.push({ row: baseRow, col: idxX1, val: uy });
-				const idxY1 = paramIndices.get(`${line.p1Id}.y`);
-				if (idxY1 !== undefined) entries.push({ row: baseRow, col: idxY1, val: -ux });
-				const idxX2 = paramIndices.get(`${line.p2Id}.x`);
-				if (idxX2 !== undefined) entries.push({ row: baseRow, col: idxX2, val: -uy });
-				const idxY2 = paramIndices.get(`${line.p2Id}.y`);
-				if (idxY2 !== undefined) entries.push({ row: baseRow, col: idxY2, val: ux });
-				return entries;
-			},
-		};
-
-		const checkDirection = () => {
-			const dx = p2.x - p1.x;
-			const dy = p2.y - p1.y;
-			return Math.hypot(dx, dy) > 1e-3 && dx * ux + dy * uy > 0;
-		};
-
-		const fallbackDrags = [
-			new DragPointConstraint(line.p1Id, targetP1.x, targetP1.y, 0.005),
-			new DragPointConstraint(line.p2Id, targetP2.x, targetP2.y, 0.005),
-		];
-
-		// 1. Try preserving both the requested angle and the current line length (works when DoF >= 2)
-		let solved = this.tryHardSolve(
-			[tempAngleConstraint, new DistanceConstraint('__temp_dist', line.p1Id, line.p2Id, len, 1.0)],
-			checkDirection
-		);
-
-		// 2. If over-constrained (e.g. 1-DoF constrained triangle where side length must change to reach the new angle),
-		// solve with the angle constraint alone starting from original valid state
-		if (!solved) {
-			this.paramManager.restoreValues(origValues);
-			solved = this.tryHardSolve([tempAngleConstraint], checkDirection);
-		}
-
-		// 3. If still not solved and the line has an AngleConstraint with another line, update that AngleConstraint
-		if (!solved) {
-			for (const c of this.constraints.values()) {
-				if (
-					c instanceof AngleConstraint &&
-					c.line1Id !== c.line2Id &&
-					(c.line1Id === lineId || c.line2Id === lineId)
-				) {
-					this.paramManager.restoreValues(origValues);
-					const otherLineId = c.line1Id === lineId ? c.line2Id : c.line1Id;
-					const otherLine = this.lines.get(otherLineId);
-					if (otherLine) {
-						const op1 = this.points.get(otherLine.p1Id);
-						const op2 = this.points.get(otherLine.p2Id);
-						if (op1 && op2) {
-							const u1x = c.line1Id === lineId ? ux * c.s1 : ((op2.x - op1.x) / Math.max(dist(op1, op2), 1e-7)) * c.s1;
-							const u1y = c.line1Id === lineId ? uy * c.s1 : ((op2.y - op1.y) / Math.max(dist(op1, op2), 1e-7)) * c.s1;
-							const u2x = c.line2Id === lineId ? ux * c.s2 : ((op2.x - op1.x) / Math.max(dist(op1, op2), 1e-7)) * c.s2;
-							const u2y = c.line2Id === lineId ? uy * c.s2 : ((op2.y - op1.y) / Math.max(dist(op1, op2), 1e-7)) * c.s2;
-							const dotVal = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
-							const newRelAngle = Math.min(179.9, Math.max(0.1, (Math.acos(dotVal) * 180) / Math.PI));
-							c.targetAngle = newRelAngle;
-							c.value = newRelAngle;
-							solved =
-								this.tryHardSolve(
-									[tempAngleConstraint, new DistanceConstraint('__temp_dist', line.p1Id, line.p2Id, len, 1.0)],
-									checkDirection
-								) || this.tryHardSolve([tempAngleConstraint], checkDirection);
-							if (solved) break;
-						}
-					}
-				}
-			}
-		}
-
-		if (!solved) {
-			p1.x = targetP1.x;
-			p1.y = targetP1.y;
-			p2.x = targetP2.x;
-			p2.y = targetP2.y;
-			this.solve(fallbackDrags);
-		}
-
-		this.solve();
-		return true;
+		return setLineAngle(this, lineId, newAngleDeg);
 	}
 
 	setLinesRelativeAngle(line1Id: string, line2Id: string, newAngleDeg: number): boolean {
-		const isAxis1 = line1Id === 'axis_x' || line1Id === 'axis_y';
-		const isAxis2 = line2Id === 'axis_x' || line2Id === 'axis_y';
-		if (isAxis1 && isAxis2) return false;
-
-		const l1 = isAxis1 ? null : this.lines.get(line1Id);
-		const l2 = isAxis2 ? null : this.lines.get(line2Id);
-		if ((!l1 && !isAxis1) || (!l2 && !isAxis2) || !isFinite(newAngleDeg) || newAngleDeg <= 0) return false;
-
-		const existing = [...this.constraints.values()].find(
-			c =>
-				c instanceof AngleConstraint &&
-				((c.line1Id === line1Id && c.line2Id === line2Id) ||
-					(c.line1Id === line2Id && c.line2Id === line1Id))
-		) as AngleConstraint | undefined;
-		if (existing) {
-			return this.updateDimensionalConstraint(existing.id, newAngleDeg);
-		}
-
-		const p1 = isAxis1
-			? ({ id: line1Id, x: 0, y: 0 } as SketchPoint)
-			: this.points.get(l1!.p1Id);
-		const p2 = isAxis1
-			? ({ id: line1Id, x: line1Id === 'axis_x' ? 1 : 0, y: line1Id === 'axis_x' ? 0 : 1 } as SketchPoint)
-			: this.points.get(l1!.p2Id);
-		const p3 = isAxis2
-			? ({ id: line2Id, x: 0, y: 0 } as SketchPoint)
-			: this.points.get(l2!.p1Id);
-		const p4 = isAxis2
-			? ({ id: line2Id, x: line2Id === 'axis_x' ? 1 : 0, y: line2Id === 'axis_x' ? 0 : 1 } as SketchPoint)
-			: this.points.get(l2!.p2Id);
-		if (!p1 || !p2 || !p3 || !p4) return false;
-
-		const clampedAngle = Math.min(179.9, Math.max(0.1, newAngleDeg));
-		const geom = this.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, line1Id, line2Id);
-		const len1 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-		const len2 = Math.hypot(p4.x - p3.x, p4.y - p3.y);
-		if (len1 < 1e-7 || len2 < 1e-7) return false;
-
-		const origDx1 = p2.x - p1.x;
-		const origDy1 = p2.y - p1.y;
-		const origDx2 = p4.x - p3.x;
-		const origDy2 = p4.y - p3.y;
-
-		const tempRelAngle = new AngleConstraint(
-			'__temp_rel_ang',
-			line1Id,
-			line2Id,
-			isAxis1 ? '' : l1!.p1Id,
-			isAxis1 ? '' : l1!.p2Id,
-			isAxis2 ? '' : l2!.p1Id,
-			isAxis2 ? '' : l2!.p2Id,
-			clampedAngle,
-			40,
-			geom.s1,
-			geom.s2,
-			geom.sign
-		);
-		const tempDist1 = !isAxis1 ? new DistanceConstraint('__temp_d1', l1!.p1Id, l1!.p2Id, len1, 1.0) : null;
-		const tempDist2 = !isAxis2 ? new DistanceConstraint('__temp_d2', l2!.p1Id, l2!.p2Id, len2, 1.0) : null;
-
-		const checkNonDegenerate = () => {
-			const d1 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-			const d2 = Math.hypot(p4.x - p3.x, p4.y - p3.y);
-			if (d1 < 1e-3 || d2 < 1e-3) return false;
-			const u1x = ((p2.x - p1.x) / d1) * geom.s1;
-			const u1y = ((p2.y - p1.y) / d1) * geom.s1;
-			const u2x = ((p4.x - p3.x) / d2) * geom.s2;
-			const u2y = ((p4.y - p3.y) / d2) * geom.s2;
-			const dotVal = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
-			const achievedDeg = (Math.acos(dotVal) * 180) / Math.PI;
-			return (
-				Math.abs(achievedDeg - clampedAngle) < 0.5 &&
-				(isAxis1 || (p2.x - p1.x) * origDx1 + (p2.y - p1.y) * origDy1 > -0.5 * d1 * len1) &&
-				(isAxis2 || (p4.x - p3.x) * origDx2 + (p4.y - p3.y) * origDy2 > -0.5 * d2 * len2)
-			);
-		};
-
-		const activeDists = [tempDist1, tempDist2].filter(Boolean) as DistanceConstraint[];
-		const candidates: IConstraint[][] = [
-			[tempRelAngle, ...activeDists],
-			...(activeDists.length > 1 ? [[tempRelAngle, activeDists[0]], [tempRelAngle, activeDists[1]]] : []),
-			[tempRelAngle],
-		];
-
-		for (const cand of candidates) {
-			if (this.tryHardSolve(cand, checkNonDegenerate)) {
-				this.solve();
-				return true;
-			}
-		}
-
-		this.solve();
-		return true;
+		return setLinesRelativeAngle(this, line1Id, line2Id, newAngleDeg);
 	}
 
 	setCircleOrArcRadius(entityId: string, newRadius: number): boolean {
-		if (!isFinite(newRadius) || newRadius <= 0) return false;
-		const circle = this.circles.get(entityId);
-		const arc = this.arcs.get(entityId);
-		const entity = circle ?? arc;
-		if (!entity) return false;
-
-		let updatedExisting = false;
-		for (const c of this.constraints.values()) {
-			if (c instanceof RadiusConstraint && c.circleId === entityId) {
-				c.targetRadius = newRadius;
-				c.value = newRadius;
-				const dispVal =
-					c.displayMode === 'diameter'
-						? Number((newRadius * 2).toFixed(2))
-						: Number(newRadius.toFixed(2));
-				c.name = c.displayMode === 'diameter' ? `Diameter (${dispVal})` : `Radius (${dispVal})`;
-				updatedExisting = true;
-			}
-		}
-
-		entity.radius = newRadius;
-		const center = this.points.get(entity.centerId);
-		if (center && arc) {
-			const start = this.points.get(arc.startPointId);
-			const end = this.points.get(arc.endPointId);
-			if (start && !this.isPointFixed(arc.startPointId)) {
-				const as = Math.atan2(start.y - center.y, start.x - center.x);
-				start.x = center.x + Math.cos(as) * newRadius;
-				start.y = center.y + Math.sin(as) * newRadius;
-			}
-			if (end && !this.isPointFixed(arc.endPointId)) {
-				const ae = Math.atan2(end.y - center.y, end.x - center.x);
-				end.x = center.x + Math.cos(ae) * newRadius;
-				end.y = center.y + Math.sin(ae) * newRadius;
-			}
-		}
-
-		if (center) {
-			for (const c of this.constraints.values()) {
-				if (c instanceof PointOnCircleConstraint && c.circleId === entityId) {
-					const pt = this.points.get(c.pointId);
-					if (pt && !this.isPointFixed(c.pointId)) {
-						const ang = Math.atan2(pt.y - center.y, pt.x - center.x);
-						pt.x = center.x + Math.cos(ang) * newRadius;
-						pt.y = center.y + Math.sin(ang) * newRadius;
-					}
-				}
-			}
-		}
-
-		if (updatedExisting) {
-			this.solve();
-		} else {
-			this.solveWithTemporaryHardConstraints([
-				new RadiusConstraint('__temp_rad', entityId, newRadius, 1.0),
-			]);
-		}
-		return true;
+		return setCircleOrArcRadius(this, entityId, newRadius);
 	}
 
 	setArcAngle(arcId: string, newSweepDeg: number): boolean {
-		const arc = this.arcs.get(arcId);
-		if (!arc || !isFinite(newSweepDeg) || newSweepDeg <= 0) return false;
-		const center = this.points.get(arc.centerId);
-		const start = this.points.get(arc.startPointId);
-		const end = this.points.get(arc.endPointId);
-		if (!center || !start || !end) return false;
-
-		const clampedDeg = Math.min(359.9, Math.max(0.1, newSweepDeg));
-		let updatedExisting = false;
-		for (const c of this.constraints.values()) {
-			if (
-				c instanceof AngleConstraint &&
-				((c.line1Id === arcId && c.line2Id === arcId) ||
-					(c.l1P1 === arc.centerId &&
-						c.l1P2 === arc.startPointId &&
-						c.l2P1 === arc.centerId &&
-						c.l2P2 === arc.endPointId))
-			) {
-				c.targetAngle = clampedDeg;
-				c.value = clampedDeg;
-				updatedExisting = true;
-			}
-		}
-
-		const sweepRad = (clampedDeg * Math.PI) / 180;
-		if (this.isPointFixed(arc.endPointId) && !this.isPointFixed(arc.startPointId)) {
-			const ae = Math.atan2(end.y - center.y, end.x - center.x);
-			const newAs = arc.clockwise ? ae + sweepRad : ae - sweepRad;
-			start.x = center.x + Math.cos(newAs) * arc.radius;
-			start.y = center.y + Math.sin(newAs) * arc.radius;
-		} else if (!this.isPointFixed(arc.endPointId)) {
-			const as = Math.atan2(start.y - center.y, start.x - center.x);
-			const newAe = arc.clockwise ? as - sweepRad : as + sweepRad;
-			end.x = center.x + Math.cos(newAe) * arc.radius;
-			end.y = center.y + Math.sin(newAe) * arc.radius;
-		}
-
-		const fallbackDrags = [
-			new DragPointConstraint(arc.centerId, center.x, center.y, 0.005),
-			new DragPointConstraint(arc.startPointId, start.x, start.y, 0.005),
-			new DragPointConstraint(arc.endPointId, end.x, end.y, 0.005),
-		];
-
-		if (updatedExisting) {
-			this.solve();
-		} else {
-			this.solveWithTemporaryHardConstraints(
-				[
-					new AngleConstraint(
-						'__temp_arc_ang',
-						arc.id,
-						arc.id,
-						arc.centerId,
-						arc.startPointId,
-						arc.centerId,
-						arc.endPointId,
-						clampedDeg,
-						40,
-						1,
-						1,
-						arc.clockwise ? -1 : 1
-					),
-				],
-				fallbackDrags
-			);
-		}
-		return true;
+		return setArcAngle(this, arcId, newSweepDeg);
 	}
 
 	setEllipseParams(
-		entityId: string,
+		id: string,
 		params: { rx?: number; ry?: number; rotationDeg?: number }
 	): boolean {
-		const entity = this.ellipses.get(entityId) ?? this.ellipticalArcs.get(entityId);
-		if (!entity) return false;
-		const center = this.points.get(entity.centerId);
-		const majorPt = this.points.get(entity.majorAxisPointId);
-		const minorPt = this.points.get(entity.minorAxisPointId);
-		if (!center || !majorPt || !minorPt) return false;
-
-		const uX = majorPt.x - center.x;
-		const uY = majorPt.y - center.y;
-		const vX = minorPt.x - center.x;
-		const vY = minorPt.y - center.y;
-		const curRx = Math.max(Math.hypot(uX, uY), 1e-7);
-		const curRy = Math.max(Math.hypot(vX, vY), 1e-7);
-
-		let uHatX = uX / curRx;
-		let uHatY = uY / curRx;
-		let vHatX = vX / curRy;
-		let vHatY = vY / curRy;
-		const sign = uHatX * vHatY - uHatY * vHatX >= 0 ? 1 : -1;
-
-		let tS = 0;
-		let tE = 0;
-		const startPt = 'startPointId' in entity ? this.points.get(entity.startPointId) : undefined;
-		const endPt = 'endPointId' in entity ? this.points.get(entity.endPointId) : undefined;
-		if (startPt && endPt) {
-			const dsX = startPt.x - center.x;
-			const dsY = startPt.y - center.y;
-			const uS = dsX * uHatX + dsY * uHatY;
-			const vS = dsX * vHatX + dsY * vHatY;
-			tS = Math.atan2(vS / curRy, uS / curRx);
-
-			const deX = endPt.x - center.x;
-			const deY = endPt.y - center.y;
-			const uE = deX * uHatX + deY * uHatY;
-			const vE = deX * vHatX + deY * vHatY;
-			tE = Math.atan2(vE / curRy, uE / curRx);
-		}
-
-		const newRx = params.rx !== undefined && isFinite(params.rx) && params.rx > 0 ? params.rx : curRx;
-		const newRy = params.ry !== undefined && isFinite(params.ry) && params.ry > 0 ? params.ry : curRy;
-
-		if (params.rx !== undefined && isFinite(params.rx) && params.rx > 0) {
-			const distC = this.getDistanceConstraint(entity.centerId, entity.majorAxisPointId, 'aligned');
-			if (distC) {
-				distC.targetDistance = newRx;
-				distC.value = newRx;
-			}
-		}
-		if (params.ry !== undefined && isFinite(params.ry) && params.ry > 0) {
-			const distC = this.getDistanceConstraint(entity.centerId, entity.minorAxisPointId, 'aligned');
-			if (distC) {
-				distC.targetDistance = newRy;
-				distC.value = newRy;
-			}
-		}
-		if (params.rotationDeg !== undefined && isFinite(params.rotationDeg)) {
-			const rad = (params.rotationDeg * Math.PI) / 180;
-			uHatX = Math.cos(rad);
-			uHatY = Math.sin(rad);
-			vHatX = -Math.sin(rad) * sign;
-			vHatY = Math.cos(rad) * sign;
-		}
-
-		if (!this.isPointFixed(entity.majorAxisPointId)) {
-			majorPt.x = center.x + uHatX * newRx;
-			majorPt.y = center.y + uHatY * newRx;
-		}
-		if (!this.isPointFixed(entity.minorAxisPointId)) {
-			minorPt.x = center.x + vHatX * newRy;
-			minorPt.y = center.y + vHatY * newRy;
-		}
-
-		const extraDrags: IConstraint[] = [
-			new DragPointConstraint(entity.centerId, center.x, center.y, 0.005),
-			new DragPointConstraint(entity.majorAxisPointId, majorPt.x, majorPt.y, 0.005),
-			new DragPointConstraint(entity.minorAxisPointId, minorPt.x, minorPt.y, 0.005),
-		];
-
-		if (startPt && endPt && 'startPointId' in entity) {
-			if (!this.isPointFixed(entity.startPointId)) {
-				const uSNew = newRx * Math.cos(tS);
-				const vSNew = newRy * Math.sin(tS);
-				startPt.x = center.x + uSNew * uHatX + vSNew * vHatX;
-				startPt.y = center.y + uSNew * uHatY + vSNew * vHatY;
-			}
-			if (!this.isPointFixed(entity.endPointId)) {
-				const uENew = newRx * Math.cos(tE);
-				const vENew = newRy * Math.sin(tE);
-				endPt.x = center.x + uENew * uHatX + vENew * vHatX;
-				endPt.y = center.y + uENew * uHatY + vENew * vHatY;
-			}
-			extraDrags.push(
-				new DragPointConstraint(entity.startPointId, startPt.x, startPt.y, 0.005),
-				new DragPointConstraint(entity.endPointId, endPt.x, endPt.y, 0.005)
-			);
-		}
-
-		this.solve(extraDrags);
-		this.solve();
-		return true;
+		return setEllipseParams(this, id, params);
 	}
 
 	hasRadiusConstraint(circleId: string): boolean {
-		for (const c of this.constraints.values()) {
-			if (c instanceof RadiusConstraint && c.circleId === circleId) {
-				return true;
-			}
-		}
-		return false;
+		return hasRadiusConstraint(this, circleId);
 	}
 
 	hasAngleConstraint(line1Id: string, line2Id: string): boolean {
-		for (const c of this.constraints.values()) {
-			if (
-				c instanceof AngleConstraint &&
-				((c.line1Id === line1Id && c.line2Id === line2Id) || (c.line1Id === line2Id && c.line2Id === line1Id))
-			) {
-				return true;
-			}
-		}
-		return false;
+		return hasAngleConstraint(this, line1Id, line2Id);
 	}
-
 
 	isPointFixed(pointId: string): boolean {
-		const pt = this.points.get(pointId);
-		if (pt?.fixed) return true;
-		for (const c of this.constraints.values()) {
-			if (c instanceof FixedConstraint && c.pointId === pointId) {
-				return true;
-			}
-		}
-		return false;
+		return isPointFixed(this, pointId);
 	}
 
-	private matchesEndpoints(pA: string, pB: string, end1: string, end2: string): boolean {
-		return (pA === end1 && pB === end2) || (pA === end2 && pB === end1);
+	matchesEndpoints(pA: string, pB: string, end1: string, end2: string): boolean {
+		return matchesEndpoints(pA, pB, end1, end2);
 	}
 
 	getLineBetween(p1Id: string, p2Id: string): SketchLine | undefined {
-		for (const line of this.lines.values()) {
-			if (
-				(line.p1Id === p1Id && line.p2Id === p2Id) ||
-				(line.p1Id === p2Id && line.p2Id === p1Id)
-			) {
-				return line;
-			}
-		}
-		return undefined;
+		return getLineBetween(this, p1Id, p2Id);
 	}
 
 	getConstraintsForEntity(
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
 		id: string
 	): IConstraint[] {
-		const res: IConstraint[] = [];
-		if (type === 'point') {
-			if (id === 'origin') {
-				for (const c of this.constraints.values()) {
-					if (c instanceof OriginDistanceConstraint) {
-						if (c.isCoincident || c.orientation === 'aligned') {
-							res.push(c);
-						}
-					}
-				}
-				return res;
-			}
-			for (const c of this.constraints.values()) {
-				if (this.isSplineInternalConstraint(c)) continue;
-				const anyC = c as any;
-				if (c.type === 'fixed') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'coincident') {
-					if (anyC.p1Id === id || anyC.p2Id === id) res.push(c);
-				} else if (c.type === 'point_on_line') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'point_on_circle') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'point_on_ellipse') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'point_on_spline') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'point_to_line_distance') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'origin_distance') {
-					if (anyC.pointId === id) res.push(c);
-				} else if (c.type === 'midpoint') {
-					if (anyC.midId === id) res.push(c);
-				} else if (c.type === 'symmetry') {
-					if (anyC.p1Id === id || anyC.p2Id === id) res.push(c);
-				} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
-					if (anyC.p1Id === id || anyC.p2Id === id) {
-						// Only associate if there is no line between these points (i.e. not a line constraint)
-						if (!this.getLineBetween(anyC.p1Id, anyC.p2Id)) {
-							res.push(c);
-						}
-					}
-				} else if (c.type === 'circular_pattern') {
-					const cpat = c as CircularPatternConstraint;
-					if (
-						cpat.centerPtId === id ||
-						cpat.sourceObjectIds?.includes(id) ||
-						cpat.copies?.some(cp => cp.createdEntityIds.some(e => e.type === 'point' && e.id === id))
-					) {
-						res.push(c);
-					}
-				} else if (c.type === 'rectangular_pattern') {
-					const rpat = c as RectangularPatternConstraint;
-					if (
-						rpat.sourceObjectIds?.includes(id) ||
-						rpat.copies?.some(cp => cp.createdEntityIds.some(e => e.type === 'point' && e.id === id))
-					) {
-						res.push(c);
-					}
-				}
-			}
-		} else if (type === 'line') {
-			if (id === 'axis_x' || id === 'axis_y') {
-				const axis = id === 'axis_x' ? 'x' : 'y';
-				for (const c of this.constraints.values()) {
-					const anyC = c as any;
-					if (c.type === 'origin_distance') {
-						const oc = c as OriginDistanceConstraint;
-						if (axis === 'x' && oc.orientation === 'vertical') {
-							res.push(c);
-						} else if (axis === 'y' && oc.orientation === 'horizontal') {
-							res.push(c);
-						}
-					} else if (c.type === 'line_to_axis_distance' && anyC.axis === axis) {
-						res.push(c);
-					} else if (c.type === 'angle') {
-						const ac = c as AngleConstraint;
-						if (ac.line1Id === id || ac.line2Id === id) {
-							res.push(c);
-						}
-					}
-				}
-				return res;
-			}
-			const line = this.lines.get(id);
-			if (!line) return [];
-			const { p1Id, p2Id } = line;
-			for (const c of this.constraints.values()) {
-				if (this.isSplineInternalConstraint(c)) continue;
-				const anyC = c as any;
-				if (c.entityIds.includes(id)) {
-					res.push(c);
-					continue;
-				}
-				if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
-					if (this.matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
-						res.push(c);
-					}
-				} else if (c.type === 'point_to_line_distance') {
-					if (anyC.lineId === id || this.matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
-						res.push(c);
-					}
-				} else if (c.type === 'equal_length') {
-					if (
-						this.matchesEndpoints(anyC.line1P1, anyC.line1P2, p1Id, p2Id) ||
-						this.matchesEndpoints(anyC.line2P1, anyC.line2P2, p1Id, p2Id)
-					) {
-						res.push(c);
-					}
-				} else if (c.type === 'parallel' || c.type === 'collinear' || c.type === 'perpendicular') {
-					if (
-						this.matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) ||
-						this.matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)
-					) {
-						res.push(c);
-					}
-				} else if (c.type === 'point_on_line' || c.type === 'tangent_line_circle') {
-					if (this.matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
-						res.push(c);
-					}
-				} else if (c.type === 'midpoint') {
-					if (this.matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
-						res.push(c);
-					}
-				} else if (c.type === 'symmetry') {
-					if (anyC.lineId === id || this.matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
-						res.push(c);
-					}
-				} else if (c.type === 'angle') {
-					if (
-						anyC.line1Id === id ||
-						anyC.line2Id === id ||
-						this.matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) ||
-						this.matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)
-					) {
-						res.push(c);
-					}
-				} else if (c.type === 'line_to_axis_distance') {
-					if (anyC.lineId === id || this.matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
-						res.push(c);
-					}
-				}
-			}
-		} else if (type === 'circle') {
-			const circ = this.circles.get(id);
-			if (!circ) return [];
-			for (const c of this.constraints.values()) {
-				const anyC = c as any;
-				if (c.type === 'radius') {
-					if (anyC.circleId === id) res.push(c);
-				} else if (c.type === 'equal_radius') {
-					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-				} else if (c.type === 'concentric') {
-					if (anyC.c1CenterId === circ.centerId || anyC.c2CenterId === circ.centerId) {
-						res.push(c);
-					}
-				} else if (c.type === 'tangent_line_circle') {
-					if (anyC.circleId === id) res.push(c);
-				} else if (c.type === 'tangent_circle_circle') {
-					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-				} else if (c.type === 'point_on_circle') {
-					if (anyC.circleId === id) res.push(c);
-				} else if (c.entityIds.includes(id)) {
-					res.push(c);
-				}
-			}
-		} else if (type === 'arc') {
-			const arc = this.arcs.get(id);
-			if (!arc) return [];
-			for (const c of this.constraints.values()) {
-				const anyC = c as any;
-				if (c.type === 'radius') {
-					if (anyC.circleId === id) res.push(c);
-				} else if (c.type === 'equal_radius') {
-					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-				} else if (c.type === 'concentric') {
-					if (anyC.c1CenterId === arc.centerId || anyC.c2CenterId === arc.centerId) {
-						res.push(c);
-					}
-				} else if (c.type === 'tangent_line_circle') {
-					if (anyC.circleId === id) res.push(c);
-				} else if (c.type === 'tangent_circle_circle') {
-					if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-				} else if (c.type === 'point_on_circle') {
-					if (anyC.circleId === id) res.push(c);
-				} else if (c.type === 'angle') {
-					if (anyC.line1Id === id || anyC.line2Id === id) res.push(c);
-				} else if (c.entityIds.includes(id)) {
-					res.push(c);
-				}
-			}
-		} else if (type === 'ellipse') {
-			const el = this.ellipses.get(id);
-			if (!el) return [];
-			for (const c of this.constraints.values()) {
-				const anyC = c as any;
-				if (anyC.ellipseId === id || c.entityIds.includes(id)) {
-					res.push(c);
-				}
-			}
-		} else if (type === 'elliptical_arc') {
-			const elarc = this.ellipticalArcs.get(id);
-			if (!elarc) return [];
-			for (const c of this.constraints.values()) {
-				const anyC = c as any;
-				if (anyC.arcId === id || anyC.ellipseId === id || c.entityIds.includes(id)) {
-					res.push(c);
-				}
-			}
-		} else if (type === 'spline') {
-			const spline = this.splines.get(id);
-			if (!spline) return [];
-			const seenIds = new Set<string>();
-			const pushUnique = (c: IConstraint) => {
-				if (!seenIds.has(c.id)) {
-					seenIds.add(c.id);
-					res.push(c);
-				}
-			};
-			if (spline.tangentLineIds) {
-				for (const lid of spline.tangentLineIds) {
-					for (const c of this.getConstraintsForEntity('line', lid)) {
-						pushUnique(c);
-					}
-				}
-			}
-			for (const c of this.constraints.values()) {
-				if (this.isSplineInternalConstraint(c)) continue;
-				const anyC = c as any;
-				if (anyC.splineId === id || c.entityIds.includes(id)) {
-					pushUnique(c);
-				} else if (c.type === 'circular_pattern') {
-					const cpat = c as CircularPatternConstraint;
-					if (cpat.sourceObjectIds?.includes(id)) pushUnique(c);
-				} else if (c.type === 'rectangular_pattern') {
-					const rpat = c as RectangularPatternConstraint;
-					if (rpat.sourceObjectIds?.includes(id)) pushUnique(c);
-				}
-			}
-		}
-		return res;
+		return getConstraintsForEntity(this, type, id);
 	}
 
 	getEntitiesForConstraint(c: IConstraint): Array<{
 		id: string;
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}> {
-		const res: Array<{
-			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
-		}> = [];
-		const seen = new Set<string>();
-
-		const add = (id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline') => {
-			if (type === 'line') {
-				const l = this.lines.get(id);
-				if (l?.isSplineHandle && l.parentSplineId && this.splines.has(l.parentSplineId)) {
-					id = l.parentSplineId;
-					type = 'spline';
-				}
-			}
-			const key = `${type}:${id}`;
-			if (!seen.has(key)) {
-				seen.add(key);
-				res.push({ id, type });
-			}
-		};
-
-		const anyC = c as any;
-
-		if (c.type === 'fixed') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) {
-				add(anyC.pointId, 'point');
-			}
-		} else if (c.type === 'coincident') {
-			if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
-			if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
-		} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
-			const line = this.getLineBetween(anyC.p1Id, anyC.p2Id);
-			if (line) {
-				add(line.id, 'line');
-			} else {
-				if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
-				if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
-			}
-		} else if (c.type === 'point_to_line_distance') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
-			if (anyC.lineId && this.lines.has(anyC.lineId)) {
-				add(anyC.lineId, 'line');
-			} else {
-				const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
-				if (line) add(line.id, 'line');
-			}
-		} else if (c.type === 'radius') {
-			const cid = anyC.circleId;
-			if (this.circles.has(cid)) add(cid, 'circle');
-			else if (this.arcs.has(cid)) add(cid, 'arc');
-		} else if (c.type === 'equal_radius') {
-			const c1 = anyC.circle1Id;
-			const c2 = anyC.circle2Id;
-			if (this.circles.has(c1)) add(c1, 'circle');
-			else if (this.arcs.has(c1)) add(c1, 'arc');
-			if (this.circles.has(c2)) add(c2, 'circle');
-			else if (this.arcs.has(c2)) add(c2, 'arc');
-		} else if (c.type === 'equal_length') {
-			const l1 = this.getLineBetween(anyC.line1P1, anyC.line1P2);
-			const l2 = this.getLineBetween(anyC.line2P1, anyC.line2P2);
-			if (l1) add(l1.id, 'line');
-			if (l2) add(l2.id, 'line');
-		} else if (c.type === 'parallel' || c.type === 'perpendicular' || c.type === 'collinear') {
-			const l1 = this.getLineBetween(anyC.l1P1, anyC.l1P2);
-			const l2 = this.getLineBetween(anyC.l2P1, anyC.l2P2);
-			if (l1) add(l1.id, 'line');
-			if (l2) add(l2.id, 'line');
-		} else if (c.type === 'symmetry') {
-			if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
-			if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
-			if (anyC.lineId && this.lines.has(anyC.lineId)) {
-				add(anyC.lineId, 'line');
-			} else {
-				const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
-				if (line) add(line.id, 'line');
-			}
-		} else if (c.type === 'circular_pattern') {
-			const cpat = c as CircularPatternConstraint;
-			if (cpat.centerPtId && this.points.has(cpat.centerPtId)) add(cpat.centerPtId, 'point');
-			if (cpat.sourceObjectIds) {
-				for (const id of cpat.sourceObjectIds) {
-					if (this.lines.has(id)) add(id, 'line');
-					else if (this.circles.has(id)) add(id, 'circle');
-					else if (this.arcs.has(id)) add(id, 'arc');
-					else if (this.ellipses.has(id)) add(id, 'ellipse');
-					else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
-					else if (this.splines.has(id)) add(id, 'spline');
-					else if (this.points.has(id)) add(id, 'point');
-				}
-			}
-			if (cpat.copies) {
-				for (const copy of cpat.copies) {
-					for (const item of copy.createdEntityIds) {
-						if (item.type === 'line' && this.lines.has(item.id)) add(item.id, 'line');
-						else if (item.type === 'circle' && this.circles.has(item.id)) add(item.id, 'circle');
-						else if (item.type === 'arc' && this.arcs.has(item.id)) add(item.id, 'arc');
-						else if (item.type === 'ellipse' && this.ellipses.has(item.id)) add(item.id, 'ellipse');
-						else if (item.type === 'elliptical_arc' && this.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
-						else if (item.type === 'point' && this.points.has(item.id)) add(item.id, 'point');
-					}
-				}
-			}
-		} else if (c.type === 'rectangular_pattern') {
-			const rpat = c as RectangularPatternConstraint;
-			if (rpat.line1Id && this.lines.has(rpat.line1Id)) add(rpat.line1Id, 'line');
-			if (rpat.line2Id && this.lines.has(rpat.line2Id)) add(rpat.line2Id, 'line');
-			if (rpat.sourceObjectIds) {
-				for (const id of rpat.sourceObjectIds) {
-					if (this.lines.has(id)) add(id, 'line');
-					else if (this.circles.has(id)) add(id, 'circle');
-					else if (this.arcs.has(id)) add(id, 'arc');
-					else if (this.ellipses.has(id)) add(id, 'ellipse');
-					else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
-					else if (this.splines.has(id)) add(id, 'spline');
-					else if (this.points.has(id)) add(id, 'point');
-				}
-			}
-			if (rpat.copies) {
-				for (const copy of rpat.copies) {
-					for (const item of copy.createdEntityIds) {
-						if (item.type === 'line' && this.lines.has(item.id)) add(item.id, 'line');
-						else if (item.type === 'circle' && this.circles.has(item.id)) add(item.id, 'circle');
-						else if (item.type === 'arc' && this.arcs.has(item.id)) add(item.id, 'arc');
-						else if (item.type === 'ellipse' && this.ellipses.has(item.id)) add(item.id, 'ellipse');
-						else if (item.type === 'elliptical_arc' && this.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
-						else if (item.type === 'point' && this.points.has(item.id)) add(item.id, 'point');
-					}
-				}
-			}
-		} else if (c.type === 'angle') {
-			if (anyC.line1Id && this.arcs.has(anyC.line1Id)) {
-				add(anyC.line1Id, 'arc');
-			} else if (anyC.line1Id && this.lines.has(anyC.line1Id)) {
-				add(anyC.line1Id, 'line');
-			} else if (anyC.line1Id === 'axis_x' || anyC.line1Id === 'axis_y') {
-				add(anyC.line1Id, 'line');
-			} else {
-				const l1 = this.getLineBetween(anyC.l1P1, anyC.l1P2);
-				if (l1) add(l1.id, 'line');
-			}
-			if (anyC.line2Id && this.arcs.has(anyC.line2Id)) {
-				add(anyC.line2Id, 'arc');
-			} else if (anyC.line2Id && this.lines.has(anyC.line2Id)) {
-				add(anyC.line2Id, 'line');
-			} else if (anyC.line2Id === 'axis_x' || anyC.line2Id === 'axis_y') {
-				add(anyC.line2Id, 'line');
-			} else {
-				const l2 = this.getLineBetween(anyC.l2P1, anyC.l2P2);
-				if (l2) add(l2.id, 'line');
-			}
-		} else if (c.type === 'point_on_line') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
-			const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
-			if (line) add(line.id, 'line');
-		} else if (c.type === 'point_on_circle') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
-			const cid = anyC.circleId;
-			if (this.circles.has(cid)) add(cid, 'circle');
-			else if (this.arcs.has(cid)) add(cid, 'arc');
-		} else if (c.type === 'point_on_ellipse') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
-			const eid = anyC.ellipseId;
-			if (this.ellipses.has(eid)) add(eid, 'ellipse');
-			else if (this.ellipticalArcs.has(eid)) add(eid, 'elliptical_arc');
-		} else if (c.type === 'point_on_spline') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
-			const sid = anyC.splineId;
-			if (this.splines.has(sid)) add(sid, 'spline');
-		} else if (c.type === 'tangent_line_circle') {
-			const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
-			if (line) add(line.id, 'line');
-			const cid = anyC.circleId;
-			if (this.circles.has(cid)) add(cid, 'circle');
-			else if (this.arcs.has(cid)) add(cid, 'arc');
-		} else if (c.type === 'tangent_circle_circle') {
-			const c1 = anyC.circle1Id;
-			if (this.circles.has(c1)) add(c1, 'circle');
-			else if (this.arcs.has(c1)) add(c1, 'arc');
-			const c2 = anyC.circle2Id;
-			if (this.circles.has(c2)) add(c2, 'circle');
-			else if (this.arcs.has(c2)) add(c2, 'arc');
-		} else if (c.type === 'concentric') {
-			const e1 =
-				[...this.circles.values()].find(circ => circ.centerId === anyC.c1CenterId) ??
-				[...this.arcs.values()].find(arc => arc.centerId === anyC.c1CenterId);
-			if (e1) {
-				add(e1.id, this.circles.has(e1.id) ? 'circle' : 'arc');
-			} else if (anyC.c1CenterId && this.points.has(anyC.c1CenterId)) {
-				add(anyC.c1CenterId, 'point');
-			}
-
-			const e2 =
-				[...this.circles.values()].find(circ => circ.centerId === anyC.c2CenterId) ??
-				[...this.arcs.values()].find(arc => arc.centerId === anyC.c2CenterId);
-			if (e2) {
-				add(e2.id, this.circles.has(e2.id) ? 'circle' : 'arc');
-			} else if (anyC.c2CenterId && this.points.has(anyC.c2CenterId)) {
-				add(anyC.c2CenterId, 'point');
-			}
-		} else if (c.type === 'midpoint') {
-			if (anyC.midId && this.points.has(anyC.midId)) add(anyC.midId, 'point');
-			const line = this.getLineBetween(anyC.p1Id, anyC.p2Id);
-			if (line) {
-				add(line.id, 'line');
-			} else {
-				if (anyC.p1Id && this.points.has(anyC.p1Id)) add(anyC.p1Id, 'point');
-				if (anyC.p2Id && this.points.has(anyC.p2Id)) add(anyC.p2Id, 'point');
-			}
-		} else if (c.type === 'ellipse_axis') {
-			if (anyC.ellipseId) {
-				if (this.ellipses.has(anyC.ellipseId)) add(anyC.ellipseId, 'ellipse');
-				else if (this.ellipticalArcs.has(anyC.ellipseId)) add(anyC.ellipseId, 'elliptical_arc');
-			}
-		} else if (c.type === 'elliptical_arc_endpoints') {
-			if (anyC.arcId && this.ellipticalArcs.has(anyC.arcId)) {
-				add(anyC.arcId, 'elliptical_arc');
-			}
-		} else if (c.type === 'offset') {
-			for (const id of c.entityIds) {
-				if (this.lines.has(id)) add(id, 'line');
-				else if (this.circles.has(id)) add(id, 'circle');
-				else if (this.arcs.has(id)) add(id, 'arc');
-				else if (this.ellipses.has(id)) add(id, 'ellipse');
-				else if (this.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
-				else if (this.splines.has(id)) add(id, 'spline');
-				else if (this.points.has(id)) add(id, 'point');
-			}
-		} else if (c.type === 'origin_distance') {
-			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
-			if (anyC.orientation === 'vertical') {
-				add('axis_x', 'line');
-			} else if (anyC.orientation === 'horizontal') {
-				add('axis_y', 'line');
-			} else {
-				add('origin', 'point');
-			}
-		} else if (c.type === 'line_to_axis_distance') {
-			if (anyC.lineId && this.lines.has(anyC.lineId)) add(anyC.lineId, 'line');
-			add(anyC.axis === 'x' ? 'axis_x' : 'axis_y', 'line');
-		}
-
-		// Safety net: check if any primitive in the sketch considers this constraint related
-		for (const l of this.lines.values()) {
-			if (this.getConstraintsForEntity('line', l.id).some(sc => sc.id === c.id)) add(l.id, 'line');
-		}
-		for (const circ of this.circles.values()) {
-			if (this.getConstraintsForEntity('circle', circ.id).some(sc => sc.id === c.id)) add(circ.id, 'circle');
-		}
-		for (const a of this.arcs.values()) {
-			if (this.getConstraintsForEntity('arc', a.id).some(sc => sc.id === c.id)) add(a.id, 'arc');
-		}
-		for (const el of this.ellipses.values()) {
-			if (this.getConstraintsForEntity('ellipse', el.id).some(sc => sc.id === c.id)) add(el.id, 'ellipse');
-		}
-		for (const ea of this.ellipticalArcs.values()) {
-			if (this.getConstraintsForEntity('elliptical_arc', ea.id).some(sc => sc.id === c.id)) add(ea.id, 'elliptical_arc');
-		}
-		for (const s of this.splines.values()) {
-			if (this.getConstraintsForEntity('spline', s.id).some(sc => sc.id === c.id)) add(s.id, 'spline');
-		}
-		for (const pt of this.points.values()) {
-			if (this.getConstraintsForEntity('point', pt.id).some(sc => sc.id === c.id)) add(pt.id, 'point');
-		}
-
-		return res;
+		return getEntitiesForConstraint(this, c);
 	}
 
 	isEntitySelected(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint'
+		type: SelectableEntityType
 	): boolean {
-		switch (type) {
-			case 'point': return this.selection.pointIds.has(id);
-			case 'line': return this.selection.lineIds.has(id);
-			case 'circle': return this.selection.circleIds.has(id);
-			case 'arc': return this.selection.arcIds.has(id);
-			case 'ellipse': return this.selection.ellipseIds.has(id);
-			case 'elliptical_arc': return this.selection.ellipticalArcIds.has(id);
-			case 'spline': return this.selection.splineIds.has(id);
-			case 'constraint': return this.selection.constraintIds.has(id);
-			default: return false;
-		}
+		return isEntitySelected(this, id, type);
 	}
 
 	deselectEntity(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint'
+		type: SelectableEntityType
 	): void {
-		switch (type) {
-			case 'point':
-				this.selection.pointIds.delete(id);
-				break;
-			case 'line':
-				this.selection.lineIds.delete(id);
-				break;
-			case 'circle':
-				this.selection.circleIds.delete(id);
-				break;
-			case 'arc':
-				this.selection.arcIds.delete(id);
-				break;
-			case 'ellipse':
-				this.selection.ellipseIds.delete(id);
-				break;
-			case 'elliptical_arc':
-				this.selection.ellipticalArcIds.delete(id);
-				break;
-			case 'spline':
-				this.selection.splineIds.delete(id);
-				break;
-			case 'constraint':
-				this.selection.constraintIds.delete(id);
-				break;
-		}
-
-		if (type !== 'constraint') {
-			for (const c of this.getConstraintsForEntity(type as any, id)) {
-				const otherEntities = this.getEntitiesForConstraint(c);
-				const stillSelected = otherEntities.some(ent => this.isEntitySelected(ent.id, ent.type));
-				if (!stillSelected) {
-					this.selection.constraintIds.delete(c.id);
-				}
-			}
-		}
-
-		this.notify();
+		deselectEntity(this, id, type);
 	}
 
 	toggleEntitySelection(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint'
+		type: SelectableEntityType
 	): void {
-		if (this.isEntitySelected(id, type)) {
-			this.deselectEntity(id, type);
-		} else {
-			this.selectEntity(id, type, true);
-		}
+		toggleEntitySelection(this, id, type);
 	}
 
 	selectEntities(
 		items: Array<{
 			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
+			type: SelectableEntityType;
 		}>,
 		multiSelect = false
 	): void {
-		if (!multiSelect) {
-			this.selection.pointIds.clear();
-			this.selection.lineIds.clear();
-			this.selection.circleIds.clear();
-			this.selection.arcIds.clear();
-			this.selection.ellipseIds.clear();
-			this.selection.ellipticalArcIds.clear();
-			this.selection.splineIds.clear();
-			this.selection.constraintIds.clear();
-		}
-
-		for (const item of items) {
-			if (item.type === 'point') {
-				this.selection.pointIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('point', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'line') {
-				this.selection.lineIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('line', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'circle') {
-				this.selection.circleIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('circle', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'arc') {
-				this.selection.arcIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('arc', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'ellipse') {
-				this.selection.ellipseIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('ellipse', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'elliptical_arc') {
-				this.selection.ellipticalArcIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('elliptical_arc', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'spline') {
-				this.selection.splineIds.add(item.id);
-				for (const c of this.getConstraintsForEntity('spline', item.id)) {
-					this.selection.constraintIds.add(c.id);
-				}
-			} else if (item.type === 'constraint') {
-				this.selection.constraintIds.add(item.id);
-			}
-		}
-
-		this.notify();
+		selectEntities(this, items, multiSelect);
 	}
 
 	selectEntity(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint',
+		type: SelectableEntityType,
 		multiSelect = false
 	): void {
-		this.selectEntities([{ id, type }], multiSelect);
+		selectEntity(this, id, type, multiSelect);
 	}
 
 	clear(): void {
@@ -5027,380 +3332,23 @@ export class SketchDocument {
 	}
 
 	clearSelection(): void {
-		this.selection.pointIds.clear();
-		this.selection.lineIds.clear();
-		this.selection.circleIds.clear();
-		this.selection.arcIds.clear();
-		this.selection.ellipseIds.clear();
-		this.selection.ellipticalArcIds.clear();
-		this.selection.splineIds.clear();
-		this.selection.constraintIds.clear();
-		this.notify();
+		clearSelection(this);
 	}
 
 	getSelectedPrimitives(): Array<{ id: string; isConstruction?: boolean }> {
-		const list: Array<{ id: string; isConstruction?: boolean }> = [];
-		for (const id of this.selection.lineIds) {
-			const l = this.lines.get(id);
-			if (l) list.push(l);
-		}
-		for (const id of this.selection.circleIds) {
-			const c = this.circles.get(id);
-			if (c) list.push(c);
-		}
-		for (const id of this.selection.arcIds) {
-			const a = this.arcs.get(id);
-			if (a) list.push(a);
-		}
-		for (const id of this.selection.ellipseIds) {
-			const el = this.ellipses.get(id);
-			if (el) list.push(el);
-		}
-		for (const id of this.selection.ellipticalArcIds) {
-			const ea = this.ellipticalArcs.get(id);
-			if (ea) list.push(ea);
-		}
-		for (const id of this.selection.splineIds) {
-			const s = this.splines.get(id);
-			if (s) list.push(s);
-		}
-		for (const id of this.selection.pointIds) {
-			const p = this.points.get(id);
-			if (p) list.push(p);
-		}
-		return list;
+		return getSelectedPrimitives(this);
 	}
 
 	getSelectedConstructionState(): boolean | null {
-		const primitives = this.getSelectedPrimitives();
-		if (primitives.length === 0) return null;
-		return primitives.every(p => !!p.isConstruction);
+		return getSelectedConstructionState(this);
 	}
 
 	deleteSelected(): void {
-		const hasSelection =
-			this.selection.pointIds.size > 0 ||
-			this.selection.lineIds.size > 0 ||
-			this.selection.circleIds.size > 0 ||
-			this.selection.arcIds.size > 0 ||
-			this.selection.ellipseIds.size > 0 ||
-			this.selection.ellipticalArcIds.size > 0 ||
-			this.selection.splineIds.size > 0 ||
-			this.selection.constraintIds.size > 0;
-
-		if (!hasSelection) return;
-
-		this.beginTransaction();
-		const selectedPoints = [...this.selection.pointIds];
-		const selectedLines = [...this.selection.lineIds];
-		const selectedCircles = [...this.selection.circleIds];
-		const selectedArcs = [...this.selection.arcIds];
-		const selectedEllipses = [...this.selection.ellipseIds];
-		const selectedEllipticalArcs = [...this.selection.ellipticalArcIds];
-		const selectedSplines = [...this.selection.splineIds];
-		const selectedConstraints = [...this.selection.constraintIds].filter(cid => {
-			const c = this.constraints.get(cid);
-			return c ? !this.isSplineInternalConstraint(c) : true;
-		});
-
-		const selectedSplinesSet = new Set(selectedSplines);
-
-		// Do not delete tangent lines directly unless parent spline is also being deleted
-		const filteredLines = selectedLines.filter(lid => {
-			const line = this.lines.get(lid);
-			if (line?.isSplineHandle) {
-				if (!line.parentSplineId || !selectedSplinesSet.has(line.parentSplineId)) {
-					this.selection.lineIds.delete(lid);
-					return false;
-				}
-			}
-			return true;
-		});
-
-		// Do not delete tangent handle points directly unless parent spline is also being deleted
-		const filteredPoints = selectedPoints.filter(pid => {
-			if (this.isSplineHandlePoint(pid)) {
-				let parentSplineSelected = false;
-				for (const line of this.lines.values()) {
-					if (line.isSplineHandle && (line.p1Id === pid || line.p2Id === pid)) {
-						if (line.parentSplineId && selectedSplinesSet.has(line.parentSplineId)) {
-							parentSplineSelected = true;
-							break;
-						}
-					}
-				}
-				if (!parentSplineSelected) {
-					this.selection.pointIds.delete(pid);
-					return false;
-				}
-			}
-			return true;
-		});
-
-		// Collect all candidate points from all selected primitives before deleting
-		const candidatePointIds = new Set<string>();
-		for (const id of filteredLines) {
-			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-		}
-		for (const id of selectedCircles) {
-			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-		}
-		for (const id of selectedArcs) {
-			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-		}
-		for (const id of selectedEllipses) {
-			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-		}
-		for (const id of selectedEllipticalArcs) {
-			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-		}
-		for (const id of selectedSplines) {
-			for (const ptId of this.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-		}
-
-		for (const id of selectedConstraints) this.removeConstraint(id);
-		for (const id of filteredLines) this.removeEntity(id);
-		for (const id of selectedCircles) this.removeEntity(id);
-		for (const id of selectedArcs) this.removeEntity(id);
-		for (const id of selectedEllipses) this.removeEntity(id);
-		for (const id of selectedEllipticalArcs) this.removeEntity(id);
-		for (const id of selectedSplines) this.removeEntity(id);
-		for (const id of filteredPoints) this.removeEntity(id);
-
-		// Final sweep for any candidate points that became unused across the batch
-		for (const ptId of candidatePointIds) {
-			if (this.points.has(ptId) && !this.isPointUsed(ptId)) {
-				this.points.delete(ptId);
-				this.selection.pointIds.delete(ptId);
-			}
-		}
-
-		this.cleanOrphanConstraints();
-
-		this.clearSelection();
-		this.rebuildParamManager();
-		this.solve();
-		this.commitTransaction();
+		deleteSelected(this);
 	}
 
 	exportSVG(viewportState?: { panX: number; panY: number; zoom: number }): string {
-		const metadataPayload: SketchFileMetadata = {
-			format: 'svg-sketcher',
-			version: 1,
-			generator: 'SVG Sketcher',
-			createdAt: new Date().toISOString(),
-			viewport: viewportState,
-			snapshot: this.takeSnapshot(),
-		};
-
-		const jsonString = JSON.stringify(metadataPayload, null, 2).replace(/]]>/g, ']]]]><![CDATA[>');
-
-		// Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
-		const elements: string[] = [];
-
-		const usedPoints = new Set<string>();
-
-		for (const line of this.lines.values()) {
-			if (line.isSplineHandle) continue;
-			usedPoints.add(line.p1Id);
-			usedPoints.add(line.p2Id);
-			const p1 = this.points.get(line.p1Id);
-			const p2 = this.points.get(line.p2Id);
-			if (p1 && p2) {
-				const dash = line.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
-				elements.push(
-					`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" />`
-				);
-			}
-		}
-
-		for (const circ of this.circles.values()) {
-			usedPoints.add(circ.centerId);
-			const center = this.points.get(circ.centerId);
-			if (center) {
-				const dash = circ.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
-				elements.push(
-					`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
-				);
-			}
-		}
-
-		for (const arc of this.arcs.values()) {
-			usedPoints.add(arc.centerId);
-			usedPoints.add(arc.startPointId);
-			usedPoints.add(arc.endPointId);
-			const center = this.points.get(arc.centerId);
-			const start = this.points.get(arc.startPointId);
-			const end = this.points.get(arc.endPointId);
-			if (center && start && end) {
-				// Convert to SVG coordinates (Y-down)
-				const sc = { x: center.x, y: -center.y };
-				const ss = { x: start.x, y: -start.y };
-				const se = { x: end.x, y: -end.y };
-
-				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-				const clockwise = !!arc.clockwise;
-
-				let sweepAngle = 0;
-				let sweepFlag = 0;
-				if (clockwise) {
-					sweepAngle = (ae - as) % (2 * Math.PI);
-					if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-					sweepFlag = 1;
-				} else {
-					sweepAngle = (as - ae) % (2 * Math.PI);
-					if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-					sweepFlag = 0;
-				}
-				const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
-				const dash = arc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
-				elements.push(
-					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
-				);
-			}
-		}
-
-		for (const el of this.ellipses.values()) {
-			usedPoints.add(el.centerId);
-			usedPoints.add(el.majorAxisPointId);
-			usedPoints.add(el.minorAxisPointId);
-			const center = this.points.get(el.centerId);
-			const maj = this.points.get(el.majorAxisPointId);
-			const min = this.points.get(el.minorAxisPointId);
-			if (center && maj && min) {
-				const sc = { x: center.x, y: -center.y };
-				const smaj = { x: maj.x, y: -maj.y };
-				const smin = { x: min.x, y: -min.y };
-				const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-				const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-				const deg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
-				const dash = el.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
-				elements.push(
-					`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="2" fill="none" />`
-				);
-			}
-		}
-
-		for (const elarc of this.ellipticalArcs.values()) {
-			usedPoints.add(elarc.centerId);
-			usedPoints.add(elarc.majorAxisPointId);
-			usedPoints.add(elarc.minorAxisPointId);
-			usedPoints.add(elarc.startPointId);
-			usedPoints.add(elarc.endPointId);
-			const center = this.points.get(elarc.centerId);
-			const maj = this.points.get(elarc.majorAxisPointId);
-			const min = this.points.get(elarc.minorAxisPointId);
-			const start = this.points.get(elarc.startPointId);
-			const end = this.points.get(elarc.endPointId);
-			if (center && maj && min && start && end) {
-				const sc = { x: center.x, y: -center.y };
-				const smaj = { x: maj.x, y: -maj.y };
-				const smin = { x: min.x, y: -min.y };
-				const ss = { x: start.x, y: -start.y };
-				const se = { x: end.x, y: -end.y };
-
-				const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-				const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-				const thetaDeg = (theta * 180) / Math.PI;
-
-				const ux = Math.cos(theta);
-				const uy = Math.sin(theta);
-				const vx = -Math.sin(theta);
-				const vy = Math.cos(theta);
-
-				const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-				const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-				const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-				const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
-
-				const ts = Math.atan2(vs / ry, us / rx);
-				const te = Math.atan2(ve / ry, ue / rx);
-
-				const clockwise = !!elarc.clockwise;
-				let sweepAngle = 0;
-				let sweepFlag = 0;
-				if (clockwise) {
-					sweepAngle = (te - ts) % (2 * Math.PI);
-					if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-					sweepFlag = 1;
-				} else {
-					sweepAngle = (ts - te) % (2 * Math.PI);
-					if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-					sweepFlag = 0;
-				}
-				const largeArc = sweepAngle > Math.PI ? 1 : 0;
-				const dash = elarc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
-				elements.push(
-					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
-				);
-			}
-		}
-
-		for (const spline of this.splines.values()) {
-			for (const pid of spline.pointIds) usedPoints.add(pid);
-			if (spline.tangentLineIds) {
-				for (const lid of spline.tangentLineIds) {
-					const l = this.lines.get(lid);
-					if (l) {
-						usedPoints.add(l.p1Id);
-						usedPoints.add(l.p2Id);
-					}
-				}
-			}
-			const pts = spline.pointIds.map(id => this.points.get(id)).filter(Boolean) as SketchPoint[];
-			if (pts.length >= 2) {
-				let segments: BezierSegment[] = [];
-				if (spline.splineType === 'control') {
-					segments = bsplineToBezier(pts.map(p => ({ x: p.x, y: -p.y })), spline.knots);
-				} else {
-					const handles = (spline.tangentLineIds || []).map(lid => {
-						const line = this.lines.get(lid);
-						if (!line) return null;
-						const p1 = this.points.get(line.p1Id);
-						const p2 = this.points.get(line.p2Id);
-						if (!p1 || !p2) return null;
-						return {
-							h1: { x: p1.x, y: -p1.y },
-							h2: { x: p2.x, y: -p2.y },
-						};
-					});
-					segments = fitPointsToBezier(pts.map(p => ({ x: p.x, y: -p.y })), handles);
-				}
-				const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
-				const dash = spline.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
-				elements.push(
-					`<path d="${d}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
-				);
-			}
-		}
-
-		// Export isolated points
-		for (const pt of this.points.values()) {
-			if (!usedPoints.has(pt.id)) {
-				const fill = '#0f172a';
-				elements.push(
-					`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`
-				);
-			}
-		}
-
-		const bbox = this.getBoundingBox();
-		let viewBox = '-100 -100 200 200';
-
-		if (bbox) {
-			const w = bbox.maxX - bbox.minX;
-			const h = bbox.maxY - bbox.minY;
-			const padding = Math.max(10, Math.max(w, h) * 0.05);
-			const minX = bbox.minX - padding;
-			const minY = -bbox.maxY - padding;
-			const vbWidth = Math.max(w + padding * 2, 20);
-			const vbHeight = Math.max(h + padding * 2, 20);
-			viewBox = `${minX.toFixed(2)} ${minY.toFixed(2)} ${vbWidth.toFixed(2)} ${vbHeight.toFixed(2)}`;
-		}
-
-		return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  <metadata id="sketcher-metadata">\n    <![CDATA[\n${jsonString}\n    ]]>\n  </metadata>\n  ${elements.join('\n  ')}\n</svg>`;
+		return exportSketchToSVG(this, viewportState);
 	}
 
 	importSVG(svgString: string): {
@@ -5408,317 +3356,15 @@ export class SketchDocument {
 		viewport?: { panX: number; panY: number; zoom: number };
 		error?: string;
 	} {
-		try {
-			if (typeof DOMParser !== 'undefined') {
-				const parser = new DOMParser();
-				const doc = parser.parseFromString(svgString, 'image/svg+xml');
-				const parserError = doc.querySelector('parsererror');
-				if (parserError) {
-					return { success: false, error: 'Invalid SVG XML structure' };
-				}
-
-				// Find sketcher metadata element
-				let metaEl: Element | null = doc.getElementById('sketcher-metadata') || doc.querySelector('metadata#sketcher-metadata');
-				if (!metaEl) {
-					const allMetadata = doc.querySelectorAll('metadata');
-					for (let i = 0; i < allMetadata.length; i++) {
-						const el = allMetadata[i];
-						if (el.textContent && el.textContent.includes('"format"') && el.textContent.includes('svg-sketcher')) {
-							metaEl = el;
-							break;
-						}
-					}
-				}
-
-				if (!metaEl || !metaEl.textContent) {
-					return { success: false, error: 'No parametric CAD metadata found in SVG' };
-				}
-
-				const rawText = metaEl.textContent.trim();
-				const data = JSON.parse(rawText) as SketchFileMetadata;
-
-				if (data.format !== 'svg-sketcher' || !data.snapshot) {
-					return { success: false, error: 'Unsupported sketch metadata format' };
-				}
-
-				this.restoreSnapshot(data.snapshot);
-				this.clearHistory();
-
-				return {
-					success: true,
-					viewport: data.viewport,
-				};
-			}
-
-			// Fallback (e.g. Node.js environment where DOMParser is not in global scope)
-			const match =
-				svgString.match(/<metadata[^>]*id="sketcher-metadata"[^>]*>([\s\S]*?)<\/metadata>/i) ||
-				svgString.match(/<metadata[^>]*>([\s\S]*?)<\/metadata>/i);
-			if (match) {
-				let text = match[1].trim();
-				const cdataMatch = text.match(/<!\[CDATA\[([\s\S]*?)\]\]>/);
-				if (cdataMatch) {
-					text = cdataMatch[1].trim();
-				}
-				const data = JSON.parse(text) as SketchFileMetadata;
-				if (data.format === 'svg-sketcher' && data.snapshot) {
-					this.restoreSnapshot(data.snapshot);
-					this.clearHistory();
-					return { success: true, viewport: data.viewport };
-				}
-			}
-			return { success: false, error: 'No parametric CAD metadata found in SVG' };
-		} catch (err) {
-			return {
-				success: false,
-				error: err instanceof Error ? err.message : 'Failed to parse SVG metadata',
-			};
-		}
+		return importSketchFromSVG(this, svgString);
 	}
 
 	getBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
-		if (this.points.size === 0) return null;
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-
-		for (const p of this.points.values()) {
-			if (p.x < minX) minX = p.x;
-			if (p.x > maxX) maxX = p.x;
-			if (p.y < minY) minY = p.y;
-			if (p.y > maxY) maxY = p.y;
-		}
-
-		for (const c of this.circles.values()) {
-			const center = this.points.get(c.centerId);
-			if (center) {
-				if (center.x - c.radius < minX) minX = center.x - c.radius;
-				if (center.x + c.radius > maxX) maxX = center.x + c.radius;
-				if (center.y - c.radius < minY) minY = center.y - c.radius;
-				if (center.y + c.radius > maxY) maxY = center.y + c.radius;
-			}
-		}
-
-		for (const a of this.arcs.values()) {
-			const center = this.points.get(a.centerId);
-			if (center) {
-				if (center.x - a.radius < minX) minX = center.x - a.radius;
-				if (center.x + a.radius > maxX) maxX = center.x + a.radius;
-				if (center.y - a.radius < minY) minY = center.y - a.radius;
-				if (center.y + a.radius > maxY) maxY = center.y + a.radius;
-			}
-		}
-
-		for (const e of this.ellipses.values()) {
-			const center = this.points.get(e.centerId);
-			const maj = this.points.get(e.majorAxisPointId);
-			const min = this.points.get(e.minorAxisPointId);
-			if (center && maj && min) {
-				const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
-				const ry = Math.hypot(min.x - center.x, min.y - center.y);
-				const rMax = Math.max(rx, ry);
-				if (center.x - rMax < minX) minX = center.x - rMax;
-				if (center.x + rMax > maxX) maxX = center.x + rMax;
-				if (center.y - rMax < minY) minY = center.y - rMax;
-				if (center.y + rMax > maxY) maxY = center.y + rMax;
-			}
-		}
-
-		for (const ea of this.ellipticalArcs.values()) {
-			const center = this.points.get(ea.centerId);
-			const maj = this.points.get(ea.majorAxisPointId);
-			const min = this.points.get(ea.minorAxisPointId);
-			if (center && maj && min) {
-				const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
-				const ry = Math.hypot(min.x - center.x, min.y - center.y);
-				const rMax = Math.max(rx, ry);
-				if (center.x - rMax < minX) minX = center.x - rMax;
-				if (center.x + rMax > maxX) maxX = center.x + rMax;
-				if (center.y - rMax < minY) minY = center.y - rMax;
-				if (center.y + rMax > maxY) maxY = center.y + rMax;
-			}
-		}
-
-		if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
-			return null;
-		}
-		return { minX, minY, maxX, maxY };
+		return getBoundingBox(this);
 	}
 
 	getSelectionBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-		let count = 0;
-
-		const includePoint = (p?: SketchPoint | null) => {
-			if (!p) return;
-			if (p.x < minX) minX = p.x;
-			if (p.x > maxX) maxX = p.x;
-			if (p.y < minY) minY = p.y;
-			if (p.y > maxY) maxY = p.y;
-			count++;
-		};
-
-		for (const pid of this.selection.pointIds) {
-			includePoint(this.points.get(pid));
-		}
-
-		for (const lid of this.selection.lineIds) {
-			const l = this.lines.get(lid);
-			if (l) {
-				includePoint(this.points.get(l.p1Id));
-				includePoint(this.points.get(l.p2Id));
-			}
-		}
-
-		for (const cid of this.selection.circleIds) {
-			const c = this.circles.get(cid);
-			if (c) {
-				const center = this.points.get(c.centerId);
-				if (center) {
-					if (center.x - c.radius < minX) minX = center.x - c.radius;
-					if (center.x + c.radius > maxX) maxX = center.x + c.radius;
-					if (center.y - c.radius < minY) minY = center.y - c.radius;
-					if (center.y + c.radius > maxY) maxY = center.y + c.radius;
-					count++;
-				}
-			}
-		}
-
-		for (const aid of this.selection.arcIds) {
-			const a = this.arcs.get(aid);
-			if (a) {
-				const center = this.points.get(a.centerId);
-				if (center) {
-					if (center.x - a.radius < minX) minX = center.x - a.radius;
-					if (center.x + a.radius > maxX) maxX = center.x + a.radius;
-					if (center.y - a.radius < minY) minY = center.y - a.radius;
-					if (center.y + a.radius > maxY) maxY = center.y + a.radius;
-					count++;
-				}
-				includePoint(this.points.get(a.startPointId));
-				includePoint(this.points.get(a.endPointId));
-			}
-		}
-
-		for (const eid of this.selection.ellipseIds) {
-			const e = this.ellipses.get(eid);
-			if (e) {
-				const center = this.points.get(e.centerId);
-				const maj = this.points.get(e.majorAxisPointId);
-				const min = this.points.get(e.minorAxisPointId);
-				if (center && maj && min) {
-					const ux = maj.x - center.x;
-					const uy = maj.y - center.y;
-					const vx = min.x - center.x;
-					const vy = min.y - center.y;
-					const dx = Math.sqrt(ux * ux + vx * vx);
-					const dy = Math.sqrt(uy * uy + vy * vy);
-					if (center.x - dx < minX) minX = center.x - dx;
-					if (center.x + dx > maxX) maxX = center.x + dx;
-					if (center.y - dy < minY) minY = center.y - dy;
-					if (center.y + dy > maxY) maxY = center.y + dy;
-					count++;
-				}
-			}
-		}
-
-		for (const eaid of this.selection.ellipticalArcIds) {
-			const ea = this.ellipticalArcs.get(eaid);
-			if (ea) {
-				const center = this.points.get(ea.centerId);
-				const maj = this.points.get(ea.majorAxisPointId);
-				const min = this.points.get(ea.minorAxisPointId);
-				if (center && maj && min) {
-					const ux = maj.x - center.x;
-					const uy = maj.y - center.y;
-					const vx = min.x - center.x;
-					const vy = min.y - center.y;
-					const dx = Math.sqrt(ux * ux + vx * vx);
-					const dy = Math.sqrt(uy * uy + vy * vy);
-					if (center.x - dx < minX) minX = center.x - dx;
-					if (center.x + dx > maxX) maxX = center.x + dx;
-					if (center.y - dy < minY) minY = center.y - dy;
-					if (center.y + dy > maxY) maxY = center.y + dy;
-					count++;
-				}
-				includePoint(this.points.get(ea.startPointId));
-				includePoint(this.points.get(ea.endPointId));
-			}
-		}
-
-		for (const sid of this.selection.splineIds) {
-			const s = this.splines.get(sid);
-			if (s) {
-				for (const pid of s.pointIds) {
-					includePoint(this.points.get(pid));
-				}
-				if (s.tangentLineIds) {
-					for (const lid of s.tangentLineIds) {
-						const l = this.lines.get(lid);
-						if (l) {
-							includePoint(this.points.get(l.p1Id));
-							includePoint(this.points.get(l.p2Id));
-						}
-					}
-				}
-			}
-		}
-
-		if (count === 0 && this.selection.constraintIds.size > 0) {
-			for (const cid of this.selection.constraintIds) {
-				const c = this.constraints.get(cid);
-				if (c) {
-					const entities = this.getEntitiesForConstraint(c);
-					for (const ent of entities) {
-						if (ent.type === 'point') {
-							includePoint(this.points.get(ent.id));
-						} else if (ent.type === 'line') {
-							const l = this.lines.get(ent.id);
-							if (l) {
-								includePoint(this.points.get(l.p1Id));
-								includePoint(this.points.get(l.p2Id));
-							}
-						} else if (ent.type === 'circle') {
-							const circle = this.circles.get(ent.id);
-							if (circle) {
-								const center = this.points.get(circle.centerId);
-								if (center) {
-									if (center.x - circle.radius < minX) minX = center.x - circle.radius;
-									if (center.x + circle.radius > maxX) maxX = center.x + circle.radius;
-									if (center.y - circle.radius < minY) minY = center.y - circle.radius;
-									if (center.y + circle.radius > maxY) maxY = center.y + circle.radius;
-									count++;
-								}
-							}
-						} else if (ent.type === 'arc') {
-							const arc = this.arcs.get(ent.id);
-							if (arc) {
-								const center = this.points.get(arc.centerId);
-								if (center) {
-									if (center.x - arc.radius < minX) minX = center.x - arc.radius;
-									if (center.x + arc.radius > maxX) maxX = center.x + arc.radius;
-									if (center.y - arc.radius < minY) minY = center.y - arc.radius;
-									if (center.y + arc.radius > maxY) maxY = center.y + arc.radius;
-									count++;
-								}
-								includePoint(this.points.get(arc.startPointId));
-								includePoint(this.points.get(arc.endPointId));
-							}
-						}
-					}
-				}
-			}
-		}
-
-		if (count === 0 || !isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
-			return null;
-		}
-
-		return { minX, minY, maxX, maxY };
+		return getSelectionBoundingBox(this);
 	}
 }
 
