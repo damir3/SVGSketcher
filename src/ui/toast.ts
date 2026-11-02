@@ -9,8 +9,10 @@ export function showToast(msg: string): void {
 	toast.textContent = msg;
 	document.body.appendChild(toast);
 
-	setTimeout(() => {
+	const timer = setTimeout(() => {
 		toast.classList.add('fade-out');
-		setTimeout(() => toast.remove(), 300);
+		const timer2 = setTimeout(() => toast.remove(), 300);
+		if (typeof (timer2 as any)?.unref === 'function') (timer2 as any).unref();
 	}, 2200);
+	if (typeof (timer as any)?.unref === 'function') (timer as any).unref();
 }

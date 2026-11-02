@@ -60,7 +60,9 @@ export class LineTool extends BaseTool {
 				snap !== null &&
 				((snap.type === 'point' && snap.id !== undefined && snap.id !== this.startPointId) ||
 					snap.type === 'line' ||
-					snap.type === 'circle');
+					snap.type === 'circle' ||
+					snap.type === 'ellipse' ||
+					snap.type === 'spline');
 
 			if (hitPrimitive) {
 				this.drawingStep = 0;

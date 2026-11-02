@@ -7,6 +7,8 @@ import {
 	CoincidentConstraint,
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
+	PointOnEllipseConstraint,
+	PointOnSplineConstraint,
 	MidpointConstraint,
 	ParallelConstraint,
 	PerpendicularConstraint,
@@ -644,7 +646,12 @@ export function executeExtend(
 			// while movingPt is still at its current valid position
 			const toRemove: string[] = [];
 			for (const c of sketch.constraints.values()) {
-				if (c instanceof PointOnLineConstraint || c instanceof PointOnCircleConstraint) {
+				if (
+					c instanceof PointOnLineConstraint ||
+					c instanceof PointOnCircleConstraint ||
+					c instanceof PointOnEllipseConstraint ||
+					c instanceof PointOnSplineConstraint
+				) {
 					if (c.pointId === movingEndId) {
 						toRemove.push(c.id);
 					}
@@ -687,6 +694,10 @@ export function executeExtend(
 				sketch.addPointOnLineConstraint(newEndPtId, intersectedCurveId);
 			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
 				sketch.addPointOnCircleConstraint(newEndPtId, intersectedCurveId);
+			} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
+				sketch.addPointOnEllipseConstraint(newEndPtId, intersectedCurveId);
+			} else if (intersectedCurveType === 'spline') {
+				sketch.addPointOnSplineConstraint(newEndPtId, intersectedCurveId);
 			}
 		}
 
@@ -734,7 +745,12 @@ export function executeExtend(
 		} else {
 			const toRemove: string[] = [];
 			for (const c of sketch.constraints.values()) {
-				if (c instanceof PointOnLineConstraint || c instanceof PointOnCircleConstraint) {
+				if (
+					c instanceof PointOnLineConstraint ||
+					c instanceof PointOnCircleConstraint ||
+					c instanceof PointOnEllipseConstraint ||
+					c instanceof PointOnSplineConstraint
+				) {
 					if (c.pointId === movingEndId) {
 						toRemove.push(c.id);
 					}
@@ -753,6 +769,10 @@ export function executeExtend(
 				sketch.addPointOnLineConstraint(newEndPtId, intersectedCurveId);
 			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
 				sketch.addPointOnCircleConstraint(newEndPtId, intersectedCurveId);
+			} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
+				sketch.addPointOnEllipseConstraint(newEndPtId, intersectedCurveId);
+			} else if (intersectedCurveType === 'spline') {
+				sketch.addPointOnSplineConstraint(newEndPtId, intersectedCurveId);
 			}
 		}
 
@@ -865,6 +885,10 @@ export function executeExtend(
 				sketch.addPointOnLineConstraint(newPt.id, intersectedCurveId);
 			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
 				sketch.addPointOnCircleConstraint(newPt.id, intersectedCurveId);
+			} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
+				sketch.addPointOnEllipseConstraint(newPt.id, intersectedCurveId);
+			} else if (intersectedCurveType === 'spline') {
+				sketch.addPointOnSplineConstraint(newPt.id, intersectedCurveId);
 			}
 		}
 

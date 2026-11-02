@@ -45,7 +45,7 @@ export class EllipticalArcTool extends BaseTool {
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
 			let cId: string;
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
 				cId = snap.id;
 				this.centerWorldPos = snap.worldPos;
 			} else {
@@ -106,10 +106,7 @@ export class EllipticalArcTool extends BaseTool {
 				const pt = sketch.addPoint(minX, minY);
 				p2Id = pt.id;
 				this.minWorldPos = vec(pt.x, pt.y);
-				if (snap && snap.type === 'line' && snap.lineId) {
-					sketch.addPointOnLineConstraint(pt.id, snap.lineId);
-					this.ctx.showToast('Point constrained to line');
-				}
+				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 			this.minPtId = p2Id;
 			this.drawingStep = 3;

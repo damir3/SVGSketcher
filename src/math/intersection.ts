@@ -1107,6 +1107,10 @@ export function createCutPoint(
 			sketch.addPointOnLineConstraint(newPt.id, cuttingCurveId);
 		} else if (cuttingCurveType === 'circle' || cuttingCurveType === 'arc') {
 			sketch.addPointOnCircleConstraint(newPt.id, cuttingCurveId);
+		} else if (cuttingCurveType === 'ellipse' || cuttingCurveType === 'elliptical_arc') {
+			sketch.addPointOnEllipseConstraint(newPt.id, cuttingCurveId);
+		} else if (cuttingCurveType === 'spline') {
+			sketch.addPointOnSplineConstraint(newPt.id, cuttingCurveId);
 		}
 	}
 

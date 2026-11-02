@@ -1379,9 +1379,7 @@ export class CanvasInteraction {
 		const geomSnapDistPx = 10;
 		let closestGeomDist = geomSnapDistPx;
 		let foundGeom:
-			| { type: 'line'; lineId: string; worldPos: Vec2; screenPos: Vec2 }
-			| { type: 'circle'; circleId: string; worldPos: Vec2; screenPos: Vec2 }
-			| { type: 'spline'; splineId: string; worldPos: Vec2; screenPos: Vec2 }
+			| { type: 'line' | 'circle' | 'ellipse' | 'spline'; id: string; worldPos: Vec2; screenPos: Vec2 }
 			| null = null;
 
 		for (const line of this.sketch.lines.values()) {
@@ -1410,7 +1408,7 @@ export class CanvasInteraction {
 				);
 				foundGeom = {
 					type: 'line',
-					lineId: line.id,
+					id: line.id,
 					worldPos,
 					screenPos: proj.point,
 				};
@@ -1426,7 +1424,7 @@ export class CanvasInteraction {
 			const worldPos = this.viewport.screenToWorld(projScreen.x, projScreen.y);
 			foundGeom = {
 				type: 'line',
-				lineId: 'axis_x',
+				id: 'axis_x',
 				worldPos: vec(worldPos.x, 0),
 				screenPos: projScreen,
 			};
@@ -1438,7 +1436,7 @@ export class CanvasInteraction {
 			const worldPos = this.viewport.screenToWorld(projScreen.x, projScreen.y);
 			foundGeom = {
 				type: 'line',
-				lineId: 'axis_y',
+				id: 'axis_y',
 				worldPos: vec(0, worldPos.y),
 				screenPos: projScreen,
 			};
@@ -1468,7 +1466,7 @@ export class CanvasInteraction {
 				const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
 				foundGeom = {
 					type: 'circle',
-					circleId: circle.id,
+					id: circle.id,
 					worldPos,
 					screenPos: snappedScreen,
 				};
@@ -1529,55 +1527,187 @@ export class CanvasInteraction {
 				const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
 				foundGeom = {
 					type: 'circle',
-					circleId: arc.id,
+					id: arc.id,
 					worldPos,
 					screenPos: snappedScreen,
 				};
 			}
 		}
 
-		if (!isConstraintTool(this.activeTool)) {
-			for (const spline of this.sketch.splines.values()) {
-				const screenSegments = this.getSplineScreenSegments(spline);
-				if (!screenSegments) continue;
+		// Snap to Ellipses
+		for (const ellipse of this.sketch.ellipses.values()) {
+			if (
+				excludePointId &&
+				(ellipse.centerId === excludePointId ||
+					ellipse.majorAxisPointId === excludePointId ||
+					ellipse.minorAxisPointId === excludePointId)
+			) {
+				continue;
+			}
+			const center = this.sketch.points.get(ellipse.centerId);
+			const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
+			const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
+			if (!center || !majorPt || !minorPt) continue;
 
-				const proj = getSplineParamAtPoint(screenSegments, screenPos);
-				if (proj.distance < closestGeomDist) {
-					closestGeomDist = proj.distance;
-					const worldPos = this.viewport.screenToWorld(proj.point.x, proj.point.y);
+			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
+			const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+
+			const uX = smaj.x - sc.x;
+			const uY = smaj.y - sc.y;
+			const vX = smin.x - sc.x;
+			const vY = smin.y - sc.y;
+
+			const rx = Math.hypot(uX, uY);
+			const ry = Math.hypot(vX, vY);
+			if (rx < 1 || ry < 1) continue;
+
+			const uHatX = uX / rx;
+			const uHatY = uY / rx;
+			const vHatX = vX / ry;
+			const vHatY = vY / ry;
+
+			const dx = screenPos.x - sc.x;
+			const dy = screenPos.y - sc.y;
+			const u = dx * uHatX + dy * uHatY;
+			const v = dx * vHatX + dy * vHatY;
+
+			const t = Math.atan2(v / ry, u / rx);
+			const uProj = rx * Math.cos(t);
+			const vProj = ry * Math.sin(t);
+
+			const snappedScreen = vec(sc.x + uProj * uHatX + vProj * vHatX, sc.y + uProj * uHatY + vProj * vHatY);
+			const dToPerimeter = dist(screenPos, snappedScreen);
+
+			if (dToPerimeter < closestGeomDist) {
+				closestGeomDist = dToPerimeter;
+				const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+				foundGeom = {
+					type: 'ellipse',
+					id: ellipse.id,
+					worldPos,
+					screenPos: snappedScreen,
+				};
+			}
+		}
+
+		// Snap to Elliptical Arcs
+		for (const arc of this.sketch.ellipticalArcs.values()) {
+			if (
+				excludePointId &&
+				(arc.centerId === excludePointId ||
+					arc.majorAxisPointId === excludePointId ||
+					arc.minorAxisPointId === excludePointId ||
+					arc.startPointId === excludePointId ||
+					arc.endPointId === excludePointId)
+			) {
+				continue;
+			}
+			const center = this.sketch.points.get(arc.centerId);
+			const majorPt = this.sketch.points.get(arc.majorAxisPointId);
+			const minorPt = this.sketch.points.get(arc.minorAxisPointId);
+			const startPt = this.sketch.points.get(arc.startPointId);
+			const endPt = this.sketch.points.get(arc.endPointId);
+			if (!center || !majorPt || !minorPt || !startPt || !endPt) continue;
+
+			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
+			const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+
+			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
+			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+			if (rx < 1 || ry < 1) continue;
+
+			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+			const ux = Math.cos(theta);
+			const uy = Math.sin(theta);
+			const vx = -Math.sin(theta);
+			const vy = Math.cos(theta);
+
+			const dx = screenPos.x - sc.x;
+			const dy = screenPos.y - sc.y;
+			const u = dx * ux + dy * uy;
+			const v = dx * vx + dy * vy;
+
+			const t = Math.atan2(v / ry, u / rx);
+
+			const ss = this.viewport.worldToScreen(startPt.x, startPt.y);
+			const se = this.viewport.worldToScreen(endPt.x, endPt.y);
+			const usScreen = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
+			const vsScreen = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+			const ueScreen = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
+			const veScreen = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+
+			const ts = Math.atan2(vsScreen / ry, usScreen / rx);
+			const te = Math.atan2(veScreen / ry, ueScreen / rx);
+			const clockwise = !!arc.clockwise;
+
+			let sweepAngle = clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
+			let pAngle = clockwise ? (t - ts) % TWO_PI : (ts - t) % TWO_PI;
+			if (pAngle < 0) pAngle += TWO_PI;
+
+			const angTolerance = geomSnapDistPx / Math.max(Math.min(rx, ry), 1);
+			if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
+				const clampedPAngle = pAngle >= TWO_PI - angTolerance ? 0 : Math.min(sweepAngle, Math.max(0, pAngle));
+				const actualT = clockwise ? ts + clampedPAngle : ts - clampedPAngle;
+				const uProj = rx * Math.cos(actualT);
+				const vProj = ry * Math.sin(actualT);
+				const snappedScreen = vec(sc.x + uProj * ux + vProj * vx, sc.y + uProj * uy + vProj * vy);
+				const dToPerimeter = dist(screenPos, snappedScreen);
+
+				if (dToPerimeter < closestGeomDist) {
+					closestGeomDist = dToPerimeter;
+					const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
 					foundGeom = {
-						type: 'spline',
-						splineId: spline.id,
+						type: 'ellipse',
+						id: arc.id,
 						worldPos,
-						screenPos: proj.point,
+						screenPos: snappedScreen,
 					};
 				}
 			}
 		}
 
-		if (foundGeom) {
-			if (foundGeom.type === 'spline') {
-				return {
+		for (const spline of this.sketch.splines.values()) {
+			if (excludePointId && spline.pointIds.includes(excludePointId)) {
+				continue;
+			}
+			if (excludePointId && spline.tangentLineIds) {
+				let isHandlePt = false;
+				for (const lid of spline.tangentLineIds) {
+					const l = this.sketch.lines.get(lid);
+					if (l && (l.p1Id === excludePointId || l.p2Id === excludePointId)) {
+						isHandlePt = true;
+						break;
+					}
+				}
+				if (isHandlePt) continue;
+			}
+
+			const screenSegments = this.getSplineScreenSegments(spline);
+			if (!screenSegments) continue;
+
+			const proj = getSplineParamAtPoint(screenSegments, screenPos);
+			if (proj.distance < closestGeomDist) {
+				closestGeomDist = proj.distance;
+				const worldPos = this.viewport.screenToWorld(proj.point.x, proj.point.y);
+				foundGeom = {
 					type: 'spline',
-					splineId: foundGeom.splineId,
-					worldPos: foundGeom.worldPos,
-					screenPos: foundGeom.screenPos,
-				};
-			} else if (foundGeom.type === 'line') {
-				return {
-					type: 'line',
-					lineId: foundGeom.lineId,
-					worldPos: foundGeom.worldPos,
-					screenPos: foundGeom.screenPos,
-				};
-			} else {
-				return {
-					type: 'circle',
-					circleId: foundGeom.circleId,
-					worldPos: foundGeom.worldPos,
-					screenPos: foundGeom.screenPos,
+					id: spline.id,
+					worldPos,
+					screenPos: proj.point,
 				};
 			}
+		}
+
+		if (foundGeom) {
+			return {
+				type: foundGeom.type,
+				id: foundGeom.id,
+				worldPos: foundGeom.worldPos,
+				screenPos: foundGeom.screenPos,
+			};
 		}
 
 		// Priority 3: Grid snapping
@@ -1617,8 +1747,8 @@ export class CanvasInteraction {
 	}
 
 	private applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void {
-		if (!snap) return;
-		if (snap.type === 'point' && snap.id && snap.id !== pointId) {
+		if (!snap || !snap.id) return;
+		if (snap.type === 'point' && snap.id !== pointId) {
 			if (snap.id === 'origin') {
 				const c = this.sketch.addOriginCoincidentConstraint(pointId);
 				if (c) {
@@ -1630,23 +1760,34 @@ export class CanvasInteraction {
 					showToast('Coincident constraint applied');
 				}
 			}
-		} else if (snap.type === 'line' && snap.lineId) {
-			if (snap.lineId === 'axis_x' || snap.lineId === 'axis_y') {
-				const axis = snap.lineId === 'axis_x' ? 'x' : 'y';
+		} else if (snap.type === 'line') {
+			if (snap.id === 'axis_x' || snap.id === 'axis_y') {
+				const axis = snap.id === 'axis_x' ? 'x' : 'y';
 				const c = this.sketch.addPointOnAxisConstraint(pointId, axis);
 				if (c) {
 					showToast(`Point constrained to ${axis.toUpperCase()}-axis`);
 				}
 			} else {
-				const c = this.sketch.addPointOnLineConstraint(pointId, snap.lineId);
+				const c = this.sketch.addPointOnLineConstraint(pointId, snap.id);
 				if (c) {
 					showToast('Point constrained to line');
 				}
 			}
-		} else if (snap.type === 'circle' && snap.circleId) {
-			const c = this.sketch.addPointOnCircleConstraint(pointId, snap.circleId);
+		} else if (snap.type === 'circle') {
+			const c = this.sketch.addPointOnCircleConstraint(pointId, snap.id);
 			if (c) {
 				showToast('Point constrained to circle');
+			}
+		} else if (snap.type === 'ellipse') {
+			const isArc = this.sketch.ellipticalArcs.has(snap.id);
+			const c = this.sketch.addPointOnEllipseConstraint(pointId, snap.id);
+			if (c) {
+				showToast(isArc ? 'Point constrained to elliptical arc' : 'Point constrained to ellipse');
+			}
+		} else if (snap.type === 'spline') {
+			const c = this.sketch.addPointOnSplineConstraint(pointId, snap.id);
+			if (c) {
+				showToast('Point constrained to spline');
 			}
 		}
 	}
@@ -1699,7 +1840,7 @@ export class CanvasInteraction {
 		if (this.isSnapModifierPressed) {
 			return { pos: targetPos, axis: null };
 		}
-		if (snap && (snap.type === 'point' || snap.type === 'line' || snap.type === 'circle' || snap.type === 'grid')) {
+		if (snap) {
 			return { pos: targetPos, axis: null };
 		}
 
@@ -2829,9 +2970,8 @@ export class CanvasInteraction {
 					const snap = this.findSnap(screen, draggedPtId);
 					if (
 						snap &&
-						((snap.type === 'point' && snap.id && snap.id !== draggedPtId) ||
-							(snap.type === 'line' && snap.lineId) ||
-							(snap.type === 'circle' && snap.circleId))
+						snap.id &&
+						(snap.type !== 'point' || snap.id !== draggedPtId)
 					) {
 						const pt = this.sketch.getPoint(draggedPtId);
 						if (pt) {
@@ -2844,22 +2984,7 @@ export class CanvasInteraction {
 						} else {
 							this.sketch.beginTransaction();
 						}
-						if (snap.type === 'point' && snap.id) {
-							const c = this.sketch.addCoincidentConstraint(draggedPtId, snap.id);
-							if (c) {
-								showToast('Coincident constraint applied');
-							}
-						} else if (snap.type === 'line' && snap.lineId) {
-							const c = this.sketch.addPointOnLineConstraint(draggedPtId, snap.lineId);
-							if (c) {
-								showToast('Point constrained to line');
-							}
-						} else if (snap.type === 'circle' && snap.circleId) {
-							const c = this.sketch.addPointOnCircleConstraint(draggedPtId, snap.circleId);
-							if (c) {
-								showToast('Point constrained to circle');
-							}
-						}
+						this.applySnapConstraintIfNeeded(draggedPtId, snap);
 						this.sketch.commitTransaction();
 					} else if (snap && snap.type === 'grid') {
 						const pt = this.sketch.getPoint(draggedPtId);
@@ -3291,13 +3416,21 @@ export class CanvasInteraction {
 
 	isEntityCompatibleWithConstraint(
 		constraintType: string,
-		entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'
+		entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
 	): boolean {
 		switch (constraintType) {
 			case 'fixed':
 				return entityType === 'point';
 			case 'coincident':
-				return entityType === 'point' || entityType === 'line' || entityType === 'circle' || entityType === 'arc';
+				return (
+					entityType === 'point' ||
+					entityType === 'line' ||
+					entityType === 'circle' ||
+					entityType === 'arc' ||
+					entityType === 'ellipse' ||
+					entityType === 'elliptical_arc' ||
+					entityType === 'spline'
+				);
 			case 'horizontal_vertical':
 			case 'horizontal':
 			case 'vertical':
@@ -3330,15 +3463,19 @@ export class CanvasInteraction {
 		const pCount = sel.pointIds.size;
 		const lCount = sel.lineIds.size;
 		const cCount = sel.circleIds.size + sel.arcIds.size;
+		const eCount = sel.ellipseIds.size + sel.ellipticalArcIds.size;
+		const sCount = sel.splineIds.size;
 
 		switch (type) {
 			case 'fixed':
 				return pCount >= 1;
 			case 'coincident':
 				return (
-					(pCount === 2 && lCount === 0 && cCount === 0) ||
-					(pCount === 1 && lCount === 1 && cCount === 0) ||
-					(pCount === 1 && cCount === 1 && lCount === 0)
+					(pCount === 2 && lCount === 0 && cCount === 0 && eCount === 0 && sCount === 0) ||
+					(pCount === 1 && lCount === 1 && cCount === 0 && eCount === 0 && sCount === 0) ||
+					(pCount === 1 && cCount === 1 && lCount === 0 && eCount === 0 && sCount === 0) ||
+					(pCount === 1 && eCount === 1 && lCount === 0 && cCount === 0 && sCount === 0) ||
+					(pCount === 1 && sCount === 1 && lCount === 0 && cCount === 0 && eCount === 0)
 				);
 			case 'horizontal_vertical':
 			case 'horizontal':
@@ -3385,6 +3522,8 @@ export class CanvasInteraction {
 		const pIds = [...sel.pointIds];
 		const lIds = [...sel.lineIds];
 		const cIds = [...sel.circleIds, ...sel.arcIds];
+		const eIds = [...sel.ellipseIds, ...sel.ellipticalArcIds];
+		const sIds = [...sel.splineIds];
 
 		let applied = false;
 		let toastMsg = '';
@@ -3399,7 +3538,7 @@ export class CanvasInteraction {
 				break;
 			}
 			case 'coincident': {
-				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0) {
+				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
 					if (pIds.includes('origin')) {
 						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
 						this.sketch.addOriginCoincidentConstraint(userPtId);
@@ -3410,7 +3549,7 @@ export class CanvasInteraction {
 						applied = true;
 						toastMsg = 'Coincident constraint applied';
 					}
-				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0) {
+				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
 						const c = this.sketch.addPointOnAxisConstraint(pIds[0], axis);
@@ -3427,13 +3566,29 @@ export class CanvasInteraction {
 							showToast('Cannot constrain point to this line');
 						}
 					}
-				} else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0) {
+				} else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
 					const c = this.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Point on circle constraint applied';
 					} else {
 						showToast('Cannot constrain point to this circle/arc');
+					}
+				} else if (pIds.length === 1 && eIds.length === 1 && lIds.length === 0 && cIds.length === 0 && sIds.length === 0) {
+					const c = this.sketch.addPointOnEllipseConstraint(pIds[0], eIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Point on ellipse constraint applied';
+					} else {
+						showToast('Cannot constrain point to this ellipse');
+					}
+				} else if (pIds.length === 1 && sIds.length === 1 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0) {
+					const c = this.sketch.addPointOnSplineConstraint(pIds[0], sIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Point on spline constraint applied';
+					} else {
+						showToast('Cannot constrain point to this spline');
 					}
 				}
 				break;

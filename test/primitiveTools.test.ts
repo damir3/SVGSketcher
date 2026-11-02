@@ -57,13 +57,25 @@ function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstr
 		showToast: () => {},
 		findSnap: () => null,
 		applySnapConstraintIfNeeded: (pointId: string, snap: any) => {
-			if (!snap) return;
-			if (snap.type === 'point' && snap.id && snap.id !== pointId) {
-				sketch.addCoincidentConstraint(pointId, snap.id);
-			} else if (snap.type === 'line' && snap.lineId) {
-				sketch.addPointOnLineConstraint(pointId, snap.lineId);
-			} else if (snap.type === 'circle' && snap.circleId) {
-				sketch.addPointOnCircleConstraint(pointId, snap.circleId);
+			if (!snap || !snap.id) return;
+			if (snap.type === 'point' && snap.id !== pointId) {
+				if (snap.id === 'origin') {
+					sketch.addOriginCoincidentConstraint(pointId);
+				} else {
+					sketch.addCoincidentConstraint(pointId, snap.id);
+				}
+			} else if (snap.type === 'line') {
+				if (snap.id === 'axis_x' || snap.id === 'axis_y') {
+					sketch.addPointOnAxisConstraint(pointId, snap.id === 'axis_x' ? 'x' : 'y');
+				} else {
+					sketch.addPointOnLineConstraint(pointId, snap.id);
+				}
+			} else if (snap.type === 'circle') {
+				sketch.addPointOnCircleConstraint(pointId, snap.id);
+			} else if (snap.type === 'ellipse') {
+				sketch.addPointOnEllipseConstraint(pointId, snap.id);
+			} else if (snap.type === 'spline') {
+				sketch.addPointOnSplineConstraint(pointId, snap.id);
 			}
 		},
 		findPointNear: (screen: Vec2, threshold = 16) => {
@@ -378,7 +390,7 @@ describe('Primitive Tools Creation', () => {
 		// Click 2: snapped to existingLine at (50, 40)
 		const snap2 = {
 			type: 'line' as const,
-			lineId: existingLine.id,
+			id: existingLine.id,
 			worldPos: vec(50, 40),
 			screenPos: vec(50, 40),
 		};

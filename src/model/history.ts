@@ -15,6 +15,8 @@ import {
 	PerpendicularConstraint,
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
+	PointOnEllipseConstraint,
+	PointOnSplineConstraint,
 	TangentLineCircleConstraint,
 	TangentCircleCircleConstraint,
 	ConcentricConstraint,
@@ -111,6 +113,14 @@ export interface SerializedConstraint {
 	ellipseId?: string;
 	majorAxisPointId?: string;
 	minorAxisPointId?: string;
+
+	splineId?: string;
+	splineType?: 'fit' | 'control';
+	splinePointIds?: string[];
+	handlePoints?: any[];
+	tangentLineIds?: string[];
+	knots?: number[];
+	isClosed?: boolean;
 
 	sourcePtId?: string;
 	patternPtId?: string;
@@ -274,6 +284,21 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.pointId = c.pointId;
 		base.circleCenterId = c.circleCenterId;
 		base.circleId = c.circleId;
+	} else if (c instanceof PointOnEllipseConstraint) {
+		base.pointId = c.pointId;
+		base.ellipseId = c.ellipseId;
+		base.centerId = c.centerId;
+		base.majorAxisPointId = c.majorAxisPointId;
+		base.minorAxisPointId = c.minorAxisPointId;
+	} else if (c instanceof PointOnSplineConstraint) {
+		base.pointId = c.pointId;
+		base.splineId = c.splineId;
+		base.splineType = c.splineType;
+		base.splinePointIds = [...c.splinePointIds];
+		base.handlePoints = c.handlePoints ? [...c.handlePoints] : undefined;
+		base.tangentLineIds = c.tangentLineIds ? [...c.tangentLineIds] : undefined;
+		base.knots = c.knots ? [...c.knots] : undefined;
+		base.isClosed = c.isClosed;
 	} else if (c instanceof TangentLineCircleConstraint) {
 		base.lineP1Id = c.lineP1Id;
 		base.lineP2Id = c.lineP2Id;
@@ -461,6 +486,31 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 			break;
 		case 'point_on_circle':
 			c = new PointOnCircleConstraint(d.id, d.pointId!, d.circleCenterId!, d.circleId!, d.weight);
+			break;
+		case 'point_on_ellipse':
+			c = new PointOnEllipseConstraint(
+				d.id,
+				d.pointId!,
+				d.ellipseId!,
+				d.centerId!,
+				d.majorAxisPointId!,
+				d.minorAxisPointId!,
+				d.weight
+			);
+			break;
+		case 'point_on_spline':
+			c = new PointOnSplineConstraint(
+				d.id,
+				d.pointId!,
+				d.splineId!,
+				d.splineType || 'fit',
+				d.splinePointIds || [],
+				d.handlePoints,
+				d.tangentLineIds,
+				d.knots,
+				d.isClosed,
+				d.weight
+			);
 			break;
 		case 'tangent_line_circle':
 			c = new TangentLineCircleConstraint(

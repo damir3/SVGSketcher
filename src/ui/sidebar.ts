@@ -2248,6 +2248,8 @@ export class Sidebar {
 			case 'concentric': return ICONS.concentric;
 			case 'point_on_line': return ICONS.pointOnLine;
 			case 'point_on_circle': return ICONS.pointOnLine;
+			case 'point_on_ellipse': return ICONS.pointOnLine;
+			case 'point_on_spline': return ICONS.pointOnLine;
 			case 'midpoint': return ICONS.midpoint;
 			case 'symmetry': return ICONS.symmetry;
 			case 'circular_pattern': return ICONS.circular_pattern;

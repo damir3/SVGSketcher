@@ -61,6 +61,7 @@ export class ConstraintTool extends BaseTool {
 			| 'arc'
 			| 'ellipse'
 			| 'elliptical_arc'
+			| 'spline'
 			| undefined;
 
 		// Points ALWAYS have top priority when clicking near a point (if points are applicable)
@@ -76,7 +77,8 @@ export class ConstraintTool extends BaseTool {
 				type !== 'circle' &&
 				type !== 'arc' &&
 				type !== 'ellipse' &&
-				type !== 'elliptical_arc')
+				type !== 'elliptical_arc' &&
+				type !== 'spline')
 		) {
 			const hitLine = this.ctx.findLineNear(screen, 18);
 			if (hitLine) {
@@ -102,14 +104,20 @@ export class ConstraintTool extends BaseTool {
 							if (hitEllipticalArc) {
 								id = hitEllipticalArc.id;
 								type = 'elliptical_arc';
-							} else if (this.isEntityCompatibleWithConstraint('line')) {
-								const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
-								if (Math.abs(screen.y - sOrigin.y) <= 18) {
-									id = 'axis_x';
-									type = 'line';
-								} else if (Math.abs(screen.x - sOrigin.x) <= 18) {
-									id = 'axis_y';
-									type = 'line';
+							} else {
+								const hitSpline = this.ctx.findSplineNear?.(screen, 18);
+								if (hitSpline) {
+									id = hitSpline.id;
+									type = 'spline';
+								} else if (this.isEntityCompatibleWithConstraint('line')) {
+									const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
+									if (Math.abs(screen.y - sOrigin.y) <= 18) {
+										id = 'axis_x';
+										type = 'line';
+									} else if (Math.abs(screen.x - sOrigin.x) <= 18) {
+										id = 'axis_y';
+										type = 'line';
+									}
 								}
 							}
 						}
@@ -128,7 +136,7 @@ export class ConstraintTool extends BaseTool {
 
 	private handleConstraintEntityClick(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
 	): void {
 		const constraintType = this.id;
 		if (!this.isEntityCompatibleWithConstraint(type)) {
@@ -216,25 +224,41 @@ export class ConstraintTool extends BaseTool {
 				if (type === 'point') {
 					if (
 						sel.pointIds.size >= 2 ||
-						(sel.pointIds.size >= 1 && (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 1))
+						(sel.pointIds.size >= 1 &&
+							(sel.lineIds.size >= 1 ||
+								sel.circleIds.size + sel.arcIds.size >= 1 ||
+								sel.ellipseIds.size + sel.ellipticalArcIds.size >= 1 ||
+								sel.splineIds.size >= 1))
 					) {
 						sel.pointIds.clear();
 						sel.lineIds.clear();
 						sel.circleIds.clear();
 						sel.arcIds.clear();
+						sel.ellipseIds.clear();
+						sel.ellipticalArcIds.clear();
+						sel.splineIds.clear();
 					}
-				} else if (type === 'line') {
-					if (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 1 || sel.pointIds.size >= 2) {
+				} else if (
+					type === 'line' ||
+					type === 'circle' ||
+					type === 'arc' ||
+					type === 'ellipse' ||
+					type === 'elliptical_arc' ||
+					type === 'spline'
+				) {
+					if (
+						sel.lineIds.size >= 1 ||
+						sel.circleIds.size + sel.arcIds.size >= 1 ||
+						sel.ellipseIds.size + sel.ellipticalArcIds.size >= 1 ||
+						sel.splineIds.size >= 1 ||
+						sel.pointIds.size >= 2
+					) {
 						sel.lineIds.clear();
 						sel.circleIds.clear();
 						sel.arcIds.clear();
-						if (sel.pointIds.size >= 2) sel.pointIds.clear();
-					}
-				} else if (type === 'circle' || type === 'arc') {
-					if (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 1 || sel.pointIds.size >= 2) {
-						sel.lineIds.clear();
-						sel.circleIds.clear();
-						sel.arcIds.clear();
+						sel.ellipseIds.clear();
+						sel.ellipticalArcIds.clear();
+						sel.splineIds.clear();
 						if (sel.pointIds.size >= 2) sel.pointIds.clear();
 					}
 				}
@@ -284,7 +308,7 @@ export class ConstraintTool extends BaseTool {
 
 	private deselectEntity(
 		id: string,
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
 	): void {
 		const sel = this.ctx.sketch.selection;
 		if (type === 'point') sel.pointIds.delete(id);
@@ -293,6 +317,7 @@ export class ConstraintTool extends BaseTool {
 		else if (type === 'arc') sel.arcIds.delete(id);
 		else if (type === 'ellipse') sel.ellipseIds.delete(id);
 		else if (type === 'elliptical_arc') sel.ellipticalArcIds.delete(id);
+		else if (type === 'spline') sel.splineIds.delete(id);
 	}
 
 	private pruneIncompatibleSelection(): void {
@@ -315,16 +340,27 @@ export class ConstraintTool extends BaseTool {
 		for (const eaid of [...sel.ellipticalArcIds]) {
 			if (!this.isEntityCompatibleWithConstraint('elliptical_arc')) sel.ellipticalArcIds.delete(eaid);
 		}
+		for (const sid of [...sel.splineIds]) {
+			if (!this.isEntityCompatibleWithConstraint('spline')) sel.splineIds.delete(sid);
+		}
 	}
 
 	private isEntityCompatibleWithConstraint(
-		entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc'
+		entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
 	): boolean {
 		switch (this.id) {
 			case 'fixed':
 				return entityType === 'point';
 			case 'coincident':
-				return entityType === 'point' || entityType === 'line' || entityType === 'circle' || entityType === 'arc';
+				return (
+					entityType === 'point' ||
+					entityType === 'line' ||
+					entityType === 'circle' ||
+					entityType === 'arc' ||
+					entityType === 'ellipse' ||
+					entityType === 'elliptical_arc' ||
+					entityType === 'spline'
+				);
 			case 'horizontal_vertical':
 			case 'horizontal':
 			case 'vertical':
@@ -362,15 +398,19 @@ export class ConstraintTool extends BaseTool {
 		const pCount = sel.pointIds.size;
 		const lCount = sel.lineIds.size;
 		const cCount = sel.circleIds.size + sel.arcIds.size;
+		const eCount = sel.ellipseIds.size + sel.ellipticalArcIds.size;
+		const sCount = sel.splineIds.size;
 
 		switch (type) {
 			case 'fixed':
 				return pCount >= 1;
 			case 'coincident':
 				return (
-					(pCount === 2 && lCount === 0 && cCount === 0) ||
-					(pCount === 1 && lCount === 1 && cCount === 0) ||
-					(pCount === 1 && cCount === 1 && lCount === 0)
+					(pCount === 2 && lCount === 0 && cCount === 0 && eCount === 0 && sCount === 0) ||
+					(pCount === 1 && lCount === 1 && cCount === 0 && eCount === 0 && sCount === 0) ||
+					(pCount === 1 && cCount === 1 && lCount === 0 && eCount === 0 && sCount === 0) ||
+					(pCount === 1 && eCount === 1 && lCount === 0 && cCount === 0 && sCount === 0) ||
+					(pCount === 1 && sCount === 1 && lCount === 0 && cCount === 0 && eCount === 0)
 				);
 			case 'horizontal_vertical':
 			case 'horizontal':
@@ -408,6 +448,8 @@ export class ConstraintTool extends BaseTool {
 		const pIds = [...sel.pointIds];
 		const lIds = [...sel.lineIds];
 		const cIds = [...sel.circleIds, ...sel.arcIds];
+		const eIds = [...sel.ellipseIds, ...sel.ellipticalArcIds];
+		const sIds = [...sel.splineIds];
 
 		let applied = false;
 		let toastMsg = '';
@@ -422,7 +464,7 @@ export class ConstraintTool extends BaseTool {
 				break;
 			}
 			case 'coincident': {
-				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0) {
+				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
 					if (pIds.includes('origin')) {
 						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
 						this.ctx.sketch.addOriginCoincidentConstraint(userPtId);
@@ -433,7 +475,7 @@ export class ConstraintTool extends BaseTool {
 						applied = true;
 						toastMsg = 'Coincident constraint applied';
 					}
-				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0) {
+				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
 						const c = this.ctx.sketch.addPointOnAxisConstraint(pIds[0], axis);
@@ -450,13 +492,29 @@ export class ConstraintTool extends BaseTool {
 							this.ctx.showToast('Cannot constrain point to this line');
 						}
 					}
-				} else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0) {
+				} else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
 					const c = this.ctx.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Point on circle constraint applied';
 					} else {
 						this.ctx.showToast('Cannot constrain point to this circle/arc');
+					}
+				} else if (pIds.length === 1 && eIds.length === 1 && lIds.length === 0 && cIds.length === 0 && sIds.length === 0) {
+					const c = this.ctx.sketch.addPointOnEllipseConstraint(pIds[0], eIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Point on ellipse constraint applied';
+					} else {
+						this.ctx.showToast('Cannot constrain point to this ellipse');
+					}
+				} else if (pIds.length === 1 && sIds.length === 1 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0) {
+					const c = this.ctx.sketch.addPointOnSplineConstraint(pIds[0], sIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Point on spline constraint applied';
+					} else {
+						this.ctx.showToast('Cannot constrain point to this spline');
 					}
 				}
 				break;

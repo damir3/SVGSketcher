@@ -28,3 +28,5 @@ export * from './ellipseAxis';
 export * from './ellipticalArcEndpoints';
 export * from './offset';
 export * from './originAxis';
+export * from './pointOnEllipse';
+export * from './pointOnSpline';

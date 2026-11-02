@@ -3,6 +3,8 @@ export type ConstraintType =
 	| 'coincident'
 	| 'point_on_line'
 	| 'point_on_circle'
+	| 'point_on_ellipse'
+	| 'point_on_spline'
 	| 'horizontal'
 	| 'vertical'
 	| 'distance'

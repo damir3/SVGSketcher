@@ -14,6 +14,8 @@ import {
 	PerpendicularConstraint,
 	PointOnLineConstraint,
 	PointOnCircleConstraint,
+	PointOnEllipseConstraint,
+	PointOnSplineConstraint,
 	TangentLineCircleConstraint,
 	TangentCircleCircleConstraint,
 	ConcentricConstraint,
@@ -2351,6 +2353,75 @@ export class SketchDocument {
 		return c;
 	}
 
+	addPointOnEllipseConstraint(pointId: string, ellipseOrArcId: string): PointOnEllipseConstraint | null {
+		const el = this.ellipses.get(ellipseOrArcId) ?? this.ellipticalArcs.get(ellipseOrArcId);
+		if (!el) return null;
+
+		if (pointId === el.centerId || pointId === el.majorAxisPointId || pointId === el.minorAxisPointId) {
+			return null;
+		}
+		if (el instanceof SketchEllipticalArc && (pointId === el.startPointId || pointId === el.endPointId)) {
+			return null;
+		}
+
+		const existing = [...this.constraints.values()].find(
+			c =>
+				c instanceof PointOnEllipseConstraint &&
+				c.pointId === pointId &&
+				c.ellipseId === ellipseOrArcId
+		);
+		if (existing) return null;
+
+		const c = new PointOnEllipseConstraint(
+			this.nextId('c_ptel'),
+			pointId,
+			ellipseOrArcId,
+			el.centerId,
+			el.majorAxisPointId,
+			el.minorAxisPointId
+		);
+		this.addConstraint(c);
+		return c;
+	}
+
+	addPointOnSplineConstraint(pointId: string, splineId: string): PointOnSplineConstraint | null {
+		const spline = this.splines.get(splineId);
+		if (!spline) return null;
+
+		if (spline.pointIds.includes(pointId)) return null;
+		if (this.isSplineHandlePoint(pointId)) return null;
+
+		const existing = [...this.constraints.values()].find(
+			c =>
+				c instanceof PointOnSplineConstraint &&
+				c.pointId === pointId &&
+				c.splineId === splineId
+		);
+		if (existing) return null;
+
+		const handlePoints: Array<{ p1Id: string; p2Id: string }> = [];
+		if (spline.tangentLineIds) {
+			for (const lid of spline.tangentLineIds) {
+				const l = this.lines.get(lid);
+				if (l) handlePoints.push({ p1Id: l.p1Id, p2Id: l.p2Id });
+			}
+		}
+
+		const c = new PointOnSplineConstraint(
+			this.nextId('c_ptspline'),
+			pointId,
+			spline.id,
+			spline.splineType,
+			[...spline.pointIds],
+			handlePoints.length > 0 ? handlePoints : undefined,
+			spline.tangentLineIds ? [...spline.tangentLineIds] : undefined,
+			spline.knots ? [...spline.knots] : undefined,
+			spline.isClosed
+		);
+		this.addConstraint(c);
+		return c;
+	}
+
 	addTangentConstraint(
 		entity1Id: string,
 		entity2Id: string
@@ -2651,7 +2722,8 @@ export class SketchDocument {
 					!this.circles.has(entId) &&
 					!this.arcs.has(entId) &&
 					!this.ellipses.has(entId) &&
-					!this.ellipticalArcs.has(entId)
+					!this.ellipticalArcs.has(entId) &&
+					!this.splines.has(entId)
 			);
 			if (hasMissingEntity) {
 				this.constraints.delete(cid);
@@ -4297,6 +4369,10 @@ export class SketchDocument {
 					if (anyC.pointId === id) res.push(c);
 				} else if (c.type === 'point_on_circle') {
 					if (anyC.pointId === id) res.push(c);
+				} else if (c.type === 'point_on_ellipse') {
+					if (anyC.pointId === id) res.push(c);
+				} else if (c.type === 'point_on_spline') {
+					if (anyC.pointId === id) res.push(c);
 				} else if (c.type === 'point_to_line_distance') {
 					if (anyC.pointId === id) res.push(c);
 				} else if (c.type === 'origin_distance') {
@@ -4498,7 +4574,10 @@ export class SketchDocument {
 			}
 			for (const c of this.constraints.values()) {
 				if (this.isSplineInternalConstraint(c)) continue;
-				if (c.type === 'circular_pattern') {
+				const anyC = c as any;
+				if (anyC.splineId === id || c.entityIds.includes(id)) {
+					pushUnique(c);
+				} else if (c.type === 'circular_pattern') {
 					const cpat = c as CircularPatternConstraint;
 					if (cpat.sourceObjectIds?.includes(id)) pushUnique(c);
 				} else if (c.type === 'rectangular_pattern') {
@@ -4673,6 +4752,15 @@ export class SketchDocument {
 			const cid = anyC.circleId;
 			if (this.circles.has(cid)) add(cid, 'circle');
 			else if (this.arcs.has(cid)) add(cid, 'arc');
+		} else if (c.type === 'point_on_ellipse') {
+			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
+			const eid = anyC.ellipseId;
+			if (this.ellipses.has(eid)) add(eid, 'ellipse');
+			else if (this.ellipticalArcs.has(eid)) add(eid, 'elliptical_arc');
+		} else if (c.type === 'point_on_spline') {
+			if (anyC.pointId && this.points.has(anyC.pointId)) add(anyC.pointId, 'point');
+			const sid = anyC.splineId;
+			if (this.splines.has(sid)) add(sid, 'spline');
 		} else if (c.type === 'tangent_line_circle') {
 			const line = this.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
 			if (line) add(line.id, 'line');

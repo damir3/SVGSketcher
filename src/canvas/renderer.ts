@@ -1777,12 +1777,12 @@ export class SVGRenderer {
 		this.renderTooltip(midX, midY, `${angleDeg.toFixed(1)}°`);
 	}
 
-	renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'circle' | 'spline' | 'grid' = 'point', clearFirst = true): void {
+	renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid' = 'point', clearFirst = true): void {
 		if (clearFirst) {
 			this.overlayGroup.innerHTML = '';
 		}
 
-		if (type === 'line' || type === 'circle' || type === 'spline') {
+		if (type === 'line' || type === 'circle' || type === 'spline' || type === 'ellipse') {
 			// Emerald diamond on object - enlarged so it clearly surrounds points
 			const d = 7;
 			createSvgElement(

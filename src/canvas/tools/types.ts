@@ -79,11 +79,8 @@ export type ToolType =
 	| ConstraintToolType;
 
 export interface SnapResult {
-	type: 'point' | 'line' | 'circle' | 'spline' | 'grid';
+	type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid';
 	id?: string;
-	lineId?: string;
-	circleId?: string;
-	splineId?: string;
 	worldPos: Vec2;
 	screenPos: Vec2;
 }
