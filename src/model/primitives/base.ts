@@ -1,5 +1,6 @@
 import type { Vec2 } from '../../math/vector';
 import type { GeoCurve } from '../../math/intersection';
+import type { IInspectable } from '../../ui/panels/inspector/types';
 
 export type PrimitiveType =
 	| 'point'
@@ -13,7 +14,7 @@ export type PrimitiveType =
 /**
  * Common polymorphic interface for all sketch geometric primitives.
  */
-export interface ISketchPrimitive {
+export interface ISketchPrimitive extends IInspectable {
 	readonly id: string;
 	readonly type: PrimitiveType;
 	isConstruction?: boolean;

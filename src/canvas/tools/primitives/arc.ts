@@ -8,6 +8,7 @@ import {
 } from '../../previewHelpers';
 import type { SketchDocument } from '../../../model/sketch';
 import type { SketchLine, SketchArc } from '../../../model/types';
+import { VariationToolPanel } from '../../../ui/panels/tools';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -102,6 +103,63 @@ export class ArcTool extends BaseTool {
 	constructor(initialMode: ArcMode = 'center') {
 		super();
 		this._mode = initialMode;
+
+		this.sidebarPanel = new VariationToolPanel<ArcMode>({
+			title: 'Arc Tool',
+			description: 'Select arc creation method:',
+			cardClass: 'arc-tool-card',
+			selectorClass: 'arc-mode-selector',
+			buttonClass: 'arc-mode-btn',
+			iconClass: 'arc-mode-icon',
+			textClass: 'arc-mode-text',
+			hintClass: 'arc-mode-hint',
+			dataAttribute: 'data-arc-mode',
+			cancelButtonId: 'btn-arc-cancel-icon',
+			modes: [
+				{
+					id: 'center',
+					label: 'Center',
+					title: 'Centerpoint Arc (Alt+1)',
+					iconName: 'arc_center',
+				},
+				{
+					id: 'three_point',
+					label: '3-Point',
+					title: '3-Point Arc (Alt+2)',
+					iconName: 'arc',
+				},
+				{
+					id: 'tangent',
+					label: 'Tangent',
+					title: 'Tangent Arc (Alt+3)',
+					iconName: 'arc_tangent',
+				},
+			],
+			getCurrentMode: () => this.mode,
+			onSelectMode: mode => this.setMode(mode),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+	}
+
+	getStepHint(): string {
+		const mode = this._mode;
+		const step = this.drawingStep;
+		if (mode === 'three_point') {
+			if (step === 0) return '1. Click to place start point';
+			if (step === 1) return '2. Click to place end point';
+			return '3. Click to set arc radius and bulge';
+		} else if (mode === 'center') {
+			if (step === 0) return '1. Click to place center point';
+			if (step === 1) return '2. Click to place start point (sets radius)';
+			return '3. Click to place end point (sets sweep angle)';
+		} else {
+			if (step === 0) return '1. Click an endpoint of an existing line or arc';
+			return '2. Click to place tangent arc end point';
+		}
 	}
 
 	get mode(): ArcMode {

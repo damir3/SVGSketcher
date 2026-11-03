@@ -2,6 +2,8 @@ import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
+import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
 
 export interface PatternPointPair {
 	sourcePtId: string;
@@ -60,6 +62,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 	suppressedIndices: number[];
 	copies: PatternCopyData[];
 	isReadOnly?: boolean;
+	totalAngleExpression?: string;
 
 	constructor(
 		id: string,
@@ -72,7 +75,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 		suppressedIndices: number[],
 		copies: PatternCopyData[],
 		weight = 1.0,
-		isReadOnly = false
+		isReadOnly = false,
+		totalAngleExpression?: string
 	) {
 		const entityIdSet = new Set<string>();
 		entityIdSet.add(centerPtId);
@@ -99,6 +103,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		this.suppressedIndices = [...suppressedIndices];
 		this.copies = copies;
 		this.isReadOnly = !!isReadOnly;
+		this.totalAngleExpression = totalAngleExpression;
 	}
 
 	override getEquationsCount(): number {
@@ -116,8 +121,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const errors: number[] = [];
-		const cx = paramMap.get(`${this.centerPtId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.centerPtId}.y`) ?? 0;
+		const cx = this.centerPtId === 'origin' ? 0 : (paramMap.get(`${this.centerPtId}.x`) ?? 0);
+		const cy = this.centerPtId === 'origin' ? 0 : (paramMap.get(`${this.centerPtId}.y`) ?? 0);
 		const suppressedSet = new Set(this.suppressedIndices);
 
 		for (const copy of this.copies) {
@@ -192,8 +197,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 				const colPy = paramIndices.get(`${pair.patternPtId}.y`);
 				const colSx = paramIndices.get(`${pair.sourcePtId}.x`);
 				const colSy = paramIndices.get(`${pair.sourcePtId}.y`);
-				const colCx = paramIndices.get(`${this.centerPtId}.x`);
-				const colCy = paramIndices.get(`${this.centerPtId}.y`);
+				const colCx = this.centerPtId === 'origin' ? undefined : paramIndices.get(`${this.centerPtId}.x`);
+				const colCy = this.centerPtId === 'origin' ? undefined : paramIndices.get(`${this.centerPtId}.y`);
 
 				// Row X: px - targetX = px - [cx(1 - cosA) + cy*sinA + sx*cosA - sy*sinA]
 				if (colPx !== undefined) entries.push({ row: rowX, col: colPx, val: this.weight });
@@ -224,7 +229,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pCtr = ctx.sketch.points.get(this.centerPtId);
+		const pCtr = this.centerPtId === 'origin' ? { x: 0, y: 0 } : ctx.sketch.points.get(this.centerPtId);
 		if (!pCtr) return;
 
 		const sCtr = ctx.viewport.worldToScreen(pCtr.x, pCtr.y);
@@ -312,4 +317,94 @@ export class CircularPatternConstraint extends BaseConstraint {
 
 		ctx.renderBadge(this.id, sCtr.x + 14, sCtr.y - 14, 'circular_pattern', COLORS.primary);
 	}
+
+	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
+		constraint: this,
+		title: () => (this.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern'),
+		iconName: () => (this.isReadOnly ? 'polygon' : 'circular_pattern'),
+		deleteButton: {
+			isVisible: () => this.isReadOnly,
+			label: 'Delete Constraint',
+			onDelete: context => {
+				context.sketch.removeConstraint(this.id);
+				context.requestRender?.();
+			},
+		},
+		segmentedControls: [
+			{
+				label: 'Distribution',
+				isVisible: () => !this.isReadOnly,
+				options: [
+					{ id: 'full', label: 'Full' },
+					{ id: 'partial', label: 'Partial' },
+					{ id: 'symmetric', label: 'Symmetric' },
+				],
+				getCurrent: () => this.distribution,
+				onSelect: (dist, context) => {
+					context.sketch.updateCircularPattern(this.id, {
+						distribution: dist as 'full' | 'partial' | 'symmetric',
+					});
+					context.requestRender?.();
+				},
+			},
+		],
+		fields: [
+			{
+				id: `insp-cpat-angle-${this.id}`,
+				label: 'Total Angle',
+				unit: '°',
+				type: 'text',
+				min: -360,
+				max: 360,
+				step: 5,
+				isVisible: () => !this.isReadOnly && this.distribution !== 'full',
+				getValue: () => this.totalAngleExpression ?? Number(this.totalAngle.toFixed(2)),
+				onChange: (val, context) => {
+					const text = String(val).trim();
+					const parsed = parseNumericOrExpression(text, this.totalAngle, context.sketch.getParameterValuesMap());
+					const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
+					if (!isNaN(parsed) && isFinite(parsed) && Math.abs(parsed) > 1e-3) {
+						context.sketch.updateCircularPattern(this.id, {
+							totalAngle: parsed,
+							totalAngleExpression: expr,
+						});
+						context.requestRender?.();
+					}
+				},
+			},
+			{
+				id: `insp-cpat-quantity-${this.id}`,
+				label: 'Quantity',
+				type: 'number',
+				min: 2,
+				max: 100,
+				step: 1,
+				isVisible: () => !this.isReadOnly,
+				getValue: () => this.quantity,
+				onInput: (val, context) => {
+					if (!isNaN(val) && val >= 2) {
+						context.sketch.updateCircularPattern(this.id, { quantity: val });
+						context.requestRender?.();
+					}
+				},
+			},
+		],
+		checkboxes: [
+			{
+				id: `insp-cpat-suppression-${this.id}`,
+				label: 'Suppression',
+				isVisible: () => !this.isReadOnly,
+				isChecked: () => this.suppression,
+				hint: () => {
+					const totalCopies = Math.max(1, this.quantity - 1);
+					const activeCopies = totalCopies - this.suppressedIndices.length;
+					return `${activeCopies} of ${totalCopies} enabled`;
+				},
+				onChange: (checked, context) => {
+					context.sketch.updateCircularPattern(this.id, { suppression: checked });
+					context.requestRender?.();
+				},
+			},
+		],
+	});
 }

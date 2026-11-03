@@ -143,6 +143,9 @@ export interface SerializedConstraint {
 	quantity2?: number;
 	distance2?: number;
 	direction2?: 'one_direction' | 'symmetric';
+	distance1Expression?: string;
+	distance2Expression?: string;
+	totalAngleExpression?: string;
 	isReadOnly?: boolean;
 	sourceChain?: any;
 	direction?: any;
@@ -253,6 +256,7 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.suppression = c.suppression;
 		base.suppressedIndices = [...c.suppressedIndices];
 		base.copies = JSON.parse(JSON.stringify(c.copies));
+		if (c.totalAngleExpression) base.totalAngleExpression = c.totalAngleExpression;
 		if (c.isReadOnly) base.isReadOnly = true;
 	} else if (c instanceof RectangularPatternConstraint) {
 		base.sourceObjectIds = [...c.sourceObjectIds];
@@ -271,6 +275,8 @@ export function serializeConstraint(c: IConstraint): SerializedConstraint {
 		base.suppression = c.suppression;
 		base.suppressedIndices = [...c.suppressedIndices];
 		base.copies = JSON.parse(JSON.stringify(c.copies));
+		if (c.distance1Expression) base.distance1Expression = c.distance1Expression;
+		if (c.distance2Expression) base.distance2Expression = c.distance2Expression;
 	} else if (c instanceof PerpendicularConstraint) {
 		base.l1P1 = c.l1P1;
 		base.l1P2 = c.l1P2;
@@ -453,7 +459,8 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.suppressedIndices || [],
 				(d.copies as PatternCopyData[]) || [],
 				d.weight,
-				!!d.isReadOnly
+				!!d.isReadOnly,
+				d.totalAngleExpression
 			);
 			break;
 		case 'rectangular_pattern':
@@ -475,7 +482,9 @@ export function deserializeConstraint(d: SerializedConstraint): IConstraint | nu
 				d.suppression ?? false,
 				d.suppressedIndices || [],
 				(d.copies as RectangularPatternCopyData[]) || [],
-				d.weight
+				d.weight,
+				d.distance1Expression,
+				d.distance2Expression
 			);
 			break;
 		case 'perpendicular':

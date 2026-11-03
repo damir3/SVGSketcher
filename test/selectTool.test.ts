@@ -348,4 +348,15 @@ describe('Select Tool Hover Mechanism', () => {
 		assert.strictEqual(axisYG.classList.contains('select-hover'), false);
 		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 	});
+
+	it('selecting a primitive with constraints does not auto-select its constraints', () => {
+		const sketch = new SketchDocument();
+		const line = sketch.addLine(0, 0, 50, 0);
+		sketch.addDistanceConstraint(line.p1Id, line.p2Id, 50);
+
+		sketch.selectEntity(line.id, 'line');
+		assert.strictEqual(sketch.selection.lineIds.size, 1);
+		assert.strictEqual(sketch.selection.lineIds.has(line.id), true);
+		assert.strictEqual(sketch.selection.constraintIds.size, 0);
+	});
 });

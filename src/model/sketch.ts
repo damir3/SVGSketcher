@@ -1643,7 +1643,8 @@ export class SketchDocument {
 		suppressedIndices: number[],
 		copies: PatternCopyData[],
 		id?: string,
-		isReadOnly?: boolean
+		isReadOnly?: boolean,
+		totalAngleExpression?: string
 	): CircularPatternConstraint | null {
 		return addCircularPatternConstraint(
 			this,
@@ -1656,7 +1657,8 @@ export class SketchDocument {
 			suppressedIndices,
 			copies,
 			id,
-			isReadOnly
+			isReadOnly,
+			totalAngleExpression
 		);
 	}
 
@@ -1665,6 +1667,7 @@ export class SketchDocument {
 		updates: {
 			distribution?: 'full' | 'partial' | 'symmetric';
 			totalAngle?: number;
+			totalAngleExpression?: string;
 			quantity?: number;
 			suppression?: boolean;
 			suppressedIndices?: number[];
@@ -1795,7 +1798,9 @@ export class SketchDocument {
 		suppression: boolean,
 		suppressedIndices: number[],
 		copies: RectangularPatternCopyData[],
-		id?: string
+		id?: string,
+		distance1Expression?: string,
+		distance2Expression?: string
 	): RectangularPatternConstraint | null {
 		return addRectangularPatternConstraint(
 			this,
@@ -1811,7 +1816,9 @@ export class SketchDocument {
 			suppression,
 			suppressedIndices,
 			copies,
-			id
+			id,
+			distance1Expression,
+			distance2Expression
 		);
 	}
 
@@ -1822,9 +1829,11 @@ export class SketchDocument {
 			line2Id?: string | null;
 			quantity1?: number;
 			distance1?: number;
+			distance1Expression?: string;
 			direction1?: 'one_direction' | 'symmetric';
 			quantity2?: number;
 			distance2?: number;
+			distance2Expression?: string;
 			direction2?: 'one_direction' | 'symmetric';
 			suppression?: boolean;
 			suppressedIndices?: number[];
@@ -3011,6 +3020,17 @@ export class SketchDocument {
 				if (c.expression) {
 					c.expression = renameParameterInExpression(c.expression, name, newName);
 				}
+				if (c instanceof RectangularPatternConstraint) {
+					if (c.distance1Expression) {
+						c.distance1Expression = renameParameterInExpression(c.distance1Expression, name, newName);
+					}
+					if (c.distance2Expression) {
+						c.distance2Expression = renameParameterInExpression(c.distance2Expression, name, newName);
+					}
+				}
+				if (c instanceof CircularPatternConstraint && c.totalAngleExpression) {
+					c.totalAngleExpression = renameParameterInExpression(c.totalAngleExpression, name, newName);
+				}
 			}
 		}
 		this.recomputeParametersAndConstraints(false);
@@ -3038,6 +3058,43 @@ export class SketchDocument {
 		}
 
 		for (const c of this.constraints.values()) {
+			if (c instanceof RectangularPatternConstraint) {
+				let updated = false;
+				const updates: any = {};
+				if (c.distance1Expression) {
+					try {
+						const val = evaluateExpression(c.distance1Expression, graphRes.values);
+						if (Number.isFinite(val)) {
+							updates.distance1 = val;
+							updated = true;
+						}
+					} catch {}
+				}
+				if (c.distance2Expression) {
+					try {
+						const val = evaluateExpression(c.distance2Expression, graphRes.values);
+						if (Number.isFinite(val)) {
+							updates.distance2 = val;
+							updated = true;
+						}
+					} catch {}
+				}
+				if (updated) {
+					this.updateRectangularPattern(c.id, updates);
+				}
+				continue;
+			}
+			if (c instanceof CircularPatternConstraint) {
+				if (c.totalAngleExpression) {
+					try {
+						const val = evaluateExpression(c.totalAngleExpression, graphRes.values);
+						if (Number.isFinite(val) && Math.abs(val) > 1e-3) {
+							this.updateCircularPattern(c.id, { totalAngle: val });
+						}
+					} catch {}
+				}
+				continue;
+			}
 			if (!c.expression) continue;
 			try {
 				const val = evaluateExpression(c.expression, graphRes.values);

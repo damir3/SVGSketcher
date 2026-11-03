@@ -212,7 +212,7 @@ export const SYMMETRY_CHORD_ATTRS: SvgAttrs = {
 
 // Mirror & Direction Lines
 export const MIRROR_LINE_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-primitive is-mirror-line',
+	class: 'entity-visible visible-primitive',
 	fill: 'none',
 	stroke: COLORS.mirrorLine,
 	'stroke-width': STROKE_WIDTH.thick,
@@ -221,7 +221,7 @@ export const MIRROR_LINE_ATTRS: SvgAttrs = {
 };
 
 export const DIR1_LINE_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-primitive is-direction-line is-dir1-line',
+	class: 'entity-visible visible-primitive',
 	fill: 'none',
 	stroke: COLORS.patternAxis1,
 	'stroke-width': STROKE_WIDTH.thick,
@@ -230,7 +230,7 @@ export const DIR1_LINE_ATTRS: SvgAttrs = {
 };
 
 export const DIR2_LINE_ATTRS: SvgAttrs = {
-	class: 'entity-visible visible-primitive is-direction-line is-dir2-line',
+	class: 'entity-visible visible-primitive',
 	fill: 'none',
 	stroke: COLORS.patternAxis2,
 	'stroke-width': STROKE_WIDTH.thick,

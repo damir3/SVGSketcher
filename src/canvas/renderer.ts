@@ -289,7 +289,7 @@ export class SVGRenderer {
 		this.patternCheckboxPositions.clear();
 		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
-		this.renderGrid(sketch, viewport, options.showGrid ?? true);
+		this.renderGrid(sketch, viewport, options.showGrid ?? true, options);
 		this.renderGeometry(sketch, viewport, options);
 		if (options.showConstraints !== false) {
 			this.renderConstraints(sketch, viewport);
@@ -341,7 +341,7 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderGrid(sketch: SketchDocument, viewport: Viewport, showGrid: boolean): void {
+	private renderGrid(sketch: SketchDocument, viewport: Viewport, showGrid: boolean, options: RenderOptions = {}): void {
 		this.gridGroup.innerHTML = '';
 
 		const origin = viewport.worldToScreen(0, 0);
@@ -475,6 +475,7 @@ export class SVGRenderer {
 		}, axisYG);
 
 		// Origin marker target (CAD surveyor style matching reference image)
+		const isPatternCenter = options.patternHighlight?.centerPointId === 'origin';
 		const originMarkerG = createSvgElement('g', {
 			'data-id': 'origin',
 			'data-type': 'point',
@@ -483,17 +484,17 @@ export class SVGRenderer {
 
 		const r = 8;
 		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`, {
-			fill: isOriginSelected ? COLORS.selected : COLORS.originQuarter,
+			fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
 		}, originMarkerG);
 
 		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`, {
-			fill: isOriginSelected ? COLORS.selected : COLORS.originQuarter,
+			fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
 		}, originMarkerG);
 
 		createSvgCircle(origin.x, origin.y, r, {
 			fill: 'none',
-			stroke: isOriginSelected ? COLORS.selected : COLORS.construction,
-			'stroke-width': isOriginSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+			stroke: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.construction,
+			'stroke-width': isOriginSelected || isPatternCenter ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
 		}, originMarkerG);
 
 		// Transparent hit target circle so clicking/hovering near (0,0) is easy
@@ -568,7 +569,7 @@ export class SVGRenderer {
 			const lineG = createSvgElement('g', {
 				'data-id': line.id,
 				'data-type': 'line',
-				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''} ${isMirrorLine ? 'is-mirror-line' : ''} ${isDir1Line || isDir2Line ? 'is-direction-line' : ''}`,
+				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''}`,
 			}, this.geometryGroup);
 
 			// Invisible generous hit target (18px wide)
@@ -866,7 +867,7 @@ export class SVGRenderer {
 			const ptG = createSvgElement('g', {
 				'data-id': pt.id,
 				'data-type': 'point',
-				class: `sketch-entity sketch-point ${isSelected ? 'is-selected' : ''} ${isPatternCenter ? 'is-pattern-center' : ''}`,
+				class: `sketch-entity sketch-point ${isSelected ? 'is-selected' : ''}`,
 			}, this.pointGroup);
 
 			// Invisible larger hit target for easy clicking
@@ -2022,7 +2023,10 @@ export class SVGRenderer {
 		this.patternGroup.innerHTML = '';
 		if (!centerPointId) return;
 
-		const centerPt = sketch.points.get(centerPointId);
+		const centerPt =
+			centerPointId === 'origin'
+				? ({ id: 'origin', x: 0, y: 0 } as SketchPoint)
+				: sketch.points.get(centerPointId);
 		if (!centerPt) return;
 
 		const sCtr = viewport.worldToScreen(centerPt.x, centerPt.y);

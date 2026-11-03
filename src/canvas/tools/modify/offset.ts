@@ -3,6 +3,7 @@ import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
+import { VariationToolPanel } from '../../../ui/panels/tools';
 import {
 	type OffsetDirection,
 	type OffsetChain,
@@ -122,6 +123,75 @@ export class OffsetTool extends BaseTool {
 		this.popup.onCancel = () => {
 			this.cancel();
 		};
+
+		this.sidebarPanel = new VariationToolPanel<OffsetDirection>({
+			title: 'Offset Tool',
+			description: 'Select direction:',
+			cardClass: 'chamfer-tool-card offset-tool-card',
+			selectorClass: 'chamfer-mode-selector',
+			buttonClass: 'chamfer-mode-btn',
+			iconClass: 'chamfer-mode-icon',
+			textClass: 'chamfer-mode-text',
+			hintClass: 'chamfer-mode-hint',
+			dataAttribute: 'data-offset-direction',
+			cancelButtonId: 'btn-offset-cancel-icon',
+			modes: [
+				{
+					id: 'one_side',
+					label: 'One Side',
+					title: 'One Side (Alt+1)',
+					iconName: 'offsetOneSide',
+				},
+				{
+					id: 'two_sides',
+					label: 'Two Sides',
+					title: 'Two Sides (Alt+2)',
+					iconName: 'offsetTwoSides',
+				},
+				{
+					id: 'symmetric',
+					label: 'Symmetric',
+					title: 'Symmetric (Alt+3)',
+					iconName: 'offsetSymmetric',
+				},
+			],
+			getCurrentMode: () => this.direction,
+			onSelectMode: dir => this.setDirection(dir),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			extraContent: {
+				render: () => `
+					<div style="margin-top: 6px;">
+						<label class="chamfer-checkbox-label">
+							<input type="checkbox" id="offset-chain-selection-checkbox" ${this.chainSelection ? 'checked' : ''} />
+							<span>Chain selection</span>
+						</label>
+					</div>
+				`,
+				bindEvents: (container: HTMLElement) => {
+					const cb = container.querySelector<HTMLInputElement>('#offset-chain-selection-checkbox');
+					cb?.addEventListener('change', () => {
+						this.setChainSelection(cb.checked);
+					});
+				},
+			},
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+	}
+
+	getStepHint(): string {
+		let hint = 'Click a curve to start chain.';
+		if (this.chain) {
+			const count = this.chain.items.length;
+			if (this.chain.isClosed) {
+				hint = `Closed loop (${count} items). Drag arrow or enter values. Enter to commit.`;
+			} else {
+				hint = `Open chain (${count} items). Click connected curve or press Enter to commit.`;
+			}
+		}
+		return hint;
 	}
 
 	override isBusy(): boolean {

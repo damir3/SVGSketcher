@@ -1,6 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { computePointToLineDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
 
@@ -112,4 +113,13 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 
 		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
+
+	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
+		constraint: this,
+		title: 'Point-to-Line Distance',
+		dimension: {
+			label: 'Distance',
+			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+		},
+	});
 }

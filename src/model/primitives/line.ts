@@ -1,8 +1,9 @@
-import type { Vec2 } from '../../math/vector';
+import { dist, type Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
 import type { GeoSegment } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchLine implements ISketchPrimitive {
 	readonly type = 'line' as const;
@@ -71,4 +72,36 @@ export class SketchLine implements ISketchPrimitive {
 			isConstruction: this.isConstruction,
 		};
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		fields: [
+			{
+				id: 'insp-line-length',
+				label: 'Length',
+				unit: 'mm',
+				getValue: ctx => {
+					const p1 = ctx.sketch.points.get(this.p1Id);
+					const p2 = ctx.sketch.points.get(this.p2Id);
+					return p1 && p2 ? Number(dist(p1, p2).toFixed(2)) : 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setLineLength(this.id, val),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-line-angle',
+				label: 'Angle',
+				unit: '°',
+				getValue: ctx => {
+					const p1 = ctx.sketch.points.get(this.p1Id);
+					const p2 = ctx.sketch.points.get(this.p2Id);
+					return p1 && p2 ? Number(((Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI).toFixed(2)) : 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setLineAngle(this.id, val),
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('line', this.id),
+		constraintsLabel: 'this line',
+		entityIds: () => [this.id],
+	});
 }

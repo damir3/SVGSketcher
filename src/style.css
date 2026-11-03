@@ -1901,16 +1901,6 @@ html, body {
   line-height: 1.3;
 }
 
-.tree-item.is-mirror-line {
-  background-color: #fef3c7 !important;
-  border-left: 3px solid #d97706 !important;
-}
-
-.tree-item.is-mirror-obj {
-  background-color: #e0f2fe !important;
-  border-left: 3px solid #0284c7 !important;
-}
-
 /* --- CIRCULAR PATTERN TOOL SIDEBAR CARD --- */
 .pattern-tool-card {
   background-color: var(--bg-surface-elevated);
@@ -2053,26 +2043,6 @@ html, body {
   font-style: italic;
   margin-top: -2px;
   line-height: 1.3;
-}
-
-.tree-item.is-pattern-center {
-  background-color: #fef3c7 !important;
-  border-left: 3px solid #d97706 !important;
-}
-
-.tree-item.is-dir1-line {
-  background-color: #fef3c7 !important;
-  border-left: 3px solid #d97706 !important;
-}
-
-.tree-item.is-dir2-line {
-  background-color: #f3e8ff !important;
-  border-left: 3px solid #9333ea !important;
-}
-
-.tree-item.is-pattern-obj {
-  background-color: #e0f2fe !important;
-  border-left: 3px solid #0284c7 !important;
 }
 
 .pattern-suppression-checkbox:hover {

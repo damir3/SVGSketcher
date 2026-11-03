@@ -2,6 +2,7 @@ import type { Vec2 } from '../../math/vector';
 import { distanceToPoint } from '../../math/hitTest';
 import { pointIntersectsAABB } from '../../math/aabb';
 import type { ISketchPrimitive } from './base';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchPoint implements ISketchPrimitive {
 	readonly type = 'point' as const;
@@ -41,4 +42,27 @@ export class SketchPoint implements ISketchPrimitive {
 	toGeoCurve(_sketch?: any): null {
 		return null;
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		fields: [
+			{
+				id: 'insp-pt-x',
+				label: 'X',
+				unit: 'mm',
+				getValue: () => Number(this.x.toFixed(2)),
+				onCommit: (val, ctx) => ctx.sketch.setPointCoords(this.id, val, this.y),
+			},
+			{
+				id: 'insp-pt-y',
+				label: 'Y',
+				unit: 'mm',
+				getValue: () => Number(this.y.toFixed(2)),
+				onCommit: (val, ctx) => ctx.sketch.setPointCoords(this.id, this.x, val),
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('point', this.id),
+		constraintsLabel: 'this point',
+		entityIds: () => [this.id],
+	});
 }

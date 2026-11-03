@@ -8,6 +8,7 @@ import { distanceToSpline } from '../../math/hitTest';
 import type { GeoSpline } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
 import type { SketchPoint } from './point';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchSpline implements ISketchPrimitive {
 	readonly type = 'spline' as const;
@@ -114,4 +115,25 @@ export class SketchSpline implements ISketchPrimitive {
 		}
 		return false;
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		rows: [
+			{
+				label: 'Type:',
+				getValue: () => (this.splineType === 'fit' ? 'Fit Point Spline' : 'Control Point Spline'),
+			},
+			{
+				label: 'Points:',
+				getValue: () => `${this.pointIds.length} points`,
+			},
+			{
+				label: 'Closed:',
+				getValue: () => (this.isClosed ? 'Yes' : 'No'),
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('spline', this.id),
+		constraintsLabel: 'this spline',
+		entityIds: () => [this.id],
+	});
 }

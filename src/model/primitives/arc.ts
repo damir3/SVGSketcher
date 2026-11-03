@@ -3,6 +3,7 @@ import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
 import type { GeoArc } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchArc implements ISketchPrimitive {
 	readonly type = 'arc' as const;
@@ -93,4 +94,41 @@ export class SketchArc implements ISketchPrimitive {
 			isConstruction: this.isConstruction,
 		};
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		fields: [
+			{
+				id: 'insp-arc-radius',
+				label: 'Radius',
+				unit: 'mm',
+				getValue: () => Number(this.radius.toFixed(2)),
+				onCommit: (val, ctx) => ctx.sketch.setCircleOrArcRadius(this.id, val),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-arc-angle',
+				label: 'Angle',
+				unit: '°',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const start = ctx.sketch.points.get(this.startPointId);
+					const end = ctx.sketch.points.get(this.endPointId);
+					if (center && start && end) {
+						const as = Math.atan2(start.y - center.y, start.x - center.x);
+						const ae = Math.atan2(end.y - center.y, end.x - center.x);
+						let sweep = this.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
+						if (sweep < 0) sweep += 2 * Math.PI;
+						return Number(((sweep * 180) / Math.PI).toFixed(2));
+					}
+					return 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setArcAngle(this.id, val),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('arc', this.id),
+		constraintsLabel: 'this arc',
+		entityIds: () => [this.id],
+	});
 }

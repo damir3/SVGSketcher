@@ -8,6 +8,7 @@ import {
 	getPreviewStrokeAttrs,
 } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
+import { VariationToolPanel } from '../../../ui/panels/tools';
 
 export type RectangleMode = 'corner' | 'center' | 'three_point' | 'rounded';
 
@@ -93,6 +94,52 @@ export class RectangleTool extends BaseTool {
 			this.ctx?.setTool('select');
 			this.ctx?.requestRender();
 		};
+
+		this.sidebarPanel = new VariationToolPanel<RectangleMode>({
+			title: 'Rectangle Tool',
+			description: 'Select rectangle creation method:',
+			cardClass: 'rectangle-tool-card',
+			selectorClass: 'rectangle-mode-selector',
+			buttonClass: 'rectangle-mode-btn',
+			iconClass: 'rectangle-mode-icon',
+			textClass: 'rectangle-mode-text',
+			hintClass: 'rectangle-mode-hint',
+			dataAttribute: 'data-rect-mode',
+			cancelButtonId: 'btn-rectangle-cancel-icon',
+			modes: [
+				{ id: 'corner', label: '2-Point', title: '2-Point Rectangle (Alt+1)', iconName: 'rectangle' },
+				{ id: 'center', label: 'Center', title: 'Center Rectangle (Alt+2)', iconName: 'rectangle_center' },
+				{ id: 'three_point', label: '3-Point', title: '3-Point Rectangle (Alt+3)', iconName: 'rectangle_3point' },
+				{ id: 'rounded', label: 'Rounded', title: 'Rounded Rectangle (Alt+4)', iconName: 'rectangle_rounded' },
+			],
+			getCurrentMode: () => this.mode,
+			onSelectMode: mode => this.setMode(mode),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+	}
+
+	getStepHint(): string {
+		const mode = this._mode;
+		const step = this.drawingStep;
+		if (mode === 'corner') {
+			if (step === 0) return '1. Click to place first corner';
+			return '2. Click to place opposite corner';
+		} else if (mode === 'center') {
+			if (step === 0) return '1. Click to place center point';
+			return '2. Click to place corner point';
+		} else if (mode === 'three_point') {
+			if (step === 0) return '1. Click to place first corner';
+			if (step === 1) return '2. Click to place second corner (base line)';
+			return '3. Click to set rectangle height';
+		} else {
+			if (step === 0) return '1. Click to place first corner';
+			if (step === 1) return '2. Click to place opposite corner';
+			return '3. Click to set corner radius';
+		}
 	}
 
 	get mode(): RectangleMode {

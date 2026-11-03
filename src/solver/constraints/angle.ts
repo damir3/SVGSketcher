@@ -1,6 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgPath, createSvgRect, createSvgText } from '../../canvas/svg';
 
@@ -311,4 +312,13 @@ export class AngleConstraint extends BaseConstraint {
 
 		return null;
 	}
+
+	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
+		constraint: this,
+		title: 'Angle',
+		dimension: {
+			label: 'Angle',
+			getValue: () => `${Number(this.targetAngle.toFixed(2))}°`,
+		},
+	});
 }

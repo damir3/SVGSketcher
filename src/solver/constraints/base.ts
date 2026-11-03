@@ -1,5 +1,6 @@
 import type { IConstraint, ConstraintType, JacobianEntry } from '../types';
 import type { ConstraintRenderContext } from './renderContext';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 export * from './renderContext';
 
 export class BaseConstraint implements IConstraint {
@@ -52,6 +53,8 @@ export class BaseConstraint implements IConstraint {
 	distanceTo(_screen: any, _sketch: any, _viewport: any, _thresholdPx?: number): number | null {
 		return null;
 	}
+
+	readonly sidebarPanel: ConstraintPanel = new ConstraintPanel(this);
 
 	protected addJacobianEntry(
 		entries: JacobianEntry[],

@@ -14,6 +14,9 @@ import {
 	loadCircleTangentPreset,
 } from './model/presets';
 import { ICONS } from './ui/icons';
+import { setToolIconProvider } from './ui/panels/tools/iconProvider';
+
+setToolIconProvider(name => ICONS[name] ?? '');
 
 function initApp(): void {
 	const app = document.getElementById('app');
@@ -163,56 +166,6 @@ function initApp(): void {
 
 	interaction.onViewportChange = () => {
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
-	};
-
-	interaction.onArcModeChange = mode => {
-		toolbar.setArcMode(mode);
-		sidebar.render();
-	};
-
-	interaction.onRectangleModeChange = mode => {
-		toolbar.setRectangleMode(mode);
-		sidebar.render();
-	};
-
-	interaction.onRectangleStateChange = () => {
-		sidebar.render();
-	};
-
-	interaction.onSlotModeChange = mode => {
-		toolbar.setSlotMode(mode);
-		sidebar.render();
-	};
-
-	interaction.onSlotStateChange = () => {
-		sidebar.render();
-	};
-
-	interaction.onSplineModeChange = mode => {
-		toolbar.setSplineMode(mode);
-		sidebar.render();
-	};
-
-	interaction.onSplineStateChange = () => {
-		sidebar.render();
-	};
-
-	interaction.onChamferModeChange = mode => {
-		toolbar.setChamferMode(mode);
-		sidebar.render();
-	};
-
-	interaction.onChamferStateChange = () => {
-		sidebar.render();
-	};
-
-	interaction.onOffsetDirectionChange = direction => {
-		toolbar.setOffsetDirection(direction);
-		sidebar.render();
-	};
-
-	interaction.onOffsetStateChange = () => {
-		sidebar.render();
 	};
 
 	interaction.onConstructionChange = active => {

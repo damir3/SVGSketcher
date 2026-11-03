@@ -1,7 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
-import { ToolPopup } from '../../../ui/tool-popup';
+import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import {
 	getConnectedPrimitivesForPoint,
@@ -210,6 +210,50 @@ export class FilletTool extends BaseTool {
 		}
 	}
 
+	getGizmoBoundingBox(): ScreenBoundingBox | null {
+		if (!this.ctx || this.pendingFillets.length === 0) return null;
+
+		const activePf =
+			this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
+			this.pendingFillets[this.pendingFillets.length - 1];
+		if (!activePf) return null;
+
+		const pts: Vec2[] = [];
+
+		if (activePf.result) {
+			pts.push(this.ctx.viewport.worldToScreen(activePf.result.midArc.x, activePf.result.midArc.y));
+			pts.push(this.ctx.viewport.worldToScreen(activePf.result.center.x, activePf.result.center.y));
+		}
+		if (activePf.vertexPointId) {
+			const pt = this.ctx.sketch.points.get(activePf.vertexPointId);
+			if (pt) pts.push(this.ctx.viewport.worldToScreen(pt.x, pt.y));
+		}
+		if (activePf.clickPos1) {
+			pts.push(this.ctx.viewport.worldToScreen(activePf.clickPos1.x, activePf.clickPos1.y));
+		}
+		if (this.ctx.renderer?.filletGizmoHandle) {
+			const gh = this.ctx.renderer.filletGizmoHandle;
+			pts.push({ x: gh.screenX - 16, y: gh.screenY - 16 });
+			pts.push({ x: gh.screenX + 16, y: gh.screenY + 16 });
+		}
+
+		if (pts.length === 0) return null;
+
+		let minX = pts[0].x;
+		let maxX = pts[0].x;
+		let minY = pts[0].y;
+		let maxY = pts[0].y;
+
+		for (let i = 1; i < pts.length; i++) {
+			if (pts[i].x < minX) minX = pts[i].x;
+			if (pts[i].x > maxX) maxX = pts[i].x;
+			if (pts[i].y < minY) minY = pts[i].y;
+			if (pts[i].y > maxY) maxY = pts[i].y;
+		}
+
+		return { minX, maxX, minY, maxY };
+	}
+
 	override onMouseMove(e: ToolMouseEvent): void {
 		const screen = e.screen;
 		const world = e.world;
@@ -254,23 +298,9 @@ export class FilletTool extends BaseTool {
 
 		// Update popup position
 		if (this.popup.isOpen() && this.pendingFillets.length > 0) {
-			const activePf =
-				this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
-				this.pendingFillets[this.pendingFillets.length - 1];
-			if (activePf) {
-				if (activePf.result) {
-					const sPos = this.ctx.viewport.worldToScreen(activePf.result.midArc.x, activePf.result.midArc.y);
-					this.popup.updatePosition(sPos);
-				} else if (activePf.vertexPointId) {
-					const pt = this.ctx.sketch.points.get(activePf.vertexPointId);
-					if (pt) {
-						const sPos = this.ctx.viewport.worldToScreen(pt.x, pt.y);
-						this.popup.updatePosition(sPos);
-					}
-				} else if (activePf.clickPos1) {
-					const sPos = this.ctx.viewport.worldToScreen(activePf.clickPos1.x, activePf.clickPos1.y);
-					this.popup.updatePosition(sPos);
-				}
+			const bbox = this.getGizmoBoundingBox();
+			if (bbox) {
+				this.popup.updatePosition(bbox);
 			}
 		}
 	}
@@ -437,12 +467,13 @@ export class FilletTool extends BaseTool {
 			? this.ctx.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
 			: this.ctx.viewport.worldToScreen(pt.x, pt.y);
 
+		const bbox = this.getGizmoBoundingBox();
 		if (this.pendingFillets.length === 1) {
 			this.popup.setLocked('radius', false);
 			this.popup.setValue('radius', this.filletRadius);
-			this.popup.show(sPos);
+			this.popup.show(bbox ?? sPos);
 		} else {
-			this.popup.updatePosition(sPos);
+			this.popup.updatePosition(bbox ?? sPos);
 		}
 
 		this.ctx.requestRender();
@@ -556,12 +587,13 @@ export class FilletTool extends BaseTool {
 			? this.ctx.viewport.worldToScreen(sharedCornerPt.x, sharedCornerPt.y)
 			: this.ctx.viewport.worldToScreen(clickPos1.x, clickPos1.y);
 
+		const bbox = this.getGizmoBoundingBox();
 		if (this.pendingFillets.length === 1) {
 			this.popup.setLocked('radius', false);
 			this.popup.setValue('radius', this.filletRadius);
-			this.popup.show(sPos);
+			this.popup.show(bbox ?? sPos);
 		} else {
-			this.popup.updatePosition(sPos);
+			this.popup.updatePosition(bbox ?? sPos);
 		}
 
 		this.ctx.requestRender();

@@ -6,6 +6,7 @@ import type { GeoCurve } from '../../math/intersection';
 import type { IConstraint } from '../../solver/types';
 import type { HoverTarget, FindHoverTargetOptions } from './hoverTarget';
 import type { IHighlightManager } from '../highlightManager';
+import type { IToolPanel } from '../../ui/panels/tools/types';
 import type {
 	SketchPoint,
 	SketchLine,
@@ -187,6 +188,9 @@ export interface ITool {
 
 	/** Default CSS cursor for this tool */
 	readonly defaultCursor?: string;
+
+	/** Optional sidebar panel rendered when this tool is active */
+	readonly sidebarPanel?: IToolPanel;
 
 	// --- Lifecycle ---
 	/** Called when tool is selected and becomes active */

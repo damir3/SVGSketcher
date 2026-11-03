@@ -1,8 +1,9 @@
-import type { Vec2 } from '../../math/vector';
+import { dist, type Vec2 } from '../../math/vector';
 import { distanceToEllipticalArc } from '../../math/hitTest';
 import { ellipticalArcIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipticalArc } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchEllipticalArc implements ISketchPrimitive {
 	readonly type = 'elliptical_arc' as const;
@@ -119,4 +120,56 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 			isConstruction: this.isConstruction,
 		};
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		fields: [
+			{
+				id: 'insp-ellipse-rx',
+				label: 'Major Radius (Rx)',
+				unit: 'mm',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
+					return center && majorPt ? Number(dist(center, majorPt).toFixed(2)) : 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rx: val }),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-ellipse-ry',
+				label: 'Minor Radius (Ry)',
+				unit: 'mm',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
+					return center && minorPt ? Number(dist(center, minorPt).toFixed(2)) : 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { ry: val }),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-ellipse-rot',
+				label: 'Rotation',
+				unit: '°',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
+					return center && majorPt
+						? Number(((Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI).toFixed(2))
+						: 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
+			},
+		],
+		rows: [
+			{
+				label: 'Direction:',
+				getValue: () => (this.clockwise ? 'Clockwise' : 'Counter-Clockwise'),
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('elliptical_arc', this.id),
+		constraintsLabel: 'this elliptical arc',
+		entityIds: () => [this.id],
+	});
 }

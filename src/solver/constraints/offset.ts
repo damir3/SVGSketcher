@@ -1,6 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
 import type { Vec2 } from '../../math/vector';
@@ -294,4 +295,13 @@ export class OffsetConstraint extends BaseConstraint {
 		}
 		return res;
 	}
+
+	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
+		constraint: this,
+		title: 'Offset Distance',
+		dimension: {
+			label: 'Distance',
+			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+		},
+	});
 }

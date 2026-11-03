@@ -3,6 +3,7 @@ import { distanceToCircle } from '../../math/hitTest';
 import { circleIntersectsAABB } from '../../math/aabb';
 import type { GeoCircle } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchCircle implements ISketchPrimitive {
 	readonly type = 'circle' as const;
@@ -56,4 +57,29 @@ export class SketchCircle implements ISketchPrimitive {
 			isConstruction: this.isConstruction,
 		};
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		fields: [
+			{
+				id: 'insp-circle-radius',
+				label: 'Radius',
+				unit: 'mm',
+				getValue: () => Number(this.radius.toFixed(2)),
+				onCommit: (val, ctx) => ctx.sketch.setCircleOrArcRadius(this.id, val),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-circle-diameter',
+				label: 'Diameter',
+				unit: 'mm',
+				getValue: () => Number((this.radius * 2).toFixed(2)),
+				onCommit: (val, ctx) => ctx.sketch.setCircleOrArcRadius(this.id, val / 2),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('circle', this.id),
+		constraintsLabel: 'this circle',
+		entityIds: () => [this.id],
+	});
 }

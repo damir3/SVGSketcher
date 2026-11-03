@@ -3,6 +3,7 @@ import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 
 /**
  * Dimensional constraint: distance between two points equals value
@@ -148,4 +149,18 @@ export class DistanceConstraint extends BaseConstraint {
 
 		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
+
+	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
+		constraint: this,
+		title: () =>
+			this.orientation === 'horizontal'
+				? 'Horizontal Distance'
+				: this.orientation === 'vertical'
+				? 'Vertical Distance'
+				: 'Distance',
+		dimension: {
+			label: 'Distance',
+			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+		},
+	});
 }

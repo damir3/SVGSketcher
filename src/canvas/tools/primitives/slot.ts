@@ -11,6 +11,7 @@ import {
 } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { parseNumericOrExpression } from '../../../math/expression';
+import { VariationToolPanel } from '../../../ui/panels/tools';
 
 export type SlotMode =
 	| 'center_to_center'
@@ -168,6 +169,86 @@ export class SlotTool extends BaseTool {
 			this.ctx?.setTool('select');
 			this.ctx?.requestRender();
 		};
+
+		this.sidebarPanel = new VariationToolPanel<SlotMode>({
+			title: 'Slot Tool',
+			description: 'Select slot creation method:',
+			cardClass: 'slot-tool-card rectangle-tool-card',
+			selectorClass: 'slot-mode-selector',
+			buttonClass: 'slot-mode-btn',
+			iconClass: 'slot-mode-icon',
+			textClass: 'slot-mode-text',
+			hintClass: 'rectangle-mode-hint slot-mode-hint',
+			dataAttribute: 'data-slot-mode',
+			cancelButtonId: 'btn-slot-cancel-icon',
+			modes: [
+				{
+					id: 'center_to_center',
+					label: 'Center-Center',
+					title: 'Center to Center Slot (Alt+1)',
+					iconName: 'slot_center_to_center',
+				},
+				{
+					id: 'center_point',
+					label: 'Center Point',
+					title: 'Center Point Slot (Alt+2)',
+					iconName: 'slot_center_point',
+				},
+				{
+					id: 'overall',
+					label: 'Overall',
+					title: 'Overall Slot (Alt+3)',
+					iconName: 'slot_overall',
+				},
+				{
+					id: 'three_point_arc',
+					label: '3-Point Arc',
+					title: '3-Point Arc Slot (Alt+4)',
+					iconName: 'slot_arc_3point',
+				},
+				{
+					id: 'center_point_arc',
+					label: 'Center Arc',
+					title: 'Center Point Arc Slot (Alt+5)',
+					iconName: 'slot_arc_center',
+				},
+			],
+			getCurrentMode: () => this.mode,
+			onSelectMode: mode => this.setMode(mode),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+	}
+
+	getStepHint(): string {
+		const mode = this._mode;
+		const step = this.drawingStep;
+		if (mode === 'center_to_center') {
+			if (step === 0) return '1. Click to place first arc center';
+			if (step === 1) return '2. Click to place second arc center';
+			return '3. Click or lock radius to finish slot';
+		} else if (mode === 'center_point') {
+			if (step === 0) return '1. Click to place slot center point';
+			if (step === 1) return '2. Click to place one arc center';
+			return '3. Click or lock radius to finish slot';
+		} else if (mode === 'overall') {
+			if (step === 0) return '1. Click to place first outer edge';
+			if (step === 1) return '2. Click to place second outer edge';
+			return '3. Click or lock radius to finish slot';
+		} else if (mode === 'three_point_arc') {
+			if (step === 0) return '1. Click to place start arc center';
+			if (step === 1) return '2. Click to place end arc center';
+			if (step === 2) return '3. Click point on centerline arc';
+			return '4. Click or lock radius to finish arc slot';
+		} else {
+			if (step === 0) return '1. Click to place arc center point';
+			if (step === 1) return '2. Click to place start arc center';
+			if (step === 2) return '3. Click end point or lock sweep angle';
+			return '4. Click or lock radius to finish arc slot';
+		}
 	}
 
 	private updatePopupValues(distVal: number, angleVal: number, radVal: number | null): void {

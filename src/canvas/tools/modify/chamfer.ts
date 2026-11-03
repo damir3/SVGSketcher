@@ -1,8 +1,9 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, normalize, vec, type Vec2 } from '../../../math/vector';
-import { ToolPopup } from '../../../ui/tool-popup';
+import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
+import { VariationToolPanel } from '../../../ui/panels/tools';
 import {
 	type ChamferMode,
 	type ChamferCandidate,
@@ -119,6 +120,56 @@ export class ChamferTool extends BaseTool {
 		this.popup.onCancel = () => {
 			this.cancel();
 		};
+
+		this.sidebarPanel = new VariationToolPanel<ChamferMode>({
+			title: 'Chamfer Tool',
+			description: 'Select chamfer mode:',
+			cardClass: 'chamfer-tool-card',
+			selectorClass: 'chamfer-mode-selector',
+			buttonClass: 'chamfer-mode-btn',
+			iconClass: 'chamfer-mode-icon',
+			textClass: 'chamfer-mode-text',
+			hintClass: 'chamfer-mode-hint',
+			dataAttribute: 'data-chamfer-mode',
+			cancelButtonId: 'btn-chamfer-cancel-icon',
+			modes: [
+				{
+					id: 'equal_distance',
+					label: 'Equal',
+					title: 'Equal Distance (Alt+1)',
+					iconName: 'chamferEqual',
+				},
+				{
+					id: 'two_distance',
+					label: 'Two Dist',
+					title: 'Two Distance (Alt+2)',
+					iconName: 'chamferTwoDistance',
+				},
+				{
+					id: 'distance_angle',
+					label: 'Dist & Angle',
+					title: 'Distance & Angle (Alt+3)',
+					iconName: 'chamferDistanceAngle',
+				},
+			],
+			getCurrentMode: () => this.mode,
+			onSelectMode: mode => this.setMode(mode),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+	}
+
+	getStepHint(): string {
+		let hint = 'Click a vertex point with 2 lines, or click two lines sharing a vertex.';
+		if (this.candidate) {
+			hint = 'Corner selected. Drag gizmo arrows or enter values in popup. Press Enter to apply.';
+		} else if (this.firstLine) {
+			hint = 'First line selected. Click the second line sharing a vertex.';
+		}
+		return hint;
 	}
 
 	override activate(ctx: any): void {
@@ -316,6 +367,44 @@ export class ChamferTool extends BaseTool {
 		}
 	}
 
+	getGizmoBoundingBox(): ScreenBoundingBox | null {
+		if (!this.candidate || !this.ctx) return null;
+
+		const sVertex = this.ctx.viewport.worldToScreen(
+			this.candidate.vertexPos.x,
+			this.candidate.vertexPos.y
+		);
+		const pts: Vec2[] = [sVertex];
+
+		if (this.ctx.renderer?.chamferGizmoHandles) {
+			for (const h of this.ctx.renderer.chamferGizmoHandles) {
+				pts.push({ x: h.screenX - 16, y: h.screenY - 16 });
+				pts.push({ x: h.screenX + 16, y: h.screenY + 16 });
+			}
+		}
+
+		if (this.candidate.result?.t1) {
+			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t1.x, this.candidate.result.t1.y));
+		}
+		if (this.candidate.result?.t2) {
+			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t2.x, this.candidate.result.t2.y));
+		}
+
+		let minX = pts[0].x;
+		let maxX = pts[0].x;
+		let minY = pts[0].y;
+		let maxY = pts[0].y;
+
+		for (let i = 1; i < pts.length; i++) {
+			if (pts[i].x < minX) minX = pts[i].x;
+			if (pts[i].x > maxX) maxX = pts[i].x;
+			if (pts[i].y < minY) minY = pts[i].y;
+			if (pts[i].y > maxY) maxY = pts[i].y;
+		}
+
+		return { minX, maxX, minY, maxY };
+	}
+
 	private selectCandidate(cand: ChamferCandidate): void {
 		this.candidate = cand;
 		this.firstLine = null;
@@ -332,7 +421,8 @@ export class ChamferTool extends BaseTool {
 			this.popup.setValue('angle', this.angleDeg);
 			this.popup.setValue('flip', this.flip);
 			this.popup.setError(false);
-			this.popup.show(sPos);
+			const bbox = this.getGizmoBoundingBox();
+			this.popup.show(bbox ?? sPos);
 			this.popup.focus();
 		}
 		this.ctx.setCursor('default');
@@ -387,6 +477,8 @@ export class ChamferTool extends BaseTool {
 					this.dist1 = newDist;
 				}
 				this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
+				const bbox = this.getGizmoBoundingBox();
+				if (bbox) this.popup.updatePosition(bbox);
 				this.recalculate();
 				this.ctx.requestRender();
 				return;
@@ -416,6 +508,8 @@ export class ChamferTool extends BaseTool {
 					const newAngle = Math.max(0, Math.min(maxAngle, Math.round(signedAngleDeg)));
 					this.angleDeg = newAngle;
 					this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
+					const angleBbox = this.getGizmoBoundingBox();
+					if (angleBbox) this.popup.updatePosition(angleBbox);
 					this.recalculate();
 					this.ctx.requestRender();
 				}

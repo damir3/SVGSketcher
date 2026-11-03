@@ -2,6 +2,7 @@ import type { ITool, ToolContext, ToolMouseEvent, ToolRenderContext } from './ty
 import type { ToolType } from './types';
 import type { HoverTarget, FindHoverTargetOptions } from './hoverTarget';
 import type { Vec2 } from '../../math/vector';
+import type { IToolPanel } from '../../ui/panels/tools/types';
 
 /**
  * Abstract base class providing common default implementations for tools.
@@ -9,8 +10,13 @@ import type { Vec2 } from '../../math/vector';
 export abstract class BaseTool implements ITool {
 	abstract readonly id: ToolType;
 	readonly defaultCursor: string = 'crosshair';
+	sidebarPanel?: IToolPanel;
 
 	protected ctx!: ToolContext;
+
+	get context(): ToolContext | undefined {
+		return this.ctx;
+	}
 
 	activate(ctx: ToolContext): void {
 		this.ctx = ctx;

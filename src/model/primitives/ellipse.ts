@@ -1,8 +1,9 @@
-import type { Vec2 } from '../../math/vector';
+import { dist, type Vec2 } from '../../math/vector';
 import { distanceToEllipse } from '../../math/hitTest';
 import { ellipseIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipse } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';
+import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchEllipse implements ISketchPrimitive {
 	readonly type = 'ellipse' as const;
@@ -80,4 +81,50 @@ export class SketchEllipse implements ISketchPrimitive {
 			isConstruction: this.isConstruction,
 		};
 	}
+
+	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
+		title: () => this.id,
+		fields: [
+			{
+				id: 'insp-ellipse-rx',
+				label: 'Major Radius (Rx)',
+				unit: 'mm',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
+					return center && majorPt ? Number(dist(center, majorPt).toFixed(2)) : 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rx: val }),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-ellipse-ry',
+				label: 'Minor Radius (Ry)',
+				unit: 'mm',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
+					return center && minorPt ? Number(dist(center, minorPt).toFixed(2)) : 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { ry: val }),
+				validate: val => !isNaN(val) && isFinite(val) && val > 0,
+			},
+			{
+				id: 'insp-ellipse-rot',
+				label: 'Rotation',
+				unit: '°',
+				getValue: ctx => {
+					const center = ctx.sketch.points.get(this.centerId);
+					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
+					return center && majorPt
+						? Number(((Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI).toFixed(2))
+						: 0;
+				},
+				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
+			},
+		],
+		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('ellipse', this.id),
+		constraintsLabel: 'this ellipse',
+		entityIds: () => [this.id],
+	});
 }

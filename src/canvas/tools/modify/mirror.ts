@@ -1,6 +1,8 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
+import { ModifyToolPanel } from '../../../ui/panels/tools';
+import { dist } from '../../../math/vector';
 
 export interface MirrorState {
 	phase: 'objects' | 'mirror_line';
@@ -10,6 +12,83 @@ export interface MirrorState {
 
 export class MirrorTool extends BaseTool {
 	readonly id = 'mirror' as const;
+	readonly sidebarPanel: ModifyToolPanel = new ModifyToolPanel({
+		cardClass: 'mirror-tool-card',
+		iconName: 'mirror',
+		title: 'Mirror Tool',
+		description: 'Create symmetric copies of primitives across a centerline.',
+		steps: [
+			{
+				id: 'objects',
+				num: 1,
+				title: 'Objects to Mirror',
+				getValue: () => {
+					const count = this.state?.selectedObjectIds.size ?? 0;
+					return count === 0 ? 'Click or box-select...' : `${count} object${count === 1 ? '' : 's'} selected`;
+				},
+				isActive: () => this.state?.phase === 'objects',
+				showClear: () => (this.state?.selectedObjectIds.size ?? 0) > 0,
+				clearTitle: 'Clear selection',
+				onSelect: () => this.setPhase('objects'),
+				onClear: () => {
+					if (this.state) {
+						this.state.selectedObjectIds.clear();
+						this.onStateChange?.();
+						this.ctx?.requestRender();
+					}
+				},
+			},
+			{
+				id: 'mirror_line',
+				num: 2,
+				title: 'Mirror Line',
+				getValue: () => {
+					const mirrorLineId = this.state?.mirrorLineId;
+					if (mirrorLineId && this.ctx?.sketch) {
+						const line = this.ctx.sketch.lines.get(mirrorLineId);
+						if (line) {
+							const p1 = this.ctx.sketch.points.get(line.p1Id);
+							const p2 = this.ctx.sketch.points.get(line.p2Id);
+							const len = p1 && p2 ? ` (${dist(p1, p2).toFixed(1)} mm)` : '';
+							return `${line.id}${len}`;
+						}
+						return mirrorLineId;
+					}
+					return 'Click a line in canvas';
+				},
+				isSelected: () => Boolean(this.state?.mirrorLineId),
+				isActive: () => this.state?.phase === 'mirror_line',
+				showClear: () => Boolean(this.state?.mirrorLineId),
+				clearTitle: 'Clear mirror line',
+				onSelect: () => this.setPhase('mirror_line'),
+				onClear: () => {
+					if (this.state) {
+						this.state.mirrorLineId = null;
+						this.onStateChange?.();
+						this.ctx?.requestRender();
+					}
+				},
+			},
+		],
+		canApply: () => Boolean((this.state?.selectedObjectIds.size ?? 0) > 0 && this.state?.mirrorLineId),
+		applyLabel: 'Apply Mirror',
+		onApply: () => this.executeMirror(),
+		onCancel: () => {
+			this.cancel();
+			this.ctx?.setTool('select');
+		},
+		getHint: () => {
+			const mirrorLineId = this.state?.mirrorLineId;
+			const objCount = this.state?.selectedObjectIds.size ?? 0;
+			if (!mirrorLineId && objCount === 0) return 'Select objects first, then pick a mirror line.';
+			if (!mirrorLineId) return 'Click a centerline in the canvas to reflect across.';
+			if (objCount === 0) return 'Pick geometry in the canvas to mirror.';
+			return 'Ready to apply! Press Enter or click Apply Mirror.';
+		},
+		bindStateChange: cb => {
+			this.onStateChange = cb;
+		},
+	});
 
 	state: MirrorState | null = null;
 	onStateChange?: () => void;

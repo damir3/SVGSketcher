@@ -892,13 +892,14 @@ describe('Primitive Tools Creation', () => {
 	it('CanvasInteraction handleKeyDown switches Rectangle modes with Alt+1..4', () => {
 		const switchedModes: string[] = [];
 		let prevented = 0;
+		const rectTool = new RectangleTool();
+		(rectTool.sidebarPanel as any).options.onSelectMode = (mode: string) => {
+			switchedModes.push(mode);
+		};
 		const fakeInteraction = {
 			isMac: false,
 			activeTool: 'rectangle',
-			setRectangleMode: (mode: string) => {
-				switchedModes.push(mode);
-			},
-			setArcMode: (_mode: string) => {},
+			activeToolInstance: rectTool,
 		};
 
 		const makeAltKey = (code: string, key: string) => ({
@@ -924,13 +925,14 @@ describe('Primitive Tools Creation', () => {
 	it('CanvasInteraction handleKeyDown switches Arc modes with Alt+1..3', () => {
 		const switchedModes: string[] = [];
 		let prevented = 0;
+		const arcTool = new ArcTool();
+		(arcTool.sidebarPanel as any).options.onSelectMode = (mode: string) => {
+			switchedModes.push(mode);
+		};
 		const fakeInteraction = {
 			isMac: false,
 			activeTool: 'arc',
-			setRectangleMode: (_mode: string) => {},
-			setArcMode: (mode: string) => {
-				switchedModes.push(mode);
-			},
+			activeToolInstance: arcTool,
 		};
 
 		const makeAltKey = (code: string, key: string) => ({
@@ -954,13 +956,14 @@ describe('Primitive Tools Creation', () => {
 
 	it('CanvasInteraction handleKeyDown works on macOS Option key with special characters', () => {
 		const switchedModes: string[] = [];
+		const rectTool = new RectangleTool();
+		(rectTool.sidebarPanel as any).options.onSelectMode = (mode: string) => {
+			switchedModes.push(mode);
+		};
 		const fakeInteraction = {
 			isMac: true,
 			activeTool: 'rectangle',
-			setRectangleMode: (mode: string) => {
-				switchedModes.push(mode);
-			},
-			setArcMode: (_mode: string) => {},
+			activeToolInstance: rectTool,
 		};
 
 		// On macOS, Option+1..4 produces characters like ¡, ™, £, ¢ while code is Digit1..4
@@ -1335,12 +1338,14 @@ describe('Primitive Tools Creation', () => {
 	it('CanvasInteraction handleKeyDown switches Slot modes with Alt+1..5', () => {
 		const switchedModes: string[] = [];
 		let prevented = 0;
+		const slotTool = new SlotTool();
+		(slotTool.sidebarPanel as any).options.onSelectMode = (mode: string) => {
+			switchedModes.push(mode);
+		};
 		const fakeInteraction = {
 			isMac: false,
 			activeTool: 'slot',
-			setSlotMode: (mode: string) => {
-				switchedModes.push(mode);
-			},
+			activeToolInstance: slotTool,
 		};
 
 		const makeAltKey = (code: string, key: string) => ({
@@ -1373,12 +1378,14 @@ describe('Primitive Tools Creation', () => {
 	it('CanvasInteraction handleKeyDown switches Spline modes with Alt+1..2', () => {
 		const switchedModes: string[] = [];
 		let prevented = 0;
+		const splineTool = new SplineTool();
+		(splineTool.sidebarPanel as any).options.onSelectMode = (mode: string) => {
+			switchedModes.push(mode);
+		};
 		const fakeInteraction = {
 			isMac: false,
 			activeTool: 'spline',
-			setSplineMode: (mode: string) => {
-				switchedModes.push(mode);
-			},
+			activeToolInstance: splineTool,
 		};
 
 		const makeAltKey = (code: string, key: string) => ({

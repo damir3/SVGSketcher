@@ -61,16 +61,6 @@ export function deselectEntity(
 			break;
 	}
 
-	if (type !== 'constraint') {
-		for (const c of sketch.getConstraintsForEntity(type as any, id)) {
-			const otherEntities = sketch.getEntitiesForConstraint(c);
-			const stillSelected = otherEntities.some(ent => sketch.isEntitySelected(ent.id, ent.type));
-			if (!stillSelected) {
-				sketch.selection.constraintIds.delete(c.id);
-			}
-		}
-	}
-
 	sketch.notify();
 }
 
@@ -108,39 +98,18 @@ export function selectEntities(
 	for (const item of items) {
 		if (item.type === 'point') {
 			sketch.selection.pointIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('point', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'line') {
 			sketch.selection.lineIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('line', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'circle') {
 			sketch.selection.circleIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('circle', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'arc') {
 			sketch.selection.arcIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('arc', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'ellipse') {
 			sketch.selection.ellipseIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('ellipse', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'elliptical_arc') {
 			sketch.selection.ellipticalArcIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('elliptical_arc', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'spline') {
 			sketch.selection.splineIds.add(item.id);
-			for (const c of sketch.getConstraintsForEntity('spline', item.id)) {
-				sketch.selection.constraintIds.add(c.id);
-			}
 		} else if (item.type === 'constraint') {
 			sketch.selection.constraintIds.add(item.id);
 		}

@@ -3,6 +3,8 @@ import { BaseConstraint } from './base';
 import type { PatternPointPair, PatternRadiusPair } from './circularPattern';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
+import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
+import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
 
 export interface RectangularPatternCopyData {
 	copyIndex: number;
@@ -108,6 +110,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 	suppression: boolean;
 	suppressedIndices: number[];
 	copies: RectangularPatternCopyData[];
+	distance1Expression?: string;
+	distance2Expression?: string;
 
 	constructor(
 		id: string,
@@ -127,7 +131,9 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		suppression: boolean,
 		suppressedIndices: number[],
 		copies: RectangularPatternCopyData[],
-		weight = 1.0
+		weight = 1.0,
+		distance1Expression?: string,
+		distance2Expression?: string
 	) {
 		const entityIdSet = new Set<string>();
 		if (line1P1Id) entityIdSet.add(line1P1Id);
@@ -166,6 +172,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		this.suppression = suppression;
 		this.suppressedIndices = [...suppressedIndices];
 		this.copies = copies;
+		this.distance1Expression = distance1Expression;
+		this.distance2Expression = distance2Expression;
 	}
 
 	override getEquationsCount(): number {
@@ -489,4 +497,153 @@ export class RectangularPatternConstraint extends BaseConstraint {
 
 		ctx.renderBadge(this.id, sCtr.x + 14, sCtr.y - 14, 'rectangular_pattern', COLORS.primary);
 	}
+
+	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
+		constraint: this,
+		title: 'Rectangular Pattern',
+		iconName: 'rectangular_pattern',
+		sections: [
+			{
+				title: 'AXIS 1',
+				segmentedControls: [
+					{
+						label: 'Direction',
+						options: [
+							{ id: 'one_direction', label: 'One Direction' },
+							{ id: 'symmetric', label: 'Symmetric' },
+						],
+						getCurrent: () => this.direction1,
+						onSelect: (dir, context) => {
+							context.sketch.updateRectangularPattern(this.id, {
+								direction1: dir as 'one_direction' | 'symmetric',
+							});
+							context.requestRender?.();
+						},
+					},
+				],
+				fields: [
+					{
+						id: `insp-rpat-dist1-${this.id}`,
+						label: 'Distance',
+						unit: 'mm',
+						type: 'text',
+						step: 0.5,
+						getValue: () => this.distance1Expression ?? Number(this.distance1.toFixed(2)),
+						onChange: (val, context) => {
+							const text = String(val).trim();
+							const parsed = parseNumericOrExpression(text, this.distance1, context.sketch.getParameterValuesMap());
+							const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
+							if (!isNaN(parsed) && isFinite(parsed)) {
+								context.sketch.updateRectangularPattern(this.id, {
+									distance1: parsed,
+									distance1Expression: expr,
+								});
+								context.requestRender?.();
+							}
+						},
+					},
+					{
+						id: `insp-rpat-qty1-${this.id}`,
+						label: 'Quantity',
+						type: 'number',
+						min: 1,
+						max: 100,
+						step: 1,
+						getValue: () => this.quantity1,
+						onInput: (val, context) => {
+							if (!isNaN(val) && val >= 1) {
+								context.sketch.updateRectangularPattern(this.id, { quantity1: val });
+								context.requestRender?.();
+							}
+						},
+					},
+				],
+			},
+			{
+				title: 'AXIS 2',
+				segmentedControls: [
+					{
+						label: 'Direction',
+						options: [
+							{ id: 'one_direction', label: 'One Direction' },
+							{ id: 'symmetric', label: 'Symmetric' },
+						],
+						getCurrent: () => this.direction2,
+						onSelect: (dir, context) => {
+							context.sketch.updateRectangularPattern(this.id, {
+								direction2: dir as 'one_direction' | 'symmetric',
+							});
+							context.requestRender?.();
+						},
+					},
+				],
+				fields: [
+					{
+						id: `insp-rpat-dist2-${this.id}`,
+						label: 'Distance',
+						unit: 'mm',
+						type: 'text',
+						step: 0.5,
+						getValue: () => this.distance2Expression ?? Number(this.distance2.toFixed(2)),
+						onChange: (val, context) => {
+							const text = String(val).trim();
+							const parsed = parseNumericOrExpression(text, this.distance2, context.sketch.getParameterValuesMap());
+							const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
+							if (!isNaN(parsed) && isFinite(parsed)) {
+								context.sketch.updateRectangularPattern(this.id, {
+									distance2: parsed,
+									distance2Expression: expr,
+								});
+								context.requestRender?.();
+							}
+						},
+					},
+					{
+						id: `insp-rpat-qty2-${this.id}`,
+						label: 'Quantity',
+						type: 'number',
+						min: 1,
+						max: 100,
+						step: 1,
+						getValue: () => this.quantity2,
+						onInput: (val, context) => {
+							if (!isNaN(val) && val >= 1) {
+								context.sketch.updateRectangularPattern(this.id, { quantity2: val });
+								context.requestRender?.();
+							}
+						},
+					},
+				],
+			},
+		],
+		checkboxes: [
+			{
+				id: `insp-rpat-suppression-${this.id}`,
+				label: 'Suppression',
+				isChecked: () => this.suppression,
+				hint: () => {
+					const maxI = Math.abs(this.distance1) > 1e-6 ? this.quantity1 : 1;
+					const maxJ = Math.abs(this.distance2) > 1e-6 ? this.quantity2 : 1;
+					let totalCopies = 0;
+					let suppressedCount = 0;
+					const suppressedSet = new Set(this.suppressedIndices);
+					for (let i = 0; i < maxI; i++) {
+						for (let j = 0; j < maxJ; j++) {
+							if (i === 0 && j === 0) continue;
+							totalCopies++;
+							if (this.suppression && suppressedSet.has(i * 1000 + j)) {
+								suppressedCount++;
+							}
+						}
+					}
+					const activeCopies = totalCopies - suppressedCount;
+					return `${activeCopies} of ${totalCopies} enabled`;
+				},
+				onChange: (checked, context) => {
+					context.sketch.updateRectangularPattern(this.id, { suppression: checked });
+					context.requestRender?.();
+				},
+			},
+		],
+	});
 }

@@ -28,8 +28,6 @@ import type {
 	SketchSpline,
 } from '../model/types';
 import { showToast } from '../ui/toast';
-import type { ChamferMode } from '../math/chamfer';
-import type { OffsetDirection } from '../math/offset';
 import type { GeoCurve } from '../math/intersection';
 import {
 	bsplineToBezier,
@@ -53,16 +51,12 @@ import {
 	LineTool,
 	CircleTool,
 	RectangleTool,
-	type RectangleMode,
 	SlotTool,
-	type SlotMode,
 	ArcTool,
-	type ArcMode,
 	PolygonTool,
 	EllipseTool,
 	EllipticalArcTool,
 	SplineTool,
-	type SplineMode,
 	TrimTool,
 	ExtendTool,
 	BreakTool,
@@ -198,22 +192,6 @@ export class CanvasInteraction {
 	onConstructionChange?: (isConstruction: boolean) => void;
 	isSnappingEnabled = true;
 	onSnappingChange?: (active: boolean) => void;
-
-	onMirrorStateChange?: () => void;
-	onCircularPatternStateChange?: () => void;
-	onRectangularPatternStateChange?: () => void;
-	onArcStateChange?: () => void;
-	onArcModeChange?: (mode: ArcMode) => void;
-	onRectangleStateChange?: () => void;
-	onRectangleModeChange?: (mode: RectangleMode) => void;
-	onSlotStateChange?: () => void;
-	onSlotModeChange?: (mode: SlotMode) => void;
-	onSplineStateChange?: () => void;
-	onSplineModeChange?: (mode: SplineMode) => void;
-	onChamferStateChange?: () => void;
-	onChamferModeChange?: (mode: ChamferMode) => void;
-	onOffsetStateChange?: () => void;
-	onOffsetDirectionChange?: (direction: OffsetDirection) => void;
 	onViewportChange?: () => void;
 
 	gizmoDragState: {
@@ -228,166 +206,6 @@ export class CanvasInteraction {
 	readonly tools = new Map<ToolType, ITool>();
 	activeToolInstance: ITool | null = null;
 	private isSettingTool = false;
-
-	getArcTool(): ArcTool | undefined {
-		return this.tools.get('arc') as ArcTool | undefined;
-	}
-
-	setArcMode(mode: ArcMode): void {
-		const arcTool = this.getArcTool();
-		if (arcTool) {
-			arcTool.setMode(mode);
-			this.onArcModeChange?.(mode);
-			if (this.activeTool !== 'arc') {
-				this.setTool('arc');
-			} else {
-				this.updateToolPreview();
-				this.onArcStateChange?.();
-			}
-		}
-	}
-
-	getRectangleTool(): RectangleTool | undefined {
-		return this.tools.get('rectangle') as RectangleTool | undefined;
-	}
-
-	setRectangleMode(mode: RectangleMode): void {
-		const rectTool = this.getRectangleTool();
-		if (rectTool) {
-			rectTool.setMode(mode);
-			this.onRectangleModeChange?.(mode);
-			if (this.activeTool !== 'rectangle') {
-				this.setTool('rectangle');
-			} else {
-				this.updateToolPreview();
-				this.onRectangleStateChange?.();
-			}
-		}
-	}
-
-	getSlotTool(): SlotTool | undefined {
-		return this.tools.get('slot') as SlotTool | undefined;
-	}
-
-	setSlotMode(mode: SlotMode): void {
-		const slotTool = this.getSlotTool();
-		if (slotTool) {
-			slotTool.setMode(mode);
-			this.onSlotModeChange?.(mode);
-			if (this.activeTool !== 'slot') {
-				this.setTool('slot');
-			} else {
-				this.updateToolPreview();
-				this.onSlotStateChange?.();
-			}
-		}
-	}
-
-	getSplineTool(): SplineTool | undefined {
-		return this.tools.get('spline') as SplineTool | undefined;
-	}
-
-	setSplineMode(mode: SplineMode): void {
-		const splineTool = this.getSplineTool();
-		if (splineTool) {
-			splineTool.setMode(mode);
-			this.onSplineModeChange?.(mode);
-			if (this.activeTool !== 'spline') {
-				this.setTool('spline');
-			} else {
-				this.updateToolPreview();
-				this.onSplineStateChange?.();
-			}
-		}
-	}
-
-	getChamferTool(): ChamferTool | undefined {
-		return this.tools.get('chamfer') as ChamferTool | undefined;
-	}
-
-	setChamferMode(mode: ChamferMode): void {
-		const chamferTool = this.getChamferTool();
-		if (chamferTool) {
-			chamferTool.setMode(mode);
-			this.onChamferModeChange?.(mode);
-			this.onChamferStateChange?.();
-			this.render();
-		}
-	}
-
-	getOffsetTool(): OffsetTool | undefined {
-		return this.tools.get('offset') as OffsetTool | undefined;
-	}
-
-	setOffsetDirection(direction: OffsetDirection): void {
-		const offsetTool = this.getOffsetTool();
-		if (offsetTool) {
-			offsetTool.setDirection(direction);
-			this.onOffsetDirectionChange?.(direction);
-			this.onOffsetStateChange?.();
-			this.render();
-		}
-	}
-
-	setOffsetChainSelection(chainSelection: boolean): void {
-		const offsetTool = this.getOffsetTool();
-		if (offsetTool) {
-			offsetTool.setChainSelection(chainSelection);
-			this.onOffsetStateChange?.();
-			this.render();
-		}
-	}
-
-	getMirrorTool(): MirrorTool | undefined {
-		return this.tools.get('mirror') as MirrorTool | undefined;
-	}
-
-	getCircularPatternTool(): CircularPatternTool | undefined {
-		return this.tools.get('circular_pattern') as CircularPatternTool | undefined;
-	}
-
-	getRectangularPatternTool(): RectangularPatternTool | undefined {
-		return this.tools.get('rectangular_pattern') as RectangularPatternTool | undefined;
-	}
-
-	setMirrorPhase(phase: 'objects' | 'mirror_line'): void {
-		(this.tools.get('mirror') as MirrorTool)?.setPhase(phase);
-	}
-
-	cancelMirror(): void {
-		(this.tools.get('mirror') as MirrorTool)?.cancel();
-		this.setTool('select');
-	}
-
-	executeMirror(): boolean {
-		return (this.tools.get('mirror') as MirrorTool)?.executeMirror() ?? false;
-	}
-
-	setCircularPatternPhase(phase: 'objects' | 'center_point'): void {
-		(this.tools.get('circular_pattern') as CircularPatternTool)?.setPhase(phase);
-	}
-
-	cancelCircularPattern(): void {
-		(this.tools.get('circular_pattern') as CircularPatternTool)?.cancel();
-		this.setTool('select');
-	}
-
-	executeCircularPattern(): boolean {
-		return (this.tools.get('circular_pattern') as CircularPatternTool)?.executeCircularPattern() ?? false;
-	}
-
-	setRectangularPatternPhase(phase: 'objects' | 'direction1' | 'direction2'): void {
-		(this.tools.get('rectangular_pattern') as RectangularPatternTool)?.setPhase(phase);
-	}
-
-	cancelRectangularPattern(): void {
-		(this.tools.get('rectangular_pattern') as RectangularPatternTool)?.cancel();
-		this.setTool('select');
-	}
-
-	executeRectangularPattern(): boolean {
-		return (this.tools.get('rectangular_pattern') as RectangularPatternTool)?.executeRectangularPattern() ?? false;
-	}
 
 	isDrawingSpline(): boolean {
 		const tool = this.activeToolInstance;
@@ -409,37 +227,13 @@ export class CanvasInteraction {
 		this.tools.set('point', new PointTool());
 		this.tools.set('line', new LineTool());
 		this.tools.set('circle', new CircleTool());
-		const rectTool = new RectangleTool();
-		rectTool.onModeChange = mode => {
-			this.onRectangleModeChange?.(mode);
-			this.onRectangleStateChange?.();
-		};
-		rectTool.onStateChange = () => this.onRectangleStateChange?.();
-		this.tools.set('rectangle', rectTool);
-		const slotTool = new SlotTool('center_to_center');
-		slotTool.onModeChange = mode => {
-			this.onSlotModeChange?.(mode);
-			this.onSlotStateChange?.();
-		};
-		slotTool.onStateChange = () => this.onSlotStateChange?.();
-		this.tools.set('slot', slotTool);
-		const arcTool = new ArcTool('center');
-		arcTool.onModeChange = mode => {
-			this.onArcModeChange?.(mode);
-			this.onArcStateChange?.();
-		};
-		arcTool.onStateChange = () => this.onArcStateChange?.();
-		this.tools.set('arc', arcTool);
+		this.tools.set('rectangle', new RectangleTool());
+		this.tools.set('slot', new SlotTool('center_to_center'));
+		this.tools.set('arc', new ArcTool('center'));
 		this.tools.set('polygon', new PolygonTool());
 		this.tools.set('ellipse', new EllipseTool());
 		this.tools.set('elliptical_arc', new EllipticalArcTool());
-		const splineTool = new SplineTool('fit');
-		splineTool.onModeChange = mode => {
-			this.onSplineModeChange?.(mode);
-			this.onSplineStateChange?.();
-		};
-		splineTool.onStateChange = () => this.onSplineStateChange?.();
-		this.tools.set('spline', splineTool);
+		this.tools.set('spline', new SplineTool('fit'));
 
 		// Modify
 		this.tools.set('trim', new TrimTool());
@@ -447,30 +241,11 @@ export class CanvasInteraction {
 		this.tools.set('break', new BreakTool());
 		this.tools.set('delete', new DeleteTool());
 		this.tools.set('fillet', new FilletTool());
-		const chamferTool = new ChamferTool();
-		chamferTool.onModeChange = mode => {
-			this.onChamferModeChange?.(mode);
-			this.onChamferStateChange?.();
-		};
-		chamferTool.onStateChange = () => this.onChamferStateChange?.();
-		this.tools.set('chamfer', chamferTool);
-		const offsetTool = new OffsetTool();
-		offsetTool.onDirectionChange = direction => {
-			this.onOffsetDirectionChange?.(direction);
-			this.onOffsetStateChange?.();
-		};
-		offsetTool.onChainSelectionChange = () => this.onOffsetStateChange?.();
-		offsetTool.onStateChange = () => this.onOffsetStateChange?.();
-		this.tools.set('offset', offsetTool);
-		const mirrorTool = new MirrorTool();
-		mirrorTool.onStateChange = () => this.onMirrorStateChange?.();
-		this.tools.set('mirror', mirrorTool);
-		const circularPatternTool = new CircularPatternTool();
-		circularPatternTool.onStateChange = () => this.onCircularPatternStateChange?.();
-		this.tools.set('circular_pattern', circularPatternTool);
-		const rectangularPatternTool = new RectangularPatternTool();
-		rectangularPatternTool.onStateChange = () => this.onRectangularPatternStateChange?.();
-		this.tools.set('rectangular_pattern', rectangularPatternTool);
+		this.tools.set('chamfer', new ChamferTool());
+		this.tools.set('offset', new OffsetTool());
+		this.tools.set('mirror', new MirrorTool());
+		this.tools.set('circular_pattern', new CircularPatternTool());
+		this.tools.set('rectangular_pattern', new RectangularPatternTool());
 
 		// Constraints
 		this.tools.set('dimension', new DimensionTool());
@@ -636,13 +411,6 @@ export class CanvasInteraction {
 			this.svg.classList.toggle('tool-select', tool === 'select');
 			this.updateCursor();
 			this.onToolChange?.(tool);
-			this.onMirrorStateChange?.();
-			this.onCircularPatternStateChange?.();
-			this.onRectangularPatternStateChange?.();
-			this.onArcStateChange?.();
-			this.onRectangleStateChange?.();
-			this.onSlotStateChange?.();
-			this.onSplineStateChange?.();
 			this.render();
 		} finally {
 			this.isSettingTool = false;
@@ -765,33 +533,18 @@ export class CanvasInteraction {
 
 		const filletTool = this.tools.get('fillet') as FilletTool | undefined;
 		if (filletTool?.popup.isOpen() && filletTool.pendingFillets.length > 0) {
-			const activePf =
-				filletTool.pendingFillets.find(pf => pf.id === filletTool.activeFilletId) ||
-				filletTool.pendingFillets[filletTool.pendingFillets.length - 1];
-			if (activePf) {
-				if (activePf.result) {
-					const sPos = this.viewport.worldToScreen(activePf.result.midArc.x, activePf.result.midArc.y);
-					filletTool.popup.updatePosition(sPos);
-				} else if (activePf.vertexPointId) {
-					const pt = this.sketch.points.get(activePf.vertexPointId);
-					if (pt) {
-						const sPos = this.viewport.worldToScreen(pt.x, pt.y);
-						filletTool.popup.updatePosition(sPos);
-					}
-				} else if (activePf.clickPos1) {
-					const sPos = this.viewport.worldToScreen(activePf.clickPos1.x, activePf.clickPos1.y);
-					filletTool.popup.updatePosition(sPos);
-				}
+			const bbox = filletTool.getGizmoBoundingBox();
+			if (bbox) {
+				filletTool.popup.updatePosition(bbox);
 			}
 		}
 
 		const chamferTool = this.tools.get('chamfer') as ChamferTool | undefined;
 		if (chamferTool?.popup.isOpen() && chamferTool.candidate) {
-			const sPos = this.viewport.worldToScreen(
-				chamferTool.candidate.vertexPos.x,
-				chamferTool.candidate.vertexPos.y
-			);
-			chamferTool.popup.updatePosition(sPos);
+			const bbox = chamferTool.getGizmoBoundingBox();
+			if (bbox) {
+				chamferTool.popup.updatePosition(bbox);
+			}
 		}
 
 		const offsetTool = this.tools.get('offset') as OffsetTool | undefined;
@@ -800,6 +553,16 @@ export class CanvasInteraction {
 			if (bbox) {
 				offsetTool.popup.updatePosition(bbox);
 			}
+		}
+
+		const circularPatternTool = this.tools.get('circular_pattern') as CircularPatternTool | undefined;
+		if (circularPatternTool?.popup.isOpen()) {
+			circularPatternTool.updatePopupPosition();
+		}
+
+		const rectangularPatternTool = this.tools.get('rectangular_pattern') as RectangularPatternTool | undefined;
+		if (rectangularPatternTool?.popup.isOpen()) {
+			rectangularPatternTool.updatePopupPosition();
 		}
 
 		this.updateToolPreview();
@@ -968,147 +731,9 @@ export class CanvasInteraction {
 			return;
 		}
 
-		// Alt + 1..4: Mode switching for Rectangle and Arc tools
-		if (e.altKey && !e.ctrlKey && !e.metaKey) {
-			if (this.activeTool === 'rectangle') {
-				switch (e.code) {
-					case 'Digit1':
-					case 'Numpad1':
-						e.preventDefault();
-						this.setRectangleMode('corner');
-						showToast('2-Point Rectangle (Alt+1)');
-						return;
-					case 'Digit2':
-					case 'Numpad2':
-						e.preventDefault();
-						this.setRectangleMode('center');
-						showToast('Center Rectangle (Alt+2)');
-						return;
-					case 'Digit3':
-					case 'Numpad3':
-						e.preventDefault();
-						this.setRectangleMode('three_point');
-						showToast('3-Point Rectangle (Alt+3)');
-						return;
-					case 'Digit4':
-					case 'Numpad4':
-						e.preventDefault();
-						this.setRectangleMode('rounded');
-						showToast('Rounded Rectangle (Alt+4)');
-						return;
-				}
-			} else if (this.activeTool === 'arc') {
-				switch (e.code) {
-					case 'Digit1':
-					case 'Numpad1':
-						e.preventDefault();
-						this.setArcMode('center');
-						showToast('Centerpoint Arc (Alt+1)');
-						return;
-					case 'Digit2':
-					case 'Numpad2':
-						e.preventDefault();
-						this.setArcMode('three_point');
-						showToast('3-Point Arc (Alt+2)');
-						return;
-					case 'Digit3':
-					case 'Numpad3':
-						e.preventDefault();
-						this.setArcMode('tangent');
-						showToast('Tangent Arc (Alt+3)');
-						return;
-				}
-			} else if (this.activeTool === 'slot') {
-				switch (e.code) {
-					case 'Digit1':
-					case 'Numpad1':
-						e.preventDefault();
-						this.setSlotMode('center_to_center');
-						showToast('Center to Center Slot (Alt+1)');
-						return;
-					case 'Digit2':
-					case 'Numpad2':
-						e.preventDefault();
-						this.setSlotMode('center_point');
-						showToast('Center Point Slot (Alt+2)');
-						return;
-					case 'Digit3':
-					case 'Numpad3':
-						e.preventDefault();
-						this.setSlotMode('overall');
-						showToast('Overall Slot (Alt+3)');
-						return;
-					case 'Digit4':
-					case 'Numpad4':
-						e.preventDefault();
-						this.setSlotMode('three_point_arc');
-						showToast('3-Point Arc Slot (Alt+4)');
-						return;
-					case 'Digit5':
-					case 'Numpad5':
-						e.preventDefault();
-						this.setSlotMode('center_point_arc');
-						showToast('Center Point Arc Slot (Alt+5)');
-						return;
-				}
-			} else if (this.activeTool === 'spline') {
-				switch (e.code) {
-					case 'Digit1':
-					case 'Numpad1':
-						e.preventDefault();
-						this.setSplineMode('fit');
-						showToast('Fit Point Spline (Alt+1)');
-						return;
-					case 'Digit2':
-					case 'Numpad2':
-						e.preventDefault();
-						this.setSplineMode('control');
-						showToast('Control Point Spline (Alt+2)');
-						return;
-				}
-			} else if (this.activeTool === 'chamfer') {
-				switch (e.code) {
-					case 'Digit1':
-					case 'Numpad1':
-						e.preventDefault();
-						this.setChamferMode('equal_distance');
-						showToast('Equal Distance Chamfer (Alt+1)');
-						return;
-					case 'Digit2':
-					case 'Numpad2':
-						e.preventDefault();
-						this.setChamferMode('two_distance');
-						showToast('Two Distance Chamfer (Alt+2)');
-						return;
-					case 'Digit3':
-					case 'Numpad3':
-						e.preventDefault();
-						this.setChamferMode('distance_angle');
-						showToast('Distance & Angle Chamfer (Alt+3)');
-						return;
-				}
-			} else if (this.activeTool === 'offset') {
-				switch (e.code) {
-					case 'Digit1':
-					case 'Numpad1':
-						e.preventDefault();
-						this.setOffsetDirection('one_side');
-						showToast('One Side Offset (Alt+1)');
-						return;
-					case 'Digit2':
-					case 'Numpad2':
-						e.preventDefault();
-						this.setOffsetDirection('two_sides');
-						showToast('Two Sides Offset (Alt+2)');
-						return;
-					case 'Digit3':
-					case 'Numpad3':
-						e.preventDefault();
-						this.setOffsetDirection('symmetric');
-						showToast('Symmetric Offset (Alt+3)');
-						return;
-				}
-			}
+		const tool = this.activeToolInstance ?? this.tools?.get(this.activeTool);
+		if (tool?.sidebarPanel?.handleKeyDown?.(e)) {
+			return;
 		}
 
 		switch (e.code) {
@@ -3285,38 +2910,7 @@ export class CanvasInteraction {
 		sel.ellipseIds.clear();
 		sel.ellipticalArcIds.clear();
 		sel.splineIds.clear();
-		// Clean up constraintIds
 		sel.constraintIds.clear();
-		for (const pid of sel.pointIds) {
-			for (const c of this.sketch.getConstraintsForEntity('point', pid)) {
-				sel.constraintIds.add(c.id);
-			}
-		}
-		for (const lid of sel.lineIds) {
-			for (const c of this.sketch.getConstraintsForEntity('line', lid)) {
-				sel.constraintIds.add(c.id);
-			}
-		}
-		for (const cid of sel.circleIds) {
-			for (const c of this.sketch.getConstraintsForEntity('circle', cid)) {
-				sel.constraintIds.add(c.id);
-			}
-		}
-		for (const aid of sel.arcIds) {
-			for (const c of this.sketch.getConstraintsForEntity('arc', aid)) {
-				sel.constraintIds.add(c.id);
-			}
-		}
-		for (const eid of sel.ellipseIds) {
-			for (const c of this.sketch.getConstraintsForEntity('ellipse', eid)) {
-				sel.constraintIds.add(c.id);
-			}
-		}
-		for (const eaid of sel.ellipticalArcIds) {
-			for (const c of this.sketch.getConstraintsForEntity('elliptical_arc', eaid)) {
-				sel.constraintIds.add(c.id);
-			}
-		}
 	}
 
 	canApplyConstraint(type: string): boolean {

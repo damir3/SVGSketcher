@@ -1,3 +1,5 @@
+import type { IInspectable } from '../ui/panels/inspector/types';
+
 export type ConstraintType =
 	| 'fixed'
 	| 'coincident'
@@ -59,7 +61,7 @@ export interface JacobianEntry {
 	val: number; // partial derivative dF_row / dX_col
 }
 
-export interface IConstraint {
+export interface IConstraint extends IInspectable {
 	readonly id: string;
 	readonly type: ConstraintType;
 	name: string;

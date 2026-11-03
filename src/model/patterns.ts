@@ -20,7 +20,10 @@ export function generateCircularPatternCopy(
 	distribution: 'full' | 'partial' | 'symmetric',
 	totalAngle: number
 ): PatternCopyData | null {
-	const centerPt = sketch.points.get(centerPtId);
+	const centerPt =
+		centerPtId === 'origin'
+			? ({ id: 'origin', x: 0, y: 0 } as any)
+			: sketch.points.get(centerPtId);
 	if (!centerPt) return null;
 
 	const angleDeg = computePatternCopyAngle(copyIndex, quantity, distribution, totalAngle);
@@ -181,9 +184,10 @@ export function addCircularPatternConstraint(
 	suppressedIndices: number[],
 	copies: PatternCopyData[],
 	id?: string,
-	isReadOnly?: boolean
+	isReadOnly?: boolean,
+	totalAngleExpression?: string
 ): CircularPatternConstraint | null {
-	if (!sketch.points.has(centerPtId)) return null;
+	if (centerPtId !== 'origin' && !sketch.points.has(centerPtId)) return null;
 
 	const cid = id || sketch.nextId('c_cpat');
 	const c = new CircularPatternConstraint(
@@ -197,7 +201,8 @@ export function addCircularPatternConstraint(
 		suppressedIndices,
 		copies,
 		1.0,
-		isReadOnly
+		isReadOnly,
+		totalAngleExpression
 	);
 	sketch.addConstraint(c);
 	return c;
@@ -209,6 +214,7 @@ export function updateCircularPattern(
 	updates: {
 		distribution?: 'full' | 'partial' | 'symmetric';
 		totalAngle?: number;
+		totalAngleExpression?: string;
 		quantity?: number;
 		suppression?: boolean;
 		suppressedIndices?: number[];
@@ -218,6 +224,10 @@ export function updateCircularPattern(
 	if (!c || !(c instanceof CircularPatternConstraint) || c.isReadOnly) return false;
 
 	sketch.beginTransaction();
+
+	if (updates.totalAngleExpression !== undefined) {
+		c.totalAngleExpression = updates.totalAngleExpression;
+	}
 
 	const oldDist = c.distribution;
 	const oldAngle = c.totalAngle;
@@ -454,7 +464,9 @@ export function addRectangularPatternConstraint(
 	suppression: boolean,
 	suppressedIndices: number[],
 	copies: RectangularPatternCopyData[],
-	id?: string
+	id?: string,
+	distance1Expression?: string,
+	distance2Expression?: string
 ): RectangularPatternConstraint | null {
 	const line1 = line1Id ? sketch.lines.get(line1Id) : null;
 	const line2 = line2Id ? sketch.lines.get(line2Id) : null;
@@ -478,7 +490,9 @@ export function addRectangularPatternConstraint(
 		suppression,
 		suppressedIndices,
 		copies,
-		1.0
+		1.0,
+		distance1Expression,
+		distance2Expression
 	);
 	sketch.addConstraint(c);
 	return c;
@@ -492,9 +506,11 @@ export function updateRectangularPattern(
 		line2Id?: string | null;
 		quantity1?: number;
 		distance1?: number;
+		distance1Expression?: string;
 		direction1?: 'one_direction' | 'symmetric';
 		quantity2?: number;
 		distance2?: number;
+		distance2Expression?: string;
 		direction2?: 'one_direction' | 'symmetric';
 		suppression?: boolean;
 		suppressedIndices?: number[];
@@ -504,6 +520,13 @@ export function updateRectangularPattern(
 	if (!c || !(c instanceof RectangularPatternConstraint)) return false;
 
 	sketch.beginTransaction();
+
+	if (updates.distance1Expression !== undefined) {
+		c.distance1Expression = updates.distance1Expression;
+	}
+	if (updates.distance2Expression !== undefined) {
+		c.distance2Expression = updates.distance2Expression;
+	}
 
 	const newLine1Id = updates.line1Id !== undefined ? updates.line1Id : c.line1Id;
 	const newLine2Id = updates.line2Id !== undefined ? updates.line2Id : c.line2Id;

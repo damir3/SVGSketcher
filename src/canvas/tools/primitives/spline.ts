@@ -2,6 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { renderSplinePreviewVisual } from '../../previewHelpers';
+import { VariationToolPanel } from '../../../ui/panels/tools';
 
 export type SplineMode = 'fit' | 'control';
 
@@ -19,6 +20,57 @@ export class SplineTool extends BaseTool {
 	constructor(initialMode: SplineMode = 'fit') {
 		super();
 		this._mode = initialMode;
+
+		this.sidebarPanel = new VariationToolPanel<SplineMode>({
+			title: 'Spline Tool',
+			description: 'Select spline creation method:',
+			cardClass: 'spline-tool-card rectangle-tool-card',
+			selectorClass: 'spline-mode-selector',
+			buttonClass: 'spline-mode-btn',
+			iconClass: 'spline-mode-icon',
+			textClass: 'spline-mode-text',
+			hintClass: 'rectangle-mode-hint spline-mode-hint',
+			dataAttribute: 'data-spline-mode',
+			cancelButtonId: 'btn-spline-cancel-icon',
+			modes: [
+				{
+					id: 'fit',
+					label: 'Fit Point',
+					title: 'Fit Point Spline (Alt+1)',
+					iconName: 'spline_fit',
+				},
+				{
+					id: 'control',
+					label: 'Control Point',
+					title: 'Control Point Spline (Alt+2)',
+					iconName: 'spline_control',
+				},
+			],
+			getCurrentMode: () => this.mode,
+			onSelectMode: mode => this.setMode(mode),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+	}
+
+	getStepHint(): string {
+		const mode = this._mode;
+		const count = this.points.length;
+
+		if (mode === 'fit') {
+			if (count === 0) return 'Click to place first fit point';
+			if (count === 1) return 'Click to place next fit point (min 2 points)';
+			if (count === 2) return 'Click to add points, or click ✓ / press Enter to finish';
+			return `Points: ${count}. Click first point to close, or click ✓ / Enter to finish`;
+		} else {
+			if (count === 0) return 'Click to place first control point (min 4 points)';
+			if (count < 4)
+				return `Points: ${count}/4. Click to place ${4 - count} more control point${4 - count > 1 ? 's' : ''}`;
+			return `Points: ${count}. Click to add more, or click ✓ / Enter to finish`;
+		}
 	}
 
 	get mode(): SplineMode {
