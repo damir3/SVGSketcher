@@ -69,6 +69,18 @@ export const REGION_STYLE = {
 	stroke: COLORS.primary,
 } as const;
 
+export const SVG_EXPORT_STYLE = {
+	geometryStroke: '#0f172a',
+	constructionStroke: '#64748b',
+	constructionDashArray: '4,4',
+	strokeWidth: 0.1,
+	fill: 'none',
+	isolatedPointFill: '#0f172a',
+	regionFill: '#bae6fd',
+	regionFillOpacity: 0.5,
+	regionStroke: 'none',
+} as const;
+
 export const DASH_ARRAY = {
 	construction: '6,6',
 	ray: '2,2',

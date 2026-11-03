@@ -24,6 +24,8 @@ describe('sketch regions', () => {
 		assert.equal(regions.length, 2);
 		const ring = regions.find((region) => region.holes.length === 1);
 		assert.ok(ring);
+		assert.match(ring.path, / A /);
+		assert.ok(regions.some((region) => (region.path.match(/ A /g) ?? []).length <= 2), 'a full circle should export as two SVG arc commands');
 		assert.equal(pointInRegion({ x: 30, y: 20 }, ring), true);
 		assert.equal(pointInRegion({ x: 0, y: 30 }, ring), false);
 		assert.equal(regions.some((region) => pointInRegion({ x: 0, y: 30 }, region)), true);
@@ -49,6 +51,8 @@ describe('sketch regions', () => {
 
 		const regions = findSketchRegions(sketch);
 		assert.equal(regions.length, 3);
+		assert.ok(regions.some((region) => / C /.test(region.path)), 'region export should preserve the spline as cubic Bezier commands');
+		assert.ok(regions.every((region) => (region.path.match(/ C /g) ?? []).length < region.points.length / 2), 'adjacent spline pieces should be merged for export');
 		assert.ok(regions.every((region) => region.area > 100));
 		assert.ok(regions.every((region) => region.holes.length === 0));
 	});

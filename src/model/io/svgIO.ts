@@ -3,7 +3,7 @@ import type { SketchSnapshot } from '../history';
 import type { SketchPoint } from '../types';
 import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../../math/spline';
 import { findSketchRegions } from '../../math/regions';
-import { REGION_STYLE } from '../../canvas/styles';
+import { SVG_EXPORT_STYLE } from '../../canvas/styles';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -37,7 +37,7 @@ export function exportSketchToSVG(
 	const elements: string[] = [];
 	const usedPoints = new Set<string>();
 	for (const region of findSketchRegions(sketch)) {
-		elements.push(`<path d="${region.path}" fill="${REGION_STYLE.fill}" fill-opacity="${REGION_STYLE.fillOpacity}" fill-rule="evenodd" stroke="none" />`);
+		elements.push(`<path d="${region.path}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" fill-rule="evenodd" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`);
 	}
 
 	for (const line of sketch.lines.values()) {
@@ -47,9 +47,9 @@ export function exportSketchToSVG(
 		const p1 = sketch.points.get(line.p1Id);
 		const p2 = sketch.points.get(line.p2Id);
 		if (p1 && p2) {
-			const dash = line.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+			const dash = line.isConstruction ? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"` : ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" />`
+				`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" />`
 			);
 		}
 	}
@@ -58,9 +58,9 @@ export function exportSketchToSVG(
 		usedPoints.add(circ.centerId);
 		const center = sketch.points.get(circ.centerId);
 		if (center) {
-			const dash = circ.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+			const dash = circ.isConstruction ? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"` : ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="2" fill="none" />`
+				`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -94,9 +94,9 @@ export function exportSketchToSVG(
 				sweepFlag = 0;
 			}
 			const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
-			const dash = arc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+			const dash = arc.isConstruction ? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"` : ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
+				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -115,9 +115,9 @@ export function exportSketchToSVG(
 			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
 			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
 			const deg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
-			const dash = el.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+			const dash = el.isConstruction ? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"` : ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="2" fill="none" />`
+				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -171,9 +171,9 @@ export function exportSketchToSVG(
 				sweepFlag = 0;
 			}
 			const largeArc = sweepAngle > Math.PI ? 1 : 0;
-			const dash = elarc.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+			const dash = elarc.isConstruction ? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"` : ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
+				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -209,9 +209,9 @@ export function exportSketchToSVG(
 				segments = fitPointsToBezier(pts.map(p => ({ x: p.x, y: -p.y })), handles);
 			}
 			const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
-			const dash = spline.isConstruction ? ' stroke-dasharray="4,4" stroke="#64748b"' : ' stroke="#0f172a"';
+			const dash = spline.isConstruction ? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"` : ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<path d="${d}"${dash} stroke-width="2" stroke-linecap="round" fill="none" />`
+				`<path d="${d}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -219,7 +219,7 @@ export function exportSketchToSVG(
 	// Export isolated points
 	for (const pt of sketch.points.values()) {
 		if (!usedPoints.has(pt.id)) {
-			const fill = '#0f172a';
+			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
 			elements.push(
 				`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`
 			);
