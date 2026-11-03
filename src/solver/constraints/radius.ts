@@ -113,10 +113,12 @@ export class RadiusConstraint extends BaseConstraint {
 
 		const cosA = Math.cos(screenAngle);
 		const sinA = Math.sin(screenAngle);
+		const isDiameter = this.displayMode === 'diameter';
 		const edge = {
 			x: sc.x + cosA * sr,
 			y: sc.y + sinA * sr,
 		};
+		const opposite = { x: sc.x - cosA * sr, y: sc.y - sinA * sr };
 
 		const dirX = cosA >= 0 ? 1 : -1;
 		const dirY = sinA >= 0 ? 1 : -1;
@@ -134,11 +136,11 @@ export class RadiusConstraint extends BaseConstraint {
 		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
 		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 
-		// Leader radial line from center to edge with arrow at circumference
-		createSvgLine(sc.x, sc.y, edge.x, edge.y, {
+		// A diameter dimension crosses the full circle; a radius dimension starts at its center.
+		createSvgLine(isDiameter ? opposite.x : sc.x, isDiameter ? opposite.y : sc.y, edge.x, edge.y, {
 			stroke: color,
 			'stroke-width': STROKE_WIDTH.dimension,
-			'marker-end': arrowUrl,
+			...(isDiameter ? { 'marker-start': arrowUrl, 'marker-end': arrowUrl } : { 'marker-end': arrowUrl }),
 		}, g);
 
 		// Shelf line from edge to tip
@@ -147,7 +149,6 @@ export class RadiusConstraint extends BaseConstraint {
 			'stroke-width': STROKE_WIDTH.dimension,
 		}, g);
 
-		const isDiameter = this.displayMode === 'diameter';
 		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
 		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
 		const prefix = this.expression ? 'fx: ' : '';

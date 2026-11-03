@@ -22,7 +22,6 @@ export class CircularPatternTool extends BaseTool {
 	readonly id = 'circular_pattern' as const;
 	readonly popup: ToolPopup<'angle' | 'quantity'>;
 	readonly sidebarPanel: ModifyToolPanel = new ModifyToolPanel({
-		cardClass: 'pattern-tool-card circular-pattern-tool-card',
 		iconName: 'circular_pattern',
 		title: 'Circular Pattern',
 		description: 'Rotate copies of geometry around a center point.',

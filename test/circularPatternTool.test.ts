@@ -89,9 +89,9 @@ describe('CircularPatternTool & Panel Integration', () => {
 
 		tool.activate(mockCtx);
 
-		// Verify initial panel HTML contains circular-pattern-tool-card
+		// Verify initial panel HTML uses the shared tool panel card style.
 		const initialHtml = tool.sidebarPanel.render();
-		assert.ok(initialHtml.includes('circular-pattern-tool-card'), 'Panel HTML should have circular-pattern-tool-card');
+		assert.ok(initialHtml.includes('tool-panel-card'), 'Panel HTML should use tool-panel-card');
 		assert.ok(initialHtml.includes('disabled'), 'Apply should be disabled initially');
 
 		// Click line to select object
@@ -315,7 +315,7 @@ describe('RectangularPatternTool & Panel Integration', () => {
 
 		// Initially panel has card
 		const initialHtml = tool.sidebarPanel.render();
-		assert.ok(initialHtml.includes('rectangular-pattern-tool-card'));
+		assert.ok(initialHtml.includes('tool-panel-card'));
 
 		// Select line
 		tool.onMouseDown({

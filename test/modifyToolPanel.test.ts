@@ -11,7 +11,6 @@ describe('ModifyToolPanel Integration', () => {
 		let cancelled = false;
 
 		const panel = new ModifyToolPanel({
-			cardClass: 'custom-modify-card',
 			iconName: 'mirror',
 			title: 'Custom Modify',
 			description: 'Description of custom modify',
@@ -67,7 +66,7 @@ describe('ModifyToolPanel Integration', () => {
 
 		const html = panel.render();
 
-		assert.ok(html.includes('custom-modify-card'), 'Renders cardClass');
+		assert.ok(html.includes('tool-panel-card'), 'Uses the shared tool panel card class');
 		assert.ok(html.includes('Custom Modify'), 'Renders title');
 		assert.ok(html.includes('Description of custom modify'), 'Renders description');
 		assert.ok(html.includes('First Step'), 'Renders step 1');

@@ -14,6 +14,7 @@ import {
 	getConnectedLinesForPoint,
 } from '../../../math/chamfer';
 import type { ChamferGizmoHandle } from '../../renderer';
+import { dispatchToolModeChange } from '../modeChangeEvent';
 
 export class ChamferTool extends BaseTool {
 	readonly id = 'chamfer' as const;
@@ -124,12 +125,6 @@ export class ChamferTool extends BaseTool {
 		this.sidebarPanel = new VariationToolPanel<ChamferMode>({
 			title: 'Chamfer Tool',
 			description: 'Select chamfer mode:',
-			cardClass: 'chamfer-tool-card',
-			selectorClass: 'chamfer-mode-selector',
-			buttonClass: 'chamfer-mode-btn',
-			iconClass: 'chamfer-mode-icon',
-			textClass: 'chamfer-mode-text',
-			hintClass: 'chamfer-mode-hint',
 			dataAttribute: 'data-chamfer-mode',
 			cancelButtonId: 'btn-chamfer-cancel-icon',
 			modes: [
@@ -236,6 +231,7 @@ export class ChamferTool extends BaseTool {
 			this.popup.setFieldVisible('flip', true);
 		}
 		this.recalculate();
+			dispatchToolModeChange('chamfer', mode);
 		this.onModeChange?.(mode);
 		this.onStateChange?.();
 		this.ctx?.requestRender();

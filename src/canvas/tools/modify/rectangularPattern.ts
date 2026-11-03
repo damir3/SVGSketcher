@@ -32,7 +32,6 @@ export class RectangularPatternTool extends BaseTool {
 	readonly id = 'rectangular_pattern' as const;
 	readonly popup: ToolPopup<'dist1' | 'qty1' | 'dist2' | 'qty2'>;
 	readonly sidebarPanel: ModifyToolPanel = new ModifyToolPanel({
-		cardClass: 'pattern-tool-card rectangular-pattern-tool-card',
 		iconName: 'rectangular_pattern',
 		title: 'Rectangular Pattern',
 		description: 'Create linear or 2D grid copies along direction axes.',

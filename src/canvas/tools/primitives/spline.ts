@@ -3,6 +3,7 @@ import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { renderSplinePreviewVisual } from '../../previewHelpers';
 import { VariationToolPanel } from '../../../ui/panels/tools';
+import { dispatchToolModeChange } from '../modeChangeEvent';
 
 export type SplineMode = 'fit' | 'control';
 
@@ -24,12 +25,6 @@ export class SplineTool extends BaseTool {
 		this.sidebarPanel = new VariationToolPanel<SplineMode>({
 			title: 'Spline Tool',
 			description: 'Select spline creation method:',
-			cardClass: 'spline-tool-card rectangle-tool-card',
-			selectorClass: 'spline-mode-selector',
-			buttonClass: 'spline-mode-btn',
-			iconClass: 'spline-mode-icon',
-			textClass: 'spline-mode-text',
-			hintClass: 'rectangle-mode-hint spline-mode-hint',
 			dataAttribute: 'data-spline-mode',
 			cancelButtonId: 'btn-spline-cancel-icon',
 			modes: [
@@ -87,6 +82,7 @@ export class SplineTool extends BaseTool {
 			this.cancel();
 		}
 		this._mode = newMode;
+		dispatchToolModeChange('spline', newMode);
 		this.onModeChange?.(newMode);
 		this.onStateChange?.();
 		this.ctx?.requestRender();

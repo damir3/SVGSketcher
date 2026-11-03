@@ -3,6 +3,11 @@ import pan from '../assets/icons/pan.svg?raw';
 import point from '../assets/icons/point.svg?raw';
 import line from '../assets/icons/line.svg?raw';
 import circle from '../assets/icons/circle.svg?raw';
+import circleCenter from '../assets/icons/circle-center.svg?raw';
+import circle2Point from '../assets/icons/circle-2point.svg?raw';
+import circle3Point from '../assets/icons/circle-3point.svg?raw';
+import circle2Tangent from '../assets/icons/circle-2tangent.svg?raw';
+import circle3Tangent from '../assets/icons/circle-3tangent.svg?raw';
 import arc from '../assets/icons/arc.svg?raw';
 import arcCenter from '../assets/icons/arc-center.svg?raw';
 import arcTangent from '../assets/icons/arc-tangent.svg?raw';
@@ -73,6 +78,11 @@ export const ICONS = {
 	point,
 	line,
 	circle,
+	circle_center: circleCenter,
+	circle_2point: circle2Point,
+	circle_3point: circle3Point,
+	circle_2tangent: circle2Tangent,
+	circle_3tangent: circle3Tangent,
 	arc,
 	arc_center: arcCenter,
 	arc_tangent: arcTangent,

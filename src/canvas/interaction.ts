@@ -395,6 +395,10 @@ export class CanvasInteraction {
 			}
 			this.activeTool = tool;
 			this.highlightManager.clear();
+				if (tool !== 'select') {
+					this.regionHoverPoint = null;
+					this.renderer.updateRegionHover(null);
+				}
 			this.cancelDrawing();
 
 			const nextTool = this.tools.get(tool) ?? null;
@@ -2018,8 +2022,9 @@ export class CanvasInteraction {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
-		this.regionHoverPoint = world;
-		const isHoveringRegion = this.renderer.updateRegionHover(world);
+		const allowRegionHover = this.activeTool === 'select';
+		this.regionHoverPoint = allowRegionHover ? world : null;
+		this.renderer.updateRegionHover(this.regionHoverPoint);
 
 		// Pan handling
 		if (this.isPanning) {
@@ -2453,8 +2458,7 @@ export class CanvasInteraction {
 		if (this.isPanning || this.isDraggingPoint || this.isBoxSelecting || this.gizmoDragState) {
 			this.highlightManager.clear();
 		} else {
-			if (isHoveringRegion) this.highlightManager.clear();
-			else this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
+			this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
 		}
 
 		// Delegate to active tool if not select

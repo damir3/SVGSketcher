@@ -4,6 +4,7 @@ import { dist, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import { VariationToolPanel } from '../../../ui/panels/tools';
+import { dispatchToolModeChange } from '../modeChangeEvent';
 import {
 	type OffsetDirection,
 	type OffsetChain,
@@ -127,12 +128,6 @@ export class OffsetTool extends BaseTool {
 		this.sidebarPanel = new VariationToolPanel<OffsetDirection>({
 			title: 'Offset Tool',
 			description: 'Select direction:',
-			cardClass: 'chamfer-tool-card offset-tool-card',
-			selectorClass: 'chamfer-mode-selector',
-			buttonClass: 'chamfer-mode-btn',
-			iconClass: 'chamfer-mode-icon',
-			textClass: 'chamfer-mode-text',
-			hintClass: 'chamfer-mode-hint',
 			dataAttribute: 'data-offset-direction',
 			cancelButtonId: 'btn-offset-cancel-icon',
 			modes: [
@@ -269,6 +264,7 @@ export class OffsetTool extends BaseTool {
 		if (bbox) {
 			this.popup.updatePosition(bbox);
 		}
+			dispatchToolModeChange('offset', direction);
 		this.onDirectionChange?.(direction);
 		this.onStateChange?.();
 		this.ctx?.requestRender();

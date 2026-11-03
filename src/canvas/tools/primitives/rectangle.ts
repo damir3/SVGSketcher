@@ -9,6 +9,7 @@ import {
 } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { VariationToolPanel } from '../../../ui/panels/tools';
+import { dispatchToolModeChange } from '../modeChangeEvent';
 
 export type RectangleMode = 'corner' | 'center' | 'three_point' | 'rounded';
 
@@ -98,12 +99,6 @@ export class RectangleTool extends BaseTool {
 		this.sidebarPanel = new VariationToolPanel<RectangleMode>({
 			title: 'Rectangle Tool',
 			description: 'Select rectangle creation method:',
-			cardClass: 'rectangle-tool-card',
-			selectorClass: 'rectangle-mode-selector',
-			buttonClass: 'rectangle-mode-btn',
-			iconClass: 'rectangle-mode-icon',
-			textClass: 'rectangle-mode-text',
-			hintClass: 'rectangle-mode-hint',
 			dataAttribute: 'data-rect-mode',
 			cancelButtonId: 'btn-rectangle-cancel-icon',
 			modes: [
@@ -154,6 +149,7 @@ export class RectangleTool extends BaseTool {
 		if (this._mode === newMode) return;
 		this.cancel();
 		this._mode = newMode;
+		dispatchToolModeChange('rectangle', newMode);
 		this.popup.setFieldVisible('radius', newMode === 'rounded');
 		this.onModeChange?.(newMode);
 		this.onStateChange?.();

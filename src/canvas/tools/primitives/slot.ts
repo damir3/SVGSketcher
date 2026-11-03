@@ -12,6 +12,7 @@ import {
 import { ToolPopup } from '../../../ui/tool-popup';
 import { parseNumericOrExpression } from '../../../math/expression';
 import { VariationToolPanel } from '../../../ui/panels/tools';
+import { dispatchToolModeChange } from '../modeChangeEvent';
 
 export type SlotMode =
 	| 'center_to_center'
@@ -173,12 +174,6 @@ export class SlotTool extends BaseTool {
 		this.sidebarPanel = new VariationToolPanel<SlotMode>({
 			title: 'Slot Tool',
 			description: 'Select slot creation method:',
-			cardClass: 'slot-tool-card rectangle-tool-card',
-			selectorClass: 'slot-mode-selector',
-			buttonClass: 'slot-mode-btn',
-			iconClass: 'slot-mode-icon',
-			textClass: 'slot-mode-text',
-			hintClass: 'rectangle-mode-hint slot-mode-hint',
 			dataAttribute: 'data-slot-mode',
 			cancelButtonId: 'btn-slot-cancel-icon',
 			modes: [
@@ -303,6 +298,7 @@ export class SlotTool extends BaseTool {
 		if (this._mode === newMode) return;
 		this.cancel();
 		this._mode = newMode;
+		dispatchToolModeChange('slot', newMode);
 		const isArc = newMode === 'three_point_arc' || newMode === 'center_point_arc';
 		this.popup.setFieldLabel('distance', isArc ? 'Chord' : 'Length');
 		this.popup.setFieldVisible('angle', isArc);

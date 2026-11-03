@@ -13,7 +13,6 @@ export interface MirrorState {
 export class MirrorTool extends BaseTool {
 	readonly id = 'mirror' as const;
 	readonly sidebarPanel: ModifyToolPanel = new ModifyToolPanel({
-		cardClass: 'mirror-tool-card',
 		iconName: 'mirror',
 		title: 'Mirror Tool',
 		description: 'Create symmetric copies of primitives across a centerline.',

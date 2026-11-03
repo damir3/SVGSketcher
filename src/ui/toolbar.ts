@@ -2,11 +2,13 @@ import { ICONS } from './icons';
 import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/interaction';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
+import type { CircleMode } from '../canvas/tools/primitives/circle';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
 import type { SplineMode } from '../canvas/tools/primitives/spline';
 import type { ChamferMode } from '../math/chamfer';
 import type { OffsetDirection } from '../math/offset';
+import type { ToolModeChangeDetail } from '../canvas/tools/modeChangeEvent';
 import { showToast } from './toast';
 export { showToast };
 
@@ -22,6 +24,7 @@ export class Toolbar {
 		this.render();
 		this.setupListeners();
 		this.setupTooltip();
+		this.setCircleMode('center_diameter');
 		this.setConstructionActive(this.interaction.getEffectiveConstructionState());
 	}
 
@@ -186,6 +189,32 @@ export class Toolbar {
 	}
 
 	private setupListeners(): void {
+		document.addEventListener('tool-mode-change', event => {
+			const { tool, mode } = (event as CustomEvent<ToolModeChangeDetail>).detail;
+			switch (tool) {
+				case 'arc':
+					this.setArcMode(mode as ArcMode);
+					break;
+				case 'circle':
+					this.setCircleMode(mode as CircleMode);
+					break;
+				case 'rectangle':
+					this.setRectangleMode(mode as RectangleMode);
+					break;
+				case 'slot':
+					this.setSlotMode(mode as SlotMode);
+					break;
+				case 'spline':
+					this.setSplineMode(mode as SplineMode);
+					break;
+				case 'chamfer':
+					this.setChamferMode(mode as ChamferMode);
+					break;
+				case 'offset':
+					this.setOffsetDirection(mode as OffsetDirection);
+					break;
+			}
+		});
 		this.interaction.onToolChange = tool => {
 			this.setActiveButton(tool);
 		};
@@ -337,6 +366,26 @@ export class Toolbar {
 
 		rectBtn.title = title;
 		rectBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${title}</span>
+		`;
+	}
+
+	setCircleMode(mode: CircleMode): void {
+		const circleBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="circle"]');
+		if (!circleBtn) return;
+
+		const circleModes: Record<CircleMode, { icon: string; title: string }> = {
+			center_diameter: { icon: ICONS.circle_center, title: 'Center Diameter Circle (C)' },
+			two_point: { icon: ICONS.circle_2point, title: '2-Point Circle (C)' },
+			three_point: { icon: ICONS.circle_3point, title: '3-Point Circle (C)' },
+			two_tangent: { icon: ICONS.circle_2tangent, title: '2-Tangent Circle (C)' },
+			three_tangent: { icon: ICONS.circle_3tangent, title: '3-Tangent Circle (C)' },
+		};
+		const { icon, title } = circleModes[mode];
+
+		circleBtn.title = title;
+		circleBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${title}</span>
 		`;

@@ -13,12 +13,6 @@ export interface ToolVariationOption<M extends string> {
 export interface VariationToolPanelOptions<M extends string> {
 	title: string;
 	description: string;
-	cardClass?: string;
-	selectorClass?: string;
-	buttonClass?: string;
-	iconClass?: string;
-	textClass?: string;
-	hintClass?: string;
 	dataAttribute?: string;
 	cancelButtonId?: string;
 	modes: ToolVariationOption<M>[];
@@ -43,8 +37,7 @@ export class VariationToolPanel<M extends string> implements IToolPanel {
 	}
 
 	private getCardSelector(): string {
-		const { cardClass = 'sidebar-panel-card' } = this.options;
-		return '.' + cardClass.trim().split(/\s+/).join('.');
+		return '.tool-panel-card';
 	}
 
 	rerender(): void {
@@ -83,12 +76,6 @@ export class VariationToolPanel<M extends string> implements IToolPanel {
 		const {
 			title,
 			description,
-			cardClass = '',
-			selectorClass = 'tool-mode-selector',
-			buttonClass = 'tool-mode-btn',
-			iconClass = 'tool-mode-icon',
-			textClass = 'tool-mode-text',
-			hintClass = 'tool-mode-hint',
 			dataAttribute = 'data-mode',
 			cancelButtonId,
 			modes,
@@ -110,9 +97,9 @@ export class VariationToolPanel<M extends string> implements IToolPanel {
 				const active = m.id === currentMode ? 'active' : '';
 				const iconSvg = m.icon ?? (m.iconName ? getToolIcon(m.iconName) : '');
 				return `
-					<button class="${buttonClass} ${active}" ${dataAttribute}="${m.id}" type="button" title="${m.title}">
-						<span class="${iconClass}">${iconSvg}</span>
-						<span class="${textClass}">${m.label}</span>
+					<button class="tool-mode-button ${active}" ${dataAttribute}="${m.id}" type="button" title="${m.title}">
+						<span class="tool-mode-icon">${iconSvg}</span>
+						<span class="tool-mode-label">${m.label}</span>
 					</button>
 				`;
 			})
@@ -121,7 +108,7 @@ export class VariationToolPanel<M extends string> implements IToolPanel {
 		const extraHtml = extraContent ? extraContent.render() : '';
 
 		return `
-			<div class="sidebar-panel-card ${cardClass}">
+			<div class="sidebar-panel-card tool-panel-card">
 				<div class="panel-card-header">
 					<div class="panel-card-title">
 						<span class="panel-card-icon">${headerIcon}</span>
@@ -132,11 +119,11 @@ export class VariationToolPanel<M extends string> implements IToolPanel {
 				<div class="panel-card-desc">
 					${description}
 				</div>
-				<div class="${selectorClass}">
+				<div class="tool-mode-selector">
 					${buttonsHtml}
 				</div>
 				${extraHtml}
-				${hint ? `<div class="${hintClass}">${hint}</div>` : ''}
+				${hint ? `<div class="tool-mode-hint">${hint}</div>` : ''}
 			</div>
 		`;
 	}

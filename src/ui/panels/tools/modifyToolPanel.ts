@@ -49,7 +49,6 @@ export type ModifyParamItem =
 	  };
 
 export interface ModifyToolPanelOptions {
-	cardClass?: string;
 	iconName: string;
 	title: string;
 	description: string;
@@ -73,7 +72,6 @@ export class ModifyToolPanel implements IToolPanel {
 	}
 
 	render(): string {
-		const cardClass = this.options.cardClass ? ` ${this.options.cardClass}` : '';
 		const canApply = this.options.canApply();
 		const iconHtml =
 			getToolIcon(this.options.iconName) ||
@@ -168,7 +166,7 @@ export class ModifyToolPanel implements IToolPanel {
 		}
 
 		return `
-			<div class="sidebar-panel-card${cardClass}">
+			<div class="sidebar-panel-card tool-panel-card">
 				<div class="panel-card-header">
 					<div class="panel-card-title">
 						<span class="panel-card-icon">${iconHtml}</span>
@@ -272,10 +270,7 @@ export class ModifyToolPanel implements IToolPanel {
 		btnCancelIcon?.addEventListener('click', handleCancel);
 
 		this.options.bindStateChange?.(() => {
-			const cardSelector = this.options.cardClass
-				? `.${this.options.cardClass.trim().split(/\s+/)[0]}`
-				: '.sidebar-panel-card';
-			const card = container.querySelector<HTMLElement>(cardSelector);
+				const card = container.querySelector<HTMLElement>('.tool-panel-card');
 			if (card) {
 				const temp = document.createElement('div');
 				temp.innerHTML = this.render();

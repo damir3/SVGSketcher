@@ -9,6 +9,7 @@ import {
 import type { SketchDocument } from '../../../model/sketch';
 import type { SketchLine, SketchArc } from '../../../model/types';
 import { VariationToolPanel } from '../../../ui/panels/tools';
+import { dispatchToolModeChange } from '../modeChangeEvent';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -107,12 +108,6 @@ export class ArcTool extends BaseTool {
 		this.sidebarPanel = new VariationToolPanel<ArcMode>({
 			title: 'Arc Tool',
 			description: 'Select arc creation method:',
-			cardClass: 'arc-tool-card',
-			selectorClass: 'arc-mode-selector',
-			buttonClass: 'arc-mode-btn',
-			iconClass: 'arc-mode-icon',
-			textClass: 'arc-mode-text',
-			hintClass: 'arc-mode-hint',
 			dataAttribute: 'data-arc-mode',
 			cancelButtonId: 'btn-arc-cancel-icon',
 			modes: [
@@ -174,6 +169,7 @@ export class ArcTool extends BaseTool {
 		if (this._mode === newMode) return;
 		this.cancel();
 		this._mode = newMode;
+		dispatchToolModeChange('arc', newMode);
 		this.onModeChange?.(newMode);
 		this.onStateChange?.();
 		this.ctx?.requestRender();
