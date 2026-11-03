@@ -192,6 +192,8 @@ export class SVGRenderer {
 	private geometryGroup: SVGGElement;
 	private regionGroup: SVGGElement;
 	private regionHoverGroup: SVGGElement;
+	private constraintBadgesVisible = true;
+	private dimensionsVisible = true;
 	private cachedRegions: ReturnType<typeof findSketchRegions> = [];
 	private cachedViewport: Viewport | null = null;
 	private constraintGroup: SVGGElement;
@@ -369,6 +371,20 @@ export class SVGRenderer {
 	setRegionsVisible(visible: boolean): void {
 		this.regionGroup.style.display = visible ? '' : 'none';
 		this.regionHoverGroup.style.display = visible ? '' : 'none';
+	}
+
+	setConstraintBadgesVisible(visible: boolean): void {
+		this.constraintBadgesVisible = visible;
+		this.constraintGroup.querySelectorAll<SVGGElement>('.constraint-badge').forEach((badge) => {
+			badge.style.display = visible ? '' : 'none';
+		});
+	}
+
+	setDimensionsVisible(visible: boolean): void {
+		this.dimensionsVisible = visible;
+		this.constraintGroup.querySelectorAll<SVGGElement>('.dimension-item').forEach((dimension) => {
+			dimension.style.display = visible ? '' : 'none';
+		});
 	}
 
 	private drawRegions(hoverPoint: Vec2 | null): void {
@@ -1001,6 +1017,8 @@ export class SVGRenderer {
 			ctx.isSelected = sketch.selection.constraintIds.has(constraint.id);
 			constraint.render?.(ctx);
 		}
+		this.setDimensionsVisible(this.dimensionsVisible);
+		this.setConstraintBadgesVisible(this.constraintBadgesVisible);
 	}
 
 	private renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void {
@@ -1691,6 +1709,7 @@ export class SVGRenderer {
 			'data-id': id,
 			'data-type': 'constraint',
 		}, this.constraintGroup);
+		g.style.display = this.constraintBadgesVisible ? '' : 'none';
 
 		const color = isSelected ? COLORS.primary : customColor ?? COLORS.badgeText;
 		const icon = getBadgeIcon(label, x, y, color);

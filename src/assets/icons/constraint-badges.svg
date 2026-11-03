@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
+  <!-- Geometric element line -->
+  <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <!-- Constraint badge pill / badge box -->
+  <rect x="5.5" y="4.5" width="13" height="9" rx="2.5" stroke="currentColor" stroke-width="1.6" fill="currentColor" fill-opacity="0.12"/>
+  <!-- Equal sign inside constraint badge -->
+  <line x1="8.5" y1="7.5" x2="15.5" y2="7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <line x1="8.5" y1="10.5" x2="15.5" y2="10.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

@@ -64,6 +64,12 @@ function initApp(): void {
 				<button class="btn-header btn-icon active" id="btn-regions-header" title="Toggle Region Fill" aria-label="Toggle Region Fill" aria-pressed="true">
 					${ICONS.regions}
 				</button>
+				<button class="btn-header btn-icon active" id="btn-constraint-badges-header" title="Toggle Constraints" aria-label="Toggle Constraints" aria-pressed="true">
+					${ICONS.constraintBadges}
+				</button>
+				<button class="btn-header btn-icon active" id="btn-dimensions-header" title="Toggle Dimensions" aria-label="Toggle Dimensions" aria-pressed="true">
+					${ICONS.dimensionsToggle}
+				</button>
 				<button class="btn-header btn-icon" id="btn-construction-header" title="Toggle Construction Mode (X)" aria-label="Toggle Construction Mode">
 					${ICONS.construction}
 				</button>
@@ -126,6 +132,8 @@ function initApp(): void {
 	const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
 	const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
 	const btnRegionsHeader = document.getElementById('btn-regions-header') as HTMLButtonElement;
+	const btnConstraintBadgesHeader = document.getElementById('btn-constraint-badges-header') as HTMLButtonElement;
+	const btnDimensionsHeader = document.getElementById('btn-dimensions-header') as HTMLButtonElement;
 	const btnConstructionHeader = document.getElementById('btn-construction-header') as HTMLButtonElement;
 	const btnFitView = document.getElementById('btn-fit-view') as HTMLButtonElement;
 	const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
@@ -279,6 +287,20 @@ function initApp(): void {
 		btnRegionsHeader.setAttribute('aria-pressed', String(visible));
 		btnRegionsHeader.classList.toggle('active', visible);
 		renderer.setRegionsVisible(visible);
+	});
+
+	btnConstraintBadgesHeader?.addEventListener('click', () => {
+		const visible = btnConstraintBadgesHeader.getAttribute('aria-pressed') !== 'true';
+		btnConstraintBadgesHeader.setAttribute('aria-pressed', String(visible));
+		btnConstraintBadgesHeader.classList.toggle('active', visible);
+		renderer.setConstraintBadgesVisible(visible);
+	});
+
+	btnDimensionsHeader?.addEventListener('click', () => {
+		const visible = btnDimensionsHeader.getAttribute('aria-pressed') !== 'true';
+		btnDimensionsHeader.setAttribute('aria-pressed', String(visible));
+		btnDimensionsHeader.classList.toggle('active', visible);
+		renderer.setDimensionsVisible(visible);
 	});
 
 	btnConstructionHeader?.addEventListener('click', () => {
