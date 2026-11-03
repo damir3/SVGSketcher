@@ -116,23 +116,17 @@ export class HighlightManager implements IHighlightManager {
 			ctx.sketch.constraints.has(this.currentTarget.id);
 
 		if (!exists) {
-			this.currentTarget = null;
-			this.currentClass = null;
-			this.currentColor = null;
+			this.clear();
 			return;
 		}
 
 		if (!tool || !tool.isHighlightEnabled || !tool.isHighlightEnabled()) {
-			this.currentTarget = null;
-			this.currentClass = null;
-			this.currentColor = null;
+			this.clear();
 			return;
 		}
 
 		if (tool.canHighlight && !tool.canHighlight(this.currentTarget)) {
-			this.currentTarget = null;
-			this.currentClass = null;
-			this.currentColor = null;
+			this.clear();
 			return;
 		}
 

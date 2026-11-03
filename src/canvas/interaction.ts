@@ -2022,12 +2022,11 @@ export class CanvasInteraction {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
-		const allowRegionHover = this.activeTool === 'select';
-		this.regionHoverPoint = allowRegionHover ? world : null;
-		this.renderer.updateRegionHover(this.regionHoverPoint);
 
 		// Pan handling
 		if (this.isPanning) {
+			this.regionHoverPoint = null;
+			this.renderer.updateRegionHover(null);
 			const dx = screen.x - this.lastMouseScreen.x;
 			const dy = screen.y - this.lastMouseScreen.y;
 			this.viewport.pan(dx, dy);
@@ -2455,11 +2454,15 @@ export class CanvasInteraction {
 		}
 
 		// Centralized hover highlight
+		let hoveredTarget = null;
 		if (this.isPanning || this.isDraggingPoint || this.isBoxSelecting || this.gizmoDragState) {
 			this.highlightManager.clear();
 		} else {
-			this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
+			hoveredTarget = this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
 		}
+		const allowRegionHover = this.activeTool === 'select' && !hoveredTarget && !this.isPanning && !this.isDraggingPoint && !this.isBoxSelecting && !this.gizmoDragState;
+		this.regionHoverPoint = allowRegionHover ? world : null;
+		this.renderer.updateRegionHover(this.regionHoverPoint);
 
 		// Delegate to active tool if not select
 		if (this.activeTool !== 'select' && this.activeToolInstance) {

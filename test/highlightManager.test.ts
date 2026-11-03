@@ -11,6 +11,7 @@ import { DimensionTool } from '../src/canvas/tools/constraints/dimension';
 import { MirrorTool } from '../src/canvas/tools/modify/mirror';
 import { CircularPatternTool } from '../src/canvas/tools/modify/circularPattern';
 import { RectangularPatternTool } from '../src/canvas/tools/modify/rectangularPattern';
+import { SelectTool } from '../src/canvas/tools/selection/select';
 
 function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {}): any {
 	const children: any[] = [];
@@ -261,6 +262,30 @@ describe('HighlightManager centralized highlighting', () => {
 
 		manager.refresh(tool);
 		assert.strictEqual(manager.getHoveredId(), null);
+	});
+
+	it('does not keep origin or axes highlighted when switching to Select', () => {
+		const sketch = new SketchDocument();
+		const svgRoot = createMockSvgElement('svg');
+		const origin = createMockSvgElement('g', { 'data-id': 'origin' });
+		const axisX = createMockSvgElement('g', { 'data-id': 'axis_x' });
+		svgRoot.appendChild(origin);
+		svgRoot.appendChild(axisX);
+		const ctx = createMockContext(sketch, svgRoot);
+		const manager = new HighlightManager(svgRoot, () => ctx);
+		const permissiveTool = new TestCustomTool();
+		const selectTool = new SelectTool();
+
+		assert.equal(manager.update(permissiveTool, vec(0, 0))?.id, 'origin');
+		manager.refresh(selectTool);
+		assert.equal(origin.classList.contains('custom-hover'), false);
+		assert.equal(manager.getHoveredId(), null);
+
+		assert.equal(manager.update(permissiveTool, vec(50, 0))?.id, 'axis_x');
+		manager.refresh(selectTool);
+		assert.equal(axisX.classList.contains('custom-hover'), false);
+		assert.equal(manager.getHoveredId(), null);
+		assert.equal(manager.update(selectTool, vec(50, 0)), null);
 	});
 });
 
