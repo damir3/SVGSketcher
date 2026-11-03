@@ -16,6 +16,7 @@ import slotOverall from '../assets/icons/slot-overall.svg?raw';
 import slotArc3Point from '../assets/icons/slot-arc-3point.svg?raw';
 import slotArcCenter from '../assets/icons/slot-arc-center.svg?raw';
 import polygon from '../assets/icons/polygon.svg?raw';
+import regions from '../assets/icons/regions.svg?raw';
 import ellipse from '../assets/icons/ellipse.svg?raw';
 import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
 import splineFit from '../assets/icons/spline-fit.svg?raw';
@@ -86,6 +87,7 @@ export const ICONS = {
 	lock: fixed,
 	unlock: unfixed,
 	polygon,
+	regions,
 	ellipse,
 	elliptical_arc: ellipticalArc,
 	spline_fit: splineFit,

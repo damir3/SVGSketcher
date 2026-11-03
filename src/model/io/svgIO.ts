@@ -2,6 +2,8 @@ import type { SketchDocument } from '../sketch';
 import type { SketchSnapshot } from '../history';
 import type { SketchPoint } from '../types';
 import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../../math/spline';
+import { findSketchRegions } from '../../math/regions';
+import { REGION_STYLE } from '../../canvas/styles';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -34,6 +36,9 @@ export function exportSketchToSVG(
 	// Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
 	const elements: string[] = [];
 	const usedPoints = new Set<string>();
+	for (const region of findSketchRegions(sketch)) {
+		elements.push(`<path d="${region.path}" fill="${REGION_STYLE.fill}" fill-opacity="${REGION_STYLE.fillOpacity}" fill-rule="evenodd" stroke="none" />`);
+	}
 
 	for (const line of sketch.lines.values()) {
 		if (line.isSplineHandle) continue;

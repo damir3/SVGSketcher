@@ -61,6 +61,9 @@ function initApp(): void {
 				<button class="btn-header btn-icon active" id="btn-snap-header" title="Toggle Snapping" aria-label="Toggle Snapping">
 					${ICONS.snap}
 				</button>
+				<button class="btn-header btn-icon active" id="btn-regions-header" title="Toggle Region Fill" aria-label="Toggle Region Fill" aria-pressed="true">
+					${ICONS.regions}
+				</button>
 				<button class="btn-header btn-icon" id="btn-construction-header" title="Toggle Construction Mode (X)" aria-label="Toggle Construction Mode">
 					${ICONS.construction}
 				</button>
@@ -122,6 +125,7 @@ function initApp(): void {
 	const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
 	const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
 	const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
+	const btnRegionsHeader = document.getElementById('btn-regions-header') as HTMLButtonElement;
 	const btnConstructionHeader = document.getElementById('btn-construction-header') as HTMLButtonElement;
 	const btnFitView = document.getElementById('btn-fit-view') as HTMLButtonElement;
 	const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
@@ -268,6 +272,13 @@ function initApp(): void {
 
 	btnSnapHeader?.addEventListener('click', () => {
 		interaction.toggleSnapping();
+	});
+
+	btnRegionsHeader?.addEventListener('click', () => {
+		const visible = btnRegionsHeader.getAttribute('aria-pressed') !== 'true';
+		btnRegionsHeader.setAttribute('aria-pressed', String(visible));
+		btnRegionsHeader.classList.toggle('active', visible);
+		renderer.setRegionsVisible(visible);
 	});
 
 	btnConstructionHeader?.addEventListener('click', () => {

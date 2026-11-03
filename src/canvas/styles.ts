@@ -61,6 +61,14 @@ export const COLORS = {
 	filletWedgeFill: 'rgba(2, 132, 199, 0.16)', // Sky-600 16%: corner wedge fill
 } as const;
 
+export const REGION_STYLE = {
+	fill: '#888',
+	hoverFill: '#bae6fd',
+	fillOpacity: 0.1,
+	hoverFillOpacity: 0.5,
+	stroke: COLORS.primary,
+} as const;
+
 export const DASH_ARRAY = {
 	construction: '6,6',
 	ray: '2,2',

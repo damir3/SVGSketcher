@@ -1,6 +1,7 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
+import { findSketchRegions, pointInRegion } from '../math/regions';
 import {
 	computePatternCopyAngle,
 	computeRectangularPatternOffset,
@@ -39,6 +40,7 @@ import {
 } from './dimensionGeometry';
 import {
 	COLORS,
+	REGION_STYLE,
 	DASH_ARRAY,
 	STROKE_WIDTH,
 	DIM_ARROWS,
@@ -98,6 +100,7 @@ const TWO_PI = 2 * Math.PI;
 
 
 export interface RenderOptions {
+	regionHoverPoint?: Vec2 | null;
 	showGrid?: boolean;
 	showConstraints?: boolean;
 	showDimensions?: boolean;
@@ -187,6 +190,10 @@ export class SVGRenderer {
 	private gridGroup: SVGGElement;
 	private originAxisGroup: SVGGElement;
 	private geometryGroup: SVGGElement;
+	private regionGroup: SVGGElement;
+	private regionHoverGroup: SVGGElement;
+	private cachedRegions: ReturnType<typeof findSketchRegions> = [];
+	private cachedViewport: Viewport | null = null;
 	private constraintGroup: SVGGElement;
 	private pointGroup: SVGGElement;
 	private mirrorGroup: SVGGElement;
@@ -222,6 +229,10 @@ export class SVGRenderer {
 		this.gridGroup.style.pointerEvents = 'none';
 
 		this.originAxisGroup = this.createGroup('origin-axis-layer');
+		this.regionGroup = this.createGroup('region-layer');
+		this.regionGroup.style.pointerEvents = 'none';
+		this.regionHoverGroup = this.createGroup('region-hover-layer');
+		this.regionHoverGroup.style.pointerEvents = 'none';
 
 		this.geometryGroup = this.createGroup('geometry-layer');
 		this.constraintGroup = this.createGroup('constraint-layer');
@@ -247,7 +258,9 @@ export class SVGRenderer {
 
 		this.svg.appendChild(this.gridGroup);
 		this.svg.appendChild(this.originAxisGroup);
+		this.svg.appendChild(this.regionGroup);
 		this.svg.appendChild(this.geometryGroup);
+		this.svg.appendChild(this.regionHoverGroup);
 		this.svg.appendChild(this.constraintGroup);
 		this.svg.appendChild(this.pointGroup);
 		this.svg.appendChild(this.mirrorGroup);
@@ -290,6 +303,7 @@ export class SVGRenderer {
 		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
 		this.renderGrid(sketch, viewport, options.showGrid ?? true, options);
+		this.renderRegions(sketch, viewport, options.regionHoverPoint ?? null);
 		this.renderGeometry(sketch, viewport, options);
 		if (options.showConstraints !== false) {
 			this.renderConstraints(sketch, viewport);
@@ -338,6 +352,40 @@ export class SVGRenderer {
 		this.offsetGroup.innerHTML = '';
 		if (options.offsetState) {
 			this.renderOffsetPreviews(sketch, viewport, options.offsetState);
+		}
+	}
+
+	private renderRegions(sketch: SketchDocument, viewport: Viewport, hoverPoint: Vec2 | null): void {
+		this.cachedRegions = findSketchRegions(sketch);
+		this.cachedViewport = viewport;
+		this.drawRegions(hoverPoint);
+	}
+
+	updateRegionHover(hoverPoint: Vec2 | null): boolean {
+		if (this.cachedViewport) this.drawRegions(hoverPoint);
+		return hoverPoint !== null && this.cachedRegions.some((region) => pointInRegion(hoverPoint, region));
+	}
+
+	setRegionsVisible(visible: boolean): void {
+		this.regionGroup.style.display = visible ? '' : 'none';
+		this.regionHoverGroup.style.display = visible ? '' : 'none';
+	}
+
+	private drawRegions(hoverPoint: Vec2 | null): void {
+		this.regionGroup.innerHTML = '';
+		this.regionHoverGroup.innerHTML = '';
+		for (const region of this.cachedRegions) {
+			const hovered = hoverPoint ? pointInRegion(hoverPoint, region) : false;
+			const d = [region.points, ...region.holes].map((ring) =>
+				`M ${ring.map((p) => { const s = this.cachedViewport!.worldToScreen(p.x, p.y); return `${s.x.toFixed(2)} ${s.y.toFixed(2)}`; }).join(' L ')} Z`
+			).join(' ');
+			createSvgPath(d, {
+				fill: hovered ? REGION_STYLE.hoverFill : REGION_STYLE.fill,
+				'fill-opacity': hovered ? REGION_STYLE.hoverFillOpacity : REGION_STYLE.fillOpacity,
+				stroke: 'none',
+				'fill-rule': 'evenodd',
+			}, this.regionGroup);
+			if (hovered) createSvgPath(d, { fill: 'none', stroke: REGION_STYLE.stroke, 'stroke-width': STROKE_WIDTH.normal, 'stroke-linejoin': 'round' }, this.regionHoverGroup);
 		}
 	}
 

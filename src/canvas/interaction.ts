@@ -166,6 +166,7 @@ export class CanvasInteraction {
 			/Macintosh/.test(navigator.userAgent));
 	private isSnapModifierPressed = false;
 	private lastMouseScreen: Vec2 = { x: 0, y: 0 };
+	private regionHoverPoint: Vec2 | null = null;
 
 	private isSnapModifier(e: MouseEvent | KeyboardEvent): boolean {
 		return this.isMac ? e.metaKey : e.ctrlKey;
@@ -520,6 +521,7 @@ export class CanvasInteraction {
 		const toolRenderOptions = this.activeToolInstance?.getRenderOptions?.() ?? {};
 		this.renderer.render(this.sketch, this.viewport, {
 			showSplineHandles: isConstraintTool(this.activeTool),
+			regionHoverPoint: this.regionHoverPoint,
 			...toolRenderOptions,
 		});
 		this.highlightManager.refresh(this.activeToolInstance);
@@ -2016,6 +2018,8 @@ export class CanvasInteraction {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
+		this.regionHoverPoint = world;
+		const isHoveringRegion = this.renderer.updateRegionHover(world);
 
 		// Pan handling
 		if (this.isPanning) {
@@ -2438,6 +2442,8 @@ export class CanvasInteraction {
 		// clear hover highlights and tool previews, and do not process hover under overlays.
 		const isOverCanvas = e.target === this.svg || (e.target instanceof Node && this.svg.contains(e.target));
 		if (!isOverCanvas) {
+			this.regionHoverPoint = null;
+			this.renderer.updateRegionHover(null);
 			this.highlightManager.clear();
 			this.renderer.clearPreviews();
 			return;
@@ -2447,7 +2453,8 @@ export class CanvasInteraction {
 		if (this.isPanning || this.isDraggingPoint || this.isBoxSelecting || this.gizmoDragState) {
 			this.highlightManager.clear();
 		} else {
-			this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
+			if (isHoveringRegion) this.highlightManager.clear();
+			else this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
 		}
 
 		// Delegate to active tool if not select
