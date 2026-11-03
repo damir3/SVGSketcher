@@ -92,12 +92,12 @@ import type { GeoCurve } from '../math/intersection';
 import { dist, type Vec2 } from '../math/vector';
 import { computeNaturalFitHandles } from '../math/spline';
 import { calculateOffsetGeometry } from '../math/offset';
+import { serializePrimitive } from './primitives/serialization';
 import {
 	HistoryManager,
 	type SketchSnapshot,
-	serializeConstraint,
-	deserializeConstraint,
 } from './history';
+import { serializeConstraint, deserializeConstraint } from '../solver/constraints/serialization';
 import {
 	evaluateExpression,
 	validateExpression,
@@ -230,7 +230,7 @@ export class SketchDocument {
 	}
 
 	canUndo(): boolean {
-		return this.history.canUndo();
+		return this.history.canUndo(this.takeSnapshot());
 	}
 
 	canRedo(): boolean {
@@ -241,8 +241,8 @@ export class SketchDocument {
 		if (this.batchDepth > 0) {
 			this.rollbackTransaction();
 		}
-		if (!this.history.canUndo()) return false;
 		const current = this.takeSnapshot();
+		if (!this.history.canUndo(current)) return false;
 		const prev = this.history.undo(current);
 		if (prev) {
 			this.restoreSnapshot(prev);
@@ -272,18 +272,13 @@ export class SketchDocument {
 
 	takeSnapshot(): SketchSnapshot {
 		return {
-			points: Array.from(this.points.values()).map(p => new SketchPoint(p)),
-			lines: Array.from(this.lines.values()).map(l => new SketchLine(l)),
-			circles: Array.from(this.circles.values()).map(c => new SketchCircle(c)),
-			arcs: Array.from(this.arcs.values()).map(a => new SketchArc(a)),
-			ellipses: Array.from(this.ellipses.values()).map(e => new SketchEllipse(e)),
-			ellipticalArcs: Array.from(this.ellipticalArcs.values()).map(a => new SketchEllipticalArc(a)),
-			splines: Array.from(this.splines.values()).map(s => new SketchSpline({
-				...s,
-				pointIds: [...s.pointIds],
-				tangentLineIds: s.tangentLineIds ? [...s.tangentLineIds] : undefined,
-				knots: s.knots ? [...s.knots] : undefined,
-			})),
+			points: [...this.points.values()].map(point => serializePrimitive(point)),
+			lines: [...this.lines.values()].map(line => serializePrimitive(line)),
+			circles: [...this.circles.values()].map(circle => serializePrimitive(circle)),
+			arcs: [...this.arcs.values()].map(arc => serializePrimitive(arc)),
+			ellipses: [...this.ellipses.values()].map(ellipse => serializePrimitive(ellipse)),
+			ellipticalArcs: [...this.ellipticalArcs.values()].map(arc => serializePrimitive(arc)),
+			splines: [...this.splines.values()].map(spline => serializePrimitive(spline)),
 			constraints: Array.from(this.constraints.values()).map(c => serializeConstraint(c)),
 			parameters: Array.from(this.parameters.values()).map(p => ({ ...p })),
 			idCounter: this.idCounter,

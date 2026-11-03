@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { CircularPatternConstraint } from '../src/solver/constraints';
-import { serializeConstraint, deserializeConstraint } from '../src/model/history';
+import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
 import { dist } from '../src/math/vector';
 
 describe('Polygon Geometry and Constraints', () => {

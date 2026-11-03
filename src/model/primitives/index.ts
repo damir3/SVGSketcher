@@ -6,3 +6,4 @@ export * from './arc';
 export * from './ellipse';
 export * from './ellipticalArc';
 export * from './spline';
+export * from './serialization';

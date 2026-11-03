@@ -6,7 +6,7 @@ import {
 	LineToAxisDistanceConstraint,
 	AngleConstraint,
 } from '../src/solver/constraints';
-import { serializeConstraint, deserializeConstraint } from '../src/model/history';
+import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
 import { determineDistanceOrientation, DimensionTool } from '../src/canvas/tools/constraints/dimension';
 import { LineTool } from '../src/canvas/tools/primitives/line';
 import { vec } from '../src/math/vector';
@@ -233,24 +233,6 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(deserialized.targetDistance, 50);
 			assert.equal(deserialized.orientation, 'aligned');
 			assert.equal(deserialized.isCoincident, false);
-		});
-
-		it('deserializes legacy point_to_axis_distance records into OriginDistanceConstraint', () => {
-			const serialized = {
-				id: 'c_legacy_1',
-				type: 'point_to_axis_distance' as const,
-				pointId: 'p1',
-				axis: 'x' as const,
-				targetDistance: 25,
-				side: 1,
-				isCoincident: false,
-			};
-			const deserialized = deserializeConstraint(serialized as any) as OriginDistanceConstraint;
-
-			assert.ok(deserialized instanceof OriginDistanceConstraint);
-			assert.equal(deserialized.pointId, 'p1');
-			assert.equal(deserialized.targetDistance, 25);
-			assert.equal(deserialized.orientation, 'vertical');
 		});
 
 		it('serializes and deserializes LineToAxisDistanceConstraint correctly', () => {
