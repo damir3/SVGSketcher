@@ -1,4 +1,5 @@
 import { BaseTool } from '../base';
+import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
@@ -155,7 +156,7 @@ export class FilletTool extends BaseTool {
 		// 1. Check for Fillet Gizmo handle dragging
 		if (this.ctx.renderer.filletGizmoHandle) {
 			const gh = this.ctx.renderer.filletGizmoHandle;
-			if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= 20) {
+			if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
 				this.filletGizmoDragState = {
 					startMouseWorld: world,
 					startRadius: gh.radius,
@@ -170,7 +171,7 @@ export class FilletTool extends BaseTool {
 
 		// 2. Point or primitive selection
 		if (!this.filletFirstPrimitive) {
-			const nearPt = this.ctx.findPointNear(screen, 16);
+			const nearPt = this.ctx.findPointNear(screen);
 			if (nearPt) {
 				const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, nearPt.id);
 				if (conn.valid) {
@@ -284,7 +285,7 @@ export class FilletTool extends BaseTool {
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
 		const isOverGizmo =
 			this.ctx.renderer.filletGizmoHandle &&
-			dist(screen, { x: this.ctx.renderer.filletGizmoHandle.screenX, y: this.ctx.renderer.filletGizmoHandle.screenY }) <= 20;
+			dist(screen, { x: this.ctx.renderer.filletGizmoHandle.screenX, y: this.ctx.renderer.filletGizmoHandle.screenY }) <= GIZMO_DISTANCE_PX;
 
 		if (this.filletGizmoDragState) {
 			this.ctx.setCursor('grabbing');
@@ -389,15 +390,15 @@ export class FilletTool extends BaseTool {
 	}
 
 	private findFilletPrimitiveNearScreen(screen: Vec2): { type: 'line' | 'arc' | 'spline'; id: string } | null {
-		const line = this.ctx.findLineNear(screen, 16);
+		const line = this.ctx.findLineNear(screen);
 		if (line && !line.isSplineHandle) {
 			return { type: 'line', id: line.id };
 		}
-		const arc = this.ctx.findArcNear(screen, 18);
+		const arc = this.ctx.findArcNear(screen);
 		if (arc) {
 			return { type: 'arc', id: arc.id };
 		}
-		const spline = this.ctx.findSplineNear(screen, 18);
+		const spline = this.ctx.findSplineNear(screen);
 		if (spline) {
 			return { type: 'spline', id: spline.id };
 		}

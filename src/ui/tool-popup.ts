@@ -32,6 +32,7 @@ export interface ToolPopupOptions<TFieldId extends string = string> {
 	fields: ToolPopupFieldConfig<TFieldId>[];
 	sketch?: SketchDocument;
 	defaultOffset?: { x: number; y: number };
+	bboxOffset?: { x: number; y: number };
 	onKeyDown?: (e: KeyboardEvent) => boolean | void;
 }
 
@@ -58,6 +59,7 @@ export class ToolPopup<TFieldId extends string = string> {
 	protected fieldOrder: TFieldId[] = [];
 	protected _isOpen = false;
 	protected defaultOffset: { x: number; y: number };
+	protected bboxOffset: { x: number; y: number };
 
 	public onChange?: (fieldId: TFieldId, value: number | string | boolean) => void;
 	public onLockChange?: (fieldId: TFieldId, locked: boolean) => void;
@@ -68,6 +70,7 @@ export class ToolPopup<TFieldId extends string = string> {
 	constructor(options: ToolPopupOptions<TFieldId>) {
 		this.sketch = options.sketch;
 		this.defaultOffset = options.defaultOffset ?? { x: 150, y: 40 };
+		this.bboxOffset = options.bboxOffset ?? { x: 100, y: 0 };
 		this.onKeyDown = options.onKeyDown;
 
 		// Initialize fieldMap first so state is available even in headless/Node test environments
@@ -173,6 +176,30 @@ export class ToolPopup<TFieldId extends string = string> {
 					lockBtn.title = field.title ?? `Lock ${field.label.toLowerCase()}`;
 					lockBtn.innerHTML = POPUP_UNLOCK_ICON;
 					wrapperEl.appendChild(lockBtn);
+				}
+
+				if (field.type === 'integer') {
+					const stepper = document.createElement('span');
+					stepper.className = 'tool-popup-stepper';
+					for (const [direction, glyph] of [['up', '▲'], ['down', '▼']] as const) {
+						const button = document.createElement('button');
+						button.type = 'button';
+						button.className = `tool-popup-stepper-${direction}`;
+						button.setAttribute('aria-label', direction === 'up' ? `Increase ${field.label}` : `Decrease ${field.label}`);
+						button.textContent = glyph;
+						button.addEventListener('click', () => {
+							const current = Number.parseFloat(input.value) || 0;
+							const step = Number(field.step) || 1;
+							const min = field.min ?? -Infinity;
+							const max = field.max ?? Infinity;
+							const next = Math.max(min, Math.min(max, current + (direction === 'up' ? step : -step)));
+							input.value = String(next);
+							input.dispatchEvent(new Event('input', { bubbles: true }));
+							input.dispatchEvent(new Event('change', { bubbles: true }));
+						});
+						stepper.appendChild(button);
+					}
+					wrapperEl.appendChild(stepper);
 				}
 
 				row.appendChild(wrapperEl);
@@ -284,9 +311,9 @@ export class ToolPopup<TFieldId extends string = string> {
 			const minBoxX = posOrBBox.minX;
 			const centerY = (posOrBBox.minY + posOrBBox.maxY) / 2;
 
-			left = refX + 100;
+			left = refX + this.bboxOffset.x;
 			if (left + popupWidth > window.innerWidth - 16) {
-				const leftAlt = minBoxX - 100 - popupWidth;
+				const leftAlt = minBoxX - this.bboxOffset.x - popupWidth;
 				if (leftAlt >= 16) {
 					left = leftAlt;
 				} else {
@@ -295,8 +322,8 @@ export class ToolPopup<TFieldId extends string = string> {
 			}
 			left = Math.max(16, left);
 
-			top = Math.min(
-				Math.max(centerY - popupHeight / 2, 16),
+				top = Math.min(
+				Math.max(centerY + this.bboxOffset.y - popupHeight / 2, 16),
 				window.innerHeight - popupHeight - 16
 			);
 		} else {

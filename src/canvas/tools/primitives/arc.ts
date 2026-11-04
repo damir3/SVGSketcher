@@ -609,7 +609,7 @@ export class ArcTool extends BaseTool {
 				ptId = snap.id;
 				ptPos = snap.worldPos;
 			} else {
-				const nearPt = this.ctx.findPointNear(screen, 16);
+				const nearPt = this.ctx.findPointNear(screen);
 				if (nearPt) {
 					ptId = nearPt.id;
 					ptPos = vec(nearPt.x, nearPt.y);

@@ -4,6 +4,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgPath, createSvgRect, createSvgText } from '../../canvas/svg';
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
 
 /**
  * Dimensional constraint: angle between two lines equals targetAngle (in degrees)
@@ -237,7 +238,7 @@ export class AngleConstraint extends BaseConstraint {
 		}, g);
 	}
 
-	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = 18): number | null {
+		override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {
 		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
 		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
 
@@ -290,12 +291,12 @@ export class AngleConstraint extends BaseConstraint {
 
 		// 1. Check distance to badge / text box
 		const dLabel = Math.hypot(screen.x - midX, screen.y - midY);
-		if (dLabel <= 20) return dLabel;
+			if (dLabel <= LABEL_DISTANCE_PX) return dLabel;
 
 		// 2. Check distance to angle arc
 		const dCenter = Math.hypot(screen.x - sCenter.x, screen.y - sCenter.y);
 		const dRadial = Math.abs(dCenter - rScreen);
-		if (dRadial <= 18) {
+			if (dRadial <= LINE_DISTANCE_PX) {
 			const pAngle = Math.atan2(screen.y - sCenter.y, screen.x - sCenter.x);
 			const sweepAngle = delta;
 			let ptSweep = pAngle - a1;

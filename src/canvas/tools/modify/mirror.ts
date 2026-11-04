@@ -95,21 +95,13 @@ export class MirrorTool extends BaseTool {
 	override activate(ctx: ToolContext): void {
 		super.activate(ctx);
 
-		const sel = ctx.sketch.selection;
-		const initialObjects = new Set<string>();
-		for (const id of sel.lineIds) initialObjects.add(id);
-		for (const id of sel.circleIds) initialObjects.add(id);
-		for (const id of sel.arcIds) initialObjects.add(id);
-		for (const id of sel.ellipseIds) initialObjects.add(id);
-		for (const id of sel.ellipticalArcIds) initialObjects.add(id);
-		for (const id of sel.pointIds) initialObjects.add(id);
+		const initialObjects = new Set(ctx.sketch.getSelectedPrimitives().map(primitive => primitive.id));
 
 		this.state = {
 			phase: initialObjects.size > 0 ? 'mirror_line' : 'objects',
 			selectedObjectIds: initialObjects,
 			mirrorLineId: null,
 		};
-		ctx.sketch.clearSelection();
 		this.onStateChange?.();
 	}
 
@@ -170,38 +162,38 @@ export class MirrorTool extends BaseTool {
 		let hitType: string | null = null;
 
 		if (this.state.phase === 'mirror_line') {
-			const hitLine = this.ctx.findLineNear(e.screen, 18);
+			const hitLine = this.ctx.findLineNear(e.screen);
 			if (hitLine) {
 				hitId = hitLine.id;
 				hitType = 'line';
 			}
 		} else {
-			const nearPoint = this.ctx.findPointNear(e.screen, 16);
+			const nearPoint = this.ctx.findPointNear(e.screen);
 			if (nearPoint) {
 				hitId = nearPoint.id;
 				hitType = 'point';
 			} else {
-				const hitLine = this.ctx.findLineNear(e.screen, 18);
+				const hitLine = this.ctx.findLineNear(e.screen);
 				if (hitLine) {
 					hitId = hitLine.id;
 					hitType = 'line';
 				} else {
-					const hitCircle = this.ctx.findCircleNear(e.screen, 18);
+					const hitCircle = this.ctx.findCircleNear(e.screen);
 					if (hitCircle) {
 						hitId = hitCircle.id;
 						hitType = 'circle';
 					} else {
-						const hitArc = this.ctx.findArcNear(e.screen, 18);
+						const hitArc = this.ctx.findArcNear(e.screen);
 						if (hitArc) {
 							hitId = hitArc.id;
 							hitType = 'arc';
 						} else {
-							const hitEllipse = this.ctx.findEllipseNear?.(e.screen, 18);
+							const hitEllipse = this.ctx.findEllipseNear?.(e.screen);
 							if (hitEllipse) {
 								hitId = hitEllipse.id;
 								hitType = 'ellipse';
 							} else {
-								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen, 18);
+								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen);
 								if (hitEllipticalArc) {
 									hitId = hitEllipticalArc.id;
 									hitType = 'elliptical_arc';

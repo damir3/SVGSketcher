@@ -1,3 +1,4 @@
+import { LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -39,7 +40,7 @@ export class ConstraintTool extends BaseTool {
 		const screen = e.screen;
 
 		if (this.id === 'fixed') {
-			const nearPoint = this.ctx.findPointNear(screen, 20);
+			const nearPoint = this.ctx.findPointNear(screen);
 			if (nearPoint) {
 				const isNowFixed = this.ctx.sketch.toggleFixedConstraint(nearPoint.id);
 				this.ctx.showToast(isNowFixed ? 'Fixed constraint applied' : 'Fixed constraint removed');
@@ -66,7 +67,7 @@ export class ConstraintTool extends BaseTool {
 
 		// Points ALWAYS have top priority when clicking near a point (if points are applicable)
 		const canUsePoints = this.isEntityCompatibleWithConstraint('point');
-		const nearPoint = canUsePoints ? this.ctx.findPointNear(screen, 16) : null;
+		const nearPoint = canUsePoints ? this.ctx.findPointNear(screen) : null;
 		if (nearPoint) {
 			id = nearPoint.id;
 			type = 'point';
@@ -80,41 +81,41 @@ export class ConstraintTool extends BaseTool {
 				type !== 'elliptical_arc' &&
 				type !== 'spline')
 		) {
-			const hitLine = this.ctx.findLineNear(screen, 18);
+			const hitLine = this.ctx.findLineNear(screen);
 			if (hitLine) {
 				id = hitLine.id;
 				type = 'line';
 			} else {
-				const hitCircle = this.ctx.findCircleNear(screen, 18);
+				const hitCircle = this.ctx.findCircleNear(screen);
 				if (hitCircle) {
 					id = hitCircle.id;
 					type = 'circle';
 				} else {
-					const hitArc = this.ctx.findArcNear(screen, 18);
+					const hitArc = this.ctx.findArcNear(screen);
 					if (hitArc) {
 						id = hitArc.id;
 						type = 'arc';
 					} else {
-						const hitEllipse = this.ctx.findEllipseNear?.(screen, 18);
+						const hitEllipse = this.ctx.findEllipseNear?.(screen);
 						if (hitEllipse) {
 							id = hitEllipse.id;
 							type = 'ellipse';
 						} else {
-							const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(screen, 18);
+							const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(screen);
 							if (hitEllipticalArc) {
 								id = hitEllipticalArc.id;
 								type = 'elliptical_arc';
 							} else {
-								const hitSpline = this.ctx.findSplineNear?.(screen, 18);
+								const hitSpline = this.ctx.findSplineNear?.(screen);
 								if (hitSpline) {
 									id = hitSpline.id;
 									type = 'spline';
 								} else if (this.isEntityCompatibleWithConstraint('line')) {
 									const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
-									if (Math.abs(screen.y - sOrigin.y) <= 18) {
+									if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
 										id = 'axis_x';
 										type = 'line';
-									} else if (Math.abs(screen.x - sOrigin.x) <= 18) {
+									} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
 										id = 'axis_y';
 										type = 'line';
 									}

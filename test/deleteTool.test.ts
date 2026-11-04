@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { DeleteTool } from '../src/canvas/tools/modify/delete';
 import { HighlightManager } from '../src/canvas/highlightManager';
-import { DistanceConstraint, AngleConstraint } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
 import { vec, type Vec2 } from '../src/math/vector';
-import { COLORS } from '../src/canvas/styles';
+import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../src/canvas/distances';
 
 function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {}): any {
 	const children: any[] = [];
@@ -101,7 +100,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			toasts.push(msg);
 		},
 		findSnap: () => null,
-		findPointNear: (screen: Vec2, threshold = 16) => {
+		findPointNear: (screen: Vec2, threshold = POINT_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestPt = null;
 			for (const p of sketch.points.values()) {
@@ -113,7 +112,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestPt;
 		},
-		findLineNear: (screen: Vec2, threshold = 18) => {
+		findLineNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestL = null;
 			for (const line of sketch.lines.values()) {
@@ -125,7 +124,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestL;
 		},
-		findCircleNear: (screen: Vec2, threshold = 18) => {
+		findCircleNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestC = null;
 			for (const circle of sketch.circles.values()) {
@@ -137,7 +136,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestC;
 		},
-		findArcNear: (screen: Vec2, threshold = 18) => {
+		findArcNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestA = null;
 			for (const arc of sketch.arcs.values()) {
@@ -149,7 +148,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestA;
 		},
-		findEllipseNear: (screen: Vec2, threshold = 18) => {
+		findEllipseNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestE = null;
 			for (const ellipse of sketch.ellipses.values()) {
@@ -161,7 +160,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestE;
 		},
-		findEllipticalArcNear: (screen: Vec2, threshold = 18) => {
+		findEllipticalArcNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestEA = null;
 			for (const arc of sketch.ellipticalArcs.values()) {
@@ -173,7 +172,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestEA;
 		},
-		findSplineNear: (screen: Vec2, threshold = 18) => {
+		findSplineNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestS = null;
 			for (const spline of sketch.splines.values()) {
@@ -185,7 +184,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 			}
 			return bestS;
 		},
-		findConstraintNear: (screen: Vec2, threshold = 18) => {
+		findConstraintNear: (screen: Vec2, threshold = LINE_DISTANCE_PX) => {
 			let bestD = threshold;
 			let bestC = null;
 			for (const c of sketch.constraints.values()) {
@@ -284,7 +283,7 @@ describe('Delete Tool', () => {
 		const center = sketch.addPoint(0, 0);
 		const start = sketch.addPoint(20, 0);
 		const end = sketch.addPoint(0, 20);
-		const arc = sketch.addArc(center.id, start.id, end.id, 20);
+		const arc = sketch.addArc(center.id, start.id, end.id, 20, true);
 
 		const { ctx } = createMockDeleteContext(sketch);
 		const tool = new DeleteTool();

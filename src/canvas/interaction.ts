@@ -2,6 +2,15 @@ import type { SketchDocument } from '../model/sketch';
 import type { SketchSnapshot } from '../model/history';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
+import {
+	LINE_DISTANCE_PX,
+	LABEL_DISTANCE_PX,
+	GIZMO_DISTANCE_PX,
+	POINT_DISTANCE_PX,
+	SNAP_GEOMETRY_DISTANCE_PX,
+	SNAP_GRID_DISTANCE_PX,
+	SNAP_POINT_DISTANCE_PX,
+} from './distances';
 import { dist, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
 import type { IConstraint } from '../solver/types';
 import {
@@ -280,19 +289,16 @@ export class CanvasInteraction {
 			onEditDimension: (c, screenPos) => this.onEditDimension?.(c, screenPos),
 			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
 				this.findSnap(screen, excludePointId, allowGrid),
-			findPointNear: (screen: Vec2, thresholdPx?: number) => this.findPointNearScreen(screen, thresholdPx),
-			findLineNear: (screen: Vec2, thresholdPx?: number) => this.findLineNearScreen(screen, thresholdPx),
-			findCircleNear: (screen: Vec2, thresholdPx?: number) => this.findCircleNearScreen(screen, thresholdPx),
-			findArcNear: (screen: Vec2, thresholdPx?: number) => this.findArcNearScreen(screen, thresholdPx),
-			findEllipseNear: (screen: Vec2, thresholdPx?: number) => this.findEllipseNearScreen(screen, thresholdPx),
-			findEllipticalArcNear: (screen: Vec2, thresholdPx?: number) =>
-				this.findEllipticalArcNearScreen(screen, thresholdPx),
-			findSplineNear: (screen: Vec2, thresholdPx?: number) => this.findSplineNearScreen(screen, thresholdPx),
-			findConstraintNear: (screen: Vec2, thresholdPx?: number) =>
-				this.findConstraintNearScreen(screen, thresholdPx),
+			findPointNear: this.findPointNear.bind(this),
+			findLineNear: this.findLineNear.bind(this),
+			findCircleNear: this.findCircleNear.bind(this),
+			findArcNear: this.findArcNear.bind(this),
+			findEllipseNear: this.findEllipseNear.bind(this),
+			findEllipticalArcNear: this.findEllipticalArcNear.bind(this),
+			findSplineNear: this.findSplineNear.bind(this),
+			findConstraintNear: this.findConstraintNear.bind(this),
 			toGeoCurve: (type, id) => this.sketch.toGeoCurve(id, type),
-			findTrimTarget: (screen: Vec2, thresholdPx?: number) =>
-				this.findTrimTargetNearScreen(screen, thresholdPx),
+			findTrimTarget: this.findTrimTargetNear.bind(this),
 			applySnapConstraintIfNeeded: (pointId: string, snap: SnapResult | null) =>
 				this.applySnapConstraintIfNeeded(pointId, snap),
 			applyAutoOrientationConstraint: (p1Id: string, p2Id: string) =>
@@ -839,7 +845,7 @@ export class CanvasInteraction {
 		}
 
 		// Priority 1: Point snapping (Always active, highest priority)
-		const pointSnapDistPx = 10;
+		const pointSnapDistPx = SNAP_POINT_DISTANCE_PX;
 		let closestPointDist = pointSnapDistPx;
 		let foundPoint: { id: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
 
@@ -918,7 +924,7 @@ export class CanvasInteraction {
 		}
 
 		// Priority 2: Line, Circle/Arc & Spline snapping
-		const geomSnapDistPx = 10;
+		const geomSnapDistPx = SNAP_GEOMETRY_DISTANCE_PX;
 		let closestGeomDist = geomSnapDistPx;
 		let foundGeom:
 			| { type: 'line' | 'circle' | 'ellipse' | 'spline'; id: string; worldPos: Vec2; screenPos: Vec2 }
@@ -1243,8 +1249,8 @@ export class CanvasInteraction {
 		const nearestScreen = this.viewport.worldToScreen(nearestWorldX, nearestWorldY);
 
 		if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
-			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= 4 ? nearestWorldX : world.x;
-			const snapScreenX = Math.abs(screenPos.x - nearestScreen.x) <= 4 ? nearestScreen.x : screenPos.x;
+			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestWorldX : world.x;
+			const snapScreenX = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestScreen.x : screenPos.x;
 			return {
 				type: 'line',
 				id: 'axis_x',
@@ -1254,8 +1260,8 @@ export class CanvasInteraction {
 		}
 
 		if (dAxisY < geomSnapDistPx) {
-			const snapY = Math.abs(screenPos.y - nearestScreen.y) <= 4 ? nearestWorldY : world.y;
-			const snapScreenY = Math.abs(screenPos.y - nearestScreen.y) <= 4 ? nearestScreen.y : screenPos.y;
+			const snapY = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestWorldY : world.y;
+			const snapScreenY = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestScreen.y : screenPos.y;
 			return {
 				type: 'line',
 				id: 'axis_y',
@@ -1264,7 +1270,7 @@ export class CanvasInteraction {
 			};
 		}
 
-		if (dist(screenPos, nearestScreen) <= 4) {
+		if (dist(screenPos, nearestScreen) <= SNAP_GRID_DISTANCE_PX) {
 			return {
 				type: 'grid',
 				worldPos: vec(nearestWorldX, nearestWorldY),
@@ -1435,7 +1441,11 @@ export class CanvasInteraction {
 		]);
 	}
 
-	private findPointNearScreen(screen: Vec2, thresholdPx = 16, excludePointId?: string): SketchPoint | null {
+	findPointNear(
+		screen: Vec2,
+		thresholdPx = POINT_DISTANCE_PX,
+		excludePointId?: string
+	): SketchPoint | null {
 		let closestDist = thresholdPx;
 		let foundPoint: SketchPoint | null = null;
 
@@ -1460,7 +1470,7 @@ export class CanvasInteraction {
 		return foundPoint;
 	}
 
-	private findLineNearScreen(screen: Vec2, thresholdPx = 16): SketchLine | null {
+	findLineNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchLine | null {
 		let closestDist = thresholdPx;
 		let foundLine: SketchLine | null = null;
 
@@ -1490,7 +1500,7 @@ export class CanvasInteraction {
 		return foundLine;
 	}
 
-	private findCircleNearScreen(screen: Vec2, thresholdPx = 18): SketchCircle | null {
+	findCircleNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchCircle | null {
 		let closestDist = thresholdPx;
 		let foundCircle: SketchCircle | null = null;
 
@@ -1505,7 +1515,7 @@ export class CanvasInteraction {
 		return foundCircle;
 	}
 
-	private findArcNearScreen(screen: Vec2, thresholdPx = 18): SketchArc | null {
+	findArcNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchArc | null {
 		let closestDist = thresholdPx;
 		let foundArc: SketchArc | null = null;
 
@@ -1520,9 +1530,9 @@ export class CanvasInteraction {
 		return foundArc;
 	}
 
-	private findConstraintNearScreen(
+	findConstraintNear(
 		screen: Vec2,
-		thresholdPx = 18
+		thresholdPx = LINE_DISTANCE_PX
 	): IConstraint | null {
 		let closestDist = thresholdPx;
 		let foundConstraint: IConstraint | null = null;
@@ -1539,7 +1549,7 @@ export class CanvasInteraction {
 		return foundConstraint;
 	}
 
-	private findEllipseNearScreen(screen: Vec2, thresholdPx = 18): SketchEllipse | null {
+	findEllipseNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchEllipse | null {
 		let closestDist = thresholdPx;
 		let foundEllipse: SketchEllipse | null = null;
 
@@ -1554,7 +1564,10 @@ export class CanvasInteraction {
 		return foundEllipse;
 	}
 
-	private findEllipticalArcNearScreen(screen: Vec2, thresholdPx = 18): SketchEllipticalArc | null {
+	findEllipticalArcNear(
+		screen: Vec2,
+		thresholdPx = LINE_DISTANCE_PX
+	): SketchEllipticalArc | null {
 		let closestDist = thresholdPx;
 		let foundArc: SketchEllipticalArc | null = null;
 
@@ -1569,7 +1582,7 @@ export class CanvasInteraction {
 		return foundArc;
 	}
 
-	private findSplineNearScreen(screen: Vec2, thresholdPx = 18): SketchSpline | null {
+	findSplineNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchSpline | null {
 		let closestDist = thresholdPx;
 		let foundSpline: SketchSpline | null = null;
 
@@ -1584,7 +1597,7 @@ export class CanvasInteraction {
 		return foundSpline;
 	}
 
-	private findTrimTargetNearScreen(screen: Vec2, thresholdPx = 18): GeoCurve | null {
+	findTrimTargetNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): GeoCurve | null {
 		let bestDist = thresholdPx;
 		let bestCurve: GeoCurve | null = null;
 
@@ -1697,7 +1710,7 @@ export class CanvasInteraction {
 
 		// Check for Rectangular Pattern Gizmo handle dragging (in select mode on selected pattern constraint)
 		for (const handle of this.renderer.rectangularGizmoHandles.values()) {
-			if (dist(screen, { x: handle.x, y: handle.y }) <= 18) {
+			if (dist(screen, { x: handle.x, y: handle.y }) <= GIZMO_DISTANCE_PX) {
 				let centroidWorld: Vec2 | null = null;
 				let u: Vec2 | null = null;
 				let startDistance = 0;
@@ -1743,7 +1756,11 @@ export class CanvasInteraction {
 		if (this.activeTool === 'select') {
 			// Check if clicking on a circular or rectangular pattern suppression checkbox on canvas
 			for (const entry of this.renderer.patternCheckboxPositions.values()) {
-				if (entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+				if (
+					entry.constraintId &&
+					Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX &&
+					Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX
+				) {
 					const c = this.sketch.constraints.get(entry.constraintId);
 					if (c instanceof CircularPatternConstraint && c.suppression) {
 						this.sketch.selectEntity(c.id, 'constraint', false);
@@ -1791,7 +1808,7 @@ export class CanvasInteraction {
 				| undefined;
 
 			// Priority 1: Points have top priority over primitives (unless user explicitly clicked a constraint badge/dimension)
-			const nearPoint = type !== 'constraint' ? this.findPointNearScreen(screen, 16) : null;
+			const nearPoint = type !== 'constraint' ? this.findPointNear(screen) : null;
 			if (nearPoint) {
 				id = nearPoint.id;
 				type = 'point';
@@ -1800,43 +1817,57 @@ export class CanvasInteraction {
 					id = snap.id;
 					type = 'point';
 				} else {
-					const hitLine = this.findLineNearScreen(screen, 18);
-					if (hitLine) {
-						id = hitLine.id;
-						type = 'line';
+					const hitConstraint = this.findConstraintNear(screen);
+					if (
+						hitConstraint &&
+						!this.sketch.isSplineInternalConstraint(hitConstraint) &&
+						hitConstraint.type !== 'arc_endpoints' &&
+						hitConstraint.type !== 'elliptical_arc_endpoints'
+					) {
+						id = hitConstraint.id;
+						type = 'constraint';
 					} else {
-						const hitCircle = this.findCircleNearScreen(screen, 18);
-						if (hitCircle) {
-							id = hitCircle.id;
-							type = 'circle';
+						const hitLine = this.findLineNear(screen);
+						if (hitLine) {
+							id = hitLine.id;
+							type = 'line';
 						} else {
-							const hitArc = this.findArcNearScreen(screen, 18);
-							if (hitArc) {
-								id = hitArc.id;
-								type = 'arc';
+							const hitCircle = this.findCircleNear(screen);
+							if (hitCircle) {
+								id = hitCircle.id;
+								type = 'circle';
 							} else {
-								const hitEllipse = this.findEllipseNearScreen(screen, 18);
-								if (hitEllipse) {
-									id = hitEllipse.id;
-									type = 'ellipse';
+								const hitArc = this.findArcNear(screen);
+								if (hitArc) {
+									id = hitArc.id;
+									type = 'arc';
 								} else {
-									const hitEllipticalArc = this.findEllipticalArcNearScreen(screen, 18);
-									if (hitEllipticalArc) {
-										id = hitEllipticalArc.id;
-										type = 'elliptical_arc';
+									const hitEllipse = this.findEllipseNear(screen);
+									if (hitEllipse) {
+										id = hitEllipse.id;
+										type = 'ellipse';
 									} else {
-										const hitSpline = this.findSplineNearScreen(screen, 18);
-										if (hitSpline) {
-											id = hitSpline.id;
-											type = 'spline';
+										const hitEllipticalArc = this.findEllipticalArcNear(
+											screen,
+											LINE_DISTANCE_PX
+										);
+										if (hitEllipticalArc) {
+											id = hitEllipticalArc.id;
+											type = 'elliptical_arc';
 										} else {
-											const sOrigin = this.viewport.worldToScreen(0, 0);
-											if (Math.abs(screen.y - sOrigin.y) <= 18) {
-												id = 'axis_x';
-												type = 'line';
-											} else if (Math.abs(screen.x - sOrigin.x) <= 18) {
-												id = 'axis_y';
-												type = 'line';
+											const hitSpline = this.findSplineNear(screen);
+											if (hitSpline) {
+												id = hitSpline.id;
+												type = 'spline';
+											} else {
+												const sOrigin = this.viewport.worldToScreen(0, 0);
+												if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
+													id = 'axis_x';
+													type = 'line';
+												} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
+													id = 'axis_y';
+													type = 'line';
+												}
 											}
 										}
 									}
@@ -1844,6 +1875,21 @@ export class CanvasInteraction {
 							}
 						}
 					}
+				}
+			}
+
+			// A visible primitive can be the raw SVG target even when the pointer is
+			// within the wider tolerance of a nearby dimension line.
+			if (type && type !== 'constraint' && type !== 'point') {
+				const hitConstraint = this.findConstraintNear(screen);
+				if (
+					hitConstraint &&
+					!this.sketch.isSplineInternalConstraint(hitConstraint) &&
+					hitConstraint.type !== 'arc_endpoints' &&
+					hitConstraint.type !== 'elliptical_arc_endpoints'
+				) {
+					id = hitConstraint.id;
+					type = 'constraint';
 				}
 			}
 
@@ -2729,22 +2775,22 @@ export class CanvasInteraction {
 
 		// If target didn't resolve to a line, circle, arc, or constraint, use geometric hit test
 		if (!type || (type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'constraint')) {
-			const hitConstraint = this.findConstraintNearScreen(screen, 18);
+			const hitConstraint = this.findConstraintNear(screen);
 			if (hitConstraint) {
 				id = hitConstraint.id;
 				type = 'constraint';
 			} else {
-				const hitLine = this.findLineNearScreen(screen, 18);
+				const hitLine = this.findLineNear(screen);
 				if (hitLine) {
 					id = hitLine.id;
 					type = 'line';
 				} else {
-					const hitCircle = this.findCircleNearScreen(screen, 18);
+					const hitCircle = this.findCircleNear(screen);
 					if (hitCircle) {
 						id = hitCircle.id;
 						type = 'circle';
 					} else {
-						const hitArc = this.findArcNearScreen(screen, 18);
+						const hitArc = this.findArcNear(screen);
 						if (hitArc) {
 							id = hitArc.id;
 							type = 'arc';

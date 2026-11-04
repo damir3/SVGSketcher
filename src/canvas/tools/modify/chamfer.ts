@@ -1,3 +1,4 @@
+import { GIZMO_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, normalize, vec, type Vec2 } from '../../../math/vector';
@@ -304,7 +305,7 @@ export class ChamferTool extends BaseTool {
 		// 1. Check for Chamfer Gizmo handle click / drag
 		if (this.ctx.renderer.chamferGizmoHandles && this.ctx.renderer.chamferGizmoHandles.length > 0) {
 			for (const gh of this.ctx.renderer.chamferGizmoHandles) {
-				if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= 20) {
+				if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
 					this.gizmoDragState = {
 						handle: gh,
 						startMouseWorld: world,
@@ -319,7 +320,7 @@ export class ChamferTool extends BaseTool {
 
 		// 2. Point selection (vertex with exactly 2 lines)
 		if (!this.firstLine) {
-			const nearPt = this.ctx.findPointNear(screen, 16);
+			const nearPt = this.ctx.findPointNear(screen);
 			if (nearPt) {
 				const cand = findChamferCandidateForPoint(this.ctx.sketch, nearPt.id);
 				if (cand) {
@@ -329,7 +330,7 @@ export class ChamferTool extends BaseTool {
 			}
 
 			// 3. Line selection (first line)
-			const hitLine = this.ctx.findLineNear(screen, 14);
+			const hitLine = this.ctx.findLineNear(screen);
 			if (hitLine && !hitLine.isSplineHandle) {
 				this.firstLine = {
 					id: hitLine.id,
@@ -342,7 +343,7 @@ export class ChamferTool extends BaseTool {
 			}
 		} else {
 			// Second line selection
-			const hitLine = this.ctx.findLineNear(screen, 14);
+			const hitLine = this.ctx.findLineNear(screen);
 			if (hitLine && !hitLine.isSplineHandle) {
 				if (hitLine.id === this.firstLine.id) {
 					// Deselect
@@ -515,7 +516,7 @@ export class ChamferTool extends BaseTool {
 
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
 		const isOverGizmo = this.ctx.renderer.chamferGizmoHandles?.some(
-			gh => dist(screen, { x: gh.screenX, y: gh.screenY }) <= 20
+			gh => dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX
 		);
 		if (this.gizmoDragState) {
 			this.ctx.setCursor('grabbing');

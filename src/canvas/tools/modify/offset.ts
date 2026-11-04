@@ -1,4 +1,5 @@
 import { BaseTool } from '../base';
+import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
@@ -407,7 +408,7 @@ export class OffsetTool extends BaseTool {
 		// 1. Check for Offset Gizmo handle click / drag
 		if (this.ctx.renderer.offsetGizmoHandles && this.ctx.renderer.offsetGizmoHandles.length > 0) {
 			for (const gh of this.ctx.renderer.offsetGizmoHandles) {
-				if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= 20) {
+				if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
 					this.gizmoDragState = {
 						handle: gh,
 						startMouseWorld: world,
@@ -421,12 +422,12 @@ export class OffsetTool extends BaseTool {
 		}
 
 		// 2. Curve selection / chain extension
-		const hitLine = this.ctx.findLineNear(screen, 14);
-		const hitArc = this.ctx.findArcNear(screen, 14);
-		const hitCircle = this.ctx.findCircleNear(screen, 14);
-		const hitEllipse = this.ctx.findEllipseNear?.(screen, 14);
-		const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(screen, 14);
-		const hitSpline = this.ctx.findSplineNear(screen, 14);
+		const hitLine = this.ctx.findLineNear(screen);
+		const hitArc = this.ctx.findArcNear(screen);
+		const hitCircle = this.ctx.findCircleNear(screen);
+		const hitEllipse = this.ctx.findEllipseNear?.(screen);
+		const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(screen);
+		const hitSpline = this.ctx.findSplineNear(screen);
 
 		let hitId: string | null = null;
 		let hitType: any = null;
@@ -520,7 +521,7 @@ export class OffsetTool extends BaseTool {
 
 		// Update cursor
 		const isOverGizmo = this.ctx.renderer.offsetGizmoHandles?.some(
-			gh => dist(screen, { x: gh.screenX, y: gh.screenY }) <= 20
+			gh => dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX
 		);
 
 		if (this.gizmoDragState) {

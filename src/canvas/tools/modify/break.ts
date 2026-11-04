@@ -11,7 +11,7 @@ export class BreakTool extends BaseTool {
 	readonly id = 'break' as const;
 
 	override onMouseDown(e: ToolMouseEvent): void {
-		const target = this.ctx.findTrimTarget?.(e.screen, 18);
+		const target = this.ctx.findTrimTarget?.(e.screen);
 		if (!target) return;
 
 		const allCurves = getAllGeoCurves(this.ctx.sketch);
@@ -26,7 +26,7 @@ export class BreakTool extends BaseTool {
 	}
 
 	override renderPreview(ctx: ToolRenderContext): void {
-		const target = this.ctx.findTrimTarget?.(ctx.cursorScreen, 18);
+		const target = this.ctx.findTrimTarget?.(ctx.cursorScreen);
 		if (target) {
 			const allCurves = getAllGeoCurves(this.ctx.sketch);
 			const candidate = getTrimCandidate(target, allCurves, ctx.cursorWorld);

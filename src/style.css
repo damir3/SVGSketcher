@@ -1197,6 +1197,30 @@ html, body {
   -moz-appearance: textfield;
 }
 
+.tool-popup-stepper {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  margin: -2px -4px -2px 2px;
+}
+
+.tool-popup-stepper button {
+  flex: 1;
+  min-width: 16px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary, #64748b);
+  font-size: 7px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tool-popup-stepper button:hover {
+  color: var(--cad-blue, #0284c7);
+  background: rgba(2, 132, 199, 0.12);
+}
+
 .tool-popup-unit {
   font-size: 11px;
   font-weight: 600;

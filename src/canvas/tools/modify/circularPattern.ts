@@ -1,3 +1,4 @@
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -5,6 +6,7 @@ import type { Vec2 } from '../../../math/vector';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import { calculateObjectsCentroid } from './utils';
+import { computePatternCopyAngle } from '../../../solver/constraints';
 
 export interface CircularPatternState {
 	phase: 'objects' | 'center_point';
@@ -108,12 +110,14 @@ export class CircularPatternTool extends BaseTool {
 				onInput: val => {
 					if (this.state) {
 						this.state.angle = val;
+						this.onStateChange?.();
 						this.ctx?.requestRender();
 					}
 				},
 				onChange: val => {
 					if (this.state) {
 						this.state.angle = val;
+						this.onStateChange?.();
 						this.ctx?.requestRender();
 					}
 				},
@@ -198,11 +202,13 @@ export class CircularPatternTool extends BaseTool {
 
 	state: CircularPatternState | null = null;
 	onStateChange?: () => void;
+	private angleDrag: { previousPointerAngle: number; accumulatedDelta: number; startAngle: number } | null = null;
 
 	constructor() {
 		super();
 		this.popup = new ToolPopup<'angle' | 'quantity'>({
 			className: 'pattern-popup circular-pattern-popup',
+			bboxOffset: { x: 150, y: 0 },
 			fields: [
 				{
 					id: 'angle',
@@ -261,14 +267,7 @@ export class CircularPatternTool extends BaseTool {
 		super.activate(ctx);
 		this.popup.setSketch(this.ctx.sketch);
 
-		const sel = ctx.sketch.selection;
-		const initialObjects = new Set<string>();
-		for (const id of sel.lineIds) initialObjects.add(id);
-		for (const id of sel.circleIds) initialObjects.add(id);
-		for (const id of sel.arcIds) initialObjects.add(id);
-		for (const id of sel.ellipseIds) initialObjects.add(id);
-		for (const id of sel.ellipticalArcIds) initialObjects.add(id);
-		for (const id of sel.pointIds) initialObjects.add(id);
+		const initialObjects = new Set(ctx.sketch.getSelectedPrimitives().map(primitive => primitive.id));
 
 		this.state = {
 			phase: initialObjects.size > 0 ? 'center_point' : 'objects',
@@ -280,7 +279,6 @@ export class CircularPatternTool extends BaseTool {
 			suppression: false,
 			suppressedIndices: new Set<number>(),
 		};
-		ctx.sketch.clearSelection();
 		this.updatePopupPosition();
 		this.onStateChange?.();
 	}
@@ -305,7 +303,7 @@ export class CircularPatternTool extends BaseTool {
 	override isHighlightEnabled(screen?: Vec2): boolean {
 		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX) {
 					return false;
 				}
 			}
@@ -350,17 +348,28 @@ export class CircularPatternTool extends BaseTool {
 		}
 
 		const centroid = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
+		const center = this.state.centerPointId === 'origin'
+			? { x: 0, y: 0 }
+			: this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 		if (centroid) {
 			pts.push(this.ctx.viewport.worldToScreen(centroid.x, centroid.y));
-		}
-
-		if (this.ctx.renderer?.patternCheckboxPositions) {
-			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId) {
-					pts.push(
-						{ x: entry.x - 14, y: entry.y - 14 },
-						{ x: entry.x + 14, y: entry.y + 14 }
-					);
+			if (center) {
+				const bboxQuantity = 12;
+				for (let k = 1; k < bboxQuantity; k++) {
+					const radians = computePatternCopyAngle(
+						k,
+						bboxQuantity,
+						this.state.distribution,
+						this.state.angle
+					) * Math.PI / 180;
+					const dx = centroid.x - center.x;
+					const dy = centroid.y - center.y;
+					const copy = {
+						x: center.x + dx * Math.cos(radians) - dy * Math.sin(radians),
+						y: center.y + dx * Math.sin(radians) + dy * Math.cos(radians),
+					};
+					const screen = this.ctx.viewport.worldToScreen(copy.x, copy.y);
+					pts.push({ x: screen.x - 14, y: screen.y - 14 }, { x: screen.x + 14, y: screen.y + 14 });
 				}
 			}
 		}
@@ -383,7 +392,7 @@ export class CircularPatternTool extends BaseTool {
 	}
 
 	updatePopupPosition(): void {
-		if (!this.state || this.state.selectedObjectIds.size === 0 || !this.ctx) {
+		if (!this.state || this.state.selectedObjectIds.size === 0 || !this.state.centerPointId || !this.ctx) {
 			this.popup.hide();
 			return;
 		}
@@ -426,11 +435,24 @@ export class CircularPatternTool extends BaseTool {
 				suppressedIndices: new Set(),
 			};
 		}
+		const angleHandle = this.ctx.renderer?.patternAngleHandle;
+		if (this.state.distribution !== 'full' && angleHandle && Math.hypot(e.screen.x - angleHandle.x, e.screen.y - angleHandle.y) <= LINE_DISTANCE_PX) {
+			const center = this.state.centerPointId === 'origin'
+				? { x: 0, y: 0 }
+				: this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
+			if (!center) return false;
+			this.angleDrag = {
+				previousPointerAngle: Math.atan2(e.world.y - center.y, e.world.x - center.x) * 180 / Math.PI,
+				accumulatedDelta: 0,
+				startAngle: this.state.angle,
+			};
+			return true;
+		}
 
 		// 1. Suppression checkbox click hit-test
 		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(e.screen.x - entry.x) <= 14 && Math.abs(e.screen.y - entry.y) <= 14) {
+				if (!entry.constraintId && Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX) {
 					if (this.state.suppressedIndices.has(entry.copyIndex)) {
 						this.state.suppressedIndices.delete(entry.copyIndex);
 					} else {
@@ -447,38 +469,38 @@ export class CircularPatternTool extends BaseTool {
 		let hitType: string | null = null;
 
 		if (this.state.phase === 'center_point') {
-			const nearPoint = this.ctx.findPointNear(e.screen, 18);
+			const nearPoint = this.ctx.findPointNear(e.screen);
 			if (nearPoint) {
 				hitId = nearPoint.id;
 				hitType = 'point';
 			}
 		} else {
-			const nearPoint = this.ctx.findPointNear(e.screen, 16);
+			const nearPoint = this.ctx.findPointNear(e.screen);
 			if (nearPoint) {
 				hitId = nearPoint.id;
 				hitType = 'point';
 			} else {
-				const hitLine = this.ctx.findLineNear(e.screen, 18);
+				const hitLine = this.ctx.findLineNear(e.screen);
 				if (hitLine) {
 					hitId = hitLine.id;
 					hitType = 'line';
 				} else {
-					const hitCircle = this.ctx.findCircleNear(e.screen, 18);
+					const hitCircle = this.ctx.findCircleNear(e.screen);
 					if (hitCircle) {
 						hitId = hitCircle.id;
 						hitType = 'circle';
 					} else {
-						const hitArc = this.ctx.findArcNear(e.screen, 18);
+						const hitArc = this.ctx.findArcNear(e.screen);
 						if (hitArc) {
 							hitId = hitArc.id;
 							hitType = 'arc';
 						} else {
-							const hitEllipse = this.ctx.findEllipseNear?.(e.screen, 18);
+							const hitEllipse = this.ctx.findEllipseNear?.(e.screen);
 							if (hitEllipse) {
 								hitId = hitEllipse.id;
 								hitType = 'ellipse';
 							} else {
-								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen, 18);
+								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen);
 								if (hitEllipticalArc) {
 									hitId = hitEllipticalArc.id;
 									hitType = 'elliptical_arc';
@@ -514,6 +536,39 @@ export class CircularPatternTool extends BaseTool {
 		// Empty click in objects phase triggers box selection
 		return false;
 	}
+
+	override onMouseMove(e: ToolMouseEvent): void {
+		if (!this.angleDrag || !this.state || !this.ctx) return;
+		const center = this.state.centerPointId === 'origin'
+			? { x: 0, y: 0 }
+			: this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
+		if (!center) return;
+		const dx = e.world.x - center.x;
+		const dy = e.world.y - center.y;
+		if (Math.hypot(dx, dy) < 1e-4) return;
+		const radialAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+		let step = radialAngle - this.angleDrag.previousPointerAngle;
+		while (step > 180) step -= 360;
+		while (step < -180) step += 360;
+		this.angleDrag.previousPointerAngle = radialAngle;
+		this.angleDrag.accumulatedDelta += step;
+		const delta = this.angleDrag.accumulatedDelta;
+		const k = this.ctx.renderer?.patternAngleHandle?.copyIndex;
+		if (!k) return;
+		const N = Math.max(2, Math.round(this.state.quantity));
+		if (this.state.distribution === 'partial') this.state.angle = this.angleDrag.startAngle + delta * (N - 1) / k;
+		else {
+			const ratio = k % 2 ? (k + 1) / 2 : -k / 2;
+			this.state.angle = this.angleDrag.startAngle + delta * (N - 1) / ratio;
+		}
+		this.state.angleExpression = undefined;
+		this.popup.setValue('angle', this.state.angle);
+		this.onStateChange?.();
+		this.updatePopupPosition();
+		this.ctx.requestRender();
+	}
+
+	override onMouseUp(_e: ToolMouseEvent): void { this.angleDrag = null; }
 
 	override onKeyDown(e: KeyboardEvent): boolean | void {
 		if (e.key === 'Tab') {
@@ -634,6 +689,7 @@ export class CircularPatternTool extends BaseTool {
 				centerPointId: this.state.centerPointId,
 				distribution: this.state.distribution,
 				angle: this.state.angle,
+				angleHandleEnabled: this.state.distribution !== 'full',
 				quantity: this.state.quantity,
 				suppression: this.state.suppression,
 				suppressedIndices: this.state.suppressedIndices,

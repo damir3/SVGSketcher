@@ -1,3 +1,5 @@
+import { LINE_DISTANCE_PX } from './distances';
+
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // ==========================================
@@ -110,7 +112,7 @@ export const STROKE_WIDTH = {
 	selected: 2,
 	trim: 2,
 	heavy: 3,
-	hitArea: 18,
+	hitArea: LINE_DISTANCE_PX,
 	splineHandle: 1,
 	splineHandleSelected: 2,
 	splineControlPolygon: 1.5,

@@ -1,3 +1,4 @@
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -471,14 +472,14 @@ export class RectangularPatternTool extends BaseTool {
 		if (this.gizmoDragState !== null) return false;
 		if (screen && this.ctx?.renderer?.rectangularGizmoHandles) {
 			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
-				if (!handle.constraintId && dist(screen, { x: handle.x, y: handle.y }) <= 18) {
+				if (!handle.constraintId && dist(screen, { x: handle.x, y: handle.y }) <= LINE_DISTANCE_PX) {
 					return false;
 				}
 			}
 		}
 		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= 14 && Math.abs(screen.y - entry.y) <= 14) {
+				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX) {
 					return false;
 				}
 			}
@@ -630,7 +631,7 @@ export class RectangularPatternTool extends BaseTool {
 		// 1. Gizmo handle dragging hit-test
 		if (this.ctx.renderer?.rectangularGizmoHandles) {
 			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
-				if (!handle.constraintId && dist(e.screen, { x: handle.x, y: handle.y }) <= 18) {
+				if (!handle.constraintId && dist(e.screen, { x: handle.x, y: handle.y }) <= LINE_DISTANCE_PX) {
 					const startDistance = handle.axis === 1 ? this.state.distance1 : this.state.distance2;
 					const paramMap = new Map<string, number>();
 					for (const [pid, pt] of this.ctx.sketch.points.entries()) {
@@ -664,7 +665,7 @@ export class RectangularPatternTool extends BaseTool {
 		// 2. Suppression checkbox click hit-test
 		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(e.screen.x - entry.x) <= 14 && Math.abs(e.screen.y - entry.y) <= 14) {
+				if (!entry.constraintId && Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX) {
 					if (this.state.suppressedIndices.has(entry.copyIndex)) {
 						this.state.suppressedIndices.delete(entry.copyIndex);
 					} else {
@@ -681,38 +682,38 @@ export class RectangularPatternTool extends BaseTool {
 		let hitType: string | null = null;
 
 		if (this.state.phase === 'direction1' || this.state.phase === 'direction2') {
-			const hitLine = this.ctx.findLineNear(e.screen, 18);
+			const hitLine = this.ctx.findLineNear(e.screen);
 			if (hitLine) {
 				hitId = hitLine.id;
 				hitType = 'line';
 			}
 		} else {
-			const nearPoint = this.ctx.findPointNear(e.screen, 16);
+			const nearPoint = this.ctx.findPointNear(e.screen);
 			if (nearPoint) {
 				hitId = nearPoint.id;
 				hitType = 'point';
 			} else {
-				const hitLine = this.ctx.findLineNear(e.screen, 18);
+				const hitLine = this.ctx.findLineNear(e.screen);
 				if (hitLine) {
 					hitId = hitLine.id;
 					hitType = 'line';
 				} else {
-					const hitCircle = this.ctx.findCircleNear(e.screen, 18);
+					const hitCircle = this.ctx.findCircleNear(e.screen);
 					if (hitCircle) {
 						hitId = hitCircle.id;
 						hitType = 'circle';
 					} else {
-						const hitArc = this.ctx.findArcNear(e.screen, 18);
+						const hitArc = this.ctx.findArcNear(e.screen);
 						if (hitArc) {
 							hitId = hitArc.id;
 							hitType = 'arc';
 						} else {
-							const hitEllipse = this.ctx.findEllipseNear?.(e.screen, 18);
+							const hitEllipse = this.ctx.findEllipseNear?.(e.screen);
 							if (hitEllipse) {
 								hitId = hitEllipse.id;
 								hitType = 'ellipse';
 							} else {
-								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen, 18);
+								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen);
 								if (hitEllipticalArc) {
 									hitId = hitEllipticalArc.id;
 									hitType = 'elliptical_arc';

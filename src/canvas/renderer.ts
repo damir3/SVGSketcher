@@ -114,6 +114,7 @@ export interface RenderOptions {
 		centerPointId: string | null;
 		distribution: 'full' | 'partial' | 'symmetric';
 		angle: number;
+		angleHandleEnabled: boolean;
 		quantity: number;
 		suppression: boolean;
 		suppressedIndices: Set<number>;
@@ -202,6 +203,7 @@ export class SVGRenderer {
 	private patternGroup: SVGGElement;
 	private patternCheckboxGroup: SVGGElement;
 	readonly patternCheckboxPositions = new Map<string, { x: number; y: number; copyIndex: number; constraintId?: string }>();
+	patternAngleHandle: { x: number; y: number; worldX: number; worldY: number; copyIndex: number } | null = null;
 	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
 	readonly chamferGizmoHandles: ChamferGizmoHandle[] = [];
 	readonly offsetGizmoHandles: OffsetGizmoHandle[] = [];
@@ -302,6 +304,7 @@ export class SVGRenderer {
 
 	render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
 		this.patternCheckboxPositions.clear();
+		this.patternAngleHandle = null;
 		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
 		this.renderGrid(sketch, viewport, options.showGrid ?? true, options);
@@ -330,7 +333,8 @@ export class SVGRenderer {
 				options.patternHighlight.angle,
 				options.patternHighlight.quantity,
 				options.patternHighlight.suppression,
-				options.patternHighlight.suppressedIndices
+				options.patternHighlight.suppressedIndices,
+				options.patternHighlight.angleHandleEnabled
 			);
 		}
 		if (options.rectangularPatternHighlight) {
@@ -636,7 +640,7 @@ export class SVGRenderer {
 				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''}`,
 			}, this.geometryGroup);
 
-			// Invisible generous hit target (18px wide)
+			// Invisible generous hit target using the shared line hit width
 			createSvgLine(s1.x, s1.y, s2.x, s2.y, HIT_AREA_STROKE_ATTRS, lineG);
 
 			// Visible line
@@ -677,7 +681,7 @@ export class SVGRenderer {
 				class: `sketch-entity sketch-circle ${isSelected ? 'is-selected' : ''}`,
 			}, this.geometryGroup);
 
-			// Invisible generous hit target (18px stroke ring)
+			// Invisible generous hit target using the shared line hit width
 			createSvgCircle(sc.x, sc.y, sr, HIT_AREA_RING_ATTRS, circleG);
 
 			// Visible circle
@@ -717,7 +721,7 @@ export class SVGRenderer {
 				class: `sketch-entity sketch-arc ${isSelected ? 'is-selected' : ''}`,
 			}, this.geometryGroup);
 
-			// Invisible generous hit target (18px stroke)
+			// Invisible generous hit target using the shared line hit width
 			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 
 			// Visible arc path
@@ -761,7 +765,7 @@ export class SVGRenderer {
 				class: `sketch-entity sketch-ellipse ${isSelected ? 'is-selected' : ''}`,
 			}, this.geometryGroup);
 
-			// Invisible generous hit target (18px stroke)
+			// Invisible generous hit target using the shared line hit width
 			createSvgEllipse(sc.x, sc.y, rx, ry, {
 				transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 				...HIT_AREA_RING_ATTRS,
@@ -810,7 +814,7 @@ export class SVGRenderer {
 				class: `sketch-entity sketch-elliptical-arc ${isSelected ? 'is-selected' : ''}`,
 			}, this.geometryGroup);
 
-			// Invisible generous hit target (18px stroke)
+			// Invisible generous hit target using the shared line hit width
 			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 
 			// Visible arc path
@@ -871,7 +875,7 @@ export class SVGRenderer {
 				class: `sketch-entity sketch-spline ${isSelected ? 'is-selected' : ''}`,
 			}, this.geometryGroup);
 
-			// Invisible generous hit target (18px stroke)
+			// Invisible generous hit target using the shared line hit width
 			createSvgPath(d, HIT_AREA_STROKE_ATTRS, splineG);
 
 			// Visible spline path
@@ -2085,7 +2089,8 @@ export class SVGRenderer {
 		angle: number,
 		quantity: number,
 		suppression: boolean,
-		suppressedIndices: Set<number>
+		suppressedIndices: Set<number>,
+		angleHandleEnabled = false
 	): void {
 		this.patternGroup.innerHTML = '';
 		if (!centerPointId) return;
@@ -2113,6 +2118,10 @@ export class SVGRenderer {
 		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
 		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
 		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+		let lastVisibleCopyIndex = N - 1;
+		if (suppression) {
+			while (lastVisibleCopyIndex > 0 && suppressedIndices.has(lastVisibleCopyIndex)) lastVisibleCopyIndex--;
+		}
 
 		// Calculate angle for each copy k (1 .. N-1)
 		for (let k = 1; k < N; k++) {
@@ -2159,6 +2168,24 @@ export class SVGRenderer {
 			// Render suppression checkbox over copy if suppression is enabled
 			if (suppression) {
 				this.renderPatternSuppressionCheckbox(centroid, k, isSuppressed);
+			}
+			if (angleHandleEnabled && k === lastVisibleCopyIndex) {
+				const worldCentroid = copyWorldPoints.length
+					? { x: copyWorldPoints.reduce((sum, p) => sum + p.x, 0) / copyWorldPoints.length, y: copyWorldPoints.reduce((sum, p) => sum + p.y, 0) / copyWorldPoints.length }
+					: { x: centerPt.x + 40 * Math.cos(aDeg * Math.PI / 180), y: centerPt.y + 40 * Math.sin(aDeg * Math.PI / 180) };
+				const dx = centroid.x - sCtr.x, dy = centroid.y - sCtr.y;
+				const len = Math.hypot(dx, dy) || 1;
+				// The arrow points back along the angle arc, toward the pattern center.
+				const direction = angle < 0 ? -1 : 1;
+				const dirX = direction * dy / len, dirY = direction * -dx / len;
+				const tipX = centroid.x + dirX * 30, tipY = centroid.y + dirY * 30;
+				const arrowLen = 16, arrowHalfWidth = 6.5;
+				const baseX = tipX - arrowLen * dirX, baseY = tipY - arrowLen * dirY;
+				const perpX = -dirY, perpY = dirX;
+				const arrowPath = `M ${tipX} ${tipY} L ${baseX + arrowHalfWidth * perpX} ${baseY + arrowHalfWidth * perpY} L ${baseX - arrowHalfWidth * perpX} ${baseY - arrowHalfWidth * perpY} Z`;
+				createSvgLine(centroid.x, centroid.y, baseX, baseY, { stroke: COLORS.primary, 'stroke-width': 2, 'stroke-dasharray': '4 3' }, this.patternGroup);
+				createSvgPath(arrowPath, OFFSET_GIZMO_ARROW_ATTRS, this.patternGroup);
+				this.patternAngleHandle = { x: baseX, y: baseY, worldX: worldCentroid.x, worldY: worldCentroid.y, copyIndex: k };
 			}
 		}
 	}

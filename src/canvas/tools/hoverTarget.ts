@@ -1,5 +1,6 @@
 import type { ToolContext } from './types';
 import type { Vec2 } from '../../math/vector';
+import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../distances';
 
 export interface HoverTarget {
 	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
@@ -23,8 +24,8 @@ export function findHoverTarget(
 	const allowSplineHandles = options.allowSplineHandles ?? false;
 	const allowAxes = options.allowAxes ?? true;
 	const allowOrigin = options.allowOrigin ?? true;
-	const pointRadius = options.pointRadius ?? 14;
-	const maxProximityDist = options.maxProximityDist ?? 18;
+	const pointRadius = options.pointRadius ?? POINT_DISTANCE_PX;
+	const maxProximityDist = options.maxProximityDist ?? LINE_DISTANCE_PX;
 
 	// 1. Direct SVG DOM hit test on constraint if rawTarget provided
 	if (rawTarget) {
@@ -79,7 +80,7 @@ export function findHoverTarget(
 	}
 
 	// 3. Point priority
-	const pt = ctx.findPointNear(screen, pointRadius);
+	const pt = ctx.findPointNear(screen);
 	if (pt && (allowSplineHandles || !ctx.sketch.isSplineHandlePoint(pt.id))) {
 		return { type: 'point', id: pt.id };
 	}
@@ -92,7 +93,7 @@ export function findHoverTarget(
 	let bestDist = maxProximityDist;
 	let bestTarget: HoverTarget | null = null;
 
-	const c = ctx.findConstraintNear?.(screen, bestDist);
+	const c = ctx.findConstraintNear?.(screen);
 	if (
 		c &&
 		!ctx.sketch.isSplineInternalConstraint(c) &&
@@ -106,7 +107,7 @@ export function findHoverTarget(
 		}
 	}
 
-	const line = ctx.findLineNear(screen, bestDist);
+	const line = ctx.findLineNear(screen);
 	if (line && (allowSplineHandles || (!line.isSplineHandle && !ctx.sketch.isSplineHandleLine(line.id)))) {
 		const d = line.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
@@ -115,7 +116,7 @@ export function findHoverTarget(
 		}
 	}
 
-	const circle = ctx.findCircleNear(screen, bestDist);
+	const circle = ctx.findCircleNear(screen);
 	if (circle) {
 		const d = circle.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
@@ -124,7 +125,7 @@ export function findHoverTarget(
 		}
 	}
 
-	const arc = ctx.findArcNear(screen, bestDist);
+	const arc = ctx.findArcNear(screen);
 	if (arc) {
 		const d = arc.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
@@ -133,7 +134,7 @@ export function findHoverTarget(
 		}
 	}
 
-	const ellipse = ctx.findEllipseNear?.(screen, bestDist);
+	const ellipse = ctx.findEllipseNear?.(screen);
 	if (ellipse) {
 		const d = ellipse.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
@@ -142,7 +143,7 @@ export function findHoverTarget(
 		}
 	}
 
-	const earc = ctx.findEllipticalArcNear?.(screen, bestDist);
+	const earc = ctx.findEllipticalArcNear?.(screen);
 	if (earc) {
 		const d = earc.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
@@ -151,7 +152,7 @@ export function findHoverTarget(
 		}
 	}
 
-	const spline = ctx.findSplineNear(screen, bestDist);
+	const spline = ctx.findSplineNear(screen);
 	if (spline) {
 		const d = spline.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
@@ -175,24 +176,6 @@ export function findHoverTarget(
 
 	if (bestTarget) {
 		return bestTarget;
-	}
-
-	// 5. Fallback: direct SVG DOM hit test on primitives/entities
-	if (rawTarget) {
-		const targetEl = rawTarget.closest?.('[data-id]') as SVGElement | null;
-		if (targetEl) {
-			const id = targetEl.getAttribute('data-id');
-			const type = targetEl.getAttribute('data-type') as HoverTarget['type'] | null;
-			if (id && type) {
-				if (!allowOrigin && id === 'origin') {
-					// skip
-				} else if (!allowAxes && (id === 'axis_x' || id === 'axis_y')) {
-					// skip
-				} else {
-					return { type, id };
-				}
-			}
-		}
 	}
 
 	return null;

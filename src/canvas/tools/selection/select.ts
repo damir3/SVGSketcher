@@ -9,6 +9,10 @@ export class SelectTool extends BaseTool {
 		return true;
 	}
 
+	// Leaving select mode must preserve the current selection so modify tools can
+	// initialize their object lists from it. Escape still clears via cancel().
+	override deactivate(): void {}
+
 	override canHighlight(target: HoverTarget): boolean {
 		return target.id !== 'origin' && target.id !== 'axis_x' && target.id !== 'axis_y';
 	}

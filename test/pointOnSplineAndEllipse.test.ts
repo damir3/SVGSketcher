@@ -17,6 +17,7 @@ function setupMockDocument() {
 	const origWin = (globalThis as any).window;
 	const makeEl = () => ({
 		style: {},
+		setAttribute: () => {},
 		classList: { add: () => {}, remove: () => {} },
 		addEventListener: () => {},
 		removeEventListener: () => {},

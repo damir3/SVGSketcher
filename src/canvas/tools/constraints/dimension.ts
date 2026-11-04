@@ -1,3 +1,4 @@
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -199,7 +200,7 @@ export class DimensionTool extends BaseTool {
 		// Priority 1: When selecting points in step 0 or step 1, points ALWAYS have top priority!
 		const excludeId =
 			this.state.step === 1 && this.state.point1Id ? this.state.point1Id : undefined;
-		const nearPoint = this.ctx.findPointNear(screen, 22);
+		const nearPoint = this.ctx.findPointNear(screen);
 		if (nearPoint && (!excludeId || nearPoint.id !== excludeId)) {
 			id = nearPoint.id;
 			type = 'point';
@@ -211,26 +212,26 @@ export class DimensionTool extends BaseTool {
 				id = snap.id;
 				type = 'point';
 			} else {
-				const hitLine = this.ctx.findLineNear(screen, 18);
+				const hitLine = this.ctx.findLineNear(screen);
 				if (hitLine) {
 					id = hitLine.id;
 					type = 'line';
 				} else {
-					const hitCircle = this.ctx.findCircleNear(screen, 18);
+					const hitCircle = this.ctx.findCircleNear(screen);
 					if (hitCircle) {
 						id = hitCircle.id;
 						type = 'circle';
 					} else {
-						const hitArc = this.ctx.findArcNear(screen, 18);
+						const hitArc = this.ctx.findArcNear(screen);
 						if (hitArc) {
 							id = hitArc.id;
 							type = 'arc';
 						} else {
 							const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
-							if (Math.abs(screen.y - sOrigin.y) <= 18) {
+							if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
 								id = 'axis_x';
 								type = 'line';
-							} else if (Math.abs(screen.x - sOrigin.x) <= 18) {
+							} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
 								id = 'axis_y';
 								type = 'line';
 							}
@@ -346,7 +347,7 @@ export class DimensionTool extends BaseTool {
 								const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
 								const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
 								let offsetScreen = tCursor - tProj;
-								if (Math.abs(offsetScreen) < 15) {
+								if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
 									offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
 								}
 								offsetWorld = offsetScreen / this.ctx.viewport.zoom;
@@ -444,7 +445,7 @@ export class DimensionTool extends BaseTool {
 						const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
 						const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
 						let offsetScreen = tCursor - tProj;
-						if (Math.abs(offsetScreen) < 15) {
+						if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
 							offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
 						}
 						offsetWorld = offsetScreen / this.ctx.viewport.zoom;
@@ -701,7 +702,7 @@ export class DimensionTool extends BaseTool {
 			const l1 = ctx.sketch.lines.get(this.state.line1Id);
 			if (l1) {
 				// Check if hovering over a point (that is NOT an endpoint of line1)
-				const hitPt = this.ctx.findPointNear(screen, 18);
+				const hitPt = this.ctx.findPointNear(screen);
 				if (hitPt && hitPt.id !== l1.p1Id && hitPt.id !== l1.p2Id) {
 					const p1 = ctx.sketch.points.get(l1.p1Id);
 					const p2 = ctx.sketch.points.get(l1.p2Id);
@@ -740,7 +741,7 @@ export class DimensionTool extends BaseTool {
 								screenPos: ctx.snap.screenPos,
 						  }
 						: (() => {
-								const pt = this.ctx.findPointNear(screen, 22);
+								const pt = this.ctx.findPointNear(screen);
 								if (pt && pt.id !== p1.id) {
 									return {
 										id: pt.id,
@@ -760,7 +761,7 @@ export class DimensionTool extends BaseTool {
 				}
 
 				// 2. SECOND PRIORITY: Check if hovering over the body of a line
-				const hitLine = this.ctx.findLineNear(screen, 14);
+				const hitLine = this.ctx.findLineNear(screen);
 				if (hitLine && hitLine.p1Id !== p1.id && hitLine.p2Id !== p1.id) {
 					const lp1 = ctx.sketch.points.get(hitLine.p1Id);
 					const lp2 = ctx.sketch.points.get(hitLine.p2Id);
