@@ -270,7 +270,7 @@ export class ModifyToolPanel implements IToolPanel {
 		btnCancelIcon?.addEventListener('click', handleCancel);
 
 		this.options.bindStateChange?.(() => {
-				const card = container.querySelector<HTMLElement>('.tool-panel-card');
+			const card = container.querySelector<HTMLElement>('.tool-panel-card');
 			if (card) {
 				const temp = document.createElement('div');
 				temp.innerHTML = this.render();

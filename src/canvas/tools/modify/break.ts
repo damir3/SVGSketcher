@@ -1,10 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import {
-	getAllGeoCurves,
-	getTrimCandidate,
-	executeBreak,
-} from '../../../math/intersection';
+import { getAllGeoCurves, getTrimCandidate, executeBreak } from '../../../math/intersection';
 import { renderBreakPreviewVisual } from '../../previewHelpers';
 
 export class BreakTool extends BaseTool {

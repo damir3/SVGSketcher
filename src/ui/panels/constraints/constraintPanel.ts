@@ -112,14 +112,10 @@ export class ConstraintPanel implements ISidebarPanel {
 	render(context: InspectorContext): string {
 		const c = this.options.constraint;
 		const title =
-			typeof this.options.title === 'function'
-				? this.options.title(context)
-				: (this.options.title ?? c.name);
+			typeof this.options.title === 'function' ? this.options.title(context) : (this.options.title ?? c.name);
 
 		const iconName =
-			typeof this.options.iconName === 'function'
-				? this.options.iconName(context)
-				: this.options.iconName;
+			typeof this.options.iconName === 'function' ? this.options.iconName(context) : this.options.iconName;
 		const iconHtml =
 			iconName && context.getIcon
 				? context.getIcon(iconName) || context.getIcon(iconName.replace(/_([a-z])/g, (_, g) => g.toUpperCase()))
@@ -128,9 +124,7 @@ export class ConstraintPanel implements ISidebarPanel {
 		// Delete button
 		let deleteButtonHtml = '';
 		if (this.options.deleteButton) {
-			const isVisible = this.options.deleteButton.isVisible
-				? this.options.deleteButton.isVisible(context)
-				: true;
+			const isVisible = this.options.deleteButton.isVisible ? this.options.deleteButton.isVisible(context) : true;
 			if (isVisible) {
 				const deleteIcon = context.getIcon ? context.getIcon('delete') : '';
 				const label = this.options.deleteButton.label ?? 'Delete Constraint';
@@ -166,10 +160,7 @@ export class ConstraintPanel implements ISidebarPanel {
 						paramsInnerHtml += dim.disabledContent(context);
 					}
 				} else {
-					const label =
-						typeof dim.label === 'function'
-							? dim.label(context)
-							: (dim.label ?? 'Distance');
+					const label = typeof dim.label === 'function' ? dim.label(context) : (dim.label ?? 'Distance');
 					const valueStr = dim.getValue(context);
 					paramsInnerHtml += `
 						<div class="inspector-param-row">
@@ -238,9 +229,7 @@ export class ConstraintPanel implements ISidebarPanel {
 		}
 
 		const paramsCardHtml =
-			paramsInnerHtml.trim().length > 0
-				? `<div class="pattern-params-card in-inspector">${paramsInnerHtml}</div>`
-				: '';
+			paramsInnerHtml.trim().length > 0 ? `<div class="pattern-params-card in-inspector">${paramsInnerHtml}</div>` : '';
 
 		// Read-only rows
 		const rowsHtml = (this.options.rows ?? [])
@@ -274,12 +263,14 @@ export class ConstraintPanel implements ISidebarPanel {
 
 		// Delete button event
 		if (this.options.deleteButton) {
-			container.querySelectorAll<HTMLButtonElement>(`.btn-sidebar-delete-constraint[data-delete-id="${c.id}"]`).forEach(btn => {
-				btn.addEventListener('click', e => {
-					e.stopPropagation();
-					this.options.deleteButton!.onDelete(context);
+			container
+				.querySelectorAll<HTMLButtonElement>(`.btn-sidebar-delete-constraint[data-delete-id="${c.id}"]`)
+				.forEach(btn => {
+					btn.addEventListener('click', e => {
+						e.stopPropagation();
+						this.options.deleteButton!.onDelete(context);
+					});
 				});
-			});
 		}
 
 		// Segmented controls events
@@ -306,23 +297,27 @@ export class ConstraintPanel implements ISidebarPanel {
 			const isVisible = dim.isVisible ? dim.isVisible(context) : true;
 			const isDisabled = dim.isDisabled ? dim.isDisabled(context) : false;
 			if (isVisible && !isDisabled) {
-				container.querySelectorAll<HTMLButtonElement>(`.btn-insp-edit-dim[data-constraint-id="${c.id}"]`).forEach(btn => {
-					btn.addEventListener('click', e => {
-						e.stopPropagation();
-						const btnRect = btn.getBoundingClientRect();
-						const screenPos = { x: btnRect.left - 240, y: btnRect.top - 10 };
-						context.onEditDimension?.(c, screenPos);
+				container
+					.querySelectorAll<HTMLButtonElement>(`.btn-insp-edit-dim[data-constraint-id="${c.id}"]`)
+					.forEach(btn => {
+						btn.addEventListener('click', e => {
+							e.stopPropagation();
+							const btnRect = btn.getBoundingClientRect();
+							const screenPos = { x: btnRect.left - 240, y: btnRect.top - 10 };
+							context.onEditDimension?.(c, screenPos);
+						});
 					});
-				});
 
-				container.querySelectorAll<HTMLElement>(`.inspector-value-display[data-constraint-id="${c.id}"]`).forEach(el => {
-					el.addEventListener('dblclick', e => {
-						e.stopPropagation();
-						const elRect = el.getBoundingClientRect();
-						const screenPos = { x: elRect.left - 240, y: elRect.top - 10 };
-						context.onEditDimension?.(c, screenPos);
+				container
+					.querySelectorAll<HTMLElement>(`.inspector-value-display[data-constraint-id="${c.id}"]`)
+					.forEach(el => {
+						el.addEventListener('dblclick', e => {
+							e.stopPropagation();
+							const elRect = el.getBoundingClientRect();
+							const screenPos = { x: elRect.left - 240, y: elRect.top - 10 };
+							context.onEditDimension?.(c, screenPos);
+						});
 					});
-				});
 			}
 		}
 

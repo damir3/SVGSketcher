@@ -1,7 +1,4 @@
-import {
-	validateExpression,
-	type VariableLookup,
-} from '../math/expression';
+import { validateExpression, type VariableLookup } from '../math/expression';
 
 export interface ExpressionPreviewResult {
 	isValid: boolean;
@@ -33,8 +30,7 @@ export function updateExpressionPreview(
 
 	const res = validateExpression(trimmed, scope);
 
-	const isPlainNumber =
-		!isNaN(Number(trimmed.replace(',', '.'))) && res.referencedVars.length === 0;
+	const isPlainNumber = !isNaN(Number(trimmed.replace(',', '.'))) && res.referencedVars.length === 0;
 
 	if (isPlainNumber) {
 		previewEl.classList.add('hidden');
@@ -45,9 +41,7 @@ export function updateExpressionPreview(
 
 	if (res.isValid && res.value !== undefined) {
 		if (Number.isFinite(res.value)) {
-			const fmtVal = Number.isInteger(res.value)
-				? res.value.toFixed(1)
-				: Number(res.value.toFixed(2)).toString();
+			const fmtVal = Number.isInteger(res.value) ? res.value.toFixed(1) : Number(res.value.toFixed(2)).toString();
 			previewEl.textContent = `= ${fmtVal} ${unit}`;
 			previewEl.classList.remove('hidden', 'error');
 			wrapperEl?.classList.remove('error');

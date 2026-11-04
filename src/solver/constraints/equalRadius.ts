@@ -25,7 +25,11 @@ export class EqualRadiusConstraint extends BaseConstraint {
 		return [(r1 - r2) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.circle1Id}.r`, baseRow, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.circle2Id}.r`, baseRow, -this.weight);

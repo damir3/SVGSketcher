@@ -11,14 +11,7 @@ export class EqualLengthConstraint extends BaseConstraint {
 	readonly line2P1: string;
 	readonly line2P2: string;
 
-	constructor(
-		id: string,
-		line1P1: string,
-		line1P2: string,
-		line2P1: string,
-		line2P2: string,
-		weight = 1.0
-	) {
+	constructor(id: string, line1P1: string, line1P2: string, line2P1: string, line2P2: string, weight = 1.0) {
 		super(id, 'equal_length', 'Equal Length', [line1P1, line1P2, line2P1, line2P2], weight);
 		this.line1P1 = line1P1;
 		this.line1P2 = line1P2;
@@ -42,7 +35,11 @@ export class EqualLengthConstraint extends BaseConstraint {
 		return [(l1 - l2) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 
 		const dx1 = (paramMap.get(`${this.line1P2}.x`) ?? 0) - (paramMap.get(`${this.line1P1}.x`) ?? 0);

@@ -368,12 +368,7 @@ export class ConstraintTool extends BaseTool {
 				return entityType === 'line' || entityType === 'point';
 			case 'dimension':
 			case 'distance':
-				return (
-					entityType === 'line' ||
-					entityType === 'point' ||
-					entityType === 'circle' ||
-					entityType === 'arc'
-				);
+				return entityType === 'line' || entityType === 'point' || entityType === 'circle' || entityType === 'arc';
 			case 'equal':
 				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
 			case 'parallel':
@@ -424,10 +419,7 @@ export class ConstraintTool extends BaseTool {
 			case 'perpendicular':
 				return lCount === 2 && pCount === 0 && cCount === 0;
 			case 'tangent':
-				return (
-					((lCount === 1 && cCount === 1) || (cCount === 2 && lCount === 0)) &&
-					pCount === 0
-				);
+				return ((lCount === 1 && cCount === 1) || (cCount === 2 && lCount === 0)) && pCount === 0;
 			case 'concentric':
 				return cCount === 2 && pCount === 0 && lCount === 0;
 			case 'point_on_line':
@@ -476,7 +468,13 @@ export class ConstraintTool extends BaseTool {
 						applied = true;
 						toastMsg = 'Coincident constraint applied';
 					}
-				} else if (pIds.length === 1 && lIds.length === 1 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
+				} else if (
+					pIds.length === 1 &&
+					lIds.length === 1 &&
+					cIds.length === 0 &&
+					eIds.length === 0 &&
+					sIds.length === 0
+				) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
 						const c = this.ctx.sketch.addPointOnAxisConstraint(pIds[0], axis);
@@ -493,7 +491,13 @@ export class ConstraintTool extends BaseTool {
 							this.ctx.showToast('Cannot constrain point to this line');
 						}
 					}
-				} else if (pIds.length === 1 && cIds.length === 1 && lIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
+				} else if (
+					pIds.length === 1 &&
+					cIds.length === 1 &&
+					lIds.length === 0 &&
+					eIds.length === 0 &&
+					sIds.length === 0
+				) {
 					const c = this.ctx.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
 					if (c) {
 						applied = true;
@@ -501,7 +505,13 @@ export class ConstraintTool extends BaseTool {
 					} else {
 						this.ctx.showToast('Cannot constrain point to this circle/arc');
 					}
-				} else if (pIds.length === 1 && eIds.length === 1 && lIds.length === 0 && cIds.length === 0 && sIds.length === 0) {
+				} else if (
+					pIds.length === 1 &&
+					eIds.length === 1 &&
+					lIds.length === 0 &&
+					cIds.length === 0 &&
+					sIds.length === 0
+				) {
 					const c = this.ctx.sketch.addPointOnEllipseConstraint(pIds[0], eIds[0]);
 					if (c) {
 						applied = true;
@@ -509,7 +519,13 @@ export class ConstraintTool extends BaseTool {
 					} else {
 						this.ctx.showToast('Cannot constrain point to this ellipse');
 					}
-				} else if (pIds.length === 1 && sIds.length === 1 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0) {
+				} else if (
+					pIds.length === 1 &&
+					sIds.length === 1 &&
+					lIds.length === 0 &&
+					cIds.length === 0 &&
+					eIds.length === 0
+				) {
 					const c = this.ctx.sketch.addPointOnSplineConstraint(pIds[0], sIds[0]);
 					if (c) {
 						applied = true;

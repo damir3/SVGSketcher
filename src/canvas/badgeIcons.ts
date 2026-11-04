@@ -31,7 +31,7 @@ const BADGE_ICONS: Record<string, BadgeIconDef> = {
 	symmetry: parseSvgIcon(symmetryRaw, 13, 13),
 	circular_pattern: parseSvgIcon(circularPatternRaw, 13, 13),
 	rectangular_pattern: parseSvgIcon(rectangularPatternRaw, 13, 13),
-	tangent: parseSvgIcon(badgeTangentRaw, 13, 13)
+	tangent: parseSvgIcon(badgeTangentRaw, 13, 13),
 };
 
 export function getBadgeIcon(name: string, x: number, y: number, color: string): SVGElement | null {

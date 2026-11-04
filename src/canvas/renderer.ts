@@ -10,12 +10,7 @@ import {
 } from '../solver/constraints';
 import { normalize, type Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
-import {
-	bsplineToBezier,
-	fitPointsToBezier,
-	getSplineSvgPath,
-	type BezierSegment,
-} from '../math/spline';
+import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../math/spline';
 
 export * from './styles';
 export * from './svg';
@@ -97,7 +92,6 @@ import {
 } from './styles';
 
 const TWO_PI = 2 * Math.PI;
-
 
 export interface RenderOptions {
 	regionHoverPoint?: Vec2 | null;
@@ -202,8 +196,17 @@ export class SVGRenderer {
 	private mirrorGroup: SVGGElement;
 	private patternGroup: SVGGElement;
 	private patternCheckboxGroup: SVGGElement;
-	readonly patternCheckboxPositions = new Map<string, { x: number; y: number; copyIndex: number; constraintId?: string }>();
-	patternAngleHandle: { x: number; y: number; worldX: number; worldY: number; copyIndex: number } | null = null;
+	readonly patternCheckboxPositions = new Map<
+		string,
+		{ x: number; y: number; copyIndex: number; constraintId?: string }
+	>();
+	patternAngleHandle: {
+		x: number;
+		y: number;
+		worldX: number;
+		worldY: number;
+		copyIndex: number;
+	} | null = null;
 	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
 	readonly chamferGizmoHandles: ChamferGizmoHandle[] = [];
 	readonly offsetGizmoHandles: OffsetGizmoHandle[] = [];
@@ -283,16 +286,20 @@ export class SVGRenderer {
 
 	private setupDefs(): void {
 		const createArrowMarker = (id: string, color: string) => {
-			const marker = createSvgElement('marker', {
-				id,
-				viewBox: '0 0 16 10',
-				refX: '16',
-				refY: '5',
-				markerWidth: '16',
-				markerHeight: '10',
-				markerUnits: 'userSpaceOnUse',
-				orient: 'auto-start-reverse',
-			}, this.defsEl);
+			const marker = createSvgElement(
+				'marker',
+				{
+					id,
+					viewBox: '0 0 16 10',
+					refX: '16',
+					refY: '5',
+					markerWidth: '16',
+					markerHeight: '10',
+					markerUnits: 'userSpaceOnUse',
+					orient: 'auto-start-reverse',
+				},
+				this.defsEl
+			);
 
 			createSvgPath('M 0 1.5 L 16 5 L 0 8.5 z', { fill: color }, marker);
 		};
@@ -338,11 +345,7 @@ export class SVGRenderer {
 			);
 		}
 		if (options.rectangularPatternHighlight) {
-			this.renderRectangularPatternPreview(
-				sketch,
-				viewport,
-				options.rectangularPatternHighlight
-			);
+			this.renderRectangularPatternPreview(sketch, viewport, options.rectangularPatternHighlight);
 		}
 		this.filletGizmoHandle = null;
 		this.filletGroup.innerHTML = '';
@@ -369,7 +372,7 @@ export class SVGRenderer {
 
 	updateRegionHover(hoverPoint: Vec2 | null): boolean {
 		if (this.cachedViewport) this.drawRegions(hoverPoint);
-		return hoverPoint !== null && this.cachedRegions.some((region) => pointInRegion(hoverPoint, region));
+		return hoverPoint !== null && this.cachedRegions.some(region => pointInRegion(hoverPoint, region));
 	}
 
 	setRegionsVisible(visible: boolean): void {
@@ -379,14 +382,14 @@ export class SVGRenderer {
 
 	setConstraintBadgesVisible(visible: boolean): void {
 		this.constraintBadgesVisible = visible;
-		this.constraintGroup.querySelectorAll<SVGGElement>('.constraint-badge').forEach((badge) => {
+		this.constraintGroup.querySelectorAll<SVGGElement>('.constraint-badge').forEach(badge => {
 			badge.style.display = visible ? '' : 'none';
 		});
 	}
 
 	setDimensionsVisible(visible: boolean): void {
 		this.dimensionsVisible = visible;
-		this.constraintGroup.querySelectorAll<SVGGElement>('.dimension-item').forEach((dimension) => {
+		this.constraintGroup.querySelectorAll<SVGGElement>('.dimension-item').forEach(dimension => {
 			dimension.style.display = visible ? '' : 'none';
 		});
 	}
@@ -396,16 +399,38 @@ export class SVGRenderer {
 		this.regionHoverGroup.innerHTML = '';
 		for (const region of this.cachedRegions) {
 			const hovered = hoverPoint ? pointInRegion(hoverPoint, region) : false;
-			const d = [region.points, ...region.holes].map((ring) =>
-				`M ${ring.map((p) => { const s = this.cachedViewport!.worldToScreen(p.x, p.y); return `${s.x.toFixed(2)} ${s.y.toFixed(2)}`; }).join(' L ')} Z`
-			).join(' ');
-			createSvgPath(d, {
-				fill: hovered ? REGION_STYLE.hoverFill : REGION_STYLE.fill,
-				'fill-opacity': hovered ? REGION_STYLE.hoverFillOpacity : REGION_STYLE.fillOpacity,
-				stroke: 'none',
-				'fill-rule': 'evenodd',
-			}, this.regionGroup);
-			if (hovered) createSvgPath(d, { fill: 'none', stroke: REGION_STYLE.stroke, 'stroke-width': STROKE_WIDTH.normal, 'stroke-linejoin': 'round' }, this.regionHoverGroup);
+			const d = [region.points, ...region.holes]
+				.map(
+					ring =>
+						`M ${ring
+							.map(p => {
+								const s = this.cachedViewport!.worldToScreen(p.x, p.y);
+								return `${s.x.toFixed(2)} ${s.y.toFixed(2)}`;
+							})
+							.join(' L ')} Z`
+				)
+				.join(' ');
+			createSvgPath(
+				d,
+				{
+					fill: hovered ? REGION_STYLE.hoverFill : REGION_STYLE.fill,
+					'fill-opacity': hovered ? REGION_STYLE.hoverFillOpacity : REGION_STYLE.fillOpacity,
+					stroke: 'none',
+					'fill-rule': 'evenodd',
+				},
+				this.regionGroup
+			);
+			if (hovered)
+				createSvgPath(
+					d,
+					{
+						fill: 'none',
+						stroke: REGION_STYLE.stroke,
+						'stroke-width': STROKE_WIDTH.normal,
+						'stroke-linejoin': 'round',
+					},
+					this.regionHoverGroup
+				);
 		}
 	}
 
@@ -458,11 +483,17 @@ export class SVGRenderer {
 					if (Math.abs(cleanVal) > 1e-4) {
 						const anchorX = s.x;
 						const anchorY = axisY + 4;
-						createSvgText(anchorX, anchorY, cleanVal.toString(), {
-							transform: `rotate(-90 ${anchorX.toFixed(1)} ${anchorY.toFixed(1)})`,
-							'text-anchor': 'end',
-							...labelStyle,
-						}, labelsG);
+						createSvgText(
+							anchorX,
+							anchorY,
+							cleanVal.toString(),
+							{
+								transform: `rotate(-90 ${anchorX.toFixed(1)} ${anchorY.toFixed(1)})`,
+								'text-anchor': 'end',
+								...labelStyle,
+							},
+							labelsG
+						);
 					}
 				} else if (showSubGrid) {
 					dMinor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
@@ -477,10 +508,16 @@ export class SVGRenderer {
 
 					const cleanVal = parseFloat((Math.round(y / step) * step).toFixed(6));
 					if (Math.abs(cleanVal) > 1e-4) {
-						createSvgText(axisX + 8, s.y, cleanVal.toString(), {
-							'text-anchor': 'start',
-							...labelStyle,
-						}, labelsG);
+						createSvgText(
+							axisX + 8,
+							s.y,
+							cleanVal.toString(),
+							{
+								'text-anchor': 'start',
+								...labelStyle,
+							},
+							labelsG
+						);
 					}
 				} else if (showSubGrid) {
 					dMinor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
@@ -489,20 +526,28 @@ export class SVGRenderer {
 
 			// Minor grid (subStep) - light subtle lines
 			if (showSubGrid && dMinor) {
-				createSvgPath(dMinor, {
-					stroke: COLORS.gridMinor,
-					'stroke-width': STROKE_WIDTH.minorGrid,
-					fill: 'none',
-				}, this.gridGroup);
+				createSvgPath(
+					dMinor,
+					{
+						stroke: COLORS.gridMinor,
+						'stroke-width': STROKE_WIDTH.minorGrid,
+						fill: 'none',
+					},
+					this.gridGroup
+				);
 			}
 
 			// Major grid (step = 5 * subStep) - distinct darker lines
 			if (dMajor) {
-				createSvgPath(dMajor, {
-					stroke: COLORS.gridMajor,
-					'stroke-width': STROKE_WIDTH.majorGrid,
-					fill: 'none',
-				}, this.gridGroup);
+				createSvgPath(
+					dMajor,
+					{
+						stroke: COLORS.gridMajor,
+						'stroke-width': STROKE_WIDTH.majorGrid,
+						fill: 'none',
+					},
+					this.gridGroup
+				);
 			}
 
 			// Coordinate labels
@@ -517,59 +562,105 @@ export class SVGRenderer {
 		const isOriginSelected = sketch.selection.pointIds.has('origin');
 
 		// X Axis (Red)
-		const axisXG = createSvgElement('g', {
-			'data-id': 'axis_x',
-			'data-type': 'line',
-			class: 'sketch-entity sketch-line sketch-axis-line' + (isXSelected ? ' is-selected selected' : ''),
-		}, this.originAxisGroup);
+		const axisXG = createSvgElement(
+			'g',
+			{
+				'data-id': 'axis_x',
+				'data-type': 'line',
+				class: 'sketch-entity sketch-line sketch-axis-line' + (isXSelected ? ' is-selected selected' : ''),
+			},
+			this.originAxisGroup
+		);
 
 		createSvgLine(0, origin.y, viewport.width, origin.y, HIT_AREA_STROKE_ATTRS, axisXG);
-		createSvgLine(0, origin.y, viewport.width, origin.y, {
-			stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
-			'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-		}, axisXG);
+		createSvgLine(
+			0,
+			origin.y,
+			viewport.width,
+			origin.y,
+			{
+				stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
+				'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+			},
+			axisXG
+		);
 
 		// Y Axis (Green)
-		const axisYG = createSvgElement('g', {
-			'data-id': 'axis_y',
-			'data-type': 'line',
-			class: 'sketch-entity sketch-line sketch-axis-line' + (isYSelected ? ' is-selected selected' : ''),
-		}, this.originAxisGroup);
+		const axisYG = createSvgElement(
+			'g',
+			{
+				'data-id': 'axis_y',
+				'data-type': 'line',
+				class: 'sketch-entity sketch-line sketch-axis-line' + (isYSelected ? ' is-selected selected' : ''),
+			},
+			this.originAxisGroup
+		);
 
 		createSvgLine(origin.x, 0, origin.x, viewport.height, HIT_AREA_STROKE_ATTRS, axisYG);
-		createSvgLine(origin.x, 0, origin.x, viewport.height, {
-			stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
-			'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-		}, axisYG);
+		createSvgLine(
+			origin.x,
+			0,
+			origin.x,
+			viewport.height,
+			{
+				stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
+				'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+			},
+			axisYG
+		);
 
 		// Origin marker target (CAD surveyor style matching reference image)
 		const isPatternCenter = options.patternHighlight?.centerPointId === 'origin';
-		const originMarkerG = createSvgElement('g', {
-			'data-id': 'origin',
-			'data-type': 'point',
-			class: 'sketch-entity sketch-point sketch-origin-marker' + (isOriginSelected ? ' is-selected selected' : ''),
-		}, this.originAxisGroup);
+		const originMarkerG = createSvgElement(
+			'g',
+			{
+				'data-id': 'origin',
+				'data-type': 'point',
+				class: 'sketch-entity sketch-point sketch-origin-marker' + (isOriginSelected ? ' is-selected selected' : ''),
+			},
+			this.originAxisGroup
+		);
 
 		const r = 8;
-		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`, {
-			fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
-		}, originMarkerG);
+		createSvgPath(
+			`M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`,
+			{
+				fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
+			},
+			originMarkerG
+		);
 
-		createSvgPath(`M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`, {
-			fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
-		}, originMarkerG);
+		createSvgPath(
+			`M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`,
+			{
+				fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
+			},
+			originMarkerG
+		);
 
-		createSvgCircle(origin.x, origin.y, r, {
-			fill: 'none',
-			stroke: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.construction,
-			'stroke-width': isOriginSelected || isPatternCenter ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-		}, originMarkerG);
+		createSvgCircle(
+			origin.x,
+			origin.y,
+			r,
+			{
+				fill: 'none',
+				stroke: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.construction,
+				'stroke-width': isOriginSelected || isPatternCenter ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+			},
+			originMarkerG
+		);
 
 		// Transparent hit target circle so clicking/hovering near (0,0) is easy
-		createSvgCircle(origin.x, origin.y, 14, {
-			fill: COLORS.hitTransparent,
-			stroke: 'none',
-		}, originMarkerG);
+		createSvgCircle(
+			origin.x,
+			origin.y,
+			14,
+			{
+				fill: COLORS.hitTransparent,
+				stroke: 'none',
+			},
+			originMarkerG
+		);
 	}
 
 	private renderGeometry(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
@@ -634,11 +725,15 @@ export class SVGRenderer {
 				isChamferSelected ||
 				isFilletSelected;
 
-			const lineG = createSvgElement('g', {
-				'data-id': line.id,
-				'data-type': 'line',
-				class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''}`,
-			}, this.geometryGroup);
+			const lineG = createSvgElement(
+				'g',
+				{
+					'data-id': line.id,
+					'data-type': 'line',
+					class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''}`,
+				},
+				this.geometryGroup
+			);
 
 			// Invisible generous hit target using the shared line hit width
 			createSvgLine(s1.x, s1.y, s2.x, s2.y, HIT_AREA_STROKE_ATTRS, lineG);
@@ -647,7 +742,14 @@ export class SVGRenderer {
 			if (line.isSplineHandle) {
 				const parentSpline = line.parentSplineId ? sketch.splines.get(line.parentSplineId) : undefined;
 				if (parentSpline?.splineType === 'control') {
-					createSvgLine(s1.x, s1.y, s2.x, s2.y, isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_CONTROL_POLYGON_ATTRS, lineG);
+					createSvgLine(
+						s1.x,
+						s1.y,
+						s2.x,
+						s2.y,
+						isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_CONTROL_POLYGON_ATTRS,
+						lineG
+					);
 				} else {
 					createSvgLine(s1.x, s1.y, s2.x, s2.y, getSplineHandleStrokeAttrs(isSelected), lineG);
 				}
@@ -658,7 +760,14 @@ export class SVGRenderer {
 			} else if (isDir2Line) {
 				createSvgLine(s1.x, s1.y, s2.x, s2.y, DIR2_LINE_ATTRS, lineG);
 			} else {
-				createSvgLine(s1.x, s1.y, s2.x, s2.y, getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true), lineG);
+				createSvgLine(
+					s1.x,
+					s1.y,
+					s2.x,
+					s2.y,
+					getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true),
+					lineG
+				);
 			}
 		}
 
@@ -675,20 +784,30 @@ export class SVGRenderer {
 				!!options.patternHighlight?.selectedObjectIds.has(circle.id) ||
 				!!options.rectangularPatternHighlight?.selectedObjectIds.has(circle.id);
 
-			const circleG = createSvgElement('g', {
-				'data-id': circle.id,
-				'data-type': 'circle',
-				class: `sketch-entity sketch-circle ${isSelected ? 'is-selected' : ''}`,
-			}, this.geometryGroup);
+			const circleG = createSvgElement(
+				'g',
+				{
+					'data-id': circle.id,
+					'data-type': 'circle',
+					class: `sketch-entity sketch-circle ${isSelected ? 'is-selected' : ''}`,
+				},
+				this.geometryGroup
+			);
 
 			// Invisible generous hit target using the shared line hit width
 			createSvgCircle(sc.x, sc.y, sr, HIT_AREA_RING_ATTRS, circleG);
 
 			// Visible circle
-			createSvgCircle(sc.x, sc.y, sr, {
-				fill: 'none',
-				...getPrimitiveStrokeAttrs(isSelected, !!circle.isConstruction, baseColor),
-			}, circleG);
+			createSvgCircle(
+				sc.x,
+				sc.y,
+				sr,
+				{
+					fill: 'none',
+					...getPrimitiveStrokeAttrs(isSelected, !!circle.isConstruction, baseColor),
+				},
+				circleG
+			);
 		}
 
 		// 3. Render Arcs
@@ -703,8 +822,7 @@ export class SVGRenderer {
 			const se = viewport.worldToScreen(end.x, end.y);
 			const sr = arc.radius * viewport.zoom;
 			const isFilletSelected =
-				options.filletState?.selectedPrimitive1?.type === 'arc' &&
-				options.filletState.selectedPrimitive1.id === arc.id;
+				options.filletState?.selectedPrimitive1?.type === 'arc' && options.filletState.selectedPrimitive1.id === arc.id;
 			const isSelected =
 				sketch.selection.arcIds.has(arc.id) ||
 				!!options.mirrorHighlight?.selectedObjectIds.has(arc.id) ||
@@ -715,20 +833,28 @@ export class SVGRenderer {
 			const clockwise = !!arc.clockwise;
 			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
 
-			const arcG = createSvgElement('g', {
-				'data-id': arc.id,
-				'data-type': 'arc',
-				class: `sketch-entity sketch-arc ${isSelected ? 'is-selected' : ''}`,
-			}, this.geometryGroup);
+			const arcG = createSvgElement(
+				'g',
+				{
+					'data-id': arc.id,
+					'data-type': 'arc',
+					class: `sketch-entity sketch-arc ${isSelected ? 'is-selected' : ''}`,
+				},
+				this.geometryGroup
+			);
 
 			// Invisible generous hit target using the shared line hit width
 			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 
 			// Visible arc path
-			createSvgPath(d, {
-				fill: 'none',
-				...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
-			}, arcG);
+			createSvgPath(
+				d,
+				{
+					fill: 'none',
+					...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
+				},
+				arcG
+			);
 
 			// Light dashed radial lines to center if selected
 			if (isSelected) {
@@ -759,24 +885,42 @@ export class SVGRenderer {
 				!!options.patternHighlight?.selectedObjectIds.has(ellipse.id) ||
 				!!options.rectangularPatternHighlight?.selectedObjectIds.has(ellipse.id);
 
-			const ellipseG = createSvgElement('g', {
-				'data-id': ellipse.id,
-				'data-type': 'ellipse',
-				class: `sketch-entity sketch-ellipse ${isSelected ? 'is-selected' : ''}`,
-			}, this.geometryGroup);
+			const ellipseG = createSvgElement(
+				'g',
+				{
+					'data-id': ellipse.id,
+					'data-type': 'ellipse',
+					class: `sketch-entity sketch-ellipse ${isSelected ? 'is-selected' : ''}`,
+				},
+				this.geometryGroup
+			);
 
 			// Invisible generous hit target using the shared line hit width
-			createSvgEllipse(sc.x, sc.y, rx, ry, {
-				transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-				...HIT_AREA_RING_ATTRS,
-			}, ellipseG);
+			createSvgEllipse(
+				sc.x,
+				sc.y,
+				rx,
+				ry,
+				{
+					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+					...HIT_AREA_RING_ATTRS,
+				},
+				ellipseG
+			);
 
 			// Visible ellipse
-			createSvgEllipse(sc.x, sc.y, rx, ry, {
-				transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-				fill: 'none',
-				...getPrimitiveStrokeAttrs(isSelected, !!ellipse.isConstruction, baseColor),
-			}, ellipseG);
+			createSvgEllipse(
+				sc.x,
+				sc.y,
+				rx,
+				ry,
+				{
+					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+					fill: 'none',
+					...getPrimitiveStrokeAttrs(isSelected, !!ellipse.isConstruction, baseColor),
+				},
+				ellipseG
+			);
 
 			// Subtle dashed conjugate axes if selected
 			if (isSelected) {
@@ -808,20 +952,28 @@ export class SVGRenderer {
 				!!options.patternHighlight?.selectedObjectIds.has(arc.id) ||
 				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id);
 
-			const arcG = createSvgElement('g', {
-				'data-id': arc.id,
-				'data-type': 'elliptical_arc',
-				class: `sketch-entity sketch-elliptical-arc ${isSelected ? 'is-selected' : ''}`,
-			}, this.geometryGroup);
+			const arcG = createSvgElement(
+				'g',
+				{
+					'data-id': arc.id,
+					'data-type': 'elliptical_arc',
+					class: `sketch-entity sketch-elliptical-arc ${isSelected ? 'is-selected' : ''}`,
+				},
+				this.geometryGroup
+			);
 
 			// Invisible generous hit target using the shared line hit width
 			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 
 			// Visible arc path
-			createSvgPath(d, {
-				fill: 'none',
-				...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
-			}, arcG);
+			createSvgPath(
+				d,
+				{
+					fill: 'none',
+					...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
+				},
+				arcG
+			);
 
 			// Light dashed radial lines to center and axes if selected
 			if (isSelected) {
@@ -861,29 +1013,42 @@ export class SVGRenderer {
 			const isSelected =
 				sketch.selection.splineIds.has(spline.id) ||
 				spline.pointIds.some(pid => sketch.selection.pointIds.has(pid)) ||
-				(spline.tangentLineIds && spline.tangentLineIds.some(lid => {
-					const line = sketch.lines.get(lid);
-					return line && (sketch.selection.lineIds.has(lid) || sketch.selection.pointIds.has(line.p1Id) || sketch.selection.pointIds.has(line.p2Id));
-				})) ||
+				(spline.tangentLineIds &&
+					spline.tangentLineIds.some(lid => {
+						const line = sketch.lines.get(lid);
+						return (
+							line &&
+							(sketch.selection.lineIds.has(lid) ||
+								sketch.selection.pointIds.has(line.p1Id) ||
+								sketch.selection.pointIds.has(line.p2Id))
+						);
+					})) ||
 				isFilletSelected;
 
 			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p.x, p.y), !!spline.isClosed);
 
-			const splineG = createSvgElement('g', {
-				'data-id': spline.id,
-				'data-type': 'spline',
-				class: `sketch-entity sketch-spline ${isSelected ? 'is-selected' : ''}`,
-			}, this.geometryGroup);
+			const splineG = createSvgElement(
+				'g',
+				{
+					'data-id': spline.id,
+					'data-type': 'spline',
+					class: `sketch-entity sketch-spline ${isSelected ? 'is-selected' : ''}`,
+				},
+				this.geometryGroup
+			);
 
 			// Invisible generous hit target using the shared line hit width
 			createSvgPath(d, HIT_AREA_STROKE_ATTRS, splineG);
 
 			// Visible spline path
-			createSvgPath(d, {
-				fill: spline.isClosed ? SPLINE_STYLES.closedFill : 'none',
-				...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, baseColor, true),
-			}, splineG);
-
+			createSvgPath(
+				d,
+				{
+					fill: spline.isClosed ? SPLINE_STYLES.closedFill : 'none',
+					...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, baseColor, true),
+				},
+				splineG
+			);
 		}
 
 		// 6. Render Points (Vertices)
@@ -911,12 +1076,20 @@ export class SVGRenderer {
 			const splineControl = controlPointToSpline.get(pt.id);
 
 			if (splineHandleInfo) {
-				if (!activeSplineIds.has(splineHandleInfo.spline.id) && !sketch.selection.pointIds.has(pt.id) && !options.showSplineHandles) {
+				if (
+					!activeSplineIds.has(splineHandleInfo.spline.id) &&
+					!sketch.selection.pointIds.has(pt.id) &&
+					!options.showSplineHandles
+				) {
 					continue;
 				}
 			}
 			if (splineControl) {
-				if (!activeSplineIds.has(splineControl.id) && !sketch.selection.pointIds.has(pt.id) && !options.showSplineHandles) {
+				if (
+					!activeSplineIds.has(splineControl.id) &&
+					!sketch.selection.pointIds.has(pt.id) &&
+					!options.showSplineHandles
+				) {
 					continue;
 				}
 			}
@@ -932,11 +1105,15 @@ export class SVGRenderer {
 				!!isPatternSelected ||
 				isPatternCenter;
 
-			const ptG = createSvgElement('g', {
-				'data-id': pt.id,
-				'data-type': 'point',
-				class: `sketch-entity sketch-point ${isSelected ? 'is-selected' : ''}`,
-			}, this.pointGroup);
+			const ptG = createSvgElement(
+				'g',
+				{
+					'data-id': pt.id,
+					'data-type': 'point',
+					class: `sketch-entity sketch-point ${isSelected ? 'is-selected' : ''}`,
+				},
+				this.pointGroup
+			);
 
 			// Invisible larger hit target for easy clicking
 			createSvgCircle(s.x, s.y, 14, HIT_AREA_POINT_ATTRS, ptG);
@@ -963,13 +1140,19 @@ export class SVGRenderer {
 				strokeColor = COLORS.white;
 			}
 
-			createSvgCircle(s.x, s.y, isSelected ? 4 : (splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3), {
-				class: 'entity-visible visible-point',
-				fill: fillColor,
-				stroke: strokeColor,
-				'stroke-width': STROKE_WIDTH.thin,
-				'pointer-events': 'all',
-			}, ptG);
+			createSvgCircle(
+				s.x,
+				s.y,
+				isSelected ? 4 : splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3,
+				{
+					class: 'entity-visible visible-point',
+					fill: fillColor,
+					stroke: strokeColor,
+					'stroke-width': STROKE_WIDTH.thin,
+					'pointer-events': 'all',
+				},
+				ptG
+			);
 		}
 	}
 
@@ -992,7 +1175,7 @@ export class SVGRenderer {
 			renderBadgeOnCircle: (id, circleId, label) => {
 				this.renderBadgeOnCircle(id, circleId, sketch, viewport, label, ctx.isSelected);
 			},
-			renderLinearDimensionVisual: (opts) => {
+			renderLinearDimensionVisual: opts => {
 				this.renderLinearDimensionVisual(opts);
 			},
 			renderDashedExtensionLines: (g, sCenter, angle, rScreen, sp1, sp2, color) => {
@@ -1001,7 +1184,7 @@ export class SVGRenderer {
 			patternCheckboxGroup: this.patternCheckboxGroup,
 			patternCheckboxPositions: this.patternCheckboxPositions,
 			rectangularGizmoHandles: this.rectangularGizmoHandles,
-			isConstraintOnlySelected: (constraintId) => this.isConstraintOnlySelected(constraintId, sketch),
+			isConstraintOnlySelected: constraintId => this.isConstraintOnlySelected(constraintId, sketch),
 			renderTransformedObjects: (objectIds, transform, options) => {
 				return this.renderTransformedObjects(sketch, viewport, objectIds, transform, options);
 			},
@@ -1040,11 +1223,15 @@ export class SVGRenderer {
 		} = opts;
 
 		const g = constraintId
-			? createSvgElement('g', {
-				class: 'dimension-item',
-				'data-id': constraintId,
-				'data-type': 'constraint',
-			}, parent)
+			? createSvgElement(
+					'g',
+					{
+						class: 'dimension-item',
+						'data-id': constraintId,
+						'data-type': 'constraint',
+					},
+					parent
+				)
 			: parent;
 
 		const color = isSelected ? COLORS.selected : COLORS.primary;
@@ -1055,8 +1242,8 @@ export class SVGRenderer {
 			const extAttrs = isTooltip
 				? PREVIEW_EXTENSION_LINE_ATTRS
 				: isSelected
-				? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
-				: EXTENSION_LINE_ATTRS;
+					? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
+					: EXTENSION_LINE_ATTRS;
 			for (const ext of extensionLines) {
 				createSvgLine(ext.from.x, ext.from.y, ext.to.x, ext.to.y, extAttrs, g);
 			}
@@ -1064,20 +1251,32 @@ export class SVGRenderer {
 
 		// 2. Start point highlight (origin anchor)
 		if (startPointHighlight) {
-			createSvgCircle(startPointHighlight.x, startPointHighlight.y, 4, {
-				fill: COLORS.primary,
-				stroke: COLORS.white,
-				'stroke-width': 1.5,
-			}, g);
+			createSvgCircle(
+				startPointHighlight.x,
+				startPointHighlight.y,
+				4,
+				{
+					fill: COLORS.primary,
+					stroke: COLORS.white,
+					'stroke-width': 1.5,
+				},
+				g
+			);
 		}
 
 		// 3. Target point snap ring
 		if (targetPointSnapped) {
-			createSvgCircle(d2.x, d2.y, 6, {
-				fill: COLORS.guideFaint,
-				stroke: COLORS.primary,
-				'stroke-width': 1.5,
-			}, g);
+			createSvgCircle(
+				d2.x,
+				d2.y,
+				6,
+				{
+					fill: COLORS.guideFaint,
+					stroke: COLORS.primary,
+					'stroke-width': 1.5,
+				},
+				g
+			);
 		}
 
 		// 4. Dimension line with arrowheads
@@ -1098,20 +1297,33 @@ export class SVGRenderer {
 			this.renderTooltip(mid.x, mid.y - 12, label);
 		} else {
 			const textLen = label.length * 8 + 14;
-			createSvgRect(mid.x - textLen * 0.5, mid.y - 10, textLen, 20, {
-				rx: 4,
-				fill: COLORS.white,
-				stroke: color,
-				'stroke-width': STROKE_WIDTH.thin,
-			}, g);
+			createSvgRect(
+				mid.x - textLen * 0.5,
+				mid.y - 10,
+				textLen,
+				20,
+				{
+					rx: 4,
+					fill: COLORS.white,
+					stroke: color,
+					'stroke-width': STROKE_WIDTH.thin,
+				},
+				g
+			);
 
-			createSvgText(mid.x, mid.y + 4, label, {
-				'text-anchor': 'middle',
-				fill: color,
-				'font-size': 12,
-				'font-weight': 600,
-				'font-family': 'monospace',
-			}, g);
+			createSvgText(
+				mid.x,
+				mid.y + 4,
+				label,
+				{
+					'text-anchor': 'middle',
+					fill: color,
+					'font-size': 12,
+					'font-weight': 600,
+					'font-family': 'monospace',
+				},
+				g
+			);
 		}
 	}
 
@@ -1156,15 +1368,21 @@ export class SVGRenderer {
 			const x2 = sCenter.x + endK * vx;
 			const y2 = sCenter.y + endK * vy;
 
-			createSvgLine(x1, y1, x2, y2, {
-				stroke: color,
-				'stroke-width': STROKE_WIDTH.majorGrid,
-				'stroke-dasharray': DASH_ARRAY.angleExtension,
-				'pointer-events': 'none',
-			}, parentG);
+			createSvgLine(
+				x1,
+				y1,
+				x2,
+				y2,
+				{
+					stroke: color,
+					'stroke-width': STROKE_WIDTH.majorGrid,
+					'stroke-dasharray': DASH_ARRAY.angleExtension,
+					'pointer-events': 'none',
+				},
+				parentG
+			);
 		}
 	}
-
 
 	private isAngleNearArc(
 		arc: { startPointId: string; endPointId: string; clockwise?: boolean },
@@ -1209,7 +1427,6 @@ export class SVGRenderer {
 		}
 		return true;
 	}
-
 
 	private renderBadgeOnSegment(
 		constraintId: string,
@@ -1309,7 +1526,6 @@ export class SVGRenderer {
 		this.renderConstraintBadge(constraintId, bx, by, label, isSelected);
 	}
 
-
 	private isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
 		const sel = sketch.selection;
 		return (
@@ -1322,7 +1538,6 @@ export class SVGRenderer {
 			sel.ellipticalArcIds.size === 0
 		);
 	}
-
 
 	private renderRectangularPatternGizmos(
 		viewport: Viewport,
@@ -1350,15 +1565,25 @@ export class SVGRenderer {
 		const v2Len = Math.max(Math.hypot(v2x, v2y), 1e-6);
 		const u2Screen = { x: v2x / v2Len, y: v2y / v2Len };
 
-		const h1World = { x: centroidWorld.x + distance1 * u1.x, y: centroidWorld.y + distance1 * u1.y };
+		const h1World = {
+			x: centroidWorld.x + distance1 * u1.x,
+			y: centroidWorld.y + distance1 * u1.y,
+		};
 		const h1Screen = viewport.worldToScreen(h1World.x, h1World.y);
 
-		const h2World = { x: centroidWorld.x + distance2 * u2.x, y: centroidWorld.y + distance2 * u2.y };
+		const h2World = {
+			x: centroidWorld.x + distance2 * u2.x,
+			y: centroidWorld.y + distance2 * u2.y,
+		};
 		const h2Screen = viewport.worldToScreen(h2World.x, h2World.y);
 
-		const gizmoG = createSvgElement('g', {
-			class: 'rectangular-pattern-gizmos',
-		}, options.targetGroup);
+		const gizmoG = createSvgElement(
+			'g',
+			{
+				class: 'rectangular-pattern-gizmos',
+			},
+			options.targetGroup
+		);
 
 		const renderArrow = (
 			from: { x: number; y: number },
@@ -1391,32 +1616,43 @@ export class SVGRenderer {
 			// Register handle centered on the arrowhead for dragging
 			const key = options.constraintId ? `gizmo-${axisNum}-${options.constraintId}` : `gizmo-${axisNum}`;
 			this.rectangularGizmoHandles.set(key, {
-				x: tipX - (arrowLen * 0.5) * aux,
-				y: tipY - (arrowLen * 0.5) * auy,
+				x: tipX - arrowLen * 0.5 * aux,
+				y: tipY - arrowLen * 0.5 * auy,
 				axis: axisNum,
 				constraintId: options.constraintId,
 			});
 
 			// Shaft line connecting origin to base of arrowhead (always solid, no dashed lines)
-			createSvgLine(from.x, from.y, baseCenterX, baseCenterY, {
-				stroke: color,
-				'stroke-width': 2.5,
-				'stroke-dasharray': 'none',
-				opacity: 0.9,
-				'pointer-events': 'none',
-			}, gizmoG);
+			createSvgLine(
+				from.x,
+				from.y,
+				baseCenterX,
+				baseCenterY,
+				{
+					stroke: color,
+					'stroke-width': 2.5,
+					'stroke-dasharray': 'none',
+					opacity: 0.9,
+					'pointer-events': 'none',
+				},
+				gizmoG
+			);
 
 			// Arrowhead as the draggable gizmo handle (replaces circle)
 			const arrowPath = `M ${tipX} ${tipY} L ${base1X} ${base1Y} L ${base2X} ${base2Y} Z`;
-			createSvgPath(arrowPath, {
-				fill: color,
-				stroke: COLORS.white,
-				'stroke-width': 1.5,
-				'stroke-linejoin': 'round',
-				class: 'rectangular-pattern-gizmo-arrow',
-				filter: FILTERS.gizmoArrow,
-				'data-axis': String(axisNum),
-			}, gizmoG);
+			createSvgPath(
+				arrowPath,
+				{
+					fill: color,
+					stroke: COLORS.white,
+					'stroke-width': 1.5,
+					'stroke-linejoin': 'round',
+					class: 'rectangular-pattern-gizmo-arrow',
+					filter: FILTERS.gizmoArrow,
+					'data-axis': String(axisNum),
+				},
+				gizmoG
+			);
 
 			// Distance label pill: without "d1:", "d2:", only the value
 			const labelText = `${distVal.toFixed(1)} mm`;
@@ -1428,22 +1664,29 @@ export class SVGRenderer {
 
 			if (isHorizontal) {
 				// Horizontal arrow -> place label below the arrow
-				const midX = tipX - (arrowLen * 0.5) * aux;
+				const midX = tipX - arrowLen * 0.5 * aux;
 				const maxY = Math.max(from.y, tipY, base1Y, base2Y);
 				pillX = midX;
 				pillY = maxY + 16;
 			} else {
 				// Vertical arrow -> place label to the right of the arrow
-				const midY = tipY - (arrowLen * 0.5) * auy;
+				const midY = tipY - arrowLen * 0.5 * auy;
 				const maxX = Math.max(from.x, tipX, base1X, base2X);
 				pillX = maxX + 10 + pillWidth * 0.5;
 				pillY = midY;
 			}
 
-			createSvgRect(pillX - pillWidth * 0.5, pillY - 10, pillWidth, 20, {
-				...RECT_PATTERN_PILL_ATTRS,
-				stroke: color,
-			}, gizmoG);
+			createSvgRect(
+				pillX - pillWidth * 0.5,
+				pillY - 10,
+				pillWidth,
+				20,
+				{
+					...RECT_PATTERN_PILL_ATTRS,
+					stroke: color,
+				},
+				gizmoG
+			);
 
 			createSvgText(pillX, pillY + 3.5, labelText, RECT_PATTERN_PILL_TEXT_ATTRS, gizmoG);
 		};
@@ -1458,12 +1701,16 @@ export class SVGRenderer {
 		isSuppressed: boolean,
 		constraintId?: string
 	): void {
-		const cbG = createSvgElement('g', {
-			class: 'pattern-suppression-checkbox',
-			style: 'cursor: pointer;',
-			'data-copy-k': String(k),
-			...(constraintId ? { 'data-constraint-id': constraintId } : {}),
-		}, this.patternCheckboxGroup);
+		const cbG = createSvgElement(
+			'g',
+			{
+				class: 'pattern-suppression-checkbox',
+				style: 'cursor: pointer;',
+				'data-copy-k': String(k),
+				...(constraintId ? { 'data-constraint-id': constraintId } : {}),
+			},
+			this.patternCheckboxGroup
+		);
 
 		// Outer halo / shadow
 		createSvgRect(centroid.x - 11, centroid.y - 11, 22, 22, CHECKBOX_HALO_ATTRS, cbG);
@@ -1535,17 +1782,22 @@ export class SVGRenderer {
 
 		const drawTransformedVertex = (screenPt: { x: number; y: number }) => {
 			if (!options.drawVertices || skipRender || !targetGroup) return;
-			createSvgCircle(screenPt.x, screenPt.y, 3, {
-				fill: baseColor === COLORS.constrained ? COLORS.constrained : COLORS.primary,
-				stroke: COLORS.white,
-				'stroke-width': STROKE_WIDTH.normal,
-				opacity,
-				'pointer-events': 'none',
-			}, targetGroup);
+			createSvgCircle(
+				screenPt.x,
+				screenPt.y,
+				3,
+				{
+					fill: baseColor === COLORS.constrained ? COLORS.constrained : COLORS.primary,
+					stroke: COLORS.white,
+					'stroke-width': STROKE_WIDTH.normal,
+					opacity,
+					'pointer-events': 'none',
+				},
+				targetGroup
+			);
 		};
 
-		const getAttrs = (isConstruction: boolean) =>
-			getCopyStrokeAttrs(isConstruction, baseColor, opacity, strokeWidth);
+		const getAttrs = (isConstruction: boolean) => getCopyStrokeAttrs(isConstruction, baseColor, opacity, strokeWidth);
 
 		for (const objId of objectIds) {
 			// Line
@@ -1638,10 +1890,17 @@ export class SVGRenderer {
 						const ry = Math.hypot(srmin.x - src.x, srmin.y - src.y);
 						const thetaDeg = (Math.atan2(srmaj.y - src.y, srmaj.x - src.x) * 180) / Math.PI;
 
-						createSvgEllipse(src.x, src.y, rx, ry, {
-							transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
-							...getAttrs(!!e.isConstruction),
-						}, targetGroup);
+						createSvgEllipse(
+							src.x,
+							src.y,
+							rx,
+							ry,
+							{
+								transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
+								...getAttrs(!!e.isConstruction),
+							},
+							targetGroup
+						);
 
 						drawTransformedVertex(src);
 						drawTransformedVertex(srmaj);
@@ -1708,34 +1967,51 @@ export class SVGRenderer {
 		isSelected: boolean,
 		customColor?: string
 	): void {
-		const g = createSvgElement('g', {
-			class: 'constraint-badge',
-			'data-id': id,
-			'data-type': 'constraint',
-		}, this.constraintGroup);
+		const g = createSvgElement(
+			'g',
+			{
+				class: 'constraint-badge',
+				'data-id': id,
+				'data-type': 'constraint',
+			},
+			this.constraintGroup
+		);
 		g.style.display = this.constraintBadgesVisible ? '' : 'none';
 
-		const color = isSelected ? COLORS.primary : customColor ?? COLORS.badgeText;
+		const color = isSelected ? COLORS.primary : (customColor ?? COLORS.badgeText);
 		const icon = getBadgeIcon(label, x, y, color);
 		const width = icon ? 18 : Math.max(18, label.length * 8 + 8);
 
-		createSvgRect(x - width * 0.5, y - 9, width, 18, {
-			rx: 3,
-			fill: isSelected ? COLORS.selectedBg : COLORS.white,
-			stroke: isSelected ? COLORS.primary : COLORS.badgeBorder,
-			'stroke-width': STROKE_WIDTH.thin,
-		}, g);
+		createSvgRect(
+			x - width * 0.5,
+			y - 9,
+			width,
+			18,
+			{
+				rx: 3,
+				fill: isSelected ? COLORS.selectedBg : COLORS.white,
+				stroke: isSelected ? COLORS.primary : COLORS.badgeBorder,
+				'stroke-width': STROKE_WIDTH.thin,
+			},
+			g
+		);
 
 		if (icon) {
 			g.appendChild(icon);
 		} else {
-			createSvgText(x, y + 4, label, {
-				'text-anchor': 'middle',
-				fill: color,
-				'font-size': 10,
-				'font-weight': 700,
-				'font-family': 'sans-serif',
-			}, g);
+			createSvgText(
+				x,
+				y + 4,
+				label,
+				{
+					'text-anchor': 'middle',
+					fill: color,
+					'font-size': 10,
+					'font-weight': 700,
+					'font-family': 'sans-serif',
+				},
+				g
+			);
 		}
 	}
 
@@ -1764,22 +2040,11 @@ export class SVGRenderer {
 		});
 	}
 
-	renderDistanceLinePreview(
-		s1: Vec2,
-		s2: Vec2,
-		distVal: number,
-		isTargetSnapped = false
-	): void {
+	renderDistanceLinePreview(s1: Vec2, s2: Vec2, distVal: number, isTargetSnapped = false): void {
 		this.renderDistancePreview(s1, s2, undefined, distVal, 'direct', isTargetSnapped);
 	}
 
-	renderPointToLineDistancePreview(
-		sp: Vec2,
-		s1: Vec2,
-		s2: Vec2,
-		cursor?: Vec2,
-		distVal = 0
-	): void {
+	renderPointToLineDistancePreview(sp: Vec2, s1: Vec2, s2: Vec2, cursor?: Vec2, distVal = 0): void {
 		this.previewGroup.innerHTML = '';
 		const geom = computePointToLineDimensionGeometry(sp, s1, s2, 0, cursor);
 		if (!geom) return;
@@ -1849,7 +2114,11 @@ export class SVGRenderer {
 		this.renderTooltip(midX, midY, `${angleDeg.toFixed(1)}°`);
 	}
 
-	renderSnapIndicator(s: Vec2, type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid' = 'point', clearFirst = true): void {
+	renderSnapIndicator(
+		s: Vec2,
+		type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid' = 'point',
+		clearFirst = true
+	): void {
 		if (clearFirst) {
 			this.overlayGroup.innerHTML = '';
 		}
@@ -1868,10 +2137,17 @@ export class SVGRenderer {
 		} else if (type === 'grid') {
 			// Indigo square at grid intersection
 			const size = 5;
-			createSvgRect(s.x - size, s.y - size, size * 2, size * 2, {
-				...SNAP_GRID_ATTRS,
-				rx: 1,
-			}, this.overlayGroup);
+			createSvgRect(
+				s.x - size,
+				s.y - size,
+				size * 2,
+				size * 2,
+				{
+					...SNAP_GRID_ATTRS,
+					rx: 1,
+				},
+				this.overlayGroup
+			);
 		} else {
 			// Circular blue ring for point
 			createSvgCircle(s.x, s.y, 7, SNAP_POINT_ATTRS, this.overlayGroup);
@@ -1940,14 +2216,19 @@ export class SVGRenderer {
 		const drawReflectedVertex = (screenPt: { x: number; y: number }, key: string) => {
 			if (reflectedPoints.has(key)) return;
 			reflectedPoints.add(key);
-			createSvgCircle(screenPt.x, screenPt.y, 3.5, {
-				...MIRROR_PREVIEW_VERTEX_ATTRS,
-				opacity: 0.5,
-			}, this.mirrorGroup);
+			createSvgCircle(
+				screenPt.x,
+				screenPt.y,
+				3.5,
+				{
+					...MIRROR_PREVIEW_VERTEX_ATTRS,
+					opacity: 0.5,
+				},
+				this.mirrorGroup
+			);
 		};
 
-		const getAttrs = (isConstruction: boolean) =>
-			getCopyStrokeAttrs(isConstruction, baseColor, 0.5);
+		const getAttrs = (isConstruction: boolean) => getCopyStrokeAttrs(isConstruction, baseColor, 0.5);
 
 		for (const objId of selectedObjectIds) {
 			if (objId === mirrorLineId) continue;
@@ -2029,10 +2310,17 @@ export class SVGRenderer {
 					const ry = Math.hypot(srmin.x - src.x, srmin.y - src.y);
 					const thetaDeg = (Math.atan2(srmaj.y - src.y, srmaj.x - src.x) * 180) / Math.PI;
 
-					createSvgEllipse(src.x, src.y, rx, ry, {
-						transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
-						...getAttrs(!!el.isConstruction),
-					}, this.mirrorGroup);
+					createSvgEllipse(
+						src.x,
+						src.y,
+						rx,
+						ry,
+						{
+							transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
+							...getAttrs(!!el.isConstruction),
+						},
+						this.mirrorGroup
+					);
 
 					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
 				}
@@ -2096,9 +2384,7 @@ export class SVGRenderer {
 		if (!centerPointId) return;
 
 		const centerPt =
-			centerPointId === 'origin'
-				? ({ id: 'origin', x: 0, y: 0 } as SketchPoint)
-				: sketch.points.get(centerPointId);
+			centerPointId === 'origin' ? ({ id: 'origin', x: 0, y: 0 } as SketchPoint) : sketch.points.get(centerPointId);
 		if (!centerPt) return;
 
 		const sCtr = viewport.worldToScreen(centerPt.x, centerPt.y);
@@ -2163,7 +2449,11 @@ export class SVGRenderer {
 			}
 
 			// Register checkbox screen position for hit-testing
-			this.patternCheckboxPositions.set(`tool-${k}`, { x: centroid.x, y: centroid.y, copyIndex: k });
+			this.patternCheckboxPositions.set(`tool-${k}`, {
+				x: centroid.x,
+				y: centroid.y,
+				copyIndex: k,
+			});
 
 			// Render suppression checkbox over copy if suppression is enabled
 			if (suppression) {
@@ -2171,21 +2461,46 @@ export class SVGRenderer {
 			}
 			if (angleHandleEnabled && k === lastVisibleCopyIndex) {
 				const worldCentroid = copyWorldPoints.length
-					? { x: copyWorldPoints.reduce((sum, p) => sum + p.x, 0) / copyWorldPoints.length, y: copyWorldPoints.reduce((sum, p) => sum + p.y, 0) / copyWorldPoints.length }
-					: { x: centerPt.x + 40 * Math.cos(aDeg * Math.PI / 180), y: centerPt.y + 40 * Math.sin(aDeg * Math.PI / 180) };
-				const dx = centroid.x - sCtr.x, dy = centroid.y - sCtr.y;
+					? {
+							x: copyWorldPoints.reduce((sum, p) => sum + p.x, 0) / copyWorldPoints.length,
+							y: copyWorldPoints.reduce((sum, p) => sum + p.y, 0) / copyWorldPoints.length,
+						}
+					: {
+							x: centerPt.x + 40 * Math.cos((aDeg * Math.PI) / 180),
+							y: centerPt.y + 40 * Math.sin((aDeg * Math.PI) / 180),
+						};
+				const dx = centroid.x - sCtr.x,
+					dy = centroid.y - sCtr.y;
 				const len = Math.hypot(dx, dy) || 1;
 				// The arrow points back along the angle arc, toward the pattern center.
 				const direction = angle < 0 ? -1 : 1;
-				const dirX = direction * dy / len, dirY = direction * -dx / len;
-				const tipX = centroid.x + dirX * 30, tipY = centroid.y + dirY * 30;
-				const arrowLen = 16, arrowHalfWidth = 6.5;
-				const baseX = tipX - arrowLen * dirX, baseY = tipY - arrowLen * dirY;
-				const perpX = -dirY, perpY = dirX;
+				const dirX = (direction * dy) / len,
+					dirY = (direction * -dx) / len;
+				const tipX = centroid.x + dirX * 30,
+					tipY = centroid.y + dirY * 30;
+				const arrowLen = 16,
+					arrowHalfWidth = 6.5;
+				const baseX = tipX - arrowLen * dirX,
+					baseY = tipY - arrowLen * dirY;
+				const perpX = -dirY,
+					perpY = dirX;
 				const arrowPath = `M ${tipX} ${tipY} L ${baseX + arrowHalfWidth * perpX} ${baseY + arrowHalfWidth * perpY} L ${baseX - arrowHalfWidth * perpX} ${baseY - arrowHalfWidth * perpY} Z`;
-				createSvgLine(centroid.x, centroid.y, baseX, baseY, { stroke: COLORS.primary, 'stroke-width': 2, 'stroke-dasharray': '4 3' }, this.patternGroup);
+				createSvgLine(
+					centroid.x,
+					centroid.y,
+					baseX,
+					baseY,
+					{ stroke: COLORS.primary, 'stroke-width': 2, 'stroke-dasharray': '4 3' },
+					this.patternGroup
+				);
 				createSvgPath(arrowPath, OFFSET_GIZMO_ARROW_ATTRS, this.patternGroup);
-				this.patternAngleHandle = { x: baseX, y: baseY, worldX: worldCentroid.x, worldY: worldCentroid.y, copyIndex: k };
+				this.patternAngleHandle = {
+					x: baseX,
+					y: baseY,
+					worldX: worldCentroid.x,
+					worldY: worldCentroid.y,
+					copyIndex: k,
+				};
 			}
 		}
 	}
@@ -2210,40 +2525,71 @@ export class SVGRenderer {
 		this.patternGroup.innerHTML = '';
 		if (highlight.selectedObjectIds.size === 0) return;
 
-		let sumX = 0, sumY = 0, ptCount = 0;
+		let sumX = 0,
+			sumY = 0,
+			ptCount = 0;
 		for (const objId of highlight.selectedObjectIds) {
 			const pt = sketch.points.get(objId);
-			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
+			if (pt) {
+				sumX += pt.x;
+				sumY += pt.y;
+				ptCount++;
+				continue;
+			}
 			const l = sketch.lines.get(objId);
 			if (l) {
 				const p1 = sketch.points.get(l.p1Id);
 				const p2 = sketch.points.get(l.p2Id);
-				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
-				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+				if (p1) {
+					sumX += p1.x;
+					sumY += p1.y;
+					ptCount++;
+				}
+				if (p2) {
+					sumX += p2.x;
+					sumY += p2.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const c = sketch.circles.get(objId);
 			if (c) {
 				const cp = sketch.points.get(c.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const a = sketch.arcs.get(objId);
 			if (a) {
 				const cp = sketch.points.get(a.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const el = sketch.ellipses.get(objId);
 			if (el) {
 				const cp = sketch.points.get(el.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const ea = sketch.ellipticalArcs.get(objId);
 			if (ea) {
 				const cp = sketch.points.get(ea.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 		}
@@ -2276,26 +2622,30 @@ export class SVGRenderer {
 				const copyIndex = i * 1000 + j;
 				const isSuppressed = highlight.suppressedIndices.has(copyIndex);
 				const copyOpacity = isSuppressed ? 0.15 : 0.5;
-				const offset = computeRectangularPatternOffset(i, j, highlight.distance1, highlight.direction1, highlight.distance2, highlight.direction2, u1, u2);
-
-				const copyWorldPoints = this.renderTransformedObjects(
-					sketch,
-					viewport,
-					highlight.selectedObjectIds,
-					offset,
-					{
-						targetGroup: this.patternGroup,
-						baseColor,
-						opacity: copyOpacity,
-						isSuppressed,
-						drawVertices: true,
-						strokeWidth: STROKE_WIDTH.normal,
-					}
+				const offset = computeRectangularPatternOffset(
+					i,
+					j,
+					highlight.distance1,
+					highlight.direction1,
+					highlight.distance2,
+					highlight.direction2,
+					u1,
+					u2
 				);
+
+				const copyWorldPoints = this.renderTransformedObjects(sketch, viewport, highlight.selectedObjectIds, offset, {
+					targetGroup: this.patternGroup,
+					baseColor,
+					opacity: copyOpacity,
+					isSuppressed,
+					drawVertices: true,
+					strokeWidth: STROKE_WIDTH.normal,
+				});
 
 				let centroid: { x: number; y: number };
 				if (copyWorldPoints.length > 0) {
-					let cSumX = 0, cSumY = 0;
+					let cSumX = 0,
+						cSumY = 0;
 					for (const p of copyWorldPoints) {
 						cSumX += p.x;
 						cSumY += p.y;
@@ -2305,7 +2655,11 @@ export class SVGRenderer {
 					centroid = viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
 				}
 
-				this.patternCheckboxPositions.set(`tool-${copyIndex}`, { x: centroid.x, y: centroid.y, copyIndex });
+				this.patternCheckboxPositions.set(`tool-${copyIndex}`, {
+					x: centroid.x,
+					y: centroid.y,
+					copyIndex,
+				});
 
 				if (highlight.suppression) {
 					this.renderPatternSuppressionCheckbox(centroid, copyIndex, isSuppressed);
@@ -2347,7 +2701,9 @@ export class SVGRenderer {
 			createSvgPath(arcD, FILLET_ARC_ATTRS, this.filletGroup);
 
 			// Check if this fillet is active for Gizmo
-			const isActive = pf.id === state.activeFilletId || (!state.activeFilletId && pf === state.pendingFillets[state.pendingFillets.length - 1]);
+			const isActive =
+				pf.id === state.activeFilletId ||
+				(!state.activeFilletId && pf === state.pendingFillets[state.pendingFillets.length - 1]);
 			if (isActive) {
 				// Center circle handle
 				createSvgCircle(sCenter.x, sCenter.y, 4, FILLET_GIZMO_CENTER_ATTRS, this.filletGroup);
@@ -2365,7 +2721,14 @@ export class SVGRenderer {
 
 				// Small square at tip
 				const sqSize = 6;
-				createSvgRect(lineEndX - sqSize * 0.5, lineEndY - sqSize * 0.5, sqSize, sqSize, FILLET_GIZMO_SQUARE_ATTRS, this.filletGroup);
+				createSvgRect(
+					lineEndX - sqSize * 0.5,
+					lineEndY - sqSize * 0.5,
+					sqSize,
+					sqSize,
+					FILLET_GIZMO_SQUARE_ATTRS,
+					this.filletGroup
+				);
 
 				// Inward arrow gizmo at sMid pointing towards sCenter
 				const aux = -uDir.x;
@@ -2713,10 +3076,17 @@ export class SVGRenderer {
 						const rx = Math.hypot(maj.x - center.x, maj.y - center.y) * viewport.zoom;
 						const ry = Math.hypot(min.x - center.x, min.y - center.y) * viewport.zoom;
 						const thetaDeg = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
-						createSvgEllipse(sc.x, sc.y, rx, ry, {
-							transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-							...OFFSET_CHAIN_ATTRS,
-						}, this.offsetGroup);
+						createSvgEllipse(
+							sc.x,
+							sc.y,
+							rx,
+							ry,
+							{
+								transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+								...OFFSET_CHAIN_ATTRS,
+							},
+							this.offsetGroup
+						);
 					}
 				}
 			} else if (it.type === 'elliptical_arc') {
@@ -2794,11 +3164,7 @@ export class SVGRenderer {
 		const norm = geomResult.gizmoNormal;
 		const sAnchor = viewport.worldToScreen(anchor.x, anchor.y);
 
-		const renderGizmoArrowForSide = (
-			type: 'dist1' | 'dist2',
-			offsetVal: number,
-			sign: number
-		) => {
+		const renderGizmoArrowForSide = (type: 'dist1' | 'dist2', offsetVal: number, sign: number) => {
 			const targetWorld = {
 				x: anchor.x + sign * offsetVal * norm.x,
 				y: anchor.y + sign * offsetVal * norm.y,

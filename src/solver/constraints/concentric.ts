@@ -29,7 +29,11 @@ export class ConcentricConstraint extends BaseConstraint {
 		return [(c1x - c2x) * this.weight, (c1y - c2y) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.c1CenterId}.x`, baseRow, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.c2CenterId}.x`, baseRow, -this.weight);

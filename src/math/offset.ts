@@ -127,7 +127,12 @@ export function getConnectedPrimitivesAtVertex(
 	excludePrimitiveId?: string
 ): Array<{ id: string; type: ChainItem['type']; connectedPointId: string; otherPointId: string }> {
 	const pGroup = getCoincidentPointGroup(sketch, pointId);
-	const res: Array<{ id: string; type: ChainItem['type']; connectedPointId: string; otherPointId: string }> = [];
+	const res: Array<{
+		id: string;
+		type: ChainItem['type'];
+		connectedPointId: string;
+		otherPointId: string;
+	}> = [];
 
 	const check = (type: ChainItem['type'], id: string, p1Id: string, p2Id: string) => {
 		if (id === excludePrimitiveId) return;
@@ -514,7 +519,10 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const p1 = sketch.points.get(item.startPointId || l.p1Id);
 		const p2 = sketch.points.get(item.endPointId || l.p2Id);
 		if (!p1 || !p2) return [];
-		return [{ x: p1.x, y: p1.y }, { x: p2.x, y: p2.y }];
+		return [
+			{ x: p1.x, y: p1.y },
+			{ x: p2.x, y: p2.y },
+		];
 	}
 
 	if (item.type === 'circle') {
@@ -525,7 +533,10 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pts: Vec2[] = [];
 		for (let i = 0; i < numSamples; i++) {
 			const a = (i / numSamples) * Math.PI * 2;
-			pts.push({ x: center.x + c.radius * Math.cos(a), y: center.y + c.radius * Math.sin(a) });
+			pts.push({
+				x: center.x + c.radius * Math.cos(a),
+				y: center.y + c.radius * Math.sin(a),
+			});
 		}
 		pts.push({ ...pts[0] });
 		return pts;
@@ -599,13 +610,23 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 			const localT = totalT - segIdx;
 			const [p0, p1, p2, p3] = beziers[segIdx];
 			const mt = 1 - localT;
-			const x = mt * mt * mt * p0.x + 3 * mt * mt * localT * p1.x + 3 * mt * localT * localT * p2.x + localT * localT * localT * p3.x;
-			const y = mt * mt * mt * p0.y + 3 * mt * mt * localT * p1.y + 3 * mt * localT * localT * p2.y + localT * localT * localT * p3.y;
+			const x =
+				mt * mt * mt * p0.x +
+				3 * mt * mt * localT * p1.x +
+				3 * mt * localT * localT * p2.x +
+				localT * localT * localT * p3.x;
+			const y =
+				mt * mt * mt * p0.y +
+				3 * mt * mt * localT * p1.y +
+				3 * mt * localT * localT * p2.y +
+				localT * localT * localT * p3.y;
 			pts.push({ x, y });
 		}
 		const isReversed =
 			item.reversed ||
-			(item.startPointId ? getCoincidentPointGroup(sketch, item.startPointId).has(s.pointIds[s.pointIds.length - 1]) : false);
+			(item.startPointId
+				? getCoincidentPointGroup(sketch, item.startPointId).has(s.pointIds[s.pointIds.length - 1])
+				: false);
 		if (isReversed) pts.reverse();
 		return pts;
 	}
@@ -622,10 +643,12 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const a = dist(center, maj);
 		const b = dist(center, min);
 		const rot = Math.atan2(maj.y - center.y, maj.x - center.x);
-		const cosR = Math.cos(rot), sinR = Math.sin(rot);
+		const cosR = Math.cos(rot),
+			sinR = Math.sin(rot);
 
 		const toEllipseParam = (p: Vec2) => {
-			const dx = p.x - center.x, dy = p.y - center.y;
+			const dx = p.x - center.x,
+				dy = p.y - center.y;
 			const ex = dx * cosR + dy * sinR;
 			const ey = -dx * sinR + dy * cosR;
 			return Math.atan2(ey / b, ex / a);
@@ -722,15 +745,23 @@ function computeSingleOffsetSide(
 		if (!c || !center) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
 		const newR = c.radius + signedDistance;
 		if (newR <= 0.1) {
-			return { primitives: [], side: 1, distance: signedDistance, isValid: false, errorMessage: 'Offset distance exceeds circle radius' };
+			return {
+				primitives: [],
+				side: 1,
+				distance: signedDistance,
+				isValid: false,
+				errorMessage: 'Offset distance exceeds circle radius',
+			};
 		}
 		return {
-			primitives: [{
-				sourceId: c.id,
-				type: 'circle',
-				circleCenter: { x: center.x, y: center.y },
-				circleRadius: newR,
-			}],
+			primitives: [
+				{
+					sourceId: c.id,
+					type: 'circle',
+					circleCenter: { x: center.x, y: center.y },
+					circleRadius: newR,
+				},
+			],
 			side: Math.sign(signedDistance) || 1,
 			distance: Math.abs(signedDistance),
 			isValid: true,
@@ -747,7 +778,8 @@ function computeSingleOffsetSide(
 		const a = dist(center, maj);
 		const b = dist(center, min);
 		const rot = Math.atan2(maj.y - center.y, maj.x - center.x);
-		const cosR = Math.cos(rot), sinR = Math.sin(rot);
+		const cosR = Math.cos(rot),
+			sinR = Math.sin(rot);
 
 		const samples = 24;
 		const fitPts: Vec2[] = [];
@@ -777,12 +809,14 @@ function computeSingleOffsetSide(
 		fitPts.push({ ...fitPts[0] });
 
 		return {
-			primitives: [{
-				sourceId: el.id,
-				type: 'spline',
-				fitPoints: fitPts,
-				isSplineClosed: true,
-			}],
+			primitives: [
+				{
+					sourceId: el.id,
+					type: 'spline',
+					fitPoints: fitPts,
+					isSplineClosed: true,
+				},
+			],
 			side: Math.sign(signedDistance) || 1,
 			distance: Math.abs(signedDistance),
 			isValid: true,
@@ -882,12 +916,18 @@ function computeSingleOffsetSide(
 				chainNorm = { x: -uT.y, y: uT.x };
 			}
 
-			const radiallyOutward = (chainNorm.x * toMid.x + chainNorm.y * toMid.y) >= 0;
+			const radiallyOutward = chainNorm.x * toMid.x + chainNorm.y * toMid.y >= 0;
 			const rDelta = radiallyOutward ? signedDistance : -signedDistance;
 			const newR = arc.radius + rDelta;
 
 			if (newR <= 0.1) {
-				return { primitives: [], side: 1, distance: signedDistance, isValid: false, errorMessage: 'Offset collapses arc radius' };
+				return {
+					primitives: [],
+					side: 1,
+					distance: signedDistance,
+					isValid: false,
+					errorMessage: 'Offset collapses arc radius',
+				};
 			}
 
 			const sRad1 = normalize({ x: p1.x - center.x, y: p1.y - center.y });
@@ -935,7 +975,10 @@ function computeSingleOffsetSide(
 			}
 
 			// Compute exact endpoint tangents for spline
-			let startTangent = normalize({ x: offSamples[1].x - offSamples[0].x, y: offSamples[1].y - offSamples[0].y });
+			let startTangent = normalize({
+				x: offSamples[1].x - offSamples[0].x,
+				y: offSamples[1].y - offSamples[0].y,
+			});
 			let endTangent = normalize({
 				x: offSamples[offSamples.length - 1].x - offSamples[offSamples.length - 2].x,
 				y: offSamples[offSamples.length - 1].y - offSamples[offSamples.length - 2].y,
@@ -951,7 +994,10 @@ function computeSingleOffsetSide(
 						item.reversed ||
 						(ep && item.startPointId ? getCoincidentPointGroup(sketch, item.startPointId).has(ep.p2Id) : false);
 					if (!isReversed) {
-						startTangent = normalize({ x: beziers[0][1].x - beziers[0][0].x, y: beziers[0][1].y - beziers[0][0].y });
+						startTangent = normalize({
+							x: beziers[0][1].x - beziers[0][0].x,
+							y: beziers[0][1].y - beziers[0][0].y,
+						});
 						endTangent = normalize({
 							x: beziers[beziers.length - 1][3].x - beziers[beziers.length - 1][2].x,
 							y: beziers[beziers.length - 1][3].y - beziers[beziers.length - 1][2].y,
@@ -961,16 +1007,30 @@ function computeSingleOffsetSide(
 							x: beziers[beziers.length - 1][2].x - beziers[beziers.length - 1][3].x,
 							y: beziers[beziers.length - 1][2].y - beziers[beziers.length - 1][3].y,
 						});
-						endTangent = normalize({ x: beziers[0][0].x - beziers[0][1].x, y: beziers[0][0].y - beziers[0][1].y });
+						endTangent = normalize({
+							x: beziers[0][0].x - beziers[0][1].x,
+							y: beziers[0][0].y - beziers[0][1].y,
+						});
 					}
 				}
 			}
 
-			const startNorm = chain.isClosed ? (isCCW ? { x: startTangent.y, y: -startTangent.x } : { x: -startTangent.y, y: startTangent.x }) : { x: -startTangent.y, y: startTangent.x };
-			const endNorm = chain.isClosed ? (isCCW ? { x: endTangent.y, y: -endTangent.x } : { x: -endTangent.y, y: endTangent.x }) : { x: -endTangent.y, y: endTangent.x };
+			const startNorm = chain.isClosed
+				? isCCW
+					? { x: startTangent.y, y: -startTangent.x }
+					: { x: -startTangent.y, y: startTangent.x }
+				: { x: -startTangent.y, y: startTangent.x };
+			const endNorm = chain.isClosed
+				? isCCW
+					? { x: endTangent.y, y: -endTangent.x }
+					: { x: -endTangent.y, y: endTangent.x }
+				: { x: -endTangent.y, y: endTangent.x };
 			splineNormals[0] = startNorm;
 			splineNormals[splineNormals.length - 1] = endNorm;
-			offSamples[0] = { x: samples[0].x + signedDistance * startNorm.x, y: samples[0].y + signedDistance * startNorm.y };
+			offSamples[0] = {
+				x: samples[0].x + signedDistance * startNorm.x,
+				y: samples[0].y + signedDistance * startNorm.y,
+			};
 			offSamples[offSamples.length - 1] = {
 				x: samples[samples.length - 1].x + signedDistance * endNorm.x,
 				y: samples[samples.length - 1].y + signedDistance * endNorm.y,
@@ -1063,7 +1123,12 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[spPts.length - 1];
-				const dSp = cur.endTangent || normalize({ x: pSp.x - spPts[spPts.length - 2].x, y: pSp.y - spPts[spPts.length - 2].y });
+				const dSp =
+					cur.endTangent ||
+					normalize({
+						x: pSp.x - spPts[spPts.length - 2].x,
+						y: pSp.y - spPts[spPts.length - 2].y,
+					});
 				const inter = intersectLines2D(pLine, dLine, pSp, dSp);
 				if (inter && dist(inter, next.p1!) <= 4 * Math.abs(signedDistance)) {
 					spPts[spPts.length - 1] = inter;
@@ -1072,7 +1137,10 @@ function computeSingleOffsetSide(
 				}
 			}
 			if (!joined) {
-				const avg = { x: (spPts[spPts.length - 1].x + next.p1!.x) / 2, y: (spPts[spPts.length - 1].y + next.p1!.y) / 2 };
+				const avg = {
+					x: (spPts[spPts.length - 1].x + next.p1!.x) / 2,
+					y: (spPts[spPts.length - 1].y + next.p1!.y) / 2,
+				};
 				spPts[spPts.length - 1] = avg;
 				next.p1 = avg;
 			}
@@ -1110,7 +1178,12 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[spPts.length - 1];
-				const dSp = cur.endTangent || normalize({ x: pSp.x - spPts[spPts.length - 2].x, y: pSp.y - spPts[spPts.length - 2].y });
+				const dSp =
+					cur.endTangent ||
+					normalize({
+						x: pSp.x - spPts[spPts.length - 2].x,
+						y: pSp.y - spPts[spPts.length - 2].y,
+					});
 				const tProj = (c.x - pSp.x) * dSp.x + (c.y - pSp.y) * dSp.y;
 				const perpDistSq = (pSp.x + tProj * dSp.x - c.x) ** 2 + (pSp.y + tProj * dSp.y - c.y) ** 2;
 				if (perpDistSq <= r * r) {
@@ -1124,13 +1197,17 @@ function computeSingleOffsetSide(
 				}
 			}
 			if (!joined) {
-				const avg = { x: (spPts[spPts.length - 1].x + next.start!.x) / 2, y: (spPts[spPts.length - 1].y + next.start!.y) / 2 };
+				const avg = {
+					x: (spPts[spPts.length - 1].x + next.start!.x) / 2,
+					y: (spPts[spPts.length - 1].y + next.start!.y) / 2,
+				};
 				spPts[spPts.length - 1] = avg;
 				next.start = avg;
 			}
 		} else {
 			// Spline-Spline or other: connect endpoints to meet at their average
-			const pCurEnd = cur.type === 'line' ? cur.p2! : cur.type === 'arc' ? cur.end! : cur.fitPoints![cur.fitPoints!.length - 1];
+			const pCurEnd =
+				cur.type === 'line' ? cur.p2! : cur.type === 'arc' ? cur.end! : cur.fitPoints![cur.fitPoints!.length - 1];
 			const pNextStart = next.type === 'line' ? next.p1! : next.type === 'arc' ? next.start! : next.fitPoints![0];
 			const avg = { x: (pCurEnd.x + pNextStart.x) / 2, y: (pCurEnd.y + pNextStart.y) / 2 };
 
@@ -1153,15 +1230,27 @@ function computeSingleOffsetSide(
 			if (raw.startTangent && handles[0]) {
 				const d0 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) / 3;
 				handles[0] = {
-					h1: { x: pts[0].x - raw.startTangent.x * d0, y: pts[0].y - raw.startTangent.y * d0 },
-					h2: { x: pts[0].x + raw.startTangent.x * d0, y: pts[0].y + raw.startTangent.y * d0 },
+					h1: {
+						x: pts[0].x - raw.startTangent.x * d0,
+						y: pts[0].y - raw.startTangent.y * d0,
+					},
+					h2: {
+						x: pts[0].x + raw.startTangent.x * d0,
+						y: pts[0].y + raw.startTangent.y * d0,
+					},
 				};
 			}
 			if (raw.endTangent && handles[count]) {
 				const dn = Math.hypot(pts[count].x - pts[count - 1].x, pts[count].y - pts[count - 1].y) / 3;
 				handles[count] = {
-					h1: { x: pts[count].x - raw.endTangent.x * dn, y: pts[count].y - raw.endTangent.y * dn },
-					h2: { x: pts[count].x + raw.endTangent.x * dn, y: pts[count].y + raw.endTangent.y * dn },
+					h1: {
+						x: pts[count].x - raw.endTangent.x * dn,
+						y: pts[count].y - raw.endTangent.y * dn,
+					},
+					h2: {
+						x: pts[count].x + raw.endTangent.x * dn,
+						y: pts[count].y + raw.endTangent.y * dn,
+					},
 				};
 			}
 			raw.handles = handles;
@@ -1394,7 +1483,10 @@ export function commitOffsetToSketch(
 			const cornerCount = chain.isClosed ? numPrims : numPrims + 1;
 			for (let i = 0; i < cornerCount; i++) {
 				const prim = side.primitives[i % numPrims];
-				const pt = (prim.type === 'line' ? prim.p1 : prim.type === 'arc' ? prim.start : prim.fitPoints?.[0]) || { x: 0, y: 0 };
+				const pt = (prim.type === 'line' ? prim.p1 : prim.type === 'arc' ? prim.start : prim.fitPoints?.[0]) || {
+					x: 0,
+					y: 0,
+				};
 				cornerPoints.push(sketch.addPoint(pt.x, pt.y));
 			}
 		}

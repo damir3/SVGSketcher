@@ -265,13 +265,7 @@ export class EllipticalArcTool extends BaseTool {
 	override onMouseMove(e: ToolMouseEvent): void {
 		const effectiveWorld = this.shouldSnap() && e.snap ? e.snap.worldPos : e.world;
 
-		if (
-			this.drawingStep === 4 &&
-			this.centerWorldPos &&
-			this.majWorldPos &&
-			this.minWorldPos &&
-			this.startWorldPtPos
-		) {
+		if (this.drawingStep === 4 && this.centerWorldPos && this.majWorldPos && this.minWorldPos && this.startWorldPtPos) {
 			const centerWorld = this.centerWorldPos;
 			const majWorld = this.majWorldPos;
 			const minWorld = this.minWorldPos;
@@ -362,16 +356,7 @@ export class EllipticalArcTool extends BaseTool {
 			const smin = ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
 			const ss = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 
-			renderEllipticalArcStartPreviewVisual(
-				ctx.targetGroup,
-				sc,
-				smaj,
-				smin,
-				ss,
-				rxVal,
-				ryVal,
-				ctx.isConstruction
-			);
+			renderEllipticalArcStartPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss, rxVal, ryVal, ctx.isConstruction);
 		} else if (
 			this.drawingStep === 4 &&
 			this.centerWorldPos &&

@@ -20,32 +20,56 @@ export function calculateObjectsCentroid(sketch: SketchDocument, objectIds: Iter
 		if (l) {
 			const p1 = sketch.points.get(l.p1Id);
 			const p2 = sketch.points.get(l.p2Id);
-			if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
-			if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+			if (p1) {
+				sumX += p1.x;
+				sumY += p1.y;
+				ptCount++;
+			}
+			if (p2) {
+				sumX += p2.x;
+				sumY += p2.y;
+				ptCount++;
+			}
 			continue;
 		}
 		const c = sketch.circles.get(objId);
 		if (c) {
 			const cp = sketch.points.get(c.centerId);
-			if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+			if (cp) {
+				sumX += cp.x;
+				sumY += cp.y;
+				ptCount++;
+			}
 			continue;
 		}
 		const a = sketch.arcs.get(objId);
 		if (a) {
 			const cp = sketch.points.get(a.centerId);
-			if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+			if (cp) {
+				sumX += cp.x;
+				sumY += cp.y;
+				ptCount++;
+			}
 			continue;
 		}
 		const el = sketch.ellipses.get(objId);
 		if (el) {
 			const cp = sketch.points.get(el.centerId);
-			if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+			if (cp) {
+				sumX += cp.x;
+				sumY += cp.y;
+				ptCount++;
+			}
 			continue;
 		}
 		const ea = sketch.ellipticalArcs.get(objId);
 		if (ea) {
 			const cp = sketch.points.get(ea.centerId);
-			if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+			if (cp) {
+				sumX += cp.x;
+				sumY += cp.y;
+				ptCount++;
+			}
 			continue;
 		}
 	}

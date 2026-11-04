@@ -7,24 +7,67 @@ import { SketchEllipse } from './ellipse';
 import { SketchEllipticalArc } from './ellipticalArc';
 import { SketchSpline } from './spline';
 
-export interface PointSnapshot { type: 'point'; id: string; x: number; y: number; fixed: boolean }
-export interface LineSnapshot {
-	type: 'line'; id: string; p1Id: string; p2Id: string; isConstruction?: boolean; isSplineHandle?: boolean; parentSplineId?: string;
+export interface PointSnapshot {
+	type: 'point';
+	id: string;
+	x: number;
+	y: number;
+	fixed: boolean;
 }
-export interface CircleSnapshot { type: 'circle'; id: string; centerId: string; radius: number; isConstruction?: boolean }
+export interface LineSnapshot {
+	type: 'line';
+	id: string;
+	p1Id: string;
+	p2Id: string;
+	isConstruction?: boolean;
+	isSplineHandle?: boolean;
+	parentSplineId?: string;
+}
+export interface CircleSnapshot {
+	type: 'circle';
+	id: string;
+	centerId: string;
+	radius: number;
+	isConstruction?: boolean;
+}
 export interface ArcSnapshot {
-	type: 'arc'; id: string; centerId: string; startPointId: string; endPointId: string; radius: number; clockwise?: boolean; isConstruction?: boolean;
+	type: 'arc';
+	id: string;
+	centerId: string;
+	startPointId: string;
+	endPointId: string;
+	radius: number;
+	clockwise?: boolean;
+	isConstruction?: boolean;
 }
 export interface EllipseSnapshot {
-	type: 'ellipse'; id: string; centerId: string; majorAxisPointId: string; minorAxisPointId: string; isConstruction?: boolean;
+	type: 'ellipse';
+	id: string;
+	centerId: string;
+	majorAxisPointId: string;
+	minorAxisPointId: string;
+	isConstruction?: boolean;
 }
 export interface EllipticalArcSnapshot {
-	type: 'elliptical_arc'; id: string; centerId: string; majorAxisPointId: string; minorAxisPointId: string;
-	startPointId: string; endPointId: string; clockwise?: boolean; isConstruction?: boolean;
+	type: 'elliptical_arc';
+	id: string;
+	centerId: string;
+	majorAxisPointId: string;
+	minorAxisPointId: string;
+	startPointId: string;
+	endPointId: string;
+	clockwise?: boolean;
+	isConstruction?: boolean;
 }
 export interface SplineSnapshot {
-	type: 'spline'; id: string; splineType: 'fit' | 'control'; pointIds: string[]; tangentLineIds?: string[];
-	knots?: number[]; isClosed?: boolean; isConstruction?: boolean;
+	type: 'spline';
+	id: string;
+	splineType: 'fit' | 'control';
+	pointIds: string[];
+	tangentLineIds?: string[];
+	knots?: number[];
+	isClosed?: boolean;
+	isConstruction?: boolean;
 }
 
 export type PrimitiveSnapshot =

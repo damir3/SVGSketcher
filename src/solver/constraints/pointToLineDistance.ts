@@ -70,7 +70,11 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		return [(h - this.side * this.targetDistance) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 

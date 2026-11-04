@@ -72,9 +72,15 @@ export class AngleConstraint extends BaseConstraint {
 		let p3x: number, p3y: number, p4x: number, p4y: number;
 
 		if (this.line1Id === 'axis_x') {
-			p1x = 0; p1y = 0; p2x = 1; p2y = 0;
+			p1x = 0;
+			p1y = 0;
+			p2x = 1;
+			p2y = 0;
 		} else if (this.line1Id === 'axis_y') {
-			p1x = 0; p1y = 0; p2x = 0; p2y = 1;
+			p1x = 0;
+			p1y = 0;
+			p2x = 0;
+			p2y = 1;
 		} else {
 			p1x = paramMap.get(`${this.l1P1}.x`) ?? 0;
 			p1y = paramMap.get(`${this.l1P1}.y`) ?? 0;
@@ -83,9 +89,15 @@ export class AngleConstraint extends BaseConstraint {
 		}
 
 		if (this.line2Id === 'axis_x') {
-			p3x = 0; p3y = 0; p4x = 1; p4y = 0;
+			p3x = 0;
+			p3y = 0;
+			p4x = 1;
+			p4y = 0;
 		} else if (this.line2Id === 'axis_y') {
-			p3x = 0; p3y = 0; p4x = 0; p4y = 1;
+			p3x = 0;
+			p3y = 0;
+			p4x = 0;
+			p4y = 1;
 		} else {
 			p3x = paramMap.get(`${this.l2P1}.x`) ?? 0;
 			p3y = paramMap.get(`${this.l2P1}.y`) ?? 0;
@@ -100,7 +112,7 @@ export class AngleConstraint extends BaseConstraint {
 
 		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
 		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
-		const avgL = isAxis1 ? l2 : (isAxis2 ? l1 : (l1 + l2) * 0.5);
+		const avgL = isAxis1 ? l2 : isAxis2 ? l1 : (l1 + l2) * 0.5;
 
 		const u1x = dx1 / l1;
 		const u1y = dy1 / l1;
@@ -121,7 +133,11 @@ export class AngleConstraint extends BaseConstraint {
 		return [cross * avgL * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 
@@ -132,17 +148,21 @@ export class AngleConstraint extends BaseConstraint {
 		const l1 = isAxis1 ? null : ctx.sketch.lines.get(this.line1Id);
 		const l2 = isAxis2 ? null : ctx.sketch.lines.get(this.line2Id);
 
-		const p1 = isAxis1
-			? ({ id: this.line1Id, x: 0, y: 0 } as any)
-			: ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p1 = isAxis1 ? ({ id: this.line1Id, x: 0, y: 0 } as any) : ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
 		const p2 = isAxis1
-			? ({ id: this.line1Id, x: this.line1Id === 'axis_x' ? 1 : 0, y: this.line1Id === 'axis_x' ? 0 : 1 } as any)
+			? ({
+					id: this.line1Id,
+					x: this.line1Id === 'axis_x' ? 1 : 0,
+					y: this.line1Id === 'axis_x' ? 0 : 1,
+				} as any)
 			: ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = isAxis2
-			? ({ id: this.line2Id, x: 0, y: 0 } as any)
-			: ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p3 = isAxis2 ? ({ id: this.line2Id, x: 0, y: 0 } as any) : ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
 		const p4 = isAxis2
-			? ({ id: this.line2Id, x: this.line2Id === 'axis_x' ? 1 : 0, y: this.line2Id === 'axis_x' ? 0 : 1 } as any)
+			? ({
+					id: this.line2Id,
+					x: this.line2Id === 'axis_x' ? 1 : 0,
+					y: this.line2Id === 'axis_x' ? 0 : 1,
+				} as any)
 			: ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return;
 
@@ -184,11 +204,15 @@ export class AngleConstraint extends BaseConstraint {
 		const midX = sCenter.x + rScreen * Math.cos(midAngle);
 		const midY = sCenter.y + rScreen * Math.sin(midAngle);
 
-		const g = createSvgElement('g', {
-			class: 'dimension-item',
-			'data-id': this.id,
-			'data-type': 'constraint',
-		}, ctx.targetGroup);
+		const g = createSvgElement(
+			'g',
+			{
+				class: 'dimension-item',
+				'data-id': this.id,
+				'data-type': 'constraint',
+			},
+			ctx.targetGroup
+		);
 
 		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
 
@@ -222,39 +246,56 @@ export class AngleConstraint extends BaseConstraint {
 		const textVal = `${prefix}${this.targetAngle.toFixed(1)}°`;
 		const textLen = textVal.length * 8 + 14;
 
-		createSvgRect(midX - textLen * 0.5, midY - 10, textLen, 20, {
-			rx: 4,
-			fill: COLORS.white,
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, g);
+		createSvgRect(
+			midX - textLen * 0.5,
+			midY - 10,
+			textLen,
+			20,
+			{
+				rx: 4,
+				fill: COLORS.white,
+				stroke: color,
+				'stroke-width': STROKE_WIDTH.dimension,
+			},
+			g
+		);
 
-		createSvgText(midX, midY + 4, textVal, {
-			'text-anchor': 'middle',
-			fill: color,
-			'font-size': 11,
-			'font-weight': 700,
-			'font-family': 'ui-monospace, monospace',
-		}, g);
+		createSvgText(
+			midX,
+			midY + 4,
+			textVal,
+			{
+				'text-anchor': 'middle',
+				fill: color,
+				'font-size': 11,
+				'font-weight': 700,
+				'font-family': 'ui-monospace, monospace',
+			},
+			g
+		);
 	}
 
-		override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {
 		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
 		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
 
 		const l1 = isAxis1 ? null : sketch.lines.get(this.line1Id);
 		const l2 = isAxis2 ? null : sketch.lines.get(this.line2Id);
-		const p1 = isAxis1
-			? ({ id: this.line1Id, x: 0, y: 0 } as any)
-			: sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p1 = isAxis1 ? ({ id: this.line1Id, x: 0, y: 0 } as any) : sketch.points.get(l1 ? l1.p1Id : this.l1P1);
 		const p2 = isAxis1
-			? ({ id: this.line1Id, x: this.line1Id === 'axis_x' ? 1 : 0, y: this.line1Id === 'axis_x' ? 0 : 1 } as any)
+			? ({
+					id: this.line1Id,
+					x: this.line1Id === 'axis_x' ? 1 : 0,
+					y: this.line1Id === 'axis_x' ? 0 : 1,
+				} as any)
 			: sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = isAxis2
-			? ({ id: this.line2Id, x: 0, y: 0 } as any)
-			: sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p3 = isAxis2 ? ({ id: this.line2Id, x: 0, y: 0 } as any) : sketch.points.get(l2 ? l2.p1Id : this.l2P1);
 		const p4 = isAxis2
-			? ({ id: this.line2Id, x: this.line2Id === 'axis_x' ? 1 : 0, y: this.line2Id === 'axis_x' ? 0 : 1 } as any)
+			? ({
+					id: this.line2Id,
+					x: this.line2Id === 'axis_x' ? 1 : 0,
+					y: this.line2Id === 'axis_x' ? 0 : 1,
+				} as any)
 			: sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return null;
 
@@ -291,12 +332,12 @@ export class AngleConstraint extends BaseConstraint {
 
 		// 1. Check distance to badge / text box
 		const dLabel = Math.hypot(screen.x - midX, screen.y - midY);
-			if (dLabel <= LABEL_DISTANCE_PX) return dLabel;
+		if (dLabel <= LABEL_DISTANCE_PX) return dLabel;
 
 		// 2. Check distance to angle arc
 		const dCenter = Math.hypot(screen.x - sCenter.x, screen.y - sCenter.y);
 		const dRadial = Math.abs(dCenter - rScreen);
-			if (dRadial <= LINE_DISTANCE_PX) {
+		if (dRadial <= LINE_DISTANCE_PX) {
 			const pAngle = Math.atan2(screen.y - sCenter.y, screen.x - sCenter.x);
 			const sweepAngle = delta;
 			let ptSweep = pAngle - a1;

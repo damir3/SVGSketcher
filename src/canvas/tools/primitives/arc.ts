@@ -1,11 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { dist, vec, getCircumcircle, type Vec2 } from '../../../math/vector';
-import {
-	renderLinePreviewVisual,
-	renderCirclePreviewVisual,
-	renderArcPreviewVisual,
-} from '../../previewHelpers';
+import { renderLinePreviewVisual, renderCirclePreviewVisual, renderArcPreviewVisual } from '../../previewHelpers';
 import type { SketchDocument } from '../../../model/sketch';
 import type { SketchLine, SketchArc } from '../../../model/types';
 import { VariationToolPanel } from '../../../ui/panels/tools';
@@ -23,10 +19,7 @@ interface ConnectedCurveInfo {
 /**
  * Finds an existing line or arc connected to ptId and returns its unit tangent vector at ptId.
  */
-export function findConnectedCurveForTangent(
-	sketch: SketchDocument,
-	ptId: string
-): ConnectedCurveInfo | null {
+export function findConnectedCurveForTangent(sketch: SketchDocument, ptId: string): ConnectedCurveInfo | null {
 	// 1. Check lines
 	for (const line of sketch.lines.values()) {
 		if (line.isSplineHandle) continue;
@@ -352,8 +345,7 @@ export class ArcTool extends BaseTool {
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
 			const length = dist(this.startWorldPos, effectiveWorld);
 			const angleDeg =
-				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
-				Math.PI;
+				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) / Math.PI;
 			renderLinePreviewVisual(ctx.targetGroup, s1, s2, length, angleDeg, ctx.isConstruction);
 		} else if (this.drawingStep === 2 && this.startWorldPos && this.arcPoint2WorldPos) {
 			const p1 = this.startWorldPos;
@@ -484,7 +476,14 @@ export class ArcTool extends BaseTool {
 			const endWorldY = centerWorld.y + radius * Math.sin(worldAngle);
 
 			let endPointId: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && snap.id !== this.arcPoint1Id && sketch.points.has(snap.id)) {
+			if (
+				snap &&
+				snap.type === 'point' &&
+				snap.id &&
+				snap.id !== this.centerId &&
+				snap.id !== this.arcPoint1Id &&
+				sketch.points.has(snap.id)
+			) {
 				endPointId = snap.id;
 			} else {
 				const pt = sketch.addPoint(endWorldX, endWorldY);
@@ -492,14 +491,7 @@ export class ArcTool extends BaseTool {
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 
-			sketch.addArc(
-				this.centerId!,
-				this.arcPoint1Id!,
-				endPointId,
-				radius,
-				clockwise,
-				this.ctx.isConstructionMode
-			);
+			sketch.addArc(this.centerId!, this.arcPoint1Id!, endPointId, radius, clockwise, this.ctx.isConstructionMode);
 			sketch.commitTransaction();
 			this.resetState();
 			this.ctx.requestRender();
@@ -644,7 +636,13 @@ export class ArcTool extends BaseTool {
 			}
 
 			let endPointId: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.tangentStartPointId && sketch.points.has(snap.id)) {
+			if (
+				snap &&
+				snap.type === 'point' &&
+				snap.id &&
+				snap.id !== this.tangentStartPointId &&
+				sketch.points.has(snap.id)
+			) {
 				endPointId = snap.id;
 			} else {
 				const pt = sketch.addPoint(p2.x, p2.y);
@@ -773,4 +771,3 @@ export class ArcTool extends BaseTool {
 		}
 	}
 }
-

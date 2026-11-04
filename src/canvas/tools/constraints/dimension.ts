@@ -1,4 +1,4 @@
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../../distances';
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -198,8 +198,7 @@ export class DimensionTool extends BaseTool {
 		let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
 
 		// Priority 1: When selecting points in step 0 or step 1, points ALWAYS have top priority!
-		const excludeId =
-			this.state.step === 1 && this.state.point1Id ? this.state.point1Id : undefined;
+		const excludeId = this.state.step === 1 && this.state.point1Id ? this.state.point1Id : undefined;
 		const nearPoint = this.ctx.findPointNear(screen);
 		if (nearPoint && (!excludeId || nearPoint.id !== excludeId)) {
 			id = nearPoint.id;
@@ -254,12 +253,24 @@ export class DimensionTool extends BaseTool {
 			if (type === 'point' && id) {
 				this.ctx.sketch.clearSelection();
 				this.ctx.sketch.selectEntity(id, 'point', false);
-				this.state = { step: 1, line1Id: null, line2Id: null, point1Id: id, point2Id: null };
+				this.state = {
+					step: 1,
+					line1Id: null,
+					line2Id: null,
+					point1Id: id,
+					point2Id: null,
+				};
 				this.ctx.requestRender();
 			} else if (type === 'line' && id) {
 				this.ctx.sketch.clearSelection();
 				this.ctx.sketch.selectEntity(id, 'line', false);
-				this.state = { step: 1, line1Id: id, line2Id: null, point1Id: null, point2Id: null };
+				this.state = {
+					step: 1,
+					line1Id: id,
+					line2Id: null,
+					point1Id: null,
+					point2Id: null,
+				};
 				this.ctx.requestRender();
 			} else if ((type === 'circle' || type === 'arc') && id) {
 				const existed = this.ctx.sketch.hasRadiusConstraint(id);
@@ -275,7 +286,13 @@ export class DimensionTool extends BaseTool {
 				}
 			} else {
 				this.ctx.sketch.clearSelection();
-				this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+				this.state = {
+					step: 0,
+					line1Id: null,
+					line2Id: null,
+					point1Id: null,
+					point2Id: null,
+				};
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
 			}
@@ -303,9 +320,17 @@ export class DimensionTool extends BaseTool {
 					const c = this.ctx.sketch.addPointToAxisDistanceConstraint(userPtId, axis);
 					if (c) {
 						this.ctx.showToast(
-							existed ? `Editing distance to ${axis.toUpperCase()}-axis` : `Distance to ${axis.toUpperCase()}-axis applied`
+							existed
+								? `Editing distance to ${axis.toUpperCase()}-axis`
+								: `Distance to ${axis.toUpperCase()}-axis applied`
 						);
-						this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+						this.state = {
+							step: 0,
+							line1Id: null,
+							line2Id: null,
+							point1Id: null,
+							point2Id: null,
+						};
 						this.ctx.renderer.clearPreviews();
 						this.ctx.sketch.clearSelection();
 						this.ctx.requestRender();
@@ -359,7 +384,13 @@ export class DimensionTool extends BaseTool {
 							this.ctx.showToast(
 								existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied'
 							);
-							this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+							this.state = {
+								step: 0,
+								line1Id: null,
+								line2Id: null,
+								point1Id: null,
+								point2Id: null,
+							};
 							this.ctx.renderer.clearPreviews();
 							this.ctx.sketch.clearSelection();
 							this.ctx.requestRender();
@@ -381,9 +412,17 @@ export class DimensionTool extends BaseTool {
 					const c = this.ctx.sketch.addPointToAxisDistanceConstraint(id, axis);
 					if (c) {
 						this.ctx.showToast(
-							existed ? `Editing distance to ${axis.toUpperCase()}-axis` : `Distance to ${axis.toUpperCase()}-axis applied`
+							existed
+								? `Editing distance to ${axis.toUpperCase()}-axis`
+								: `Distance to ${axis.toUpperCase()}-axis applied`
 						);
-						this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+						this.state = {
+							step: 0,
+							line1Id: null,
+							line2Id: null,
+							point1Id: null,
+							point2Id: null,
+						};
 						this.ctx.renderer.clearPreviews();
 						this.ctx.sketch.clearSelection();
 						this.ctx.requestRender();
@@ -395,7 +434,13 @@ export class DimensionTool extends BaseTool {
 				}
 				if (type === 'line' && id && id !== 'axis_x' && id !== 'axis_y') {
 					this.ctx.sketch.selectEntity(id, 'line', true);
-					this.state = { step: 2, line1Id: this.state.line1Id, line2Id: id, point1Id: null, point2Id: null };
+					this.state = {
+						step: 2,
+						line1Id: this.state.line1Id,
+						line2Id: id,
+						point1Id: null,
+						point2Id: null,
+					};
 					this.ctx.requestRender();
 					return true;
 				}
@@ -404,7 +449,13 @@ export class DimensionTool extends BaseTool {
 
 			const l1 = this.state.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
 			if (!l1) {
-				this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+				this.state = {
+					step: 0,
+					line1Id: null,
+					line2Id: null,
+					point1Id: null,
+					point2Id: null,
+				};
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
 				return true;
@@ -413,7 +464,13 @@ export class DimensionTool extends BaseTool {
 			// If clicked on an axis line -> switch to Angle constraint mode!
 			if (type === 'line' && (id === 'axis_x' || id === 'axis_y')) {
 				this.ctx.sketch.selectEntity(id, 'line', true);
-				this.state = { step: 2, line1Id: l1.id, line2Id: id, point1Id: null, point2Id: null };
+				this.state = {
+					step: 2,
+					line1Id: l1.id,
+					line2Id: id,
+					point1Id: null,
+					point2Id: null,
+				};
 				this.ctx.requestRender();
 				return true;
 			}
@@ -421,7 +478,13 @@ export class DimensionTool extends BaseTool {
 			// If clicked on another line -> switch to Angle constraint mode!
 			if (type === 'line' && id && id !== l1.id) {
 				this.ctx.sketch.selectEntity(id, 'line', true);
-				this.state = { step: 2, line1Id: l1.id, line2Id: id, point1Id: null, point2Id: null };
+				this.state = {
+					step: 2,
+					line1Id: l1.id,
+					line2Id: id,
+					point1Id: null,
+					point2Id: null,
+				};
 				this.ctx.requestRender();
 				return true;
 			}
@@ -457,7 +520,13 @@ export class DimensionTool extends BaseTool {
 					this.ctx.showToast(
 						existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied'
 					);
-					this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+					this.state = {
+						step: 0,
+						line1Id: null,
+						line2Id: null,
+						point1Id: null,
+						point2Id: null,
+					};
 					this.ctx.renderer.clearPreviews();
 					this.ctx.sketch.clearSelection();
 					this.ctx.requestRender();
@@ -483,12 +552,18 @@ export class DimensionTool extends BaseTool {
 					const toastMsg = existed
 						? 'Editing distance constraint'
 						: orientation === 'horizontal'
-						? 'Horizontal distance constraint applied'
-						: orientation === 'vertical'
-						? 'Vertical distance constraint applied'
-						: 'Distance constraint applied';
+							? 'Horizontal distance constraint applied'
+							: orientation === 'vertical'
+								? 'Vertical distance constraint applied'
+								: 'Distance constraint applied';
 					this.ctx.showToast(toastMsg);
-					this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+					this.state = {
+						step: 0,
+						line1Id: null,
+						line2Id: null,
+						point1Id: null,
+						point2Id: null,
+					};
 					this.ctx.renderer.clearPreviews();
 					this.ctx.sketch.clearSelection();
 					this.ctx.requestRender();
@@ -526,22 +601,23 @@ export class DimensionTool extends BaseTool {
 						}
 
 						const existed = this.ctx.sketch.hasOriginConstraint(userPtId);
-						const c = this.ctx.sketch.addOriginDistanceConstraint(
-							userPtId,
-							undefined,
-							orientation,
-							offsetWorld
-						);
+						const c = this.ctx.sketch.addOriginDistanceConstraint(userPtId, undefined, orientation, offsetWorld);
 						if (c) {
 							const toastMsg = existed
 								? 'Editing distance to (0,0)'
 								: orientation === 'horizontal'
-								? 'Horizontal distance to (0,0) applied'
-								: orientation === 'vertical'
-								? 'Vertical distance to (0,0) applied'
-								: 'Distance to (0,0) applied';
+									? 'Horizontal distance to (0,0) applied'
+									: orientation === 'vertical'
+										? 'Vertical distance to (0,0) applied'
+										: 'Distance to (0,0) applied';
 							this.ctx.showToast(toastMsg);
-							this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+							this.state = {
+								step: 0,
+								line1Id: null,
+								line2Id: null,
+								point1Id: null,
+								point2Id: null,
+							};
 							this.ctx.renderer.clearPreviews();
 							this.ctx.sketch.clearSelection();
 							this.ctx.requestRender();
@@ -561,11 +637,7 @@ export class DimensionTool extends BaseTool {
 					const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
 					const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
 
-					const existed = this.ctx.sketch.hasDistanceConstraint(
-						this.state.point1Id,
-						this.state.point2Id,
-						orientation
-					);
+					const existed = this.ctx.sketch.hasDistanceConstraint(this.state.point1Id, this.state.point2Id, orientation);
 					const c = this.ctx.sketch.addDistanceConstraint(
 						this.state.point1Id,
 						this.state.point2Id,
@@ -577,12 +649,18 @@ export class DimensionTool extends BaseTool {
 						const toastMsg = existed
 							? 'Editing distance constraint'
 							: orientation === 'horizontal'
-							? 'Horizontal distance constraint applied'
-							: orientation === 'vertical'
-							? 'Vertical distance constraint applied'
-							: 'Distance constraint applied';
+								? 'Horizontal distance constraint applied'
+								: orientation === 'vertical'
+									? 'Vertical distance constraint applied'
+									: 'Distance constraint applied';
 						this.ctx.showToast(toastMsg);
-						this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+						this.state = {
+							step: 0,
+							line1Id: null,
+							line2Id: null,
+							point1Id: null,
+							point2Id: null,
+						};
 						this.ctx.renderer.clearPreviews();
 						this.ctx.sketch.clearSelection();
 						this.ctx.requestRender();
@@ -615,10 +693,7 @@ export class DimensionTool extends BaseTool {
 							const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
 							const offsetWorld = (tCursor - tProj) / this.ctx.viewport.zoom;
 
-							const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(
-								this.state.point1Id,
-								this.state.line1Id
-							);
+							const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(this.state.point1Id, this.state.line1Id);
 							const c = this.ctx.sketch.addPointToLineDistanceConstraint(
 								this.state.point1Id,
 								this.state.line1Id,
@@ -629,7 +704,13 @@ export class DimensionTool extends BaseTool {
 								this.ctx.showToast(
 									existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied'
 								);
-								this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+								this.state = {
+									step: 0,
+									line1Id: null,
+									line2Id: null,
+									point1Id: null,
+									point2Id: null,
+								};
 								this.ctx.renderer.clearPreviews();
 								this.ctx.sketch.clearSelection();
 								this.ctx.requestRender();
@@ -651,23 +732,33 @@ export class DimensionTool extends BaseTool {
 			const l1 = isAxis1 ? null : this.ctx.sketch.lines.get(line1Id);
 			const l2 = isAxis2 ? null : this.ctx.sketch.lines.get(line2Id);
 			if ((!l1 && !isAxis1) || (!l2 && !isAxis2) || (isAxis1 && isAxis2)) {
-				this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+				this.state = {
+					step: 0,
+					line1Id: null,
+					line2Id: null,
+					point1Id: null,
+					point2Id: null,
+				};
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
 				return true;
 			}
 
-			const p1 = isAxis1
-				? ({ id: line1Id, x: 0, y: 0 } as any)
-				: this.ctx.sketch.points.get(l1!.p1Id);
+			const p1 = isAxis1 ? ({ id: line1Id, x: 0, y: 0 } as any) : this.ctx.sketch.points.get(l1!.p1Id);
 			const p2 = isAxis1
-				? ({ id: line1Id, x: line1Id === 'axis_x' ? 1 : 0, y: line1Id === 'axis_x' ? 0 : 1 } as any)
+				? ({
+						id: line1Id,
+						x: line1Id === 'axis_x' ? 1 : 0,
+						y: line1Id === 'axis_x' ? 0 : 1,
+					} as any)
 				: this.ctx.sketch.points.get(l1!.p2Id);
-			const p3 = isAxis2
-				? ({ id: line2Id, x: 0, y: 0 } as any)
-				: this.ctx.sketch.points.get(l2!.p1Id);
+			const p3 = isAxis2 ? ({ id: line2Id, x: 0, y: 0 } as any) : this.ctx.sketch.points.get(l2!.p1Id);
 			const p4 = isAxis2
-				? ({ id: line2Id, x: line2Id === 'axis_x' ? 1 : 0, y: line2Id === 'axis_x' ? 0 : 1 } as any)
+				? ({
+						id: line2Id,
+						x: line2Id === 'axis_x' ? 1 : 0,
+						y: line2Id === 'axis_x' ? 0 : 1,
+					} as any)
 				: this.ctx.sketch.points.get(l2!.p2Id);
 			if (p1 && p2 && p3 && p4) {
 				const geom = this.ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, line1Id, line2Id);
@@ -676,7 +767,13 @@ export class DimensionTool extends BaseTool {
 				const c = this.ctx.sketch.addAngleConstraint(line1Id, line2Id, undefined, arcRadiusWorld, world);
 				if (c) {
 					this.ctx.showToast(existed ? 'Editing angle constraint' : 'Angle constraint applied');
-					this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+					this.state = {
+						step: 0,
+						line1Id: null,
+						line2Id: null,
+						point1Id: null,
+						point2Id: null,
+					};
 					this.ctx.renderer.clearPreviews();
 					this.ctx.sketch.clearSelection();
 					this.ctx.requestRender();
@@ -739,7 +836,7 @@ export class DimensionTool extends BaseTool {
 								id: ctx.snap.id,
 								worldPos: ctx.snap.worldPos,
 								screenPos: ctx.snap.screenPos,
-						  }
+							}
 						: (() => {
 								const pt = this.ctx.findPointNear(screen);
 								if (pt && pt.id !== p1.id) {
@@ -750,7 +847,7 @@ export class DimensionTool extends BaseTool {
 									};
 								}
 								return null;
-						  })();
+							})();
 
 				if (snapPt) {
 					const targetScreen = snapPt.screenPos;
@@ -812,17 +909,21 @@ export class DimensionTool extends BaseTool {
 			const l1 = isAxis1 ? null : ctx.sketch.lines.get(line1Id);
 			const l2 = isAxis2 ? null : ctx.sketch.lines.get(line2Id);
 			if ((l1 || isAxis1) && (l2 || isAxis2) && !(isAxis1 && isAxis2)) {
-				const p1 = isAxis1
-					? ({ id: line1Id, x: 0, y: 0 } as any)
-					: ctx.sketch.points.get(l1!.p1Id);
+				const p1 = isAxis1 ? ({ id: line1Id, x: 0, y: 0 } as any) : ctx.sketch.points.get(l1!.p1Id);
 				const p2 = isAxis1
-					? ({ id: line1Id, x: line1Id === 'axis_x' ? 1 : 0, y: line1Id === 'axis_x' ? 0 : 1 } as any)
+					? ({
+							id: line1Id,
+							x: line1Id === 'axis_x' ? 1 : 0,
+							y: line1Id === 'axis_x' ? 0 : 1,
+						} as any)
 					: ctx.sketch.points.get(l1!.p2Id);
-				const p3 = isAxis2
-					? ({ id: line2Id, x: 0, y: 0 } as any)
-					: ctx.sketch.points.get(l2!.p1Id);
+				const p3 = isAxis2 ? ({ id: line2Id, x: 0, y: 0 } as any) : ctx.sketch.points.get(l2!.p1Id);
 				const p4 = isAxis2
-					? ({ id: line2Id, x: line2Id === 'axis_x' ? 1 : 0, y: line2Id === 'axis_x' ? 0 : 1 } as any)
+					? ({
+							id: line2Id,
+							x: line2Id === 'axis_x' ? 1 : 0,
+							y: line2Id === 'axis_x' ? 0 : 1,
+						} as any)
 					: ctx.sketch.points.get(l2!.p2Id);
 				if (p1 && p2 && p3 && p4) {
 					const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, line1Id, line2Id);

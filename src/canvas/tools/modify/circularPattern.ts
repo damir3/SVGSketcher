@@ -1,4 +1,4 @@
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../../distances';
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -202,7 +202,11 @@ export class CircularPatternTool extends BaseTool {
 
 	state: CircularPatternState | null = null;
 	onStateChange?: () => void;
-	private angleDrag: { previousPointerAngle: number; accumulatedDelta: number; startAngle: number } | null = null;
+	private angleDrag: {
+		previousPointerAngle: number;
+		accumulatedDelta: number;
+		startAngle: number;
+	} | null = null;
 
 	constructor() {
 		super();
@@ -303,7 +307,11 @@ export class CircularPatternTool extends BaseTool {
 	override isHighlightEnabled(screen?: Vec2): boolean {
 		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX) {
+				if (
+					!entry.constraintId &&
+					Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX &&
+					Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX
+				) {
 					return false;
 				}
 			}
@@ -332,36 +340,29 @@ export class CircularPatternTool extends BaseTool {
 
 		if (this.state.centerPointId === 'origin') {
 			const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
-			pts.push(
-				{ x: sOrigin.x - 20, y: sOrigin.y - 20 },
-				{ x: sOrigin.x + 20, y: sOrigin.y + 20 }
-			);
+			pts.push({ x: sOrigin.x - 20, y: sOrigin.y - 20 }, { x: sOrigin.x + 20, y: sOrigin.y + 20 });
 		} else if (this.state.centerPointId) {
 			const pt = this.ctx.sketch.points.get(this.state.centerPointId);
 			if (pt) {
 				const sCenter = this.ctx.viewport.worldToScreen(pt.x, pt.y);
-				pts.push(
-					{ x: sCenter.x - 20, y: sCenter.y - 20 },
-					{ x: sCenter.x + 20, y: sCenter.y + 20 }
-				);
+				pts.push({ x: sCenter.x - 20, y: sCenter.y - 20 }, { x: sCenter.x + 20, y: sCenter.y + 20 });
 			}
 		}
 
 		const centroid = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
-		const center = this.state.centerPointId === 'origin'
-			? { x: 0, y: 0 }
-			: this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
+		const center =
+			this.state.centerPointId === 'origin'
+				? { x: 0, y: 0 }
+				: this.state.centerPointId
+					? this.ctx.sketch.points.get(this.state.centerPointId)
+					: null;
 		if (centroid) {
 			pts.push(this.ctx.viewport.worldToScreen(centroid.x, centroid.y));
 			if (center) {
 				const bboxQuantity = 12;
 				for (let k = 1; k < bboxQuantity; k++) {
-					const radians = computePatternCopyAngle(
-						k,
-						bboxQuantity,
-						this.state.distribution,
-						this.state.angle
-					) * Math.PI / 180;
+					const radians =
+						(computePatternCopyAngle(k, bboxQuantity, this.state.distribution, this.state.angle) * Math.PI) / 180;
 					const dx = centroid.x - center.x;
 					const dy = centroid.y - center.y;
 					const copy = {
@@ -436,13 +437,20 @@ export class CircularPatternTool extends BaseTool {
 			};
 		}
 		const angleHandle = this.ctx.renderer?.patternAngleHandle;
-		if (this.state.distribution !== 'full' && angleHandle && Math.hypot(e.screen.x - angleHandle.x, e.screen.y - angleHandle.y) <= LINE_DISTANCE_PX) {
-			const center = this.state.centerPointId === 'origin'
-				? { x: 0, y: 0 }
-				: this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
+		if (
+			this.state.distribution !== 'full' &&
+			angleHandle &&
+			Math.hypot(e.screen.x - angleHandle.x, e.screen.y - angleHandle.y) <= LINE_DISTANCE_PX
+		) {
+			const center =
+				this.state.centerPointId === 'origin'
+					? { x: 0, y: 0 }
+					: this.state.centerPointId
+						? this.ctx.sketch.points.get(this.state.centerPointId)
+						: null;
 			if (!center) return false;
 			this.angleDrag = {
-				previousPointerAngle: Math.atan2(e.world.y - center.y, e.world.x - center.x) * 180 / Math.PI,
+				previousPointerAngle: (Math.atan2(e.world.y - center.y, e.world.x - center.x) * 180) / Math.PI,
 				accumulatedDelta: 0,
 				startAngle: this.state.angle,
 			};
@@ -452,7 +460,11 @@ export class CircularPatternTool extends BaseTool {
 		// 1. Suppression checkbox click hit-test
 		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX) {
+				if (
+					!entry.constraintId &&
+					Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX &&
+					Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX
+				) {
 					if (this.state.suppressedIndices.has(entry.copyIndex)) {
 						this.state.suppressedIndices.delete(entry.copyIndex);
 					} else {
@@ -539,14 +551,17 @@ export class CircularPatternTool extends BaseTool {
 
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (!this.angleDrag || !this.state || !this.ctx) return;
-		const center = this.state.centerPointId === 'origin'
-			? { x: 0, y: 0 }
-			: this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
+		const center =
+			this.state.centerPointId === 'origin'
+				? { x: 0, y: 0 }
+				: this.state.centerPointId
+					? this.ctx.sketch.points.get(this.state.centerPointId)
+					: null;
 		if (!center) return;
 		const dx = e.world.x - center.x;
 		const dy = e.world.y - center.y;
 		if (Math.hypot(dx, dy) < 1e-4) return;
-		const radialAngle = Math.atan2(dy, dx) * 180 / Math.PI;
+		const radialAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
 		let step = radialAngle - this.angleDrag.previousPointerAngle;
 		while (step > 180) step -= 360;
 		while (step < -180) step += 360;
@@ -556,10 +571,10 @@ export class CircularPatternTool extends BaseTool {
 		const k = this.ctx.renderer?.patternAngleHandle?.copyIndex;
 		if (!k) return;
 		const N = Math.max(2, Math.round(this.state.quantity));
-		if (this.state.distribution === 'partial') this.state.angle = this.angleDrag.startAngle + delta * (N - 1) / k;
+		if (this.state.distribution === 'partial') this.state.angle = this.angleDrag.startAngle + (delta * (N - 1)) / k;
 		else {
 			const ratio = k % 2 ? (k + 1) / 2 : -k / 2;
-			this.state.angle = this.angleDrag.startAngle + delta * (N - 1) / ratio;
+			this.state.angle = this.angleDrag.startAngle + (delta * (N - 1)) / ratio;
 		}
 		this.state.angleExpression = undefined;
 		this.popup.setValue('angle', this.state.angle);
@@ -568,7 +583,9 @@ export class CircularPatternTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
-	override onMouseUp(_e: ToolMouseEvent): void { this.angleDrag = null; }
+	override onMouseUp(_e: ToolMouseEvent): void {
+		this.angleDrag = null;
+	}
 
 	override onKeyDown(e: KeyboardEvent): boolean | void {
 		if (e.key === 'Tab') {
@@ -609,9 +626,7 @@ export class CircularPatternTool extends BaseTool {
 		}
 
 		const centerPt =
-			centerPointId === 'origin'
-				? ({ id: 'origin', x: 0, y: 0 } as any)
-				: this.ctx.sketch.points.get(centerPointId);
+			centerPointId === 'origin' ? ({ id: 'origin', x: 0, y: 0 } as any) : this.ctx.sketch.points.get(centerPointId);
 		if (!centerPt) {
 			this.ctx.showToast('Center point not found');
 			return false;

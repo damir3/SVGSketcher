@@ -10,23 +10,8 @@ export class ArcEndpointsConstraint extends BaseConstraint {
 	readonly startPointId: string;
 	readonly endPointId: string;
 
-	constructor(
-		id: string,
-		arcId: string,
-		centerId: string,
-		startPointId: string,
-		endPointId: string,
-		weight = 1.0
-	) {
-		super(
-			id,
-			'arc_endpoints',
-			'Arc Endpoints',
-			[arcId, centerId, startPointId, endPointId],
-			weight,
-			false,
-			false
-		);
+	constructor(id: string, arcId: string, centerId: string, startPointId: string, endPointId: string, weight = 1.0) {
+		super(id, 'arc_endpoints', 'Arc Endpoints', [arcId, centerId, startPointId, endPointId], weight, false, false);
 		this.arcId = arcId;
 		this.centerId = centerId;
 		this.startPointId = startPointId;

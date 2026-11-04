@@ -24,8 +24,7 @@ function initApp(): void {
 
 	const isMac =
 		typeof navigator !== 'undefined' &&
-		(/Mac|iPhone|iPod|iPad/.test(navigator.platform) ||
-			/Macintosh|Mac OS X/.test(navigator.userAgent));
+		(/Mac|iPhone|iPod|iPad/.test(navigator.platform) || /Macintosh|Mac OS X/.test(navigator.userAgent));
 
 	app.innerHTML = `
 		<!-- TOP HEADER -->
@@ -411,10 +410,7 @@ function initApp(): void {
 
 		if (isCtrlOrCmd) {
 			// Undo: Ctrl+Z / Cmd+Z (without Shift)
-			if (
-				(e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') &&
-				!e.shiftKey
-			) {
+			if ((e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') && !e.shiftKey) {
 				e.preventDefault();
 				if (interaction.isDrawingSpline()) {
 					if (interaction.undoSplinePoint()) {
@@ -430,11 +426,8 @@ function initApp(): void {
 			}
 
 			// Redo: Ctrl+Y / Cmd+Y OR Ctrl+Shift+Z / Cmd+Shift+Z
-			const isRedoZ =
-				(e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') &&
-				e.shiftKey;
-			const isRedoY =
-				e.key === 'y' || e.key === 'Y' || e.code === 'KeyY';
+			const isRedoZ = (e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') && e.shiftKey;
+			const isRedoY = e.key === 'y' || e.key === 'Y' || e.code === 'KeyY';
 			if (isRedoZ || isRedoY) {
 				e.preventDefault();
 				if (interaction.isDrawingSpline()) {

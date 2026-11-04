@@ -26,7 +26,11 @@ export class DragPointConstraint extends BaseConstraint {
 		return [(px - this.targetX) * this.weight, (py - this.targetY) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow + 1, this.weight);

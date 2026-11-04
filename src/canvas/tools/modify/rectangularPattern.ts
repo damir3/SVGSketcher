@@ -1,4 +1,4 @@
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../../distances';
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -452,10 +452,7 @@ export class RectangularPatternTool extends BaseTool {
 	override isBusy(): boolean {
 		return Boolean(
 			this.state &&
-				(this.state.selectedObjectIds.size > 0 ||
-					this.state.line1Id ||
-					this.state.line2Id ||
-					this.gizmoDragState)
+				(this.state.selectedObjectIds.size > 0 || this.state.line1Id || this.state.line2Id || this.gizmoDragState)
 		);
 	}
 
@@ -479,7 +476,11 @@ export class RectangularPatternTool extends BaseTool {
 		}
 		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX) {
+				if (
+					!entry.constraintId &&
+					Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX &&
+					Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX
+				) {
 					return false;
 				}
 			}
@@ -523,10 +524,7 @@ export class RectangularPatternTool extends BaseTool {
 			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
 				if (!handle.constraintId) {
 					hasHandles = true;
-					pts.push(
-						{ x: handle.x - 20, y: handle.y - 20 },
-						{ x: handle.x + 20, y: handle.y + 20 }
-					);
+					pts.push({ x: handle.x - 20, y: handle.y - 20 }, { x: handle.x + 20, y: handle.y + 20 });
 				}
 			}
 		}
@@ -564,10 +562,7 @@ export class RectangularPatternTool extends BaseTool {
 		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
 				if (!entry.constraintId) {
-					pts.push(
-						{ x: entry.x - 14, y: entry.y - 14 },
-						{ x: entry.x + 14, y: entry.y + 14 }
-					);
+					pts.push({ x: entry.x - 14, y: entry.y - 14 }, { x: entry.x + 14, y: entry.y + 14 });
 				}
 			}
 		}
@@ -665,7 +660,11 @@ export class RectangularPatternTool extends BaseTool {
 		// 2. Suppression checkbox click hit-test
 		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId && Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX && Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX) {
+				if (
+					!entry.constraintId &&
+					Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX &&
+					Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX
+				) {
 					if (this.state.suppressedIndices.has(entry.copyIndex)) {
 						this.state.suppressedIndices.delete(entry.copyIndex);
 					} else {

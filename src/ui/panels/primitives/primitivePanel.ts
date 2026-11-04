@@ -18,9 +18,7 @@ export class PrimitivePanel implements IPrimitivePanel {
 				? this.options.constraintsLabel(context)
 				: (this.options.constraintsLabel ?? 'this entity');
 		const entityIds =
-			typeof this.options.entityIds === 'function'
-				? this.options.entityIds(context)
-				: (this.options.entityIds ?? []);
+			typeof this.options.entityIds === 'function' ? this.options.entityIds(context) : (this.options.entityIds ?? []);
 
 		const fieldsHtml =
 			fields.length > 0
@@ -67,11 +65,7 @@ export class PrimitivePanel implements IPrimitivePanel {
 		const fields = this.options.fields ?? [];
 		for (const f of fields) {
 			if (f.onCommit) {
-				context.bindInspectorNumberInput(
-					`#${f.id}`,
-					val => f.onCommit!(val, context),
-					f.validate
-				);
+				context.bindInspectorNumberInput(`#${f.id}`, val => f.onCommit!(val, context), f.validate);
 			}
 		}
 	}

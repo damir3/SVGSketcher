@@ -38,7 +38,11 @@ export class ParallelConstraint extends BaseConstraint {
 		return [cross * avgL * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 

@@ -52,7 +52,11 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		return [(signedDist - this.initialSide * r) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 

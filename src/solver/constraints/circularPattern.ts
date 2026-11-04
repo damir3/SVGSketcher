@@ -128,12 +128,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		for (const copy of this.copies) {
 			if (this.suppression && suppressedSet.has(copy.copyIndex)) continue;
 
-			const angleDeg = computePatternCopyAngle(
-				copy.copyIndex,
-				this.quantity,
-				this.distribution,
-				this.totalAngle
-			);
+			const angleDeg = computePatternCopyAngle(copy.copyIndex, this.quantity, this.distribution, this.totalAngle);
 			const rad = (angleDeg * Math.PI) / 180;
 			const cosA = Math.cos(rad);
 			const sinA = Math.sin(rad);
@@ -178,12 +173,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		for (const copy of this.copies) {
 			if (this.suppression && suppressedSet.has(copy.copyIndex)) continue;
 
-			const angleDeg = computePatternCopyAngle(
-				copy.copyIndex,
-				this.quantity,
-				this.distribution,
-				this.totalAngle
-			);
+			const angleDeg = computePatternCopyAngle(copy.copyIndex, this.quantity, this.distribution, this.totalAngle);
 			const rad = (angleDeg * Math.PI) / 180;
 			const cosA = Math.cos(rad);
 			const sinA = Math.sin(rad);
@@ -252,7 +242,9 @@ export class CircularPatternConstraint extends BaseConstraint {
 				const copy = this.copies.find(cp => cp.copyIndex === k);
 
 				if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-					let sumX = 0, sumY = 0, count = 0;
+					let sumX = 0,
+						sumY = 0,
+						count = 0;
 					for (const pair of copy.pointPairs) {
 						const pt = ctx.sketch.points.get(pair.patternPtId);
 						if (pt) {
@@ -261,9 +253,10 @@ export class CircularPatternConstraint extends BaseConstraint {
 							count++;
 						}
 					}
-					centroid = count > 0
-						? ctx.viewport.worldToScreen(sumX / count, sumY / count)
-						: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
+					centroid =
+						count > 0
+							? ctx.viewport.worldToScreen(sumX / count, sumY / count)
+							: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
 				} else if (ctx.renderTransformedObjects) {
 					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
 					const copyWorldPoints = ctx.renderTransformedObjects(
@@ -279,7 +272,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 					);
 
 					if (copyWorldPoints.length > 0) {
-						let sumX = 0, sumY = 0;
+						let sumX = 0,
+							sumY = 0;
 						for (const p of copyWorldPoints) {
 							sumX += p.x;
 							sumY += p.y;

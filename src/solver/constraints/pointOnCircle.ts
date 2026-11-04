@@ -11,13 +11,7 @@ export class PointOnCircleConstraint extends BaseConstraint {
 	readonly circleCenterId: string;
 	readonly circleId: string;
 
-	constructor(
-		id: string,
-		pointId: string,
-		circleCenterId: string,
-		circleId: string,
-		weight = 1.0
-	) {
+	constructor(id: string, pointId: string, circleCenterId: string, circleId: string, weight = 1.0) {
 		super(id, 'point_on_circle', 'Point on Circle', [pointId, circleCenterId, circleId], weight);
 		this.pointId = pointId;
 		this.circleCenterId = circleCenterId;
@@ -42,7 +36,11 @@ export class PointOnCircleConstraint extends BaseConstraint {
 		return [(cur - r) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
 		const py = paramMap.get(`${this.pointId}.y`) ?? 0;

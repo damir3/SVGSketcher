@@ -65,13 +65,7 @@ export class PolygonTool extends BaseTool {
 		this.popup.onCommit = () => {
 			if (this.drawingStep === 1 && this.centerPtId) {
 				const hasRadiusConstraint = this.radiusLocked || this.popup.isLocked('radius');
-				this.commitPolygon(
-					this.centerPtId,
-					this.sides,
-					this.radius,
-					this.currentAngle,
-					hasRadiusConstraint
-				);
+				this.commitPolygon(this.centerPtId, this.sides, this.radius, this.currentAngle, hasRadiusConstraint);
 			}
 		};
 		this.popup.onCancel = () => {
@@ -124,17 +118,8 @@ export class PolygonTool extends BaseTool {
 			const curPos = snap ? snap.worldPos : world;
 			const currentDist = dist(this.centerWorldPos!, curPos);
 			const radius = this.radiusLocked ? this.radius : Math.max(1, currentDist);
-			const angleRad = Math.atan2(
-				curPos.y - this.centerWorldPos!.y,
-				curPos.x - this.centerWorldPos!.x
-			);
-			this.commitPolygon(
-				this.centerPtId!,
-				this.sides,
-				radius,
-				angleRad,
-				this.radiusLocked
-			);
+			const angleRad = Math.atan2(curPos.y - this.centerWorldPos!.y, curPos.x - this.centerWorldPos!.x);
+			this.commitPolygon(this.centerPtId!, this.sides, radius, angleRad, this.radiusLocked);
 		}
 	}
 
@@ -220,13 +205,7 @@ export class PolygonTool extends BaseTool {
 			if (this.drawingStep === 1 && this.centerPtId) {
 				e.preventDefault();
 				const hasRadiusConstraint = this.radiusLocked || this.popup.isLocked('radius');
-				this.commitPolygon(
-					this.centerPtId,
-					this.sides,
-					this.radius,
-					this.currentAngle,
-					hasRadiusConstraint
-				);
+				this.commitPolygon(this.centerPtId, this.sides, this.radius, this.currentAngle, hasRadiusConstraint);
 				return true;
 			}
 		}

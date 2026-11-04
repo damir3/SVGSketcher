@@ -18,11 +18,7 @@ export interface RectangularPatternCopyData {
 	}>;
 }
 
-export function computeAxisOffset(
-	index: number,
-	distance: number,
-	direction: 'one_direction' | 'symmetric'
-): number {
+export function computeAxisOffset(index: number, distance: number, direction: 'one_direction' | 'symmetric'): number {
 	if (index === 0) return 0;
 	if (direction === 'one_direction') {
 		return index * distance;
@@ -248,7 +244,10 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		const line2 = this.line2P1Id && this.line2P2Id ? { p1Id: this.line2P1Id, p2Id: this.line2P2Id } : null;
 		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
 
-		let du1_dx1b = 0, du1_dy1b = 0, du1_dx1b_y = 0, du1_dy1b_y = 0;
+		let du1_dx1b = 0,
+			du1_dy1b = 0,
+			du1_dx1b_y = 0,
+			du1_dy1b_y = 0;
 		let hasL1 = false;
 		if (line1) {
 			const x1a = paramMap.get(`${line1.p1Id}.x`) ?? 0;
@@ -262,13 +261,16 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				hasL1 = true;
 				const invL = 1 / L1;
 				du1_dx1b = (1 - u1.x * u1.x) * invL;
-				du1_dy1b = (-u1.x * u1.y) * invL;
-				du1_dx1b_y = (-u1.x * u1.y) * invL;
+				du1_dy1b = -u1.x * u1.y * invL;
+				du1_dx1b_y = -u1.x * u1.y * invL;
 				du1_dy1b_y = (1 - u1.y * u1.y) * invL;
 			}
 		}
 
-		let du2_dx2b = 0, du2_dy2b = 0, du2_dx2b_y = 0, du2_dy2b_y = 0;
+		let du2_dx2b = 0,
+			du2_dy2b = 0,
+			du2_dx2b_y = 0,
+			du2_dy2b_y = 0;
 		let hasL2 = false;
 		if (line2) {
 			const x2a = paramMap.get(`${line2.p1Id}.x`) ?? 0;
@@ -282,8 +284,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				hasL2 = true;
 				const invL = 1 / L2;
 				du2_dx2b = (1 - u2.x * u2.x) * invL;
-				du2_dy2b = (-u2.x * u2.y) * invL;
-				du2_dx2b_y = (-u2.x * u2.y) * invL;
+				du2_dy2b = -u2.x * u2.y * invL;
+				du2_dx2b_y = -u2.x * u2.y * invL;
 				du2_dy2b_y = (1 - u2.y * u2.y) * invL;
 			}
 		}
@@ -312,8 +314,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				if (colSy !== undefined) entries.push({ row: rowY, col: colSy, val: -this.weight });
 
 				if (hasL1 && line1) {
-					const dDeltaX_dx1b = o1 * du1_dx1b + (!hasL2 ? o2 * (-du1_dx1b_y) : 0);
-					const dDeltaX_dy1b = o1 * du1_dy1b + (!hasL2 ? o2 * (-du1_dy1b_y) : 0);
+					const dDeltaX_dx1b = o1 * du1_dx1b + (!hasL2 ? o2 * -du1_dx1b_y : 0);
+					const dDeltaX_dy1b = o1 * du1_dy1b + (!hasL2 ? o2 * -du1_dy1b_y : 0);
 					const dDeltaY_dx1b = o1 * du1_dx1b_y + (!hasL2 ? o2 * du1_dx1b : 0);
 					const dDeltaY_dy1b = o1 * du1_dy1b_y + (!hasL2 ? o2 * du1_dy1b : 0);
 
@@ -360,40 +362,71 @@ export class RectangularPatternConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		let sumX = 0, sumY = 0, ptCount = 0;
+		let sumX = 0,
+			sumY = 0,
+			ptCount = 0;
 		for (const objId of this.sourceObjectIds) {
 			const pt = ctx.sketch.points.get(objId);
-			if (pt) { sumX += pt.x; sumY += pt.y; ptCount++; continue; }
+			if (pt) {
+				sumX += pt.x;
+				sumY += pt.y;
+				ptCount++;
+				continue;
+			}
 			const l = ctx.sketch.lines.get(objId);
 			if (l) {
 				const p1 = ctx.sketch.points.get(l.p1Id);
 				const p2 = ctx.sketch.points.get(l.p2Id);
-				if (p1) { sumX += p1.x; sumY += p1.y; ptCount++; }
-				if (p2) { sumX += p2.x; sumY += p2.y; ptCount++; }
+				if (p1) {
+					sumX += p1.x;
+					sumY += p1.y;
+					ptCount++;
+				}
+				if (p2) {
+					sumX += p2.x;
+					sumY += p2.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const c = ctx.sketch.circles.get(objId);
 			if (c) {
 				const cp = ctx.sketch.points.get(c.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const a = ctx.sketch.arcs.get(objId);
 			if (a) {
 				const cp = ctx.sketch.points.get(a.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const el = ctx.sketch.ellipses.get(objId);
 			if (el) {
 				const cp = ctx.sketch.points.get(el.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 			const ea = ctx.sketch.ellipticalArcs.get(objId);
 			if (ea) {
 				const cp = ctx.sketch.points.get(ea.centerId);
-				if (cp) { sumX += cp.x; sumY += cp.y; ptCount++; }
+				if (cp) {
+					sumX += cp.x;
+					sumY += cp.y;
+					ptCount++;
+				}
 				continue;
 			}
 		}
@@ -424,7 +457,11 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				const suppressedSet = new Set(this.suppressedIndices);
 				const isFullyConstrained = ctx.sketch.lastSolverResult?.status === 'CONVERGED';
 				const hasConflict = ctx.sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-				const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+				const baseColor = hasConflict
+					? COLORS.conflict
+					: isFullyConstrained
+						? COLORS.constrained
+						: COLORS.unconstrained;
 
 				const maxI = Math.abs(this.distance1) > 1e-6 ? this.quantity1 : 1;
 				const maxJ = Math.abs(this.distance2) > 1e-6 ? this.quantity2 : 1;
@@ -434,13 +471,24 @@ export class RectangularPatternConstraint extends BaseConstraint {
 						if (i === 0 && j === 0) continue;
 						const copyIndex = i * 1000 + j;
 						const isSuppressed = suppressedSet.has(copyIndex);
-						const offset = computeRectangularPatternOffset(i, j, this.distance1, this.direction1, this.distance2, this.direction2, u1, u2);
+						const offset = computeRectangularPatternOffset(
+							i,
+							j,
+							this.distance1,
+							this.direction1,
+							this.distance2,
+							this.direction2,
+							u1,
+							u2
+						);
 
 						let centroid: { x: number; y: number };
 						const copy = this.copies.find(cp => cp.copyIndex === copyIndex);
 
 						if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-							let cSumX = 0, cSumY = 0, cCount = 0;
+							let cSumX = 0,
+								cSumY = 0,
+								cCount = 0;
 							for (const pair of copy.pointPairs) {
 								const pt = ctx.sketch.points.get(pair.patternPtId);
 								if (pt) {
@@ -449,23 +497,21 @@ export class RectangularPatternConstraint extends BaseConstraint {
 									cCount++;
 								}
 							}
-							centroid = cCount > 0
-								? ctx.viewport.worldToScreen(cSumX / cCount, cSumY / cCount)
-								: ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+							centroid =
+								cCount > 0
+									? ctx.viewport.worldToScreen(cSumX / cCount, cSumY / cCount)
+									: ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
 						} else if (ctx.renderTransformedObjects) {
-							const copyWorldPoints = ctx.renderTransformedObjects(
-								this.sourceObjectIds,
-								offset,
-								{
-									targetGroup: ctx.targetGroup,
-									baseColor,
-									opacity: 0.25,
-									drawVertices: true,
-									skipRender: !isSuppressed,
-								}
-							);
+							const copyWorldPoints = ctx.renderTransformedObjects(this.sourceObjectIds, offset, {
+								targetGroup: ctx.targetGroup,
+								baseColor,
+								opacity: 0.25,
+								drawVertices: true,
+								skipRender: !isSuppressed,
+							});
 							if (copyWorldPoints.length > 0) {
-								let cSumX = 0, cSumY = 0;
+								let cSumX = 0,
+									cSumY = 0;
 								for (const p of copyWorldPoints) {
 									cSumX += p.x;
 									cSumY += p.y;
@@ -552,7 +598,9 @@ export class RectangularPatternConstraint extends BaseConstraint {
 						getValue: () => this.quantity1,
 						onInput: (val, context) => {
 							if (!isNaN(val) && val >= 1) {
-								context.sketch.updateRectangularPattern(this.id, { quantity1: val });
+								context.sketch.updateRectangularPattern(this.id, {
+									quantity1: val,
+								});
 								context.requestRender?.();
 							}
 						},
@@ -608,7 +656,9 @@ export class RectangularPatternConstraint extends BaseConstraint {
 						getValue: () => this.quantity2,
 						onInput: (val, context) => {
 							if (!isNaN(val) && val >= 1) {
-								context.sketch.updateRectangularPattern(this.id, { quantity2: val });
+								context.sketch.updateRectangularPattern(this.id, {
+									quantity2: val,
+								});
 								context.requestRender?.();
 							}
 						},

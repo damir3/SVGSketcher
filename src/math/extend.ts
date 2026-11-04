@@ -513,8 +513,7 @@ export function executeExtend(
 	sketch: SketchDocument,
 	candidate: ExtendCandidate
 ): { createdEntityId?: string; modifiedEntityId: string } | null {
-	const { targetType, targetId, edge, toPoint, becomesFullLoop, intersectedCurveId, intersectedCurveType } =
-		candidate;
+	const { targetType, targetId, edge, toPoint, becomesFullLoop, intersectedCurveId, intersectedCurveType } = candidate;
 
 	if (targetType === 'line') {
 		const line = sketch.lines.get(targetId);
@@ -569,10 +568,7 @@ export function executeExtend(
 			// Transfer line orientation and distance constraints from movingEndId to newEndPtId
 			for (const c of Array.from(sketch.constraints.values())) {
 				if (c instanceof HorizontalConstraint || c instanceof VerticalConstraint) {
-					if (
-						(c.p1Id === fixedEndId && c.p2Id === movingEndId) ||
-						(c.p2Id === fixedEndId && c.p1Id === movingEndId)
-					) {
+					if ((c.p1Id === fixedEndId && c.p2Id === movingEndId) || (c.p2Id === fixedEndId && c.p1Id === movingEndId)) {
 						if (c.p1Id === movingEndId) {
 							(c as any).p1Id = newEndPtId;
 							(c as any).entityIds = [newEndPtId, c.p2Id];
@@ -582,10 +578,7 @@ export function executeExtend(
 						}
 					}
 				} else if (c instanceof DistanceConstraint) {
-					if (
-						(c.p1Id === fixedEndId && c.p2Id === movingEndId) ||
-						(c.p2Id === fixedEndId && c.p1Id === movingEndId)
-					) {
+					if ((c.p1Id === fixedEndId && c.p2Id === movingEndId) || (c.p2Id === fixedEndId && c.p1Id === movingEndId)) {
 						if (c.p1Id === movingEndId) {
 							(c as any).p1Id = newEndPtId;
 							(c as any).entityIds = [newEndPtId, fixedEndId];
@@ -679,8 +672,7 @@ export function executeExtend(
 			for (const c of sketch.constraints.values()) {
 				if (
 					c instanceof DistanceConstraint &&
-					((c.p1Id === line.p1Id && c.p2Id === line.p2Id) ||
-						(c.p1Id === line.p2Id && c.p2Id === line.p1Id))
+					((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
 				) {
 					c.targetDistance = newLen;
 					c.value = newLen;
@@ -785,12 +777,7 @@ export function executeExtend(
 		if (!ea) return null;
 
 		if (becomesFullLoop) {
-			const ellipse = sketch.addEllipse(
-				ea.centerId,
-				ea.majorAxisPointId,
-				ea.minorAxisPointId,
-				ea.isConstruction
-			);
+			const ellipse = sketch.addEllipse(ea.centerId, ea.majorAxisPointId, ea.minorAxisPointId, ea.isConstruction);
 			sketch.removeEntity(ea.id);
 			sketch.solve();
 			return { createdEntityId: ellipse.id, modifiedEntityId: ea.id };

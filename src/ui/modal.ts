@@ -56,10 +56,10 @@ export class DimensionModal {
 		const curVal = isDistance
 			? constraint.targetDistance
 			: isAngle
-			? constraint.targetAngle
-			: this.currentMode === 'diameter'
-			? (constraint as RadiusConstraint).targetRadius * 2
-			: (constraint as RadiusConstraint).targetRadius;
+				? constraint.targetAngle
+				: this.currentMode === 'diameter'
+					? (constraint as RadiusConstraint).targetRadius * 2
+					: (constraint as RadiusConstraint).targetRadius;
 
 		const unit = isAngle ? '°' : 'mm';
 		const displayVal = Number(curVal.toFixed(2)).toString();
@@ -116,7 +116,8 @@ export class DimensionModal {
 					const stepVal = isAngle ? 0.5 : 0.1;
 					const delta = (e.key === 'ArrowUp' ? 1 : -1) * stepVal;
 					const evalRes = this.sketch.evaluateExpression(input.value.trim());
-					const cur = evalRes.isValid && evalRes.value ? evalRes.value : (parseFloat(input.value.trim().replace(',', '.')) || 0);
+					const cur =
+						evalRes.isValid && evalRes.value ? evalRes.value : parseFloat(input.value.trim().replace(',', '.')) || 0;
 					const min = isAngle ? 0.1 : 0.01;
 					const max = isAngle ? (constraint.name.includes('Arc') ? 359.9 : 179.9) : Infinity;
 					const nextVal = Math.min(max, Math.max(min, Number((cur + delta).toFixed(2))));

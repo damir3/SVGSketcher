@@ -61,12 +61,7 @@ export function distanceToArc(
  * Calculates distance from a query point to the perimeter of an oriented ellipse.
  * Returns null if the ellipse is degenerate (rx < 0.1 or ry < 0.1).
  */
-export function distanceToEllipse(
-	point: Vec2,
-	center: Vec2,
-	majorPt: Vec2,
-	minorPt: Vec2
-): number | null {
+export function distanceToEllipse(point: Vec2, center: Vec2, majorPt: Vec2, minorPt: Vec2): number | null {
 	const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
 	const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
 	if (rx < 0.1 || ry < 0.1) return null;
@@ -162,12 +157,7 @@ export function distanceToLinearDimension(point: Vec2, d1: Vec2, d2: Vec2): numb
 /**
  * Calculates distance from a query point to a radial dimension leader line and shelf.
  */
-export function distanceToRadiusDimension(
-	point: Vec2,
-	center: Vec2,
-	radius: number,
-	screenAngle: number
-): number {
+export function distanceToRadiusDimension(point: Vec2, center: Vec2, radius: number, screenAngle: number): number {
 	const cosA = Math.cos(screenAngle);
 	const sinA = Math.sin(screenAngle);
 	const edge = { x: center.x + cosA * radius, y: center.y + sinA * radius };

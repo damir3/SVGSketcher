@@ -1,10 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import {
-	getAllGeoCurves,
-	getTrimCandidate,
-	executeTrim,
-} from '../../../math/intersection';
+import { getAllGeoCurves, getTrimCandidate, executeTrim } from '../../../math/intersection';
 import { renderTrimPreviewVisual } from '../../previewHelpers';
 
 export class TrimTool extends BaseTool {

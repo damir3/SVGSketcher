@@ -70,7 +70,7 @@ export class LineTool extends BaseTool {
 				sketch.beginTransaction();
 				this.startPointId = p2Id;
 				const p2 = sketch.getPoint(p2Id);
-				this.startWorldPos = p2 ? vec(p2.x, p2.y) : (snap ? snap.worldPos : world);
+				this.startWorldPos = p2 ? vec(p2.x, p2.y) : snap ? snap.worldPos : world;
 			}
 			this.ctx.requestRender();
 		}
@@ -91,8 +91,7 @@ export class LineTool extends BaseTool {
 
 			const length = dist(this.startWorldPos, effectiveWorld);
 			const angleDeg =
-				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) /
-				Math.PI;
+				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) / Math.PI;
 
 			createSvgLine(s1.x, s1.y, s2.x, s2.y, getPreviewStrokeAttrs(ctx.isConstruction, false, true), ctx.targetGroup);
 

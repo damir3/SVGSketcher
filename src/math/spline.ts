@@ -45,7 +45,10 @@ export function evaluateBezierDerivative(b: BezierSegment, t: number): Vec2 {
  * Splits a cubic Bezier curve at parameter t in [0, 1] into two exact cubic Bezier curves using de Casteljau algorithm.
  */
 export function splitBezier(b: BezierSegment, t: number): { left: BezierSegment; right: BezierSegment } {
-	const p0 = b[0], p1 = b[1], p2 = b[2], p3 = b[3];
+	const p0 = b[0],
+		p1 = b[1],
+		p2 = b[2],
+		p3 = b[3];
 	const u = 1 - t;
 
 	const p01 = { x: u * p0.x + t * p1.x, y: u * p0.y + t * p1.y };
@@ -73,31 +76,43 @@ export function bsplineToBezier(pts: Vec2[], explicitKnots?: number[]): BezierSe
 	if (n === 1) {
 		const dx = (pts[1].x - pts[0].x) / 3;
 		const dy = (pts[1].y - pts[0].y) / 3;
-		return [[
-			{ x: pts[0].x, y: pts[0].y },
-			{ x: pts[0].x + dx, y: pts[0].y + dy },
-			{ x: pts[1].x - dx, y: pts[1].y - dy },
-			{ x: pts[1].x, y: pts[1].y },
-		]];
+		return [
+			[
+				{ x: pts[0].x, y: pts[0].y },
+				{ x: pts[0].x + dx, y: pts[0].y + dy },
+				{ x: pts[1].x - dx, y: pts[1].y - dy },
+				{ x: pts[1].x, y: pts[1].y },
+			],
+		];
 	}
 
 	if (n === 2) {
 		// Degree elevated quadratic Bezier
-		return [[
-			{ x: pts[0].x, y: pts[0].y },
-			{ x: pts[0].x + (2 * (pts[1].x - pts[0].x)) / 3, y: pts[0].y + (2 * (pts[1].y - pts[0].y)) / 3 },
-			{ x: pts[2].x + (2 * (pts[1].x - pts[2].x)) / 3, y: pts[2].y + (2 * (pts[1].y - pts[2].y)) / 3 },
-			{ x: pts[2].x, y: pts[2].y },
-		]];
+		return [
+			[
+				{ x: pts[0].x, y: pts[0].y },
+				{
+					x: pts[0].x + (2 * (pts[1].x - pts[0].x)) / 3,
+					y: pts[0].y + (2 * (pts[1].y - pts[0].y)) / 3,
+				},
+				{
+					x: pts[2].x + (2 * (pts[1].x - pts[2].x)) / 3,
+					y: pts[2].y + (2 * (pts[1].y - pts[2].y)) / 3,
+				},
+				{ x: pts[2].x, y: pts[2].y },
+			],
+		];
 	}
 
 	if (n === 3) {
-		return [[
-			{ x: pts[0].x, y: pts[0].y },
-			{ x: pts[1].x, y: pts[1].y },
-			{ x: pts[2].x, y: pts[2].y },
-			{ x: pts[3].x, y: pts[3].y },
-		]];
+		return [
+			[
+				{ x: pts[0].x, y: pts[0].y },
+				{ x: pts[1].x, y: pts[1].y },
+				{ x: pts[2].x, y: pts[2].y },
+				{ x: pts[3].x, y: pts[3].y },
+			],
+		];
 	}
 
 	// For n >= 4: clamped cubic B-spline with (n - 2) spans
@@ -144,12 +159,7 @@ export function bsplineToBezier(pts: Vec2[], explicitKnots?: number[]): BezierSe
 	const numSegs = Math.floor((currentPts.length - 1) / 3);
 	const segments: BezierSegment[] = [];
 	for (let s = 0; s < numSegs; s++) {
-		segments.push([
-			currentPts[s * 3],
-			currentPts[s * 3 + 1],
-			currentPts[s * 3 + 2],
-			currentPts[s * 3 + 3],
-		]);
+		segments.push([currentPts[s * 3], currentPts[s * 3 + 1], currentPts[s * 3 + 2], currentPts[s * 3 + 3]]);
 	}
 	return segments;
 }
@@ -198,7 +208,10 @@ export function computeNaturalFitHandles(fitPts: Vec2[]): Array<{ h1: Vec2; h2: 
 			let scale = (d1 + d2) / 6;
 
 			if (d1 > 1e-6 && d2 > 1e-6) {
-				const cosTheta = Math.max(-0.999, Math.min(1, ((fi.x - prev.x) * (next.x - fi.x) + (fi.y - prev.y) * (next.y - fi.y)) / (d1 * d2)));
+				const cosTheta = Math.max(
+					-0.999,
+					Math.min(1, ((fi.x - prev.x) * (next.x - fi.x) + (fi.y - prev.y) * (next.y - fi.y)) / (d1 * d2))
+				);
 				const curvatureFactor = 1 / (3 * (1 + Math.sqrt(Math.max(0, (1 + cosTheta) * 0.5))));
 				scale = (d1 + d2) * curvatureFactor;
 			}
@@ -233,7 +246,10 @@ export function computeNaturalFitHandles(fitPts: Vec2[]): Array<{ h1: Vec2; h2: 
 			let scale = (d1 + d2) / 6;
 
 			if (d1 > 1e-6 && d2 > 1e-6) {
-				const cosTheta = Math.max(-0.999, Math.min(1, ((fi.x - prev.x) * (next.x - fi.x) + (fi.y - prev.y) * (next.y - fi.y)) / (d1 * d2)));
+				const cosTheta = Math.max(
+					-0.999,
+					Math.min(1, ((fi.x - prev.x) * (next.x - fi.x) + (fi.y - prev.y) * (next.y - fi.y)) / (d1 * d2))
+				);
 				const curvatureFactor = 1 / (3 * (1 + Math.sqrt(Math.max(0, (1 + cosTheta) * 0.5))));
 				scale = (d1 + d2) * curvatureFactor;
 			}
@@ -259,10 +275,7 @@ export function computeNaturalFitHandles(fitPts: Vec2[]): Array<{ h1: Vec2; h2: 
 /**
  * Builds cubic Bezier segments from fit points and optional explicit handle endpoints.
  */
-export function fitPointsToBezier(
-	fitPts: Vec2[],
-	handles?: Array<{ h1: Vec2; h2: Vec2 } | null>
-): BezierSegment[] {
+export function fitPointsToBezier(fitPts: Vec2[], handles?: Array<{ h1: Vec2; h2: Vec2 } | null>): BezierSegment[] {
 	const n = fitPts.length - 1;
 	if (n < 1) return [];
 
@@ -427,11 +440,7 @@ export function trimBezier(b: BezierSegment, t0: number, t1: number): BezierSegm
 /**
  * Extracts a sub-interval [paramA, paramB] of a spline as Bezier segments.
  */
-export function extractSplineInterval(
-	segments: BezierSegment[],
-	paramA: number,
-	paramB: number
-): BezierSegment[] {
+export function extractSplineInterval(segments: BezierSegment[], paramA: number, paramB: number): BezierSegment[] {
 	if (Math.abs(paramA - paramB) < 1e-5) return [];
 
 	if (paramA > paramB) {

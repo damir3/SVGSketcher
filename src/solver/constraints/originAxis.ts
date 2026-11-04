@@ -39,16 +39,16 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		const name = isCoincident
 			? 'Coincident with (0,0)'
 			: targetDistance === 0
-			? orientation === 'horizontal'
-				? 'Point on Y-Axis'
-				: orientation === 'vertical'
-				? 'Point on X-Axis'
-				: 'Coincident with (0,0)'
-			: orientation === 'horizontal'
-			? 'Distance to Y-Axis'
-			: orientation === 'vertical'
-			? 'Distance to X-Axis'
-			: 'Distance to (0,0)';
+				? orientation === 'horizontal'
+					? 'Point on Y-Axis'
+					: orientation === 'vertical'
+						? 'Point on X-Axis'
+						: 'Coincident with (0,0)'
+				: orientation === 'horizontal'
+					? 'Distance to Y-Axis'
+					: orientation === 'vertical'
+						? 'Distance to X-Axis'
+						: 'Distance to (0,0)';
 
 		super(id, 'origin_distance', name, [pointId], weight, false, isDim, targetDistance);
 		this.pointId = pointId;
@@ -238,8 +238,8 @@ export class OriginDistanceConstraint extends BaseConstraint {
 			return this.orientation === 'horizontal'
 				? 'Distance to Y-Axis'
 				: this.orientation === 'vertical'
-				? 'Distance to X-Axis'
-				: 'Distance to (0,0)';
+					? 'Distance to X-Axis'
+					: 'Distance to (0,0)';
 		},
 		rows: [
 			{
@@ -374,8 +374,7 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 
 		const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
 		const sp = ctx.viewport.worldToScreen(midPt.x, midPt.y);
-		const sAxis2 =
-			this.axis === 'x' ? ctx.viewport.worldToScreen(100, 0) : ctx.viewport.worldToScreen(0, 100);
+		const sAxis2 = this.axis === 'x' ? ctx.viewport.worldToScreen(100, 0) : ctx.viewport.worldToScreen(0, 100);
 
 		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);
@@ -409,8 +408,7 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 
 		const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
 		const sp = viewport.worldToScreen(midPt.x, midPt.y);
-		const sAxis2 =
-			this.axis === 'x' ? viewport.worldToScreen(100, 0) : viewport.worldToScreen(0, 100);
+		const sAxis2 = this.axis === 'x' ? viewport.worldToScreen(100, 0) : viewport.worldToScreen(0, 100);
 
 		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);

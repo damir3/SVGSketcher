@@ -23,12 +23,8 @@ export class RadiusConstraint extends BaseConstraint {
 		leaderAngle?: number,
 		displayMode: 'radius' | 'diameter' = 'radius'
 	) {
-		const valStr = displayMode === 'diameter'
-			? Number((targetRadius * 2).toFixed(2))
-			: Number(targetRadius.toFixed(2));
-		const label = displayMode === 'diameter'
-			? `Diameter (${valStr})`
-			: `Radius (${valStr})`;
+		const valStr = displayMode === 'diameter' ? Number((targetRadius * 2).toFixed(2)) : Number(targetRadius.toFixed(2));
+		const label = displayMode === 'diameter' ? `Diameter (${valStr})` : `Radius (${valStr})`;
 		super(id, 'radius', label, [circleId], weight, false, true, targetRadius);
 		this.circleId = circleId;
 		this.targetRadius = targetRadius;
@@ -45,7 +41,11 @@ export class RadiusConstraint extends BaseConstraint {
 		return [(r - this.targetRadius) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.circleId}.r`, baseRow, this.weight);
 		return res;
@@ -127,27 +127,45 @@ export class RadiusConstraint extends BaseConstraint {
 			y: edge.y + dirY * 20,
 		};
 
-		const g = createSvgElement('g', {
-			class: 'dimension-item',
-			'data-id': this.id,
-			'data-type': 'constraint',
-		}, ctx.targetGroup);
+		const g = createSvgElement(
+			'g',
+			{
+				class: 'dimension-item',
+				'data-id': this.id,
+				'data-type': 'constraint',
+			},
+			ctx.targetGroup
+		);
 
 		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
 		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 
 		// A diameter dimension crosses the full circle; a radius dimension starts at its center.
-		createSvgLine(isDiameter ? opposite.x : sc.x, isDiameter ? opposite.y : sc.y, edge.x, edge.y, {
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-			...(isDiameter ? { 'marker-start': arrowUrl, 'marker-end': arrowUrl } : { 'marker-end': arrowUrl }),
-		}, g);
+		createSvgLine(
+			isDiameter ? opposite.x : sc.x,
+			isDiameter ? opposite.y : sc.y,
+			edge.x,
+			edge.y,
+			{
+				stroke: color,
+				'stroke-width': STROKE_WIDTH.dimension,
+				...(isDiameter ? { 'marker-start': arrowUrl, 'marker-end': arrowUrl } : { 'marker-end': arrowUrl }),
+			},
+			g
+		);
 
 		// Shelf line from edge to tip
-		createSvgLine(edge.x, edge.y, tip.x, tip.y, {
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-		}, g);
+		createSvgLine(
+			edge.x,
+			edge.y,
+			tip.x,
+			tip.y,
+			{
+				stroke: color,
+				'stroke-width': STROKE_WIDTH.dimension,
+			},
+			g
+		);
 
 		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
 		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
@@ -156,20 +174,33 @@ export class RadiusConstraint extends BaseConstraint {
 		const textLen = textVal.length * 8 + 14;
 
 		const rectX = dirX > 0 ? tip.x : tip.x - textLen;
-		createSvgRect(rectX, tip.y - 12, textLen, 20, {
-			rx: 4,
-			fill: COLORS.white,
-			stroke: color,
-			'stroke-width': ctx.isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
-		}, g);
+		createSvgRect(
+			rectX,
+			tip.y - 12,
+			textLen,
+			20,
+			{
+				rx: 4,
+				fill: COLORS.white,
+				stroke: color,
+				'stroke-width': ctx.isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
+			},
+			g
+		);
 
-		createSvgText(rectX + textLen * 0.5, tip.y + 3, textVal, {
-			'text-anchor': 'middle',
-			fill: color,
-			'font-size': 12,
-			'font-weight': 600,
-			'font-family': 'monospace',
-		}, g);
+		createSvgText(
+			rectX + textLen * 0.5,
+			tip.y + 3,
+			textVal,
+			{
+				'text-anchor': 'middle',
+				fill: color,
+				'font-size': 12,
+				'font-weight': 600,
+				'font-family': 'monospace',
+			},
+			g
+		);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
@@ -198,7 +229,7 @@ export class RadiusConstraint extends BaseConstraint {
 				if (this.leaderAngle !== undefined) {
 					let rel = clockwise ? (this.leaderAngle - as) % (2 * Math.PI) : (as - this.leaderAngle) % (2 * Math.PI);
 					if (rel < 0) rel += 2 * Math.PI;
-					if (rel > sweepAngle) rel = rel - sweepAngle < (2 * Math.PI) - rel ? sweepAngle : 0;
+					if (rel > sweepAngle) rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
 					screenAngle = clockwise ? as + rel : as - rel;
 				} else {
 					screenAngle = clockwise ? as + sweepAngle / 2 : as - sweepAngle / 2;

@@ -84,7 +84,14 @@ export class EllipseTool extends BaseTool {
 			const minY = centerWorld.y + sign * ryVal * vy;
 
 			let p2Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && snap.id !== this.majPtId && sketch.points.has(snap.id)) {
+			if (
+				snap &&
+				snap.type === 'point' &&
+				snap.id &&
+				snap.id !== this.centerId &&
+				snap.id !== this.majPtId &&
+				sketch.points.has(snap.id)
+			) {
 				p2Id = snap.id;
 			} else {
 				const pt = sketch.addPoint(minX, minY);
@@ -92,12 +99,7 @@ export class EllipseTool extends BaseTool {
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 
-			sketch.addEllipse(
-				this.centerId!,
-				this.majPtId!,
-				p2Id,
-				this.ctx.isConstructionMode
-			);
+			sketch.addEllipse(this.centerId!, this.majPtId!, p2Id, this.ctx.isConstructionMode);
 			sketch.commitTransaction();
 			this.cancel();
 			this.ctx.requestRender();

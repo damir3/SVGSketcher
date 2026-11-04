@@ -118,12 +118,7 @@ export class Lexer {
 						hasDot = true;
 						numStr += '.';
 						this.pos++;
-					} else if (
-						c === ',' &&
-						!hasDot &&
-						this.pos + 1 < this.src.length &&
-						/\d/.test(this.src[this.pos + 1])
-					) {
+					} else if (c === ',' && !hasDot && this.pos + 1 < this.src.length && /\d/.test(this.src[this.pos + 1])) {
 						hasDot = true;
 						numStr += '.';
 						this.pos++;
@@ -217,10 +212,7 @@ export class Lexer {
 	}
 }
 
-export type VariableLookup =
-	| Map<string, number>
-	| Record<string, number>
-	| ((name: string) => number | undefined);
+export type VariableLookup = Map<string, number> | Record<string, number> | ((name: string) => number | undefined);
 
 export class ExpressionParser {
 	private tokens: Token[] = [];
@@ -294,11 +286,7 @@ export class ExpressionParser {
 
 	private parseMultiplication(): number {
 		let left = this.parsePower();
-		while (
-			this.current().type === 'STAR' ||
-			this.current().type === 'SLASH' ||
-			this.current().type === 'PERCENT'
-		) {
+		while (this.current().type === 'STAR' || this.current().type === 'SLASH' || this.current().type === 'PERCENT') {
 			const op = this.consume().type;
 			const right = this.parsePower();
 			if (op === 'STAR') {
@@ -410,7 +398,8 @@ export class ExpressionParser {
 				} else if (this.lookup instanceof Map) {
 					val = this.lookup.get(rawIdent) ?? this.lookup.get(lowerIdent);
 				} else {
-					val = (this.lookup as Record<string, number>)[rawIdent] ?? (this.lookup as Record<string, number>)[lowerIdent];
+					val =
+						(this.lookup as Record<string, number>)[rawIdent] ?? (this.lookup as Record<string, number>)[lowerIdent];
 				}
 			}
 
@@ -687,7 +676,8 @@ export function isValidParameterName(name: string): { isValid: boolean; error?: 
 	if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed)) {
 		return {
 			isValid: false,
-			error: 'Parameter name must start with a letter or underscore, and contain only letters, numbers, and underscores',
+			error:
+				'Parameter name must start with a letter or underscore, and contain only letters, numbers, and underscores',
 		};
 	}
 	if (RESERVED_WORDS.has(trimmed.toLowerCase())) {
@@ -703,11 +693,7 @@ export function isValidParameterName(name: string): { isValid: boolean; error?: 
  * Parses a string that may contain either a raw number or a mathematical expression,
  * returning the evaluated finite number or fallback.
  */
-export function parseNumericOrExpression(
-	text: string,
-	fallback: number,
-	scope?: VariableLookup
-): number {
+export function parseNumericOrExpression(text: string, fallback: number, scope?: VariableLookup): number {
 	const trimmed = text.trim();
 	if (!trimmed) return fallback;
 	try {
@@ -732,10 +718,7 @@ export function renameParameterInExpression(expr: string, oldName: string, newNa
  * Returns trimmed expression string if text represents a formula or variable expression
  * (i.e. valid and not a plain numeric literal). Returns undefined if invalid or plain number.
  */
-export function getExpressionIfValid(
-	text: string,
-	scope?: VariableLookup
-): string | undefined {
+export function getExpressionIfValid(text: string, scope?: VariableLookup): string | undefined {
 	const trimmed = text.trim();
 	if (!trimmed) return undefined;
 	const res = validateExpression(trimmed, scope);
@@ -747,5 +730,3 @@ export function getExpressionIfValid(
 	}
 	return undefined;
 }
-
-

@@ -1,11 +1,7 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { getAllGeoCurves } from '../../../math/intersection';
-import {
-	findExtendTarget,
-	findExtendCandidate,
-	executeExtend,
-} from '../../../math/extend';
+import { findExtendTarget, findExtendCandidate, executeExtend } from '../../../math/extend';
 import { renderExtendPreviewVisual } from '../../previewHelpers';
 import type { HoverTarget } from '../hoverTarget';
 

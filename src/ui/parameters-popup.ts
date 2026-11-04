@@ -34,10 +34,7 @@ export class ParametersPopup {
 
 	private isEditingInput(): boolean {
 		const active = document.activeElement;
-		return (
-			active instanceof HTMLInputElement &&
-			this.container.contains(active)
-		);
+		return active instanceof HTMLInputElement && this.container.contains(active);
 	}
 
 	public show(): void {
@@ -136,8 +133,8 @@ export class ParametersPopup {
 				const displayVal = hasError
 					? `<span class="param-val-error" title="${errorMsg}">! Error</span>`
 					: Number.isInteger(p.value)
-					? p.value.toFixed(1)
-					: Number(p.value.toFixed(2)).toString();
+						? p.value.toFixed(1)
+						: Number(p.value.toFixed(2)).toString();
 
 				return `
 				<tr data-param-name="${p.name}">

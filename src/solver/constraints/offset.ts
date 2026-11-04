@@ -168,9 +168,7 @@ export class OffsetConstraint extends BaseConstraint {
 					const f0 = this.lineResidual(pm, p, ptId);
 					// Differentiate ONLY with respect to offset geometry parameters so that
 					// OffsetConstraint drives the offset children without pushing/distorting the master parent geometry.
-					const params = [
-						`${ptId}.x`, `${ptId}.y`,
-					];
+					const params = [`${ptId}.x`, `${ptId}.y`];
 					for (const pid of params) {
 						if (!paramIndices.has(pid)) continue;
 						const orig = pm.get(pid);

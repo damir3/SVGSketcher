@@ -48,10 +48,7 @@ export function matchesEndpoints(pA: string, pB: string, end1: string, end2: str
 
 export function getLineBetween(sketch: SketchDocument, p1Id: string, p2Id: string): SketchLine | undefined {
 	for (const line of sketch.lines.values()) {
-		if (
-			(line.p1Id === p1Id && line.p2Id === p2Id) ||
-			(line.p1Id === p2Id && line.p2Id === p1Id)
-		) {
+		if ((line.p1Id === p1Id && line.p2Id === p2Id) || (line.p1Id === p2Id && line.p2Id === p1Id)) {
 			return line;
 		}
 	}
@@ -209,10 +206,7 @@ export function getConstraintsForEntity(
 					res.push(c);
 				}
 			} else if (c.type === 'parallel' || c.type === 'collinear' || c.type === 'perpendicular') {
-				if (
-					matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) ||
-					matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)
-				) {
+				if (matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) || matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)) {
 					res.push(c);
 				}
 			} else if (c.type === 'point_on_line' || c.type === 'tangent_line_circle') {
@@ -342,7 +336,10 @@ export function getConstraintsForEntity(
 	return res;
 }
 
-export function getEntitiesForConstraint(sketch: SketchDocument, c: IConstraint): Array<{
+export function getEntitiesForConstraint(
+	sketch: SketchDocument,
+	c: IConstraint
+): Array<{
 	id: string;
 	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 }> {
@@ -601,7 +598,8 @@ export function getEntitiesForConstraint(sketch: SketchDocument, c: IConstraint)
 		if (sketch.getConstraintsForEntity('ellipse', el.id).some(sc => sc.id === c.id)) add(el.id, 'ellipse');
 	}
 	for (const ea of sketch.ellipticalArcs.values()) {
-		if (sketch.getConstraintsForEntity('elliptical_arc', ea.id).some(sc => sc.id === c.id)) add(ea.id, 'elliptical_arc');
+		if (sketch.getConstraintsForEntity('elliptical_arc', ea.id).some(sc => sc.id === c.id))
+			add(ea.id, 'elliptical_arc');
 	}
 	for (const s of sketch.splines.values()) {
 		if (sketch.getConstraintsForEntity('spline', s.id).some(sc => sc.id === c.id)) add(s.id, 'spline');

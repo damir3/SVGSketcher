@@ -25,7 +25,15 @@ export interface SketchSnapshot {
 
 type Entity = { id: string };
 type EntityChange = { before: Entity | null; after: Entity | null };
-type SnapshotCollection = 'points' | 'lines' | 'circles' | 'arcs' | 'ellipses' | 'ellipticalArcs' | 'splines' | 'constraints';
+type SnapshotCollection =
+	| 'points'
+	| 'lines'
+	| 'circles'
+	| 'arcs'
+	| 'ellipses'
+	| 'ellipticalArcs'
+	| 'splines'
+	| 'constraints';
 type HistoryPatch = {
 	collections: Partial<Record<SnapshotCollection, Record<string, EntityChange>>>;
 	parameters?: Record<string, { before: SketchParameter | null; after: SketchParameter | null }>;
@@ -38,7 +46,16 @@ function equalValue(a: unknown, b: unknown): boolean {
 }
 
 function makePatch(before: SketchSnapshot, after: SketchSnapshot): HistoryPatch | null {
-	const collections: SnapshotCollection[] = ['points', 'lines', 'circles', 'arcs', 'ellipses', 'ellipticalArcs', 'splines', 'constraints'];
+	const collections: SnapshotCollection[] = [
+		'points',
+		'lines',
+		'circles',
+		'arcs',
+		'ellipses',
+		'ellipticalArcs',
+		'splines',
+		'constraints',
+	];
 	const changes: HistoryPatch['collections'] = {};
 	const changedKeys: string[] = [];
 	for (const name of collections) {
@@ -80,18 +97,26 @@ function makePatch(before: SketchSnapshot, after: SketchSnapshot): HistoryPatch 
 function applyPatch(snapshot: SketchSnapshot, patch: HistoryPatch, direction: 'before' | 'after'): SketchSnapshot {
 	const result: SketchSnapshot = {
 		...snapshot,
-		points: [...snapshot.points], lines: [...snapshot.lines], circles: [...snapshot.circles], arcs: [...snapshot.arcs],
-		ellipses: [...(snapshot.ellipses ?? [])], ellipticalArcs: [...(snapshot.ellipticalArcs ?? [])],
+		points: [...snapshot.points],
+		lines: [...snapshot.lines],
+		circles: [...snapshot.circles],
+		arcs: [...snapshot.arcs],
+		ellipses: [...(snapshot.ellipses ?? [])],
+		ellipticalArcs: [...(snapshot.ellipticalArcs ?? [])],
 		constraints: [...snapshot.constraints],
 	};
 	if (snapshot.splines || patch.collections.splines) result.splines = [...(snapshot.splines ?? [])];
 	if (snapshot.parameters || patch.parameters) result.parameters = [...(snapshot.parameters ?? [])];
-	for (const [name, delta] of Object.entries(patch.collections) as [SnapshotCollection, Record<string, EntityChange>][]) {
+	for (const [name, delta] of Object.entries(patch.collections) as [
+		SnapshotCollection,
+		Record<string, EntityChange>,
+	][]) {
 		const list = result[name] as Entity[];
 		const map = new Map(list.map(item => [item.id, item]));
 		for (const [id, change] of Object.entries(delta)) {
 			const value = change[direction];
-			if (value) map.set(id, value); else map.delete(id);
+			if (value) map.set(id, value);
+			else map.delete(id);
 		}
 		(result as any)[name] = [...map.values()];
 	}
@@ -99,7 +124,8 @@ function applyPatch(snapshot: SketchSnapshot, patch: HistoryPatch, direction: 'b
 		const map = new Map((result.parameters ?? []).map(item => [item.name, item]));
 		for (const [name, change] of Object.entries(patch.parameters)) {
 			const value = change[direction];
-			if (value) map.set(name, value); else map.delete(name);
+			if (value) map.set(name, value);
+			else map.delete(name);
 		}
 		result.parameters = [...map.values()];
 	}
@@ -137,16 +163,34 @@ export class HistoryManager {
 		if (!patch) return;
 		this.redoStack = [];
 		const previous = this.undoStack[this.undoStack.length - 1];
-		if (previous && previous.changedKeys.length === patch.changedKeys.length && previous.changedKeys.every(key => patch.changedKeys.includes(key))) {
-			for (const [name, entities] of Object.entries(patch.collections) as [SnapshotCollection, Record<string, EntityChange>][]) {
+		if (
+			previous &&
+			previous.changedKeys.length === patch.changedKeys.length &&
+			previous.changedKeys.every(key => patch.changedKeys.includes(key))
+		) {
+			for (const [name, entities] of Object.entries(patch.collections) as [
+				SnapshotCollection,
+				Record<string, EntityChange>,
+			][]) {
 				const target = previous.collections[name] ?? (previous.collections[name] = {});
-				for (const [id, change] of Object.entries(entities)) target[id] = { before: target[id] ? target[id].before : change.before, after: change.after };
+				for (const [id, change] of Object.entries(entities))
+					target[id] = {
+						before: target[id] ? target[id].before : change.before,
+						after: change.after,
+					};
 			}
 			for (const [name, change] of Object.entries(patch.parameters ?? {})) {
 				const target = previous.parameters ?? (previous.parameters = {});
-				target[name] = { before: target[name] ? target[name].before : change.before, after: change.after };
+				target[name] = {
+					before: target[name] ? target[name].before : change.before,
+					after: change.after,
+				};
 			}
-			if (patch.idCounter) previous.idCounter = { before: previous.idCounter?.before ?? patch.idCounter.before, after: patch.idCounter.after };
+			if (patch.idCounter)
+				previous.idCounter = {
+					before: previous.idCounter?.before ?? patch.idCounter.before,
+					after: patch.idCounter.after,
+				};
 			if (!patchHasChanges(previous)) this.undoStack.pop();
 			return;
 		}
@@ -159,7 +203,9 @@ export class HistoryManager {
 		if (currentSnapshot) this.finalize(currentSnapshot);
 		return this.undoStack.length > 0;
 	}
-	canRedo(): boolean { return this.redoStack.length > 0; }
+	canRedo(): boolean {
+		return this.redoStack.length > 0;
+	}
 
 	undo(currentSnapshot: SketchSnapshot): SketchSnapshot | null {
 		this.finalize(currentSnapshot);

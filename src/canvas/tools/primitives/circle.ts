@@ -8,12 +8,7 @@ import { VariationToolPanel } from '../../../ui/panels/tools';
 import { findHoverTarget } from '../hoverTarget';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 
-export type CircleMode =
-	| 'center_diameter'
-	| 'two_point'
-	| 'three_point'
-	| 'two_tangent'
-	| 'three_tangent';
+export type CircleMode = 'center_diameter' | 'two_point' | 'three_point' | 'two_tangent' | 'three_tangent';
 
 type TangentLine = { p: Vec2; n: Vec2 };
 type CircleGeometry = { center: Vec2; radius: number };
@@ -163,16 +158,9 @@ export class CircleTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
-	private finish(
-		center: Vec2,
-		radius: number,
-		existingCenterId?: string,
-		dimensionMode?: 'radius' | 'diameter'
-	): void {
+	private finish(center: Vec2, radius: number, existingCenterId?: string, dimensionMode?: 'radius' | 'diameter'): void {
 		const sketch = this.ctx.sketch;
-		const point = existingCenterId
-			? sketch.points.get(existingCenterId)!
-			: sketch.addPoint(center.x, center.y);
+		const point = existingCenterId ? sketch.points.get(existingCenterId)! : sketch.addPoint(center.x, center.y);
 		const circle = sketch.addCircle(point.id, Math.max(radius, 0.1), this.ctx.isConstructionMode);
 
 		if (this._mode === 'three_tangent' || this._mode === 'two_tangent') {
@@ -261,9 +249,7 @@ export class CircleTool extends BaseTool {
 				this.notify();
 			} else {
 				const locked = this.popup.isLocked('radius');
-				const radius = locked
-					? this.popup.getNumericValue('radius', 20) / 2
-					: Math.max(5, dist(this.center!, e.world));
+				const radius = locked ? this.popup.getNumericValue('radius', 20) / 2 : Math.max(5, dist(this.center!, e.world));
 				this.finish(this.center!, radius, this.centerId!, locked ? 'diameter' : undefined);
 			}
 
@@ -297,17 +283,12 @@ export class CircleTool extends BaseTool {
 				const b =
 					locked && directionLength > 1e-9
 						? vec(
-							a.x + ((cursor.x - a.x) / directionLength) * diameter,
-							a.y + ((cursor.y - a.y) / directionLength) * diameter
-						)
+								a.x + ((cursor.x - a.x) / directionLength) * diameter,
+								a.y + ((cursor.y - a.y) / directionLength) * diameter
+							)
 						: cursor;
 
-				this.finish(
-					vec((a.x + b.x) / 2, (a.y + b.y) / 2),
-					diameter / 2,
-					undefined,
-					locked ? 'diameter' : undefined
-				);
+				this.finish(vec((a.x + b.x) / 2, (a.y + b.y) / 2), diameter / 2, undefined, locked ? 'diameter' : undefined);
 				return;
 			}
 
@@ -386,11 +367,15 @@ export class CircleTool extends BaseTool {
 		this.lastCursorWorld = e.snap?.worldPos ?? e.world;
 
 		if (this._mode === 'center_diameter' && this.drawingStep === 1 && !this.popup.isLocked('radius')) {
-			this.popup.updateValues({ radius: 2 * Math.max(5, dist(this.center!, e.effectiveWorld)) });
+			this.popup.updateValues({
+				radius: 2 * Math.max(5, dist(this.center!, e.effectiveWorld)),
+			});
 		}
 
 		if (this._mode === 'two_point' && this.drawingStep > 0 && !this.popup.isLocked('radius')) {
-			this.popup.updateValues({ radius: Math.max(5, dist(this.points[0], e.effectiveWorld)) });
+			this.popup.updateValues({
+				radius: Math.max(5, dist(this.points[0], e.effectiveWorld)),
+			});
 		}
 
 		if (this._mode === 'three_point' && this.drawingStep === 2 && !this.popup.isLocked('radius')) {
@@ -482,10 +467,10 @@ export class CircleTool extends BaseTool {
 
 						for (let row = 0; row < 3; row++) {
 							if (row === column) continue;
-						const factor = matrix[row][column];
-						for (let j = column; j < 4; j++) {
-							matrix[row][j] -= factor * matrix[column][j];
-						}
+							const factor = matrix[row][column];
+							for (let j = column; j < 4; j++) {
+								matrix[row][j] -= factor * matrix[column][j];
+							}
 						}
 					}
 
@@ -514,10 +499,7 @@ export class CircleTool extends BaseTool {
 		if (length < 1e-8) return null;
 
 		const offset = Math.max(10, length / 2);
-		const fallbackPoint = vec(
-			(a.x + b.x) / 2 - (dy / length) * offset,
-			(a.y + b.y) / 2 + (dx / length) * offset
-		);
+		const fallbackPoint = vec((a.x + b.x) / 2 - (dy / length) * offset, (a.y + b.y) / 2 + (dx / length) * offset);
 		return getCircumcircle(a, b, fallbackPoint);
 	}
 
@@ -656,9 +638,7 @@ export class CircleTool extends BaseTool {
 		const dx = cursor.x - firstPoint.x;
 		const dy = cursor.y - firstPoint.y;
 		const length = Math.hypot(dx, dy) || 1;
-		const diameter = this.popup.isLocked('radius')
-			? this.popup.getNumericValue('radius', 20)
-			: Math.hypot(dx, dy);
+		const diameter = this.popup.isLocked('radius') ? this.popup.getNumericValue('radius', 20) : Math.hypot(dx, dy);
 		const secondPoint = this.popup.isLocked('radius')
 			? vec(firstPoint.x + (dx / length) * diameter, firstPoint.y + (dy / length) * diameter)
 			: cursor;
@@ -752,10 +732,7 @@ export class CircleTool extends BaseTool {
 
 		const h1 = lineA.p.x * lineA.n.x + lineA.p.y * lineA.n.y;
 		const h2 = lineB.p.x * lineB.n.x + lineB.p.y * lineB.n.y;
-		return vec(
-			(h1 * lineB.n.y - lineA.n.y * h2) / determinant,
-			(lineA.n.x * h2 - h1 * lineB.n.x) / determinant
-		);
+		return vec((h1 * lineB.n.y - lineA.n.y * h2) / determinant, (lineA.n.x * h2 - h1 * lineB.n.x) / determinant);
 	}
 
 	private getTwoTangentCircle(cursor: Vec2): CircleGeometry | null {

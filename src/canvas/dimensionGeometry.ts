@@ -108,7 +108,7 @@ export function computePointToLineDimensionGeometry(
 
 	// Ensure there is always a visible offset / выноска if none was specified or cursor is directly at projection
 	if (Math.abs(tDim - tProj) < 2) {
-		const defaultOffset = (tProj < lineLen * 0.5 ? 25 : -25);
+		const defaultOffset = tProj < lineLen * 0.5 ? 25 : -25;
 		tDim = tProj + (screenOffset !== 0 ? screenOffset : defaultOffset);
 	}
 

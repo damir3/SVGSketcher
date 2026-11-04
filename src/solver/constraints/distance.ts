@@ -28,18 +28,9 @@ export class DistanceConstraint extends BaseConstraint {
 			orientation === 'horizontal'
 				? 'Horizontal Distance'
 				: orientation === 'vertical'
-				? 'Vertical Distance'
-				: 'Distance';
-		super(
-			id,
-			'distance',
-			prefix,
-			[p1Id, p2Id],
-			weight,
-			false,
-			true,
-			targetDistance
-		);
+					? 'Vertical Distance'
+					: 'Distance';
+		super(id, 'distance', prefix, [p1Id, p2Id], weight, false, true, targetDistance);
 		this.p1Id = p1Id;
 		this.p2Id = p2Id;
 		this.targetDistance = targetDistance;
@@ -76,7 +67,11 @@ export class DistanceConstraint extends BaseConstraint {
 		return [(cur - this.targetDistance) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
 		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
@@ -156,8 +151,8 @@ export class DistanceConstraint extends BaseConstraint {
 			this.orientation === 'horizontal'
 				? 'Horizontal Distance'
 				: this.orientation === 'vertical'
-				? 'Vertical Distance'
-				: 'Distance',
+					? 'Vertical Distance'
+					: 'Distance',
 		dimension: {
 			label: 'Distance',
 			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,

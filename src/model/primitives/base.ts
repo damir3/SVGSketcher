@@ -2,14 +2,7 @@ import type { Vec2 } from '../../math/vector';
 import type { GeoCurve } from '../../math/intersection';
 import type { IInspectable } from '../../ui/panels/inspector/types';
 
-export type PrimitiveType =
-	| 'point'
-	| 'line'
-	| 'circle'
-	| 'arc'
-	| 'ellipse'
-	| 'elliptical_arc'
-	| 'spline';
+export type PrimitiveType = 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 
 /**
  * Common polymorphic interface for all sketch geometric primitives.

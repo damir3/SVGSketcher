@@ -11,12 +11,7 @@ import {
 import type { SketchPoint } from './types';
 import { dist } from '../math/vector';
 
-export function setPointCoords(
-	sketch: SketchDocument,
-	pointId: string,
-	targetX: number,
-	targetY: number
-): boolean {
+export function setPointCoords(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
 	const pt = sketch.points.get(pointId);
 	if (!pt || !isFinite(targetX) || !isFinite(targetY)) return false;
 
@@ -101,11 +96,7 @@ export function setPointCoords(
 	return true;
 }
 
-export function setLineLength(
-	sketch: SketchDocument,
-	lineId: string,
-	newLength: number
-): boolean {
+export function setLineLength(sketch: SketchDocument, lineId: string, newLength: number): boolean {
 	const line = sketch.lines.get(lineId);
 	if (!line || !isFinite(newLength) || newLength <= 0) return false;
 	const p1 = sketch.points.get(line.p1Id);
@@ -123,8 +114,7 @@ export function setLineLength(
 	for (const c of sketch.constraints.values()) {
 		if (
 			c instanceof DistanceConstraint &&
-			((c.p1Id === line.p1Id && c.p2Id === line.p2Id) ||
-				(c.p1Id === line.p2Id && c.p2Id === line.p1Id))
+			((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
 		) {
 			const orient = c.orientation ?? 'aligned';
 			if (
@@ -165,11 +155,7 @@ export function setLineLength(
 	return true;
 }
 
-export function setLineAngle(
-	sketch: SketchDocument,
-	lineId: string,
-	newAngleDeg: number
-): boolean {
+export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg: number): boolean {
 	const line = sketch.lines.get(lineId);
 	if (!line || !isFinite(newAngleDeg)) return false;
 	const p1 = sketch.points.get(line.p1Id);
@@ -252,11 +238,7 @@ export function setLineAngle(
 	// 3. If still not solved and the line has an AngleConstraint with another line, update that AngleConstraint
 	if (!solved) {
 		for (const c of sketch.constraints.values()) {
-			if (
-				c instanceof AngleConstraint &&
-				c.line1Id !== c.line2Id &&
-				(c.line1Id === lineId || c.line2Id === lineId)
-			) {
+			if (c instanceof AngleConstraint && c.line1Id !== c.line2Id && (c.line1Id === lineId || c.line2Id === lineId)) {
 				sketch.paramManager.restoreValues(origValues);
 				const otherLineId = c.line1Id === lineId ? c.line2Id : c.line1Id;
 				const otherLine = sketch.lines.get(otherLineId);
@@ -313,24 +295,27 @@ export function setLinesRelativeAngle(
 	const existing = [...sketch.constraints.values()].find(
 		c =>
 			c instanceof AngleConstraint &&
-			((c.line1Id === line1Id && c.line2Id === line2Id) ||
-				(c.line1Id === line2Id && c.line2Id === line1Id))
+			((c.line1Id === line1Id && c.line2Id === line2Id) || (c.line1Id === line2Id && c.line2Id === line1Id))
 	) as AngleConstraint | undefined;
 	if (existing) {
 		return sketch.updateDimensionalConstraint(existing.id, newAngleDeg);
 	}
 
-	const p1 = isAxis1
-		? ({ id: line1Id, x: 0, y: 0 } as SketchPoint)
-		: sketch.points.get(l1!.p1Id);
+	const p1 = isAxis1 ? ({ id: line1Id, x: 0, y: 0 } as SketchPoint) : sketch.points.get(l1!.p1Id);
 	const p2 = isAxis1
-		? ({ id: line1Id, x: line1Id === 'axis_x' ? 1 : 0, y: line1Id === 'axis_x' ? 0 : 1 } as SketchPoint)
+		? ({
+				id: line1Id,
+				x: line1Id === 'axis_x' ? 1 : 0,
+				y: line1Id === 'axis_x' ? 0 : 1,
+			} as SketchPoint)
 		: sketch.points.get(l1!.p2Id);
-	const p3 = isAxis2
-		? ({ id: line2Id, x: 0, y: 0 } as SketchPoint)
-		: sketch.points.get(l2!.p1Id);
+	const p3 = isAxis2 ? ({ id: line2Id, x: 0, y: 0 } as SketchPoint) : sketch.points.get(l2!.p1Id);
 	const p4 = isAxis2
-		? ({ id: line2Id, x: line2Id === 'axis_x' ? 1 : 0, y: line2Id === 'axis_x' ? 0 : 1 } as SketchPoint)
+		? ({
+				id: line2Id,
+				x: line2Id === 'axis_x' ? 1 : 0,
+				y: line2Id === 'axis_x' ? 0 : 1,
+			} as SketchPoint)
 		: sketch.points.get(l2!.p2Id);
 	if (!p1 || !p2 || !p3 || !p4) return false;
 
@@ -382,7 +367,12 @@ export function setLinesRelativeAngle(
 	const activeDists = [tempDist1, tempDist2].filter(Boolean) as DistanceConstraint[];
 	const candidates: IConstraint[][] = [
 		[tempRelAngle, ...activeDists],
-		...(activeDists.length > 1 ? [[tempRelAngle, activeDists[0]], [tempRelAngle, activeDists[1]]] : []),
+		...(activeDists.length > 1
+			? [
+					[tempRelAngle, activeDists[0]],
+					[tempRelAngle, activeDists[1]],
+				]
+			: []),
 		[tempRelAngle],
 	];
 
@@ -397,11 +387,7 @@ export function setLinesRelativeAngle(
 	return true;
 }
 
-export function setCircleOrArcRadius(
-	sketch: SketchDocument,
-	entityId: string,
-	newRadius: number
-): boolean {
+export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, newRadius: number): boolean {
 	if (!isFinite(newRadius) || newRadius <= 0) return false;
 	const circle = sketch.circles.get(entityId);
 	const arc = sketch.arcs.get(entityId);
@@ -413,10 +399,7 @@ export function setCircleOrArcRadius(
 		if (c instanceof RadiusConstraint && c.circleId === entityId) {
 			c.targetRadius = newRadius;
 			c.value = newRadius;
-			const dispVal =
-				c.displayMode === 'diameter'
-					? Number((newRadius * 2).toFixed(2))
-					: Number(newRadius.toFixed(2));
+			const dispVal = c.displayMode === 'diameter' ? Number((newRadius * 2).toFixed(2)) : Number(newRadius.toFixed(2));
 			c.name = c.displayMode === 'diameter' ? `Diameter (${dispVal})` : `Radius (${dispVal})`;
 			updatedExisting = true;
 		}
@@ -455,18 +438,12 @@ export function setCircleOrArcRadius(
 	if (updatedExisting) {
 		sketch.solve();
 	} else {
-		sketch.solveWithTemporaryHardConstraints([
-			new RadiusConstraint('__temp_rad', entityId, newRadius, 1.0),
-		]);
+		sketch.solveWithTemporaryHardConstraints([new RadiusConstraint('__temp_rad', entityId, newRadius, 1.0)]);
 	}
 	return true;
 }
 
-export function setArcAngle(
-	sketch: SketchDocument,
-	arcId: string,
-	newSweepDeg: number
-): boolean {
+export function setArcAngle(sketch: SketchDocument, arcId: string, newSweepDeg: number): boolean {
 	const arc = sketch.arcs.get(arcId);
 	if (!arc || !isFinite(newSweepDeg) || newSweepDeg <= 0) return false;
 	const center = sketch.points.get(arc.centerId);

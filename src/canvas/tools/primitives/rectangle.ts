@@ -2,11 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext, SnapResult } from '../types';
 import { dist, vec, type Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, createSvgRect } from '../../svg';
-import {
-	AUX_AXIS_ATTRS,
-	POLYGON_CENTER_ATTRS,
-	getPreviewStrokeAttrs,
-} from '../../styles';
+import { AUX_AXIS_ATTRS, POLYGON_CENTER_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { VariationToolPanel } from '../../../ui/panels/tools';
 import { dispatchToolModeChange } from '../modeChangeEvent';
@@ -102,10 +98,30 @@ export class RectangleTool extends BaseTool {
 			dataAttribute: 'data-rect-mode',
 			cancelButtonId: 'btn-rectangle-cancel-icon',
 			modes: [
-				{ id: 'corner', label: '2-Point', title: '2-Point Rectangle (Alt+1)', iconName: 'rectangle' },
-				{ id: 'center', label: 'Center', title: 'Center Rectangle (Alt+2)', iconName: 'rectangle_center' },
-				{ id: 'three_point', label: '3-Point', title: '3-Point Rectangle (Alt+3)', iconName: 'rectangle_3point' },
-				{ id: 'rounded', label: 'Rounded', title: 'Rounded Rectangle (Alt+4)', iconName: 'rectangle_rounded' },
+				{
+					id: 'corner',
+					label: '2-Point',
+					title: '2-Point Rectangle (Alt+1)',
+					iconName: 'rectangle',
+				},
+				{
+					id: 'center',
+					label: 'Center',
+					title: 'Center Rectangle (Alt+2)',
+					iconName: 'rectangle_center',
+				},
+				{
+					id: 'three_point',
+					label: '3-Point',
+					title: '3-Point Rectangle (Alt+3)',
+					iconName: 'rectangle_3point',
+				},
+				{
+					id: 'rounded',
+					label: 'Rounded',
+					title: 'Rounded Rectangle (Alt+4)',
+					iconName: 'rectangle_rounded',
+				},
 			],
 			getCurrentMode: () => this.mode,
 			onSelectMode: mode => this.setMode(mode),
@@ -173,10 +189,14 @@ export class RectangleTool extends BaseTool {
 		if (!this.ctx) return;
 		switch (this._mode) {
 			case 'corner':
-				this.ctx.showToast(this.drawingStep === 0 ? 'Rectangle: Click first corner' : 'Rectangle: Click opposite corner');
+				this.ctx.showToast(
+					this.drawingStep === 0 ? 'Rectangle: Click first corner' : 'Rectangle: Click opposite corner'
+				);
 				break;
 			case 'center':
-				this.ctx.showToast(this.drawingStep === 0 ? 'Center Rectangle: Click center point' : 'Center Rectangle: Click corner point');
+				this.ctx.showToast(
+					this.drawingStep === 0 ? 'Center Rectangle: Click center point' : 'Center Rectangle: Click corner point'
+				);
 				break;
 			case 'three_point':
 				if (this.drawingStep === 0) this.ctx.showToast('3-Point Rectangle: Click first corner');
@@ -430,7 +450,10 @@ export class RectangleTool extends BaseTool {
 			}
 		} else if (this._mode === 'rounded') {
 			const c1 = this.startWorldPos;
-			const c2 = this.drawingStep === 2 && this.secondWorldPos ? this.secondWorldPos : this.computeCornerSecondPoint(effectiveWorld);
+			const c2 =
+				this.drawingStep === 2 && this.secondWorldPos
+					? this.secondWorldPos
+					: this.computeCornerSecondPoint(effectiveWorld);
 			const s1 = ctx.viewport.worldToScreen(c1.x, c1.y);
 			const s2 = ctx.viewport.worldToScreen(c2.x, c2.y);
 
@@ -566,7 +589,11 @@ export class RectangleTool extends BaseTool {
 			this.commitCenter(C, this.width / 2, this.height / 2);
 		} else if (this._mode === 'three_point') {
 			const P1 = this.startWorldPos!;
-			const P2 = this.secondWorldPos ?? (this.lastEffectiveWorld ? this.computeThreePointSecondPoint(this.lastEffectiveWorld) : vec(P1.x + this.width, P1.y));
+			const P2 =
+				this.secondWorldPos ??
+				(this.lastEffectiveWorld
+					? this.computeThreePointSecondPoint(this.lastEffectiveWorld)
+					: vec(P1.x + this.width, P1.y));
 			const V = vec(P2.x - P1.x, P2.y - P1.y);
 			const baseLen = Math.hypot(V.x, V.y);
 			const n = baseLen > 1e-4 ? vec(-V.y / baseLen, V.x / baseLen) : vec(0, 1);
@@ -670,7 +697,12 @@ export class RectangleTool extends BaseTool {
 		const { sketch } = this.ctx;
 
 		let centerPtId: string;
-		if (this.startSnap && this.startSnap.type === 'point' && this.startSnap.id && sketch.points.has(this.startSnap.id)) {
+		if (
+			this.startSnap &&
+			this.startSnap.type === 'point' &&
+			this.startSnap.id &&
+			sketch.points.has(this.startSnap.id)
+		) {
 			centerPtId = this.startSnap.id;
 		} else {
 			const cpt = sketch.addPoint(center.x, center.y);

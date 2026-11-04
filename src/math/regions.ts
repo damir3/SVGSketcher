@@ -13,28 +13,51 @@ export interface SketchRegion {
 const KEY_SCALE = 1e5;
 const key = (p: Vec2) => `${Math.round(p.x * KEY_SCALE)},${Math.round(p.y * KEY_SCALE)}`;
 const cross = (a: Vec2, b: Vec2) => a.x * b.y - a.y * b.x;
-const polygonArea = (points: Vec2[]) => points.reduce((sum, p, i) => sum + cross(p, points[(i + 1) % points.length]), 0) / 2;
+const polygonArea = (points: Vec2[]) =>
+	points.reduce((sum, p, i) => sum + cross(p, points[(i + 1) % points.length]), 0) / 2;
 function pointInPolygon(point: Vec2, points: Vec2[]): boolean {
 	let inside = false;
 	for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-		if ((points[i].y > point.y) !== (points[j].y > point.y) && point.x < (points[j].x - points[i].x) * (point.y - points[i].y) / (points[j].y - points[i].y) + points[i].x) inside = !inside;
+		if (
+			points[i].y > point.y !== points[j].y > point.y &&
+			point.x < ((points[j].x - points[i].x) * (point.y - points[i].y)) / (points[j].y - points[i].y) + points[i].x
+		)
+			inside = !inside;
 	}
 	return inside;
 }
 type RegionCurve = ReturnType<typeof getAllGeoCurves>[number];
-interface BoundaryEdge { curve: RegionCurve; t0: number; t1: number; from: string; to: string; }
-function pointText(p: Vec2): string { return `${p.x.toFixed(5)} ${(-p.y).toFixed(5)}`; }
+interface BoundaryEdge {
+	curve: RegionCurve;
+	t0: number;
+	t1: number;
+	from: string;
+	to: string;
+}
+function pointText(p: Vec2): string {
+	return `${p.x.toFixed(5)} ${(-p.y).toFixed(5)}`;
+}
 function exactRingPath(points: Vec2[], edges: BoundaryEdge[]): string {
 	let d = `M ${pointText(points[0])}`;
 	const oriented = edges.map((edge, i) => {
 		if (!edge) return null;
 		const forward = key(points[i]) === edge.from;
-		return { edge, forward, a: forward ? edge.t0 : edge.t1, b: forward ? edge.t1 : edge.t0, start: i, end: (i + 1) % points.length };
+		return {
+			edge,
+			forward,
+			a: forward ? edge.t0 : edge.t1,
+			b: forward ? edge.t1 : edge.t0,
+			start: i,
+			end: (i + 1) % points.length,
+		};
 	});
-	const runs: Array<NonNullable<typeof oriented[number]>> = [];
+	const runs: Array<NonNullable<(typeof oriented)[number]>> = [];
 	for (let i = 0; i < oriented.length; i++) {
 		const item = oriented[i];
-		if (!item) { d += ` L ${pointText(points[(i + 1) % points.length])}`; continue; }
+		if (!item) {
+			d += ` L ${pointText(points[(i + 1) % points.length])}`;
+			continue;
+		}
 		let run = { ...item };
 		while (i + 1 < oriented.length) {
 			const next = oriented[i + 1];
@@ -45,34 +68,50 @@ function exactRingPath(points: Vec2[], edges: BoundaryEdge[]): string {
 		runs.push(run);
 	}
 	for (const run of runs) {
-		const curve = run.edge.curve, end = points[run.end];
-		if (curve.type === 'segment') { d += ` L ${pointText(end)}`; continue; }
+		const curve = run.edge.curve,
+			end = points[run.end];
+		if (curve.type === 'segment') {
+			d += ` L ${pointText(end)}`;
+			continue;
+		}
 		if (curve.type === 'spline') {
-			const lo = Math.min(run.a, run.b), hi = Math.max(run.a, run.b);
-			const pieces = hi <= 1
-				? extractSplineInterval(curve.bezierSegments, lo, hi)
-				: [...extractSplineInterval(curve.bezierSegments, lo % 1, 1), ...extractSplineInterval(curve.bezierSegments, 0, hi % 1)];
+			const lo = Math.min(run.a, run.b),
+				hi = Math.max(run.a, run.b);
+			const pieces =
+				hi <= 1
+					? extractSplineInterval(curve.bezierSegments, lo, hi)
+					: [
+							...extractSplineInterval(curve.bezierSegments, lo % 1, 1),
+							...extractSplineInterval(curve.bezierSegments, 0, hi % 1),
+						];
 			const ordered = run.forward ? pieces : [...pieces].reverse();
 			for (let i = 0; i < ordered.length; i++) {
 				const piece = ordered[i];
-				const bezier = run.forward ? piece : [piece[3], piece[2], piece[1], piece[0]] as BezierSegment;
+				const bezier = run.forward ? piece : ([piece[3], piece[2], piece[1], piece[0]] as BezierSegment);
 				d += ` C ${pointText(bezier[1])} ${pointText(bezier[2])} ${pointText(i === ordered.length - 1 ? end : bezier[3])}`;
 			}
 			continue;
 		}
-		let rx: number, ry: number, rotation = 0, sweep: number;
+		let rx: number,
+			ry: number,
+			rotation = 0,
+			sweep: number;
 		if (curve.type === 'circle' || curve.type === 'arc') {
 			rx = ry = curve.radius;
-			sweep = curve.type === 'circle' ? (run.forward ? 1 : 0) : (curve.clockwise === run.forward ? 1 : 0);
+			sweep = curve.type === 'circle' ? (run.forward ? 1 : 0) : curve.clockwise === run.forward ? 1 : 0;
 		} else {
-			const center = curve.center, major = curve.majorAxisPoint, minor = curve.minorAxisPoint;
+			const center = curve.center,
+				major = curve.majorAxisPoint,
+				minor = curve.minorAxisPoint;
 			rx = Math.hypot(major.x - center.x, major.y - center.y);
 			ry = Math.hypot(minor.x - center.x, minor.y - center.y);
-			rotation = Math.atan2(-(major.y - center.y), major.x - center.x) * 180 / Math.PI;
-			sweep = curve.type === 'ellipse' ? (run.forward ? 1 : 0) : (curve.clockwise === run.forward ? 1 : 0);
+			rotation = (Math.atan2(-(major.y - center.y), major.x - center.x) * 180) / Math.PI;
+			sweep = curve.type === 'ellipse' ? (run.forward ? 1 : 0) : curve.clockwise === run.forward ? 1 : 0;
 		}
-		const span = Math.abs(run.b - run.a) * (curve.type === 'arc' || curve.type === 'elliptical_arc' ? getArcSweep(curve) : 1);
-		const arcCommand = (to: Vec2, arcSpan: number) => ` A ${rx.toFixed(5)} ${ry.toFixed(5)} ${rotation.toFixed(5)} ${arcSpan > Math.PI ? 1 : 0} ${sweep} ${pointText(to)}`;
+		const span =
+			Math.abs(run.b - run.a) * (curve.type === 'arc' || curve.type === 'elliptical_arc' ? getArcSweep(curve) : 1);
+		const arcCommand = (to: Vec2, arcSpan: number) =>
+			` A ${rx.toFixed(5)} ${ry.toFixed(5)} ${rotation.toFixed(5)} ${arcSpan > Math.PI ? 1 : 0} ${sweep} ${pointText(to)}`;
 		if (Math.hypot(points[run.start].x - end.x, points[run.start].y - end.y) < 1e-5 && span > Math.PI * 1.99) {
 			const mid = getPointAtParam(curve, (run.a + run.b) / 2);
 			d += arcCommand(mid, span / 2) + arcCommand(end, span / 2);
@@ -87,19 +126,26 @@ function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc
 		const minor = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const start = { x: curve.start.x, y: -curve.start.y };
 		const end = { x: curve.end.x, y: -curve.end.y };
-		const rx = Math.hypot(major.x - center.x, major.y - center.y), ry = Math.hypot(minor.x - center.x, minor.y - center.y);
+		const rx = Math.hypot(major.x - center.x, major.y - center.y),
+			ry = Math.hypot(minor.x - center.x, minor.y - center.y);
 		const theta = Math.atan2(major.y - center.y, major.x - center.x);
-		const ux = Math.cos(theta), uy = Math.sin(theta), vx = -Math.sin(theta), vy = Math.cos(theta);
+		const ux = Math.cos(theta),
+			uy = Math.sin(theta),
+			vx = -Math.sin(theta),
+			vy = Math.cos(theta);
 		const param = (point: Vec2) => {
-			const dx = point.x - center.x, dy = point.y - center.y;
+			const dx = point.x - center.x,
+				dy = point.y - center.y;
 			return Math.atan2((dx * vx + dy * vy) / Math.max(ry, 1e-6), (dx * ux + dy * uy) / Math.max(rx, 1e-6));
 		};
-		const ts = param(start), te = param(end);
+		const ts = param(start),
+			te = param(end);
 		let sweep = curve.clockwise ? (te - ts) % (2 * Math.PI) : (ts - te) % (2 * Math.PI);
 		return sweep < 0 ? sweep + 2 * Math.PI : sweep;
 	}
 	const angle = (point: Vec2) => Math.atan2(-(point.y - curve.center.y), point.x - curve.center.x);
-	const start = angle(curve.start), end = angle(curve.end);
+	const start = angle(curve.start),
+		end = angle(curve.end);
 	let sweep = curve.clockwise ? (end - start) % (2 * Math.PI) : (start - end) % (2 * Math.PI);
 	if (sweep < 0) sweep += 2 * Math.PI;
 	return sweep;
@@ -112,7 +158,10 @@ function intersectionCut(curve: ReturnType<typeof getAllGeoCurves>[number], poin
 	}
 	return { t: getParamAtPoint(curve, point), p: point };
 }
-function curvePointAt(item: { curve: ReturnType<typeof getAllGeoCurves>[number]; periodic: boolean }, param: number): Vec2 {
+function curvePointAt(
+	item: { curve: ReturnType<typeof getAllGeoCurves>[number]; periodic: boolean },
+	param: number
+): Vec2 {
 	if (item.curve.type === 'spline' && item.periodic && (param < 0 || param > 1)) {
 		param = ((param % 1) + 1) % 1;
 	}
@@ -122,63 +171,94 @@ function curvePointAt(item: { curve: ReturnType<typeof getAllGeoCurves>[number];
 /** Finds bounded faces in the planar arrangement of sketch curves. Curves are flattened
  * into short chords; the resulting region boundaries are therefore SVG-ready polylines. */
 export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
-	const curves = getAllGeoCurves(sketch).filter((c) => !c.isConstruction);
+	const curves = getAllGeoCurves(sketch).filter(c => !c.isConstruction);
 	const segments: Array<{ a: Vec2; b: Vec2; curve: RegionCurve; t0: number; t1: number }> = [];
-	const params = curves.map((curve) => {
+	const params = curves.map(curve => {
 		const periodic = curve.type === 'circle' || curve.type === 'ellipse' || (curve.type === 'spline' && curve.isClosed);
-		return { curve, periodic, period: curve.type === 'circle' || curve.type === 'ellipse' ? 2 * Math.PI : 1, cuts: [] as Array<{ t: number; p: Vec2 }> };
+		return {
+			curve,
+			periodic,
+			period: curve.type === 'circle' || curve.type === 'ellipse' ? 2 * Math.PI : 1,
+			cuts: [] as Array<{ t: number; p: Vec2 }>,
+		};
 	});
-	for (let i = 0; i < curves.length; i++) for (let j = i + 1; j < curves.length; j++) {
-		for (const p of intersectCurves(curves[i], curves[j])) {
-			params[i].cuts.push(intersectionCut(curves[i], p));
-			params[j].cuts.push(intersectionCut(curves[j], p));
+	for (let i = 0; i < curves.length; i++)
+		for (let j = i + 1; j < curves.length; j++) {
+			for (const p of intersectCurves(curves[i], curves[j])) {
+				params[i].cuts.push(intersectionCut(curves[i], p));
+				params[j].cuts.push(intersectionCut(curves[j], p));
+			}
 		}
-	}
 	for (const item of params) {
 		const { curve, periodic, period } = item;
-		const unique = item.cuts.sort((a, b) => a.t - b.t).filter((cut, i, all) => i === 0 || Math.abs(cut.t - all[i - 1].t) > 1e-6);
+		const unique = item.cuts
+			.sort((a, b) => a.t - b.t)
+			.filter((cut, i, all) => i === 0 || Math.abs(cut.t - all[i - 1].t) > 1e-6);
 		const intervals: Array<[number, Vec2, number, Vec2]> = [];
 		if (periodic) {
 			if (!unique.length) intervals.push([0, getPointAtParam(curve, 0), period, getPointAtParam(curve, 0)]);
-			else for (let i = 0; i < unique.length; i++) {
-				const a = unique[i], b = unique[(i + 1) % unique.length];
-				intervals.push([a.t, a.p, i + 1 < unique.length ? b.t : b.t + period, b.p]);
-			}
+			else
+				for (let i = 0; i < unique.length; i++) {
+					const a = unique[i],
+						b = unique[(i + 1) % unique.length];
+					intervals.push([a.t, a.p, i + 1 < unique.length ? b.t : b.t + period, b.p]);
+				}
 		} else {
 			const cuts = [{ t: 0, p: getPointAtParam(curve, 0) }, ...unique, { t: 1, p: getPointAtParam(curve, 1) }];
 			for (let i = 0; i < cuts.length - 1; i++) intervals.push([cuts[i].t, cuts[i].p, cuts[i + 1].t, cuts[i + 1].p]);
 		}
 		for (const [t0, p0, t1, p1] of intervals) {
-			const count = curve.type === 'segment' ? 1 : Math.max(1, Math.ceil((curve.type === 'arc' || curve.type === 'elliptical_arc' ? 48 : 96) * Math.abs(t1 - t0) / period));
+			const count =
+				curve.type === 'segment'
+					? 1
+					: Math.max(
+							1,
+							Math.ceil(
+								((curve.type === 'arc' || curve.type === 'elliptical_arc' ? 48 : 96) * Math.abs(t1 - t0)) / period
+							)
+						);
 			let prev = p0;
 			for (let k = 1; k <= count; k++) {
-				const next = k === count ? p1 : curvePointAt(item, t0 + (t1 - t0) * k / count);
+				const next = k === count ? p1 : curvePointAt(item, t0 + ((t1 - t0) * k) / count);
 				if (Math.hypot(next.x - prev.x, next.y - prev.y) > 1e-7) {
-					const nextT = t0 + (t1 - t0) * k / count;
-					const prevT = t0 + (t1 - t0) * (k - 1) / count;
+					const nextT = t0 + ((t1 - t0) * k) / count;
+					const prevT = t0 + ((t1 - t0) * (k - 1)) / count;
 					segments.push({ a: prev, b: next, curve, t0: prevT, t1: nextT });
 				}
 				prev = next;
 			}
 		}
 	}
-	const nodes = new Map<string, Vec2>(), edges = new Map<string, Set<string>>(), edgeSources = new Map<string, BoundaryEdge>();
-	const edgeKey = (a: string, b: string) => a < b ? `${a}|${b}` : `${b}|${a}`;
-	const addEdge = (segment: typeof segments[number]) => {
-		const ka = key(segment.a), kb = key(segment.b); if (ka === kb) return;
-		nodes.set(ka, segment.a); nodes.set(kb, segment.b);
+	const nodes = new Map<string, Vec2>(),
+		edges = new Map<string, Set<string>>(),
+		edgeSources = new Map<string, BoundaryEdge>();
+	const edgeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+	const addEdge = (segment: (typeof segments)[number]) => {
+		const ka = key(segment.a),
+			kb = key(segment.b);
+		if (ka === kb) return;
+		nodes.set(ka, segment.a);
+		nodes.set(kb, segment.b);
 		(edges.get(ka) ?? (edges.set(ka, new Set()), edges.get(ka)!)).add(kb);
 		(edges.get(kb) ?? (edges.set(kb, new Set()), edges.get(kb)!)).add(ka);
-		edgeSources.set(edgeKey(ka, kb), { curve: segment.curve, t0: segment.t0, t1: segment.t1, from: ka, to: kb });
+		edgeSources.set(edgeKey(ka, kb), {
+			curve: segment.curve,
+			t0: segment.t0,
+			t1: segment.t1,
+			from: ka,
+			to: kb,
+		});
 	};
 	for (const segment of segments) addEdge(segment);
 	// Open strokes and dangling branches do not bound faces. Remove graph bridges
 	// before walking faces so dead ends cannot distort the region boundary traversal.
 	const bridges = new Set<string>();
-	const discovery = new Map<string, number>(), low = new Map<string, number>();
+	const discovery = new Map<string, number>(),
+		low = new Map<string, number>();
 	let time = 0;
 	const findBridges = (node: string, parent: string | null) => {
-		discovery.set(node, ++time); low.set(node, time);
+		discovery.set(node, ++time);
+		low.set(node, time);
 		for (const next of edges.get(node) ?? []) {
 			if (next === parent) continue;
 			if (!discovery.has(next)) {
@@ -189,22 +269,52 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 		}
 	};
 	for (const node of edges.keys()) if (!discovery.has(node)) findBridges(node, null);
-	for (const [node, adjacent] of edges) for (const next of adjacent) if (bridges.has(edgeKey(node, next))) adjacent.delete(next);
-	const visited = new Set<string>(), loops: Array<{ points: Vec2[]; edges: BoundaryEdge[]; area: number; path: string }> = [];
-	for (const [from, adjacent] of edges) for (const to of adjacent) {
-		const edgeId = (a:string,b:string)=>`${a}>${b}`; if(visited.has(edgeId(from,to)))continue;
-		const loop: Vec2[]=[]; const loopEdges: BoundaryEdge[]=[]; const localEdges = new Set<string>(); let a=from,b=to, guard=0;
-		while(guard++<10000){ const id=edgeId(a,b); if(localEdges.has(id))break; localEdges.add(id); loop.push(nodes.get(a)!);
-			const source = edgeSources.get(edgeKey(a, b)); if (source) loopEdges.push(source);
-			const around=[...(edges.get(b)??[])].sort((u,v)=>Math.atan2(nodes.get(u)!.y-nodes.get(b)!.y,nodes.get(u)!.x-nodes.get(b)!.x)-Math.atan2(nodes.get(v)!.y-nodes.get(b)!.y,nodes.get(v)!.x-nodes.get(b)!.x));
-			const index=around.indexOf(a); if(index<0||!around.length)break; const next=around[(index-1+around.length)%around.length]; a=b;b=next; if(a===from&&b===to)break;
+	for (const [node, adjacent] of edges)
+		for (const next of adjacent) if (bridges.has(edgeKey(node, next))) adjacent.delete(next);
+	const visited = new Set<string>(),
+		loops: Array<{ points: Vec2[]; edges: BoundaryEdge[]; area: number; path: string }> = [];
+	for (const [from, adjacent] of edges)
+		for (const to of adjacent) {
+			const edgeId = (a: string, b: string) => `${a}>${b}`;
+			if (visited.has(edgeId(from, to))) continue;
+			const loop: Vec2[] = [];
+			const loopEdges: BoundaryEdge[] = [];
+			const localEdges = new Set<string>();
+			let a = from,
+				b = to,
+				guard = 0;
+			while (guard++ < 10000) {
+				const id = edgeId(a, b);
+				if (localEdges.has(id)) break;
+				localEdges.add(id);
+				loop.push(nodes.get(a)!);
+				const source = edgeSources.get(edgeKey(a, b));
+				if (source) loopEdges.push(source);
+				const around = [...(edges.get(b) ?? [])].sort(
+					(u, v) =>
+						Math.atan2(nodes.get(u)!.y - nodes.get(b)!.y, nodes.get(u)!.x - nodes.get(b)!.x) -
+						Math.atan2(nodes.get(v)!.y - nodes.get(b)!.y, nodes.get(v)!.x - nodes.get(b)!.x)
+				);
+				const index = around.indexOf(a);
+				if (index < 0 || !around.length) break;
+				const next = around[(index - 1 + around.length) % around.length];
+				a = b;
+				b = next;
+				if (a === from && b === to) break;
+			}
+			for (const id of localEdges) visited.add(id);
+			if (loop.length < 3 || a !== from || b !== to) continue;
+			let area = 0;
+			for (let i = 0; i < loop.length; i++) area += cross(loop[i], loop[(i + 1) % loop.length]);
+			area /= 2;
+			if (area <= 1e-7) continue;
+			loops.push({
+				points: loop,
+				edges: loopEdges,
+				area,
+				path: exactRingPath(loop, loopEdges),
+			});
 		}
-		for (const id of localEdges) visited.add(id);
-		if(loop.length<3||a!==from||b!==to)continue;
-		let area=0; for(let i=0;i<loop.length;i++)area+=cross(loop[i],loop[(i+1)%loop.length]); area/=2;
-		if(area<=1e-7)continue;
-		loops.push({ points: loop, edges: loopEdges, area, path: exactRingPath(loop, loopEdges) });
-	}
 	// Disconnected nested contours are separate graph components. Build a parent tree
 	// so each bounded face gets direct child contours as holes while each child remains
 	// a region of its own.
@@ -215,20 +325,26 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 			// Faces created by intersecting curves share their exact intersection
 			// vertices. They are adjacent, not nested, even if a boundary vertex
 			// happens to pass the point-in-polygon test.
-			const sharesBoundary = loop.points.some((p) => loops[j].points.some((q) => Math.hypot(p.x - q.x, p.y - q.y) < 1e-4));
+			const sharesBoundary = loop.points.some(p => loops[j].points.some(q => Math.hypot(p.x - q.x, p.y - q.y) < 1e-4));
 			if (sharesBoundary) continue;
-			if (pointInPolygon(loop.points[0], loops[j].points) && (parent < 0 || loops[j].area < loops[parent].area)) parent = j;
+			if (pointInPolygon(loop.points[0], loops[j].points) && (parent < 0 || loops[j].area < loops[parent].area))
+				parent = j;
 		}
 		return parent;
 	});
 	return loops.map((loop, i) => {
 		const holeLoops = loops.filter((_, child) => parents[child] === i);
-		const holes = holeLoops.map((hole) => hole.points);
-		const path = [loop.path, ...holeLoops.map((hole) => hole.path)].join(' ');
-		return { points: loop.points, holes, area: loop.area - holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0), path };
+		const holes = holeLoops.map(hole => hole.points);
+		const path = [loop.path, ...holeLoops.map(hole => hole.path)].join(' ');
+		return {
+			points: loop.points,
+			holes,
+			area: loop.area - holes.reduce((sum, hole) => sum + Math.abs(polygonArea(hole)), 0),
+			path,
+		};
 	});
 }
 
 export function pointInRegion(point: Vec2, region: SketchRegion): boolean {
-	return pointInPolygon(point, region.points) && !region.holes.some((hole) => pointInPolygon(point, hole));
+	return pointInPolygon(point, region.points) && !region.holes.some(hole => pointInPolygon(point, hole));
 }

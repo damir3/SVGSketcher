@@ -60,10 +60,7 @@ function parseSvgTransform(value: string | null): SvgMatrix {
 				if (args.length >= 3) {
 					const cx = args[1];
 					const cy = args[2];
-					next = multiplySvgMatrices(
-						[1, 0, 0, 1, cx, cy],
-						multiplySvgMatrices(next, [1, 0, 0, 1, -cx, -cy])
-					);
+					next = multiplySvgMatrices([1, 0, 0, 1, cx, cy], multiplySvgMatrices(next, [1, 0, 0, 1, -cx, -cy]));
 				}
 				break;
 			}
@@ -104,7 +101,13 @@ function parseSvgLengthInMillimeters(value: string | null): number | null {
 
 type SvgPathSegment =
 	| { kind: 'line'; start: [number, number]; end: [number, number] }
-	| { kind: 'cubic'; start: [number, number]; c1: [number, number]; c2: [number, number]; end: [number, number] }
+	| {
+			kind: 'cubic';
+			start: [number, number];
+			c1: [number, number];
+			c2: [number, number];
+			end: [number, number];
+	  }
 	| {
 			kind: 'arc';
 			start: [number, number];
@@ -131,8 +134,7 @@ function parseSvgPath(d: string): Array<{ segments: SvgPathSegment[]; closed: bo
 
 	const isCommand = (v: string) => /^[a-z]$/i.test(v);
 	const take = (): number => Number(tokens[i++]);
-	const hasNumbers = (count: number) =>
-		i + count <= tokens.length && !tokens.slice(i, i + count).some(isCommand);
+	const hasNumbers = (count: number) => i + count <= tokens.length && !tokens.slice(i, i + count).some(isCommand);
 
 	const lineTo = (ex: number, ey: number) => {
 		current?.segments.push({ kind: 'line', start: [x, y], end: [ex, ey] });
@@ -195,10 +197,7 @@ function parseSvgPath(d: string): Array<{ segments: SvgPathSegment[]; closed: bo
 				continue;
 			}
 			const n = take();
-			lineTo(
-				op === 'H' ? (relative ? x + n : n) : x,
-				op === 'V' ? (relative ? y + n : n) : y
-			);
+			lineTo(op === 'H' ? (relative ? x + n : n) : x, op === 'V' ? (relative ? y + n : n) : y);
 			cubicControl = null;
 			quadraticControl = null;
 			continue;
@@ -212,11 +211,7 @@ function parseSvgPath(d: string): Array<{ segments: SvgPathSegment[]; closed: bo
 			}
 			const start: [number, number] = [x, y];
 			const c1: [number, number] =
-				op === 'C'
-					? [take(), take()]
-					: cubicControl
-						? [2 * x - cubicControl[0], 2 * y - cubicControl[1]]
-						: [x, y];
+				op === 'C' ? [take(), take()] : cubicControl ? [2 * x - cubicControl[0], 2 * y - cubicControl[1]] : [x, y];
 			if (relative && op === 'C') {
 				c1[0] += start[0];
 				c1[1] += start[1];
@@ -265,10 +260,7 @@ function parseSvgPath(d: string): Array<{ segments: SvgPathSegment[]; closed: bo
 				start[0] + (2 / 3) * (control[0] - start[0]),
 				start[1] + (2 / 3) * (control[1] - start[1]),
 			];
-			const c2: [number, number] = [
-				end[0] + (2 / 3) * (control[0] - end[0]),
-				end[1] + (2 / 3) * (control[1] - end[1]),
-			];
+			const c2: [number, number] = [end[0] + (2 / 3) * (control[0] - end[0]), end[1] + (2 / 3) * (control[1] - end[1])];
 
 			current?.segments.push({ kind: 'cubic', start, c1, c2, end });
 			x = end[0];
@@ -292,10 +284,7 @@ function parseSvgPath(d: string): Array<{ segments: SvgPathSegment[]; closed: bo
 			const ny = take();
 
 			const start: [number, number] = [x, y];
-			const end: [number, number] = [
-				relative ? x + nx : nx,
-				relative ? y + ny : ny,
-			];
+			const end: [number, number] = [relative ? x + nx : nx, relative ? y + ny : ny];
 
 			if (rx === 0 || ry === 0) {
 				lineTo(end[0], end[1]);
@@ -322,7 +311,7 @@ function parseSvgPath(d: string): Array<{ segments: SvgPathSegment[]; closed: bo
 		command = '';
 	}
 
-	return paths.filter((path) => path.segments.length > 0);
+	return paths.filter(path => path.segments.length > 0);
 }
 
 function getSvgArcCenter(segment: Extract<SvgPathSegment, { kind: 'arc' }>) {
@@ -346,17 +335,14 @@ function getSvgArcCenter(segment: Extract<SvgPathSegment, { kind: 'arc' }>) {
 
 	const numerator = Math.max(0, rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp);
 	const denominator = rx * rx * yp * yp + ry * ry * xp * xp;
-	const factor =
-		(segment.large === segment.sweep ? -1 : 1) *
-		Math.sqrt(denominator ? numerator / denominator : 0);
+	const factor = (segment.large === segment.sweep ? -1 : 1) * Math.sqrt(denominator ? numerator / denominator : 0);
 
 	const cxp = (factor * rx * yp) / ry;
 	const cyp = (factor * -ry * xp) / rx;
 	const cx = cos * cxp - sin * cyp + (segment.start[0] + segment.end[0]) / 2;
 	const cy = sin * cxp + cos * cyp + (segment.start[1] + segment.end[1]) / 2;
 
-	const angle = (ux: number, uy: number, vx: number, vy: number) =>
-		Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+	const angle = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
 
 	const ux = (xp - cxp) / rx;
 	const uy = (yp - cyp) / ry;
@@ -409,7 +395,11 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 		return { success: false, error: 'SVG contains no supported geometry' };
 	}
 
-	const rootViewBox = root.getAttribute('viewBox')?.trim().split(/[\s,]+/).map(Number);
+	const rootViewBox = root
+		.getAttribute('viewBox')
+		?.trim()
+		.split(/[\s,]+/)
+		.map(Number);
 	let viewMatrix: SvgMatrix = [1, 0, 0, 1, 0, 0];
 
 	if (rootViewBox?.length === 4 && rootViewBox.every(Number.isFinite)) {
@@ -427,8 +417,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 		return [m[0] * x + m[2] * y + m[4], -(m[1] * x + m[3] * y + m[5])];
 	};
 
-	const num = (attrs: Record<string, string>, key: string, fallback = 0) =>
-		Number(attrs[key] ?? fallback);
+	const num = (attrs: Record<string, string>, key: string, fallback = 0) => Number(attrs[key] ?? fallback);
 
 	const pathPointIds = new Map<string, string>();
 	const getPathPointId = (coord: [number, number]): string => {
@@ -522,7 +511,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 				const start = getPathPointId(segment.start);
 				const end = getPathPointId(segment.end);
-				const clockwise = (ux * vy - uy * vx < 0) === (segment.sweep === 1);
+				const clockwise = ux * vy - uy * vx < 0 === (segment.sweep === 1);
 				const centerId = sketch.addPoint(center[0], center[1]).id;
 
 				if (Math.abs(majorRadius - minorRadius) < 1e-8) {
@@ -854,16 +843,16 @@ export function exportSketchToSVG(
 				}
 			}
 		}
-		const pts = spline.pointIds.map((id) => sketch.points.get(id)).filter(Boolean) as SketchPoint[];
+		const pts = spline.pointIds.map(id => sketch.points.get(id)).filter(Boolean) as SketchPoint[];
 		if (pts.length >= 2) {
 			let segments: BezierSegment[] = [];
 			if (spline.splineType === 'control') {
 				segments = bsplineToBezier(
-					pts.map((p) => ({ x: p.x, y: -p.y })),
+					pts.map(p => ({ x: p.x, y: -p.y })),
 					spline.knots
 				);
 			} else {
-				const handles = (spline.tangentLineIds || []).map((lid) => {
+				const handles = (spline.tangentLineIds || []).map(lid => {
 					const line = sketch.lines.get(lid);
 					if (!line) return null;
 					const p1 = sketch.points.get(line.p1Id);
@@ -875,11 +864,11 @@ export function exportSketchToSVG(
 					};
 				});
 				segments = fitPointsToBezier(
-					pts.map((p) => ({ x: p.x, y: -p.y })),
+					pts.map(p => ({ x: p.x, y: -p.y })),
 					handles
 				);
 			}
-			const d = getSplineSvgPath(segments, (p) => p, !!spline.isClosed);
+			const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
 			const dash = spline.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
@@ -893,9 +882,7 @@ export function exportSketchToSVG(
 	for (const pt of sketch.points.values()) {
 		if (!usedPoints.has(pt.id)) {
 			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
-			elements.push(
-				`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`
-			);
+			elements.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`);
 		}
 	}
 
@@ -940,11 +927,7 @@ export function importSketchFromSVG(
 				const allMetadata = doc.querySelectorAll('metadata');
 				for (let i = 0; i < allMetadata.length; i++) {
 					const el = allMetadata[i];
-					if (
-						el.textContent &&
-						el.textContent.includes('"format"') &&
-						el.textContent.includes('svg-sketcher')
-					) {
+					if (el.textContent && el.textContent.includes('"format"') && el.textContent.includes('svg-sketcher')) {
 						metaEl = el;
 						break;
 					}

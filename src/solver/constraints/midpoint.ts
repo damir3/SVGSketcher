@@ -39,7 +39,11 @@ export class MidpointConstraint extends BaseConstraint {
 		];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		const alpha = this.ratio;
 		this.addJacobianEntry(res, paramIndices, `${this.midId}.x`, baseRow, this.weight);
@@ -54,7 +58,10 @@ export class MidpointConstraint extends BaseConstraint {
 
 	override render(ctx: ConstraintRenderContext): void {
 		for (const line of ctx.sketch.lines.values()) {
-			if (line.isSplineHandle && ((line.p1Id === this.p1Id && line.p2Id === this.p2Id) || (line.p1Id === this.p2Id && line.p2Id === this.p1Id))) {
+			if (
+				line.isSplineHandle &&
+				((line.p1Id === this.p1Id && line.p2Id === this.p2Id) || (line.p1Id === this.p2Id && line.p2Id === this.p1Id))
+			) {
 				return;
 			}
 		}

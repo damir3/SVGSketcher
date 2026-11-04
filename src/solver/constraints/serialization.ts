@@ -49,30 +49,191 @@ interface ConstraintSnapshotBase {
 type ConstraintSnapshotData =
 	| { type: 'fixed' | 'drag_point'; pointId: string; targetX: number; targetY: number }
 	| { type: 'coincident' | 'horizontal' | 'vertical'; p1Id: string; p2Id: string }
-	| { type: 'distance'; p1Id: string; p2Id: string; targetDistance: number; offset?: number; orientation: 'aligned' | 'horizontal' | 'vertical' }
-	| { type: 'point_to_line_distance'; pointId: string; lineId: string; lineP1Id: string; lineP2Id: string; targetDistance: number; side: number; offset?: number }
-	| { type: 'angle'; line1Id: string; line2Id: string; l1P1: string; l1P2: string; l2P1: string; l2P2: string; targetAngle: number; arcRadius: number; s1: number; s2: number; sign: number }
-	| { type: 'radius'; circleId: string; targetRadius: number; leaderAngle?: number; displayMode: 'radius' | 'diameter' }
+	| {
+			type: 'distance';
+			p1Id: string;
+			p2Id: string;
+			targetDistance: number;
+			offset?: number;
+			orientation: 'aligned' | 'horizontal' | 'vertical';
+	  }
+	| {
+			type: 'point_to_line_distance';
+			pointId: string;
+			lineId: string;
+			lineP1Id: string;
+			lineP2Id: string;
+			targetDistance: number;
+			side: number;
+			offset?: number;
+	  }
+	| {
+			type: 'angle';
+			line1Id: string;
+			line2Id: string;
+			l1P1: string;
+			l1P2: string;
+			l2P1: string;
+			l2P2: string;
+			targetAngle: number;
+			arcRadius: number;
+			s1: number;
+			s2: number;
+			sign: number;
+	  }
+	| {
+			type: 'radius';
+			circleId: string;
+			targetRadius: number;
+			leaderAngle?: number;
+			displayMode: 'radius' | 'diameter';
+	  }
 	| { type: 'equal_length'; line1P1: string; line1P2: string; line2P1: string; line2P2: string }
-	| { type: 'parallel' | 'collinear' | 'perpendicular'; l1P1: string; l1P2: string; l2P1: string; l2P2: string }
+	| {
+			type: 'parallel' | 'collinear' | 'perpendicular';
+			l1P1: string;
+			l1P2: string;
+			l2P1: string;
+			l2P2: string;
+	  }
 	| { type: 'equal_radius'; circle1Id: string; circle2Id: string }
-	| { type: 'symmetry'; p1Id: string; p2Id: string; lineP1Id: string; lineP2Id: string; lineId?: string }
-	| { type: 'circular_pattern'; centerPtId: string; sourceObjectIds: string[]; distribution: 'full' | 'partial' | 'symmetric'; totalAngle: number; angleDeg?: number; quantity: number; suppression: boolean; suppressedIndices: number[]; copies: PatternCopyData[]; totalAngleExpression?: string; isReadOnly?: boolean }
-	| { type: 'rectangular_pattern'; sourceObjectIds: string[]; line1Id: string | null; line1P1Id?: string; line1P2Id?: string; line2Id: string | null; line2P1Id?: string; line2P2Id?: string; quantity1: number; distance1: number; direction1: 'one_direction' | 'symmetric'; quantity2: number; distance2: number; direction2: 'one_direction' | 'symmetric'; suppression: boolean; suppressedIndices: number[]; copies: RectangularPatternCopyData[]; distance1Expression?: string; distance2Expression?: string }
+	| {
+			type: 'symmetry';
+			p1Id: string;
+			p2Id: string;
+			lineP1Id: string;
+			lineP2Id: string;
+			lineId?: string;
+	  }
+	| {
+			type: 'circular_pattern';
+			centerPtId: string;
+			sourceObjectIds: string[];
+			distribution: 'full' | 'partial' | 'symmetric';
+			totalAngle: number;
+			angleDeg?: number;
+			quantity: number;
+			suppression: boolean;
+			suppressedIndices: number[];
+			copies: PatternCopyData[];
+			totalAngleExpression?: string;
+			isReadOnly?: boolean;
+	  }
+	| {
+			type: 'rectangular_pattern';
+			sourceObjectIds: string[];
+			line1Id: string | null;
+			line1P1Id?: string;
+			line1P2Id?: string;
+			line2Id: string | null;
+			line2P1Id?: string;
+			line2P2Id?: string;
+			quantity1: number;
+			distance1: number;
+			direction1: 'one_direction' | 'symmetric';
+			quantity2: number;
+			distance2: number;
+			direction2: 'one_direction' | 'symmetric';
+			suppression: boolean;
+			suppressedIndices: number[];
+			copies: RectangularPatternCopyData[];
+			distance1Expression?: string;
+			distance2Expression?: string;
+	  }
 	| { type: 'point_on_line'; pointId: string; lineP1Id: string; lineP2Id: string }
 	| { type: 'point_on_circle'; pointId: string; circleCenterId: string; circleId: string }
-	| { type: 'point_on_ellipse'; pointId: string; ellipseId: string; centerId: string; majorAxisPointId: string; minorAxisPointId: string }
-	| { type: 'point_on_spline'; pointId: string; splineId: string; splineType: 'fit' | 'control'; splinePointIds: string[]; handlePoints?: any[]; tangentLineIds?: string[]; knots?: number[]; isClosed?: boolean }
-	| { type: 'tangent_line_circle'; lineP1Id: string; lineP2Id: string; circleCenterId: string; circleId: string; initialSide: number }
-	| { type: 'tangent_circle_circle'; circle1CenterId: string; circle1Id: string; circle2CenterId: string; circle2Id: string; isInternal: boolean; outerCircleId: string | null; sharedPointId: string | null }
+	| {
+			type: 'point_on_ellipse';
+			pointId: string;
+			ellipseId: string;
+			centerId: string;
+			majorAxisPointId: string;
+			minorAxisPointId: string;
+	  }
+	| {
+			type: 'point_on_spline';
+			pointId: string;
+			splineId: string;
+			splineType: 'fit' | 'control';
+			splinePointIds: string[];
+			handlePoints?: any[];
+			tangentLineIds?: string[];
+			knots?: number[];
+			isClosed?: boolean;
+	  }
+	| {
+			type: 'tangent_line_circle';
+			lineP1Id: string;
+			lineP2Id: string;
+			circleCenterId: string;
+			circleId: string;
+			initialSide: number;
+	  }
+	| {
+			type: 'tangent_circle_circle';
+			circle1CenterId: string;
+			circle1Id: string;
+			circle2CenterId: string;
+			circle2Id: string;
+			isInternal: boolean;
+			outerCircleId: string | null;
+			sharedPointId: string | null;
+	  }
 	| { type: 'concentric'; c1CenterId: string; c2CenterId: string }
 	| { type: 'midpoint'; midId: string; p1Id: string; p2Id: string; ratio: number }
-	| { type: 'arc_endpoints'; arcId: string; centerId: string; startPointId: string; endPointId: string }
-	| { type: 'ellipse_axis'; ellipseId: string; centerId: string; majorAxisPointId: string; minorAxisPointId: string }
-	| { type: 'elliptical_arc_endpoints'; arcId: string; centerId: string; majorAxisPointId: string; minorAxisPointId: string; startPointId: string; endPointId: string }
-	| { type: 'offset'; targetDistance: number; pairs: any[]; dimPairIndex: number; sourceChain?: any; direction?: any; flip?: boolean; cornerPointIds?: string[] }
-	| { type: 'origin_distance'; pointId: string; targetDistance: number; orientation: 'aligned' | 'horizontal' | 'vertical'; side: number; offset?: number; isCoincident: boolean }
-	| { type: 'line_to_axis_distance'; lineId: string; lineP1Id: string; lineP2Id: string; axis: 'x' | 'y'; targetDistance: number; side: number; offset?: number; isCollinear: boolean };
+	| {
+			type: 'arc_endpoints';
+			arcId: string;
+			centerId: string;
+			startPointId: string;
+			endPointId: string;
+	  }
+	| {
+			type: 'ellipse_axis';
+			ellipseId: string;
+			centerId: string;
+			majorAxisPointId: string;
+			minorAxisPointId: string;
+	  }
+	| {
+			type: 'elliptical_arc_endpoints';
+			arcId: string;
+			centerId: string;
+			majorAxisPointId: string;
+			minorAxisPointId: string;
+			startPointId: string;
+			endPointId: string;
+	  }
+	| {
+			type: 'offset';
+			targetDistance: number;
+			pairs: any[];
+			dimPairIndex: number;
+			sourceChain?: any;
+			direction?: any;
+			flip?: boolean;
+			cornerPointIds?: string[];
+	  }
+	| {
+			type: 'origin_distance';
+			pointId: string;
+			targetDistance: number;
+			orientation: 'aligned' | 'horizontal' | 'vertical';
+			side: number;
+			offset?: number;
+			isCoincident: boolean;
+	  }
+	| {
+			type: 'line_to_axis_distance';
+			lineId: string;
+			lineP1Id: string;
+			lineP2Id: string;
+			axis: 'x' | 'y';
+			targetDistance: number;
+			side: number;
+			offset?: number;
+			isCollinear: boolean;
+	  };
 
 export type ConstraintSnapshot = ConstraintSnapshotBase & ConstraintSnapshotData;
 

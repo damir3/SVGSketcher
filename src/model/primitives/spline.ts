@@ -1,9 +1,5 @@
 import type { Vec2 } from '../../math/vector';
-import {
-	bsplineToBezier,
-	fitPointsToBezier,
-	type BezierSegment,
-} from '../../math/spline';
+import { bsplineToBezier, fitPointsToBezier, type BezierSegment } from '../../math/spline';
 import { distanceToSpline } from '../../math/hitTest';
 import type { GeoSpline } from '../../math/intersection';
 import type { ISketchPrimitive } from './base';

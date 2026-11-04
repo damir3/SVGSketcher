@@ -682,11 +682,7 @@ export function getPrimitiveStrokeAttrs(
 	};
 }
 
-export function getPreviewStrokeAttrs(
-	isConstruction = false,
-	isGuide = false,
-	roundCap = false
-): SvgAttrs {
+export function getPreviewStrokeAttrs(isConstruction = false, isGuide = false, roundCap = false): SvgAttrs {
 	return {
 		stroke: isGuide ? COLORS.primary : isConstruction ? COLORS.construction : COLORS.unconstrained,
 		'stroke-width': STROKE_WIDTH.normal,

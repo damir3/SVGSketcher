@@ -265,7 +265,7 @@ export class OffsetTool extends BaseTool {
 		if (bbox) {
 			this.popup.updatePosition(bbox);
 		}
-			dispatchToolModeChange('offset', direction);
+		dispatchToolModeChange('offset', direction);
 		this.onDirectionChange?.(direction);
 		this.onStateChange?.();
 		this.ctx?.requestRender();
@@ -283,14 +283,7 @@ export class OffsetTool extends BaseTool {
 			return;
 		}
 
-		const res = calculateOffsetGeometry(
-			this.ctx.sketch,
-			this.chain,
-			this.direction,
-			this.dist1,
-			this.dist2,
-			this.flip
-		);
+		const res = calculateOffsetGeometry(this.ctx.sketch, this.chain, this.direction, this.dist1, this.dist2, this.flip);
 		this.geomResult = res;
 
 		if (!res.isValid) {
@@ -303,10 +296,7 @@ export class OffsetTool extends BaseTool {
 	getGizmoBoundingBox(): ScreenBoundingBox | null {
 		if (!this.geomResult || !this.ctx) return null;
 
-		const sAnchor = this.ctx.viewport.worldToScreen(
-			this.geomResult.gizmoAnchor.x,
-			this.geomResult.gizmoAnchor.y
-		);
+		const sAnchor = this.ctx.viewport.worldToScreen(this.geomResult.gizmoAnchor.x, this.geomResult.gizmoAnchor.y);
 
 		const pts: Vec2[] = [sAnchor];
 
@@ -457,13 +447,7 @@ export class OffsetTool extends BaseTool {
 				return;
 			}
 
-			const nextChain = toggleOrExtendChain(
-				this.ctx.sketch,
-				this.chain,
-				hitId,
-				hitType,
-				this.chainSelection
-			);
+			const nextChain = toggleOrExtendChain(this.ctx.sketch, this.chain, hitId, hitType, this.chainSelection);
 
 			this.chain = nextChain;
 			this.recalculate();

@@ -107,7 +107,7 @@ export function renderArcPreviewVisual(
 	const midX = sc.x + sr * Math.cos(midAngle);
 	const midY = sc.y + sr * Math.sin(midAngle);
 
-	const deg = sweepDeg ?? (sweepAngle * 180 / Math.PI);
+	const deg = sweepDeg ?? (sweepAngle * 180) / Math.PI;
 	renderTooltip(parent, midX, midY, `R ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
 }
 
@@ -184,11 +184,18 @@ export function renderEllipseMajorAxisPreviewVisual(
 	radiusVal: number,
 	_isConstruction = false
 ): void {
-	createSvgLine(sc.x, sc.y, current.x, current.y, {
-		stroke: COLORS.primary,
-		'stroke-width': STROKE_WIDTH.dimension,
-		'stroke-dasharray': DASH_ARRAY.axis,
-	}, parent);
+	createSvgLine(
+		sc.x,
+		sc.y,
+		current.x,
+		current.y,
+		{
+			stroke: COLORS.primary,
+			'stroke-width': STROKE_WIDTH.dimension,
+			'stroke-dasharray': DASH_ARRAY.axis,
+		},
+		parent
+	);
 
 	const deg = (Math.atan2(current.y - sc.y, current.x - sc.x) * 180) / Math.PI;
 	renderTooltip(parent, current.x + 12, current.y - 12, `Rx ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
@@ -208,10 +215,17 @@ export function renderEllipsePreviewVisual(
 	const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
 	const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
 
-	createSvgEllipse(sc.x, sc.y, rx, ry, {
-		transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-		...getPreviewStrokeAttrs(isConstruction, isGuide),
-	}, parent);
+	createSvgEllipse(
+		sc.x,
+		sc.y,
+		rx,
+		ry,
+		{
+			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+			...getPreviewStrokeAttrs(isConstruction, isGuide),
+		},
+		parent
+	);
 
 	createSvgLine(sc.x, sc.y, smaj.x, smaj.y, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc.x, sc.y, smin.x, smin.y, AUX_RAY_ATTRS, parent);
@@ -234,13 +248,20 @@ export function renderEllipticalArcStartPreviewVisual(
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 	const thetaDeg = (theta * 180) / Math.PI;
 
-	createSvgEllipse(sc.x, sc.y, rx, ry, {
-		transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-		stroke: COLORS.guideStartEllipse,
-		'stroke-width': STROKE_WIDTH.dimension,
-		'stroke-dasharray': DASH_ARRAY.axis,
-		fill: 'none',
-	}, parent);
+	createSvgEllipse(
+		sc.x,
+		sc.y,
+		rx,
+		ry,
+		{
+			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+			stroke: COLORS.guideStartEllipse,
+			'stroke-width': STROKE_WIDTH.dimension,
+			'stroke-dasharray': DASH_ARRAY.axis,
+			fill: 'none',
+		},
+		parent
+	);
 
 	const ux = Math.cos(theta);
 	const uy = Math.sin(theta);
@@ -280,10 +301,17 @@ export function renderEllipticalArcPreviewVisual(
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 	const thetaDeg = (theta * 180) / Math.PI;
 
-	createSvgEllipse(sc.x, sc.y, rx, ry, {
-		transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-		...GUIDE_OUTLINE_ATTRS,
-	}, parent);
+	createSvgEllipse(
+		sc.x,
+		sc.y,
+		rx,
+		ry,
+		{
+			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+			...GUIDE_OUTLINE_ATTRS,
+		},
+		parent
+	);
 
 	const ux = Math.cos(theta);
 	const uy = Math.sin(theta);
@@ -319,7 +347,12 @@ export function renderEllipticalArcPreviewVisual(
 	createSvgLine(sc.x, sc.y, projSe.x, projSe.y, AUX_RAY_ATTRS, parent);
 
 	const sweepDeg = (sweepAngle * 180) / Math.PI;
-	renderTooltip(parent, projSe.x + 12, projSe.y - 12, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`);
+	renderTooltip(
+		parent,
+		projSe.x + 12,
+		projSe.y - 12,
+		`Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`
+	);
 }
 
 export function renderSplinePreviewVisual(
@@ -354,10 +387,14 @@ export function renderSplinePreviewVisual(
 	}
 
 	const checkmarkPos = { x: lastPt.x + 20, y: lastPt.y - 12 };
-	const checkG = createSvgElement('g', {
-		class: 'spline-finish-checkmark',
-		style: 'cursor: pointer;',
-	}, parent);
+	const checkG = createSvgElement(
+		'g',
+		{
+			class: 'spline-finish-checkmark',
+			style: 'cursor: pointer;',
+		},
+		parent
+	);
 
 	createSvgCircle(checkmarkPos.x, checkmarkPos.y, 11, SPLINE_CHECKMARK_CIRCLE_ATTRS, checkG);
 	const checkD = `M ${checkmarkPos.x - 4} ${checkmarkPos.y} L ${checkmarkPos.x - 1} ${checkmarkPos.y + 3.5} L ${checkmarkPos.x + 4.5} ${checkmarkPos.y - 3.5}`;
@@ -392,7 +429,17 @@ export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandi
 			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
 			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
 			const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
-			createSvgEllipse(sc.x, sc.y, rx, ry, { transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`, ...TRIM_STROKE_ATTRS }, parent);
+			createSvgEllipse(
+				sc.x,
+				sc.y,
+				rx,
+				ry,
+				{
+					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+					...TRIM_STROKE_ATTRS,
+				},
+				parent
+			);
 		} else if (curve.type === 'elliptical_arc') {
 			const sc = viewport.worldToScreen(curve.center.x, curve.center.y);
 			const smaj = viewport.worldToScreen(curve.majorAxisPoint.x, curve.majorAxisPoint.y);
@@ -469,11 +516,7 @@ export function renderBreakPreviewVisual(parent: SVGElement, candidate: TrimCand
 	}
 }
 
-export function renderExtendPreviewVisual(
-	parent: SVGElement,
-	candidate: ExtendCandidate,
-	viewport: Viewport
-): void {
+export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendCandidate, viewport: Viewport): void {
 	const EXTEND_PREVIEW_ATTRS = {
 		stroke: '#0284c7',
 		'stroke-width': 2,

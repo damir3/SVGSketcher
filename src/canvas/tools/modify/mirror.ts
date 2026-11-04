@@ -319,7 +319,10 @@ export class MirrorTool extends BaseTool {
 		};
 
 		let createdCount = 0;
-		const newCreatedItems: Array<{ id: string; type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' }> = [];
+		const newCreatedItems: Array<{
+			id: string;
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+		}> = [];
 
 		// Mirror each primitive in selectedObjectIds
 		for (const objId of selectedObjectIds) {

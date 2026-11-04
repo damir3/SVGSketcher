@@ -29,7 +29,11 @@ export class CoincidentConstraint extends BaseConstraint {
 		return [(p1x - p2x) * this.weight, (p1y - p2y) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, -this.weight);

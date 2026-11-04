@@ -117,11 +117,7 @@ export function createSvgEllipse(
 	);
 }
 
-export function createSvgPath(
-	d: string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGPathElement {
+export function createSvgPath(d: string, attrs?: SvgAttrs, parent?: SVGElement): SVGPathElement {
 	return createSvgElement(
 		'path',
 		{
@@ -235,4 +231,3 @@ export function getEllipticalArcSvgPath(
 
 	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 }
-

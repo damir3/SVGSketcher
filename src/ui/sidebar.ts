@@ -211,9 +211,7 @@ export class Sidebar {
 			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 		}>
 	): string {
-		const visiblePrimitives = primitives.filter(
-			p => p.id !== 'origin' && p.id !== 'axis_x' && p.id !== 'axis_y'
-		);
+		const visiblePrimitives = primitives.filter(p => p.id !== 'origin' && p.id !== 'axis_x' && p.id !== 'axis_y');
 		return `
 			<div class="inspector-divider"></div>
 			<div class="inspector-primitives-section">
@@ -266,11 +264,7 @@ export class Sidebar {
 		}
 	}
 
-	private renderConstraintsSublist(
-		constraints: any[],
-		entityName: string,
-		currentEntityIds: string[] = []
-	): string {
+	private renderConstraintsSublist(constraints: any[], entityName: string, currentEntityIds: string[] = []): string {
 		const visibleConstraints = constraints.filter(
 			c => c.type !== 'arc_endpoints' && c.type !== 'elliptical_arc_endpoints'
 		);
@@ -408,11 +402,12 @@ export class Sidebar {
 
 		if (c instanceof DistanceConstraint) {
 			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
-			name = c.orientation === 'horizontal'
-				? 'Horizontal Distance'
-				: c.orientation === 'vertical'
-				? 'Vertical Distance'
-				: 'Distance';
+			name =
+				c.orientation === 'horizontal'
+					? 'Horizontal Distance'
+					: c.orientation === 'vertical'
+						? 'Vertical Distance'
+						: 'Distance';
 		} else if (c instanceof PointToLineDistanceConstraint) {
 			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
 			name = 'Point-Line Distance';
@@ -423,14 +418,17 @@ export class Sidebar {
 			valBadge = `<span class="val-badge">${c.targetAngle.toFixed(1)}°</span>`;
 			name = 'Angle';
 		} else if (c instanceof RadiusConstraint) {
-			valBadge = c.displayMode === 'diameter'
-				? `<span class="val-badge">Ø ${(c.targetRadius * 2).toFixed(1)} mm</span>`
-				: `<span class="val-badge">R ${c.targetRadius.toFixed(1)} mm</span>`;
+			valBadge =
+				c.displayMode === 'diameter'
+					? `<span class="val-badge">Ø ${(c.targetRadius * 2).toFixed(1)} mm</span>`
+					: `<span class="val-badge">R ${c.targetRadius.toFixed(1)} mm</span>`;
 			name = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
 		} else if (c instanceof CircularPatternConstraint) {
 			const label = c.isReadOnly
 				? `${c.quantity} Vertices`
-				: (c.distribution === 'full' ? `${c.quantity}x Full` : `${c.quantity}x ${c.totalAngle.toFixed(1)}°`);
+				: c.distribution === 'full'
+					? `${c.quantity}x Full`
+					: `${c.quantity}x ${c.totalAngle.toFixed(1)}°`;
 			valBadge = `<span class="val-badge">${label}</span>`;
 			name = c.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern';
 		} else if (c instanceof OriginDistanceConstraint) {
@@ -445,8 +443,8 @@ export class Sidebar {
 					c.orientation === 'horizontal'
 						? 'Distance to Y-Axis'
 						: c.orientation === 'vertical'
-						? 'Distance to X-Axis'
-						: 'Distance to (0,0)';
+							? 'Distance to X-Axis'
+							: 'Distance to (0,0)';
 			}
 		} else if (c instanceof LineToAxisDistanceConstraint) {
 			const axisName = c.axis === 'x' ? 'X-Axis' : 'Y-Axis';
@@ -460,9 +458,7 @@ export class Sidebar {
 
 		const allEntities = this.sketch.getEntitiesForConstraint(c);
 		const targetEntities = (
-			currentEntityIds.length === 1
-				? allEntities.filter(e => e.id !== currentEntityIds[0])
-				: allEntities
+			currentEntityIds.length === 1 ? allEntities.filter(e => e.id !== currentEntityIds[0]) : allEntities
 		).filter(e => e.id !== 'origin' && e.id !== 'axis_x' && e.id !== 'axis_y');
 
 		const linkedEntitiesHtml =
@@ -519,33 +515,58 @@ export class Sidebar {
 
 	private getConstraintIcon(type: string): string {
 		switch (type) {
-			case 'fixed': return ICONS.fixed;
-			case 'coincident': return ICONS.coincident;
-			case 'horizontal': return ICONS.horizontal;
-			case 'vertical': return ICONS.vertical;
-			case 'distance': return ICONS.distance;
-			case 'point_to_line_distance': return ICONS.distance;
-			case 'angle': return ICONS.angle;
-			case 'radius': return ICONS.circle;
+			case 'fixed':
+				return ICONS.fixed;
+			case 'coincident':
+				return ICONS.coincident;
+			case 'horizontal':
+				return ICONS.horizontal;
+			case 'vertical':
+				return ICONS.vertical;
+			case 'distance':
+				return ICONS.distance;
+			case 'point_to_line_distance':
+				return ICONS.distance;
+			case 'angle':
+				return ICONS.angle;
+			case 'radius':
+				return ICONS.circle;
 			case 'equal_length':
-			case 'equal_radius': return ICONS.equal;
-			case 'parallel': return ICONS.parallel;
-			case 'collinear': return ICONS.collinear;
-			case 'perpendicular': return ICONS.perpendicular;
+			case 'equal_radius':
+				return ICONS.equal;
+			case 'parallel':
+				return ICONS.parallel;
+			case 'collinear':
+				return ICONS.collinear;
+			case 'perpendicular':
+				return ICONS.perpendicular;
 			case 'tangent_line_circle':
-			case 'tangent_circle_circle': return ICONS.tangent;
-			case 'concentric': return ICONS.concentric;
-			case 'point_on_line': return ICONS.pointOnLine;
-			case 'point_on_circle': return ICONS.pointOnLine;
-			case 'point_on_ellipse': return ICONS.pointOnLine;
-			case 'point_on_spline': return ICONS.pointOnLine;
-			case 'midpoint': return ICONS.midpoint;
-			case 'symmetry': return ICONS.symmetry;
-			case 'circular_pattern': return ICONS.circular_pattern;
-			case 'rectangular_pattern': return ICONS.rectangular_pattern;
-			case 'origin_distance': return ICONS.distance;
-			case 'line_to_axis_distance': return ICONS.distance;
-			default: return ICONS.coincident;
+			case 'tangent_circle_circle':
+				return ICONS.tangent;
+			case 'concentric':
+				return ICONS.concentric;
+			case 'point_on_line':
+				return ICONS.pointOnLine;
+			case 'point_on_circle':
+				return ICONS.pointOnLine;
+			case 'point_on_ellipse':
+				return ICONS.pointOnLine;
+			case 'point_on_spline':
+				return ICONS.pointOnLine;
+			case 'midpoint':
+				return ICONS.midpoint;
+			case 'symmetry':
+				return ICONS.symmetry;
+			case 'circular_pattern':
+				return ICONS.circular_pattern;
+			case 'rectangular_pattern':
+				return ICONS.rectangular_pattern;
+			case 'origin_distance':
+				return ICONS.distance;
+			case 'line_to_axis_distance':
+				return ICONS.distance;
+			default:
+				return ICONS.coincident;
 		}
 	}
 

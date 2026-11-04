@@ -11,29 +11,30 @@ export type SelectableEntityType =
 	| 'spline'
 	| 'constraint';
 
-export function isEntitySelected(
-	sketch: SketchDocument,
-	id: string,
-	type: SelectableEntityType
-): boolean {
+export function isEntitySelected(sketch: SketchDocument, id: string, type: SelectableEntityType): boolean {
 	switch (type) {
-		case 'point': return sketch.selection.pointIds.has(id);
-		case 'line': return sketch.selection.lineIds.has(id);
-		case 'circle': return sketch.selection.circleIds.has(id);
-		case 'arc': return sketch.selection.arcIds.has(id);
-		case 'ellipse': return sketch.selection.ellipseIds.has(id);
-		case 'elliptical_arc': return sketch.selection.ellipticalArcIds.has(id);
-		case 'spline': return sketch.selection.splineIds.has(id);
-		case 'constraint': return sketch.selection.constraintIds.has(id);
-		default: return false;
+		case 'point':
+			return sketch.selection.pointIds.has(id);
+		case 'line':
+			return sketch.selection.lineIds.has(id);
+		case 'circle':
+			return sketch.selection.circleIds.has(id);
+		case 'arc':
+			return sketch.selection.arcIds.has(id);
+		case 'ellipse':
+			return sketch.selection.ellipseIds.has(id);
+		case 'elliptical_arc':
+			return sketch.selection.ellipticalArcIds.has(id);
+		case 'spline':
+			return sketch.selection.splineIds.has(id);
+		case 'constraint':
+			return sketch.selection.constraintIds.has(id);
+		default:
+			return false;
 	}
 }
 
-export function deselectEntity(
-	sketch: SketchDocument,
-	id: string,
-	type: SelectableEntityType
-): void {
+export function deselectEntity(sketch: SketchDocument, id: string, type: SelectableEntityType): void {
 	switch (type) {
 		case 'point':
 			sketch.selection.pointIds.delete(id);
@@ -64,11 +65,7 @@ export function deselectEntity(
 	sketch.notify();
 }
 
-export function toggleEntitySelection(
-	sketch: SketchDocument,
-	id: string,
-	type: SelectableEntityType
-): void {
+export function toggleEntitySelection(sketch: SketchDocument, id: string, type: SelectableEntityType): void {
 	if (sketch.isEntitySelected(id, type)) {
 		sketch.deselectEntity(id, type);
 	} else {
@@ -284,7 +281,9 @@ export function deleteSelected(sketch: SketchDocument): void {
 	sketch.commitTransaction();
 }
 
-export function getBoundingBox(sketch: SketchDocument): { minX: number; minY: number; maxX: number; maxY: number } | null {
+export function getBoundingBox(
+	sketch: SketchDocument
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
 	if (sketch.points.size === 0) return null;
 	let minX = Infinity;
 	let minY = Infinity;
@@ -354,7 +353,9 @@ export function getBoundingBox(sketch: SketchDocument): { minX: number; minY: nu
 	return { minX, minY, maxX, maxY };
 }
 
-export function getSelectionBoundingBox(sketch: SketchDocument): { minX: number; minY: number; maxX: number; maxY: number } | null {
+export function getSelectionBoundingBox(
+	sketch: SketchDocument
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
 	let minX = Infinity;
 	let minY = Infinity;
 	let maxX = -Infinity;

@@ -88,7 +88,9 @@ export class VariationToolPanel<M extends string> implements IToolPanel {
 		const currentMode = getCurrentMode();
 		const hint = getHint?.() ?? '';
 		const currentOpt = modes.find(m => m.id === currentMode);
-		const defaultHeaderIcon = currentOpt ? (currentOpt.icon ?? (currentOpt.iconName ? getToolIcon(currentOpt.iconName) : '')) : '';
+		const defaultHeaderIcon = currentOpt
+			? (currentOpt.icon ?? (currentOpt.iconName ? getToolIcon(currentOpt.iconName) : ''))
+			: '';
 		const headerIcon = getHeaderIcon?.() ?? defaultHeaderIcon;
 		const cancelIdAttr = cancelButtonId ? `id="${cancelButtonId}"` : '';
 

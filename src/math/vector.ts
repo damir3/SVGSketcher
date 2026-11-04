@@ -73,11 +73,7 @@ export function projectPointOntoLine(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; 
 	return { point: projection, t, dist: dist(p, projection) };
 }
 
-export function getCircumcircle(
-	p1: Vec2,
-	p2: Vec2,
-	p3: Vec2
-): { center: Vec2; radius: number } | null {
+export function getCircumcircle(p1: Vec2, p2: Vec2, p3: Vec2): { center: Vec2; radius: number } | null {
 	const d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
 	if (Math.abs(d) < 1e-6) return null;
 
@@ -93,4 +89,3 @@ export function getCircumcircle(
 
 	return { center: vec(xc, yc), radius: r };
 }
-

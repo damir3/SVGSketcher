@@ -285,7 +285,10 @@ export class FilletTool extends BaseTool {
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
 		const isOverGizmo =
 			this.ctx.renderer.filletGizmoHandle &&
-			dist(screen, { x: this.ctx.renderer.filletGizmoHandle.screenX, y: this.ctx.renderer.filletGizmoHandle.screenY }) <= GIZMO_DISTANCE_PX;
+			dist(screen, {
+				x: this.ctx.renderer.filletGizmoHandle.screenX,
+				y: this.ctx.renderer.filletGizmoHandle.screenY,
+			}) <= GIZMO_DISTANCE_PX;
 
 		if (this.filletGizmoDragState) {
 			this.ctx.setCursor('grabbing');
@@ -585,8 +588,8 @@ export class FilletTool extends BaseTool {
 		const sPos = candidate.result
 			? this.ctx.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
 			: sharedCornerPt
-			? this.ctx.viewport.worldToScreen(sharedCornerPt.x, sharedCornerPt.y)
-			: this.ctx.viewport.worldToScreen(clickPos1.x, clickPos1.y);
+				? this.ctx.viewport.worldToScreen(sharedCornerPt.x, sharedCornerPt.y)
+				: this.ctx.viewport.worldToScreen(clickPos1.x, clickPos1.y);
 
 		const bbox = this.getGizmoBoundingBox();
 		if (this.pendingFillets.length === 1) {

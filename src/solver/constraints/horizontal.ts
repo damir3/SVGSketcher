@@ -25,7 +25,11 @@ export class HorizontalConstraint extends BaseConstraint {
 		return [(p2y - p1y) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, this.weight);

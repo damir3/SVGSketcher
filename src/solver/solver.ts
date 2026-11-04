@@ -223,7 +223,10 @@ export class NumericalSolver {
 				paramMgr.applyStateVector(x);
 				lambda = Math.max(lambda / this.options.lambdaFactor, this.options.minLambda);
 
-				if (Math.sqrt(stepNormSq) < this.options.tolerance || currentError < this.options.tolerance * this.options.tolerance) {
+				if (
+					Math.sqrt(stepNormSq) < this.options.tolerance ||
+					currentError < this.options.tolerance * this.options.tolerance
+				) {
 					iteration++;
 					break;
 				}

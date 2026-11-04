@@ -181,11 +181,17 @@ export class ToolPopup<TFieldId extends string = string> {
 				if (field.type === 'integer') {
 					const stepper = document.createElement('span');
 					stepper.className = 'tool-popup-stepper';
-					for (const [direction, glyph] of [['up', '▲'], ['down', '▼']] as const) {
+					for (const [direction, glyph] of [
+						['up', '▲'],
+						['down', '▼'],
+					] as const) {
 						const button = document.createElement('button');
 						button.type = 'button';
 						button.className = `tool-popup-stepper-${direction}`;
-						button.setAttribute('aria-label', direction === 'up' ? `Increase ${field.label}` : `Decrease ${field.label}`);
+						button.setAttribute(
+							'aria-label',
+							direction === 'up' ? `Increase ${field.label}` : `Decrease ${field.label}`
+						);
 						button.textContent = glyph;
 						button.addEventListener('click', () => {
 							const current = Number.parseFloat(input.value) || 0;
@@ -322,20 +328,14 @@ export class ToolPopup<TFieldId extends string = string> {
 			}
 			left = Math.max(16, left);
 
-				top = Math.min(
+			top = Math.min(
 				Math.max(centerY + this.bboxOffset.y - popupHeight / 2, 16),
 				window.innerHeight - popupHeight - 16
 			);
 		} else {
 			// Screen coordinate positioning
-			left = Math.min(
-				Math.max(posOrBBox.x + this.defaultOffset.x, 16),
-				window.innerWidth - popupWidth - 16
-			);
-			top = Math.min(
-				Math.max(posOrBBox.y + this.defaultOffset.y, 16),
-				window.innerHeight - popupHeight - 16
-			);
+			left = Math.min(Math.max(posOrBBox.x + this.defaultOffset.x, 16), window.innerWidth - popupWidth - 16);
+			top = Math.min(Math.max(posOrBBox.y + this.defaultOffset.y, 16), window.innerHeight - popupHeight - 16);
 		}
 
 		this.container.style.left = `${left}px`;
@@ -498,11 +498,7 @@ export class ToolPopup<TFieldId extends string = string> {
 			return val;
 		}
 
-		const val = parseNumericOrExpression(
-			field.input.value,
-			fallback,
-			this.sketch?.getParameterValuesMap()
-		);
+		const val = parseNumericOrExpression(field.input.value, fallback, this.sketch?.getParameterValuesMap());
 		if (isNaN(val)) return fallback;
 		if (field.config.min !== undefined && val < field.config.min) return field.config.min;
 		if (field.config.max !== undefined && val > field.config.max) return field.config.max;
@@ -525,11 +521,7 @@ export class ToolPopup<TFieldId extends string = string> {
 		return getExpressionIfValid(field.input.value, this.sketch?.getParameterValuesMap());
 	}
 
-	public setValue(
-		id: TFieldId,
-		value: number | string | boolean | null | undefined,
-		formatNumber = true
-	): void {
+	public setValue(id: TFieldId, value: number | string | boolean | null | undefined, formatNumber = true): void {
 		const field = this.fieldMap.get(id);
 		if (!field) return;
 
@@ -657,7 +649,10 @@ export class ToolPopup<TFieldId extends string = string> {
 
 	protected focusFieldElement(el: HTMLElement): void {
 		el.focus?.();
-		if ((typeof HTMLInputElement !== 'undefined' && el instanceof HTMLInputElement) || (el as any)?.tagName === 'INPUT') {
+		if (
+			(typeof HTMLInputElement !== 'undefined' && el instanceof HTMLInputElement) ||
+			(el as any)?.tagName === 'INPUT'
+		) {
 			(el as HTMLInputElement).select?.();
 		}
 	}

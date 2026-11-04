@@ -25,7 +25,11 @@ export class VerticalConstraint extends BaseConstraint {
 		return [(p2x - p1x) * this.weight];
 	}
 
-	override jacobian(paramIndices: Map<string, number>, baseRow: number, _paramMap: Map<string, number>): JacobianEntry[] {
+	override jacobian(
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		_paramMap: Map<string, number>
+	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, this.weight);

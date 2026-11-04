@@ -11,12 +11,7 @@ export class SketchPoint implements ISketchPrimitive {
 	y: number;
 	fixed: boolean;
 
-	constructor(
-		dataOrId: string | { id: string; x: number; y: number; fixed?: boolean },
-		x = 0,
-		y = 0,
-		fixed = false
-	) {
+	constructor(dataOrId: string | { id: string; x: number; y: number; fixed?: boolean }, x = 0, y = 0, fixed = false) {
 		if (typeof dataOrId === 'object') {
 			this.id = dataOrId.id;
 			this.x = dataOrId.x;

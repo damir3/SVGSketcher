@@ -115,10 +115,7 @@ export function getConnectedLinesForPoint(
 /**
  * Creates a ChamferCandidate given a vertex point where exactly 2 lines meet.
  */
-export function findChamferCandidateForPoint(
-	sketch: SketchDocument,
-	pointId: string
-): ChamferCandidate | null {
+export function findChamferCandidateForPoint(sketch: SketchDocument, pointId: string): ChamferCandidate | null {
 	const conn = getConnectedLinesForPoint(sketch, pointId);
 	if (!conn.valid || conn.lineIds.length !== 2) return null;
 

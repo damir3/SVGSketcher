@@ -48,13 +48,7 @@ export class PointOnSplineConstraint extends BaseConstraint {
 			}
 		}
 		const allEntityIds = Array.from(
-			new Set([
-				pointId,
-				splineId,
-				...splinePointIds,
-				...(tangentLineIds || []),
-				...handlePointIds,
-			])
+			new Set([pointId, splineId, ...splinePointIds, ...(tangentLineIds || []), ...handlePointIds])
 		);
 
 		super(id, 'point_on_spline', 'Point on Spline', allEntityIds, weight);

@@ -232,7 +232,7 @@ export class ChamferTool extends BaseTool {
 			this.popup.setFieldVisible('flip', true);
 		}
 		this.recalculate();
-			dispatchToolModeChange('chamfer', mode);
+		dispatchToolModeChange('chamfer', mode);
 		this.onModeChange?.(mode);
 		this.onStateChange?.();
 		this.ctx?.requestRender();
@@ -240,14 +240,7 @@ export class ChamferTool extends BaseTool {
 
 	recalculate(): void {
 		if (!this.candidate) return;
-		const res = calculateChamferGeometry(
-			this.candidate,
-			this.mode,
-			this.dist1,
-			this.dist2,
-			this.angleDeg,
-			this.flip
-		);
+		const res = calculateChamferGeometry(this.candidate, this.mode, this.dist1, this.dist2, this.angleDeg, this.flip);
 		this.candidate.result = res;
 
 		if (!res.isValid) {
@@ -367,10 +360,7 @@ export class ChamferTool extends BaseTool {
 	getGizmoBoundingBox(): ScreenBoundingBox | null {
 		if (!this.candidate || !this.ctx) return null;
 
-		const sVertex = this.ctx.viewport.worldToScreen(
-			this.candidate.vertexPos.x,
-			this.candidate.vertexPos.y
-		);
+		const sVertex = this.ctx.viewport.worldToScreen(this.candidate.vertexPos.x, this.candidate.vertexPos.y);
 		const pts: Vec2[] = [sVertex];
 
 		if (this.ctx.renderer?.chamferGizmoHandles) {
@@ -408,10 +398,7 @@ export class ChamferTool extends BaseTool {
 		this.recalculate();
 
 		if (this.candidate.result) {
-			const sPos = this.ctx.viewport.worldToScreen(
-				this.candidate.vertexPos.x,
-				this.candidate.vertexPos.y
-			);
+			const sPos = this.ctx.viewport.worldToScreen(this.candidate.vertexPos.x, this.candidate.vertexPos.y);
 			this.setMode(this.mode);
 			this.popup.setValue('dist1', this.dist1);
 			this.popup.setValue('dist2', this.dist2);
@@ -488,7 +475,7 @@ export class ChamferTool extends BaseTool {
 
 				// Determine which side of refDir points into the corner interior
 				const cross12 = this.candidate.dir1.x * this.candidate.dir2.y - this.candidate.dir1.y * this.candidate.dir2.x;
-				const interiorSign = !this.flip ? (cross12 >= 0 ? -1 : 1) : (cross12 >= 0 ? 1 : -1);
+				const interiorSign = !this.flip ? (cross12 >= 0 ? -1 : 1) : cross12 >= 0 ? 1 : -1;
 
 				const toMouse = vec(world.x - refVertex.x, world.y - refVertex.y);
 				const toMouseLen = Math.hypot(toMouse.x, toMouse.y);

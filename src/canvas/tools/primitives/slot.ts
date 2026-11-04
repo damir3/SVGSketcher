@@ -14,12 +14,7 @@ import { parseNumericOrExpression } from '../../../math/expression';
 import { VariationToolPanel } from '../../../ui/panels/tools';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 
-export type SlotMode =
-	| 'center_to_center'
-	| 'center_point'
-	| 'overall'
-	| 'three_point_arc'
-	| 'center_point_arc';
+export type SlotMode = 'center_to_center' | 'center_point' | 'overall' | 'three_point_arc' | 'center_point_arc';
 
 export type SlotPopupField = 'distance' | 'angle' | 'radius';
 
@@ -410,10 +405,7 @@ export class SlotTool extends BaseTool {
 			this.secondWorldPos = this.arcStartWorld;
 		}
 		if (this.arcEndWorld) {
-			const theta2 = Math.atan2(
-				this.arcEndWorld.y - this.arcCenterWorld.y,
-				this.arcEndWorld.x - this.arcCenterWorld.x
-			);
+			const theta2 = Math.atan2(this.arcEndWorld.y - this.arcCenterWorld.y, this.arcEndWorld.x - this.arcCenterWorld.x);
 			this.arcEndWorld = vec(
 				this.arcCenterWorld.x + this.arcRadius * Math.cos(theta2),
 				this.arcCenterWorld.y + this.arcRadius * Math.sin(theta2)
@@ -426,7 +418,12 @@ export class SlotTool extends BaseTool {
 			this.isDistanceLocked = true;
 			this.popup.setLocked('distance', true);
 
-			if ((this.isLinearMode() || this._mode === 'three_point_arc') && this.drawingStep >= 2 && this.firstWorldPos && this.secondWorldPos) {
+			if (
+				(this.isLinearMode() || this._mode === 'three_point_arc') &&
+				this.drawingStep >= 2 &&
+				this.firstWorldPos &&
+				this.secondWorldPos
+			) {
 				this.secondWorldPos = this.computeLinearSecondPoint(this.secondWorldPos);
 			} else if (this._mode === 'center_point_arc') {
 				this.arcRadius = this.distance;
@@ -483,7 +480,13 @@ export class SlotTool extends BaseTool {
 				this.commitLinearSlot();
 				return;
 			}
-			if (!this.isLinearMode() && this.drawingStep === 3 && this.arcCenterWorld && this.arcStartWorld && this.arcEndWorld) {
+			if (
+				!this.isLinearMode() &&
+				this.drawingStep === 3 &&
+				this.arcCenterWorld &&
+				this.arcStartWorld &&
+				this.arcEndWorld
+			) {
 				this.commitArcSlot();
 				return;
 			}
@@ -726,8 +729,8 @@ export class SlotTool extends BaseTool {
 			const theta1 = Math.atan2(p1.y - circum.center.y, p1.x - circum.center.x);
 			const theta2 = Math.atan2(p2.y - circum.center.y, p2.x - circum.center.x);
 			const theta3 = Math.atan2(p3.y - circum.center.y, p3.x - circum.center.x);
-			const ccwSpan = ((theta2 - theta1) % TWO_PI + TWO_PI) % TWO_PI;
-			const ccwMid = ((theta3 - theta1) % TWO_PI + TWO_PI) % TWO_PI;
+			const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
+			const ccwMid = (((theta3 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 			this.arcWorldSweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;
 
 			if ((this.isRadiusLocked || this.popup.isLocked('radius')) && this.radius !== null) {
@@ -939,8 +942,8 @@ export class SlotTool extends BaseTool {
 		if (!this.isAngleLocked && !this.popup.isLocked('angle')) {
 			const rawSweep =
 				sweepSign > 0
-					? ((thetaCur - theta1) % TWO_PI + TWO_PI) % TWO_PI
-					: ((theta1 - thetaCur) % TWO_PI + TWO_PI) % TWO_PI;
+					? (((thetaCur - theta1) % TWO_PI) + TWO_PI) % TWO_PI
+					: (((theta1 - thetaCur) % TWO_PI) + TWO_PI) % TWO_PI;
 			const clampedSweep = Math.max(0.01, Math.min(TWO_PI - 0.01, rawSweep));
 			this.angle = (clampedSweep * 180) / Math.PI;
 		}
@@ -992,7 +995,7 @@ export class SlotTool extends BaseTool {
 		const theta1 = Math.atan2(c1.y - center.y, c1.x - center.x);
 		const theta2 = Math.atan2(c2.y - center.y, c2.x - center.x);
 
-		const ccwSpan = ((theta2 - theta1) % TWO_PI + TWO_PI) % TWO_PI;
+		const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 		const span = sweepSign > 0 ? ccwSpan : (TWO_PI - ccwSpan) % TWO_PI;
 		const thetaMid = theta1 + sweepSign * (span * 0.5);
 
@@ -1119,8 +1122,8 @@ export class SlotTool extends BaseTool {
 				const theta1 = Math.atan2(p1.y - circum.center.y, p1.x - circum.center.x);
 				const theta2 = Math.atan2(p2.y - circum.center.y, p2.x - circum.center.x);
 				const theta3 = Math.atan2(p3.y - circum.center.y, p3.x - circum.center.x);
-				const ccwSpan = ((theta2 - theta1) % TWO_PI + TWO_PI) % TWO_PI;
-				const ccwMid = ((theta3 - theta1) % TWO_PI + TWO_PI) % TWO_PI;
+				const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
+				const ccwMid = (((theta3 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 				const sweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;
 
 				this.renderArcSlotPreviewGeometry(
@@ -1332,13 +1335,7 @@ export class SlotTool extends BaseTool {
 
 	private addOrReusePoint(pos: Vec2, snap: SnapResult | null, excludeIds: string[] = []): string {
 		const { sketch } = this.ctx;
-		if (
-			snap &&
-			snap.type === 'point' &&
-			snap.id &&
-			sketch.points.has(snap.id) &&
-			!excludeIds.includes(snap.id)
-		) {
+		if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id) && !excludeIds.includes(snap.id)) {
 			return snap.id;
 		}
 		const pt = sketch.addPoint(pos.x, pos.y);

@@ -3,11 +3,7 @@ import { dist } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline } from '../model/types';
 import { CoincidentConstraint, MidpointConstraint } from '../solver/constraints';
-import {
-	getPointAtParam,
-	type GeoCurve,
-	type GeoSpline,
-} from './intersection';
+import { getPointAtParam, type GeoCurve, type GeoSpline } from './intersection';
 import { extractSplineInterval, getSplineParamAtPoint } from './spline';
 
 const TWO_PI = 2 * Math.PI;
@@ -176,10 +172,7 @@ function intersectLines(p1: Vec2, d1: Vec2, p2: Vec2, d2: Vec2): Vec2 | null {
  * Evaluates position, unit tangent, and unit normal on a curve at parameter t,
  * with support for linear tangential extension outside [0, 1].
  */
-export function evaluateCurveExtended(
-	curve: GeoCurve,
-	t: number
-): { point: Vec2; tangent: Vec2; normal: Vec2 } {
+export function evaluateCurveExtended(curve: GeoCurve, t: number): { point: Vec2; tangent: Vec2; normal: Vec2 } {
 	if (curve.type === 'segment') {
 		const p1 = curve.p1;
 		const p2 = curve.p2;
@@ -255,10 +248,7 @@ export function evaluateCurveExtended(
 /**
  * Projects a point onto a curve (or its linear extension) and returns parameter t and distance.
  */
-export function projectOntoCurveExtended(
-	curve: GeoCurve,
-	pt: Vec2
-): { t: number; point: Vec2; dist: number } {
+export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number; point: Vec2; dist: number } {
 	if (curve.type === 'segment') {
 		const p1 = curve.p1;
 		const p2 = curve.p2;
@@ -376,7 +366,10 @@ function solveFilletBranch(
 ): { center: Vec2; pt1: Vec2; pt2: Vec2 } | null {
 	const r0 = Math.min(radius, 1.0);
 	const dTan0 = r0 / Math.tan(halfAngle);
-	const p0 = projectOntoCurveExtended(prim1, { x: V.x + dTan0 * dir1.x, y: V.y + dTan0 * dir1.y });
+	const p0 = projectOntoCurveExtended(prim1, {
+		x: V.x + dTan0 * dir1.x,
+		y: V.y + dTan0 * dir1.y,
+	});
 	let t1 = p0.t;
 
 	const isSpline1 = prim1.type === 'spline';
@@ -407,14 +400,17 @@ function solveFilletBranch(
 	const ev1_0 = evaluateCurveExtended(prim1, t1);
 	const na1 = { x: -ev1_0.tangent.y, y: ev1_0.tangent.x };
 	const dotNa1 = na1.x * bisectorDir.x + na1.y * bisectorDir.y;
-	const side1 = Math.abs(dotNa1) > 1e-4 ? (dotNa1 > 0 ? 1 : -1) : ((na1.x * dir2.x + na1.y * dir2.y) > 0 ? 1 : -1);
+	const side1 = Math.abs(dotNa1) > 1e-4 ? (dotNa1 > 0 ? 1 : -1) : na1.x * dir2.x + na1.y * dir2.y > 0 ? 1 : -1;
 
-	const center0 = { x: ev1_0.point.x + r0 * side1 * na1.x, y: ev1_0.point.y + r0 * side1 * na1.y };
+	const center0 = {
+		x: ev1_0.point.x + r0 * side1 * na1.x,
+		y: ev1_0.point.y + r0 * side1 * na1.y,
+	};
 	const proj2_0 = projectOntoCurveExtended(prim2, center0);
 	const ev2_0 = evaluateCurveExtended(prim2, proj2_0.t);
 	const na2 = { x: -ev2_0.tangent.y, y: ev2_0.tangent.x };
 	const dotNa2 = na2.x * bisectorDir.x + na2.y * bisectorDir.y;
-	const side2 = Math.abs(dotNa2) > 1e-4 ? (dotNa2 > 0 ? 1 : -1) : ((na2.x * dir1.x + na2.y * dir1.y) > 0 ? 1 : -1);
+	const side2 = Math.abs(dotNa2) > 1e-4 ? (dotNa2 > 0 ? 1 : -1) : na2.x * dir1.x + na2.y * dir1.y > 0 ? 1 : -1;
 
 	const numSteps = radius <= 5 ? 1 : Math.max(2, Math.ceil(radius / 5));
 	let center = { x: 0, y: 0 };
@@ -456,11 +452,15 @@ function solveFilletBranch(
 			const dt = 1e-3;
 			const ev1Next = evaluateCurveExtended(prim1, t1 + dt);
 			const n1Next = { x: side1 * -ev1Next.tangent.y, y: side1 * ev1Next.tangent.x };
-			const centerNext = { x: ev1Next.point.x + r * n1Next.x, y: ev1Next.point.y + r * n1Next.y };
+			const centerNext = {
+				x: ev1Next.point.x + r * n1Next.x,
+				y: ev1Next.point.y + r * n1Next.y,
+			};
 			const proj2Next = projectOntoCurveExtended(prim2, centerNext);
 			const ev2Next = evaluateCurveExtended(prim2, proj2Next.t);
 			const n2Next = { x: side2 * -ev2Next.tangent.y, y: side2 * ev2Next.tangent.x };
-			const signedDistNext = (centerNext.x - proj2Next.point.x) * n2Next.x + (centerNext.y - proj2Next.point.y) * n2Next.y;
+			const signedDistNext =
+				(centerNext.x - proj2Next.point.x) * n2Next.x + (centerNext.y - proj2Next.point.y) * n2Next.y;
 
 			const deriv = (signedDistNext - signedDist) / dt;
 			if (Math.abs(deriv) < 1e-6) break;
@@ -580,7 +580,12 @@ export function calculateFilletGeometry(
 			let minDist = Infinity;
 			let bestT1 = 0;
 			let bestT2 = 0;
-			const pairs: [number, number][] = [[0, 0], [0, 1], [1, 0], [1, 1]];
+			const pairs: [number, number][] = [
+				[0, 0],
+				[0, 1],
+				[1, 0],
+				[1, 1],
+			];
 			for (const [tA, tB] of pairs) {
 				const ptA = tA === 0 ? ev1_0.point : ev1_1.point;
 				const ptB = tB === 0 ? ev2_0.point : ev2_1.point;
@@ -613,7 +618,10 @@ export function calculateFilletGeometry(
 			} else {
 				const p1ToClick2 = projectOntoCurveExtended(curve1, click2);
 				const p2ToClick1 = projectOntoCurveExtended(curve2, click1);
-				V = { x: (p1ToClick2.point.x + p2ToClick1.point.x) * 0.5, y: (p1ToClick2.point.y + p2ToClick1.point.y) * 0.5 };
+				V = {
+					x: (p1ToClick2.point.x + p2ToClick1.point.x) * 0.5,
+					y: (p1ToClick2.point.y + p2ToClick1.point.y) * 0.5,
+				};
 				u1 = normalize({ x: click1.x - V.x, y: click1.y - V.y });
 				u2 = normalize({ x: click2.x - V.x, y: click2.y - V.y });
 			}
@@ -728,19 +736,27 @@ export function commitFilletToSketch(
 	const pCenter = sketch.addPoint(res.center.x, res.center.y);
 
 	// 2. Create the fillet arc
-	const filletArc = sketch.addArc(
-		pCenter.id,
-		pT1.id,
-		pT2.id,
-		res.radius,
-		res.clockwise
-	);
+	const filletArc = sketch.addArc(pCenter.id, pT1.id, pT2.id, res.radius, res.clockwise);
 
 	// 3. Trim or extend primitive 1
-	const oldPt1 = trimOrExtendPrimitive(sketch, fillet.primitive1, pT1.id, res.param1, fillet.endPointId1, res.cornerVertex);
+	const oldPt1 = trimOrExtendPrimitive(
+		sketch,
+		fillet.primitive1,
+		pT1.id,
+		res.param1,
+		fillet.endPointId1,
+		res.cornerVertex
+	);
 
 	// 4. Trim or extend primitive 2
-	const oldPt2 = trimOrExtendPrimitive(sketch, fillet.primitive2, pT2.id, res.param2, fillet.endPointId2, res.cornerVertex);
+	const oldPt2 = trimOrExtendPrimitive(
+		sketch,
+		fillet.primitive2,
+		pT2.id,
+		res.param2,
+		fillet.endPointId2,
+		res.cornerVertex
+	);
 
 	// 5. If corner vertex or old endpoints exist and are now unreferenced, delete them
 	const candidatesToClean = new Set<string>();
@@ -1057,19 +1073,28 @@ function replaceSplineWithInterval(
 			const p0 = subSegments[0][0];
 			rawPoints.push(p0);
 			const v = { x: subSegments[0][1].x - p0.x, y: subSegments[0][1].y - p0.y };
-			rawHandles.push({ h1: { x: p0.x - v.x, y: p0.y - v.y }, h2: { x: p0.x + v.x, y: p0.y + v.y } });
+			rawHandles.push({
+				h1: { x: p0.x - v.x, y: p0.y - v.y },
+				h2: { x: p0.x + v.x, y: p0.y + v.y },
+			});
 		} else if (j === M) {
 			const pM = subSegments[M - 1][3];
 			rawPoints.push(pM);
 			const v = { x: pM.x - subSegments[M - 1][2].x, y: pM.y - subSegments[M - 1][2].y };
-			rawHandles.push({ h1: { x: pM.x - v.x, y: pM.y - v.y }, h2: { x: pM.x + v.x, y: pM.y + v.y } });
+			rawHandles.push({
+				h1: { x: pM.x - v.x, y: pM.y - v.y },
+				h2: { x: pM.x + v.x, y: pM.y + v.y },
+			});
 		} else {
 			const pJ = subSegments[j][0];
 			rawPoints.push(pJ);
 			const vin = { x: pJ.x - subSegments[j - 1][2].x, y: pJ.y - subSegments[j - 1][2].y };
 			const vout = { x: subSegments[j][1].x - pJ.x, y: subSegments[j][1].y - pJ.y };
 			const v = { x: (vin.x + vout.x) * 0.5, y: (vin.y + vout.y) * 0.5 };
-			rawHandles.push({ h1: { x: pJ.x - v.x, y: pJ.y - v.y }, h2: { x: pJ.x + v.x, y: pJ.y + v.y } });
+			rawHandles.push({
+				h1: { x: pJ.x - v.x, y: pJ.y - v.y },
+				h2: { x: pJ.x + v.x, y: pJ.y + v.y },
+			});
 		}
 	}
 

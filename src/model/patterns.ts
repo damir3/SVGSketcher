@@ -20,10 +20,7 @@ export function generateCircularPatternCopy(
 	distribution: 'full' | 'partial' | 'symmetric',
 	totalAngle: number
 ): PatternCopyData | null {
-	const centerPt =
-		centerPtId === 'origin'
-			? ({ id: 'origin', x: 0, y: 0 } as any)
-			: sketch.points.get(centerPtId);
+	const centerPt = centerPtId === 'origin' ? ({ id: 'origin', x: 0, y: 0 } as any) : sketch.points.get(centerPtId);
 	if (!centerPt) return null;
 
 	const angleDeg = computePatternCopyAngle(copyIndex, quantity, distribution, totalAngle);
@@ -92,14 +89,7 @@ export function generateCircularPatternCopy(
 			const nCenterId = getOrRotatePoint(arc.centerId);
 			const nStartId = getOrRotatePoint(arc.startPointId);
 			const nEndId = getOrRotatePoint(arc.endPointId);
-			const newArc = sketch.addArc(
-				nCenterId,
-				nStartId,
-				nEndId,
-				arc.radius,
-				arc.clockwise,
-				arc.isConstruction
-			);
+			const newArc = sketch.addArc(nCenterId, nStartId, nEndId, arc.radius, arc.clockwise, arc.isConstruction);
 			radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
 			createdEntityIds.push({ id: newArc.id, type: 'arc' });
 			continue;
@@ -110,12 +100,7 @@ export function generateCircularPatternCopy(
 			const nCenterId = getOrRotatePoint(ellipse.centerId);
 			const nMajorId = getOrRotatePoint(ellipse.majorAxisPointId);
 			const nMinorId = getOrRotatePoint(ellipse.minorAxisPointId);
-			const newEllipse = sketch.addEllipse(
-				nCenterId,
-				nMajorId,
-				nMinorId,
-				ellipse.isConstruction
-			);
+			const newEllipse = sketch.addEllipse(nCenterId, nMajorId, nMinorId, ellipse.isConstruction);
 			createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
 			continue;
 		}
@@ -385,14 +370,7 @@ export function generateRectangularPatternCopy(
 			const nCenterId = getOrTranslatePoint(arc.centerId);
 			const nStartId = getOrTranslatePoint(arc.startPointId);
 			const nEndId = getOrTranslatePoint(arc.endPointId);
-			const newArc = sketch.addArc(
-				nCenterId,
-				nStartId,
-				nEndId,
-				arc.radius,
-				arc.clockwise,
-				arc.isConstruction
-			);
+			const newArc = sketch.addArc(nCenterId, nStartId, nEndId, arc.radius, arc.clockwise, arc.isConstruction);
 			radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
 			createdEntityIds.push({ id: newArc.id, type: 'arc' });
 			continue;
@@ -403,12 +381,7 @@ export function generateRectangularPatternCopy(
 			const nCenterId = getOrTranslatePoint(ellipse.centerId);
 			const nMajorId = getOrTranslatePoint(ellipse.majorAxisPointId);
 			const nMinorId = getOrTranslatePoint(ellipse.minorAxisPointId);
-			const newEllipse = sketch.addEllipse(
-				nCenterId,
-				nMajorId,
-				nMinorId,
-				ellipse.isConstruction
-			);
+			const newEllipse = sketch.addEllipse(nCenterId, nMajorId, nMinorId, ellipse.isConstruction);
 			createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
 			continue;
 		}
@@ -537,7 +510,8 @@ export function updateRectangularPattern(
 	const newDist2 = updates.distance2 !== undefined ? updates.distance2 : c.distance2;
 	const newDir2 = updates.direction2 !== undefined ? updates.direction2 : c.direction2;
 	const newSuppression = updates.suppression !== undefined ? updates.suppression : c.suppression;
-	const newSuppressed = updates.suppressedIndices !== undefined ? new Set(updates.suppressedIndices) : new Set(c.suppressedIndices);
+	const newSuppressed =
+		updates.suppressedIndices !== undefined ? new Set(updates.suppressedIndices) : new Set(c.suppressedIndices);
 
 	const line1 = newLine1Id ? sketch.lines.get(newLine1Id) : null;
 	const line2 = newLine2Id ? sketch.lines.get(newLine2Id) : null;
@@ -614,16 +588,7 @@ export function updateRectangularPattern(
 
 	// 3. Update coordinates of existing copies
 	for (const copy of c.copies) {
-		const offset = computeRectangularPatternOffset(
-			copy.i,
-			copy.j,
-			newDist1,
-			newDir1,
-			newDist2,
-			newDir2,
-			u1,
-			u2
-		);
+		const offset = computeRectangularPatternOffset(copy.i, copy.j, newDist1, newDir1, newDist2, newDir2, u1, u2);
 		for (const pair of copy.pointPairs) {
 			const sPt = sketch.points.get(pair.sourcePtId);
 			const pPt = sketch.points.get(pair.patternPtId);
