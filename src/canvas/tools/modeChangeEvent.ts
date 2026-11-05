@@ -1,4 +1,4 @@
-export type ModeAwareToolId = 'arc' | 'circle' | 'rectangle' | 'slot' | 'spline' | 'chamfer' | 'offset';
+export type ModeAwareToolId = 'arc' | 'circle' | 'rectangle' | 'slot' | 'spline' | 'ellipse' | 'chamfer' | 'offset';
 
 export interface ToolModeChangeDetail {
 	tool: ModeAwareToolId;

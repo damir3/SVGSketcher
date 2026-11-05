@@ -7,7 +7,6 @@ import { RectangleTool } from '../src/canvas/tools/primitives/rectangle';
 import { SlotTool } from '../src/canvas/tools/primitives/slot';
 import { ArcTool } from '../src/canvas/tools/primitives/arc';
 import { EllipseTool } from '../src/canvas/tools/primitives/ellipse';
-import { EllipticalArcTool } from '../src/canvas/tools/primitives/ellipticalArc';
 import { SplineTool } from '../src/canvas/tools/primitives/spline';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { TrimTool } from '../src/canvas/tools/modify/trim';
@@ -562,11 +561,14 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(sketch.points.size, 3);
 	});
 
-	it('EllipseTool creates ellipse', () => {
+	it('EllipseTool creates ellipse and elliptical arc and supports setMode', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 		const ellipseTool = new EllipseTool();
 		ellipseTool.activate(ctx);
+
+		assert.equal(ellipseTool.id, 'ellipse');
+		assert.equal(ellipseTool.mode, 'ellipse');
 
 		ellipseTool.onMouseDown(makeMouseEvent(0, 0));
 		ellipseTool.onMouseDown(makeMouseEvent(40, 0));
@@ -575,6 +577,22 @@ describe('Primitive Tools Creation', () => {
 
 		assert.equal(sketch.ellipses.size, 1);
 		assert.equal(sketch.points.size, 3);
+
+		// Switch mode to elliptical_arc
+		const modeEvents: string[] = [];
+		ellipseTool.onModeChange = m => modeEvents.push(m);
+		ellipseTool.setMode('elliptical_arc');
+		assert.equal(ellipseTool.mode, 'elliptical_arc');
+		assert.deepEqual(modeEvents, ['elliptical_arc']);
+
+		ellipseTool.onMouseDown(makeMouseEvent(100, 100));
+		ellipseTool.onMouseDown(makeMouseEvent(160, 100));
+		ellipseTool.onMouseDown(makeMouseEvent(100, 130));
+		ellipseTool.onMouseDown(makeMouseEvent(160, 100));
+		ellipseTool.onMouseMove(makeMouseEvent(100, 130));
+		ellipseTool.onMouseDown(makeMouseEvent(100, 130));
+
+		assert.equal(sketch.ellipticalArcs.size, 1);
 	});
 
 	it('SplineTool creates fit and control splines and supports setMode', () => {
@@ -1876,10 +1894,10 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.equal(arc.endPointId, targetEndPt.id);
 	});
 
-	it('EllipticalArcTool snaps only when choosing center, disables snapping on major/minor/angles', () => {
+	it('EllipseTool in elliptical_arc mode snaps only when choosing center, disables snapping on major/minor/angles', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
-		const elArcTool = new EllipticalArcTool();
+		const elArcTool = new EllipseTool('elliptical_arc');
 		elArcTool.activate(ctx);
 
 		assert.equal(elArcTool.step, 0);

@@ -60,7 +60,6 @@ import {
 	ArcTool,
 	PolygonTool,
 	EllipseTool,
-	EllipticalArcTool,
 	SplineTool,
 	TextTool,
 	TrimTool,
@@ -241,8 +240,7 @@ export class CanvasInteraction {
 		this.tools.set('slot', new SlotTool('center_to_center'));
 		this.tools.set('arc', new ArcTool('center'));
 		this.tools.set('polygon', new PolygonTool());
-		this.tools.set('ellipse', new EllipseTool());
-		this.tools.set('elliptical_arc', new EllipticalArcTool());
+		this.tools.set('ellipse', new EllipseTool('ellipse'));
 		this.tools.set('spline', new SplineTool('fit'));
 		this.tools.set('text', new TextTool());
 

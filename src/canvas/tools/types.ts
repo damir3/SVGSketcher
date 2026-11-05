@@ -26,7 +26,6 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'rectangle',
 	'slot',
 	'ellipse',
-	'elliptical_arc',
 	'spline',
 	'text',
 ] as const;

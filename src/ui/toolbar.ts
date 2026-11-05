@@ -6,6 +6,7 @@ import type { CircleMode } from '../canvas/tools/primitives/circle';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
 import type { SlotMode } from '../canvas/tools/primitives/slot';
 import type { SplineMode } from '../canvas/tools/primitives/spline';
+import type { EllipseMode } from '../canvas/tools/primitives/ellipse';
 import type { ChamferMode } from '../math/chamfer';
 import type { OffsetDirection } from '../math/offset';
 import type { ToolModeChangeDetail } from '../canvas/tools/modeChangeEvent';
@@ -69,10 +70,6 @@ export class Toolbar {
 				<button class="tool-btn" data-tool="ellipse" title="Ellipse (E)">
 					${ICONS.ellipse}
 					<span class="btn-tooltip">Ellipse (E)</span>
-				</button>
-				<button class="tool-btn" data-tool="elliptical_arc" title="Elliptical Arc">
-					${ICONS.elliptical_arc}
-					<span class="btn-tooltip">Elliptical Arc</span>
 				</button>
 				<button class="tool-btn" data-tool="text" title="Text">
 					${ICONS.text}
@@ -210,6 +207,9 @@ export class Toolbar {
 					break;
 				case 'spline':
 					this.setSplineMode(mode as SplineMode);
+					break;
+				case 'ellipse':
+					this.setEllipseMode(mode as EllipseMode);
 					break;
 				case 'chamfer':
 					this.setChamferMode(mode as ChamferMode);
@@ -433,6 +433,21 @@ export class Toolbar {
 
 		splineBtn.title = title;
 		splineBtn.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${tooltip}</span>
+		`;
+	}
+
+	setEllipseMode(mode: EllipseMode): void {
+		const ellipseBtn = this.container.querySelector<HTMLButtonElement>('[data-tool="ellipse"]');
+		if (!ellipseBtn) return;
+
+		const icon = mode === 'elliptical_arc' ? ICONS.elliptical_arc : ICONS.ellipse;
+		const title = mode === 'elliptical_arc' ? 'Elliptical Arc (E)' : 'Ellipse (E)';
+		const tooltip = mode === 'elliptical_arc' ? 'Elliptical Arc (E)' : 'Ellipse (E)';
+
+		ellipseBtn.title = title;
+		ellipseBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${tooltip}</span>
 		`;

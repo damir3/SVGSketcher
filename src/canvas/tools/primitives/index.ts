@@ -6,6 +6,5 @@ export * from './slot';
 export * from './arc';
 export * from './polygon';
 export * from './ellipse';
-export * from './ellipticalArc';
 export * from './spline';
 export * from './text';
