@@ -1551,8 +1551,17 @@ export class SketchDocument {
 		return c;
 	}
 
-	addCollinearConstraint(line1Id: string, line2Id: string): CollinearConstraint | null {
+	addCollinearConstraint(line1Id: string, line2Id: string): CollinearConstraint | LineToAxisDistanceConstraint | null {
 		if (line1Id === line2Id) return null;
+		const isAxis1 = line1Id === 'axis_x' || line1Id === 'axis_y';
+		const isAxis2 = line2Id === 'axis_x' || line2Id === 'axis_y';
+		if (isAxis1 && isAxis2) return null;
+		if (isAxis1 || isAxis2) {
+			const axis = isAxis1 ? (line1Id === 'axis_x' ? 'x' : 'y') : line2Id === 'axis_x' ? 'x' : 'y';
+			const userLineId = isAxis1 ? line2Id : line1Id;
+			return this.addLineCollinearWithAxisConstraint(userLineId, axis);
+		}
+
 		const l1 = this.lines.get(line1Id);
 		const l2 = this.lines.get(line2Id);
 		if (!l1 || !l2) return null;
@@ -1574,21 +1583,131 @@ export class SketchDocument {
 
 	addSymmetryConstraint(p1Id: string, p2Id: string, lineId: string): SymmetryConstraint | null {
 		if (p1Id === p2Id) return null;
-		if (!this.points.has(p1Id) || !this.points.has(p2Id)) return null;
-		const line = this.lines.get(lineId);
-		if (!line) return null;
+		const isValidP1 = p1Id === 'origin' || this.points.has(p1Id);
+		const isValidP2 = p2Id === 'origin' || this.points.has(p2Id);
+		if (!isValidP1 || !isValidP2) return null;
+
+		const isBuiltIn = lineId === 'axis_x' || lineId === 'axis_y' || lineId === 'origin';
+		if (isBuiltIn && (p1Id === 'origin' || p2Id === 'origin')) {
+			return null;
+		}
+		const line = isBuiltIn ? null : this.lines.get(lineId);
+		if (!isBuiltIn && !line) return null;
+		if (line && (p1Id === line.p1Id || p1Id === line.p2Id || p2Id === line.p1Id || p2Id === line.p2Id)) {
+			// If one of the points is an endpoint of the symmetry line itself, cannot be symmetric to a distinct point
+			if (p1Id === line.p1Id && p2Id === line.p2Id) return null;
+			if (p1Id === line.p2Id && p2Id === line.p1Id) return null;
+		}
 
 		const existing = [...this.constraints.values()].find(
 			c =>
 				c instanceof SymmetryConstraint &&
 				((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id)) &&
-				this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)
+				(isBuiltIn
+					? c.lineId === lineId
+					: c.lineId === line!.id || this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line!.p1Id, line!.p2Id))
 		);
 		if (existing) return existing as SymmetryConstraint;
 
-		const c = new SymmetryConstraint(this.nextId('c_symm'), p1Id, p2Id, line.p1Id, line.p2Id, 1.0, line.id);
+		const c = new SymmetryConstraint(
+			this.nextId('c_symm'),
+			p1Id,
+			p2Id,
+			isBuiltIn ? '' : line!.p1Id,
+			isBuiltIn ? '' : line!.p2Id,
+			1.0,
+			isBuiltIn ? lineId : line!.id
+		);
 		this.addConstraint(c);
 		return c;
+	}
+
+	addLineSymmetryConstraints(line1Id: string, line2Id: string, axisId: string): IConstraint[] {
+		if (line1Id === line2Id || line1Id === axisId || line2Id === axisId) return [];
+		const l1 = this.lines.get(line1Id);
+		const l2 = this.lines.get(line2Id);
+		if (!l1 || !l2) return [];
+
+		const p11 = this.points.get(l1.p1Id);
+		const p12 = this.points.get(l1.p2Id);
+		const p21 = this.points.get(l2.p1Id);
+		const p22 = this.points.get(l2.p2Id);
+		if (!p11 || !p12 || !p21 || !p22) return [];
+
+		const reflectPoint = (p: { x: number; y: number }): { x: number; y: number } => {
+			if (axisId === 'axis_x') {
+				return { x: p.x, y: -p.y };
+			}
+			if (axisId === 'axis_y') {
+				return { x: -p.x, y: p.y };
+			}
+			if (axisId === 'origin') {
+				return { x: -p.x, y: -p.y };
+			}
+			const axisLine = this.lines.get(axisId);
+			if (axisLine) {
+				const a = this.points.get(axisLine.p1Id);
+				const b = this.points.get(axisLine.p2Id);
+				if (a && b) {
+					const dx = b.x - a.x;
+					const dy = b.y - a.y;
+					const lenSq = dx * dx + dy * dy;
+					if (lenSq > 1e-12) {
+						const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+						const fx = a.x + t * dx;
+						const fy = a.y + t * dy;
+						return { x: 2 * fx - p.x, y: 2 * fy - p.y };
+					}
+				}
+			}
+			return { x: p.x, y: p.y };
+		};
+
+		let swap = false;
+		if (l1.p1Id === l2.p2Id || l1.p2Id === l2.p1Id) {
+			swap = true;
+		} else if (l1.p1Id === l2.p1Id || l1.p2Id === l2.p2Id) {
+			swap = false;
+		} else {
+			const r1 = reflectPoint(p11);
+			const r2 = reflectPoint(p12);
+			const costDirect = (r1.x - p21.x) ** 2 + (r1.y - p21.y) ** 2 + (r2.x - p22.x) ** 2 + (r2.y - p22.y) ** 2;
+			const costSwapped = (r1.x - p22.x) ** 2 + (r1.y - p22.y) ** 2 + (r2.x - p21.x) ** 2 + (r2.y - p21.y) ** 2;
+			swap = costSwapped < costDirect;
+		}
+
+		const pairs: [string, string][] = swap
+			? [
+					[l1.p1Id, l2.p2Id],
+					[l1.p2Id, l2.p1Id],
+				]
+			: [
+					[l1.p1Id, l2.p1Id],
+					[l1.p2Id, l2.p2Id],
+				];
+
+		const created: IConstraint[] = [];
+		this.beginTransaction();
+		for (const [paId, pbId] of pairs) {
+			if (paId === pbId) {
+				let c: IConstraint | null = null;
+				if (axisId === 'axis_x') {
+					c = this.addPointOnAxisConstraint(paId, 'x');
+				} else if (axisId === 'axis_y') {
+					c = this.addPointOnAxisConstraint(paId, 'y');
+				} else if (axisId === 'origin') {
+					c = this.addOriginCoincidentConstraint(paId);
+				} else {
+					c = this.addPointOnLineConstraint(paId, axisId);
+				}
+				if (c) created.push(c);
+			} else {
+				const c = this.addSymmetryConstraint(paId, pbId, axisId);
+				if (c) created.push(c);
+			}
+		}
+		this.commitTransaction();
+		return created;
 	}
 
 	generatePatternCopy(
@@ -1952,10 +2071,48 @@ export class SketchDocument {
 		entity1Id: string,
 		entity2Id: string
 	): TangentLineCircleConstraint | TangentCircleCircleConstraint | null {
-		const line1 = this.lines.get(entity1Id);
-		const line2 = this.lines.get(entity2Id);
+		const isAxis1 = entity1Id === 'axis_x' || entity1Id === 'axis_y';
+		const isAxis2 = entity2Id === 'axis_x' || entity2Id === 'axis_y';
+		const line1 = isAxis1 ? null : this.lines.get(entity1Id);
+		const line2 = isAxis2 ? null : this.lines.get(entity2Id);
 		const circ1 = this.circles.get(entity1Id) ?? this.arcs.get(entity1Id);
 		const circ2 = this.circles.get(entity2Id) ?? this.arcs.get(entity2Id);
+
+		// Case 0: Coordinate Axis and Circle/Arc
+		if ((isAxis1 && circ2) || (isAxis2 && circ1)) {
+			const axisId = isAxis1 ? entity1Id : entity2Id;
+			const circ = (circ2 ?? circ1)!;
+
+			const existing = [...this.constraints.values()].find(
+				c =>
+					c instanceof TangentLineCircleConstraint &&
+					c.circleId === circ.id &&
+					(c.lineId === axisId || c.lineP1Id === axisId)
+			);
+			if (existing) return existing as TangentLineCircleConstraint;
+
+			const center = this.points.get(circ.centerId);
+			let side = 1;
+			if (center) {
+				const dx = axisId === 'axis_x' ? 1 : 0;
+				const dy = axisId === 'axis_x' ? 0 : 1;
+				const cross = center.x * dy - center.y * dx;
+				side = cross >= 0 ? 1 : -1;
+			}
+
+			const c = new TangentLineCircleConstraint(
+				this.nextId('c_tang'),
+				'',
+				'',
+				circ.centerId,
+				circ.id,
+				side,
+				1.0,
+				axisId
+			);
+			this.addConstraint(c);
+			return c;
+		}
 
 		// Case 1: Line and Circle/Arc
 		if ((line1 && circ2) || (line2 && circ1)) {
@@ -1976,7 +2133,9 @@ export class SketchDocument {
 				line.p2Id,
 				circ.centerId,
 				circ.id,
-				this.getTangentSide(line, circ.centerId)
+				this.getTangentSide(line, circ.centerId),
+				1.0,
+				line.id
 			);
 			this.addConstraint(c);
 			return c;
@@ -2069,11 +2228,34 @@ export class SketchDocument {
 		return c;
 	}
 
-	addMidpointConstraint(pointId: string, lineId: string): MidpointConstraint | null {
-		const line = this.lines.get(lineId);
-		if (!line) return null;
+	addMidpointConstraint(pointId: string, lineOrP1Id: string, p2Id?: string): MidpointConstraint | null {
+		if (pointId !== 'origin' && !this.points.has(pointId)) return null;
 
-		const c = new MidpointConstraint(this.nextId('c_mid'), pointId, line.p1Id, line.p2Id);
+		let end1Id: string;
+		let end2Id: string;
+		if (p2Id !== undefined) {
+			if (lineOrP1Id === p2Id) return null;
+			const valid1 = lineOrP1Id === 'origin' || this.points.has(lineOrP1Id);
+			const valid2 = p2Id === 'origin' || this.points.has(p2Id);
+			if (!valid1 || !valid2) return null;
+			end1Id = lineOrP1Id;
+			end2Id = p2Id;
+		} else {
+			const line = this.lines.get(lineOrP1Id);
+			if (!line) return null;
+			end1Id = line.p1Id;
+			end2Id = line.p2Id;
+		}
+
+		if (pointId === end1Id || pointId === end2Id) return null;
+
+		const existing = [...this.constraints.values()].find(
+			c =>
+				c instanceof MidpointConstraint && c.midId === pointId && this.matchesEndpoints(c.p1Id, c.p2Id, end1Id, end2Id)
+		);
+		if (existing) return existing as MidpointConstraint;
+
+		const c = new MidpointConstraint(this.nextId('c_mid'), pointId, end1Id, end2Id);
 		this.addConstraint(c);
 		return c;
 	}
@@ -2209,6 +2391,9 @@ export class SketchDocument {
 			}
 			const hasMissingEntity = constraint.entityIds.some(
 				entId =>
+					entId !== 'origin' &&
+					entId !== 'axis_x' &&
+					entId !== 'axis_y' &&
 					!this.points.has(entId) &&
 					!this.lines.has(entId) &&
 					!this.circles.has(entId) &&
@@ -2223,8 +2408,11 @@ export class SketchDocument {
 				continue;
 			}
 			if (constraint instanceof SymmetryConstraint) {
+				const isBuiltInAxis =
+					constraint.lineId === 'axis_x' || constraint.lineId === 'axis_y' || constraint.lineId === 'origin';
 				if (
 					constraint.lineId &&
+					!isBuiltInAxis &&
 					!this.lines.has(constraint.lineId) &&
 					!this.getLineBetween(constraint.lineP1Id, constraint.lineP2Id)
 				) {

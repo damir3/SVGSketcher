@@ -5,9 +5,14 @@ import {
 	OriginDistanceConstraint,
 	LineToAxisDistanceConstraint,
 	AngleConstraint,
+	SymmetryConstraint,
+	MidpointConstraint,
+	TangentLineCircleConstraint,
+	EqualRadiusConstraint,
 } from '../src/solver/constraints';
 import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
 import { determineDistanceOrientation, DimensionTool } from '../src/canvas/tools/constraints/dimension';
+import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { LineTool } from '../src/canvas/tools/primitives/line';
 import { vec } from '../src/math/vector';
 
@@ -569,13 +574,13 @@ describe('Origin & Axis Constraints', () => {
 				},
 				showToast: () => {},
 				requestRender: () => {},
+				setCursor: () => {},
 				findPointNear: () => null,
 				findLineNear: () => null,
 				findCircleNear: () => null,
 				findArcNear: () => null,
 				findHoverTarget: () => null,
 				findSnap: () => null,
-				setCursor: () => {},
 				onEditDimension: (c: any) => {
 					editedConstraint = c;
 				},
@@ -640,13 +645,13 @@ describe('Origin & Axis Constraints', () => {
 				},
 				showToast: () => {},
 				requestRender: () => {},
+				setCursor: () => {},
 				findPointNear: () => null,
 				findLineNear: () => null,
 				findCircleNear: () => null,
 				findArcNear: () => null,
 				findHoverTarget: () => null,
 				findSnap: () => null,
-				setCursor: () => {},
 				onEditDimension: (c: any) => {
 					editedConstraint = c;
 				},
@@ -723,6 +728,424 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(restored.line1Id, line.id);
 			assert.equal(restored.line2Id, 'axis_x');
 			assert.equal(restored.targetAngle, 35);
+		});
+	});
+
+	describe('Symmetry Constraints with Axes and Origin', () => {
+		it('constrains two points symmetric across X-axis and Y-axis', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(30, 40);
+			const p2 = sketch.addPoint(10, -15);
+			sketch.addFixedConstraint(p1.id);
+
+			const cX = sketch.addSymmetryConstraint(p1.id, p2.id, 'axis_x');
+			assert.ok(cX instanceof SymmetryConstraint);
+			assert.equal(cX.lineId, 'axis_x');
+			assert.ok(Math.abs(p2.x - 30) < 1e-3, `Expected p2.x ~ 30, got ${p2.x}`);
+			assert.ok(Math.abs(p2.y - -40) < 1e-3, `Expected p2.y ~ -40, got ${p2.y}`);
+
+			const p3 = sketch.addPoint(-10, 20);
+			const cY = sketch.addSymmetryConstraint(p1.id, p3.id, 'axis_y');
+			assert.ok(cY instanceof SymmetryConstraint);
+			assert.equal(cY.lineId, 'axis_y');
+			assert.ok(Math.abs(p3.x - -30) < 1e-3, `Expected p3.x ~ -30, got ${p3.x}`);
+			assert.ok(Math.abs(p3.y - 40) < 1e-3, `Expected p3.y ~ 40, got ${p3.y}`);
+		});
+
+		it('constrains two points symmetric across Origin (0,0)', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(25, 35);
+			const p2 = sketch.addPoint(-10, -15);
+			sketch.addFixedConstraint(p1.id);
+
+			const c = sketch.addSymmetryConstraint(p1.id, p2.id, 'origin');
+			assert.ok(c instanceof SymmetryConstraint);
+			assert.equal(c.lineId, 'origin');
+			assert.ok(Math.abs(p2.x - -25) < 1e-3, `Expected p2.x ~ -25, got ${p2.x}`);
+			assert.ok(Math.abs(p2.y - -35) < 1e-3, `Expected p2.y ~ -35, got ${p2.y}`);
+		});
+
+		it('constrains a point and Origin (0,0) symmetric across a user line', () => {
+			const sketch = new SketchDocument();
+			const lp1 = sketch.addPoint(20, -50);
+			const lp2 = sketch.addPoint(20, 50);
+			const line = sketch.addLine(lp1.id, lp2.id);
+			sketch.addFixedConstraint(lp1.id);
+			sketch.addFixedConstraint(lp2.id);
+
+			const p = sketch.addPoint(30, 10);
+			const c = sketch.addSymmetryConstraint(p.id, 'origin', line.id);
+			assert.ok(c instanceof SymmetryConstraint);
+			assert.ok(Math.abs(p.x - 40) < 1e-3, `Expected p.x ~ 40, got ${p.x}`);
+			assert.ok(Math.abs(p.y - 0) < 1e-3, `Expected p.y ~ 0, got ${p.y}`);
+		});
+
+		it('ConstraintTool(symmetry) supports 2 points + axis, 2 points + origin, 2 circles + axis/origin, and 2 lines + axis/origin', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(20, 30);
+			const p2 = sketch.addPoint(-10, 25);
+			sketch.addFixedConstraint(p1.id);
+
+			const mockCtx: any = {
+				sketch,
+				viewport: {
+					zoom: 1,
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+				},
+				showToast: () => {},
+				requestRender: () => {},
+				setCursor: () => {},
+				findPointNear: () => null,
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+			};
+
+			const makeEvent = (pos: { x: number; y: number }, id?: string, type?: string) =>
+				({
+					screen: pos,
+					world: pos,
+					client: pos,
+					raw: {
+						target: {
+							closest: () =>
+								id ? { getAttribute: (attr: string) => (attr === 'data-id' ? id : attr === 'data-type' ? type : null) } : null,
+						},
+					},
+				}) as any;
+
+			const tool = new ConstraintTool('symmetry');
+			tool.activate(mockCtx);
+
+			// 1. Two points + Y-axis
+			tool.onMouseDown(makeEvent(vec(20, 30), p1.id, 'point'));
+			tool.onMouseDown(makeEvent(vec(-10, 25), p2.id, 'point'));
+			tool.onMouseDown(makeEvent(vec(0, 50), 'axis_y', 'line'));
+
+			assert.ok(Math.abs(p2.x - -20) < 1e-3);
+			assert.ok(Math.abs(p2.y - 30) < 1e-3);
+
+			// 2. Two points + origin
+			const p3 = sketch.addPoint(-15, -20);
+			tool.onMouseDown(makeEvent(vec(20, 30), p1.id, 'point'));
+			tool.onMouseDown(makeEvent(vec(-15, -20), p3.id, 'point'));
+			tool.onMouseDown(makeEvent(vec(0, 0), 'origin', 'point'));
+
+			assert.ok(Math.abs(p3.x - -20) < 1e-3);
+			assert.ok(Math.abs(p3.y - -30) < 1e-3);
+
+			// 3. Two circles + X-axis
+			const c1Center = sketch.addPoint(40, 25);
+			const c1 = sketch.addCircle(c1Center.id, 12);
+			sketch.addFixedConstraint(c1Center.id);
+			sketch.addRadiusConstraint(c1.id, 12);
+
+			const c2Center = sketch.addPoint(35, -20);
+			const c2 = sketch.addCircle(c2Center.id, 8);
+
+			tool.onMouseDown(makeEvent(vec(40, 37), c1.id, 'circle'));
+			tool.onMouseDown(makeEvent(vec(35, -28), c2.id, 'circle'));
+			tool.onMouseDown(makeEvent(vec(50, 0), 'axis_x', 'line'));
+
+			assert.ok(Math.abs(c2Center.x - 40) < 1e-3);
+			assert.ok(Math.abs(c2Center.y - -25) < 1e-3);
+			assert.ok(Math.abs(c2.radius - 12) < 1e-3);
+			assert.ok([...sketch.constraints.values()].some(c => c instanceof EqualRadiusConstraint));
+		});
+
+		it('links, renders, serializes, and preserves SymmetryConstraint with axes/origin during orphan cleanup', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(20, 30);
+			const p2 = sketch.addPoint(20, -30);
+			const cAxis = sketch.addSymmetryConstraint(p1.id, p2.id, 'axis_x')!;
+			assert.ok(cAxis);
+
+			const p3 = sketch.addPoint(-20, -30);
+			const cOrigin = sketch.addSymmetryConstraint(p1.id, p3.id, 'origin')!;
+			assert.ok(cOrigin);
+
+			// Check entity links
+			assert.ok(sketch.getConstraintsForEntity('line', 'axis_x').some(c => c.id === cAxis.id));
+			assert.ok(sketch.getEntitiesForConstraint(cAxis).some(e => e.id === 'axis_x' && e.type === 'line'));
+
+			assert.ok(sketch.getConstraintsForEntity('point', 'origin').some(c => c.id === cOrigin.id));
+			assert.ok(sketch.getEntitiesForConstraint(cOrigin).some(e => e.id === 'origin' && e.type === 'point'));
+
+			// Check orphan cleanup preservation when deleting an unrelated point
+			const extraPt = sketch.addPoint(100, 100);
+			sketch.removeEntity(extraPt.id);
+			assert.ok(sketch.constraints.has(cAxis.id), 'Symmetry with axis_x should not be deleted by cleanOrphanConstraints');
+			assert.ok(sketch.constraints.has(cOrigin.id), 'Symmetry with origin should not be deleted by cleanOrphanConstraints');
+
+			// Serialization
+			const restored = deserializeConstraint(serializeConstraint(cAxis)) as SymmetryConstraint;
+			assert.equal(restored instanceof SymmetryConstraint, true);
+			assert.equal(restored.lineId, 'axis_x');
+		});
+	});
+
+	describe('Midpoint Constraints with Origin', () => {
+		it('constrains line midpoint to Origin (0,0)', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(30, 40);
+			const p2 = sketch.addPoint(-20, -30);
+			const line = sketch.addLine(p1.id, p2.id);
+			sketch.addFixedConstraint(p1.id);
+
+			const c = sketch.addMidpointConstraint('origin', line.id);
+			assert.ok(c instanceof MidpointConstraint);
+			assert.equal(c.midId, 'origin');
+			assert.ok(Math.abs(p2.x - -30) < 1e-3, `Expected p2.x ~ -30, got ${p2.x}`);
+			assert.ok(Math.abs(p2.y - -40) < 1e-3, `Expected p2.y ~ -40, got ${p2.y}`);
+
+			// Rejects coordinate axis as line target for midpoint
+			assert.equal(sketch.addMidpointConstraint(p1.id, 'axis_x'), null);
+		});
+
+		it('renders badge at (0,0), links to origin, and survives cleanOrphanConstraints', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(20, 10);
+			const p2 = sketch.addPoint(-20, -10);
+			const line = sketch.addLine(p1.id, p2.id);
+			const c = sketch.addMidpointConstraint('origin', line.id)!;
+			assert.ok(c);
+
+			let badgePos: { x: number; y: number } | null = null;
+			const mockCtx: any = {
+				sketch,
+				viewport: {
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					zoom: 1,
+				},
+				renderBadge: (_id: string, x: number, y: number) => {
+					badgePos = { x, y };
+				},
+			};
+			c.render(mockCtx);
+			assert.deepEqual(badgePos, { x: 0, y: -14 });
+			assert.ok(c.distanceTo({ x: 0, y: -14 }, sketch, mockCtx.viewport)! < 1e-3);
+
+			assert.ok(sketch.getConstraintsForEntity('point', 'origin').some(sc => sc.id === c.id));
+			assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === 'origin' && e.type === 'point'));
+
+			const extraPt = sketch.addPoint(99, 99);
+			sketch.removeEntity(extraPt.id);
+			assert.ok(sketch.constraints.has(c.id), 'Midpoint on origin should survive cleanOrphanConstraints');
+		});
+	});
+
+	describe('Tangent Constraints with Coordinate Axes', () => {
+		it('constrains a circle tangent to X-axis and Y-axis', () => {
+			const sketch = new SketchDocument();
+			const center = sketch.addPoint(40, 35);
+			const circle = sketch.addCircle(center.id, 20);
+			sketch.addRadiusConstraint(circle.id, 20);
+
+			const cX = sketch.addTangentConstraint('axis_x', circle.id) as TangentLineCircleConstraint;
+			assert.ok(cX instanceof TangentLineCircleConstraint);
+			assert.equal(cX.lineId, 'axis_x');
+			assert.ok(Math.abs(center.y - 20) < 1e-3, `Expected center.y ~ 20, got ${center.y}`);
+
+			const cY = sketch.addTangentConstraint(circle.id, 'axis_y') as TangentLineCircleConstraint;
+			assert.ok(cY instanceof TangentLineCircleConstraint);
+			assert.equal(cY.lineId, 'axis_y');
+			assert.ok(Math.abs(center.x - 20) < 1e-3, `Expected center.x ~ 20, got ${center.x}`);
+		});
+
+		it('ConstraintTool(tangent) selects axis even when clicking near (0,0) over origin DOM element', () => {
+			const sketch = new SketchDocument();
+			const center = sketch.addPoint(0, 25);
+			const circle = sketch.addCircle(center.id, 15);
+			sketch.addRadiusConstraint(circle.id, 15);
+
+			const mockCtx: any = {
+				sketch,
+				viewport: {
+					zoom: 1,
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+				},
+				showToast: () => {},
+				requestRender: () => {},
+				setCursor: () => {},
+				findPointNear: () => ({ id: 'origin', x: 0, y: 0 }),
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+			};
+
+			const tool = new ConstraintTool('tangent');
+			tool.activate(mockCtx);
+
+			// Hover options should disable origin and enable axes for tangent tool
+			const hoverOpts = tool.getHoverTargetOptions();
+			assert.equal(hoverOpts.allowOrigin, false);
+			assert.equal(hoverOpts.allowAxes, true);
+
+			// Click 1: circle
+			tool.onMouseDown({
+				screen: vec(0, 40),
+				world: vec(0, 40),
+				client: vec(0, 40),
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? circle.id : attr === 'data-type' ? 'circle' : null),
+						}),
+					},
+				},
+			} as any);
+
+			// Click 2: near (0,0) where raw.target is 'origin' (point), should fall through to axis_x
+			tool.onMouseDown({
+				screen: vec(2, 0),
+				world: vec(2, 0),
+				client: vec(2, 0),
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? 'origin' : attr === 'data-type' ? 'point' : null),
+						}),
+					},
+				},
+			} as any);
+
+			assert.ok(Math.abs(center.y - 15) < 1e-3, `Expected center.y ~ 15, got ${center.y}`);
+		});
+
+		it('renders tangent badge on infinite axis, links entities, serializes, and survives cleanOrphanConstraints', () => {
+			const sketch = new SketchDocument();
+			const center = sketch.addPoint(200, 20);
+			const circle = sketch.addCircle(center.id, 20);
+			const c = sketch.addTangentConstraint('axis_x', circle.id) as TangentLineCircleConstraint;
+			assert.ok(c);
+
+			let renderedBadge = false;
+			const mockCtx: any = {
+				sketch,
+				viewport: {
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					zoom: 1,
+				},
+				renderBadge: (_id: string, _x: number, _y: number, label: string) => {
+					if (label === 'tangent') renderedBadge = true;
+				},
+				renderBadgeOnSegment: () => {
+					assert.fail('Should not call renderBadgeOnSegment for axis');
+				},
+				renderBadgeOnCircle: () => {},
+			};
+			c.render(mockCtx);
+			assert.equal(renderedBadge, true, 'Should render tangent badge at tangent point even at x=200 along axis_x');
+
+			assert.ok(sketch.getConstraintsForEntity('line', 'axis_x').some(sc => sc.id === c.id));
+			assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === 'axis_x' && e.type === 'line'));
+
+			const restored = deserializeConstraint(serializeConstraint(c)) as TangentLineCircleConstraint;
+			assert.equal(restored instanceof TangentLineCircleConstraint, true);
+			assert.equal(restored.lineId, 'axis_x');
+
+			const extraPt = sketch.addPoint(50, 50);
+			sketch.removeEntity(extraPt.id);
+			assert.ok(sketch.constraints.has(c.id), 'Tangent with axis_x should survive cleanOrphanConstraints');
+		});
+	});
+
+	describe('Collinear Constraints with Coordinate Axes', () => {
+		it('addCollinearConstraint delegates to LineToAxisDistanceConstraint when given axis_x or axis_y', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(10, 15);
+			const p2 = sketch.addPoint(50, 25);
+			const line = sketch.addLine(p1.id, p2.id);
+
+			const c = sketch.addCollinearConstraint(line.id, 'axis_x');
+			assert.ok(c instanceof LineToAxisDistanceConstraint);
+			assert.equal(c.isCollinear, true);
+			assert.equal(c.axis, 'x');
+			assert.ok(Math.abs(p1.y) < 1e-4);
+			assert.ok(Math.abs(p2.y) < 1e-4);
+
+			assert.equal(sketch.addCollinearConstraint('axis_x', 'axis_y'), null);
+		});
+	});
+
+	describe('Two-Line Symmetry with Opposite Endpoint Directions (sketch_1793864359069.svg)', () => {
+		it('correctly pairs endpoints when two lines have opposite directions across axis_y', () => {
+			const sketch = new SketchDocument();
+			// Exact coordinates and direction from sketch_1793864359069.svg:
+			// Line-5: Point-5 (bottom-right) -> Point-6 (top-right)
+			// Line-7: Point-7 (top-left) -> Point-8 (bottom-left)
+			const p5 = sketch.addPoint(101.79068827101727, 12.987276531412446);
+			const p6 = sketch.addPoint(83.87500000000027, 45.25141492374967);
+			const p7 = sketch.addPoint(-83.87500000000028, 45.25141492374967);
+			const p8 = sketch.addPoint(-101.79069099267647, 12.987276534860813);
+
+			const line5 = sketch.addLine(p5.id, p6.id);
+			const line7 = sketch.addLine(p7.id, p8.id);
+			sketch.addHorizontalConstraint(p6.id, p7.id);
+
+			const ctx: any = {
+				sketch,
+				viewport: {
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					zoom: 1,
+				},
+				findPointNear: () => null,
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+				requestRender: () => {},
+				showToast: () => {},
+				setCursor: () => {},
+			};
+
+			const tool = new ConstraintTool('symmetry');
+			tool.activate(ctx);
+
+			// Simulate box-selecting both lines before activating tool (includes endpoints in selection)
+			sketch.selectEntity(p5.id, 'point', true);
+			sketch.selectEntity(p6.id, 'point', true);
+			sketch.selectEntity(p7.id, 'point', true);
+			sketch.selectEntity(p8.id, 'point', true);
+			sketch.selectEntity(line5.id, 'line', true);
+			sketch.selectEntity(line7.id, 'line', true);
+
+			// Re-activating tool prunes endpoints of selected lines
+			tool.activate(ctx);
+			assert.equal(sketch.selection.pointIds.size, 0);
+			assert.equal(sketch.selection.lineIds.size, 2);
+
+			// Click axis_y
+			tool.onMouseDown({
+				screen: vec(400, 200),
+				world: vec(0, 100),
+				client: vec(400, 200),
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? 'axis_y' : attr === 'data-type' ? 'line' : null),
+						}),
+					},
+				},
+			} as any);
+
+			// Verify both lines kept their length (~36.9) and did NOT collapse!
+			const len5 = Math.hypot(p6.x - p5.x, p6.y - p5.y);
+			const len7 = Math.hypot(p8.x - p7.x, p8.y - p7.y);
+			assert.ok(len5 > 35, `Expected Line-5 length > 35, got ${len5}`);
+			assert.ok(len7 > 35, `Expected Line-7 length > 35, got ${len7}`);
+
+			// Verify p5 is paired with p8 (bottom pair) and p6 is paired with p7 (top pair)
+			assert.ok(Math.abs(p5.x + p8.x) < 1e-4);
+			assert.ok(Math.abs(p5.y - p8.y) < 1e-4);
+			assert.ok(Math.abs(p6.x + p7.x) < 1e-4);
+			assert.ok(Math.abs(p6.y - p7.y) < 1e-4);
+
+			// Drag p5 and verify p8 mirrors across axis_y
+			sketch.dragPoint(p5.id, 120, 10);
+			assert.ok(Math.abs(p5.x + p8.x) < 1e-3);
+			assert.ok(Math.abs(p5.y - p8.y) < 1e-3);
 		});
 	});
 });

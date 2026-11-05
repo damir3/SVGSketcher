@@ -31,7 +31,11 @@ export class ConstraintTool extends BaseTool {
 	}
 
 	override getHoverTargetOptions(): FindHoverTargetOptions {
-		return { allowSplineHandles: true };
+		return {
+			allowSplineHandles: true,
+			allowOrigin: this.isEntityCompatibleWithConstraint('point'),
+			allowAxes: this.isEntityCompatibleWithConstraint('line'),
+		};
 	}
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {
@@ -41,7 +45,7 @@ export class ConstraintTool extends BaseTool {
 
 		if (this.id === 'fixed') {
 			const nearPoint = this.ctx.findPointNear(screen);
-			if (nearPoint) {
+			if (nearPoint && nearPoint.id !== 'origin') {
 				const isNowFixed = this.ctx.sketch.toggleFixedConstraint(nearPoint.id);
 				this.ctx.showToast(isNowFixed ? 'Fixed constraint applied' : 'Fixed constraint removed');
 				this.ctx.requestRender();
@@ -64,6 +68,11 @@ export class ConstraintTool extends BaseTool {
 			| 'elliptical_arc'
 			| 'spline'
 			| undefined;
+
+		if (type && !this.isEntityCompatibleWithConstraint(type)) {
+			id = undefined;
+			type = undefined;
+		}
 
 		// Points ALWAYS have top priority when clicking near a point (if points are applicable)
 		const canUsePoints = this.isEntityCompatibleWithConstraint('point');
@@ -284,12 +293,89 @@ export class ConstraintTool extends BaseTool {
 				}
 				break;
 			}
-			case 'point_on_line':
-			case 'midpoint': {
+			case 'point_on_line': {
 				if (type === 'point' && sel.pointIds.size >= 1) {
 					sel.pointIds.clear();
 				} else if (type === 'line' && sel.lineIds.size >= 1) {
 					sel.lineIds.clear();
+				}
+				break;
+			}
+			case 'midpoint': {
+				if (type === 'point') {
+					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) {
+						sel.pointIds.clear();
+					} else if (sel.lineIds.size === 0) {
+						if (sel.pointIds.size >= 3 || (id !== 'origin' && sel.pointIds.size >= 2 && !sel.pointIds.has('origin'))) {
+							sel.pointIds.clear();
+						}
+					}
+				} else if (type === 'line') {
+					if (sel.lineIds.size >= 1) sel.lineIds.clear();
+					if (sel.pointIds.size > 1) sel.pointIds.clear();
+				}
+				break;
+			}
+			case 'symmetry': {
+				if (type === 'point') {
+					if (id === 'origin') {
+						if (sel.circleIds.size + sel.arcIds.size > 0) {
+							sel.pointIds.clear();
+							sel.lineIds.clear();
+						} else if (sel.lineIds.size > 0) {
+							sel.lineIds.delete('axis_x');
+							sel.lineIds.delete('axis_y');
+							if (sel.lineIds.size > 2) sel.lineIds.clear();
+							sel.pointIds.clear();
+						} else if (sel.pointIds.size >= 3) {
+							sel.pointIds.clear();
+						}
+					} else {
+						sel.circleIds.clear();
+						sel.arcIds.clear();
+						if (sel.lineIds.size > 1) {
+							sel.lineIds.clear();
+						}
+						if (sel.lineIds.size === 1) {
+							sel.pointIds.delete('origin');
+							if (sel.pointIds.size >= 2) sel.pointIds.clear();
+						} else if (sel.pointIds.size >= 3 || (sel.pointIds.size >= 2 && !sel.pointIds.has('origin'))) {
+							sel.pointIds.clear();
+						}
+					}
+				} else if (type === 'line') {
+					if (id === 'axis_x' || id === 'axis_y') {
+						sel.lineIds.delete('axis_x');
+						sel.lineIds.delete('axis_y');
+					}
+					if (sel.circleIds.size + sel.arcIds.size > 0) {
+						sel.pointIds.clear();
+						if (sel.lineIds.size >= 1) sel.lineIds.clear();
+					} else if (sel.pointIds.size > 0) {
+						if (sel.pointIds.size === 1 && sel.pointIds.has('origin') && id !== 'axis_x' && id !== 'axis_y') {
+							if (sel.lineIds.size >= 2) sel.lineIds.clear();
+						} else {
+							sel.pointIds.delete('origin');
+							if (sel.lineIds.size >= 1) sel.lineIds.clear();
+							if (sel.pointIds.size > 2) sel.pointIds.clear();
+						}
+					} else if (sel.lineIds.size >= 3) {
+						sel.lineIds.clear();
+					}
+				} else if (type === 'circle' || type === 'arc') {
+					if (sel.pointIds.size > 1 || (sel.pointIds.size === 1 && !sel.pointIds.has('origin'))) {
+						sel.pointIds.clear();
+					}
+					if (sel.lineIds.size > 1) {
+						sel.lineIds.clear();
+					}
+					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) {
+						sel.pointIds.clear();
+					}
+					if (sel.circleIds.size + sel.arcIds.size >= 2) {
+						sel.circleIds.clear();
+						sel.arcIds.clear();
+					}
 				}
 				break;
 			}
@@ -343,6 +429,16 @@ export class ConstraintTool extends BaseTool {
 		}
 		for (const sid of [...sel.splineIds]) {
 			if (!this.isEntityCompatibleWithConstraint('spline')) sel.splineIds.delete(sid);
+		}
+		// Strip endpoints of selected lines that were also included by box-selection
+		if (sel.lineIds.size > 0 && sel.pointIds.size > 0) {
+			for (const lid of sel.lineIds) {
+				const l = this.ctx.sketch.lines.get(lid);
+				if (l) {
+					sel.pointIds.delete(l.p1Id);
+					sel.pointIds.delete(l.p2Id);
+				}
+			}
 		}
 	}
 
@@ -423,13 +519,25 @@ export class ConstraintTool extends BaseTool {
 			case 'concentric':
 				return cCount === 2 && pCount === 0 && lCount === 0;
 			case 'point_on_line':
-			case 'midpoint':
 				return pCount === 1 && lCount === 1 && cCount === 0;
+			case 'midpoint':
+				return (
+					(pCount === 1 && lCount === 1 && cCount === 0) ||
+					(pCount === 3 && sel.pointIds.has('origin') && lCount === 0 && cCount === 0)
+				);
 			case 'symmetry':
 				return (
 					(pCount === 2 && lCount === 1 && cCount === 0) ||
+					(pCount === 3 && sel.pointIds.has('origin') && lCount === 0 && cCount === 0) ||
 					(cCount === 2 && lCount === 1 && pCount === 0) ||
-					(lCount === 3 && pCount === 0 && cCount === 0)
+					(cCount === 2 && pCount === 1 && sel.pointIds.has('origin') && lCount === 0) ||
+					(lCount === 3 && pCount === 0 && cCount === 0) ||
+					(lCount === 2 &&
+						pCount === 1 &&
+						sel.pointIds.has('origin') &&
+						!sel.lineIds.has('axis_x') &&
+						!sel.lineIds.has('axis_y') &&
+						cCount === 0)
 				);
 			default:
 				return false;
@@ -613,23 +721,56 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'parallel': {
 				if (lIds.length === 2) {
-					this.ctx.sketch.addParallelConstraint(lIds[0], lIds[1]);
-					applied = true;
-					toastMsg = 'Parallel constraint applied';
+					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
+						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
+						const axis = lIds.includes('axis_x') ? 'x' : 'y';
+						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
+						const line = this.ctx.sketch.lines.get(userLineId);
+						if (line) {
+							if (axis === 'x') {
+								this.ctx.sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
+							} else {
+								this.ctx.sketch.addVerticalConstraint(line.p1Id, line.p2Id);
+							}
+							applied = true;
+							toastMsg = `Parallel to ${axis.toUpperCase()}-axis applied`;
+						}
+					} else {
+						this.ctx.sketch.addParallelConstraint(lIds[0], lIds[1]);
+						applied = true;
+						toastMsg = 'Parallel constraint applied';
+					}
 				}
 				break;
 			}
 			case 'perpendicular': {
 				if (lIds.length === 2) {
-					this.ctx.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
-					applied = true;
-					toastMsg = 'Perpendicular constraint applied';
+					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
+						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
+						const axis = lIds.includes('axis_x') ? 'x' : 'y';
+						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
+						const line = this.ctx.sketch.lines.get(userLineId);
+						if (line) {
+							if (axis === 'x') {
+								this.ctx.sketch.addVerticalConstraint(line.p1Id, line.p2Id);
+							} else {
+								this.ctx.sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
+							}
+							applied = true;
+							toastMsg = `Perpendicular to ${axis.toUpperCase()}-axis applied`;
+						}
+					} else {
+						this.ctx.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
+						applied = true;
+						toastMsg = 'Perpendicular constraint applied';
+					}
 				}
 				break;
 			}
 			case 'collinear': {
 				if (lIds.length === 2) {
 					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
+						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
 						const axis = lIds.includes('axis_x') ? 'x' : 'y';
 						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
 						const c = this.ctx.sketch.addLineCollinearWithAxisConstraint(userLineId, axis);
@@ -655,13 +796,17 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'tangent': {
 				if (lIds.length === 1 && cIds.length === 1) {
-					this.ctx.sketch.addTangentConstraint(lIds[0], cIds[0]);
-					applied = true;
-					toastMsg = 'Tangent constraint applied';
+					const c = this.ctx.sketch.addTangentConstraint(lIds[0], cIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Tangent constraint applied';
+					}
 				} else if (cIds.length === 2 && lIds.length === 0) {
-					this.ctx.sketch.addTangentConstraint(cIds[0], cIds[1]);
-					applied = true;
-					toastMsg = 'Tangent constraint applied';
+					const c = this.ctx.sketch.addTangentConstraint(cIds[0], cIds[1]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Tangent constraint applied';
+					}
 				}
 				break;
 			}
@@ -695,14 +840,62 @@ export class ConstraintTool extends BaseTool {
 					} else {
 						this.ctx.showToast('Cannot constrain midpoint to this line');
 					}
+				} else if (pIds.length === 3 && pIds.includes('origin') && lIds.length === 0) {
+					const userPts = pIds.filter(id => id !== 'origin');
+					const c = this.ctx.sketch.addMidpointConstraint('origin', userPts[0], userPts[1]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Midpoint constraint applied';
+					}
 				}
 				break;
 			}
 			case 'symmetry': {
-				if (lIds.length === 1 && pIds.length === 2) {
-					this.ctx.sketch.addSymmetryConstraint(pIds[0], pIds[1], lIds[0]);
-					applied = true;
-					toastMsg = 'Symmetry constraint applied';
+				if (pIds.length === 2 && lIds.length === 1) {
+					const c = this.ctx.sketch.addSymmetryConstraint(pIds[0], pIds[1], lIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Symmetry constraint applied';
+					} else {
+						this.ctx.showToast('Cannot apply symmetry to these entities');
+					}
+				} else if (pIds.length === 3 && pIds.includes('origin') && lIds.length === 0) {
+					const userPts = pIds.filter(id => id !== 'origin');
+					const c = this.ctx.sketch.addSymmetryConstraint(userPts[0], userPts[1], 'origin');
+					if (c) {
+						applied = true;
+						toastMsg = 'Symmetry constraint applied';
+					}
+				} else if (cIds.length === 2 && (lIds.length === 1 || (pIds.length === 1 && pIds[0] === 'origin'))) {
+					const symAxisId = lIds.length === 1 ? lIds[0] : 'origin';
+					const c1 = this.ctx.sketch.circles.get(cIds[0]) ?? this.ctx.sketch.arcs.get(cIds[0]);
+					const c2 = this.ctx.sketch.circles.get(cIds[1]) ?? this.ctx.sketch.arcs.get(cIds[1]);
+					if (c1 && c2) {
+						this.ctx.sketch.beginTransaction();
+						this.ctx.sketch.addSymmetryConstraint(c1.centerId, c2.centerId, symAxisId);
+						this.ctx.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
+						this.ctx.sketch.commitTransaction();
+						applied = true;
+						toastMsg = 'Symmetry & equal radius applied';
+					}
+				} else if (lIds.length === 3) {
+					const builtinAxisIdx = lIds.findIndex(id => id === 'axis_x' || id === 'axis_y');
+					const constrIdx = lIds.findIndex(id => this.ctx.sketch.lines.get(id)?.isConstruction);
+					const axisId = builtinAxisIdx !== -1 ? lIds[builtinAxisIdx] : constrIdx !== -1 ? lIds[constrIdx] : lIds[2];
+					const otherLines = lIds.filter(id => id !== axisId);
+					if (otherLines.length === 2) {
+						const created = this.ctx.sketch.addLineSymmetryConstraints(otherLines[0], otherLines[1], axisId);
+						if (created.length > 0) {
+							applied = true;
+							toastMsg = 'Line symmetry constraints applied';
+						}
+					}
+				} else if (lIds.length === 2 && pIds.length === 1 && pIds[0] === 'origin') {
+					const created = this.ctx.sketch.addLineSymmetryConstraints(lIds[0], lIds[1], 'origin');
+					if (created.length > 0) {
+						applied = true;
+						toastMsg = 'Line symmetry constraints applied';
+					}
 				}
 				break;
 			}

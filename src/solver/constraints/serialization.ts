@@ -168,6 +168,7 @@ type ConstraintSnapshotData =
 			circleCenterId: string;
 			circleId: string;
 			initialSide: number;
+			lineId?: string;
 	  }
 	| {
 			type: 'tangent_circle_circle';
