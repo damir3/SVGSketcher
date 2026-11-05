@@ -10,6 +10,7 @@ import {
 	bindTextCardEvents,
 	type TextCardCallbacks,
 } from '../../../ui/panels/primitives/textPanel';
+import { showToast } from '../../../ui/toast';
 
 export class TextTool extends BaseTool {
 	readonly id = 'text' as const;
@@ -662,6 +663,23 @@ export class TextToolSidebarPanel implements IToolPanel {
 
 	constructor(tool: TextTool) {
 		this.tool = tool;
+	}
+
+	handleKeyDown(e: KeyboardEvent): boolean {
+		if (!e.altKey || e.ctrlKey || e.metaKey) return false;
+
+		const match = e.code.match(/^(?:Digit|Numpad)([12])$/);
+		if (!match) return false;
+
+		const mode = match[1] === '1' ? 'text' : 'text_on_path';
+		e.preventDefault();
+		if (this.tool.mode !== mode) {
+			this.tool.mode = mode;
+			this.tool.context?.requestRender();
+		}
+		this.rerender();
+		showToast(mode === 'text' ? 'Text in Rectangle (Alt+1)' : 'Text on Path (Alt+2)');
+		return true;
 	}
 
 	rerender(): void {

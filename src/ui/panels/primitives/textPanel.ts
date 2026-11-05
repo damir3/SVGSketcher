@@ -62,11 +62,11 @@ export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: b
 				? `
 		<!-- Mode selection: Text or Text On Path (tool mode only, no Mode label) -->
 		<div class="tool-mode-selector" id="text-tool-mode-control" style="margin-bottom: 8px;">
-			<button class="tool-mode-button ${data.mode === 'text' ? 'active' : ''}" data-mode="text" type="button" title="Text in Rectangle">
+			<button class="tool-mode-button ${data.mode === 'text' ? 'active' : ''}" data-mode="text" type="button" title="Text in Rectangle (Alt+1)">
 				<span class="tool-mode-icon">${getToolIcon('text_rect') || getToolIcon('text')}</span>
 				<span class="tool-mode-label">Text</span>
 			</button>
-			<button class="tool-mode-button ${data.mode === 'text_on_path' ? 'active' : ''}" data-mode="text_on_path" type="button" title="Text on Path">
+			<button class="tool-mode-button ${data.mode === 'text_on_path' ? 'active' : ''}" data-mode="text_on_path" type="button" title="Text on Path (Alt+2)">
 				<span class="tool-mode-icon">${getToolIcon('text_on_path')}</span>
 				<span class="tool-mode-label">Text On Path</span>
 			</button>
