@@ -8,13 +8,18 @@ import {
 	computeRectangularPatternDirections,
 	type ConstraintRenderContext,
 } from '../solver/constraints';
-import { normalize, type Vec2 } from '../math/vector';
+import { vec, dist, normalize, type Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
 import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../math/spline';
+import { getFontSync, loadFontAsync } from './fonts';
+import { generateTextSvgPathData } from '../math/textPath';
 
 export * from './styles';
 export * from './svg';
 export * from './dimensionGeometry';
+export { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
+
+import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
 
 import {
 	createSvgElement,
@@ -94,6 +99,8 @@ import {
 const TWO_PI = 2 * Math.PI;
 
 export interface RenderOptions {
+	activeTextId?: string | null;
+	hiddenEntityIds?: Set<string>;
 	regionHoverPoint?: Vec2 | null;
 	showGrid?: boolean;
 	showConstraints?: boolean;
@@ -219,6 +226,17 @@ export class SVGRenderer {
 		radius: number;
 	} | null = null;
 	public previewGroup: SVGGElement;
+	public textGroup: SVGGElement;
+	public textRotationGizmo: {
+		textId: string;
+		centerWorld: Vec2;
+		handleScreen: Vec2;
+	} | null = null;
+	public textDragGizmo: {
+		textId: string;
+		centerWorld: Vec2;
+		centerScreen: Vec2;
+	} | null = null;
 	private overlayGroup: SVGGElement;
 	private filletGroup: SVGGElement;
 	private chamferGroup: SVGGElement;
@@ -242,6 +260,7 @@ export class SVGRenderer {
 		this.regionHoverGroup.style.pointerEvents = 'none';
 
 		this.geometryGroup = this.createGroup('geometry-layer');
+		this.textGroup = this.createGroup('text-layer');
 		this.constraintGroup = this.createGroup('constraint-layer');
 		this.pointGroup = this.createGroup('point-layer');
 
@@ -267,6 +286,7 @@ export class SVGRenderer {
 		this.svg.appendChild(this.originAxisGroup);
 		this.svg.appendChild(this.regionGroup);
 		this.svg.appendChild(this.geometryGroup);
+		this.svg.appendChild(this.textGroup);
 		this.svg.appendChild(this.regionHoverGroup);
 		this.svg.appendChild(this.constraintGroup);
 		this.svg.appendChild(this.pointGroup);
@@ -317,8 +337,12 @@ export class SVGRenderer {
 		this.renderGrid(sketch, viewport, options.showGrid ?? true, options);
 		this.renderRegions(sketch, viewport, options.regionHoverPoint ?? null);
 		this.renderGeometry(sketch, viewport, options);
+		this.textRotationGizmo = null;
+		this.textDragGizmo = null;
+		this.textGroup.innerHTML = '';
+		this.renderTexts(sketch, viewport, options);
 		if (options.showConstraints !== false) {
-			this.renderConstraints(sketch, viewport);
+			this.renderConstraints(sketch, viewport, options);
 		}
 		this.mirrorGroup.innerHTML = '';
 		if (options.mirrorHighlight) {
@@ -696,6 +720,7 @@ export class SVGRenderer {
 
 		// 1. Render Lines
 		for (const line of sketch.lines.values()) {
+			if (options.hiddenEntityIds?.has(line.id)) continue;
 			const p1 = sketch.points.get(line.p1Id);
 			const p2 = sketch.points.get(line.p2Id);
 			if (!p1 || !p2) continue;
@@ -1072,6 +1097,7 @@ export class SVGRenderer {
 		}
 
 		for (const pt of sketch.points.values()) {
+			if (options.hiddenEntityIds?.has(pt.id)) continue;
 			const splineHandleInfo = handlePointToSpline.get(pt.id);
 			const splineControl = controlPointToSpline.get(pt.id);
 
@@ -1156,7 +1182,262 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderConstraints(sketch: SketchDocument, viewport: Viewport): void {
+	private renderTexts(sketch: SketchDocument, viewport: Viewport, options: RenderOptions): void {
+		for (const text of sketch.texts.values()) {
+			if (options.hiddenEntityIds?.has(text.id)) continue;
+			const isSelected = sketch.selection.textIds.has(text.id) || options.activeTextId === text.id;
+			const color = isSelected ? COLORS.primary : COLORS.unconstrained;
+			const hScreen = Math.max(1, text.height * viewport.zoom);
+			const fontFam = text.fontFamily || 'Arial, sans-serif';
+
+			if (text.mode === 'text') {
+				const corners = text.getRectangleCorners(sketch);
+				if (!corners) continue;
+
+				const [p0, p1, p2, p3] = corners;
+				const cWorld = vec((p0.x + p2.x) / 2, (p0.y + p2.y) / 2);
+				const sCenter = viewport.worldToScreen(cWorld.x, cWorld.y);
+				const widthWorld = dist(p0, p1);
+				const heightWorld = dist(p0, p3);
+				const wScreen = widthWorld * viewport.zoom;
+				const hBoxScreen = heightWorld * viewport.zoom;
+
+				const angleCad = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+				const angleScreenDeg = (-angleCad * 180) / Math.PI;
+
+				const textG = createSvgElement(
+					'g',
+					{
+						class: `sketch-text-entity ${isSelected ? 'selected' : ''}`,
+						transform: `translate(${sCenter.x.toFixed(2)}, ${sCenter.y.toFixed(2)}) rotate(${angleScreenDeg.toFixed(2)})`,
+						'data-id': text.id,
+						'data-text-id': text.id,
+						cursor: 'pointer',
+					},
+					this.textGroup
+				);
+
+				// Transparent hit-rect covering the entire box for easy clicking & double-clicking
+				createSvgElement(
+					'rect',
+					{
+						x: -wScreen / 2,
+						y: -hBoxScreen / 2,
+						width: wScreen,
+						height: hBoxScreen,
+						fill: 'rgba(0, 0, 0, 0.001)',
+						'data-id': text.id,
+						'data-text-id': text.id,
+					},
+					textG
+				);
+
+				const scaleX = text.flipHorizontal ? -1 : 1;
+				const scaleY = text.flipVertical ? -1 : 1;
+				const innerG =
+					text.flipHorizontal || text.flipVertical
+						? createSvgElement('g', { transform: `scale(${scaleX}, ${scaleY})` }, textG)
+						: textG;
+
+				let posX = 0;
+				let textAnchor = 'middle';
+				if (text.alignment === 'left') {
+					if (text.flipHorizontal) {
+						posX = wScreen / 2 - 4;
+						textAnchor = 'end';
+					} else {
+						posX = -wScreen / 2 + 4;
+						textAnchor = 'start';
+					}
+				} else if (text.alignment === 'right') {
+					if (text.flipHorizontal) {
+						posX = -wScreen / 2 + 4;
+						textAnchor = 'start';
+					} else {
+						posX = wScreen / 2 - 4;
+						textAnchor = 'end';
+					}
+				}
+
+				const letterSpacingPx = (text.characterSpacing / 100) * hScreen;
+				const lines = (text.text || '').split(/\r?\n/);
+				const numLines = Math.max(1, lines.length);
+				const lineHeightPx = hScreen * 1.25;
+				const totalBlockHeightPx = (numLines - 1) * lineHeightPx;
+
+				let startY = 0;
+				const vAlign = text.verticalAlignment ?? 'middle';
+				if (vAlign === 'top') {
+					startY = text.flipVertical ? hBoxScreen / 2 - hScreen / 2 - 3 : -hBoxScreen / 2 + hScreen / 2 + 3;
+				} else if (vAlign === 'bottom') {
+					startY = text.flipVertical
+						? -hBoxScreen / 2 + hScreen / 2 + 3 + totalBlockHeightPx
+						: hBoxScreen / 2 - hScreen / 2 - 3 - totalBlockHeightPx;
+				} else {
+					startY = text.flipVertical ? totalBlockHeightPx / 2 : -totalBlockHeightPx / 2;
+				}
+
+				const textEl = createSvgElement(
+					'text',
+					{
+						x: posX,
+						y: startY,
+						fill: color,
+						'font-family': fontFam,
+						'font-size': `${hScreen.toFixed(1)}px`,
+						'font-weight': text.bold ? 'bold' : 'normal',
+						'font-style': text.italic ? 'italic' : 'normal',
+						'letter-spacing': `${letterSpacingPx.toFixed(1)}px`,
+						'text-anchor': textAnchor,
+						'dominant-baseline': 'central',
+						'data-id': text.id,
+						'data-text-id': text.id,
+					},
+					innerG
+				);
+
+				for (let i = 0; i < lines.length; i++) {
+					const lineY = text.flipVertical ? startY - i * lineHeightPx : startY + i * lineHeightPx;
+					createSvgElement(
+						'tspan',
+						{
+							x: posX,
+							y: lineY.toFixed(1),
+							'data-id': text.id,
+							'data-text-id': text.id,
+						},
+						textEl,
+						lines[i] || ' '
+					);
+				}
+
+				// Rotation Gizmo Handle (at top center of rectangle)
+				if (isSelected || options.activeTextId === text.id) {
+					const stemLen = TEXT_ROTATION_HANDLE_DISTANCE_PX;
+					const topEdgeY = -hBoxScreen / 2;
+					const handleY = topEdgeY - stemLen;
+
+					createSvgElement(
+						'line',
+						{
+							x1: 0,
+							y1: topEdgeY,
+							x2: 0,
+							y2: handleY,
+							stroke: COLORS.primary,
+							'stroke-width': 1.5,
+							'stroke-dasharray': '2,2',
+						},
+						textG
+					);
+
+					createSvgElement(
+						'circle',
+						{
+							cx: 0,
+							cy: handleY,
+							r: 5.5,
+							fill: COLORS.white,
+							stroke: COLORS.primary,
+							'stroke-width': 2,
+							class: 'text-rotation-handle',
+							cursor: 'grab',
+						},
+						textG
+					);
+
+					const rad = (angleScreenDeg * Math.PI) / 180;
+					const cosA = Math.cos(rad);
+					const sinA = Math.sin(rad);
+					const hScreenX = sCenter.x + (0 * cosA - handleY * sinA);
+					const hScreenY = sCenter.y + (0 * sinA + handleY * cosA);
+
+					this.textRotationGizmo = {
+						textId: text.id,
+						centerWorld: cWorld,
+						handleScreen: vec(hScreenX, hScreenY),
+					};
+
+					// Center Drag / Move Handle (at center of rectangle)
+					createSvgElement(
+						'circle',
+						{
+							cx: 0,
+							cy: 0,
+							r: 5.5,
+							fill: COLORS.white,
+							stroke: COLORS.primary,
+							'stroke-width': 2,
+							class: 'text-drag-handle',
+							cursor: 'move',
+						},
+						textG
+					);
+
+					this.textDragGizmo = {
+						textId: text.id,
+						centerWorld: cWorld,
+						centerScreen: sCenter,
+					};
+				}
+			} else if (text.mode === 'text_on_path' && text.targetPrimitiveId) {
+				const curve = sketch.toGeoCurve(text.targetPrimitiveId, text.targetPrimitiveType);
+				if (!curve) continue;
+
+				const font = getFontSync(text.fontFamily, text.bold, text.italic);
+				if (!font) {
+					loadFontAsync(text.fontFamily, text.bold, text.italic);
+				}
+
+				const pathData = font
+					? generateTextSvgPathData(
+							{
+								mode: 'text_on_path',
+								text: text.text,
+								height: text.height,
+								characterSpacing: text.characterSpacing,
+								placement: text.placement,
+								fitToPath: text.fitToPath,
+								flipHorizontal: text.flipHorizontal,
+								flipVertical: text.flipVertical,
+								alignment: text.alignment,
+								coordSystem: 'cad',
+							},
+							font,
+							curve
+						)
+					: '';
+
+				if (pathData) {
+					const textPathG = createSvgElement(
+						'g',
+						{
+							class: `sketch-text-entity ${isSelected ? 'selected' : ''}`,
+							transform: `matrix(${viewport.zoom}, 0, 0, ${-viewport.zoom}, ${viewport.panX.toFixed(2)}, ${viewport.panY.toFixed(2)})`,
+							'data-id': text.id,
+							'data-text-id': text.id,
+							cursor: 'pointer',
+						},
+						this.textGroup
+					);
+
+					createSvgElement(
+						'path',
+						{
+							d: pathData,
+							fill: color,
+							'data-id': text.id,
+							'data-text-id': text.id,
+							cursor: 'pointer',
+						},
+						textPathG
+					);
+				}
+			}
+		}
+	}
+
+	private renderConstraints(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
 		this.constraintGroup.innerHTML = '';
 		const lineBadgeCounts = new Map<string, number>();
 
@@ -1201,6 +1482,7 @@ export class SVGRenderer {
 
 		for (const constraint of sketch.constraints.values()) {
 			if (sketch.isSplineInternalConstraint(constraint)) continue;
+			if (options.hiddenEntityIds && constraint.entityIds?.some(id => options.hiddenEntityIds!.has(id))) continue;
 			ctx.isSelected = sketch.selection.constraintIds.has(constraint.id);
 			constraint.render?.(ctx);
 		}

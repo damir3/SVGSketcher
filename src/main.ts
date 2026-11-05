@@ -15,8 +15,10 @@ import {
 } from './model/presets';
 import { ICONS } from './ui/icons';
 import { setToolIconProvider } from './ui/panels/tools/iconProvider';
+import { preloadFonts, setOnFontLoaded } from './canvas/fonts';
 
 setToolIconProvider(name => ICONS[name] ?? '');
+preloadFonts();
 
 function initApp(): void {
 	const app = document.getElementById('app');
@@ -201,6 +203,10 @@ function initApp(): void {
 
 	window.addEventListener('resize', handleResize);
 	setTimeout(handleResize, 50);
+
+	setOnFontLoaded(() => {
+		renderer.render(sketch, viewport);
+	});
 
 	// Track cursor coordinates and solver benchmark
 	svg.addEventListener('mousemove', e => {
@@ -404,7 +410,26 @@ function initApp(): void {
 
 	// Keyboard Shortcuts
 	window.addEventListener('keydown', e => {
-		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+		const target = e.target as HTMLElement | null;
+		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+		if (
+			(target &&
+				((typeof HTMLInputElement !== 'undefined' && target instanceof HTMLInputElement) ||
+					(typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
+					target.tagName === 'INPUT' ||
+					target.tagName === 'TEXTAREA' ||
+					target.tagName === 'SELECT' ||
+					target.isContentEditable)) ||
+			(activeEl &&
+				((typeof HTMLInputElement !== 'undefined' && activeEl instanceof HTMLInputElement) ||
+					(typeof HTMLTextAreaElement !== 'undefined' && activeEl instanceof HTMLTextAreaElement) ||
+					activeEl.tagName === 'INPUT' ||
+					activeEl.tagName === 'TEXTAREA' ||
+					activeEl.tagName === 'SELECT' ||
+					activeEl.isContentEditable))
+		) {
+			return;
+		}
 
 		const isCtrlOrCmd = e.ctrlKey || e.metaKey;
 

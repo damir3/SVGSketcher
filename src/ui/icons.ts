@@ -43,6 +43,22 @@ import breakIcon from '../assets/icons/break.svg?raw';
 import mirror from '../assets/icons/mirror.svg?raw';
 import circularPattern from '../assets/icons/circular-pattern.svg?raw';
 import rectangularPattern from '../assets/icons/rectangular-pattern.svg?raw';
+import textIcon from '../assets/icons/text.svg?raw';
+import textRectIcon from '../assets/icons/text-rect.svg?raw';
+import textOnPathIcon from '../assets/icons/text-on-path.svg?raw';
+
+import bold from '../assets/icons/bold.svg?raw';
+import italic from '../assets/icons/italic.svg?raw';
+import alignLeft from '../assets/icons/align-left.svg?raw';
+import alignCenter from '../assets/icons/align-center.svg?raw';
+import alignRight from '../assets/icons/align-right.svg?raw';
+import alignTop from '../assets/icons/align-top.svg?raw';
+import alignMiddle from '../assets/icons/align-middle.svg?raw';
+import alignBottom from '../assets/icons/align-bottom.svg?raw';
+import placementAbove from '../assets/icons/placement-above.svg?raw';
+import placementBelow from '../assets/icons/placement-below.svg?raw';
+import flipHorizontal from '../assets/icons/flip-horizontal.svg?raw';
+import flipVertical from '../assets/icons/flip-vertical.svg?raw';
 
 import coincident from '../assets/icons/coincident.svg?raw';
 import fixed from '../assets/icons/fixed.svg?raw';
@@ -106,6 +122,31 @@ export const ICONS = {
 	elliptical_arc: ellipticalArc,
 	spline_fit: splineFit,
 	spline_control: splineControl,
+	text: textIcon,
+	text_rect: textRectIcon,
+	text_on_path: textOnPathIcon,
+	bold,
+	italic,
+	alignLeft,
+	alignCenter,
+	alignRight,
+	alignTop,
+	alignMiddle,
+	alignBottom,
+	align_left: alignLeft,
+	align_center: alignCenter,
+	align_right: alignRight,
+	align_top: alignTop,
+	align_middle: alignMiddle,
+	align_bottom: alignBottom,
+	placementAbove,
+	placementBelow,
+	placement_above: placementAbove,
+	placement_below: placementBelow,
+	flipHorizontal,
+	flipVertical,
+	flip_horizontal: flipHorizontal,
+	flip_vertical: flipVertical,
 	construction,
 	snap,
 	trim,

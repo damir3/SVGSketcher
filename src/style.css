@@ -1706,6 +1706,12 @@ body {
 	background-color: var(--bg-surface-elevated);
 }
 
+.pattern-segmented-control .seg-btn svg {
+	width: 15px;
+	height: 15px;
+	display: block;
+}
+
 .seg-btn {
 	border: none;
 	background: transparent;
@@ -2136,4 +2142,28 @@ body {
 .btn-param-action.primary:hover {
 	box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 	background: linear-gradient(135deg, #0369a1, #0284c7);
+}
+
+.text-drag-handle {
+	cursor: move;
+	transition:
+		fill 0.15s ease,
+		stroke-width 0.15s ease;
+}
+
+.text-drag-handle:hover {
+	fill: #e0f2fe;
+	stroke-width: 2.5;
+}
+
+.text-rotation-handle {
+	cursor: grab;
+	transition:
+		fill 0.15s ease,
+		stroke-width 0.15s ease;
+}
+
+.text-rotation-handle:hover {
+	fill: #e0f2fe;
+	stroke-width: 2.5;
 }

@@ -4,6 +4,10 @@ import type { SketchPoint } from '../types';
 import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../../math/spline';
 import { findSketchRegions } from '../../math/regions';
 import { SVG_EXPORT_STYLE } from '../../canvas/styles';
+import { getFontSync } from '../../canvas/fonts';
+import { generateTextSvgPathData } from '../../math/textPath';
+import type { GeoCurve } from '../../math/intersection';
+import type { Vec2 } from '../../math/vector';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -678,6 +682,23 @@ export function exportSketchToSVG(
 	// Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
 	const elements: string[] = [];
 	const usedPoints = new Set<string>();
+
+	// Text rectangle construction lines and points should not be exported as visual lines/points
+	const textRectLineIds = new Set<string>();
+	const textRectPointIds = new Set<string>();
+	for (const text of sketch.texts.values()) {
+		if (text.rectangleLineIds) {
+			for (const id of text.rectangleLineIds) {
+				textRectLineIds.add(id);
+			}
+		}
+		if (text.rectanglePointIds) {
+			for (const id of text.rectanglePointIds) {
+				textRectPointIds.add(id);
+			}
+		}
+	}
+
 	for (const region of findSketchRegions(sketch)) {
 		elements.push(
 			`<path d="${region.path}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" fill-rule="evenodd" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`
@@ -685,7 +706,7 @@ export function exportSketchToSVG(
 	}
 
 	for (const line of sketch.lines.values()) {
-		if (line.isSplineHandle) continue;
+		if (line.isSplineHandle || textRectLineIds.has(line.id)) continue;
 		usedPoints.add(line.p1Id);
 		usedPoints.add(line.p2Id);
 		const p1 = sketch.points.get(line.p1Id);
@@ -878,9 +899,52 @@ export function exportSketchToSVG(
 		}
 	}
 
+	// Export text objects as vector paths
+	for (const text of sketch.texts.values()) {
+		const font = getFontSync(text.fontFamily, text.bold, text.italic);
+		if (!font) continue;
+
+		let targetCurve: GeoCurve | null = null;
+		let rectangleCorners: [Vec2, Vec2, Vec2, Vec2] | undefined = undefined;
+
+		if (text.mode === 'text') {
+			const corners = text.getRectangleCorners(sketch);
+			if (corners) {
+				rectangleCorners = corners;
+			}
+		} else if (text.mode === 'text_on_path' && text.targetPrimitiveId) {
+			targetCurve = sketch.toGeoCurve(text.targetPrimitiveId, text.targetPrimitiveType);
+		}
+
+		const d = generateTextSvgPathData(
+			{
+				mode: text.mode,
+				text: text.text,
+				height: text.height,
+				characterSpacing: text.characterSpacing,
+				placement: text.placement,
+				fitToPath: text.fitToPath,
+				flipHorizontal: text.flipHorizontal,
+				flipVertical: text.flipVertical,
+				alignment: text.alignment,
+				verticalAlignment: text.verticalAlignment,
+				rectangleCorners,
+				coordSystem: 'svg',
+			},
+			font,
+			targetCurve
+		);
+
+		if (d) {
+			elements.push(
+				`<path d="${d}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`
+			);
+		}
+	}
+
 	// Export isolated points
 	for (const pt of sketch.points.values()) {
-		if (!usedPoints.has(pt.id)) {
+		if (!usedPoints.has(pt.id) && !textRectPointIds.has(pt.id)) {
 			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
 			elements.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`);
 		}

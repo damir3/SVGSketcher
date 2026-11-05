@@ -85,6 +85,8 @@ import {
 	SketchEllipse,
 	SketchEllipticalArc,
 	SketchSpline,
+	SketchText,
+	type TextSnapshot,
 	type ISketchPrimitive,
 	type SelectionState,
 } from './types';
@@ -116,6 +118,7 @@ export class SketchDocument {
 	ellipses = new Map<string, SketchEllipse>();
 	ellipticalArcs = new Map<string, SketchEllipticalArc>();
 	splines = new Map<string, SketchSpline>();
+	texts = new Map<string, SketchText>();
 	constraints = new Map<string, IConstraint>();
 	parameters = new Map<string, SketchParameter>();
 
@@ -127,6 +130,7 @@ export class SketchDocument {
 		ellipseIds: new Set(),
 		ellipticalArcIds: new Set(),
 		splineIds: new Set(),
+		textIds: new Set(),
 		constraintIds: new Set(),
 	};
 
@@ -167,6 +171,7 @@ export class SketchDocument {
 			this.ellipses.has(id) ||
 			this.ellipticalArcs.has(id) ||
 			this.splines.has(id) ||
+			this.texts.has(id) ||
 			this.constraints.has(id);
 
 		let next = (this.counters.get(prefix) ?? 0) + 1;
@@ -276,6 +281,7 @@ export class SketchDocument {
 			ellipses: [...this.ellipses.values()].map(ellipse => serializePrimitive(ellipse)),
 			ellipticalArcs: [...this.ellipticalArcs.values()].map(arc => serializePrimitive(arc)),
 			splines: [...this.splines.values()].map(spline => serializePrimitive(spline)),
+			texts: [...this.texts.values()].map(text => text.serialize()),
 			constraints: Array.from(this.constraints.values()).map(c => serializeConstraint(c)),
 			parameters: Array.from(this.parameters.values()).map(p => ({ ...p })),
 			idCounter: this.idCounter,
@@ -316,6 +322,11 @@ export class SketchDocument {
 		this.splines.clear();
 		for (const s of snapshot.splines ?? []) {
 			this.splines.set(s.id, new SketchSpline(s));
+		}
+
+		this.texts.clear();
+		for (const t of snapshot.texts ?? []) {
+			this.texts.set(t.id, new SketchText(t));
 		}
 
 		this.constraints.clear();
@@ -2226,6 +2237,12 @@ export class SketchDocument {
 
 	// --- Deletion with cascade ---
 	removeEntity(id: string): void {
+		if (this.texts.has(id)) {
+			this.texts.delete(id);
+			this.selection.textIds.delete(id);
+			this.notify();
+			return;
+		}
 		if (this.constraints.has(id)) {
 			this.removeConstraint(id);
 			return;
@@ -2237,7 +2254,8 @@ export class SketchDocument {
 			!this.arcs.has(id) &&
 			!this.ellipses.has(id) &&
 			!this.ellipticalArcs.has(id) &&
-			!this.splines.has(id)
+			!this.splines.has(id) &&
+			!this.texts.has(id)
 		) {
 			return;
 		}
@@ -2492,6 +2510,21 @@ export class SketchDocument {
 		}
 
 		this.cleanOrphanConstraints();
+		// Cascade deletion of any text bound to the deleted entity or its rectangle
+		for (const [tId, text] of this.texts.entries()) {
+			if (text.mode === 'text') {
+				if (text.rectanglePointIds?.includes(id) || text.rectangleLineIds?.includes(id)) {
+					this.texts.delete(tId);
+					this.selection.textIds.delete(tId);
+				}
+			} else if (text.mode === 'text_on_path') {
+				if (text.targetPrimitiveId === id) {
+					this.texts.delete(tId);
+					this.selection.textIds.delete(tId);
+				}
+			}
+		}
+		this.cleanOrphanTexts();
 
 		this.rebuildParamManager();
 		this.solve();
@@ -3295,6 +3328,7 @@ export class SketchDocument {
 		this.ellipses.clear();
 		this.ellipticalArcs.clear();
 		this.splines.clear();
+		this.texts.clear();
 		this.constraints.clear();
 		this.parameters.clear();
 		this.selection.pointIds.clear();
@@ -3304,6 +3338,7 @@ export class SketchDocument {
 		this.selection.ellipseIds.clear();
 		this.selection.ellipticalArcIds.clear();
 		this.selection.splineIds.clear();
+		this.selection.textIds.clear();
 		this.selection.constraintIds.clear();
 		this.counters.clear();
 		this.rebuildParamManager();
@@ -3324,6 +3359,39 @@ export class SketchDocument {
 
 	deleteSelected(): void {
 		deleteSelected(this);
+	}
+
+	addText(options: Omit<TextSnapshot, 'type' | 'id'>): SketchText {
+		this.pushHistory();
+		const id = this.nextId('Text');
+		const text = new SketchText({
+			id,
+			...options,
+		});
+		this.texts.set(id, text);
+		this.notify();
+		return text;
+	}
+
+	cleanOrphanTexts(): void {
+		for (const [tId, text] of this.texts.entries()) {
+			if (text.mode === 'text') {
+				if (text.rectanglePointIds) {
+					const hasAllPoints = text.rectanglePointIds.every(pid => this.points.has(pid));
+					const hasAllLines = text.rectangleLineIds ? text.rectangleLineIds.every(lid => this.lines.has(lid)) : true;
+					if (!hasAllPoints || !hasAllLines) {
+						this.texts.delete(tId);
+						this.selection.textIds.delete(tId);
+					}
+				}
+			} else if (text.mode === 'text_on_path' && text.targetPrimitiveId) {
+				const prim = this.getPrimitive(text.targetPrimitiveId, text.targetPrimitiveType);
+				if (!prim) {
+					this.texts.delete(tId);
+					this.selection.textIds.delete(tId);
+				}
+			}
+		}
 	}
 
 	exportSVG(viewportState?: { panX: number; panY: number; zoom: number }): string {

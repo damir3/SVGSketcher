@@ -28,6 +28,7 @@ export const DRAWING_PRIMITIVE_TOOLS = [
 	'ellipse',
 	'elliptical_arc',
 	'spline',
+	'text',
 ] as const;
 
 export const CONSTRAINT_TOOLS = [

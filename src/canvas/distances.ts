@@ -7,3 +7,6 @@ export const POINT_DISTANCE_PX = 10;
 export const LINE_DISTANCE_PX = 8;
 export const LABEL_DISTANCE_PX = 15;
 export const GIZMO_DISTANCE_PX = 20;
+
+/** Distance in screen pixels from the top edge of text rectangle to rotation circle gizmo handle */
+export const TEXT_ROTATION_HANDLE_DISTANCE_PX = 36;

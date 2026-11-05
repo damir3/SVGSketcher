@@ -1,5 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
-import type { SketchSpline } from '../model/types';
+import type { SketchSpline, SketchText } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
 import { parseNumericOrExpression } from '../math/expression';
 import {
@@ -37,6 +37,9 @@ export class Sidebar {
 		this.container = container;
 		this.sketch = sketch;
 		this.interaction = interaction;
+		if (this.interaction) {
+			this.interaction.sidebar = this;
+		}
 
 		this.sketch.onChange(() => this.render());
 		if (this.interaction) {
@@ -50,6 +53,15 @@ export class Sidebar {
 	}
 
 	render(): void {
+		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+		if (
+			activeEl &&
+			this.container.contains(activeEl) &&
+			(activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')
+		) {
+			return;
+		}
+
 		const res = this.sketch.lastSolverResult;
 		const dof = res ? res.degreesOfFreedom : 0;
 		const status = res ? res.status : 'CONVERGED';
@@ -72,6 +84,7 @@ export class Sidebar {
 		const ellipses = [...this.sketch.ellipses.values()];
 		const ellipticalArcs = [...this.sketch.ellipticalArcs.values()];
 		const splines = [...this.sketch.splines.values()];
+		const texts = [...this.sketch.texts.values()];
 		const totalPrimitives =
 			points.length +
 			lines.length +
@@ -79,7 +92,8 @@ export class Sidebar {
 			arcs.length +
 			ellipses.length +
 			ellipticalArcs.length +
-			splines.length;
+			splines.length +
+			texts.length;
 
 		this.container.innerHTML = `
 			<div class="sidebar-header">
@@ -103,6 +117,7 @@ export class Sidebar {
 						<span class="tree-title">Primitives (${totalPrimitives})</span>
 					</div>
 					<div class="tree-list">
+						${texts.map(t => this.renderTextItem(t)).join('')}
 						${splines.map(s => this.renderSplineItem(s)).join('')}
 						${lines.map(l => this.renderLineItem(l)).join('')}
 						${circles.map(c => this.renderCircleItem(c)).join('')}
@@ -124,6 +139,9 @@ export class Sidebar {
 	}
 
 	private renderInspector(): string {
+		if (this.interaction?.activeTool === 'text') {
+			return '';
+		}
 		const entity = this.getSelectedInspectableEntity();
 		if (!entity?.sidebarPanel) return '';
 		return entity.sidebarPanel.render(this.createInspectorContext());
@@ -156,6 +174,7 @@ export class Sidebar {
 			sel.ellipseIds.size +
 			sel.ellipticalArcIds.size +
 			sel.splineIds.size +
+			sel.textIds.size +
 			sel.constraintIds.size;
 
 		if (totalCount !== 1) {
@@ -196,6 +215,10 @@ export class Sidebar {
 
 		if (sel.splineIds.size === 1) {
 			return this.sketch.splines.get([...sel.splineIds][0]) ?? null;
+		}
+
+		if (sel.textIds.size === 1) {
+			return this.sketch.texts.get([...sel.textIds][0]) ?? null;
 		}
 
 		if (sel.constraintIds.size === 1) {
@@ -362,6 +385,21 @@ export class Sidebar {
 					<span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${arc.isConstruction ? '(aux)' : ''}</span>
 				</div>
 				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>` : ''}
+			</div>
+		`;
+	}
+
+	private renderTextItem(text: SketchText, showDelete = true): string {
+		const isSelected = this.sketch.selection.textIds.has(text.id);
+		const label = text.text ? `"${text.text.slice(0, 15)}"` : text.id;
+		return `
+			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="text" data-id="${text.id}">
+				<div class="tree-item-info">
+					<span class="tree-icon">${ICONS.text || 'T'}</span>
+					<span class="tree-name">${text.id}</span>
+					<span class="tree-meta">${label} (${text.mode === 'text' ? 'Box' : 'Path'})</span>
+				</div>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${text.id}" title="Delete">${ICONS.delete}</button>` : ''}
 			</div>
 		`;
 	}
@@ -585,9 +623,24 @@ export class Sidebar {
 					| 'ellipse'
 					| 'elliptical_arc'
 					| 'spline'
+					| 'text'
 					| 'constraint';
 
 				this.sketch.selectEntity(id, type, false);
+			});
+
+			item.addEventListener('dblclick', () => {
+				const id = item.getAttribute('data-id')!;
+				const type = item.getAttribute('data-type')!;
+				if (type === 'text') {
+					const t = this.sketch.texts.get(id);
+					if (t) {
+						this.sketch.selectEntity(id, 'text', false);
+						this.render();
+						const textarea = this.container.querySelector<HTMLTextAreaElement>('#text-tool-input-text');
+						textarea?.focus();
+					}
+				}
 			});
 		});
 
@@ -623,9 +676,11 @@ export class Sidebar {
 		this.interaction?.activeToolInstance?.sidebarPanel?.bindEvents(this.container);
 
 		// Inspector entity events
-		const entity = this.getSelectedInspectableEntity();
-		const ctx = this.createInspectorContext();
-		entity?.sidebarPanel?.bindEvents(this.container, ctx);
+		if (this.interaction?.activeTool !== 'text') {
+			const entity = this.getSelectedInspectableEntity();
+			const ctx = this.createInspectorContext();
+			entity?.sidebarPanel?.bindEvents(this.container, ctx);
+		}
 	}
 
 	private bindInspectorNumberInput(

@@ -8,6 +8,7 @@ import type {
 	SketchEllipse,
 	SketchEllipticalArc,
 	SketchSpline,
+	SketchText,
 } from './primitives';
 
 export type SketchEntity =
@@ -18,6 +19,7 @@ export type SketchEntity =
 	| { type: 'ellipse'; entity: SketchEllipse }
 	| { type: 'elliptical_arc'; entity: SketchEllipticalArc }
 	| { type: 'spline'; entity: SketchSpline }
+	| { type: 'text'; entity: SketchText }
 	| { type: 'constraint'; entity: IConstraint };
 
 export interface SelectionState {
@@ -28,5 +30,6 @@ export interface SelectionState {
 	ellipseIds: Set<string>;
 	ellipticalArcIds: Set<string>;
 	splineIds: Set<string>;
+	textIds: Set<string>;
 	constraintIds: Set<string>;
 }

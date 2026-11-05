@@ -74,6 +74,10 @@ export class Toolbar {
 					${ICONS.elliptical_arc}
 					<span class="btn-tooltip">Elliptical Arc</span>
 				</button>
+				<button class="tool-btn" data-tool="text" title="Text">
+					${ICONS.text}
+					<span class="btn-tooltip">Text</span>
+				</button>
 				<button class="tool-btn" data-tool="circular_pattern" id="tool-circular-pattern" title="Circular Pattern">
 					${ICONS.circular_pattern}
 					<span class="btn-tooltip">Circular Pattern</span>

@@ -8,7 +8,8 @@ import type {
 	EllipseSnapshot,
 	EllipticalArcSnapshot,
 	SplineSnapshot,
-} from './primitives/serialization';
+	TextSnapshot,
+} from './primitives';
 
 export interface SketchSnapshot {
 	points: PointSnapshot[];
@@ -18,6 +19,7 @@ export interface SketchSnapshot {
 	ellipses: EllipseSnapshot[];
 	ellipticalArcs: EllipticalArcSnapshot[];
 	splines?: SplineSnapshot[];
+	texts?: TextSnapshot[];
 	constraints: ConstraintSnapshot[];
 	parameters?: SketchParameter[];
 	idCounter: number;
@@ -33,6 +35,7 @@ type SnapshotCollection =
 	| 'ellipses'
 	| 'ellipticalArcs'
 	| 'splines'
+	| 'texts'
 	| 'constraints';
 type HistoryPatch = {
 	collections: Partial<Record<SnapshotCollection, Record<string, EntityChange>>>;
@@ -54,6 +57,7 @@ function makePatch(before: SketchSnapshot, after: SketchSnapshot): HistoryPatch 
 		'ellipses',
 		'ellipticalArcs',
 		'splines',
+		'texts',
 		'constraints',
 	];
 	const changes: HistoryPatch['collections'] = {};
@@ -106,6 +110,7 @@ function applyPatch(snapshot: SketchSnapshot, patch: HistoryPatch, direction: 'b
 		constraints: [...snapshot.constraints],
 	};
 	if (snapshot.splines || patch.collections.splines) result.splines = [...(snapshot.splines ?? [])];
+	if (snapshot.texts || patch.collections.texts) result.texts = [...(snapshot.texts ?? [])];
 	if (snapshot.parameters || patch.parameters) result.parameters = [...(snapshot.parameters ?? [])];
 	for (const [name, delta] of Object.entries(patch.collections) as [
 		SnapshotCollection,

@@ -35,6 +35,7 @@ import type {
 	SketchEllipse,
 	SketchEllipticalArc,
 	SketchSpline,
+	SketchText,
 } from '../model/types';
 import { showToast } from '../ui/toast';
 import type { GeoCurve } from '../math/intersection';
@@ -61,6 +62,7 @@ import {
 	EllipseTool,
 	EllipticalArcTool,
 	SplineTool,
+	TextTool,
 	TrimTool,
 	ExtendTool,
 	BreakTool,
@@ -153,7 +155,7 @@ export class CanvasInteraction {
 	private boxSelectShift = false;
 	private pendingExclusiveSelection: {
 		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'text' | 'constraint';
 	} | null = null;
 
 	// Dragging history snapshot
@@ -198,6 +200,9 @@ export class CanvasInteraction {
 	isSnappingEnabled = true;
 	onSnappingChange?: (active: boolean) => void;
 	onViewportChange?: () => void;
+	sidebar?: any;
+	private textRotationDragState: { textId: string; centerWorld: Vec2 } | null = null;
+	private textDragState: { textId: string; startWorld: Vec2; initialPoints: Map<string, Vec2> } | null = null;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -239,6 +244,7 @@ export class CanvasInteraction {
 		this.tools.set('ellipse', new EllipseTool());
 		this.tools.set('elliptical_arc', new EllipticalArcTool());
 		this.tools.set('spline', new SplineTool('fit'));
+		this.tools.set('text', new TextTool());
 
 		// Modify
 		this.tools.set('trim', new TrimTool());
@@ -698,6 +704,29 @@ export class CanvasInteraction {
 	}
 
 	public handleKeyDown(e: KeyboardEvent): void {
+		const target = e.target as HTMLElement | null;
+		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+		const isInputTarget = Boolean(
+			(target &&
+				((typeof HTMLInputElement !== 'undefined' && target instanceof HTMLInputElement) ||
+					(typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
+					target.tagName === 'INPUT' ||
+					target.tagName === 'TEXTAREA' ||
+					target.tagName === 'SELECT' ||
+					target.isContentEditable)) ||
+				(activeEl &&
+					((typeof HTMLInputElement !== 'undefined' && activeEl instanceof HTMLInputElement) ||
+						(typeof HTMLTextAreaElement !== 'undefined' && activeEl instanceof HTMLTextAreaElement) ||
+						activeEl.tagName === 'INPUT' ||
+						activeEl.tagName === 'TEXTAREA' ||
+						activeEl.tagName === 'SELECT' ||
+						activeEl.isContentEditable))
+		);
+
+		if (isInputTarget) {
+			return;
+		}
+
 		if (
 			this.isMac
 				? e.code === 'MetaLeft' || e.code === 'MetaRight' || e.metaKey
@@ -707,14 +736,7 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			this.render();
 		}
-		const isInputTarget = Boolean(
-			e.target &&
-				((typeof HTMLInputElement !== 'undefined' && e.target instanceof HTMLInputElement) ||
-					(typeof HTMLTextAreaElement !== 'undefined' && e.target instanceof HTMLTextAreaElement) ||
-					(e.target as any).tagName === 'INPUT' ||
-					(e.target as any).tagName === 'TEXTAREA')
-		);
-		if (e.code === 'Space' && !isInputTarget) {
+		if (e.code === 'Space') {
 			this.isSpacePressed = true;
 		}
 		if (e.code === 'Tab') {
@@ -722,9 +744,6 @@ export class CanvasInteraction {
 				const handled = this.activeToolInstance.onKeyDown(e);
 				if (handled) return;
 			}
-		}
-		if (isInputTarget) {
-			return;
 		}
 
 		const tool = this.activeToolInstance ?? this.tools?.get(this.activeTool);
@@ -1647,8 +1666,21 @@ export class CanvasInteraction {
 		const timeDelta = now - this.lastClickTime;
 		const distanceDelta = dist(screen, this.lastClickPos);
 
-		if (this.activeTool === 'select' && timeDelta >= 50 && timeDelta <= 350 && distanceDelta < 30) {
+		if (this.activeTool === 'select' && timeDelta >= 50 && timeDelta <= 400 && distanceDelta < 30) {
 			this.lastClickTime = 0;
+			const targetEl = e.target as SVGElement | null;
+			const clickedText = this.findTextNear(screen, targetEl);
+			if (clickedText) {
+				e.preventDefault();
+				e.stopPropagation();
+				this.lastDoubleClickedTime = now;
+				this.cancelDrawing();
+				this.sketch.selectEntity(clickedText.id, 'text', false);
+				this.sidebar?.render();
+				const textarea = this.sidebar?.container?.querySelector('#text-tool-input-text') as HTMLTextAreaElement | null;
+				textarea?.focus();
+				return;
+			}
 			if (this.triggerDimensionEditAt(e, screen, clientPos)) {
 				e.preventDefault();
 				e.stopPropagation();
@@ -1673,6 +1705,37 @@ export class CanvasInteraction {
 
 		const world = this.viewport.screenToWorld(screen.x, screen.y);
 		const snap = this.findSnap(screen);
+
+		// Check for Text rotation gizmo handle dragging
+		const textGizmo = this.renderer.textRotationGizmo;
+		if (textGizmo && dist(screen, textGizmo.handleScreen) <= 15) {
+			this.textRotationDragState = {
+				textId: textGizmo.textId,
+				centerWorld: textGizmo.centerWorld,
+			};
+			this.sketch.beginTransaction();
+			return;
+		}
+
+		// Check for Text center drag gizmo handle dragging
+		const textDragGizmo = this.renderer.textDragGizmo;
+		if (textDragGizmo && dist(screen, textDragGizmo.centerScreen) <= 15) {
+			const text = this.sketch.texts.get(textDragGizmo.textId);
+			const initialPoints = new Map<string, Vec2>();
+			if (text?.rectanglePointIds) {
+				for (const pid of text.rectanglePointIds) {
+					const pt = this.sketch.points.get(pid);
+					if (pt) initialPoints.set(pid, vec(pt.x, pt.y));
+				}
+			}
+			this.textDragState = {
+				textId: textDragGizmo.textId,
+				startWorld: world,
+				initialPoints,
+			};
+			this.sketch.beginTransaction();
+			return;
+		}
 
 		// Check for Rectangular Pattern Gizmo handle dragging (in select mode on selected pattern constraint)
 		for (const handle of this.renderer.rectangularGizmoHandles.values()) {
@@ -1772,6 +1835,7 @@ export class CanvasInteraction {
 				| 'ellipse'
 				| 'elliptical_arc'
 				| 'spline'
+				| 'text'
 				| 'constraint'
 				| undefined;
 
@@ -1825,13 +1889,19 @@ export class CanvasInteraction {
 												id = hitSpline.id;
 												type = 'spline';
 											} else {
-												const sOrigin = this.viewport.worldToScreen(0, 0);
-												if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
-													id = 'axis_x';
-													type = 'line';
-												} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
-													id = 'axis_y';
-													type = 'line';
+												const hitText = this.findTextNear(screen, target);
+												if (hitText) {
+													id = hitText.id;
+													type = 'text';
+												} else {
+													const sOrigin = this.viewport.worldToScreen(0, 0);
+													if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
+														id = 'axis_x';
+														type = 'line';
+													} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
+														id = 'axis_y';
+														type = 'line';
+													}
 												}
 											}
 										}
@@ -2080,6 +2150,73 @@ export class CanvasInteraction {
 					this.render();
 				}
 			}
+			return;
+		}
+
+		// Text Rotation Gizmo drag handling
+		if (this.textRotationDragState) {
+			const text = this.sketch.texts.get(this.textRotationDragState.textId);
+			if (text && text.rectanglePointIds) {
+				const c = this.textRotationDragState.centerWorld;
+				const mouseAngle = Math.atan2(world.y - c.y, world.x - c.x);
+				const targetAngle = mouseAngle - Math.PI / 2;
+
+				const corners = text.getRectangleCorners(this.sketch);
+				if (corners) {
+					const [p0, p1, p2, p3] = corners;
+					const currentAngle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+					const deltaAngle = targetAngle - currentAngle;
+
+					const rotatePoint = (p: Vec2, center: Vec2, rad: number): Vec2 => {
+						const cos = Math.cos(rad);
+						const sin = Math.sin(rad);
+						const dx = p.x - center.x;
+						const dy = p.y - center.y;
+						return vec(center.x + dx * cos - dy * sin, center.y + dx * sin + dy * cos);
+					};
+
+					const pt0 = this.sketch.points.get(text.rectanglePointIds[0]);
+					const pt1 = this.sketch.points.get(text.rectanglePointIds[1]);
+					const pt2 = this.sketch.points.get(text.rectanglePointIds[2]);
+					const pt3 = this.sketch.points.get(text.rectanglePointIds[3]);
+
+					if (pt0 && pt1 && pt2 && pt3) {
+						const np0 = rotatePoint(p0, c, deltaAngle);
+						const np1 = rotatePoint(p1, c, deltaAngle);
+						const np2 = rotatePoint(p2, c, deltaAngle);
+						const np3 = rotatePoint(p3, c, deltaAngle);
+
+						pt0.x = np0.x;
+						pt0.y = np0.y;
+						pt1.x = np1.x;
+						pt1.y = np1.y;
+						pt2.x = np2.x;
+						pt2.y = np2.y;
+						pt3.x = np3.x;
+						pt3.y = np3.y;
+
+						this.sketch.solve();
+						this.render();
+						return;
+					}
+				}
+			}
+			return;
+		}
+
+		// Text Center Drag Gizmo handling
+		if (this.textDragState) {
+			const dx = world.x - this.textDragState.startWorld.x;
+			const dy = world.y - this.textDragState.startWorld.y;
+			for (const [pid, initPos] of this.textDragState.initialPoints) {
+				const pt = this.sketch.points.get(pid);
+				if (pt) {
+					pt.x = initPos.x + dx;
+					pt.y = initPos.y + dy;
+				}
+			}
+			this.sketch.solve();
+			this.render();
 			return;
 		}
 
@@ -2467,7 +2604,14 @@ export class CanvasInteraction {
 
 		// Centralized hover highlight
 		let hoveredTarget = null;
-		if (this.isPanning || this.isDraggingPoint || this.isBoxSelecting || this.gizmoDragState) {
+		if (
+			this.isPanning ||
+			this.isDraggingPoint ||
+			this.isBoxSelecting ||
+			this.gizmoDragState ||
+			this.textRotationDragState ||
+			this.textDragState
+		) {
 			this.highlightManager.clear();
 		} else {
 			hoveredTarget = this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
@@ -2478,7 +2622,9 @@ export class CanvasInteraction {
 			!this.isPanning &&
 			!this.isDraggingPoint &&
 			!this.isBoxSelecting &&
-			!this.gizmoDragState;
+			!this.gizmoDragState &&
+			!this.textRotationDragState &&
+			!this.textDragState;
 		this.regionHoverPoint = allowRegionHover ? world : null;
 		this.renderer.updateRegionHover(this.regionHoverPoint);
 
@@ -2516,6 +2662,16 @@ export class CanvasInteraction {
 		this.svg.classList.remove('is-dragging');
 		if (this.gizmoDragState) {
 			this.gizmoDragState = null;
+			this.render();
+		}
+		if (this.textRotationDragState) {
+			this.textRotationDragState = null;
+			this.sketch.commitTransaction();
+			this.render();
+		}
+		if (this.textDragState) {
+			this.textDragState = null;
+			this.sketch.commitTransaction();
 			this.render();
 		}
 		if (this.isPanning) {
@@ -2840,12 +2996,45 @@ export class CanvasInteraction {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
 		const clientPos = vec(e.clientX, e.clientY);
+
+		const targetEl = e.target as SVGElement | null;
+		const clickedText = this.findTextNear(screen, targetEl);
+		if (clickedText) {
+			e.preventDefault();
+			e.stopPropagation();
+			this.lastDoubleClickedTime = now;
+			this.cancelDrawing();
+			this.sketch.selectEntity(clickedText.id, 'text', false);
+			this.sidebar?.render();
+			const textarea = this.sidebar?.container?.querySelector('#text-tool-input-text') as HTMLTextAreaElement | null;
+			textarea?.focus();
+			return;
+		}
+
 		if (this.triggerDimensionEditAt(e, screen, clientPos)) {
 			e.preventDefault();
 			e.stopPropagation();
 			this.lastDoubleClickedTime = now;
 			this.cancelDrawing();
 		}
+	}
+
+	findTextNear(screen: Vec2, targetEl?: SVGElement | null): SketchText | null {
+		const textIdFromAttr =
+			targetEl?.getAttribute('data-text-id') || targetEl?.closest('[data-text-id]')?.getAttribute('data-text-id');
+		if (textIdFromAttr) {
+			const t = this.sketch.texts.get(textIdFromAttr);
+			if (t) return t;
+		}
+
+		for (const t of this.sketch.texts.values()) {
+			const d = t.distanceTo(screen, this.sketch, this.viewport);
+			if (d !== null && d <= 15) {
+				return t;
+			}
+		}
+
+		return null;
 	}
 
 	private updateCursor(): void {

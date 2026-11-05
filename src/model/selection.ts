@@ -9,6 +9,7 @@ export type SelectableEntityType =
 	| 'ellipse'
 	| 'elliptical_arc'
 	| 'spline'
+	| 'text'
 	| 'constraint';
 
 export function isEntitySelected(sketch: SketchDocument, id: string, type: SelectableEntityType): boolean {
@@ -27,6 +28,8 @@ export function isEntitySelected(sketch: SketchDocument, id: string, type: Selec
 			return sketch.selection.ellipticalArcIds.has(id);
 		case 'spline':
 			return sketch.selection.splineIds.has(id);
+		case 'text':
+			return sketch.selection.textIds.has(id);
 		case 'constraint':
 			return sketch.selection.constraintIds.has(id);
 		default:
@@ -56,6 +59,9 @@ export function deselectEntity(sketch: SketchDocument, id: string, type: Selecta
 			break;
 		case 'spline':
 			sketch.selection.splineIds.delete(id);
+			break;
+		case 'text':
+			sketch.selection.textIds.delete(id);
 			break;
 		case 'constraint':
 			sketch.selection.constraintIds.delete(id);
@@ -89,6 +95,7 @@ export function selectEntities(
 		sketch.selection.ellipseIds.clear();
 		sketch.selection.ellipticalArcIds.clear();
 		sketch.selection.splineIds.clear();
+		sketch.selection.textIds.clear();
 		sketch.selection.constraintIds.clear();
 	}
 
@@ -107,6 +114,8 @@ export function selectEntities(
 			sketch.selection.ellipticalArcIds.add(item.id);
 		} else if (item.type === 'spline') {
 			sketch.selection.splineIds.add(item.id);
+		} else if (item.type === 'text') {
+			sketch.selection.textIds.add(item.id);
 		} else if (item.type === 'constraint') {
 			sketch.selection.constraintIds.add(item.id);
 		}
@@ -132,6 +141,7 @@ export function clearSelection(sketch: SketchDocument): void {
 	sketch.selection.ellipseIds.clear();
 	sketch.selection.ellipticalArcIds.clear();
 	sketch.selection.splineIds.clear();
+	sketch.selection.textIds.clear();
 	sketch.selection.constraintIds.clear();
 	sketch.notify();
 }
@@ -184,6 +194,7 @@ export function deleteSelected(sketch: SketchDocument): void {
 		sketch.selection.ellipseIds.size > 0 ||
 		sketch.selection.ellipticalArcIds.size > 0 ||
 		sketch.selection.splineIds.size > 0 ||
+		sketch.selection.textIds.size > 0 ||
 		sketch.selection.constraintIds.size > 0;
 
 	if (!hasSelection) return;
@@ -196,6 +207,7 @@ export function deleteSelected(sketch: SketchDocument): void {
 	const selectedEllipses = [...sketch.selection.ellipseIds];
 	const selectedEllipticalArcs = [...sketch.selection.ellipticalArcIds];
 	const selectedSplines = [...sketch.selection.splineIds];
+	const selectedTexts = [...sketch.selection.textIds];
 	const selectedConstraints = [...sketch.selection.constraintIds].filter(cid => {
 		const c = sketch.constraints.get(cid);
 		return c ? !sketch.isSplineInternalConstraint(c) : true;
@@ -263,6 +275,7 @@ export function deleteSelected(sketch: SketchDocument): void {
 	for (const id of selectedEllipses) sketch.removeEntity(id);
 	for (const id of selectedEllipticalArcs) sketch.removeEntity(id);
 	for (const id of selectedSplines) sketch.removeEntity(id);
+	for (const id of selectedTexts) sketch.removeEntity(id);
 	for (const id of filteredPoints) sketch.removeEntity(id);
 
 	// Final sweep for any candidate points that became unused across the batch
