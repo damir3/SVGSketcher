@@ -2665,8 +2665,7 @@ export class SVGRenderer {
 		this.patternGroup.innerHTML = '';
 		if (!centerPointId) return;
 
-		const centerPt =
-			centerPointId === 'origin' ? ({ id: 'origin', x: 0, y: 0 } as SketchPoint) : sketch.points.get(centerPointId);
+		const centerPt = sketch.points.get(centerPointId);
 		if (!centerPt) return;
 
 		const sCtr = viewport.worldToScreen(centerPt.x, centerPt.y);

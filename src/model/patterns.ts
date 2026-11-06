@@ -20,7 +20,7 @@ export function generateCircularPatternCopy(
 	distribution: 'full' | 'partial' | 'symmetric',
 	totalAngle: number
 ): PatternCopyData | null {
-	const centerPt = centerPtId === 'origin' ? ({ id: 'origin', x: 0, y: 0 } as any) : sketch.points.get(centerPtId);
+	const centerPt = sketch.points.get(centerPtId);
 	if (!centerPt) return null;
 
 	const angleDeg = computePatternCopyAngle(copyIndex, quantity, distribution, totalAngle);
@@ -172,7 +172,7 @@ export function addCircularPatternConstraint(
 	isReadOnly?: boolean,
 	totalAngleExpression?: string
 ): CircularPatternConstraint | null {
-	if (centerPtId !== 'origin' && !sketch.points.has(centerPtId)) return null;
+	if (!sketch.points.get(centerPtId)) return null;
 
 	const cid = id || sketch.nextId('c_cpat');
 	const c = new CircularPatternConstraint(

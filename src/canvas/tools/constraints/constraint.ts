@@ -218,9 +218,18 @@ export class ConstraintTool extends BaseTool {
 				break;
 			}
 			case 'parallel':
-			case 'collinear':
 			case 'perpendicular': {
 				if (sel.lineIds.size >= 2) sel.lineIds.clear();
+				break;
+			}
+			case 'collinear': {
+				if (type === 'line') {
+					sel.pointIds.clear();
+					if (sel.lineIds.size >= 2) sel.lineIds.clear();
+				} else if (type === 'point') {
+					sel.lineIds.clear();
+					if (sel.pointIds.size >= 3) sel.pointIds.clear();
+				}
 				break;
 			}
 			case 'concentric': {
@@ -306,7 +315,7 @@ export class ConstraintTool extends BaseTool {
 					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) {
 						sel.pointIds.clear();
 					} else if (sel.lineIds.size === 0) {
-						if (sel.pointIds.size >= 3 || (id !== 'origin' && sel.pointIds.size >= 2 && !sel.pointIds.has('origin'))) {
+						if (sel.pointIds.size >= 3) {
 							sel.pointIds.clear();
 						}
 					}
@@ -468,9 +477,10 @@ export class ConstraintTool extends BaseTool {
 			case 'equal':
 				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
 			case 'parallel':
-			case 'collinear':
 			case 'perpendicular':
 				return entityType === 'line';
+			case 'collinear':
+				return entityType === 'line' || entityType === 'point';
 			case 'tangent':
 				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
 			case 'concentric':
@@ -511,9 +521,10 @@ export class ConstraintTool extends BaseTool {
 			case 'equal':
 				return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
 			case 'parallel':
-			case 'collinear':
 			case 'perpendicular':
 				return lCount === 2 && pCount === 0 && cCount === 0;
+			case 'collinear':
+				return (lCount === 2 && pCount === 0 && cCount === 0) || (pCount === 3 && lCount === 0 && cCount === 0);
 			case 'tangent':
 				return ((lCount === 1 && cCount === 1) || (cCount === 2 && lCount === 0)) && pCount === 0;
 			case 'concentric':
@@ -521,10 +532,7 @@ export class ConstraintTool extends BaseTool {
 			case 'point_on_line':
 				return pCount === 1 && lCount === 1 && cCount === 0;
 			case 'midpoint':
-				return (
-					(pCount === 1 && lCount === 1 && cCount === 0) ||
-					(pCount === 3 && sel.pointIds.has('origin') && lCount === 0 && cCount === 0)
-				);
+				return (pCount === 1 && lCount === 1 && cCount === 0) || (pCount === 3 && lCount === 0 && cCount === 0);
 			case 'symmetry':
 				return (
 					(pCount === 2 && lCount === 1 && cCount === 0) ||
@@ -783,6 +791,12 @@ export class ConstraintTool extends BaseTool {
 						applied = true;
 						toastMsg = 'Collinear constraint applied';
 					}
+				} else if (pIds.length === 3 && lIds.length === 0) {
+					const c = this.ctx.sketch.addThreePointCollinearConstraint(pIds[0], pIds[1], pIds[2]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Collinear constraint applied';
+					}
 				}
 				break;
 			}
@@ -840,9 +854,8 @@ export class ConstraintTool extends BaseTool {
 					} else {
 						this.ctx.showToast('Cannot constrain midpoint to this line');
 					}
-				} else if (pIds.length === 3 && pIds.includes('origin') && lIds.length === 0) {
-					const userPts = pIds.filter(id => id !== 'origin');
-					const c = this.ctx.sketch.addMidpointConstraint('origin', userPts[0], userPts[1]);
+				} else if (pIds.length === 3 && lIds.length === 0) {
+					const c = this.ctx.sketch.addThreePointMidpointConstraint(pIds[0], pIds[1], pIds[2]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Midpoint constraint applied';

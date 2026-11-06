@@ -338,10 +338,7 @@ export class CircularPatternTool extends BaseTool {
 
 		const pts: Vec2[] = [];
 
-		if (this.state.centerPointId === 'origin') {
-			const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
-			pts.push({ x: sOrigin.x - 20, y: sOrigin.y - 20 }, { x: sOrigin.x + 20, y: sOrigin.y + 20 });
-		} else if (this.state.centerPointId) {
+		if (this.state.centerPointId) {
 			const pt = this.ctx.sketch.points.get(this.state.centerPointId);
 			if (pt) {
 				const sCenter = this.ctx.viewport.worldToScreen(pt.x, pt.y);
@@ -350,12 +347,7 @@ export class CircularPatternTool extends BaseTool {
 		}
 
 		const centroid = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
-		const center =
-			this.state.centerPointId === 'origin'
-				? { x: 0, y: 0 }
-				: this.state.centerPointId
-					? this.ctx.sketch.points.get(this.state.centerPointId)
-					: null;
+		const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 		if (centroid) {
 			pts.push(this.ctx.viewport.worldToScreen(centroid.x, centroid.y));
 			if (center) {
@@ -442,12 +434,7 @@ export class CircularPatternTool extends BaseTool {
 			angleHandle &&
 			Math.hypot(e.screen.x - angleHandle.x, e.screen.y - angleHandle.y) <= LINE_DISTANCE_PX
 		) {
-			const center =
-				this.state.centerPointId === 'origin'
-					? { x: 0, y: 0 }
-					: this.state.centerPointId
-						? this.ctx.sketch.points.get(this.state.centerPointId)
-						: null;
+			const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 			if (!center) return false;
 			this.angleDrag = {
 				previousPointerAngle: (Math.atan2(e.world.y - center.y, e.world.x - center.x) * 180) / Math.PI,
@@ -551,12 +538,7 @@ export class CircularPatternTool extends BaseTool {
 
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (!this.angleDrag || !this.state || !this.ctx) return;
-		const center =
-			this.state.centerPointId === 'origin'
-				? { x: 0, y: 0 }
-				: this.state.centerPointId
-					? this.ctx.sketch.points.get(this.state.centerPointId)
-					: null;
+		const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 		if (!center) return;
 		const dx = e.world.x - center.x;
 		const dy = e.world.y - center.y;
@@ -625,8 +607,7 @@ export class CircularPatternTool extends BaseTool {
 			return false;
 		}
 
-		const centerPt =
-			centerPointId === 'origin' ? ({ id: 'origin', x: 0, y: 0 } as any) : this.ctx.sketch.points.get(centerPointId);
+		const centerPt = this.ctx.sketch.points.get(centerPointId);
 		if (!centerPt) {
 			this.ctx.showToast('Center point not found');
 			return false;

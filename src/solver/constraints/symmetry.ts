@@ -24,18 +24,24 @@ export class SymmetryConstraint extends BaseConstraint {
 		weight = 1.0,
 		lineId?: string
 	) {
+		const axisId =
+			lineId === 'axis_x' || lineId === 'axis_y'
+				? lineId
+				: lineP1Id === 'axis_x' || lineP1Id === 'axis_y'
+					? lineP1Id
+					: undefined;
 		super(
 			id,
 			'symmetry',
 			'Symmetry',
-			[p1Id, p2Id, lineP1Id, lineP2Id, lineId].filter((x): x is string => Boolean(x)),
+			[p1Id, p2Id, ...(axisId ? [] : [lineP1Id, lineP2Id]), axisId ?? lineId].filter((x): x is string => Boolean(x)),
 			weight
 		);
 		this.p1Id = p1Id;
 		this.p2Id = p2Id;
-		this.lineP1Id = lineP1Id;
-		this.lineP2Id = lineP2Id;
-		this.lineId = lineId;
+		this.lineP1Id = axisId ? 'origin' : lineP1Id;
+		this.lineP2Id = axisId ? axisId : lineP2Id;
+		this.lineId = axisId ?? lineId;
 	}
 
 	override getEquationsCount(): number {
@@ -43,22 +49,19 @@ export class SymmetryConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p1x = this.p1Id === 'origin' ? 0 : (paramMap.get(`${this.p1Id}.x`) ?? 0);
-		const p1y = this.p1Id === 'origin' ? 0 : (paramMap.get(`${this.p1Id}.y`) ?? 0);
-		const p2x = this.p2Id === 'origin' ? 0 : (paramMap.get(`${this.p2Id}.x`) ?? 0);
-		const p2y = this.p2Id === 'origin' ? 0 : (paramMap.get(`${this.p2Id}.y`) ?? 0);
+		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
+		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
+		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
+		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
 
-		if (this.lineId === 'origin' || this.lineP1Id === 'origin') {
+		if (this.lineId === 'origin' || (this.lineP1Id === 'origin' && !this.lineP2Id)) {
 			return [(p1x + p2x) * 0.5 * this.weight, (p1y + p2y) * 0.5 * this.weight];
 		}
 
-		const isAxisX = this.lineId === 'axis_x' || this.lineP1Id === 'axis_x';
-		const isAxisY = this.lineId === 'axis_y' || this.lineP1Id === 'axis_y';
-
-		const ax = isAxisX || isAxisY ? 0 : (paramMap.get(`${this.lineP1Id}.x`) ?? 0);
-		const ay = isAxisX || isAxisY ? 0 : (paramMap.get(`${this.lineP1Id}.y`) ?? 0);
-		const bx = isAxisX ? 1 : isAxisY ? 0 : (paramMap.get(`${this.lineP2Id}.x`) ?? 0);
-		const by = isAxisX ? 0 : isAxisY ? 1 : (paramMap.get(`${this.lineP2Id}.y`) ?? 0);
+		const ax = paramMap.get(`${this.lineP1Id}.x`) ?? 0;
+		const ay = paramMap.get(`${this.lineP1Id}.y`) ?? 0;
+		const bx = paramMap.get(`${this.lineP2Id}.x`) ?? 0;
+		const by = paramMap.get(`${this.lineP2Id}.y`) ?? 0;
 
 		const dx = bx - ax;
 		const dy = by - ay;
@@ -90,8 +93,8 @@ export class SymmetryConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const p1 = this.p1Id === 'origin' ? { x: 0, y: 0 } : ctx.sketch.points.get(this.p1Id);
-		const p2 = this.p2Id === 'origin' ? { x: 0, y: 0 } : ctx.sketch.points.get(this.p2Id);
+		const p1 = ctx.sketch.points.get(this.p1Id);
+		const p2 = ctx.sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return;
 
 		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
@@ -106,8 +109,8 @@ export class SymmetryConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const p1 = this.p1Id === 'origin' ? { x: 0, y: 0 } : sketch.points.get(this.p1Id);
-		const p2 = this.p2Id === 'origin' ? { x: 0, y: 0 } : sketch.points.get(this.p2Id);
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return null;
 
 		const s1 = viewport.worldToScreen(p1.x, p1.y);

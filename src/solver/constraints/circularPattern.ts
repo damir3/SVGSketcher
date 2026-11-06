@@ -121,8 +121,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const errors: number[] = [];
-		const cx = this.centerPtId === 'origin' ? 0 : (paramMap.get(`${this.centerPtId}.x`) ?? 0);
-		const cy = this.centerPtId === 'origin' ? 0 : (paramMap.get(`${this.centerPtId}.y`) ?? 0);
+		const cx = paramMap.get(`${this.centerPtId}.x`) ?? 0;
+		const cy = paramMap.get(`${this.centerPtId}.y`) ?? 0;
 		const suppressedSet = new Set(this.suppressedIndices);
 
 		for (const copy of this.copies) {
@@ -187,8 +187,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 				const colPy = paramIndices.get(`${pair.patternPtId}.y`);
 				const colSx = paramIndices.get(`${pair.sourcePtId}.x`);
 				const colSy = paramIndices.get(`${pair.sourcePtId}.y`);
-				const colCx = this.centerPtId === 'origin' ? undefined : paramIndices.get(`${this.centerPtId}.x`);
-				const colCy = this.centerPtId === 'origin' ? undefined : paramIndices.get(`${this.centerPtId}.y`);
+				const colCx = paramIndices.get(`${this.centerPtId}.x`);
+				const colCy = paramIndices.get(`${this.centerPtId}.y`);
 
 				// Row X: px - targetX = px - [cx(1 - cosA) + cy*sinA + sx*cosA - sy*sinA]
 				if (colPx !== undefined) entries.push({ row: rowX, col: colPx, val: this.weight });
@@ -219,7 +219,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pCtr = this.centerPtId === 'origin' ? { x: 0, y: 0 } : ctx.sketch.points.get(this.centerPtId);
+		const pCtr = ctx.sketch.points.get(this.centerPtId);
 		if (!pCtr) return;
 
 		const sCtr = ctx.viewport.worldToScreen(pCtr.x, pCtr.y);

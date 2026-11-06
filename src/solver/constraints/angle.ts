@@ -37,11 +37,17 @@ export class AngleConstraint extends BaseConstraint {
 		sign = 1,
 		weight = 1.0
 	) {
+		const isAxis1 = line1Id === 'axis_x' || line1Id === 'axis_y';
+		const isAxis2 = line2Id === 'axis_x' || line2Id === 'axis_y';
 		super(
 			id,
 			'angle',
 			'Angle',
-			[line1Id, line2Id, l1P1, l1P2, l2P1, l2P2].filter(Boolean),
+			[
+				...new Set(
+					[line1Id, line2Id, ...(isAxis1 ? [] : [l1P1, l1P2]), ...(isAxis2 ? [] : [l2P1, l2P2])].filter(Boolean)
+				),
+			],
 			weight,
 			false,
 			true,
@@ -49,10 +55,10 @@ export class AngleConstraint extends BaseConstraint {
 		);
 		this.line1Id = line1Id;
 		this.line2Id = line2Id;
-		this.l1P1 = l1P1;
-		this.l1P2 = l1P2;
-		this.l2P1 = l2P1;
-		this.l2P2 = l2P2;
+		this.l1P1 = isAxis1 ? 'origin' : l1P1;
+		this.l1P2 = isAxis1 ? line1Id : l1P2;
+		this.l2P1 = isAxis2 ? 'origin' : l2P1;
+		this.l2P2 = isAxis2 ? line2Id : l2P2;
 		this.targetAngle = targetAngle;
 		this.arcRadius = arcRadius;
 		this.s1 = s1;
@@ -68,42 +74,14 @@ export class AngleConstraint extends BaseConstraint {
 		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
 		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
 
-		let p1x: number, p1y: number, p2x: number, p2y: number;
-		let p3x: number, p3y: number, p4x: number, p4y: number;
-
-		if (this.line1Id === 'axis_x') {
-			p1x = 0;
-			p1y = 0;
-			p2x = 1;
-			p2y = 0;
-		} else if (this.line1Id === 'axis_y') {
-			p1x = 0;
-			p1y = 0;
-			p2x = 0;
-			p2y = 1;
-		} else {
-			p1x = paramMap.get(`${this.l1P1}.x`) ?? 0;
-			p1y = paramMap.get(`${this.l1P1}.y`) ?? 0;
-			p2x = paramMap.get(`${this.l1P2}.x`) ?? 0;
-			p2y = paramMap.get(`${this.l1P2}.y`) ?? 0;
-		}
-
-		if (this.line2Id === 'axis_x') {
-			p3x = 0;
-			p3y = 0;
-			p4x = 1;
-			p4y = 0;
-		} else if (this.line2Id === 'axis_y') {
-			p3x = 0;
-			p3y = 0;
-			p4x = 0;
-			p4y = 1;
-		} else {
-			p3x = paramMap.get(`${this.l2P1}.x`) ?? 0;
-			p3y = paramMap.get(`${this.l2P1}.y`) ?? 0;
-			p4x = paramMap.get(`${this.l2P2}.x`) ?? 0;
-			p4y = paramMap.get(`${this.l2P2}.y`) ?? 0;
-		}
+		const p1x = paramMap.get(`${this.l1P1}.x`) ?? 0;
+		const p1y = paramMap.get(`${this.l1P1}.y`) ?? 0;
+		const p2x = paramMap.get(`${this.l1P2}.x`) ?? 0;
+		const p2y = paramMap.get(`${this.l1P2}.y`) ?? 0;
+		const p3x = paramMap.get(`${this.l2P1}.x`) ?? 0;
+		const p3y = paramMap.get(`${this.l2P1}.y`) ?? 0;
+		const p4x = paramMap.get(`${this.l2P2}.x`) ?? 0;
+		const p4y = paramMap.get(`${this.l2P2}.y`) ?? 0;
 
 		const dx1 = (p2x - p1x) * this.s1;
 		const dy1 = (p2y - p1y) * this.s1;
@@ -142,28 +120,12 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
-		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
-
-		const l1 = isAxis1 ? null : ctx.sketch.lines.get(this.line1Id);
-		const l2 = isAxis2 ? null : ctx.sketch.lines.get(this.line2Id);
-
-		const p1 = isAxis1 ? ({ id: this.line1Id, x: 0, y: 0 } as any) : ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = isAxis1
-			? ({
-					id: this.line1Id,
-					x: this.line1Id === 'axis_x' ? 1 : 0,
-					y: this.line1Id === 'axis_x' ? 0 : 1,
-				} as any)
-			: ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = isAxis2 ? ({ id: this.line2Id, x: 0, y: 0 } as any) : ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = isAxis2
-			? ({
-					id: this.line2Id,
-					x: this.line2Id === 'axis_x' ? 1 : 0,
-					y: this.line2Id === 'axis_x' ? 0 : 1,
-				} as any)
-			: ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		const l1 = ctx.sketch.getLine(this.line1Id);
+		const l2 = ctx.sketch.getLine(this.line2Id);
+		const p1 = ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return;
 
 		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
@@ -223,8 +185,18 @@ export class AngleConstraint extends BaseConstraint {
 		const sp4 = ctx.viewport.worldToScreen(p4.x, p4.y);
 
 		if (ctx.renderDashedExtensionLines) {
-			if (!isAxis1) ctx.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, sp2, color);
-			if (!isAxis2) ctx.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, sp4, color);
+			const isUserLine1 = Boolean(this.line1Id && ctx.sketch.lines.has(this.line1Id));
+			const isUserLine2 = Boolean(this.line2Id && ctx.sketch.lines.has(this.line2Id));
+			const isArc1 = Boolean(this.line1Id && ctx.sketch.arcs.has(this.line1Id));
+			const isArc2 = Boolean(this.line2Id && ctx.sketch.arcs.has(this.line2Id));
+			const hasSeg1 = Boolean(isUserLine1 || isArc1 || ctx.sketch.getLineBetween(this.l1P1, this.l1P2));
+			const hasSeg2 = Boolean(isUserLine2 || isArc2 || ctx.sketch.getLineBetween(this.l2P1, this.l2P2));
+			if (!this.line1Id || isUserLine1 || isArc1) {
+				ctx.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, hasSeg1 ? sp2 : sp1, color);
+			}
+			if (!this.line2Id || isUserLine2 || isArc2) {
+				ctx.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, hasSeg2 ? sp4 : sp3, color);
+			}
 		}
 
 		// Arc path with arrowheads
@@ -276,27 +248,12 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {
-		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
-		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
-
-		const l1 = isAxis1 ? null : sketch.lines.get(this.line1Id);
-		const l2 = isAxis2 ? null : sketch.lines.get(this.line2Id);
-		const p1 = isAxis1 ? ({ id: this.line1Id, x: 0, y: 0 } as any) : sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = isAxis1
-			? ({
-					id: this.line1Id,
-					x: this.line1Id === 'axis_x' ? 1 : 0,
-					y: this.line1Id === 'axis_x' ? 0 : 1,
-				} as any)
-			: sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = isAxis2 ? ({ id: this.line2Id, x: 0, y: 0 } as any) : sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = isAxis2
-			? ({
-					id: this.line2Id,
-					x: this.line2Id === 'axis_x' ? 1 : 0,
-					y: this.line2Id === 'axis_x' ? 0 : 1,
-				} as any)
-			: sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		const l1 = sketch.getLine(this.line1Id);
+		const l2 = sketch.getLine(this.line2Id);
+		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
 		if (!p1 || !p2 || !p3 || !p4) return null;
 
 		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);

@@ -31,6 +31,27 @@ export function hasAngleConstraint(sketch: SketchDocument, line1Id: string, line
 	return false;
 }
 
+export function hasThreePointAngleConstraint(
+	sketch: SketchDocument,
+	p1Id: string,
+	p2Id: string,
+	p3Id: string
+): boolean {
+	for (const c of sketch.constraints.values()) {
+		if (
+			c instanceof AngleConstraint &&
+			!c.line1Id &&
+			!c.line2Id &&
+			c.l1P1 === p2Id &&
+			c.l2P1 === p2Id &&
+			((c.l1P2 === p1Id && c.l2P2 === p3Id) || (c.l1P2 === p3Id && c.l2P2 === p1Id))
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
 export function isPointFixed(sketch: SketchDocument, pointId: string): boolean {
 	const pt = sketch.points.get(pointId);
 	if (pt?.fixed) return true;
@@ -137,6 +158,23 @@ export function getConstraintsForEntity(
 					if (cpat.centerPtId === 'origin') {
 						res.push(c);
 					}
+				} else if (c.type === 'collinear') {
+					const l1 = sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
+					const l2 = sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
+					if (
+						(!l1 || !l2) &&
+						(anyC.l1P1 === 'origin' || anyC.l1P2 === 'origin' || anyC.l2P1 === 'origin' || anyC.l2P2 === 'origin')
+					) {
+						res.push(c);
+					}
+				} else if (c.type === 'angle') {
+					if (
+						!anyC.line1Id &&
+						!anyC.line2Id &&
+						(anyC.l1P1 === 'origin' || anyC.l1P2 === 'origin' || anyC.l2P1 === 'origin' || anyC.l2P2 === 'origin')
+					) {
+						res.push(c);
+					}
 				}
 			}
 			return res;
@@ -161,7 +199,28 @@ export function getConstraintsForEntity(
 			} else if (c.type === 'origin_distance') {
 				if (anyC.pointId === id) res.push(c);
 			} else if (c.type === 'midpoint') {
-				if (anyC.midId === id) res.push(c);
+				if (
+					anyC.midId === id ||
+					((anyC.p1Id === id || anyC.p2Id === id) && !sketch.getLineBetween(anyC.p1Id, anyC.p2Id))
+				) {
+					res.push(c);
+				}
+			} else if (c.type === 'collinear') {
+				const l1 = sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
+				const l2 = sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
+				if (!l1 || !l2) {
+					if (anyC.l1P1 === id || anyC.l1P2 === id || anyC.l2P1 === id || anyC.l2P2 === id) {
+						res.push(c);
+					}
+				}
+			} else if (c.type === 'angle') {
+				if (
+					!anyC.line1Id &&
+					!anyC.line2Id &&
+					(anyC.l1P1 === id || anyC.l1P2 === id || anyC.l2P1 === id || anyC.l2P2 === id)
+				) {
+					res.push(c);
+				}
 			} else if (c.type === 'symmetry') {
 				if (anyC.p1Id === id || anyC.p2Id === id) res.push(c);
 			} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
@@ -246,8 +305,18 @@ export function getConstraintsForEntity(
 				) {
 					res.push(c);
 				}
-			} else if (c.type === 'parallel' || c.type === 'collinear' || c.type === 'perpendicular') {
+			} else if (c.type === 'parallel' || c.type === 'perpendicular') {
 				if (matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) || matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)) {
+					res.push(c);
+				}
+			} else if (c.type === 'collinear') {
+				const l1 = sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
+				const l2 = sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
+				if (
+					l1 &&
+					l2 &&
+					(matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) || matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id))
+				) {
 					res.push(c);
 				}
 			} else if (c.type === 'point_on_line' || c.type === 'tangent_line_circle') {
@@ -266,8 +335,8 @@ export function getConstraintsForEntity(
 				if (
 					anyC.line1Id === id ||
 					anyC.line2Id === id ||
-					matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) ||
-					matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)
+					(Boolean(anyC.line1Id) && matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id)) ||
+					(Boolean(anyC.line2Id) && matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id))
 				) {
 					res.push(c);
 				}
@@ -446,27 +515,35 @@ export function getEntitiesForConstraint(
 		const l2 = sketch.getLineBetween(anyC.line2P1, anyC.line2P2);
 		if (l1) add(l1.id, 'line');
 		if (l2) add(l2.id, 'line');
-	} else if (c.type === 'parallel' || c.type === 'perpendicular' || c.type === 'collinear') {
+	} else if (c.type === 'parallel' || c.type === 'perpendicular') {
 		const l1 = sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
 		const l2 = sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
 		if (l1) add(l1.id, 'line');
 		if (l2) add(l2.id, 'line');
+	} else if (c.type === 'collinear') {
+		const l1 = sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
+		const l2 = sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
+		if (l1 && l2) {
+			add(l1.id, 'line');
+			add(l2.id, 'line');
+		} else {
+			for (const pid of [anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2]) {
+				if (sketch.points.get(pid)) add(pid, 'point');
+			}
+		}
 	} else if (c.type === 'symmetry') {
-		if (anyC.p1Id === 'origin' || (anyC.p1Id && sketch.points.has(anyC.p1Id))) add(anyC.p1Id, 'point');
-		if (anyC.p2Id === 'origin' || (anyC.p2Id && sketch.points.has(anyC.p2Id))) add(anyC.p2Id, 'point');
+		if (sketch.points.get(anyC.p1Id)) add(anyC.p1Id, 'point');
+		if (sketch.points.get(anyC.p2Id)) add(anyC.p2Id, 'point');
 		if (anyC.lineId === 'origin') {
 			add('origin', 'point');
-		} else if (anyC.lineId === 'axis_x' || anyC.lineId === 'axis_y') {
-			add(anyC.lineId, 'line');
-		} else if (anyC.lineId && sketch.lines.has(anyC.lineId)) {
-			add(anyC.lineId, 'line');
 		} else {
-			const line = sketch.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
+			const line =
+				(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? sketch.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
 			if (line) add(line.id, 'line');
 		}
 	} else if (c.type === 'circular_pattern') {
 		const cpat = c as CircularPatternConstraint;
-		if (cpat.centerPtId && sketch.points.has(cpat.centerPtId)) add(cpat.centerPtId, 'point');
+		if (sketch.points.get(cpat.centerPtId)) add(cpat.centerPtId, 'point');
 		if (cpat.sourceObjectIds) {
 			for (const id of cpat.sourceObjectIds) {
 				if (sketch.lines.has(id)) add(id, 'line');
@@ -518,55 +595,46 @@ export function getEntitiesForConstraint(
 			}
 		}
 	} else if (c.type === 'angle') {
-		if (anyC.line1Id && sketch.arcs.has(anyC.line1Id)) {
-			add(anyC.line1Id, 'arc');
-		} else if (anyC.line1Id && sketch.lines.has(anyC.line1Id)) {
-			add(anyC.line1Id, 'line');
-		} else if (anyC.line1Id === 'axis_x' || anyC.line1Id === 'axis_y') {
-			add(anyC.line1Id, 'line');
+		if (!anyC.line1Id && !anyC.line2Id) {
+			for (const pid of [anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2]) {
+				if (sketch.points.get(pid)) add(pid, 'point');
+			}
 		} else {
-			const l1 = sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
-			if (l1) add(l1.id, 'line');
-		}
-		if (anyC.line2Id && sketch.arcs.has(anyC.line2Id)) {
-			add(anyC.line2Id, 'arc');
-		} else if (anyC.line2Id && sketch.lines.has(anyC.line2Id)) {
-			add(anyC.line2Id, 'line');
-		} else if (anyC.line2Id === 'axis_x' || anyC.line2Id === 'axis_y') {
-			add(anyC.line2Id, 'line');
-		} else {
-			const l2 = sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
-			if (l2) add(l2.id, 'line');
+			if (anyC.line1Id && sketch.arcs.has(anyC.line1Id)) {
+				add(anyC.line1Id, 'arc');
+			} else {
+				const l1 = sketch.getLine(anyC.line1Id) ?? sketch.getLineBetween(anyC.l1P1, anyC.l1P2);
+				if (l1) add(l1.id, 'line');
+			}
+			if (anyC.line2Id && sketch.arcs.has(anyC.line2Id)) {
+				add(anyC.line2Id, 'arc');
+			} else {
+				const l2 = sketch.getLine(anyC.line2Id) ?? sketch.getLineBetween(anyC.l2P1, anyC.l2P2);
+				if (l2) add(l2.id, 'line');
+			}
 		}
 	} else if (c.type === 'point_on_line') {
-		if (anyC.pointId === 'origin' || (anyC.pointId && sketch.points.has(anyC.pointId))) add(anyC.pointId, 'point');
+		if (sketch.points.get(anyC.pointId)) add(anyC.pointId, 'point');
 		const line = sketch.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
 		if (line) add(line.id, 'line');
 	} else if (c.type === 'point_on_circle') {
-		if (anyC.pointId === 'origin' || (anyC.pointId && sketch.points.has(anyC.pointId))) add(anyC.pointId, 'point');
+		if (sketch.points.get(anyC.pointId)) add(anyC.pointId, 'point');
 		const cid = anyC.circleId;
 		if (sketch.circles.has(cid)) add(cid, 'circle');
 		else if (sketch.arcs.has(cid)) add(cid, 'arc');
 	} else if (c.type === 'point_on_ellipse') {
-		if (anyC.pointId === 'origin' || (anyC.pointId && sketch.points.has(anyC.pointId))) add(anyC.pointId, 'point');
+		if (sketch.points.get(anyC.pointId)) add(anyC.pointId, 'point');
 		const eid = anyC.ellipseId;
 		if (sketch.ellipses.has(eid)) add(eid, 'ellipse');
 		else if (sketch.ellipticalArcs.has(eid)) add(eid, 'elliptical_arc');
 	} else if (c.type === 'point_on_spline') {
-		if (anyC.pointId === 'origin' || (anyC.pointId && sketch.points.has(anyC.pointId))) add(anyC.pointId, 'point');
+		if (sketch.points.get(anyC.pointId)) add(anyC.pointId, 'point');
 		const sid = anyC.splineId;
 		if (sketch.splines.has(sid)) add(sid, 'spline');
 	} else if (c.type === 'tangent_line_circle') {
-		if (anyC.lineId === 'axis_x' || anyC.lineId === 'axis_y') {
-			add(anyC.lineId, 'line');
-		} else if (anyC.lineP1Id === 'axis_x' || anyC.lineP1Id === 'axis_y') {
-			add(anyC.lineP1Id, 'line');
-		} else if (anyC.lineId && sketch.lines.has(anyC.lineId)) {
-			add(anyC.lineId, 'line');
-		} else {
-			const line = sketch.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
-			if (line) add(line.id, 'line');
-		}
+		const line =
+			(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? sketch.getLineBetween(anyC.lineP1Id, anyC.lineP2Id);
+		if (line) add(line.id, 'line');
 		const cid = anyC.circleId;
 		if (sketch.circles.has(cid)) add(cid, 'circle');
 		else if (sketch.arcs.has(cid)) add(cid, 'arc');
@@ -596,13 +664,13 @@ export function getEntitiesForConstraint(
 			add(anyC.c2CenterId, 'point');
 		}
 	} else if (c.type === 'midpoint') {
-		if (anyC.midId === 'origin' || (anyC.midId && sketch.points.has(anyC.midId))) add(anyC.midId, 'point');
+		if (sketch.points.get(anyC.midId)) add(anyC.midId, 'point');
 		const line = sketch.getLineBetween(anyC.p1Id, anyC.p2Id);
 		if (line) {
 			add(line.id, 'line');
 		} else {
-			if (anyC.p1Id === 'origin' || (anyC.p1Id && sketch.points.has(anyC.p1Id))) add(anyC.p1Id, 'point');
-			if (anyC.p2Id === 'origin' || (anyC.p2Id && sketch.points.has(anyC.p2Id))) add(anyC.p2Id, 'point');
+			if (sketch.points.get(anyC.p1Id)) add(anyC.p1Id, 'point');
+			if (sketch.points.get(anyC.p2Id)) add(anyC.p2Id, 'point');
 		}
 	} else if (c.type === 'ellipse_axis') {
 		if (anyC.ellipseId) {

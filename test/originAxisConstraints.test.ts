@@ -7,6 +7,7 @@ import {
 	AngleConstraint,
 	SymmetryConstraint,
 	MidpointConstraint,
+	CollinearConstraint,
 	TangentLineCircleConstraint,
 	EqualRadiusConstraint,
 } from '../src/solver/constraints';
@@ -1146,6 +1147,285 @@ describe('Origin & Axis Constraints', () => {
 			sketch.dragPoint(p5.id, 120, 10);
 			assert.ok(Math.abs(p5.x + p8.x) < 1e-3);
 			assert.ok(Math.abs(p5.y - p8.y) < 1e-3);
+		});
+	});
+
+	describe('Three-Point Constraints (Midpoint, Collinear, Angle)', () => {
+		it('Midpoint by 3 points picks the geometrically middle point regardless of selection order', () => {
+			const sketch = new SketchDocument();
+			const pA = sketch.addPoint(0, 0, true);
+			const pMid = sketch.addPoint(45, 18); // geometrically closest to midpoint (50, 10)
+			const pB = sketch.addPoint(100, 20, true);
+
+			// Pass points in order (pA, pB, pMid) — pMid should still be identified as midId
+			const c = sketch.addThreePointMidpointConstraint(pA.id, pB.id, pMid.id);
+			assert.ok(c instanceof MidpointConstraint);
+			assert.equal(c.midId, pMid.id);
+			assert.ok(Math.abs(pMid.x - 50) < 1e-4, `Expected pMid.x ~ 50, got ${pMid.x}`);
+			assert.ok(Math.abs(pMid.y - 10) < 1e-4, `Expected pMid.y ~ 10, got ${pMid.y}`);
+
+			// Entity links include all 3 points
+			for (const pid of [pA.id, pMid.id, pB.id]) {
+				assert.ok(sketch.getConstraintsForEntity('point', pid).some(sc => sc.id === c.id));
+				assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === pid && e.type === 'point'));
+			}
+		});
+
+		it('ConstraintTool(midpoint) applies 3-point midpoint on 3 arbitrary points', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(10, 10, true);
+			const p2 = sketch.addPoint(90, 50, true);
+			const p3 = sketch.addPoint(48, 25); // middle point
+
+			const ctx: any = {
+				sketch,
+				viewport: {
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					zoom: 1,
+				},
+				findPointNear: () => null,
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+				requestRender: () => {},
+				showToast: () => {},
+				setCursor: () => {},
+			};
+
+			const tool = new ConstraintTool('midpoint');
+			tool.activate(ctx);
+
+			for (const pt of [p1, p2, p3]) {
+				tool.onMouseDown({
+					screen: vec(pt.x, pt.y),
+					world: vec(pt.x, pt.y),
+					client: vec(pt.x, pt.y),
+					raw: {
+						target: {
+							closest: () => ({
+								getAttribute: (attr: string) => (attr === 'data-id' ? pt.id : attr === 'data-type' ? 'point' : null),
+							}),
+						},
+					},
+				} as any);
+			}
+
+			assert.ok(Math.abs(p3.x - 50) < 1e-4, `Expected p3.x ~ 50, got ${p3.x}`);
+			assert.ok(Math.abs(p3.y - 30) < 1e-4, `Expected p3.y ~ 30, got ${p3.y}`);
+		});
+
+		it('Collinear by 3 points constrains 3 points onto one line and removes exactly 1 DoF', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(0, 0, true);
+			const p2 = sketch.addPoint(50, 25);
+			const p3 = sketch.addPoint(100, 0, true);
+
+			const c = sketch.addThreePointCollinearConstraint(p1.id, p2.id, p3.id);
+			assert.ok(c instanceof CollinearConstraint);
+			assert.equal(c.isThreePoint(), true);
+			assert.equal(c.getEquationsCount(), 1);
+			assert.ok(Math.abs(p2.y) < 1e-4, `Expected p2.y ~ 0, got ${p2.y}`);
+			assert.notEqual(sketch.lastSolverResult?.status, 'OVER_CONSTRAINED');
+
+			// Serialization roundtrip preserves 3-point collinear
+			const restored = deserializeConstraint(serializeConstraint(c)) as CollinearConstraint;
+			assert.ok(restored instanceof CollinearConstraint);
+			assert.equal(restored.isThreePoint(), true);
+			assert.equal(restored.getEquationsCount(), 1);
+
+			// Entity links include all 3 points
+			for (const pid of [p1.id, p2.id, p3.id]) {
+				assert.ok(sketch.getConstraintsForEntity('point', pid).some(sc => sc.id === c.id));
+				assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === pid && e.type === 'point'));
+			}
+		});
+
+		it('ConstraintTool(collinear) applies 3-point collinear on 3 points including origin', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(40, 40, true);
+			const p2 = sketch.addPoint(80, 60);
+
+			const ctx: any = {
+				sketch,
+				viewport: {
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					zoom: 1,
+				},
+				findPointNear: () => null,
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+				requestRender: () => {},
+				showToast: () => {},
+				setCursor: () => {},
+			};
+
+			const tool = new ConstraintTool('collinear');
+			tool.activate(ctx);
+
+			for (const id of ['origin', p1.id, p2.id]) {
+				tool.onMouseDown({
+					screen: vec(0, 0),
+					world: vec(0, 0),
+					client: vec(0, 0),
+					raw: {
+						target: {
+							closest: () => ({
+								getAttribute: (attr: string) => (attr === 'data-id' ? id : attr === 'data-type' ? 'point' : null),
+							}),
+						},
+					},
+				} as any);
+			}
+
+			// Origin (0,0), p1 (40,40), p2 should lie on y = x
+			assert.ok(Math.abs(p2.x - p2.y) < 1e-3, `Expected p2.x ~ p2.y, got (${p2.x}, ${p2.y})`);
+			assert.equal(sketch.getConstraintsForEntity('point', 'origin').length, 1);
+		});
+
+		it('Angle by 3 points uses the 2nd point as the vertex (∠P1-P2-P3) and solves target angle', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(100, 0, true);
+			const p2 = sketch.addPoint(0, 0, true); // vertex
+			const p3 = sketch.addPoint(60, 80); // initial angle ~53.13 deg
+			sketch.addDistanceConstraint(p2.id, p3.id, 100);
+
+			const c = sketch.addThreePointAngleConstraint(p1.id, p2.id, p3.id, 90);
+			assert.ok(c instanceof AngleConstraint);
+			assert.equal(c.l1P1, p2.id);
+			assert.equal(c.l1P2, p1.id);
+			assert.equal(c.l2P1, p2.id);
+			assert.equal(c.l2P2, p3.id);
+
+			assert.ok(Math.abs(p3.x - 0) < 1e-3, `Expected p3.x ~ 0, got ${p3.x}`);
+			assert.ok(Math.abs(p3.y - 100) < 1e-3, `Expected p3.y ~ 100, got ${p3.y}`);
+
+			// Update dimensional constraint to 60 degrees
+			const updated = sketch.updateDimensionalConstraint(c.id, 60);
+			assert.equal(updated, true);
+			assert.ok(Math.abs(p3.x - 50) < 1e-2, `Expected p3.x ~ 50, got ${p3.x}`);
+			assert.ok(Math.abs(p3.y - 86.6025) < 1e-2, `Expected p3.y ~ 86.6025, got ${p3.y}`);
+
+			// Entity links include all 3 points
+			for (const pid of [p1.id, p2.id, p3.id]) {
+				assert.ok(sketch.getConstraintsForEntity('point', pid).some(sc => sc.id === c.id));
+				assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === pid && e.type === 'point'));
+			}
+
+			// Serialization roundtrip preserves 3-point angle
+			const restored = deserializeConstraint(serializeConstraint(c)) as AngleConstraint;
+			assert.ok(restored instanceof AngleConstraint);
+			assert.equal(restored.line1Id, '');
+			assert.equal(restored.line2Id, '');
+			assert.equal(restored.l1P1, p2.id);
+			assert.equal(restored.l1P2, p1.id);
+			assert.equal(restored.l2P1, p2.id);
+			assert.equal(restored.l2P2, p3.id);
+		});
+
+		it('DimensionTool creates 3-point angle constraint via 4 clicks (P1, vertex P2, P3, place arc)', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(100, 0, true);
+			const p2 = sketch.addPoint(0, 0, true); // vertex
+			const p3 = sketch.addPoint(0, 100);
+
+			let editedConstraint: any = null;
+			const ctx: any = {
+				sketch,
+				viewport: {
+					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+					zoom: 1,
+				},
+				renderer: {
+					clearPreviews: () => {},
+					renderAnglePreview: () => {},
+					renderDistancePreview: () => {},
+					renderDistanceLinePreview: () => {},
+				},
+				findSnap: () => null,
+				findPointNear: () => null,
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+				requestRender: () => {},
+				showToast: () => {},
+				setCursor: () => {},
+				onEditDimension: (c: any) => {
+					editedConstraint = c;
+				},
+			};
+
+			const tool = new DimensionTool();
+			tool.activate(ctx);
+
+			// Click 1: p1
+			tool.onMouseDown({
+				screen: vec(100, 0),
+				world: vec(100, 0),
+				client: vec(100, 0),
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? p1.id : attr === 'data-type' ? 'point' : null),
+						}),
+					},
+				},
+			} as any);
+			assert.equal(tool.state.step, 1);
+			assert.equal(tool.state.point1Id, p1.id);
+
+			// Click 2: p2 (vertex)
+			tool.onMouseDown({
+				screen: vec(0, 0),
+				world: vec(0, 0),
+				client: vec(0, 0),
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? p2.id : attr === 'data-type' ? 'point' : null),
+						}),
+					},
+				},
+			} as any);
+			assert.equal(tool.state.step, 2);
+			assert.equal(tool.state.point2Id, p2.id);
+
+			// Click 3: p3
+			tool.onMouseDown({
+				screen: vec(0, 100),
+				world: vec(0, 100),
+				client: vec(0, 100),
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? p3.id : attr === 'data-type' ? 'point' : null),
+						}),
+					},
+				},
+			} as any);
+			assert.equal(tool.state.step, 2);
+			assert.equal(tool.state.point3Id, p3.id);
+
+			// Click 4: place angle dimension arc at (30, 30)
+			tool.onMouseDown({
+				screen: vec(30, 30),
+				world: vec(30, 30),
+				client: vec(30, 30),
+				raw: {
+					target: {
+						closest: () => null,
+					},
+				},
+			} as any);
+
+			assert.equal(tool.state.step, 0);
+			assert.ok(editedConstraint instanceof AngleConstraint);
+			assert.equal(editedConstraint.l1P1, p2.id);
+			assert.equal(editedConstraint.l1P2, p1.id);
+			assert.equal(editedConstraint.l2P1, p2.id);
+			assert.equal(editedConstraint.l2P2, p3.id);
+			assert.equal(editedConstraint.targetAngle, 90);
 		});
 	});
 });

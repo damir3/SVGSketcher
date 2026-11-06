@@ -6,6 +6,20 @@ export class ParamManager {
 	private freeParams: ParamRef[] = [];
 	private paramIndices = new Map<string, number>();
 
+	constructor() {
+		this.registerBuiltInParams();
+	}
+
+	private registerBuiltInParams(): void {
+		const nop = () => {};
+		this.params.set('origin.x', { id: 'origin.x', get: () => 0, set: nop, isFixed: true });
+		this.params.set('origin.y', { id: 'origin.y', get: () => 0, set: nop, isFixed: true });
+		this.params.set('axis_x.x', { id: 'axis_x.x', get: () => 1, set: nop, isFixed: true });
+		this.params.set('axis_x.y', { id: 'axis_x.y', get: () => 0, set: nop, isFixed: true });
+		this.params.set('axis_y.x', { id: 'axis_y.x', get: () => 0, set: nop, isFixed: true });
+		this.params.set('axis_y.y', { id: 'axis_y.y', get: () => 1, set: nop, isFixed: true });
+	}
+
 	register(param: ParamRef): void {
 		this.params.set(param.id, param);
 	}
@@ -18,6 +32,7 @@ export class ParamManager {
 		this.params.clear();
 		this.freeParams = [];
 		this.paramIndices.clear();
+		this.registerBuiltInParams();
 	}
 
 	prepare(lockedParams?: Set<string>): void {

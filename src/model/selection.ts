@@ -173,6 +173,7 @@ export function getSelectedPrimitives(sketch: SketchDocument): Array<{ id: strin
 		if (s) list.push(s);
 	}
 	for (const id of sketch.selection.pointIds) {
+		if (!sketch.points.has(id)) continue;
 		const p = sketch.points.get(id);
 		if (p) list.push(p);
 	}

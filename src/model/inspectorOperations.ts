@@ -8,7 +8,6 @@ import {
 	DragPointConstraint,
 	AngleConstraint,
 } from '../solver/constraints';
-import type { SketchPoint } from './types';
 import { dist } from '../math/vector';
 
 export function setPointCoords(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
@@ -284,13 +283,13 @@ export function setLinesRelativeAngle(
 	line2Id: string,
 	newAngleDeg: number
 ): boolean {
-	const isAxis1 = line1Id === 'axis_x' || line1Id === 'axis_y';
-	const isAxis2 = line2Id === 'axis_x' || line2Id === 'axis_y';
-	if (isAxis1 && isAxis2) return false;
+	const hasUserLine1 = sketch.lines.has(line1Id);
+	const hasUserLine2 = sketch.lines.has(line2Id);
+	if (!hasUserLine1 && !hasUserLine2) return false;
 
-	const l1 = isAxis1 ? null : sketch.lines.get(line1Id);
-	const l2 = isAxis2 ? null : sketch.lines.get(line2Id);
-	if ((!l1 && !isAxis1) || (!l2 && !isAxis2) || !isFinite(newAngleDeg) || newAngleDeg <= 0) return false;
+	const l1 = sketch.getLine(line1Id);
+	const l2 = sketch.getLine(line2Id);
+	if (!l1 || !l2 || !isFinite(newAngleDeg) || newAngleDeg <= 0) return false;
 
 	const existing = [...sketch.constraints.values()].find(
 		c =>
@@ -301,22 +300,10 @@ export function setLinesRelativeAngle(
 		return sketch.updateDimensionalConstraint(existing.id, newAngleDeg);
 	}
 
-	const p1 = isAxis1 ? ({ id: line1Id, x: 0, y: 0 } as SketchPoint) : sketch.points.get(l1!.p1Id);
-	const p2 = isAxis1
-		? ({
-				id: line1Id,
-				x: line1Id === 'axis_x' ? 1 : 0,
-				y: line1Id === 'axis_x' ? 0 : 1,
-			} as SketchPoint)
-		: sketch.points.get(l1!.p2Id);
-	const p3 = isAxis2 ? ({ id: line2Id, x: 0, y: 0 } as SketchPoint) : sketch.points.get(l2!.p1Id);
-	const p4 = isAxis2
-		? ({
-				id: line2Id,
-				x: line2Id === 'axis_x' ? 1 : 0,
-				y: line2Id === 'axis_x' ? 0 : 1,
-			} as SketchPoint)
-		: sketch.points.get(l2!.p2Id);
+	const p1 = sketch.points.get(l1.p1Id);
+	const p2 = sketch.points.get(l1.p2Id);
+	const p3 = sketch.points.get(l2.p1Id);
+	const p4 = sketch.points.get(l2.p2Id);
 	if (!p1 || !p2 || !p3 || !p4) return false;
 
 	const clampedAngle = Math.min(179.9, Math.max(0.1, newAngleDeg));
@@ -334,18 +321,18 @@ export function setLinesRelativeAngle(
 		'__temp_rel_ang',
 		line1Id,
 		line2Id,
-		isAxis1 ? '' : l1!.p1Id,
-		isAxis1 ? '' : l1!.p2Id,
-		isAxis2 ? '' : l2!.p1Id,
-		isAxis2 ? '' : l2!.p2Id,
+		l1.p1Id,
+		l1.p2Id,
+		l2.p1Id,
+		l2.p2Id,
 		clampedAngle,
 		40,
 		geom.s1,
 		geom.s2,
 		geom.sign
 	);
-	const tempDist1 = !isAxis1 ? new DistanceConstraint('__temp_d1', l1!.p1Id, l1!.p2Id, len1, 1.0) : null;
-	const tempDist2 = !isAxis2 ? new DistanceConstraint('__temp_d2', l2!.p1Id, l2!.p2Id, len2, 1.0) : null;
+	const tempDist1 = hasUserLine1 ? new DistanceConstraint('__temp_d1', l1.p1Id, l1.p2Id, len1, 1.0) : null;
+	const tempDist2 = hasUserLine2 ? new DistanceConstraint('__temp_d2', l2.p1Id, l2.p2Id, len2, 1.0) : null;
 
 	const checkNonDegenerate = () => {
 		const d1 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
@@ -359,8 +346,8 @@ export function setLinesRelativeAngle(
 		const achievedDeg = (Math.acos(dotVal) * 180) / Math.PI;
 		return (
 			Math.abs(achievedDeg - clampedAngle) < 0.5 &&
-			(isAxis1 || (p2.x - p1.x) * origDx1 + (p2.y - p1.y) * origDy1 > -0.5 * d1 * len1) &&
-			(isAxis2 || (p4.x - p3.x) * origDx2 + (p4.y - p3.y) * origDy2 > -0.5 * d2 * len2)
+			(p2.x - p1.x) * origDx1 + (p2.y - p1.y) * origDy1 > -0.5 * d1 * len1 &&
+			(p4.x - p3.x) * origDx2 + (p4.y - p3.y) * origDy2 > -0.5 * d2 * len2
 		);
 	};
 

@@ -26,12 +26,12 @@ export class MidpointConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const mx = this.midId === 'origin' ? 0 : (paramMap.get(`${this.midId}.x`) ?? 0);
-		const my = this.midId === 'origin' ? 0 : (paramMap.get(`${this.midId}.y`) ?? 0);
-		const p1x = this.p1Id === 'origin' ? 0 : (paramMap.get(`${this.p1Id}.x`) ?? 0);
-		const p1y = this.p1Id === 'origin' ? 0 : (paramMap.get(`${this.p1Id}.y`) ?? 0);
-		const p2x = this.p2Id === 'origin' ? 0 : (paramMap.get(`${this.p2Id}.x`) ?? 0);
-		const p2y = this.p2Id === 'origin' ? 0 : (paramMap.get(`${this.p2Id}.y`) ?? 0);
+		const mx = paramMap.get(`${this.midId}.x`) ?? 0;
+		const my = paramMap.get(`${this.midId}.y`) ?? 0;
+		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
+		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
+		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
+		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
 
 		const alpha = this.ratio;
 		return [
@@ -66,14 +66,14 @@ export class MidpointConstraint extends BaseConstraint {
 				return;
 			}
 		}
-		const pt = this.midId === 'origin' ? { x: 0, y: 0 } : ctx.sketch.points.get(this.midId);
+		const pt = ctx.sketch.points.get(this.midId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
 		ctx.renderBadge(this.id, s.x, s.y - 14, 'M', COLORS.primary);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const pt = this.midId === 'origin' ? { x: 0, y: 0 } : sketch.points.get(this.midId);
+		const pt = sketch.points.get(this.midId);
 		if (!pt) return null;
 		const s = viewport.worldToScreen(pt.x, pt.y);
 		return distanceToPoint(screen, { x: s.x, y: s.y - 14 });

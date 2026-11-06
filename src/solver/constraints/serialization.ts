@@ -293,5 +293,27 @@ export function deserializeConstraint(snapshot: ConstraintSnapshot): IConstraint
 		entityIds: snapshot.entityIds ?? [],
 		weight: snapshot.weight ?? 1,
 	};
+	if (snapshot.type === 'angle') {
+		if (data.line1Id === 'axis_x' || data.line1Id === 'axis_y') {
+			data.l1P1 = 'origin';
+			data.l1P2 = data.line1Id;
+		}
+		if (data.line2Id === 'axis_x' || data.line2Id === 'axis_y') {
+			data.l2P1 = 'origin';
+			data.l2P2 = data.line2Id;
+		}
+	} else if (snapshot.type === 'symmetry' || snapshot.type === 'tangent_line_circle') {
+		const axisId =
+			data.lineId === 'axis_x' || data.lineId === 'axis_y'
+				? data.lineId
+				: data.lineP1Id === 'axis_x' || data.lineP1Id === 'axis_y'
+					? data.lineP1Id
+					: undefined;
+		if (axisId) {
+			data.lineP1Id = 'origin';
+			data.lineP2Id = axisId;
+			data.lineId = axisId;
+		}
+	}
 	return BaseConstraint.restoreFromSnapshot(constraintClass, data);
 }

@@ -3,7 +3,7 @@ import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 
 /**
- * Constrains two lines to be collinear (parallel and lying on the same line)
+ * Constrains two lines or three points to be collinear (parallel and lying on the same line)
  */
 export class CollinearConstraint extends BaseConstraint {
 	readonly l1P1: string;
@@ -12,15 +12,19 @@ export class CollinearConstraint extends BaseConstraint {
 	readonly l2P2: string;
 
 	constructor(id: string, l1P1: string, l1P2: string, l2P1: string, l2P2: string, weight = 1.0) {
-		super(id, 'collinear', 'Collinear', [l1P1, l1P2, l2P1, l2P2], weight);
+		super(id, 'collinear', 'Collinear', [...new Set([l1P1, l1P2, l2P1, l2P2].filter(Boolean))], weight);
 		this.l1P1 = l1P1;
 		this.l1P2 = l1P2;
 		this.l2P1 = l2P1;
 		this.l2P2 = l2P2;
 	}
 
+	isThreePoint(): boolean {
+		return this.l1P1 === this.l2P1 || this.l1P1 === this.l2P2 || this.l1P2 === this.l2P1 || this.l1P2 === this.l2P2;
+	}
+
 	override getEquationsCount(): number {
-		return 2;
+		return this.isThreePoint() ? 1 : 2;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
@@ -47,6 +51,10 @@ export class CollinearConstraint extends BaseConstraint {
 		const cross = (dx1 * dy2 - dy1 * dx2) / (l1 * l2);
 		const eq0 = cross * avgL * this.weight;
 
+		if (this.isThreePoint()) {
+			return [eq0];
+		}
+
 		// Equation 1: Perpendicular distance from midpoint of line 2 to infinite line 1
 		const mid2x = (p21x + p22x) * 0.5;
 		const mid2y = (p21y + p22y) * 0.5;
@@ -62,6 +70,9 @@ export class CollinearConstraint extends BaseConstraint {
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
 		const j0 = computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+		if (this.isThreePoint()) {
+			return j0;
+		}
 		const j1 = computeNumericJacobianForEquation(this, paramIndices, baseRow, 1, paramMap);
 		return [...j0, ...j1];
 	}

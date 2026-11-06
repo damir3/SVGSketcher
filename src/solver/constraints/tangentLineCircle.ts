@@ -23,19 +23,27 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		weight = 1.0,
 		lineId?: string
 	) {
+		const axisId =
+			lineId === 'axis_x' || lineId === 'axis_y'
+				? lineId
+				: lineP1Id === 'axis_x' || lineP1Id === 'axis_y'
+					? lineP1Id
+					: undefined;
 		super(
 			id,
 			'tangent_line_circle',
 			'Tangent',
-			[lineP1Id, lineP2Id, circleCenterId, circleId, lineId].filter((x): x is string => Boolean(x)),
+			[...(axisId ? [] : [lineP1Id, lineP2Id]), circleCenterId, circleId, axisId ?? lineId].filter((x): x is string =>
+				Boolean(x)
+			),
 			weight
 		);
-		this.lineP1Id = lineP1Id;
-		this.lineP2Id = lineP2Id;
+		this.lineP1Id = axisId ? 'origin' : lineP1Id;
+		this.lineP2Id = axisId ? axisId : lineP2Id;
 		this.circleCenterId = circleCenterId;
 		this.circleId = circleId;
 		this.initialSide = initialSide >= 0 ? 1 : -1;
-		this.lineId = lineId;
+		this.lineId = axisId ?? lineId;
 	}
 
 	override getEquationsCount(): number {
@@ -47,13 +55,10 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const cy = paramMap.get(`${this.circleCenterId}.y`) ?? 0;
 		const r = paramMap.get(`${this.circleId}.r`) ?? 10;
 
-		const isAxisX = this.lineId === 'axis_x' || this.lineP1Id === 'axis_x';
-		const isAxisY = this.lineId === 'axis_y' || this.lineP1Id === 'axis_y';
-
-		const p1x = isAxisX || isAxisY ? 0 : (paramMap.get(`${this.lineP1Id}.x`) ?? 0);
-		const p1y = isAxisX || isAxisY ? 0 : (paramMap.get(`${this.lineP1Id}.y`) ?? 0);
-		const p2x = isAxisX ? 1 : isAxisY ? 0 : (paramMap.get(`${this.lineP2Id}.x`) ?? 0);
-		const p2y = isAxisX ? 0 : isAxisY ? 1 : (paramMap.get(`${this.lineP2Id}.y`) ?? 0);
+		const p1x = paramMap.get(`${this.lineP1Id}.x`) ?? 0;
+		const p1y = paramMap.get(`${this.lineP1Id}.y`) ?? 0;
+		const p2x = paramMap.get(`${this.lineP2Id}.x`) ?? 0;
+		const p2y = paramMap.get(`${this.lineP2Id}.y`) ?? 0;
 
 		const dx = p2x - p1x;
 		const dy = p2y - p1y;
@@ -73,12 +78,10 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const isAxisX = this.lineId === 'axis_x' || this.lineP1Id === 'axis_x';
-		const isAxisY = this.lineId === 'axis_y' || this.lineP1Id === 'axis_y';
-		const isAxis = isAxisX || isAxisY;
+		const isAxis = Boolean(this.lineId && !ctx.sketch.lines.has(this.lineId));
 
-		const p1 = isAxis ? { x: 0, y: 0 } : ctx.sketch.points.get(this.lineP1Id);
-		const p2 = isAxisX ? { x: 100, y: 0 } : isAxisY ? { x: 0, y: 100 } : ctx.sketch.points.get(this.lineP2Id);
+		const p1 = ctx.sketch.points.get(this.lineP1Id);
+		const p2 = ctx.sketch.points.get(this.lineP2Id);
 		const circle = ctx.sketch.circles.get(this.circleId);
 		const arc = ctx.sketch.arcs.get(this.circleId);
 		const entity = circle ?? arc;

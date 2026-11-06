@@ -2335,30 +2335,12 @@ export class CanvasInteraction {
 						}
 					}
 				} else if (constraint instanceof AngleConstraint) {
-					const isAxis1 = constraint.line1Id === 'axis_x' || constraint.line1Id === 'axis_y';
-					const isAxis2 = constraint.line2Id === 'axis_x' || constraint.line2Id === 'axis_y';
-					const l1 = isAxis1 ? null : this.sketch.lines.get(constraint.line1Id);
-					const l2 = isAxis2 ? null : this.sketch.lines.get(constraint.line2Id);
-					const p1 = isAxis1
-						? ({ id: constraint.line1Id, x: 0, y: 0 } as any)
-						: this.sketch.points.get(l1 ? l1.p1Id : constraint.l1P1);
-					const p2 = isAxis1
-						? ({
-								id: constraint.line1Id,
-								x: constraint.line1Id === 'axis_x' ? 1 : 0,
-								y: constraint.line1Id === 'axis_x' ? 0 : 1,
-							} as any)
-						: this.sketch.points.get(l1 ? l1.p2Id : constraint.l1P2);
-					const p3 = isAxis2
-						? ({ id: constraint.line2Id, x: 0, y: 0 } as any)
-						: this.sketch.points.get(l2 ? l2.p1Id : constraint.l2P1);
-					const p4 = isAxis2
-						? ({
-								id: constraint.line2Id,
-								x: constraint.line2Id === 'axis_x' ? 1 : 0,
-								y: constraint.line2Id === 'axis_x' ? 0 : 1,
-							} as any)
-						: this.sketch.points.get(l2 ? l2.p2Id : constraint.l2P2);
+					const l1 = this.sketch.getLine(constraint.line1Id);
+					const l2 = this.sketch.getLine(constraint.line2Id);
+					const p1 = this.sketch.points.get(l1 ? l1.p1Id : constraint.l1P1);
+					const p2 = this.sketch.points.get(l1 ? l1.p2Id : constraint.l1P2);
+					const p3 = this.sketch.points.get(l2 ? l2.p1Id : constraint.l2P1);
+					const p4 = this.sketch.points.get(l2 ? l2.p2Id : constraint.l2P2);
 					if (p1 && p2 && p3 && p4) {
 						const geom = this.sketch.calculateLinesAngleGeometry(
 							p1,
@@ -2372,7 +2354,7 @@ export class CanvasInteraction {
 						const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
 						constraint.arcRadius = arcRadiusWorld;
 
-						if ((l1 || isAxis1) && (l2 || isAxis2) && (geom.s1 !== constraint.s1 || geom.s2 !== constraint.s2)) {
+						if (l1 && l2 && (geom.s1 !== constraint.s1 || geom.s2 !== constraint.s2)) {
 							constraint.s1 = geom.s1;
 							constraint.s2 = geom.s2;
 							constraint.sign = geom.sign;
@@ -3064,9 +3046,16 @@ export class CanvasInteraction {
 				break;
 			}
 			case 'parallel':
-			case 'collinear':
 			case 'perpendicular': {
 				sel.pointIds.clear();
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'collinear': {
+				if (sel.lineIds.size > 0) {
+					sel.pointIds.clear();
+				}
 				sel.circleIds.clear();
 				sel.arcIds.clear();
 				break;
@@ -3164,15 +3153,17 @@ export class CanvasInteraction {
 					(lCount === 1 && pCount === 0 && cCount === 0) ||
 					(lCount === 2 && pCount === 0 && cCount === 0) ||
 					(pCount === 2 && lCount === 0 && cCount === 0) ||
+					(pCount === 3 && lCount === 0 && cCount === 0) ||
 					(cCount === 1 && pCount === 0 && lCount === 0) ||
 					(lCount === 1 && pCount === 1 && cCount === 0)
 				);
 			case 'equal':
 				return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
 			case 'parallel':
-			case 'collinear':
 			case 'perpendicular':
 				return lCount === 2 && pCount === 0 && cCount === 0;
+			case 'collinear':
+				return (lCount === 2 && pCount === 0 && cCount === 0) || (pCount === 3 && lCount === 0 && cCount === 0);
 			case 'tangent':
 				return ((lCount === 1 && cCount === 1) || (cCount === 2 && lCount === 0)) && pCount === 0;
 			case 'concentric':
@@ -3180,10 +3171,7 @@ export class CanvasInteraction {
 			case 'point_on_line':
 				return pCount === 1 && lCount === 1 && cCount === 0;
 			case 'midpoint':
-				return (
-					(pCount === 1 && lCount === 1 && cCount === 0) ||
-					(pCount === 3 && sel.pointIds.has('origin') && lCount === 0 && cCount === 0)
-				);
+				return (pCount === 1 && lCount === 1 && cCount === 0) || (pCount === 3 && lCount === 0 && cCount === 0);
 			case 'symmetry':
 				return (
 					(pCount === 2 && lCount === 1 && cCount === 0) ||
@@ -3416,45 +3404,14 @@ export class CanvasInteraction {
 						this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 					}
 				} else if (lIds.length === 2) {
-					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
-						const axisId = lIds.includes('axis_x') ? 'axis_x' : 'axis_y';
-						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
-						const existed = this.sketch.hasAngleConstraint(userLineId, axisId);
-						const c = this.sketch.addAngleConstraint(userLineId, axisId);
+					const existed = this.sketch.hasAngleConstraint(lIds[0], lIds[1]);
+					const c = this.sketch.addAngleConstraint(lIds[0], lIds[1]);
+					if (c) {
 						applied = true;
 						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
-						if (c && this.onEditDimension) {
-							const line = this.sketch.lines.get(userLineId)!;
-							const p1 = this.sketch.points.get(line.p1Id)!;
-							const p2 = this.sketch.points.get(line.p2Id)!;
-							const isX = axisId === 'axis_x';
-							const p3 = { id: axisId, x: 0, y: 0 } as any;
-							const p4 = { id: axisId, x: isX ? 1 : 0, y: isX ? 0 : 1 } as any;
-							const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, userLineId, axisId);
-							const rScreen = Math.max(28, (c.arcRadius ?? 40) * this.viewport.zoom);
-							const sCenter = this.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-							const sRay1 = this.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-							const sRay2 = this.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
-							const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-							const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
-							let delta = a2 - a1;
-							const TWO_PI = 2 * Math.PI;
-							while (delta > Math.PI) delta -= TWO_PI;
-							while (delta < -Math.PI) delta += TWO_PI;
-							const midAngle = a1 + delta * 0.5;
-							const midX = sCenter.x + rScreen * Math.cos(midAngle);
-							const midY = sCenter.y + rScreen * Math.sin(midAngle);
-							const rect = this.svg.getBoundingClientRect();
-							this.onEditDimension(c, vec(rect.left + midX, rect.top + midY));
-						}
-					} else {
-						const existed = this.sketch.hasAngleConstraint(lIds[0], lIds[1]);
-						const c = this.sketch.addAngleConstraint(lIds[0], lIds[1]);
-						applied = true;
-						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
-						if (c && this.onEditDimension) {
-							const l1 = this.sketch.lines.get(lIds[0])!;
-							const l2 = this.sketch.lines.get(lIds[1])!;
+						if (this.onEditDimension) {
+							const l1 = this.sketch.getLine(lIds[0])!;
+							const l2 = this.sketch.getLine(lIds[1])!;
 							const p1 = this.sketch.points.get(l1.p1Id)!;
 							const p2 = this.sketch.points.get(l1.p2Id)!;
 							const p3 = this.sketch.points.get(l2.p1Id)!;
@@ -3475,6 +3432,36 @@ export class CanvasInteraction {
 							const midY = sCenter.y + rScreen * Math.sin(midAngle);
 							const rect = this.svg.getBoundingClientRect();
 							this.onEditDimension(c, vec(rect.left + midX, rect.top + midY));
+						}
+					}
+				} else if (pIds.length === 3 && lIds.length === 0) {
+					const existed = this.sketch.hasThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]);
+					const c = this.sketch.addThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]);
+					if (c) {
+						applied = true;
+						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
+						if (this.onEditDimension) {
+							const p1 = this.sketch.points.get(pIds[0]);
+							const p2 = this.sketch.points.get(pIds[1]);
+							const p3 = this.sketch.points.get(pIds[2]);
+							if (p1 && p2 && p3) {
+								const geom = this.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
+								const rScreen = Math.max(28, (c.arcRadius ?? 40) * this.viewport.zoom);
+								const sCenter = this.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
+								const sRay1 = this.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
+								const sRay2 = this.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+								const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
+								const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+								let delta = a2 - a1;
+								const TWO_PI = 2 * Math.PI;
+								while (delta > Math.PI) delta -= TWO_PI;
+								while (delta < -Math.PI) delta += TWO_PI;
+								const midAngle = a1 + delta * 0.5;
+								const midX = sCenter.x + rScreen * Math.cos(midAngle);
+								const midY = sCenter.y + rScreen * Math.sin(midAngle);
+								const rect = this.svg.getBoundingClientRect();
+								this.onEditDimension(c, vec(rect.left + midX, rect.top + midY));
+							}
 						}
 					}
 				} else if (pIds.length === 2) {
@@ -3572,6 +3559,12 @@ export class CanvasInteraction {
 						applied = true;
 						toastMsg = 'Collinear constraint applied';
 					}
+				} else if (pIds.length === 3 && lIds.length === 0) {
+					const c = this.sketch.addThreePointCollinearConstraint(pIds[0], pIds[1], pIds[2]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Collinear constraint applied';
+					}
 				}
 				break;
 			}
@@ -3653,9 +3646,8 @@ export class CanvasInteraction {
 					} else {
 						showToast('Cannot constrain midpoint to this line');
 					}
-				} else if (pIds.length === 3 && pIds.includes('origin') && lIds.length === 0) {
-					const userPts = pIds.filter(id => id !== 'origin');
-					const c = this.sketch.addMidpointConstraint('origin', userPts[0], userPts[1]);
+				} else if (pIds.length === 3 && lIds.length === 0) {
+					const c = this.sketch.addThreePointMidpointConstraint(pIds[0], pIds[1], pIds[2]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Midpoint constraint applied';
