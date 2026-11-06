@@ -15,7 +15,7 @@ import {
 	AUX_AXIS_ATTRS,
 	AUX_RAY_ATTRS,
 	GUIDE_OUTLINE_ATTRS,
-	POLYGON_CENTER_ATTRS,
+	PREVIEW_POINT_ATTRS,
 	getPreviewStrokeAttrs,
 } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
@@ -1057,17 +1057,17 @@ export class SlotTool extends BaseTool {
 			const sc1 = ctx.viewport.worldToScreen(c1);
 			const sc2 = ctx.viewport.worldToScreen(c2);
 			createSvgLine(sc1, sc2, AUX_AXIS_ATTRS, ctx.targetGroup);
-			createSvgCircle(sc1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-			createSvgCircle(sc2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(sc1, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
+			createSvgCircle(sc2, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 
 			if (this._mode === 'center_point') {
 				const sm = ctx.viewport.worldToScreen(p1);
-				createSvgCircle(sm, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgCircle(sm, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 			} else if (this._mode === 'overall') {
 				const se1 = ctx.viewport.worldToScreen(p1);
 				const se2 = ctx.viewport.worldToScreen(p2);
-				createSvgCircle(se1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-				createSvgCircle(se2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgCircle(se1, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
+				createSvgCircle(se2, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 			}
 
 			if (hasRadius && (this.drawingStep === 2 || this.isRadiusLocked || this.popup.isLocked('radius'))) {
@@ -1098,13 +1098,13 @@ export class SlotTool extends BaseTool {
 
 		if (this._mode === 'three_point_arc') {
 			const s1 = ctx.viewport.worldToScreen(this.firstWorldPos);
-			createSvgCircle(s1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(s1, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 
 			if (this.drawingStep === 1) {
 				const p2 = this.computeLinearSecondPoint(effectiveWorld);
 				const s2 = ctx.viewport.worldToScreen(p2);
 				createSvgLine(s1, s2, AUX_AXIS_ATTRS, ctx.targetGroup);
-				createSvgCircle(s2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgCircle(s2, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 				return;
 			}
 
@@ -1114,7 +1114,7 @@ export class SlotTool extends BaseTool {
 				const p3 = ctx.cursorWorld;
 				const circum = getCircumcircle(p1, p2, p3);
 				const s2 = ctx.viewport.worldToScreen(p2);
-				createSvgCircle(s2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgCircle(s2, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 
 				if (!circum || circum.radius < 1 || circum.radius > 50000) {
 					createSvgLine(s1, s2, AUX_AXIS_ATTRS, ctx.targetGroup);
@@ -1159,7 +1159,7 @@ export class SlotTool extends BaseTool {
 		if (this._mode === 'center_point_arc') {
 			const center = this.arcCenterWorld!;
 			const sCenter = ctx.viewport.worldToScreen(center);
-			createSvgCircle(sCenter, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(sCenter, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 
 			if (this.drawingStep === 1) {
 				const p1 = this.computeLinearSecondPoint(effectiveWorld);
@@ -1167,7 +1167,7 @@ export class SlotTool extends BaseTool {
 				const rScreen = dist(center, p1) * ctx.viewport.zoom;
 				createSvgLine(sCenter, sCur, AUX_RAY_ATTRS, ctx.targetGroup);
 				createSvgCircle(sCenter, rScreen, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
-				createSvgCircle(sCur, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgCircle(sCur, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 				return;
 			}
 
@@ -1217,9 +1217,9 @@ export class SlotTool extends BaseTool {
 		const sc2 = ctx.viewport.worldToScreen(c2);
 
 		// Centerline arc and key points (no radial construction lines)
-		createSvgCircle(sCenter, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-		createSvgCircle(sc1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-		createSvgCircle(sc2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+		createSvgCircle(sCenter, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
+		createSvgCircle(sc1, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
+		createSvgCircle(sc2, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 
 		const cwCenter = isArcClockwiseThroughPoint(ctx.viewport, center, c1, c2, geom.midCenterArc);
 		createSvgPath(

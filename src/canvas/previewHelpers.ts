@@ -19,8 +19,7 @@ import {
 	getPreviewStrokeAttrs,
 	AUX_RAY_ATTRS,
 	GUIDE_OUTLINE_ATTRS,
-	POLYGON_VERTEX_ATTRS,
-	POLYGON_CENTER_ATTRS,
+	PREVIEW_POINT_ATTRS,
 	POLYGON_RADIUS_HANDLE_ATTRS,
 	SPLINE_STYLES,
 	SPLINE_PREVIEW_GUIDE_ATTRS,
@@ -29,7 +28,6 @@ import {
 	SPLINE_CHECKMARK_PATH_ATTRS,
 	getSplinePreviewStrokeAttrs,
 	TRIM_STROKE_ATTRS,
-	CUT_MARKER_ATTRS,
 } from './styles';
 import { getArcSvgPath, getEllipticalArcSvgPath } from './svg';
 import {
@@ -170,9 +168,9 @@ export function renderPolygonPreviewVisual(
 	}
 
 	for (const pt of pts) {
-		createSvgCircle(pt, 2.5, POLYGON_VERTEX_ATTRS, parent);
+		createSvgCircle(pt, 2.5, PREVIEW_POINT_ATTRS, parent);
 	}
-	createSvgCircle(sCtr, 3, POLYGON_CENTER_ATTRS, parent);
+	createSvgCircle(sCtr, 3, PREVIEW_POINT_ATTRS, parent);
 	createSvgCircle(midScreen, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, parent);
 }
 
@@ -460,8 +458,8 @@ export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandi
 
 export function renderCutMarkerVisual(parent: SVGElement, pt: Vec2): void {
 	const size = 5;
-	createSvgLine({ x: pt.x - size, y: pt.y - size }, { x: pt.x + size, y: pt.y + size }, CUT_MARKER_ATTRS, parent);
-	createSvgLine({ x: pt.x - size, y: pt.y + size }, { x: pt.x + size, y: pt.y - size }, CUT_MARKER_ATTRS, parent);
+	createSvgLine({ x: pt.x - size, y: pt.y - size }, { x: pt.x + size, y: pt.y + size }, TRIM_STROKE_ATTRS, parent);
+	createSvgLine({ x: pt.x - size, y: pt.y + size }, { x: pt.x + size, y: pt.y - size }, TRIM_STROKE_ATTRS, parent);
 }
 
 export function renderBreakPreviewVisual(parent: SVGElement, candidate: TrimCandidate, viewport: Viewport): void {

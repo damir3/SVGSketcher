@@ -203,14 +203,6 @@ export const TRIM_STROKE_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
-export const CUT_MARKER_ATTRS: SvgAttrs = {
-	stroke: COLORS.trim,
-	'stroke-width': STROKE_WIDTH.trim,
-	'stroke-linecap': 'round',
-	fill: 'none',
-	'pointer-events': 'none',
-};
-
 export const COPY_STROKE_BASE_ATTRS: SvgAttrs = {
 	'stroke-linecap': 'round',
 	fill: 'none',
@@ -360,6 +352,22 @@ export const RECT_PATTERN_PILL_TEXT_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
+// Shared Gizmo Styles
+export const GIZMO_POINT_ATTRS: SvgAttrs = {
+	fill: COLORS.white,
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.normal,
+	'pointer-events': 'none',
+};
+
+export const GIZMO_GUIDE_ATTRS: SvgAttrs = {
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.dimension,
+	'stroke-dasharray': DASH_ARRAY.filletGizmo,
+	fill: 'none',
+	'pointer-events': 'none',
+};
+
 // Fillet Previews & Gizmos
 export const FILLET_HIGHLIGHT_ATTRS: SvgAttrs = {
 	stroke: COLORS.primary,
@@ -388,13 +396,6 @@ export const FILLET_ARC_ATTRS: SvgAttrs = {
 	'stroke-width': STROKE_WIDTH.thick,
 	fill: 'none',
 	'stroke-linecap': 'round',
-	'pointer-events': 'none',
-};
-
-export const FILLET_GIZMO_CENTER_ATTRS: SvgAttrs = {
-	fill: COLORS.white,
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.normal,
 	'pointer-events': 'none',
 };
 
@@ -463,21 +464,6 @@ export const CHAMFER_GIZMO_CIRCLE_ATTRS: SvgAttrs = {
 	filter: FILTERS.filletGizmoArrow,
 };
 
-export const CHAMFER_GIZMO_ARC_ATTRS: SvgAttrs = {
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.dimension,
-	'stroke-dasharray': DASH_ARRAY.filletGizmo,
-	fill: 'none',
-	'pointer-events': 'none',
-};
-
-export const CHAMFER_GIZMO_POINT_ATTRS: SvgAttrs = {
-	fill: COLORS.white,
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.normal,
-	'pointer-events': 'none',
-};
-
 // Offset Previews & Gizmos
 export const OFFSET_CHAIN_ATTRS: SvgAttrs = {
 	stroke: COLORS.selected,
@@ -503,14 +489,6 @@ export const OFFSET_GIZMO_ARROW_ATTRS: SvgAttrs = {
 	'stroke-linejoin': 'round',
 	class: 'offset-gizmo-arrow chamfer-gizmo-arrow',
 	filter: FILTERS.filletGizmoArrow,
-};
-
-export const OFFSET_GIZMO_LINE_ATTRS: SvgAttrs = {
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.dimension,
-	'stroke-dasharray': DASH_ARRAY.filletGizmo,
-	fill: 'none',
-	'pointer-events': 'none',
 };
 
 // Snap Indicators
@@ -613,14 +591,8 @@ export const SPLINE_CHECKMARK_PATH_ATTRS: SvgAttrs = {
 	fill: 'none',
 };
 
-// Polygon Preview
-export const POLYGON_VERTEX_ATTRS: SvgAttrs = {
-	fill: COLORS.primary,
-	stroke: COLORS.white,
-	'stroke-width': STROKE_WIDTH.thin,
-};
-
-export const POLYGON_CENTER_ATTRS: SvgAttrs = {
+// Preview Points
+export const PREVIEW_POINT_ATTRS: SvgAttrs = {
 	fill: COLORS.primary,
 	stroke: COLORS.white,
 	'stroke-width': STROKE_WIDTH.thin,

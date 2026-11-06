@@ -8,8 +8,7 @@ import { createSvgCircle, createSvgLine, createSvgPath } from '../../svg';
 import {
 	GUIDE_OUTLINE_ATTRS,
 	AUX_RAY_ATTRS,
-	POLYGON_VERTEX_ATTRS,
-	POLYGON_CENTER_ATTRS,
+	PREVIEW_POINT_ATTRS,
 	POLYGON_RADIUS_HANDLE_ATTRS,
 	getPreviewStrokeAttrs,
 } from '../../styles';
@@ -179,11 +178,11 @@ export class PolygonTool extends BaseTool {
 
 			// 5. Draw vertex dots
 			for (const pt of pts) {
-				createSvgCircle(pt, 2.5, POLYGON_VERTEX_ATTRS, ctx.targetGroup);
+				createSvgCircle(pt, 2.5, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 			}
 
 			// 6. Center marker
-			createSvgCircle(sCtr, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(sCtr, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 
 			// 7. Midpoint marker on incircle
 			createSvgCircle(midScreen, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, ctx.targetGroup);

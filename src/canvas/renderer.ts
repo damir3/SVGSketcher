@@ -88,7 +88,7 @@ import {
 	RECT_PATTERN_PILL_TEXT_ATTRS,
 	FILLET_WEDGE_ATTRS,
 	FILLET_ARC_ATTRS,
-	FILLET_GIZMO_CENTER_ATTRS,
+	GIZMO_POINT_ATTRS,
 	FILLET_GIZMO_RADIAL_ATTRS,
 	FILLET_GIZMO_SQUARE_ATTRS,
 	FILLET_GIZMO_ARROW_ATTRS,
@@ -96,12 +96,10 @@ import {
 	CHAMFER_CUT_LINE_ATTRS,
 	CHAMFER_GIZMO_ARROW_ATTRS,
 	CHAMFER_GIZMO_CIRCLE_ATTRS,
-	CHAMFER_GIZMO_ARC_ATTRS,
-	CHAMFER_GIZMO_POINT_ATTRS,
+	GIZMO_GUIDE_ATTRS,
 	OFFSET_CHAIN_ATTRS,
 	OFFSET_PREVIEW_ATTRS,
 	OFFSET_GIZMO_ARROW_ATTRS,
-	OFFSET_GIZMO_LINE_ATTRS,
 	SNAP_POINT_ATTRS,
 	SNAP_GRID_ATTRS,
 	SNAP_OBJECT_ATTRS,
@@ -2878,7 +2876,7 @@ export class SVGRenderer {
 				(!state.activeFilletId && pf === state.pendingFillets[state.pendingFillets.length - 1]);
 			if (isActive) {
 				// Center circle handle
-				createSvgCircle(sCenter, 4, FILLET_GIZMO_CENTER_ATTRS, this.filletGroup);
+				createSvgCircle(sCenter, 4, GIZMO_POINT_ATTRS, this.filletGroup);
 
 				// Radial dashed line extending outward from center through midArc
 				const uDir = {
@@ -2944,7 +2942,7 @@ export class SVGRenderer {
 		createSvgLine(sT2, sV, CHAMFER_CUT_LINE_ATTRS, this.chamferGroup);
 
 		// Vertex V point
-		createSvgCircle(sV, 3.5, CHAMFER_GIZMO_POINT_ATTRS, this.chamferGroup);
+		createSvgCircle(sV, 3.5, GIZMO_POINT_ATTRS, this.chamferGroup);
 
 		// Chamfer line
 		createSvgLine(sT1, sT2, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
@@ -2962,8 +2960,8 @@ export class SVGRenderer {
 		}
 
 		// Cut points T1 and T2
-		createSvgCircle(sT1, 3, CHAMFER_GIZMO_POINT_ATTRS, this.chamferGroup);
-		createSvgCircle(sT2, 3, CHAMFER_GIZMO_POINT_ATTRS, this.chamferGroup);
+		createSvgCircle(sT1, 3, GIZMO_POINT_ATTRS, this.chamferGroup);
+		createSvgCircle(sT2, 3, GIZMO_POINT_ATTRS, this.chamferGroup);
 
 		// Helper to draw an arrow head
 		const drawArrow = (tip: Vec2, dir: Vec2) => {
@@ -3009,7 +3007,7 @@ export class SVGRenderer {
 			// Dashed guide line from vertex V to the base of the arrow along bisector
 			const baseCenter = addScaled(tip, uSBis, -16);
 			if (Math.hypot(baseCenter.x - sV.x, baseCenter.y - sV.y) > 4) {
-				createSvgLine(sV, baseCenter, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+				createSvgLine(sV, baseCenter, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 			}
 
 			const bisectorWorld = normalize({
@@ -3072,7 +3070,7 @@ export class SVGRenderer {
 				const circle = addScaled(sT1, uSChamfer, 100);
 
 				// Guide line along the angle ray to the circle handle
-				createSvgLine(sT1, circle, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+				createSvgLine(sT1, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
 				// Visual arc showing the angle at T1 between ray towards V and ray towards T2 at 100px
 				const vV = sub(sV, sT1);
@@ -3089,12 +3087,12 @@ export class SVGRenderer {
 					const end = circle;
 
 					// Guide line along reference arm towards V out to 100px
-					createSvgLine(sT1, start, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+					createSvgLine(sT1, start, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
 					if (Math.abs(diff) > 1e-3) {
 						const sweepFlag = diff > 0 ? 1 : 0;
 						const arcD = `M ${start.x} ${start.y} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${end.x} ${end.y}`;
-						createSvgPath(arcD, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+						createSvgPath(arcD, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 					}
 				}
 
@@ -3129,7 +3127,7 @@ export class SVGRenderer {
 				const circle = addScaled(sT2, uSChamfer, 100);
 
 				// Guide line along the angle ray to the circle handle
-				createSvgLine(sT2, circle, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+				createSvgLine(sT2, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
 				// Visual arc showing the angle at T2 between ray towards V and ray towards T1 at 100px
 				const vV = sub(sV, sT2);
@@ -3146,12 +3144,12 @@ export class SVGRenderer {
 					const end = circle;
 
 					// Guide line along reference arm towards V out to 100px
-					createSvgLine(sT2, start, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+					createSvgLine(sT2, start, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
 					if (Math.abs(diff) > 1e-3) {
 						const sweepFlag = diff > 0 ? 1 : 0;
 						const arcD = `M ${start.x} ${start.y} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${end.x} ${end.y}`;
-						createSvgPath(arcD, CHAMFER_GIZMO_ARC_ATTRS, this.chamferGroup);
+						createSvgPath(arcD, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 					}
 				}
 
@@ -3314,7 +3312,7 @@ export class SVGRenderer {
 			const uDir = scale(vDir, 1.0 / lenDir);
 
 			// Dashed guide line from anchor to target
-			createSvgLine(sAnchor, sTarget, OFFSET_GIZMO_LINE_ATTRS, this.offsetGroup);
+			createSvgLine(sAnchor, sTarget, GIZMO_GUIDE_ATTRS, this.offsetGroup);
 
 			// Tip points towards sTarget
 			const tip = sTarget;

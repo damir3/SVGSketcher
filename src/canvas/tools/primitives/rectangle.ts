@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext, SnapResult } from '../types';
 import { dist, dot, vec, sub, type Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, createSvgRect } from '../../svg';
-import { AUX_AXIS_ATTRS, POLYGON_CENTER_ATTRS, getPreviewStrokeAttrs } from '../../styles';
+import { AUX_AXIS_ATTRS, PREVIEW_POINT_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { VariationToolPanel } from '../../../ui/panels/tools';
 import { dispatchToolModeChange } from '../modeChangeEvent';
@@ -408,7 +408,7 @@ export class RectangleTool extends BaseTool {
 			createSvgRect(min, { x: rw, y: rh }, previewAttrs, ctx.targetGroup);
 			createSvgLine(s1, s2, AUX_AXIS_ATTRS, ctx.targetGroup);
 			createSvgLine({ x: s1.x, y: s2.y }, { x: s2.x, y: s1.y }, AUX_AXIS_ATTRS, ctx.targetGroup);
-			createSvgCircle(sc, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(sc, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 		} else if (this._mode === 'three_point') {
 			const s1 = ctx.viewport.worldToScreen(this.startWorldPos);
 
