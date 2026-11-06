@@ -1,4 +1,5 @@
 import type { Vec2 } from './vector';
+import { AABB } from './aabb';
 import { projectPointOntoSegment } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
@@ -739,19 +740,8 @@ function findBezierImplicitRoots(b: BezierSegment, f: (p: Vec2) => number): Vec2
 export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
 	const pts: Vec2[] = [];
 
-	function getBBox(b: BezierSegment) {
-		let minX = Infinity,
-			maxX = -Infinity,
-			minY = Infinity,
-			maxY = -Infinity;
-		for (let i = 0; i < 4; i++) {
-			const p = b[i];
-			if (p.x < minX) minX = p.x;
-			if (p.x > maxX) maxX = p.x;
-			if (p.y < minY) minY = p.y;
-			if (p.y > maxY) maxY = p.y;
-		}
-		return { minX, maxX, minY, maxY };
+	function getBBox(b: BezierSegment): AABB {
+		return AABB.fromPoints(b)!;
 	}
 
 	interface Task {
@@ -772,16 +762,16 @@ export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec
 		const box2 = getBBox(seg2);
 
 		if (
-			box1.maxX < box2.minX - 1e-4 ||
-			box1.minX > box2.maxX + 1e-4 ||
-			box1.maxY < box2.minY - 1e-4 ||
-			box1.minY > box2.maxY + 1e-4
+			box1.max.x < box2.min.x - 1e-4 ||
+			box1.min.x > box2.max.x + 1e-4 ||
+			box1.max.y < box2.min.y - 1e-4 ||
+			box1.min.y > box2.max.y + 1e-4
 		) {
 			continue;
 		}
 
-		const span1 = Math.max(box1.maxX - box1.minX, box1.maxY - box1.minY);
-		const span2 = Math.max(box2.maxX - box2.minX, box2.maxY - box2.minY);
+		const span1 = Math.max(box1.max.x - box1.min.x, box1.max.y - box1.min.y);
+		const span2 = Math.max(box2.max.x - box2.min.x, box2.max.y - box2.min.y);
 
 		if ((span1 < 1e-4 && span2 < 1e-4) || depth >= 15) {
 			let t = (t0 + t1) * 0.5;

@@ -75,25 +75,14 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 		return distanceToEllipticalArc(screen, sc, smaj, smin, ss, se, !!this.clockwise, thresholdPx);
 	}
 
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch: any): boolean {
+	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const center = sketch.points.get(this.centerId);
 		const majorPt = sketch.points.get(this.majorAxisPointId);
 		const minorPt = sketch.points.get(this.minorAxisPointId);
 		const startPt = sketch.points.get(this.startPointId);
 		const endPt = sketch.points.get(this.endPointId);
 		if (!center || !majorPt || !minorPt || !startPt || !endPt) return false;
-		return ellipticalArcIntersectsAABB(
-			center,
-			majorPt,
-			minorPt,
-			startPt,
-			endPt,
-			!!this.clockwise,
-			minX,
-			minY,
-			maxX,
-			maxY
-		);
+		return ellipticalArcIntersectsAABB(center, majorPt, minorPt, startPt, endPt, !!this.clockwise, min, max);
 	}
 
 	toGeoCurve(sketch: any): GeoEllipticalArc | null {

@@ -1,4 +1,5 @@
 import { GIZMO_DISTANCE_PX } from '../../distances';
+import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
 import { dist, normalize, vec, type Vec2 } from '../../../math/vector';
@@ -377,19 +378,7 @@ export class ChamferTool extends BaseTool {
 			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t2.x, this.candidate.result.t2.y));
 		}
 
-		let minX = pts[0].x;
-		let maxX = pts[0].x;
-		let minY = pts[0].y;
-		let maxY = pts[0].y;
-
-		for (let i = 1; i < pts.length; i++) {
-			if (pts[i].x < minX) minX = pts[i].x;
-			if (pts[i].x > maxX) maxX = pts[i].x;
-			if (pts[i].y < minY) minY = pts[i].y;
-			if (pts[i].y > maxY) maxY = pts[i].y;
-		}
-
-		return { minX, maxX, minY, maxY };
+		return AABB.fromPoints(pts);
 	}
 
 	private selectCandidate(cand: ChamferCandidate): void {

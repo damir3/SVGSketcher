@@ -104,10 +104,10 @@ export class SketchSpline implements ISketchPrimitive {
 		return distanceToSpline(screen, segments);
 	}
 
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch: any): boolean {
+	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const pts = this.pointIds.map(id => sketch.points.get(id)).filter((p: any): p is SketchPoint => !!p);
 		for (const pt of pts) {
-			if (pt.x >= minX && pt.x <= maxX && pt.y >= minY && pt.y <= maxY) return true;
+			if (pt.x >= min.x && pt.x <= max.x && pt.y >= min.y && pt.y <= max.y) return true;
 		}
 		return false;
 	}

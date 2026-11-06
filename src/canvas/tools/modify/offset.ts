@@ -1,4 +1,5 @@
 import { BaseTool } from '../base';
+import { AABB } from '../../../math/aabb';
 import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
 import { dist, type Vec2 } from '../../../math/vector';
@@ -330,19 +331,7 @@ export class OffsetTool extends BaseTool {
 			}
 		}
 
-		let minX = pts[0].x;
-		let maxX = pts[0].x;
-		let minY = pts[0].y;
-		let maxY = pts[0].y;
-
-		for (let i = 1; i < pts.length; i++) {
-			if (pts[i].x < minX) minX = pts[i].x;
-			if (pts[i].x > maxX) maxX = pts[i].x;
-			if (pts[i].y < minY) minY = pts[i].y;
-			if (pts[i].y > maxY) maxY = pts[i].y;
-		}
-
-		return { minX, maxX, minY, maxY };
+		return AABB.fromPoints(pts);
 	}
 
 	commit(): void {

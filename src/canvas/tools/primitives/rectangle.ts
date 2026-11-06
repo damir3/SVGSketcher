@@ -345,18 +345,16 @@ export class RectangleTool extends BaseTool {
 			} else if (this.drawingStep === 2 && this.secondWorldPos) {
 				const c1 = this.startWorldPos;
 				const c2 = this.secondWorldPos;
-				const minX = Math.min(c1.x, c2.x);
-				const maxX = Math.max(c1.x, c2.x);
-				const minY = Math.min(c1.y, c2.y);
-				const maxY = Math.max(c1.y, c2.y);
-				const maxR = Math.min(maxX - minX, maxY - minY) / 2;
+				const min = { x: Math.min(c1.x, c2.x), y: Math.min(c1.y, c2.y) };
+				const max = { x: Math.max(c1.x, c2.x), y: Math.max(c1.y, c2.y) };
+				const maxR = Math.min(max.x - min.x, max.y - min.y) / 2;
 
 				if (!this.isRadiusLocked) {
 					const isInside =
-						effectiveWorld.x >= minX &&
-						effectiveWorld.x <= maxX &&
-						effectiveWorld.y >= minY &&
-						effectiveWorld.y <= maxY;
+						effectiveWorld.x >= min.x &&
+						effectiveWorld.x <= max.x &&
+						effectiveWorld.y >= min.y &&
+						effectiveWorld.y <= max.y;
 
 					if (!isInside) {
 						this.radius = 0;
@@ -392,30 +390,26 @@ export class RectangleTool extends BaseTool {
 			const s1 = ctx.viewport.worldToScreen(c1.x, c1.y);
 			const s2 = ctx.viewport.worldToScreen(c2.x, c2.y);
 
-			const rx = Math.min(s1.x, s2.x);
-			const ry = Math.min(s1.y, s2.y);
+			const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
 			const rw = Math.abs(s2.x - s1.x);
 			const rh = Math.abs(s2.y - s1.y);
 
-			createSvgRect(rx, ry, rw, rh, previewAttrs, ctx.targetGroup);
+			createSvgRect(min.x, min.y, rw, rh, previewAttrs, ctx.targetGroup);
 		} else if (this._mode === 'center') {
 			const C = this.startWorldPos;
 			const halfDims = this.computeCenterHalfDims(effectiveWorld);
-			const minX = C.x - halfDims.w;
-			const maxX = C.x + halfDims.w;
-			const minY = C.y - halfDims.h;
-			const maxY = C.y + halfDims.h;
+			const worldMin = { x: C.x - halfDims.w, y: C.y - halfDims.h };
+			const worldMax = { x: C.x + halfDims.w, y: C.y + halfDims.h };
 
-			const s1 = ctx.viewport.worldToScreen(minX, maxY);
-			const s2 = ctx.viewport.worldToScreen(maxX, minY);
+			const s1 = ctx.viewport.worldToScreen(worldMin.x, worldMax.y);
+			const s2 = ctx.viewport.worldToScreen(worldMax.x, worldMin.y);
 			const sc = ctx.viewport.worldToScreen(C.x, C.y);
 
-			const rx = Math.min(s1.x, s2.x);
-			const ry = Math.min(s1.y, s2.y);
+			const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
 			const rw = Math.abs(s2.x - s1.x);
 			const rh = Math.abs(s2.y - s1.y);
 
-			createSvgRect(rx, ry, rw, rh, previewAttrs, ctx.targetGroup);
+			createSvgRect(min.x, min.y, rw, rh, previewAttrs, ctx.targetGroup);
 			createSvgLine(s1.x, s1.y, s2.x, s2.y, AUX_AXIS_ATTRS, ctx.targetGroup);
 			createSvgLine(s1.x, s2.y, s2.x, s1.y, AUX_AXIS_ATTRS, ctx.targetGroup);
 			createSvgCircle(sc.x, sc.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
@@ -457,8 +451,7 @@ export class RectangleTool extends BaseTool {
 			const s1 = ctx.viewport.worldToScreen(c1.x, c1.y);
 			const s2 = ctx.viewport.worldToScreen(c2.x, c2.y);
 
-			const rx = Math.min(s1.x, s2.x);
-			const ry = Math.min(s1.y, s2.y);
+			const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
 			const rw = Math.abs(s2.x - s1.x);
 			const rh = Math.abs(s2.y - s1.y);
 
@@ -466,7 +459,7 @@ export class RectangleTool extends BaseTool {
 			const effectiveR = Math.max(0, Math.min(this.radius, maxR));
 			const sr = effectiveR * ctx.viewport.zoom;
 
-			createSvgRect(rx, ry, rw, rh, { ...previewAttrs, rx: sr, ry: sr }, ctx.targetGroup);
+			createSvgRect(min.x, min.y, rw, rh, { ...previewAttrs, rx: sr, ry: sr }, ctx.targetGroup);
 		}
 	}
 
@@ -622,15 +615,13 @@ export class RectangleTool extends BaseTool {
 	private commitCorner(c1: Vec2, c2: Vec2, snap: SnapResult | null): void {
 		const { sketch } = this.ctx;
 
-		const minX = Math.min(c1.x, c2.x);
-		const maxX = Math.max(c1.x, c2.x);
-		const minY = Math.min(c1.y, c2.y);
-		const maxY = Math.max(c1.y, c2.y);
+		const min = { x: Math.min(c1.x, c2.x), y: Math.min(c1.y, c2.y) };
+		const max = { x: Math.max(c1.x, c2.x), y: Math.max(c1.y, c2.y) };
 
-		const p0 = sketch.addPoint(minX, minY);
-		const p1 = sketch.addPoint(maxX, minY);
-		const p2 = sketch.addPoint(maxX, maxY);
-		const p3 = sketch.addPoint(minX, maxY);
+		const p0 = sketch.addPoint(min.x, min.y);
+		const p1 = sketch.addPoint(max.x, min.y);
+		const p2 = sketch.addPoint(max.x, max.y);
+		const p3 = sketch.addPoint(min.x, max.y);
 
 		const pts = [p0, p1, p2, p3];
 		const findClosest = (target: Vec2) => {
@@ -712,15 +703,13 @@ export class RectangleTool extends BaseTool {
 			}
 		}
 
-		const minX = center.x - halfW;
-		const maxX = center.x + halfW;
-		const minY = center.y - halfH;
-		const maxY = center.y + halfH;
+		const min = { x: center.x - halfW, y: center.y - halfH };
+		const max = { x: center.x + halfW, y: center.y + halfH };
 
-		const p0 = sketch.addPoint(minX, minY);
-		const p1 = sketch.addPoint(maxX, minY);
-		const p2 = sketch.addPoint(maxX, maxY);
-		const p3 = sketch.addPoint(minX, maxY);
+		const p0 = sketch.addPoint(min.x, min.y);
+		const p1 = sketch.addPoint(max.x, min.y);
+		const p2 = sketch.addPoint(max.x, max.y);
+		const p3 = sketch.addPoint(min.x, max.y);
 
 		if (snap && effectiveWorld) {
 			const pts = [p0, p1, p2, p3];
@@ -831,13 +820,11 @@ export class RectangleTool extends BaseTool {
 	private commitRounded(c1: Vec2, c2: Vec2, radius: number, snap: SnapResult | null = null): void {
 		const { sketch } = this.ctx;
 
-		const minX = Math.min(c1.x, c2.x);
-		const maxX = Math.max(c1.x, c2.x);
-		const minY = Math.min(c1.y, c2.y);
-		const maxY = Math.max(c1.y, c2.y);
+		const min = { x: Math.min(c1.x, c2.x), y: Math.min(c1.y, c2.y) };
+		const max = { x: Math.max(c1.x, c2.x), y: Math.max(c1.y, c2.y) };
 
-		const w = maxX - minX;
-		const h = maxY - minY;
+		const w = max.x - min.x;
+		const h = max.y - min.y;
 		const r = Math.min(radius, w / 2, h / 2);
 
 		if (r < 0.05) {
@@ -848,21 +835,21 @@ export class RectangleTool extends BaseTool {
 		const isConst = this.ctx.isConstructionMode;
 
 		// 1. Points on straight segments and arc centers
-		const ptTopStart = sketch.addPoint(minX + r, maxY);
-		const ptTopEnd = sketch.addPoint(maxX - r, maxY);
-		const centerTR = sketch.addPoint(maxX - r, maxY - r);
+		const ptTopStart = sketch.addPoint(min.x + r, max.y);
+		const ptTopEnd = sketch.addPoint(max.x - r, max.y);
+		const centerTR = sketch.addPoint(max.x - r, max.y - r);
 
-		const ptRightStart = sketch.addPoint(maxX, maxY - r);
-		const ptRightEnd = sketch.addPoint(maxX, minY + r);
-		const centerBR = sketch.addPoint(maxX - r, minY + r);
+		const ptRightStart = sketch.addPoint(max.x, max.y - r);
+		const ptRightEnd = sketch.addPoint(max.x, min.y + r);
+		const centerBR = sketch.addPoint(max.x - r, min.y + r);
 
-		const ptBottomStart = sketch.addPoint(maxX - r, minY);
-		const ptBottomEnd = sketch.addPoint(minX + r, minY);
-		const centerBL = sketch.addPoint(minX + r, minY + r);
+		const ptBottomStart = sketch.addPoint(max.x - r, min.y);
+		const ptBottomEnd = sketch.addPoint(min.x + r, min.y);
+		const centerBL = sketch.addPoint(min.x + r, min.y + r);
 
-		const ptLeftStart = sketch.addPoint(minX, minY + r);
-		const ptLeftEnd = sketch.addPoint(minX, maxY - r);
-		const centerTL = sketch.addPoint(minX + r, maxY - r);
+		const ptLeftStart = sketch.addPoint(min.x, min.y + r);
+		const ptLeftEnd = sketch.addPoint(min.x, max.y - r);
+		const centerTL = sketch.addPoint(min.x + r, max.y - r);
 
 		// 2. Lines
 		const topLine = sketch.addLine(ptTopStart.id, ptTopEnd.id, isConst);

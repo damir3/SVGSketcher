@@ -39,10 +39,10 @@ export class SketchCircle implements ISketchPrimitive {
 		return distanceToCircle(screen, sc, sr);
 	}
 
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch: any): boolean {
+	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const center = sketch.points.get(this.centerId);
 		if (!center) return false;
-		return circleIntersectsAABB(center.x, center.y, this.radius, minX, minY, maxX, maxY);
+		return circleIntersectsAABB(center, this.radius, min, max);
 	}
 
 	toGeoCurve(sketch: any): GeoCircle | null {

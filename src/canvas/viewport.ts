@@ -1,4 +1,5 @@
 import { vec, type Vec2 } from '../math/vector';
+import type { AABB } from '../math/aabb';
 
 export class Viewport {
 	width = 800;
@@ -22,15 +23,10 @@ export class Viewport {
 		this.panY = this.height / 2;
 	}
 
-	getTargetFit(
-		minX: number,
-		minY: number,
-		maxX: number,
-		maxY: number,
-		padding = 80
-	): { panX: number; panY: number; zoom: number } {
-		const boxWidth = maxX - minX;
-		const boxHeight = maxY - minY;
+	getTargetFit(bounds: AABB, padding = 80): { panX: number; panY: number; zoom: number } {
+		const { min, max } = bounds;
+		const boxWidth = max.x - min.x;
+		const boxHeight = max.y - min.y;
 
 		const availWidth = Math.max(this.width - padding * 2, 50);
 		const availHeight = Math.max(this.height - padding * 2, 50);
@@ -44,8 +40,8 @@ export class Viewport {
 
 		const zoom = Math.min(Math.max(fitZoom, 0.05), 50.0);
 
-		const centerX = (minX + maxX) / 2;
-		const centerY = (minY + maxY) / 2;
+		const centerX = (min.x + max.x) / 2;
+		const centerY = (min.y + max.y) / 2;
 
 		const panX = this.width / 2 - centerX * zoom;
 		const panY = this.height / 2 + centerY * zoom;
@@ -53,8 +49,8 @@ export class Viewport {
 		return { panX, panY, zoom };
 	}
 
-	fitToBounds(minX: number, minY: number, maxX: number, maxY: number, padding = 80): void {
-		const target = this.getTargetFit(minX, minY, maxX, maxY, padding);
+	fitToBounds(bounds: AABB, padding = 80): void {
+		const target = this.getTargetFit(bounds, padding);
 		this.zoom = target.zoom;
 		this.panX = target.panX;
 		this.panY = target.panY;

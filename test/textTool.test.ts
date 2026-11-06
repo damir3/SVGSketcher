@@ -1,3 +1,4 @@
+import { AABB } from '../src/math/aabb';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -1527,9 +1528,8 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 		assert.ok(dFit && dFit.startsWith('M'));
 		const yCoords = (dFit.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
-		const maxY = Math.max(...yCoords);
-		const minY = Math.min(...yCoords);
-		const heightSpan = maxY - minY;
+		const yBounds = AABB.fromPoints(yCoords.map(y => vec(0, y)))!;
+		const heightSpan = yBounds.max.y - yBounds.min.y;
 		assert.ok(heightSpan >= 6 && heightSpan <= 11, `Glyph height should be preserved (~10), got ${heightSpan}`);
 	});
 
@@ -1576,13 +1576,17 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			font
 		);
 
-		const xCoordsNormal = (dLeftNormal.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 0).map(Number);
-		const xCoordsFlipped = (dLeftFlipped.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 0).map(Number);
-
-		const minXNormal = Math.min(...xCoordsNormal);
-		const minXFlipped = Math.min(...xCoordsFlipped);
-		assert.ok(Math.abs(minXNormal - -49) < 2, `Normal minX should be near -49, got ${minXNormal}`);
-		assert.ok(Math.abs(minXFlipped - -49) < 2, `Flipped minX should still be near -49, got ${minXFlipped}`);
+		const boundsForPath = (path: string) => {
+			const coords = (path.match(/[-+]?\d*\.?\d+/g) || []).map(Number);
+			const points = Array.from({ length: Math.floor(coords.length / 2) }, (_, index) =>
+				vec(coords[index * 2], coords[index * 2 + 1])
+			);
+			return AABB.fromPoints(points)!;
+		};
+		const leftNormalBounds = boundsForPath(dLeftNormal);
+		const leftFlippedBounds = boundsForPath(dLeftFlipped);
+		assert.ok(Math.abs(leftNormalBounds.min.x - -49) < 2, `Normal min.x should be near -49, got ${leftNormalBounds.min.x}`);
+		assert.ok(Math.abs(leftFlippedBounds.min.x - -49) < 2, `Flipped min.x should still be near -49, got ${leftFlippedBounds.min.x}`);
 
 		// Test Top Alignment with and without vertical flip
 		const dTopNormal = generateTextSvgPathData(
@@ -1624,10 +1628,10 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const yCoordsNormalTop = (dTopNormal.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
 		const yCoordsFlippedTop = (dTopFlipped.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
 
-		const maxYNormal = Math.max(...yCoordsNormalTop);
-		const maxYFlipped = Math.max(...yCoordsFlippedTop);
-		assert.ok(Math.abs(maxYNormal - 19) < 3, `Normal maxY should be near 19, got ${maxYNormal}`);
-		assert.ok(Math.abs(maxYFlipped - 19) < 3, `Flipped maxY should still be near 19, got ${maxYFlipped}`);
+		const topNormalBounds = AABB.fromPoints(yCoordsNormalTop.map(y => vec(0, y)))!;
+		const topFlippedBounds = AABB.fromPoints(yCoordsFlippedTop.map(y => vec(0, y)))!;
+		assert.ok(Math.abs(topNormalBounds.max.y - 19) < 3, `Normal max.y should be near 19, got ${topNormalBounds.max.y}`);
+		assert.ok(Math.abs(topFlippedBounds.max.y - 19) < 3, `Flipped max.y should still be near 19, got ${topFlippedBounds.max.y}`);
 	});
 
 	it('bindTextCardEvents handles Fit to Path checkbox changes and Mode switching', () => {

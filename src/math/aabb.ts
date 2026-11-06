@@ -2,54 +2,61 @@ import type { Vec2 } from './vector';
 
 const TWO_PI = 2 * Math.PI;
 
-export interface AABB {
-	minX: number;
-	minY: number;
-	maxX: number;
-	maxY: number;
+export class AABB {
+	min: Vec2;
+	max: Vec2;
+
+	constructor(point?: Vec2) {
+		this.min = point ? { ...point } : { x: Infinity, y: Infinity };
+		this.max = point ? { ...point } : { x: -Infinity, y: -Infinity };
+	}
+
+	addPoint(point: Vec2): this {
+		this.min.x = Math.min(this.min.x, point.x);
+		this.min.y = Math.min(this.min.y, point.y);
+		this.max.x = Math.max(this.max.x, point.x);
+		this.max.y = Math.max(this.max.y, point.y);
+		return this;
+	}
+
+	static fromPoints(points: Iterable<Vec2>): AABB | null {
+		const iterator = points[Symbol.iterator]();
+		const first = iterator.next();
+		if (first.done) return null;
+
+		const aabb = new AABB(first.value);
+		for (let next = iterator.next(); !next.done; next = iterator.next()) {
+			aabb.addPoint(next.value);
+		}
+		return aabb;
+	}
 }
 
 /**
  * Checks if a point lies within an axis-aligned bounding box (AABB).
  */
-export function pointIntersectsAABB(
-	px: number,
-	py: number,
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number
-): boolean {
-	return px >= minX && px <= maxX && py >= minY && py <= maxY;
+export function pointIntersectsAABB(p: Vec2, min: Vec2, max: Vec2): boolean {
+	return p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y;
 }
 
 /**
- * Checks if a 2D line segment between (p1x, p1y) and (p2x, p2y) intersects or is contained within an AABB.
+ * Checks if a 2D line segment between p1 and p2 intersects or is contained within an AABB.
  * Uses Liang-Barsky parametric line clipping.
  */
-export function segmentIntersectsAABB(
-	p1x: number,
-	p1y: number,
-	p2x: number,
-	p2y: number,
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number
-): boolean {
-	if (p1x >= minX && p1x <= maxX && p1y >= minY && p1y <= maxY) return true;
-	if (p2x >= minX && p2x <= maxX && p2y >= minY && p2y <= maxY) return true;
+export function segmentIntersectsAABB(p1: Vec2, p2: Vec2, min: Vec2, max: Vec2): boolean {
+	if (p1.x >= min.x && p1.x <= max.x && p1.y >= min.y && p1.y <= max.y) return true;
+	if (p2.x >= min.x && p2.x <= max.x && p2.y >= min.y && p2.y <= max.y) return true;
 
-	if (Math.max(p1x, p2x) < minX || Math.min(p1x, p2x) > maxX) return false;
-	if (Math.max(p1y, p2y) < minY || Math.min(p1y, p2y) > maxY) return false;
+	if (Math.max(p1.x, p2.x) < min.x || Math.min(p1.x, p2.x) > max.x) return false;
+	if (Math.max(p1.y, p2.y) < min.y || Math.min(p1.y, p2.y) > max.y) return false;
 
-	const dx = p2x - p1x;
-	const dy = p2y - p1y;
+	const dx = p2.x - p1.x;
+	const dy = p2.y - p1.y;
 	let t0 = 0.0;
 	let t1 = 1.0;
 
 	const p = [-dx, dx, -dy, dy];
-	const q = [p1x - minX, maxX - p1x, p1y - minY, maxY - p1y];
+	const q = [p1.x - min.x, max.x - p1.x, p1.y - min.y, max.y - p1.y];
 
 	for (let i = 0; i < 4; i++) {
 		if (p[i] === 0) {
@@ -71,25 +78,17 @@ export function segmentIntersectsAABB(
 /**
  * Checks if a circle perimeter or interior intersects an AABB.
  */
-export function circleIntersectsAABB(
-	cx: number,
-	cy: number,
-	r: number,
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number
-): boolean {
-	if (cx >= minX && cx <= maxX && cy >= minY && cy <= maxY) return true;
+export function circleIntersectsAABB(c: Vec2, r: number, min: Vec2, max: Vec2): boolean {
+	if (c.x >= min.x && c.x <= max.x && c.y >= min.y && c.y <= max.y) return true;
 
-	const closestX = Math.max(minX, Math.min(cx, maxX));
-	const closestY = Math.max(minY, Math.min(cy, maxY));
-	const distSq = (cx - closestX) ** 2 + (cy - closestY) ** 2;
+	const closestX = Math.max(min.x, Math.min(c.x, max.x));
+	const closestY = Math.max(min.y, Math.min(c.y, max.y));
+	const distSq = (c.x - closestX) ** 2 + (c.y - closestY) ** 2;
 
 	if (distSq > r * r) return false;
 
-	const maxDx = Math.max(Math.abs(cx - minX), Math.abs(cx - maxX));
-	const maxDy = Math.max(Math.abs(cy - minY), Math.abs(cy - maxY));
+	const maxDx = Math.max(Math.abs(c.x - min.x), Math.abs(c.x - max.x));
+	const maxDy = Math.max(Math.abs(c.y - min.y), Math.abs(c.y - max.y));
 	const furthestDistSq = maxDx * maxDx + maxDy * maxDy;
 
 	if (furthestDistSq < r * r) return false;
@@ -106,14 +105,12 @@ export function arcIntersectsAABB(
 	start: Vec2,
 	end: Vec2,
 	clockwise: boolean,
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number
+	min: Vec2,
+	max: Vec2
 ): boolean {
-	if (start.x >= minX && start.x <= maxX && start.y >= minY && start.y <= maxY) return true;
-	if (end.x >= minX && end.x <= maxX && end.y >= minY && end.y <= maxY) return true;
-	if (center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY) return true;
+	if (start.x >= min.x && start.x <= max.x && start.y >= min.y && start.y <= max.y) return true;
+	if (end.x >= min.x && end.x <= max.x && end.y >= min.y && end.y <= max.y) return true;
+	if (center.x >= min.x && center.x <= max.x && center.y >= min.y && center.y <= max.y) return true;
 
 	const as = Math.atan2(start.y - center.y, start.x - center.x);
 	const ae = Math.atan2(end.y - center.y, end.x - center.x);
@@ -137,8 +134,8 @@ export function arcIntersectsAABB(
 		const currX = center.x + radius * Math.cos(angle);
 		const currY = center.y + radius * Math.sin(angle);
 
-		if (currX >= minX && currX <= maxX && currY >= minY && currY <= maxY) return true;
-		if (segmentIntersectsAABB(prevX, prevY, currX, currY, minX, minY, maxX, maxY)) return true;
+		if (currX >= min.x && currX <= max.x && currY >= min.y && currY <= max.y) return true;
+		if (segmentIntersectsAABB({ x: prevX, y: prevY }, { x: currX, y: currY }, min, max)) return true;
 
 		prevX = currX;
 		prevY = currY;
@@ -150,18 +147,10 @@ export function arcIntersectsAABB(
 /**
  * Checks if an ellipse intersects or is inside an AABB.
  */
-export function ellipseIntersectsAABB(
-	center: Vec2,
-	majorPt: Vec2,
-	minorPt: Vec2,
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number
-): boolean {
-	if (center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY) return true;
-	if (majorPt.x >= minX && majorPt.x <= maxX && majorPt.y >= minY && majorPt.y <= maxY) return true;
-	if (minorPt.x >= minX && minorPt.x <= maxX && minorPt.y >= minY && minorPt.y <= maxY) return true;
+export function ellipseIntersectsAABB(center: Vec2, majorPt: Vec2, minorPt: Vec2, min: Vec2, max: Vec2): boolean {
+	if (center.x >= min.x && center.x <= max.x && center.y >= min.y && center.y <= max.y) return true;
+	if (majorPt.x >= min.x && majorPt.x <= max.x && majorPt.y >= min.y && majorPt.y <= max.y) return true;
+	if (minorPt.x >= min.x && minorPt.x <= max.x && minorPt.y >= min.y && minorPt.y <= max.y) return true;
 
 	const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
 	const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
@@ -184,8 +173,8 @@ export function ellipseIntersectsAABB(
 		const currX = center.x + rx * cosT * ux + ry * sinT * vx;
 		const currY = center.y + rx * cosT * uy + ry * sinT * vy;
 
-		if (currX >= minX && currX <= maxX && currY >= minY && currY <= maxY) return true;
-		if (segmentIntersectsAABB(prevX, prevY, currX, currY, minX, minY, maxX, maxY)) return true;
+		if (currX >= min.x && currX <= max.x && currY >= min.y && currY <= max.y) return true;
+		if (segmentIntersectsAABB({ x: prevX, y: prevY }, { x: currX, y: currY }, min, max)) return true;
 
 		prevX = currX;
 		prevY = currY;
@@ -204,14 +193,12 @@ export function ellipticalArcIntersectsAABB(
 	startPt: Vec2,
 	endPt: Vec2,
 	clockwise: boolean,
-	minX: number,
-	minY: number,
-	maxX: number,
-	maxY: number
+	min: Vec2,
+	max: Vec2
 ): boolean {
-	if (center.x >= minX && center.x <= maxX && center.y >= minY && center.y <= maxY) return true;
-	if (startPt.x >= minX && startPt.x <= maxX && startPt.y >= minY && startPt.y <= maxY) return true;
-	if (endPt.x >= minX && endPt.x <= maxX && endPt.y >= minY && endPt.y <= maxY) return true;
+	if (center.x >= min.x && center.x <= max.x && center.y >= min.y && center.y <= max.y) return true;
+	if (startPt.x >= min.x && startPt.x <= max.x && startPt.y >= min.y && startPt.y <= max.y) return true;
+	if (endPt.x >= min.x && endPt.x <= max.x && endPt.y >= min.y && endPt.y <= max.y) return true;
 
 	const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
 	const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
@@ -252,8 +239,8 @@ export function ellipticalArcIntersectsAABB(
 		const currX = center.x + rx * cosT * ux + ry * sinT * vx;
 		const currY = center.y + rx * cosT * uy + ry * sinT * vy;
 
-		if (currX >= minX && currX <= maxX && currY >= minY && currY <= maxY) return true;
-		if (segmentIntersectsAABB(prevX, prevY, currX, currY, minX, minY, maxX, maxY)) return true;
+		if (currX >= min.x && currX <= max.x && currY >= min.y && currY <= max.y) return true;
+		if (segmentIntersectsAABB({ x: prevX, y: prevY }, { x: currX, y: currY }, min, max)) return true;
 
 		prevX = currX;
 		prevY = currY;

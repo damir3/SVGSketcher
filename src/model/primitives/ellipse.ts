@@ -56,12 +56,12 @@ export class SketchEllipse implements ISketchPrimitive {
 		return distanceToEllipse(screen, sc, smaj, smin);
 	}
 
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch: any): boolean {
+	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const center = sketch.points.get(this.centerId);
 		const majorPt = sketch.points.get(this.majorAxisPointId);
 		const minorPt = sketch.points.get(this.minorAxisPointId);
 		if (!center || !majorPt || !minorPt) return false;
-		return ellipseIntersectsAABB(center, majorPt, minorPt, minX, minY, maxX, maxY);
+		return ellipseIntersectsAABB(center, majorPt, minorPt, min, max);
 	}
 
 	toGeoCurve(sketch: any): GeoEllipse | null {

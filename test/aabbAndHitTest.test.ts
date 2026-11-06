@@ -22,42 +22,40 @@ import { vec } from '../src/math/vector';
 import { SketchDocument } from '../src/model/sketch';
 
 describe('AABB Geometry Intersections', () => {
-	const minX = 10,
-		minY = 10,
-		maxX = 50,
-		maxY = 50;
+	const min = vec(10, 10);
+	const max = vec(50, 50);
 
 	it('pointIntersectsAABB detects points inside, on boundary, and outside', () => {
-		assert.equal(pointIntersectsAABB(25, 25, minX, minY, maxX, maxY), true);
-		assert.equal(pointIntersectsAABB(10, 50, minX, minY, maxX, maxY), true);
-		assert.equal(pointIntersectsAABB(5, 25, minX, minY, maxX, maxY), false);
-		assert.equal(pointIntersectsAABB(25, 60, minX, minY, maxX, maxY), false);
+		assert.equal(pointIntersectsAABB(vec(25, 25), min, max), true);
+		assert.equal(pointIntersectsAABB(vec(10, 50), min, max), true);
+		assert.equal(pointIntersectsAABB(vec(5, 25), min, max), false);
+		assert.equal(pointIntersectsAABB(vec(25, 60), min, max), false);
 	});
 
 	it('segmentIntersectsAABB detects segments inside, crossing, and outside', () => {
 		// Inside
-		assert.equal(segmentIntersectsAABB(20, 20, 40, 40, minX, minY, maxX, maxY), true);
+		assert.equal(segmentIntersectsAABB(vec(20, 20), vec(40, 40), min, max), true);
 		// Crossing completely through
-		assert.equal(segmentIntersectsAABB(0, 30, 60, 30, minX, minY, maxX, maxY), true);
+		assert.equal(segmentIntersectsAABB(vec(0, 30), vec(60, 30), min, max), true);
 		// Diagonal crossing
-		assert.equal(segmentIntersectsAABB(0, 0, 60, 60, minX, minY, maxX, maxY), true);
+		assert.equal(segmentIntersectsAABB(vec(0, 0), vec(60, 60), min, max), true);
 		// Completely outside
-		assert.equal(segmentIntersectsAABB(0, 0, 5, 5, minX, minY, maxX, maxY), false);
-		assert.equal(segmentIntersectsAABB(60, 10, 60, 50, minX, minY, maxX, maxY), false);
+		assert.equal(segmentIntersectsAABB(vec(0, 0), vec(5, 5), min, max), false);
+		assert.equal(segmentIntersectsAABB(vec(60, 10), vec(60, 50), min, max), false);
 		// Skimming outside near corner
-		assert.equal(segmentIntersectsAABB(0, 60, 60, 0, minX, minY, maxX, maxY), true);
-		assert.equal(segmentIntersectsAABB(0, 110, 110, 0, minX, minY, maxX, maxY), false);
+		assert.equal(segmentIntersectsAABB(vec(0, 60), vec(60, 0), min, max), true);
+		assert.equal(segmentIntersectsAABB(vec(0, 110), vec(110, 0), min, max), false);
 	});
 
 	it('circleIntersectsAABB detects circles intersecting or outside', () => {
 		// Center inside
-		assert.equal(circleIntersectsAABB(25, 25, 5, minX, minY, maxX, maxY), true);
+		assert.equal(circleIntersectsAABB(vec(25, 25), 5, min, max), true);
 		// Center outside, edge crossing
-		assert.equal(circleIntersectsAABB(0, 25, 15, minX, minY, maxX, maxY), true);
+		assert.equal(circleIntersectsAABB(vec(0, 25), 15, min, max), true);
 		// Center outside, not reaching
-		assert.equal(circleIntersectsAABB(0, 25, 8, minX, minY, maxX, maxY), false);
+		assert.equal(circleIntersectsAABB(vec(0, 25), 8, min, max), false);
 		// Center outside, radius encompasses the entire AABB without intersecting border
-		assert.equal(circleIntersectsAABB(-50, -50, 200, minX, minY, maxX, maxY), false);
+		assert.equal(circleIntersectsAABB(vec(-50, -50), 200, min, max), false);
 	});
 
 	it('arcIntersectsAABB respects angular span of the arc', () => {
@@ -68,7 +66,7 @@ describe('AABB Geometry Intersections', () => {
 		const startRight = vec(radius * Math.cos(-Math.PI / 4), 30 + radius * Math.sin(-Math.PI / 4));
 		const endRight = vec(radius * Math.cos(Math.PI / 4), 30 + radius * Math.sin(Math.PI / 4));
 		assert.equal(
-			arcIntersectsAABB(center, radius, startRight, endRight, true, minX, minY, maxX, maxY),
+			arcIntersectsAABB(center, radius, startRight, endRight, true, min, max),
 			true
 		);
 
@@ -76,7 +74,7 @@ describe('AABB Geometry Intersections', () => {
 		const startLeft = vec(radius * Math.cos((3 * Math.PI) / 4), 30 + radius * Math.sin((3 * Math.PI) / 4));
 		const endLeft = vec(radius * Math.cos((-3 * Math.PI) / 4), 30 + radius * Math.sin((-3 * Math.PI) / 4));
 		assert.equal(
-			arcIntersectsAABB(center, radius, startLeft, endLeft, true, minX, minY, maxX, maxY),
+			arcIntersectsAABB(center, radius, startLeft, endLeft, true, min, max),
 			false
 		);
 	});
@@ -87,19 +85,19 @@ describe('AABB Geometry Intersections', () => {
 		const minorPt = vec(30, 40); // ry = 10
 
 		// Ellipse inside AABB
-		assert.equal(ellipseIntersectsAABB(center, majorPt, minorPt, minX, minY, maxX, maxY), true);
+		assert.equal(ellipseIntersectsAABB(center, majorPt, minorPt, min, max), true);
 
 		// Ellipse outside AABB
 		const farCenter = vec(100, 100);
 		const farMajor = vec(110, 100);
 		const farMinor = vec(100, 105);
-		assert.equal(ellipseIntersectsAABB(farCenter, farMajor, farMinor, minX, minY, maxX, maxY), false);
+		assert.equal(ellipseIntersectsAABB(farCenter, farMajor, farMinor, min, max), false);
 
 		// Elliptical arc crossing
 		const startPt = vec(45, 30);
 		const endPt = vec(30, 40);
 		assert.equal(
-			ellipticalArcIntersectsAABB(center, majorPt, minorPt, startPt, endPt, true, minX, minY, maxX, maxY),
+			ellipticalArcIntersectsAABB(center, majorPt, minorPt, startPt, endPt, true, min, max),
 			true
 		);
 	});
@@ -209,24 +207,24 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 
 		// Point hit test and AABB
 		assert.equal(p1.distanceTo(vec(13, 14), sketch, viewport), 5);
-		assert.equal(p1.intersectsAABB(0, 0, 20, 20, sketch), true);
-		assert.equal(p1.intersectsAABB(30, 30, 40, 40, sketch), false);
+		assert.equal(p1.intersectsAABB(vec(0, 0), vec(20, 20), sketch), true);
+		assert.equal(p1.intersectsAABB(vec(30, 30), vec(40, 40), sketch), false);
 
 		// Line hit test and AABB
 		assert.equal(line.distanceTo(vec(30, 14), sketch, viewport), 4);
-		assert.equal(line.intersectsAABB(20, 0, 40, 20, sketch), true);
-		assert.equal(line.intersectsAABB(60, 60, 80, 80, sketch), false);
+		assert.equal(line.intersectsAABB(vec(20, 0), vec(40, 20), sketch), true);
+		assert.equal(line.intersectsAABB(vec(60, 60), vec(80, 80), sketch), false);
 
 		// Circle hit test and AABB
 		assert.equal(circle.distanceTo(vec(100, 128), sketch, viewport), 3);
-		assert.equal(circle.intersectsAABB(80, 80, 120, 120, sketch), true);
-		assert.equal(circle.intersectsAABB(0, 0, 20, 20, sketch), false);
+		assert.equal(circle.intersectsAABB(vec(80, 80), vec(120, 120), sketch), true);
+		assert.equal(circle.intersectsAABB(vec(0, 0), vec(20, 20), sketch), false);
 
 		// Arc hit test and AABB
 		const dArc = arc.distanceTo(vec(218, 218), sketch, viewport);
 		assert.ok(dArc !== null && dArc < 2);
-		assert.equal(arc.intersectsAABB(190, 190, 230, 230, sketch), true);
-		assert.equal(arc.intersectsAABB(0, 0, 50, 50, sketch), false);
+		assert.equal(arc.intersectsAABB(vec(190, 190), vec(230, 230), sketch), true);
+		assert.equal(arc.intersectsAABB(vec(0, 0), vec(50, 50), sketch), false);
 	});
 
 	it('constraints implement distanceTo polymorphically', () => {

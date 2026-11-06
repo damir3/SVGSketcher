@@ -12,6 +12,7 @@ import {
 	SNAP_POINT_DISTANCE_PX,
 } from './distances';
 import { dist, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
+import { AABB } from '../math/aabb';
 import type { IConstraint } from '../solver/types';
 import {
 	DistanceConstraint,
@@ -646,7 +647,7 @@ export class CanvasInteraction {
 		const bbox = this.sketch.getSelectionBoundingBox() ?? this.sketch.getBoundingBox();
 		let target: { panX: number; panY: number; zoom: number };
 		if (bbox) {
-			target = this.viewport.getTargetFit(bbox.minX, bbox.minY, bbox.maxX, bbox.maxY);
+			target = this.viewport.getTargetFit(bbox);
 		} else {
 			target = {
 				panX: this.viewport.width / 2,
@@ -3724,10 +3725,8 @@ export class CanvasInteraction {
 		const w1 = this.viewport.screenToWorld(minScreenX, minScreenY);
 		const w2 = this.viewport.screenToWorld(maxScreenX, maxScreenY);
 
-		const minX = Math.min(w1.x, w2.x);
-		const maxX = Math.max(w1.x, w2.x);
-		const minY = Math.min(w1.y, w2.y);
-		const maxY = Math.max(w1.y, w2.y);
+		const bounds = AABB.fromPoints([w1, w2])!;
+		const { min, max } = bounds;
 
 		const itemsToSelect: Array<{
 			id: string;
@@ -3736,42 +3735,42 @@ export class CanvasInteraction {
 
 		// 1. Points
 		for (const pt of this.sketch.points.values()) {
-			if (pt.intersectsAABB(minX, minY, maxX, maxY, this.sketch)) {
+			if (pt.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: pt.id, type: 'point' });
 			}
 		}
 
 		// 2. Lines
 		for (const line of this.sketch.lines.values()) {
-			if (line.intersectsAABB(minX, minY, maxX, maxY, this.sketch)) {
+			if (line.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: line.id, type: 'line' });
 			}
 		}
 
 		// 3. Circles
 		for (const circle of this.sketch.circles.values()) {
-			if (circle.intersectsAABB(minX, minY, maxX, maxY, this.sketch)) {
+			if (circle.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: circle.id, type: 'circle' });
 			}
 		}
 
 		// 4. Arcs
 		for (const arc of this.sketch.arcs.values()) {
-			if (arc.intersectsAABB(minX, minY, maxX, maxY, this.sketch)) {
+			if (arc.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: arc.id, type: 'arc' });
 			}
 		}
 
 		// 5. Ellipses
 		for (const ellipse of this.sketch.ellipses.values()) {
-			if (ellipse.intersectsAABB(minX, minY, maxX, maxY, this.sketch)) {
+			if (ellipse.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: ellipse.id, type: 'ellipse' });
 			}
 		}
 
 		// 6. Elliptical Arcs
 		for (const elArc of this.sketch.ellipticalArcs.values()) {
-			if (elArc.intersectsAABB(minX, minY, maxX, maxY, this.sketch)) {
+			if (elArc.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: elArc.id, type: 'elliptical_arc' });
 			}
 		}

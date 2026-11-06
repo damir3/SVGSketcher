@@ -1,3 +1,5 @@
+import { AABB } from '../src/math/aabb';
+import { vec } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -60,10 +62,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(p1.id, 'point');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.equal(bbox.minX, 15);
-		assert.equal(bbox.maxX, 15);
-		assert.equal(bbox.minY, -25);
-		assert.equal(bbox.maxY, -25);
+		assert.equal(bbox.min.x, 15);
+		assert.equal(bbox.max.x, 15);
+		assert.equal(bbox.min.y, -25);
+		assert.equal(bbox.max.y, -25);
 	});
 
 	it('computes selection bounding box for a selected line', () => {
@@ -79,10 +81,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(line.id, 'line');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.equal(bbox.minX, 10);
-		assert.equal(bbox.maxX, 50);
-		assert.equal(bbox.minY, 20);
-		assert.equal(bbox.maxY, 80);
+		assert.equal(bbox.min.x, 10);
+		assert.equal(bbox.max.x, 50);
+		assert.equal(bbox.min.y, 20);
+		assert.equal(bbox.max.y, 80);
 	});
 
 	it('computes selection bounding box for a selected circle', () => {
@@ -97,10 +99,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(circle.id, 'circle');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.equal(bbox.minX, 5);
-		assert.equal(bbox.maxX, 55);
-		assert.equal(bbox.minY, 15);
-		assert.equal(bbox.maxY, 65);
+		assert.equal(bbox.min.x, 5);
+		assert.equal(bbox.max.x, 55);
+		assert.equal(bbox.min.y, 15);
+		assert.equal(bbox.max.y, 65);
 	});
 
 	it('computes selection bounding box for a selected arc', () => {
@@ -116,10 +118,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(arc.id, 'arc');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.equal(bbox.minX, -10);
-		assert.equal(bbox.maxX, 30);
-		assert.equal(bbox.minY, -10);
-		assert.equal(bbox.maxY, 30);
+		assert.equal(bbox.min.x, -10);
+		assert.equal(bbox.max.x, 30);
+		assert.equal(bbox.min.y, -10);
+		assert.equal(bbox.max.y, 30);
 	});
 
 	it('computes selection bounding box for a selected ellipse', () => {
@@ -135,10 +137,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(ellipse.id, 'ellipse');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.equal(Math.round(bbox.minX), 0);
-		assert.equal(Math.round(bbox.maxX), 100);
-		assert.equal(Math.round(bbox.minY), 30);
-		assert.equal(Math.round(bbox.maxY), 70);
+		assert.equal(Math.round(bbox.min.x), 0);
+		assert.equal(Math.round(bbox.max.x), 100);
+		assert.equal(Math.round(bbox.min.y), 30);
+		assert.equal(Math.round(bbox.max.y), 70);
 	});
 
 	it('computes selection bounding box for a selected spline', () => {
@@ -154,10 +156,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(spline.id, 'spline');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.ok(bbox.minX <= 10);
-		assert.ok(bbox.maxX >= 30);
-		assert.ok(bbox.minY <= 10);
-		assert.ok(bbox.maxY >= 40);
+		assert.ok(bbox.min.x <= 10);
+		assert.ok(bbox.max.x >= 30);
+		assert.ok(bbox.min.y <= 10);
+		assert.ok(bbox.max.y >= 40);
 	});
 
 	it('computes combined bounding box for multiple selected items', () => {
@@ -179,10 +181,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 		]);
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.equal(bbox.minX, 10);
-		assert.equal(bbox.maxX, 120);
-		assert.equal(bbox.minY, 10);
-		assert.equal(bbox.maxY, 80);
+		assert.equal(bbox.min.x, 10);
+		assert.equal(bbox.max.x, 120);
+		assert.equal(bbox.min.y, 10);
+		assert.equal(bbox.max.y, 80);
 	});
 
 	it('computes bounding box for entities of a selected constraint if only constraint is selected', () => {
@@ -198,16 +200,17 @@ describe('Fit to View & Selection Bounding Box', () => {
 		sketch.selectEntity(c.id, 'constraint');
 		const bbox = sketch.getSelectionBoundingBox();
 		assert.ok(bbox);
-		assert.ok(Math.abs(bbox.minX - 10) < 0.1);
-		assert.ok(Math.abs(bbox.maxX - 30) < 0.1);
-		assert.ok(Math.abs(bbox.minY - 20) < 0.1);
-		assert.ok(Math.abs(bbox.maxY - 40) < 0.1);
+		assert.ok(Math.abs(bbox.min.x - 10) < 0.1);
+		assert.ok(Math.abs(bbox.max.x - 30) < 0.1);
+		assert.ok(Math.abs(bbox.min.y - 20) < 0.1);
+		assert.ok(Math.abs(bbox.max.y - 40) < 0.1);
 	});
 
 	it('getTargetFit returns expected pan and zoom matching fitToBounds', () => {
 		const vp = new Viewport(800, 600);
-		const target = vp.getTargetFit(0, 0, 100, 100, 80);
-		vp.fitToBounds(0, 0, 100, 100, 80);
+		const bounds = AABB.fromPoints([vec(0, 0), vec(100, 100)])!;
+		const target = vp.getTargetFit(bounds, 80);
+		vp.fitToBounds(bounds, 80);
 
 		assert.equal(vp.panX, target.panX);
 		assert.equal(vp.panY, target.panY);
@@ -243,7 +246,7 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 			// 1. Zoom with selection (should zoom to l1 only: [0, 0] to [20, 20])
 			sketch.selectEntity(l1.id, 'line');
-			const targetSelected = vp.getTargetFit(0, 0, 20, 20);
+			const targetSelected = vp.getTargetFit(AABB.fromPoints([vec(0, 0), vec(20, 20)])!);
 			interaction.fitToView(false);
 
 			assert.equal(vp.panX, targetSelected.panX);
@@ -252,7 +255,7 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 			// 2. Zoom without selection (should zoom to whole scene: [0, 0] to [300, 300])
 			sketch.clearSelection();
-			const targetAll = vp.getTargetFit(0, 0, 300, 300);
+			const targetAll = vp.getTargetFit(AABB.fromPoints([vec(0, 0), vec(300, 300)])!);
 			interaction.fitToView(false);
 
 			assert.equal(vp.panX, targetAll.panX);

@@ -316,14 +316,12 @@ export class TextTool extends BaseTool {
 		if (!this.startWorld) return;
 		const sketch = this.ctx.sketch;
 
-		let minX = Math.min(this.startWorld.x, secondPos.x);
-		let maxX = Math.max(this.startWorld.x, secondPos.x);
-		let minY = Math.min(this.startWorld.y, secondPos.y);
-		let maxY = Math.max(this.startWorld.y, secondPos.y);
+		const min = { x: Math.min(this.startWorld.x, secondPos.x), y: Math.min(this.startWorld.y, secondPos.y) };
+		const max = { x: Math.max(this.startWorld.x, secondPos.x), y: Math.max(this.startWorld.y, secondPos.y) };
 
-		if (maxX - minX < 2 || maxY - minY < 2) {
-			maxX = minX + 50;
-			maxY = minY + 30;
+		if (max.x - min.x < 2 || max.y - min.y < 2) {
+			max.x = min.x + 50;
+			max.y = min.y + 30;
 		}
 
 		sketch.beginTransaction();
@@ -344,14 +342,14 @@ export class TextTool extends BaseTool {
 				const hasAllLines = existingText.rectangleLineIds.every(lid => sketch.lines.has(lid));
 				if (pt0 && pt1 && pt2 && pt3 && hasAllLines) {
 					hasAllPointsAndLines = true;
-					pt0.x = minX;
-					pt0.y = maxY;
-					pt1.x = maxX;
-					pt1.y = maxY;
-					pt2.x = maxX;
-					pt2.y = minY;
-					pt3.x = minX;
-					pt3.y = minY;
+					pt0.x = min.x;
+					pt0.y = max.y;
+					pt1.x = max.x;
+					pt1.y = max.y;
+					pt2.x = max.x;
+					pt2.y = min.y;
+					pt3.x = min.x;
+					pt3.y = min.y;
 					sketch.solve();
 				}
 			}
@@ -368,10 +366,10 @@ export class TextTool extends BaseTool {
 					}
 				}
 
-				const p0 = sketch.addPoint(minX, maxY, false);
-				const p1 = sketch.addPoint(maxX, maxY, false);
-				const p2 = sketch.addPoint(maxX, minY, false);
-				const p3 = sketch.addPoint(minX, minY, false);
+				const p0 = sketch.addPoint(min.x, max.y, false);
+				const p1 = sketch.addPoint(max.x, max.y, false);
+				const p2 = sketch.addPoint(max.x, min.y, false);
+				const p3 = sketch.addPoint(min.x, min.y, false);
 
 				const l0 = sketch.addLine(p0.id, p1.id, true);
 				const l1 = sketch.addLine(p1.id, p2.id, true);
@@ -413,10 +411,10 @@ export class TextTool extends BaseTool {
 		}
 
 		// Add 4 construction points: p0(TL), p1(TR), p2(BR), p3(BL) in CAD Y-up
-		const p0 = sketch.addPoint(minX, maxY, false);
-		const p1 = sketch.addPoint(maxX, maxY, false);
-		const p2 = sketch.addPoint(maxX, minY, false);
-		const p3 = sketch.addPoint(minX, minY, false);
+		const p0 = sketch.addPoint(min.x, max.y, false);
+		const p1 = sketch.addPoint(max.x, max.y, false);
+		const p2 = sketch.addPoint(max.x, min.y, false);
+		const p3 = sketch.addPoint(min.x, min.y, false);
 
 		// Add 4 construction lines
 		const l0 = sketch.addLine(p0.id, p1.id, true);
@@ -558,16 +556,14 @@ export class TextTool extends BaseTool {
 			const s1 = ctx.viewport.worldToScreen(this.startWorld.x, this.startWorld.y);
 			const s2 = ctx.viewport.worldToScreen(this.currentWorld.x, this.currentWorld.y);
 
-			const minX = Math.min(s1.x, s2.x);
-			const maxX = Math.max(s1.x, s2.x);
-			const minY = Math.min(s1.y, s2.y);
-			const maxY = Math.max(s1.y, s2.y);
-			const w = Math.max(1, maxX - minX);
-			const h = Math.max(1, maxY - minY);
+			const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
+			const max = { x: Math.max(s1.x, s2.x), y: Math.max(s1.y, s2.y) };
+			const w = Math.max(1, max.x - min.x);
+			const h = Math.max(1, max.y - min.y);
 
 			createSvgRect(
-				minX,
-				minY,
+				min.x,
+				min.y,
 				w,
 				h,
 				{
@@ -586,24 +582,24 @@ export class TextTool extends BaseTool {
 			const lineHeightPx = hScreen * 1.25;
 			const totalBlockHeightPx = (numLines - 1) * lineHeightPx;
 
-			const cx = minX + w / 2;
-			const cy = minY + h / 2;
+			const cx = min.x + w / 2;
+			const cy = min.y + h / 2;
 
 			let posX = cx;
 			let textAnchor = 'middle';
 			if (this.alignment === 'left') {
-				posX = minX + 4;
+				posX = min.x + 4;
 				textAnchor = 'start';
 			} else if (this.alignment === 'right') {
-				posX = maxX - 4;
+				posX = max.x - 4;
 				textAnchor = 'end';
 			}
 
 			let startY = cy;
 			if (this.verticalAlignment === 'top') {
-				startY = minY + hScreen / 2 + 4;
+				startY = min.y + hScreen / 2 + 4;
 			} else if (this.verticalAlignment === 'bottom') {
-				startY = maxY - hScreen / 2 - 4 - totalBlockHeightPx;
+				startY = max.y - hScreen / 2 - 4 - totalBlockHeightPx;
 			} else {
 				startY = cy - totalBlockHeightPx / 2;
 			}

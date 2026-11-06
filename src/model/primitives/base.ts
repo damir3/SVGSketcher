@@ -21,7 +21,7 @@ export interface ISketchPrimitive extends IInspectable {
 	/**
 	 * Checks if this primitive is inside or intersects an axis-aligned bounding box (world coordinates).
 	 */
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch?: any): boolean;
+	intersectsAABB(min: Vec2, max: Vec2, sketch?: any): boolean;
 
 	/**
 	 * Converts the sketch primitive into a normalized GeoCurve representation for geometric operations.

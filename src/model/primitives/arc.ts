@@ -67,12 +67,12 @@ export class SketchArc implements ISketchPrimitive {
 		return distanceToArc(screen, sc, sr, ss, se, !!this.clockwise, thresholdPx);
 	}
 
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch: any): boolean {
+	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const center = sketch.points.get(this.centerId);
 		const start = sketch.points.get(this.startPointId);
 		const end = sketch.points.get(this.endPointId);
 		if (!center || !start || !end) return false;
-		return arcIntersectsAABB(center, this.radius, start, end, !!this.clockwise, minX, minY, maxX, maxY);
+		return arcIntersectsAABB(center, this.radius, start, end, !!this.clockwise, min, max);
 	}
 
 	toGeoCurve(sketch: any): GeoArc | null {

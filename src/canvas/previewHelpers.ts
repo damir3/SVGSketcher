@@ -119,12 +119,11 @@ export function renderRectanglePreviewVisual(
 	h: number,
 	isConstruction = false
 ): void {
-	const minX = Math.min(s1.x, s2.x);
-	const minY = Math.min(s1.y, s2.y);
+	const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
 	const width = Math.abs(s2.x - s1.x);
 	const height = Math.abs(s2.y - s1.y);
 
-	createSvgRect(minX, minY, width, height, getPreviewStrokeAttrs(isConstruction), parent);
+	createSvgRect(min.x, min.y, width, height, getPreviewStrokeAttrs(isConstruction), parent);
 	renderTooltip(parent, s2.x + 12, s2.y - 12, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
 }
 

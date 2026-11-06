@@ -693,10 +693,10 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Anchor is at (50, 0) => screen (250, 150)
 			// Normal for horizontal line is (0, 1) => target at (50, 20) => screen (250, 130)
-			assert.equal(bbox.minX, 250);
-			assert.equal(bbox.maxX, 250);
-			assert.equal(bbox.minY, 130);
-			assert.equal(bbox.maxY, 150);
+			assert.equal(bbox.min.x, 250);
+			assert.equal(bbox.max.x, 250);
+			assert.equal(bbox.min.y, 130);
+			assert.equal(bbox.max.y, 150);
 
 			// Test two_sides mode: dist1 = 20, dist2 = 30
 			tool.direction = 'two_sides';
@@ -709,14 +709,14 @@ describe('OffsetTool UI and Workflow', () => {
 			// Target 1: (50, 20) => screen (250, 130)
 			// Target 2: (50, -30) => screen (250, 180)
 			// Anchor: (50, 0) => screen (250, 150)
-			assert.equal(bbox2.minY, 130);
-			assert.equal(bbox2.maxY, 180);
-			assert.equal(bbox2.minX, 250);
-			assert.equal(bbox2.maxX, 250);
+			assert.equal(bbox2.min.y, 130);
+			assert.equal(bbox2.max.y, 180);
+			assert.equal(bbox2.min.x, 250);
+			assert.equal(bbox2.max.x, 250);
 
 			// Verify popup position relative to bbox2
 			tool.popup.updatePosition(bbox2);
-			// left should be maxX + 100 = 250 + 100 = 350
+			// left should be bbox.max.x + 100 = 250 + 100 = 350
 			const container = (tool.popup as any).container;
 			assert.equal(container.style.left, '350px');
 		} finally {

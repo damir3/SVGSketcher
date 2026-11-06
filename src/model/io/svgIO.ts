@@ -407,13 +407,15 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 	let viewMatrix: SvgMatrix = [1, 0, 0, 1, 0, 0];
 
 	if (rootViewBox?.length === 4 && rootViewBox.every(Number.isFinite)) {
-		const [minX, minY, width, height] = rootViewBox;
+		const min = { x: rootViewBox[0], y: rootViewBox[1] };
+		const width = rootViewBox[2];
+		const height = rootViewBox[3];
 		const viewportWidth = parseSvgLengthInMillimeters(root.getAttribute('width')) ?? width;
 		const viewportHeight = parseSvgLengthInMillimeters(root.getAttribute('height')) ?? height;
 		const scale = Math.min(viewportWidth / width, viewportHeight / height);
 		const offsetX = (viewportWidth - width * scale) / 2;
 		const offsetY = (viewportHeight - height * scale) / 2;
-		viewMatrix = [scale, 0, 0, scale, offsetX - minX * scale, offsetY - minY * scale];
+		viewMatrix = [scale, 0, 0, scale, offsetX - min.x * scale, offsetY - min.y * scale];
 	}
 
 	const point = (x: number, y: number, matrix: SvgMatrix): [number, number] => {
@@ -954,14 +956,13 @@ export function exportSketchToSVG(
 	let viewBox = '-100 -100 200 200';
 
 	if (bbox) {
-		const w = bbox.maxX - bbox.minX;
-		const h = bbox.maxY - bbox.minY;
+		const w = bbox.max.x - bbox.min.x;
+		const h = bbox.max.y - bbox.min.y;
 		const padding = Math.max(10, Math.max(w, h) * 0.05);
-		const minX = bbox.minX - padding;
-		const minY = -bbox.maxY - padding;
+		const viewBoxMin = { x: bbox.min.x - padding, y: -bbox.max.y - padding };
 		const vbWidth = Math.max(w + padding * 2, 20);
 		const vbHeight = Math.max(h + padding * 2, 20);
-		viewBox = `${minX.toFixed(2)} ${minY.toFixed(2)} ${vbWidth.toFixed(2)} ${vbHeight.toFixed(2)}`;
+		viewBox = `${viewBoxMin.x.toFixed(2)} ${viewBoxMin.y.toFixed(2)} ${vbWidth.toFixed(2)} ${vbHeight.toFixed(2)}`;
 	}
 
 	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  <metadata id="sketcher-metadata">\n    <![CDATA[\n${jsonString}\n    ]]>\n  </metadata>\n  ${elements.join('\n  ')}\n</svg>`;

@@ -93,6 +93,7 @@ import {
 } from './types';
 import type { GeoCurve } from '../math/intersection';
 import { dist, type Vec2 } from '../math/vector';
+import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { calculateOffsetGeometry } from '../math/offset';
 import { serializePrimitive } from './primitives/serialization';
@@ -3651,11 +3652,11 @@ export class SketchDocument {
 		return importSketchFromSVG(this, svgString);
 	}
 
-	getBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+	getBoundingBox(): AABB | null {
 		return getBoundingBox(this);
 	}
 
-	getSelectionBoundingBox(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+	getSelectionBoundingBox(): AABB | null {
 		return getSelectionBoundingBox(this);
 	}
 }

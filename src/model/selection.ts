@@ -1,4 +1,5 @@
 import type { SketchDocument } from './sketch';
+import { AABB } from '../math/aabb';
 import type { SketchPoint } from './types';
 
 export type SelectableEntityType =
@@ -295,39 +296,25 @@ export function deleteSelected(sketch: SketchDocument): void {
 	sketch.commitTransaction();
 }
 
-export function getBoundingBox(
-	sketch: SketchDocument
-): { minX: number; minY: number; maxX: number; maxY: number } | null {
+export function getBoundingBox(sketch: SketchDocument): AABB | null {
 	if (sketch.points.size === 0) return null;
-	let minX = Infinity;
-	let minY = Infinity;
-	let maxX = -Infinity;
-	let maxY = -Infinity;
+	const bounds = new AABB();
 
-	for (const p of sketch.points.values()) {
-		if (p.x < minX) minX = p.x;
-		if (p.x > maxX) maxX = p.x;
-		if (p.y < minY) minY = p.y;
-		if (p.y > maxY) maxY = p.y;
-	}
+	for (const p of sketch.points.values()) bounds.addPoint(p);
 
 	for (const c of sketch.circles.values()) {
 		const center = sketch.points.get(c.centerId);
 		if (center) {
-			if (center.x - c.radius < minX) minX = center.x - c.radius;
-			if (center.x + c.radius > maxX) maxX = center.x + c.radius;
-			if (center.y - c.radius < minY) minY = center.y - c.radius;
-			if (center.y + c.radius > maxY) maxY = center.y + c.radius;
+			bounds.addPoint({ x: center.x - c.radius, y: center.y - c.radius });
+			bounds.addPoint({ x: center.x + c.radius, y: center.y + c.radius });
 		}
 	}
 
 	for (const a of sketch.arcs.values()) {
 		const center = sketch.points.get(a.centerId);
 		if (center) {
-			if (center.x - a.radius < minX) minX = center.x - a.radius;
-			if (center.x + a.radius > maxX) maxX = center.x + a.radius;
-			if (center.y - a.radius < minY) minY = center.y - a.radius;
-			if (center.y + a.radius > maxY) maxY = center.y + a.radius;
+			bounds.addPoint({ x: center.x - a.radius, y: center.y - a.radius });
+			bounds.addPoint({ x: center.x + a.radius, y: center.y + a.radius });
 		}
 	}
 
@@ -339,10 +326,8 @@ export function getBoundingBox(
 			const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
 			const ry = Math.hypot(min.x - center.x, min.y - center.y);
 			const rMax = Math.max(rx, ry);
-			if (center.x - rMax < minX) minX = center.x - rMax;
-			if (center.x + rMax > maxX) maxX = center.x + rMax;
-			if (center.y - rMax < minY) minY = center.y - rMax;
-			if (center.y + rMax > maxY) maxY = center.y + rMax;
+			bounds.addPoint({ x: center.x - rMax, y: center.y - rMax });
+			bounds.addPoint({ x: center.x + rMax, y: center.y + rMax });
 		}
 	}
 
@@ -354,34 +339,24 @@ export function getBoundingBox(
 			const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
 			const ry = Math.hypot(min.x - center.x, min.y - center.y);
 			const rMax = Math.max(rx, ry);
-			if (center.x - rMax < minX) minX = center.x - rMax;
-			if (center.x + rMax > maxX) maxX = center.x + rMax;
-			if (center.y - rMax < minY) minY = center.y - rMax;
-			if (center.y + rMax > maxY) maxY = center.y + rMax;
+			bounds.addPoint({ x: center.x - rMax, y: center.y - rMax });
+			bounds.addPoint({ x: center.x + rMax, y: center.y + rMax });
 		}
 	}
 
-	if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+	if (!isFinite(bounds.min.x) || !isFinite(bounds.max.x) || !isFinite(bounds.min.y) || !isFinite(bounds.max.y)) {
 		return null;
 	}
-	return { minX, minY, maxX, maxY };
+	return bounds;
 }
 
-export function getSelectionBoundingBox(
-	sketch: SketchDocument
-): { minX: number; minY: number; maxX: number; maxY: number } | null {
-	let minX = Infinity;
-	let minY = Infinity;
-	let maxX = -Infinity;
-	let maxY = -Infinity;
+export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
+	const bounds = new AABB();
 	let count = 0;
 
 	const includePoint = (p?: SketchPoint | null) => {
 		if (!p) return;
-		if (p.x < minX) minX = p.x;
-		if (p.x > maxX) maxX = p.x;
-		if (p.y < minY) minY = p.y;
-		if (p.y > maxY) maxY = p.y;
+		bounds.addPoint(p);
 		count++;
 	};
 
@@ -402,10 +377,8 @@ export function getSelectionBoundingBox(
 		if (c) {
 			const center = sketch.points.get(c.centerId);
 			if (center) {
-				if (center.x - c.radius < minX) minX = center.x - c.radius;
-				if (center.x + c.radius > maxX) maxX = center.x + c.radius;
-				if (center.y - c.radius < minY) minY = center.y - c.radius;
-				if (center.y + c.radius > maxY) maxY = center.y + c.radius;
+				bounds.addPoint({ x: center.x - c.radius, y: center.y - c.radius });
+				bounds.addPoint({ x: center.x + c.radius, y: center.y + c.radius });
 				count++;
 			}
 		}
@@ -416,10 +389,8 @@ export function getSelectionBoundingBox(
 		if (a) {
 			const center = sketch.points.get(a.centerId);
 			if (center) {
-				if (center.x - a.radius < minX) minX = center.x - a.radius;
-				if (center.x + a.radius > maxX) maxX = center.x + a.radius;
-				if (center.y - a.radius < minY) minY = center.y - a.radius;
-				if (center.y + a.radius > maxY) maxY = center.y + a.radius;
+				bounds.addPoint({ x: center.x - a.radius, y: center.y - a.radius });
+				bounds.addPoint({ x: center.x + a.radius, y: center.y + a.radius });
 				count++;
 			}
 			includePoint(sketch.points.get(a.startPointId));
@@ -440,10 +411,8 @@ export function getSelectionBoundingBox(
 				const vy = min.y - center.y;
 				const dx = Math.sqrt(ux * ux + vx * vx);
 				const dy = Math.sqrt(uy * uy + vy * vy);
-				if (center.x - dx < minX) minX = center.x - dx;
-				if (center.x + dx > maxX) maxX = center.x + dx;
-				if (center.y - dy < minY) minY = center.y - dy;
-				if (center.y + dy > maxY) maxY = center.y + dy;
+				bounds.addPoint({ x: center.x - dx, y: center.y - dy });
+				bounds.addPoint({ x: center.x + dx, y: center.y + dy });
 				count++;
 			}
 		}
@@ -462,10 +431,8 @@ export function getSelectionBoundingBox(
 				const vy = min.y - center.y;
 				const dx = Math.sqrt(ux * ux + vx * vx);
 				const dy = Math.sqrt(uy * uy + vy * vy);
-				if (center.x - dx < minX) minX = center.x - dx;
-				if (center.x + dx > maxX) maxX = center.x + dx;
-				if (center.y - dy < minY) minY = center.y - dy;
-				if (center.y + dy > maxY) maxY = center.y + dy;
+				bounds.addPoint({ x: center.x - dx, y: center.y - dy });
+				bounds.addPoint({ x: center.x + dx, y: center.y + dy });
 				count++;
 			}
 			includePoint(sketch.points.get(ea.startPointId));
@@ -510,10 +477,8 @@ export function getSelectionBoundingBox(
 						if (circle) {
 							const center = sketch.points.get(circle.centerId);
 							if (center) {
-								if (center.x - circle.radius < minX) minX = center.x - circle.radius;
-								if (center.x + circle.radius > maxX) maxX = center.x + circle.radius;
-								if (center.y - circle.radius < minY) minY = center.y - circle.radius;
-								if (center.y + circle.radius > maxY) maxY = center.y + circle.radius;
+								bounds.addPoint({ x: center.x - circle.radius, y: center.y - circle.radius });
+								bounds.addPoint({ x: center.x + circle.radius, y: center.y + circle.radius });
 								count++;
 							}
 						}
@@ -522,10 +487,8 @@ export function getSelectionBoundingBox(
 						if (arc) {
 							const center = sketch.points.get(arc.centerId);
 							if (center) {
-								if (center.x - arc.radius < minX) minX = center.x - arc.radius;
-								if (center.x + arc.radius > maxX) maxX = center.x + arc.radius;
-								if (center.y - arc.radius < minY) minY = center.y - arc.radius;
-								if (center.y + arc.radius > maxY) maxY = center.y + arc.radius;
+								bounds.addPoint({ x: center.x - arc.radius, y: center.y - arc.radius });
+								bounds.addPoint({ x: center.x + arc.radius, y: center.y + arc.radius });
 								count++;
 							}
 							includePoint(sketch.points.get(arc.startPointId));
@@ -537,9 +500,15 @@ export function getSelectionBoundingBox(
 		}
 	}
 
-	if (count === 0 || !isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+	if (
+		count === 0 ||
+		!isFinite(bounds.min.x) ||
+		!isFinite(bounds.max.x) ||
+		!isFinite(bounds.min.y) ||
+		!isFinite(bounds.max.y)
+	) {
 		return null;
 	}
 
-	return { minX, minY, maxX, maxY };
+	return bounds;
 }

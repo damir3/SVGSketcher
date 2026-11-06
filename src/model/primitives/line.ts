@@ -53,11 +53,11 @@ export class SketchLine implements ISketchPrimitive {
 		return distanceToSegment(screen, s1, s2);
 	}
 
-	intersectsAABB(minX: number, minY: number, maxX: number, maxY: number, sketch: any): boolean {
+	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const p1 = sketch.points.get(this.p1Id);
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return false;
-		return segmentIntersectsAABB(p1.x, p1.y, p2.x, p2.y, minX, minY, maxX, maxY);
+		return segmentIntersectsAABB(p1, p2, min, max);
 	}
 
 	toGeoCurve(sketch: any): GeoSegment | null {

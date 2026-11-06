@@ -332,7 +332,7 @@ describe('RectangularPatternTool & Panel Integration', () => {
 		// Verify gizmo bounding box is computed and popup is placed to the right
 		const bbox = tool.getGizmoBoundingBox();
 		assert.ok(bbox);
-		assert.ok(bbox.maxX >= 5);
+		assert.ok(bbox.max.x >= 5);
 
 		// Enter expression in popup
 		const dist1Input = tool.popup.getInputElement('dist1')!;

@@ -170,8 +170,7 @@ export class EllipseTool extends BaseTool {
 			if (ryVal < 1) ryVal = 1;
 			const sign = dx * vx + dy * vy < 0 ? -1 : 1;
 
-			const minX = centerWorld.x + sign * ryVal * vx;
-			const minY = centerWorld.y + sign * ryVal * vy;
+			const minorAxisPos = { x: centerWorld.x + sign * ryVal * vx, y: centerWorld.y + sign * ryVal * vy };
 
 			let p2Id: string;
 			if (
@@ -185,7 +184,7 @@ export class EllipseTool extends BaseTool {
 				p2Id = snap.id;
 				this.minWorldPos = snap.worldPos;
 			} else {
-				const pt = sketch.addPoint(minX, minY);
+				const pt = sketch.addPoint(minorAxisPos.x, minorAxisPos.y);
 				p2Id = pt.id;
 				this.minWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);

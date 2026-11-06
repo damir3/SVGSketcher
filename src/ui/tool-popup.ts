@@ -2,13 +2,9 @@ import type { Vec2 } from '../math/vector';
 import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
 import type { SketchDocument } from '../model/sketch';
 import { updateExpressionPreview } from './expression-preview';
+import type { AABB } from '../math/aabb';
 
-export interface ScreenBoundingBox {
-	minX: number;
-	maxX: number;
-	minY: number;
-	maxY: number;
-}
+export type ScreenBoundingBox = AABB;
 
 export type ToolPopupFieldType = 'dimension' | 'integer' | 'checkbox';
 
@@ -311,11 +307,11 @@ export class ToolPopup<TFieldId extends string = string> {
 		let left: number;
 		let top: number;
 
-		if ('minX' in posOrBBox) {
+		if ('min' in posOrBBox) {
 			// Bounding box positioning
-			const refX = posOrBBox.maxX;
-			const minBoxX = posOrBBox.minX;
-			const centerY = (posOrBBox.minY + posOrBBox.maxY) / 2;
+			const refX = posOrBBox.max.x;
+			const minBoxX = posOrBBox.min.x;
+			const centerY = (posOrBBox.min.y + posOrBBox.max.y) / 2;
 
 			left = refX + this.bboxOffset.x;
 			if (left + popupWidth > window.innerWidth - 16) {

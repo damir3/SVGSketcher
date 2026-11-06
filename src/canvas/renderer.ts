@@ -1947,14 +1947,14 @@ export class SVGRenderer {
 			if (isHorizontal) {
 				// Horizontal arrow -> place label below the arrow
 				const midX = tipX - arrowLen * 0.5 * aux;
-				const maxY = Math.max(from.y, tipY, base1Y, base2Y);
+				const max = { x: from.x, y: Math.max(from.y, tipY, base1Y, base2Y) };
 				pillX = midX;
-				pillY = maxY + 16;
+				pillY = max.y + 16;
 			} else {
 				// Vertical arrow -> place label to the right of the arrow
 				const midY = tipY - arrowLen * 0.5 * auy;
-				const maxX = Math.max(from.x, tipX, base1X, base2X);
-				pillX = maxX + 10 + pillWidth * 0.5;
+				const max = { x: Math.max(from.x, tipX, base1X, base2X), y: from.y };
+				pillX = max.x + 10 + pillWidth * 0.5;
 				pillY = midY;
 			}
 
@@ -2443,12 +2443,11 @@ export class SVGRenderer {
 
 	renderSelectionBox(s1: Vec2, s2: Vec2): void {
 		this.overlayGroup.innerHTML = '';
-		const minX = Math.min(s1.x, s2.x);
-		const minY = Math.min(s1.y, s2.y);
+		const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
 		const width = Math.abs(s2.x - s1.x);
 		const height = Math.abs(s2.y - s1.y);
 
-		createSvgRect(minX, minY, width, height, SELECTION_BOX_ATTRS, this.overlayGroup);
+		createSvgRect(min.x, min.y, width, height, SELECTION_BOX_ATTRS, this.overlayGroup);
 	}
 
 	renderMirrorPreview(
