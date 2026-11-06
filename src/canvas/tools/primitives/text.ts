@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, vec, sub, type Vec2 } from '../../../math/vector';
+import { angleFromTo, dist, vec, sub, type Vec2 } from '../../../math/vector';
 import type { IToolPanel } from '../../../ui/panels/tools/types';
 import type { SketchText } from '../../../model/primitives/text';
 import { COLORS } from '../../styles';
@@ -271,11 +271,11 @@ export class TextTool extends BaseTool {
 
 		const c = this.rotationCenter;
 		// Target angle of mouse relative to center
-		const mouseAngle = Math.atan2(mouseWorld.y - c.y, mouseWorld.x - c.x);
+		const mouseAngle = angleFromTo(c, mouseWorld);
 		// In unrotated rectangle, top center handle is at angle +PI/2
 		const targetAngle = mouseAngle - Math.PI / 2;
 
-		const currentAngle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+		const currentAngle = angleFromTo(p0, p1);
 		const deltaAngle = targetAngle - currentAngle;
 
 		const rotatePoint = (p: Vec2, center: Vec2, rad: number): Vec2 => {

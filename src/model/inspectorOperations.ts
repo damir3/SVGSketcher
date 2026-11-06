@@ -1,3 +1,4 @@
+import { ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
 import type { SketchDocument } from './sketch';
 import type { IConstraint } from '../solver/types';
 import {
@@ -8,7 +9,7 @@ import {
 	DragPointConstraint,
 	AngleConstraint,
 } from '../solver/constraints';
-import { add, addScaled, cross, dot, normalizeOrNull, scale, sub, vec } from '../math/vector';
+import { angleFromTo, addScaled, cross, dot, normalizeOrNull, scale, sub, vec } from '../math/vector';
 
 export function setPointCoords(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
 	const pt = sketch.points.get(pointId);
@@ -388,12 +389,12 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 		const start = sketch.points.get(arc.startPointId);
 		const end = sketch.points.get(arc.endPointId);
 		if (start && !sketch.isPointFixed(arc.startPointId)) {
-			const as = Math.atan2(start.y - center.y, start.x - center.x);
+			const as = angleFromTo(center, start);
 			start.x = center.x + Math.cos(as) * newRadius;
 			start.y = center.y + Math.sin(as) * newRadius;
 		}
 		if (end && !sketch.isPointFixed(arc.endPointId)) {
-			const ae = Math.atan2(end.y - center.y, end.x - center.x);
+			const ae = angleFromTo(center, end);
 			end.x = center.x + Math.cos(ae) * newRadius;
 			end.y = center.y + Math.sin(ae) * newRadius;
 		}
@@ -404,7 +405,7 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 			if (c instanceof PointOnCircleConstraint && c.circleId === entityId) {
 				const pt = sketch.points.get(c.pointId);
 				if (pt && !sketch.isPointFixed(c.pointId)) {
-					const ang = Math.atan2(pt.y - center.y, pt.x - center.x);
+					const ang = angleFromTo(center, pt);
 					pt.x = center.x + Math.cos(ang) * newRadius;
 					pt.y = center.y + Math.sin(ang) * newRadius;
 				}
@@ -447,12 +448,12 @@ export function setArcAngle(sketch: SketchDocument, arcId: string, newSweepDeg: 
 
 	const sweepRad = (clampedDeg * Math.PI) / 180;
 	if (sketch.isPointFixed(arc.endPointId) && !sketch.isPointFixed(arc.startPointId)) {
-		const ae = Math.atan2(end.y - center.y, end.x - center.x);
+		const ae = angleFromTo(center, end);
 		const newAs = arc.clockwise ? ae + sweepRad : ae - sweepRad;
 		start.x = center.x + Math.cos(newAs) * arc.radius;
 		start.y = center.y + Math.sin(newAs) * arc.radius;
 	} else if (!sketch.isPointFixed(arc.endPointId)) {
-		const as = Math.atan2(start.y - center.y, start.x - center.x);
+		const as = angleFromTo(center, start);
 		const newAe = arc.clockwise ? as - sweepRad : as + sweepRad;
 		end.x = center.x + Math.cos(newAe) * arc.radius;
 		end.y = center.y + Math.sin(newAe) * arc.radius;
@@ -516,15 +517,10 @@ export function setEllipseParams(
 	const startPt = 'startPointId' in entity ? sketch.points.get(entity.startPointId) : undefined;
 	const endPt = 'endPointId' in entity ? sketch.points.get(entity.endPointId) : undefined;
 	if (startPt && endPt) {
-		const ds = sub(startPt, center);
-		const uS = dot(ds, uHat);
-		const vS = dot(ds, vHat);
-		tS = Math.atan2(vS / curRy, uS / curRx);
+		const radii = vec(curRx, curRy);
+		tS = ellipseParameterAtPoint(startPt, center, radii, uHat, vHat);
 
-		const de = sub(endPt, center);
-		const uE = dot(de, uHat);
-		const vE = dot(de, vHat);
-		tE = Math.atan2(vE / curRy, uE / curRx);
+		tE = ellipseParameterAtPoint(endPt, center, radii, uHat, vHat);
 	}
 
 	const newRx = params.rx !== undefined && isFinite(params.rx) && params.rx > 0 ? params.rx : curRx;
@@ -564,15 +560,12 @@ export function setEllipseParams(
 	];
 
 	if (startPt && endPt && 'startPointId' in entity) {
+		const radii = vec(newRx, newRy);
 		if (!sketch.isPointFixed(entity.startPointId)) {
-			const uSNew = newRx * Math.cos(tS);
-			const vSNew = newRy * Math.sin(tS);
-			Object.assign(startPt, add(center, addScaled(scale(uHat, uSNew), vHat, vSNew)));
+			Object.assign(startPt, ellipsePointAtParameter(tS, center, radii, uHat, vHat));
 		}
 		if (!sketch.isPointFixed(entity.endPointId)) {
-			const uENew = newRx * Math.cos(tE);
-			const vENew = newRy * Math.sin(tE);
-			Object.assign(endPt, add(center, addScaled(scale(uHat, uENew), vHat, vENew)));
+			Object.assign(endPt, ellipsePointAtParameter(tE, center, radii, uHat, vHat));
 		}
 		extraDrags.push(
 			new DragPointConstraint(entity.startPointId, startPt.x, startPt.y, 0.005),

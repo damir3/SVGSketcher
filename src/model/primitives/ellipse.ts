@@ -1,4 +1,4 @@
-import { dist, type Vec2 } from '../../math/vector';
+import { angleFromToDeg, dist, type Vec2 } from '../../math/vector';
 import { distanceToEllipse } from '../../math/hitTest';
 import { ellipseIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipse } from '../../math/intersection';
@@ -116,9 +116,7 @@ export class SketchEllipse implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt
-						? Number(((Math.atan2(majorPt.y - center.y, majorPt.x - center.x) * 180) / Math.PI).toFixed(2))
-						: 0;
+					return center && majorPt ? Number(angleFromToDeg(center, majorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
 			},

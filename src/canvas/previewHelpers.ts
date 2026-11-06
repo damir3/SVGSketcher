@@ -1,4 +1,5 @@
-import { dot, sub, abs, distancesFrom, vec, type Vec2 } from '../math/vector';
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
+import { angleFromTo, angleFromToDeg, abs, distancesFrom, vec, type Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
@@ -83,8 +84,8 @@ export function renderArcPreviewVisual(
 	sweepDeg?: number,
 	isConstruction = false
 ): void {
-	const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-	const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+	const as = angleFromTo(sc, ss);
+	const ae = angleFromTo(sc, se);
 
 	let sweepAngle = 0;
 	if (clockwise) {
@@ -193,7 +194,7 @@ export function renderEllipseMajorAxisPreviewVisual(
 		parent
 	);
 
-	const deg = (Math.atan2(current.y - sc.y, current.x - sc.x) * 180) / Math.PI;
+	const deg = angleFromToDeg(sc, current);
 	renderTooltip(parent, { x: current.x + 12, y: current.y - 12 }, `Rx ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
 }
 
@@ -208,7 +209,7 @@ export function renderEllipsePreviewVisual(
 	isGuide = false
 ): void {
 	const r = distancesFrom(sc, smaj, smin);
-	const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+	const thetaDeg = angleFromToDeg(sc, smaj);
 
 	createSvgEllipse(
 		sc,
@@ -237,7 +238,7 @@ export function renderEllipticalArcStartPreviewVisual(
 	_isConstruction = false
 ): void {
 	const r = distancesFrom(sc, smaj, smin);
-	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+	const theta = angleFromTo(sc, smaj);
 	const thetaDeg = (theta * 180) / Math.PI;
 
 	createSvgEllipse(
@@ -253,18 +254,11 @@ export function renderEllipticalArcStartPreviewVisual(
 		parent
 	);
 
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU: u, axisV: v } = ellipseAxes(theta);
 
-	const startOffset = sub(ss, sc);
-	const us = dot(startOffset, u);
-	const vs = dot(startOffset, v);
-	const ts = Math.atan2(vs / r.y, us / r.x);
+	const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
 
-	const projSs = vec(
-		sc.x + r.x * Math.cos(ts) * u.x + r.y * Math.sin(ts) * v.x,
-		sc.y + r.x * Math.cos(ts) * u.y + r.y * Math.sin(ts) * v.y
-	);
+	const projSs = ellipsePointAtParameter(ts, sc, r, u, v);
 
 	createSvgLine(sc, projSs, AUX_RAY_ATTRS, parent);
 	createSvgCircle(projSs, 4, { fill: COLORS.primary }, parent);
@@ -290,7 +284,7 @@ export function renderEllipticalArcPreviewVisual(
 	const r = distancesFrom(sc, smaj, smin);
 	if (r.x < 0.1 || r.y < 0.1) return;
 
-	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+	const theta = angleFromTo(sc, smaj);
 	const thetaDeg = (theta * 180) / Math.PI;
 
 	createSvgEllipse(
@@ -303,18 +297,10 @@ export function renderEllipticalArcPreviewVisual(
 		parent
 	);
 
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU: u, axisV: v } = ellipseAxes(theta);
 
-	const startOffset = sub(ss, sc);
-	const us = dot(startOffset, u);
-	const vs = dot(startOffset, v);
-	const endOffset = sub(se, sc);
-	const ue = dot(endOffset, u);
-	const ve = dot(endOffset, v);
-
-	const ts = Math.atan2(vs / r.y, us / r.x);
-	const te = Math.atan2(ve / r.y, ue / r.x);
+	const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
+	const te = ellipseParameterAtPoint(se, sc, r, u, v);
 
 	let sweepAngle = 0;
 	if (clockwise) {
@@ -325,10 +311,7 @@ export function renderEllipticalArcPreviewVisual(
 		if (sweepAngle < 0) sweepAngle += TWO_PI;
 	}
 
-	const projSe = vec(
-		sc.x + r.x * Math.cos(te) * u.x + r.y * Math.sin(te) * v.x,
-		sc.y + r.x * Math.cos(te) * u.y + r.y * Math.sin(te) * v.y
-	);
+	const projSe = ellipsePointAtParameter(te, sc, r, u, v);
 
 	const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, projSe, clockwise);
 	createSvgPath(d, getPreviewStrokeAttrs(isConstruction, false, true), parent);
@@ -416,7 +399,7 @@ export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandi
 			const smaj = viewport.worldToScreen(curve.majorAxisPoint);
 			const smin = viewport.worldToScreen(curve.minorAxisPoint);
 			const r = distancesFrom(sc, smaj, smin);
-			const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+			const thetaDeg = angleFromToDeg(sc, smaj);
 			createSvgEllipse(
 				sc,
 				r,
@@ -543,7 +526,7 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 				const smaj = viewport.worldToScreen(maj);
 				const smin = viewport.worldToScreen(min);
 				const r = distancesFrom(sc, smaj, smin);
-				const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+				const thetaDeg = angleFromToDeg(sc, smaj);
 				createSvgEllipse(
 					sc,
 					r,

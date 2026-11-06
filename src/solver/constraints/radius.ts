@@ -4,7 +4,14 @@ import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgLine, createSvgRect, createSvgText } from '../../canvas/svg';
-import { distanceToRadiusDimension } from '../../math/hitTest';
+import type { Viewport } from '../../canvas/viewport';
+import { distanceToSegment } from '../../math/hitTest';
+import { angleFromTo, addScaled, dist, sub, vec, type Vec2 } from '../../math/vector';
+import type { SketchDocument } from '../../model/sketch';
+
+const DEFAULT_LEADER_OFFSET = 8;
+const LABEL_HEIGHT = 20;
+const TWO_PI = 2 * Math.PI;
 
 /**
  * Dimensional constraint: circle radius equals value
@@ -13,6 +20,7 @@ export class RadiusConstraint extends BaseConstraint {
 	readonly circleId: string;
 	targetRadius: number;
 	leaderAngle?: number;
+	leaderOffset?: number; // Signed distance from the perimeter in sketch units.
 	displayMode: 'radius' | 'diameter';
 
 	constructor(
@@ -51,82 +59,90 @@ export class RadiusConstraint extends BaseConstraint {
 		return res;
 	}
 
-	override render(ctx: ConstraintRenderContext): void {
-		const circle = ctx.sketch.circles.get(this.circleId);
-		const arc = ctx.sketch.arcs.get(this.circleId);
-		const entity = circle ?? arc;
-		if (!entity) return;
-		const center = ctx.sketch.points.get(entity.centerId);
-		if (!center) return;
+	private getLayout(sketch: SketchDocument, viewport: Viewport, labelTarget?: Vec2) {
+		const arc = sketch.arcs.get(this.circleId);
+		const entity = sketch.circles.get(this.circleId) ?? arc;
+		const center = entity && sketch.points.get(entity.centerId);
+		if (!entity || !center) return null;
 
-		const sc = ctx.viewport.worldToScreen(center);
-		const sr = entity.radius * ctx.viewport.zoom;
+		const screenCenter = viewport.worldToScreen(center);
+		const screenRadius = entity.radius * viewport.zoom;
+		const targetDistance = labelTarget && dist(screenCenter, labelTarget);
+		let angle = this.leaderAngle;
+		if (labelTarget && targetDistance) {
+			angle = angleFromTo(screenCenter, labelTarget);
+		}
 
-		// Leader angle in screen space (screen Y is positive downwards)
-		let screenAngle = -Math.PI / 4; // Default for circle: 45° up and right
-
-		const TWO_PI = 2 * Math.PI;
 		if (arc) {
-			const start = ctx.sketch.points.get(arc.startPointId);
-			const end = ctx.sketch.points.get(arc.endPointId);
+			const start = sketch.points.get(arc.startPointId);
+			const end = sketch.points.get(arc.endPointId);
 			if (start && end) {
-				const ss = ctx.viewport.worldToScreen(start);
-				const se = ctx.viewport.worldToScreen(end);
-				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-				const clockwise = !!arc.clockwise;
-
-				let sweepAngle = 0;
-				if (clockwise) {
-					sweepAngle = (ae - as) % TWO_PI;
-					if (sweepAngle < 0) sweepAngle += TWO_PI;
-					if (this.leaderAngle !== undefined) {
-						let rel = (this.leaderAngle - as) % TWO_PI;
-						if (rel < 0) rel += TWO_PI;
-						if (rel > sweepAngle) {
-							rel = rel - sweepAngle < TWO_PI - rel ? sweepAngle : 0;
-						}
-						screenAngle = as + rel;
-					} else {
-						screenAngle = as + sweepAngle / 2;
-					}
-				} else {
-					sweepAngle = (as - ae) % TWO_PI;
-					if (sweepAngle < 0) sweepAngle += TWO_PI;
-					if (this.leaderAngle !== undefined) {
-						let rel = (as - this.leaderAngle) % TWO_PI;
-						if (rel < 0) rel += TWO_PI;
-						if (rel > sweepAngle) {
-							rel = rel - sweepAngle < TWO_PI - rel ? sweepAngle : 0;
-						}
-						screenAngle = as - rel;
-					} else {
-						screenAngle = as - sweepAngle / 2;
-					}
-				}
-			}
-		} else {
-			if (this.leaderAngle !== undefined) {
-				screenAngle = this.leaderAngle;
+				const ss = viewport.worldToScreen(start);
+				const se = viewport.worldToScreen(end);
+				const startAngle = angleFromTo(screenCenter, ss);
+				const endAngle = angleFromTo(screenCenter, se);
+				const sign = arc.clockwise ? 1 : -1;
+				let sweep = ((endAngle - startAngle) * sign) % TWO_PI;
+				if (sweep < 0) sweep += TWO_PI;
+				let rel = angle === undefined ? sweep / 2 : ((angle - startAngle) * sign) % TWO_PI;
+				if (rel < 0) rel += TWO_PI;
+				if (rel > sweep) rel = rel - sweep < TWO_PI - rel ? sweep : 0;
+				angle = startAngle + sign * rel;
 			}
 		}
 
-		const cosA = Math.cos(screenAngle);
-		const sinA = Math.sin(screenAngle);
+		angle ??= -Math.PI / 4;
+		const dir = vec(Math.cos(angle), Math.sin(angle));
 		const isDiameter = this.displayMode === 'diameter';
-		const edge = {
-			x: sc.x + cosA * sr,
-			y: sc.y + sinA * sr,
-		};
-		const opposite = { x: sc.x - cosA * sr, y: sc.y - sinA * sr };
+		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
+		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
+		const prefix = this.expression ? 'fx: ' : '';
+		const text = isDiameter ? `${prefix}Ø ${numStr}` : `${prefix}R ${numStr}`;
+		const labelSize = vec(text.length * 8 + 14, LABEL_HEIGHT);
 
-		const dirX = cosA >= 0 ? 1 : -1;
-		const dirY = sinA >= 0 ? 1 : -1;
-		const tip = {
-			x: edge.x + dirX * 30,
-			y: edge.y + dirY * 20,
+		const offset =
+			targetDistance === undefined
+				? (this.leaderOffset ?? DEFAULT_LEADER_OFFSET)
+				: (targetDistance - screenRadius) / viewport.zoom;
+		const isInside = offset < 0;
+		const edge = addScaled(screenCenter, dir, screenRadius);
+		const anchor = addScaled(screenCenter, dir, Math.max(0, screenRadius + offset * viewport.zoom));
+		const labelCenter = isInside ? anchor : vec(anchor.x + ((dir.x >= 0 ? 1 : -1) * labelSize.x) / 2, anchor.y);
+		const labelOrigin = vec(labelCenter.x - labelSize.x / 2, labelCenter.y - labelSize.y / 2);
+		return {
+			start: isDiameter ? addScaled(screenCenter, dir, -screenRadius) : screenCenter,
+			edge,
+			anchor,
+			isInside,
+			isDiameter,
+			angle,
+			offset,
+			text,
+			labelCenter,
+			labelOrigin,
+			labelSize,
 		};
+	}
 
+	getLabelAnchor(sketch: SketchDocument, viewport: Viewport): Vec2 | undefined {
+		return this.getLayout(sketch, viewport)?.anchor;
+	}
+
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		const layout = this.getLayout(sketch, viewport, screen);
+		if (!layout) return;
+		this.leaderAngle = layout.angle;
+		this.leaderOffset = layout.offset;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		this.renderDimension(ctx.sketch, ctx.viewport, ctx.targetGroup, ctx.isSelected);
+	}
+
+	renderDimension(sketch: SketchDocument, viewport: Viewport, targetGroup: SVGGElement, isSelected = false): void {
+		const layout = this.getLayout(sketch, viewport);
+		if (!layout) return;
+		const { start, edge, anchor, isInside, isDiameter, text, labelCenter, labelOrigin, labelSize } = layout;
 		const g = createSvgElement(
 			'g',
 			{
@@ -134,15 +150,15 @@ export class RadiusConstraint extends BaseConstraint {
 				'data-id': this.id,
 				'data-type': 'constraint',
 			},
-			ctx.targetGroup
+			targetGroup
 		);
 
-		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
-		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
+		const color = isSelected ? COLORS.selected : COLORS.primary;
+		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 
 		// A diameter dimension crosses the full circle; a radius dimension starts at its center.
 		createSvgLine(
-			{ x: isDiameter ? opposite.x : sc.x, y: isDiameter ? opposite.y : sc.y },
+			start,
 			edge,
 			{
 				stroke: color,
@@ -152,39 +168,25 @@ export class RadiusConstraint extends BaseConstraint {
 			g
 		);
 
-		// Shelf line from edge to tip
-		createSvgLine(
-			edge,
-			tip,
-			{
-				stroke: color,
-				'stroke-width': STROKE_WIDTH.dimension,
-			},
-			g
-		);
+		if (!isInside) {
+			createSvgLine(edge, anchor, { stroke: color, 'stroke-width': STROKE_WIDTH.dimension }, g);
+		}
 
-		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
-		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
-		const prefix = this.expression ? 'fx: ' : '';
-		const textVal = isDiameter ? `${prefix}Ø ${numStr}` : `${prefix}R ${numStr}`;
-		const textLen = textVal.length * 8 + 14;
-
-		const rectX = dirX > 0 ? tip.x : tip.x - textLen;
 		createSvgRect(
-			{ x: rectX, y: tip.y - 12 },
-			{ x: textLen, y: 20 },
+			labelOrigin,
+			labelSize,
 			{
 				rx: 4,
 				fill: COLORS.white,
 				stroke: color,
-				'stroke-width': ctx.isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
+				'stroke-width': isSelected ? STROKE_WIDTH.normal : STROKE_WIDTH.thin,
 			},
 			g
 		);
 
 		createSvgText(
-			{ x: rectX + textLen * 0.5, y: tip.y + 3 },
-			textVal,
+			vec(labelCenter.x, labelCenter.y + 4),
+			text,
 			{
 				'text-anchor': 'middle',
 				fill: color,
@@ -196,45 +198,16 @@ export class RadiusConstraint extends BaseConstraint {
 		);
 	}
 
-	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const circle = sketch.circles.get(this.circleId);
-		const arc = sketch.arcs.get(this.circleId);
-		const entity = circle ?? arc;
-		if (!entity) return null;
-		const center = sketch.points.get(entity.centerId);
-		if (!center) return null;
-
-		const sc = viewport.worldToScreen(center);
-		const sr = entity.radius * viewport.zoom;
-
-		let screenAngle = -Math.PI / 4;
-		if (arc) {
-			const start = sketch.points.get(arc.startPointId);
-			const end = sketch.points.get(arc.endPointId);
-			if (start && end) {
-				const ss = viewport.worldToScreen(start);
-				const se = viewport.worldToScreen(end);
-				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-				const clockwise = !!arc.clockwise;
-				let sweepAngle = clockwise ? (ae - as) % (2 * Math.PI) : (as - ae) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				if (this.leaderAngle !== undefined) {
-					let rel = clockwise ? (this.leaderAngle - as) % (2 * Math.PI) : (as - this.leaderAngle) % (2 * Math.PI);
-					if (rel < 0) rel += 2 * Math.PI;
-					if (rel > sweepAngle) rel = rel - sweepAngle < 2 * Math.PI - rel ? sweepAngle : 0;
-					screenAngle = clockwise ? as + rel : as - rel;
-				} else {
-					screenAngle = clockwise ? as + sweepAngle / 2 : as - sweepAngle / 2;
-				}
-			}
-		} else {
-			if (this.leaderAngle !== undefined) {
-				screenAngle = this.leaderAngle;
-			}
-		}
-
-		return distanceToRadiusDimension(screen, sc, sr, screenAngle);
+	override distanceTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): number | null {
+		const layout = this.getLayout(sketch, viewport);
+		if (!layout) return null;
+		const { start, edge, anchor, isInside, labelOrigin, labelSize } = layout;
+		const local = sub(screen, labelOrigin);
+		const labelDistance = Math.hypot(
+			Math.max(0, -local.x, local.x - labelSize.x),
+			Math.max(0, -local.y, local.y - labelSize.y)
+		);
+		return Math.min(labelDistance, distanceToSegment(screen, start, isInside ? edge : anchor));
 	}
 
 	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({

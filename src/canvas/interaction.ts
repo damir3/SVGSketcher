@@ -1,3 +1,4 @@
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSnapshot } from '../model/history';
 import type { Viewport } from './viewport';
@@ -12,6 +13,8 @@ import {
 	SNAP_POINT_DISTANCE_PX,
 } from './distances';
 import {
+	angleFromTo,
+	angleToXAxisDeg,
 	addScaled,
 	dot,
 	ORIGIN,
@@ -161,6 +164,7 @@ export class CanvasInteraction {
 	private isDraggingConstraint = false;
 	private draggedConstraintId: string | null = null;
 	private dragConstraintStartScreen: Vec2 | null = null;
+	private radiusLabelGrabOffset: Vec2 | null = null;
 
 	// Box selection state
 	private isBoxSelecting = false;
@@ -393,6 +397,13 @@ export class CanvasInteraction {
 
 	setTool(tool: ToolType): void {
 		if (this.isSettingTool) return;
+		if (tool === 'distance') {
+			const { circleIds, arcIds, pointIds, lineIds } = this.sketch.selection;
+			const radialIds = [...circleIds, ...arcIds];
+			if (!pointIds.size && !lineIds.size && radialIds.length === 1 && !this.sketch.hasRadiusConstraint(radialIds[0])) {
+				tool = 'dimension';
+			}
+		}
 		this.isSettingTool = true;
 		try {
 			if (tool !== 'dimension' && this.canApplyConstraint(tool)) {
@@ -513,6 +524,7 @@ export class CanvasInteraction {
 		this.isDraggingConstraint = false;
 		this.draggedConstraintId = null;
 		this.dragConstraintStartScreen = null;
+		this.radiusLabelGrabOffset = null;
 
 		this.preDragSnapshot = null;
 		this.hasDragged = false;
@@ -1023,9 +1035,9 @@ export class CanvasInteraction {
 			const dToPerimeter = Math.abs(dToCenter - sr);
 			if (dToPerimeter >= closestGeomDist) continue;
 
-			const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-			const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-			const ap = Math.atan2(screenPos.y - sc.y, screenPos.x - sc.x);
+			const as = angleFromTo(sc, ss);
+			const ae = angleFromTo(sc, se);
+			const ap = angleFromTo(sc, screenPos);
 			const clockwise = !!arc.clockwise;
 
 			let sweepAngle = 0;
@@ -1086,15 +1098,8 @@ export class CanvasInteraction {
 			const uHat = scale(axisU, 1 / r.x);
 			const vHat = scale(axisV, 1 / r.y);
 
-			const dir = sub(screenPos, sc);
-			const u = dot(dir, uHat);
-			const v = dot(dir, vHat);
-
-			const t = Math.atan2(v / r.y, u / r.x);
-			const uProj = r.x * Math.cos(t);
-			const vProj = r.y * Math.sin(t);
-
-			const snappedScreen = vec(sc.x + uProj * uHat.x + vProj * vHat.x, sc.y + uProj * uHat.y + vProj * vHat.y);
+			const t = ellipseParameterAtPoint(screenPos, sc, r, uHat, vHat);
+			const snappedScreen = ellipsePointAtParameter(t, sc, r, uHat, vHat);
 			const dToPerimeter = dist(screenPos, snappedScreen);
 
 			if (dToPerimeter < closestGeomDist) {
@@ -1135,27 +1140,15 @@ export class CanvasInteraction {
 			const r = distancesFrom(sc, smaj, smin);
 			if (r.x < 1 || r.y < 1) continue;
 
-			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-			const axisU = vec(Math.cos(theta), Math.sin(theta));
-			const axisV = vec(-Math.sin(theta), Math.cos(theta));
+			const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
 
-			const dir = sub(screenPos, sc);
-			const u = dot(dir, axisU);
-			const v = dot(dir, axisV);
-
-			const t = Math.atan2(v / r.y, u / r.x);
+			const t = ellipseParameterAtPoint(screenPos, sc, r, axisU, axisV);
 
 			const ss = this.viewport.worldToScreen(startPt);
 			const se = this.viewport.worldToScreen(endPt);
-			const startOffset = sub(ss, sc);
-			const usScreen = dot(startOffset, axisU);
-			const vsScreen = dot(startOffset, axisV);
-			const endOffset = sub(se, sc);
-			const ueScreen = dot(endOffset, axisU);
-			const veScreen = dot(endOffset, axisV);
 
-			const ts = Math.atan2(vsScreen / r.y, usScreen / r.x);
-			const te = Math.atan2(veScreen / r.y, ueScreen / r.x);
+			const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
+			const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
 			const clockwise = !!arc.clockwise;
 
 			let sweepAngle = clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
@@ -1167,9 +1160,7 @@ export class CanvasInteraction {
 			if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
 				const clampedPAngle = pAngle >= TWO_PI - angTolerance ? 0 : Math.min(sweepAngle, Math.max(0, pAngle));
 				const actualT = clockwise ? ts + clampedPAngle : ts - clampedPAngle;
-				const uProj = r.x * Math.cos(actualT);
-				const vProj = r.y * Math.sin(actualT);
-				const snappedScreen = vec(sc.x + uProj * axisU.x + vProj * axisV.x, sc.y + uProj * axisU.y + vProj * axisV.y);
+				const snappedScreen = ellipsePointAtParameter(actualT, sc, r, axisU, axisV);
 				const dToPerimeter = dist(screenPos, snappedScreen);
 
 				if (dToPerimeter < closestGeomDist) {
@@ -1341,7 +1332,7 @@ export class CanvasInteraction {
 		const dir = sub(p2, p1);
 		if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) return;
 
-		const angleDeg = (Math.atan2(Math.abs(dir.y), Math.abs(dir.x)) * 180) / Math.PI;
+		const angleDeg = angleToXAxisDeg(dir);
 
 		// Horizontal check
 		if (angleDeg < 1.0) {
@@ -1389,7 +1380,7 @@ export class CanvasInteraction {
 			return { pos: targetPos, axis: null };
 		}
 
-		const angleDeg = (Math.atan2(Math.abs(dir.y), Math.abs(dir.x)) * 180) / Math.PI;
+		const angleDeg = angleToXAxisDeg(dir);
 
 		if (angleDeg < 1.0) {
 			return {
@@ -1687,7 +1678,7 @@ export class CanvasInteraction {
 				e.preventDefault();
 				e.stopPropagation();
 				this.lastDoubleClickedTime = now;
-				this.cancelDrawing();
+				if (this.activeTool === 'select') this.cancelDrawing();
 				return;
 			}
 		} else {
@@ -2081,6 +2072,10 @@ export class CanvasInteraction {
 						this.preDragSnapshot = this.sketch.takeSnapshot();
 						this.hasDragged = false;
 						this.dragConstraintStartScreen = screen;
+						if (constraint instanceof RadiusConstraint) {
+							const anchor = constraint.getLabelAnchor(this.sketch, this.viewport);
+							this.radiusLabelGrabOffset = anchor ? sub(anchor, screen) : null;
+						}
 					}
 				}
 
@@ -2159,13 +2154,13 @@ export class CanvasInteraction {
 			const text = this.sketch.texts.get(this.textRotationDragState.textId);
 			if (text && text.rectanglePointIds) {
 				const c = this.textRotationDragState.centerWorld;
-				const mouseAngle = Math.atan2(world.y - c.y, world.x - c.x);
+				const mouseAngle = angleFromTo(c, world);
 				const targetAngle = mouseAngle - Math.PI / 2;
 
 				const corners = text.getRectangleCorners(this.sketch);
 				if (corners) {
 					const [p0, p1, p2, p3] = corners;
-					const currentAngle = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+					const currentAngle = angleFromTo(p0, p1);
 					const deltaAngle = targetAngle - currentAngle;
 
 					const rotatePoint = (p: Vec2, center: Vec2, rad: number): Vec2 => {
@@ -2355,16 +2350,9 @@ export class CanvasInteraction {
 						}
 						this.render();
 					}
-				} else if (constraint instanceof RadiusConstraint) {
-					const entity = this.sketch.circles.get(constraint.circleId) ?? this.sketch.arcs.get(constraint.circleId);
-					if (entity) {
-						const center = this.sketch.points.get(entity.centerId);
-						if (center) {
-							const sc = this.viewport.worldToScreen(center);
-							constraint.leaderAngle = Math.atan2(screen.y - sc.y, screen.x - sc.x);
-							this.render();
-						}
-					}
+				} else if (constraint instanceof RadiusConstraint && this.radiusLabelGrabOffset) {
+					constraint.moveLabelTo(addScaled(screen, this.radiusLabelGrabOffset, 1), this.sketch, this.viewport);
+					this.render();
 				}
 			}
 			return;
@@ -2805,6 +2793,7 @@ export class CanvasInteraction {
 			this.isDraggingConstraint = false;
 			this.draggedConstraintId = null;
 			this.dragConstraintStartScreen = null;
+			this.radiusLabelGrabOffset = null;
 
 			if (hadDragged) {
 				if (this.preDragSnapshot) {
@@ -2929,17 +2918,19 @@ export class CanvasInteraction {
 				}
 			}
 		} else if (type === 'circle' || type === 'arc') {
-			const isCircle = this.sketch.circles.has(id);
 			const entity = this.sketch.circles.get(id) ?? this.sketch.arcs.get(id);
 			if (entity) {
-				let radConstraint = [...this.sketch.constraints.values()].find(
-					c => c instanceof RadiusConstraint && c.circleId === entity.id
-				) as RadiusConstraint | undefined;
+				const radConstraint = [...this.sketch.constraints.values()].find(
+					(c): c is RadiusConstraint => c instanceof RadiusConstraint && c.circleId === entity.id
+				);
 
 				if (!radConstraint) {
-					// Circle defaults to diameter, arc defaults to radius
-					radConstraint =
-						this.sketch.addRadiusConstraint(entity.id, undefined, isCircle ? 'diameter' : 'radius') ?? undefined;
+					this.sketch.clearSelection();
+					this.setTool('dimension');
+					if (this.activeToolInstance instanceof DimensionTool) {
+						this.activeToolInstance.beginRadiusPlacement(entity.id, true);
+						return true;
+					}
 				}
 
 				if (radConstraint && this.onEditDimension) {
@@ -2982,7 +2973,7 @@ export class CanvasInteraction {
 			e.preventDefault();
 			e.stopPropagation();
 			this.lastDoubleClickedTime = now;
-			this.cancelDrawing();
+			if (this.activeTool === 'select') this.cancelDrawing();
 		}
 	}
 
@@ -3411,8 +3402,8 @@ export class CanvasInteraction {
 								x: geom.pInt.x + geom.u2.x * 20,
 								y: geom.pInt.y + geom.u2.y * 20,
 							});
-							const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-							const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+							const a1 = angleFromTo(sCenter, sRay1);
+							const a2 = angleFromTo(sCenter, sRay2);
 							let delta = a2 - a1;
 							const TWO_PI = 2 * Math.PI;
 							while (delta > Math.PI) delta -= TWO_PI;
@@ -3445,8 +3436,8 @@ export class CanvasInteraction {
 									x: geom.pInt.x + geom.u2.x * 20,
 									y: geom.pInt.y + geom.u2.y * 20,
 								});
-								const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-								const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+								const a1 = angleFromTo(sCenter, sRay1);
+								const a2 = angleFromTo(sCenter, sRay2);
 								let delta = a2 - a1;
 								const TWO_PI = 2 * Math.PI;
 								while (delta > Math.PI) delta -= TWO_PI;
@@ -3489,10 +3480,13 @@ export class CanvasInteraction {
 						}
 					}
 				} else if (cIds.length === 1) {
-					const existed = this.sketch.hasRadiusConstraint(cIds[0]);
+					if (!this.sketch.hasRadiusConstraint(cIds[0])) {
+						this.setTool('dimension');
+						return true;
+					}
 					const c = this.sketch.addRadiusConstraint(cIds[0]);
 					applied = true;
-					toastMsg = existed ? 'Editing radius constraint' : 'Radius constraint applied';
+					toastMsg = 'Editing radius constraint';
 					if (c && this.onEditDimension) {
 						const circ = this.sketch.circles.get(cIds[0]) ?? this.sketch.arcs.get(cIds[0]);
 						const center = circ ? this.sketch.points.get(circ.centerId) : null;

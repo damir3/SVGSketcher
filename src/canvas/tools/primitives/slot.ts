@@ -1,6 +1,15 @@
 import { BaseTool } from '../base';
 import type { SnapResult, ToolMouseEvent, ToolRenderContext } from '../types';
-import { dot, sub, dist, projectPointOntoSegment, getCircumcircle, vec, type Vec2 } from '../../../math/vector';
+import {
+	angleFromTo,
+	dot,
+	sub,
+	dist,
+	projectPointOntoSegment,
+	getCircumcircle,
+	vec,
+	type Vec2,
+} from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, getArcSvgPath } from '../../svg';
 import {
 	AUX_AXIS_ATTRS,
@@ -36,9 +45,9 @@ function isArcClockwiseThroughPoint(
 	const se = viewport.worldToScreen(end);
 	const sm = viewport.worldToScreen(midPoint);
 
-	const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-	const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-	const am = Math.atan2(sm.y - sc.y, sm.x - sc.x);
+	const as = angleFromTo(sc, ss);
+	const ae = angleFromTo(sc, se);
+	const am = angleFromTo(sc, sm);
 
 	let sweepCW = (ae - as) % TWO_PI;
 	if (sweepCW < 0) sweepCW += TWO_PI;
@@ -394,10 +403,7 @@ export class SlotTool extends BaseTool {
 	private updateCenterArcEndpointsForRadius(): void {
 		if (!this.arcCenterWorld) return;
 		if (this.arcStartWorld) {
-			const theta1 = Math.atan2(
-				this.arcStartWorld.y - this.arcCenterWorld.y,
-				this.arcStartWorld.x - this.arcCenterWorld.x
-			);
+			const theta1 = angleFromTo(this.arcCenterWorld, this.arcStartWorld);
 			this.arcStartWorld = vec(
 				this.arcCenterWorld.x + this.arcRadius * Math.cos(theta1),
 				this.arcCenterWorld.y + this.arcRadius * Math.sin(theta1)
@@ -405,7 +411,7 @@ export class SlotTool extends BaseTool {
 			this.secondWorldPos = this.arcStartWorld;
 		}
 		if (this.arcEndWorld) {
-			const theta2 = Math.atan2(this.arcEndWorld.y - this.arcCenterWorld.y, this.arcEndWorld.x - this.arcCenterWorld.x);
+			const theta2 = angleFromTo(this.arcCenterWorld, this.arcEndWorld);
 			this.arcEndWorld = vec(
 				this.arcCenterWorld.x + this.arcRadius * Math.cos(theta2),
 				this.arcCenterWorld.y + this.arcRadius * Math.sin(theta2)
@@ -726,9 +732,9 @@ export class SlotTool extends BaseTool {
 			this.thirdSnap = null;
 
 			// Determine world sweep sign from p1 -> p2 through p3
-			const theta1 = Math.atan2(p1.y - circum.center.y, p1.x - circum.center.x);
-			const theta2 = Math.atan2(p2.y - circum.center.y, p2.x - circum.center.x);
-			const theta3 = Math.atan2(p3.y - circum.center.y, p3.x - circum.center.x);
+			const theta1 = angleFromTo(circum.center, p1);
+			const theta2 = angleFromTo(circum.center, p2);
+			const theta3 = angleFromTo(circum.center, p3);
 			const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 			const ccwMid = (((theta3 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 			this.arcWorldSweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;
@@ -793,7 +799,7 @@ export class SlotTool extends BaseTool {
 			this.arcRadius = rArc;
 			this.distance = rArc;
 
-			const theta1 = Math.atan2(p1.y - this.arcCenterWorld!.y, p1.x - this.arcCenterWorld!.x);
+			const theta1 = angleFromTo(this.arcCenterWorld!, p1);
 			this.arcCenterPrevAngle = theta1;
 			this.arcCenterTotalAngle = 0;
 			this.arcWorldSweepSign = 1;
@@ -910,8 +916,8 @@ export class SlotTool extends BaseTool {
 		const start = this.arcStartWorld!;
 		const rArc = this.arcRadius;
 
-		const theta1 = Math.atan2(start.y - center.y, start.x - center.x);
-		const thetaCur = Math.atan2(effectiveWorld.y - center.y, effectiveWorld.x - center.x);
+		const theta1 = angleFromTo(center, start);
+		const thetaCur = angleFromTo(center, effectiveWorld);
 
 		if (this.arcCenterPrevAngle === null) {
 			this.arcCenterPrevAngle = theta1;
@@ -950,7 +956,7 @@ export class SlotTool extends BaseTool {
 	private applyLockedCenterArcAngle(rArc = this.arcRadius): void {
 		const center = this.arcCenterWorld!;
 		const start = this.arcStartWorld!;
-		const theta1 = Math.atan2(start.y - center.y, start.x - center.x);
+		const theta1 = angleFromTo(center, start);
 		const sweepSign = this.arcWorldSweepSign || 1;
 		const sweepRad = (Math.max(0.1, Math.min(359.9, this.angle)) * Math.PI) / 180;
 
@@ -988,8 +994,8 @@ export class SlotTool extends BaseTool {
 		const maxR = Math.max(0.1, rArc - 0.5);
 		const effectiveR = Math.max(0.1, Math.min(slotRadius, maxR));
 
-		const theta1 = Math.atan2(c1.y - center.y, c1.x - center.x);
-		const theta2 = Math.atan2(c2.y - center.y, c2.x - center.x);
+		const theta1 = angleFromTo(center, c1);
+		const theta2 = angleFromTo(center, c2);
 
 		const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 		const span = sweepSign > 0 ? ccwSpan : (TWO_PI - ccwSpan) % TWO_PI;
@@ -1115,9 +1121,9 @@ export class SlotTool extends BaseTool {
 					return;
 				}
 
-				const theta1 = Math.atan2(p1.y - circum.center.y, p1.x - circum.center.x);
-				const theta2 = Math.atan2(p2.y - circum.center.y, p2.x - circum.center.x);
-				const theta3 = Math.atan2(p3.y - circum.center.y, p3.x - circum.center.x);
+				const theta1 = angleFromTo(circum.center, p1);
+				const theta2 = angleFromTo(circum.center, p2);
+				const theta3 = angleFromTo(circum.center, p3);
 				const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 				const ccwMid = (((theta3 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 				const sweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;

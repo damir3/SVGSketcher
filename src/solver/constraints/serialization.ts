@@ -86,6 +86,7 @@ type ConstraintSnapshotData =
 			circleId: string;
 			targetRadius: number;
 			leaderAngle?: number;
+			leaderOffset?: number;
 			displayMode: 'radius' | 'diameter';
 	  }
 	| { type: 'equal_length'; line1P1: string; line1P2: string; line2P1: string; line2P2: string }

@@ -1,6 +1,7 @@
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from './vector';
-import { dot, vec, cross, distancesFrom, sub } from './vector';
+import { angleFromTo, angleFromToDeg, vec, cross, distancesFrom } from './vector';
+import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurves } from './intersection';
 import { extractSplineInterval, type BezierSegment } from './spline';
 
@@ -106,7 +107,7 @@ function exactRingPath(points: Vec2[], edges: BoundaryEdge[]): string {
 			const r = distancesFrom(center, major, minor);
 			rx = r.x;
 			ry = r.y;
-			rotation = (Math.atan2(-(major.y - center.y), major.x - center.x) * 180) / Math.PI;
+			rotation = -angleFromToDeg(center, major);
 			sweep = curve.type === 'ellipse' ? (run.forward ? 1 : 0) : curve.clockwise === run.forward ? 1 : 0;
 		}
 		const span =
@@ -128,19 +129,14 @@ function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc
 		const start = { x: curve.start.x, y: -curve.start.y };
 		const end = { x: curve.end.x, y: -curve.end.y };
 		const r = distancesFrom(center, major, minor);
-		const theta = Math.atan2(major.y - center.y, major.x - center.x);
-		const u = vec(Math.cos(theta), Math.sin(theta)),
-			v = vec(-Math.sin(theta), Math.cos(theta));
-		const param = (point: Vec2) => {
-			const dir = sub(point, center);
-			return Math.atan2(dot(dir, v) / Math.max(r.y, 1e-6), dot(dir, u) / Math.max(r.x, 1e-6));
-		};
-		const ts = param(start),
-			te = param(end);
+		const { axisU, axisV } = ellipseAxes(angleFromTo(center, major));
+		const paramRadii = vec(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
+		const ts = ellipseParameterAtPoint(start, center, paramRadii, axisU, axisV);
+		const te = ellipseParameterAtPoint(end, center, paramRadii, axisU, axisV);
 		let sweep = curve.clockwise ? (te - ts) % (2 * Math.PI) : (ts - te) % (2 * Math.PI);
 		return sweep < 0 ? sweep + 2 * Math.PI : sweep;
 	}
-	const angle = (point: Vec2) => Math.atan2(-(point.y - curve.center.y), point.x - curve.center.x);
+	const angle = (point: Vec2) => -angleFromTo(curve.center, point);
 	const start = angle(curve.start),
 		end = angle(curve.end);
 	let sweep = curve.clockwise ? (end - start) % (2 * Math.PI) : (start - end) % (2 * Math.PI);
@@ -288,9 +284,7 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 				const source = edgeSources.get(edgeKey(a, b));
 				if (source) loopEdges.push(source);
 				const around = [...(edges.get(b) ?? [])].sort(
-					(u, v) =>
-						Math.atan2(nodes.get(u)!.y - nodes.get(b)!.y, nodes.get(u)!.x - nodes.get(b)!.x) -
-						Math.atan2(nodes.get(v)!.y - nodes.get(b)!.y, nodes.get(v)!.x - nodes.get(b)!.x)
+					(u, v) => angleFromTo(nodes.get(b)!, nodes.get(u)!) - angleFromTo(nodes.get(b)!, nodes.get(v)!)
 				);
 				const index = around.indexOf(a);
 				if (index < 0 || !around.length) break;

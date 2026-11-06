@@ -1,5 +1,5 @@
 import * as opentype from 'opentype.js';
-import { vec, dist, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
+import { angleFromTo, vec, dist, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
 import type { GeoCurve, GeoSegment, GeoCircle, GeoArc, GeoSpline } from './intersection';
 import { evaluateBezier, evaluateBezierDerivative } from './spline';
 
@@ -68,8 +68,8 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 		}
 		case 'arc': {
 			const arc = curve as GeoArc;
-			const thetaS = Math.atan2(arc.start.y - arc.center.y, arc.start.x - arc.center.x);
-			const thetaE = Math.atan2(arc.end.y - arc.center.y, arc.end.x - arc.center.x);
+			const thetaS = angleFromTo(arc.center, arc.start);
+			const thetaE = angleFromTo(arc.center, arc.end);
 			let sweep = 0;
 			const dir = arc.clockwise ? -1 : 1;
 			if (arc.clockwise) {

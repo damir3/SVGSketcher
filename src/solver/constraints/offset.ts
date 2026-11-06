@@ -4,7 +4,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
-import { cross, dot, vec, addScaled, mid, sub, type Vec2 } from '../../math/vector';
+import { angleFromTo, cross, dot, vec, addScaled, mid, sub, type Vec2 } from '../../math/vector';
 
 /**
  * Line pair: both endpoints of the offset line lie at signed distance `side * d`
@@ -234,8 +234,8 @@ export class OffsetConstraint extends BaseConstraint {
 			const s = sketch.points.get(off.startPointId);
 			const e = sketch.points.get(off.endPointId);
 			if (s && e) {
-				const as = Math.atan2(s.y - cOff.y, s.x - cOff.x);
-				const ae = Math.atan2(e.y - cOff.y, e.x - cOff.x);
+				const as = angleFromTo(cOff, s);
+				const ae = angleFromTo(cOff, e);
 				let sweep = off.clockwise ? as - ae : ae - as;
 				while (sweep < 0) sweep += 2 * Math.PI;
 				ang = off.clockwise ? as - sweep / 2 : as + sweep / 2;

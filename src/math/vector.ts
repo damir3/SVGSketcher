@@ -111,6 +111,36 @@ export function angle(a: Vec2, b: Vec2): number {
 	return Math.atan2(cross(a, b), dot(a, b));
 }
 
+/** Returns the signed direction of a vector in radians, relative to the positive X axis. */
+export function directionAngle(v: Vec2): number {
+	return Math.atan2(v.y, v.x);
+}
+
+/** Returns the signed direction of a vector in degrees, relative to the positive X axis. */
+export function directionAngleDeg(v: Vec2): number {
+	return (directionAngle(v) * 180) / Math.PI;
+}
+
+/** Returns the direction from one point to another in radians, relative to the positive X axis. */
+export function angleFromTo(from: Vec2, to: Vec2): number {
+	return Math.atan2(to.y - from.y, to.x - from.x);
+}
+
+/** Returns the direction from one point to another in degrees, relative to the positive X axis. */
+export function angleFromToDeg(from: Vec2, to: Vec2): number {
+	return (angleFromTo(from, to) * 180) / Math.PI;
+}
+
+/** Returns the unsigned angle to the X axis in radians, from 0 to π/2. */
+export function angleToXAxis(dir: Vec2): number {
+	return Math.atan2(Math.abs(dir.y), Math.abs(dir.x));
+}
+
+/** Returns the unsigned angle to the X axis in degrees, from 0 to 90. */
+export function angleToXAxisDeg(dir: Vec2): number {
+	return (angleToXAxis(dir) * 180) / Math.PI;
+}
+
 export function projectPointOntoSegment(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; t: number; dist: number } {
 	const ab = sub(b, a);
 	const l2 = dot(ab, ab);

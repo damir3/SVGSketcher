@@ -16,10 +16,12 @@ import {
 	distanceToEllipse,
 	distanceToEllipticalArc,
 	distanceToLinearDimension,
-	distanceToRadiusDimension,
 } from '../src/math/hitTest';
 import { vec } from '../src/math/vector';
 import { SketchDocument } from '../src/model/sketch';
+import { deserializeConstraint, serializeConstraint } from '../src/solver/constraints/serialization';
+import { RadiusConstraint } from '../src/solver/constraints/radius';
+import { DimensionTool } from '../src/canvas/tools/constraints/dimension';
 
 describe('AABB Geometry Intersections', () => {
 	const min = vec(10, 10);
@@ -165,15 +167,10 @@ describe('Hit Testing and Distance Mathematics', () => {
 		assert.ok(Math.abs(dArc - 3) < 0.1);
 	});
 
-	it('distanceToLinearDimension and distanceToRadiusDimension compute valid distance metrics', () => {
+	it('distanceToLinearDimension measures distance to the dimension line', () => {
 		const d1 = vec(10, 50);
 		const d2 = vec(90, 50);
 		assert.equal(distanceToLinearDimension(vec(50, 55), d1, d2), 5);
-
-		const sc = vec(100, 100);
-		const sr = 40;
-		const dRad = distanceToRadiusDimension(vec(140, 100), sc, sr, 0);
-		assert.ok(dRad >= 0);
 	});
 });
 
@@ -234,6 +231,107 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		const fixedC = sketch.addFixedConstraint(p1.id);
 		assert.ok(fixedC);
 		assert.equal(fixedC.distanceTo?.(vec(0, 0), sketch, viewport), null);
+	});
+
+	it('keeps the dragged radial label and the leader on the same ray after restoring the sketch', () => {
+		const sketch = new SketchDocument();
+		const center = sketch.addPoint(vec(0, 0));
+		const circle = sketch.addCircle(center.id, 25);
+		const dimension = sketch.addRadiusConstraint(circle.id, 25, 'diameter');
+		assert.ok(dimension);
+
+		const legacy = deserializeConstraint(serializeConstraint(dimension));
+		assert.ok(legacy instanceof RadiusConstraint);
+		assert.equal(legacy.leaderOffset, undefined);
+		assert.ok(legacy.getLabelAnchor(sketch, viewport));
+
+		dimension.moveLabelTo(vec(60, 80), sketch, viewport);
+		assert.ok(Math.abs(dimension.leaderOffset! - 75) < 1e-9);
+
+		const restored = deserializeConstraint(serializeConstraint(dimension));
+		assert.ok(restored instanceof RadiusConstraint);
+		const label = restored.getLabelAnchor(sketch, viewport);
+		assert.ok(label);
+		assert.ok(Math.hypot(label.x - 60, label.y - 80) < 1e-9);
+		assert.equal(restored.distanceTo(vec(75, 85), sketch, viewport), 0);
+		assert.ok(restored.distanceTo(vec(45, 85), sketch, viewport)! > 10);
+		assert.ok(restored.distanceTo(vec(30, 40), sketch, viewport)! < 1e-9);
+		assert.ok(restored.distanceTo(vec(-12, -16), sketch, viewport)! < 1e-9);
+		restored.displayMode = 'radius';
+		assert.equal(restored.distanceTo(vec(-12, -16), sketch, viewport), 20);
+
+		restored.moveLabelTo(vec(-60, 80), sketch, viewport);
+		assert.equal(restored.distanceTo(vec(-75, 85), sketch, viewport), 0);
+		assert.ok(restored.distanceTo(vec(-45, 85), sketch, viewport)! > 10);
+	});
+
+	it('creates a radial constraint and opens its editor only after clicking the label position', () => {
+		const sketch = new SketchDocument();
+		const center = sketch.addPoint(vec(0, 0));
+		const circle = sketch.addCircle(center.id, 100);
+		const opened: Array<{ constraint: RadiusConstraint; client: { x: number; y: number } }> = [];
+		const tool = new DimensionTool();
+		const ctx = {
+			sketch,
+			viewport,
+			renderer: { clearPreviews: () => {} },
+			showToast: () => {},
+			requestRender: () => {},
+			setCursor: () => {},
+			findSnap: () => null,
+			findPointNear: () => null,
+			onEditDimension: (constraint: RadiusConstraint, client: { x: number; y: number }) => {
+				assert.equal(sketch.constraints.get(constraint.id), constraint);
+				opened.push({ constraint, client });
+			},
+		} as unknown as Parameters<DimensionTool['activate']>[0];
+		const selectCircle = {
+			screen: vec(100, 0),
+			raw: {
+				target: { closest: () => ({ getAttribute: (name: string) => (name === 'data-id' ? circle.id : 'circle') }) },
+			},
+		} as unknown as Parameters<DimensionTool['onMouseDown']>[0];
+		tool.activate(ctx);
+		tool.onMouseDown(selectCircle);
+		assert.equal(sketch.constraints.size, 0);
+		assert.equal(opened.length, 0);
+		tool.cancel();
+		assert.equal(sketch.constraints.size, 0);
+
+		sketch.selectEntity(circle.id, 'circle');
+		tool.activate(ctx);
+		assert.equal(sketch.constraints.size, 0);
+		const position = vec(40, 30);
+		const client = vec(140, 130);
+		tool.onMouseDown({ screen: position, client } as Parameters<DimensionTool['onMouseDown']>[0]);
+		assert.equal(opened.length, 1);
+		const { constraint } = opened[0];
+		assert.equal(constraint.displayMode, 'diameter');
+		assert.equal(constraint.leaderOffset, -50);
+		assert.equal(opened[0].client, client);
+		const anchor = constraint.getLabelAnchor(sketch, viewport);
+		assert.ok(anchor && Math.hypot(anchor.x - position.x, anchor.y - position.y) < 1e-9);
+		assert.equal(constraint.distanceTo(vec(25, 35), sketch, viewport), 0);
+		assert.equal(sketch.undo(), true);
+		assert.equal(sketch.constraints.size, 0);
+	});
+
+	it('clamps a dragged arc dimension to its sweep and keeps the leader radial', () => {
+		const sketch = new SketchDocument();
+		const center = sketch.addPoint(vec(0, 0));
+		const start = sketch.addPoint(vec(25, 0));
+		const end = sketch.addPoint(vec(0, 25));
+		const arc = sketch.addArc(center.id, start.id, end.id, 25, true);
+		const dimension = sketch.addRadiusConstraint(arc.id, 25, 'radius');
+		assert.ok(dimension);
+
+		dimension.moveLabelTo(vec(-60, 80), sketch, viewport);
+		assert.equal(dimension.leaderAngle, Math.PI / 2);
+		assert.ok(dimension.distanceTo(vec(0, 60), sketch, viewport)! < 1e-9);
+		assert.ok(dimension.distanceTo(vec(0, 100), sketch, viewport)! < 1e-9);
+		dimension.moveLabelTo(vec(0, 12), sketch, viewport);
+		assert.equal(dimension.leaderOffset, -13);
+		assert.equal(dimension.distanceTo(vec(0, 12), sketch, viewport), 0);
 	});
 
 	it('primitives and SketchDocument implement toGeoCurve polymorphically', () => {

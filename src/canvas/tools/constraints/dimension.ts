@@ -2,7 +2,20 @@ import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { ORIGIN, cross, dist, dot, mid, normalize, scale, sub, vec, type Vec2 } from '../../../math/vector';
+import {
+	ORIGIN,
+	cross,
+	directionAngleDeg,
+	dist,
+	dot,
+	mid,
+	normalize,
+	scale,
+	sub,
+	vec,
+	type Vec2,
+} from '../../../math/vector';
+import { RadiusConstraint } from '../../../solver/constraints/radius';
 
 export interface DimensionState {
 	step: number;
@@ -36,10 +49,10 @@ export function determineDistanceOrientation(
 
 	// Angle of cursor from midpoint in degrees (-180 to 180)
 	// -90° is UP, +90° is DOWN, 0° is RIGHT, ±180° is LEFT
-	const theta = (Math.atan2(v.y, v.x) * 180) / Math.PI;
+	const theta = directionAngleDeg(v);
 
 	// Angle of line and line normal in degrees
-	const lineAngle = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+	const lineAngle = directionAngleDeg(dir);
 	const norm1 = lineAngle + 90;
 	const norm2 = lineAngle - 90;
 
@@ -89,6 +102,7 @@ export function determineDistanceOrientation(
 
 export class DimensionTool extends BaseTool {
 	readonly id = 'dimension' as const;
+	private radiusDraft: { constraint: RadiusConstraint; returnToSelect: boolean } | null = null;
 
 	state: DimensionState = {
 		step: 0,
@@ -149,7 +163,27 @@ export class DimensionTool extends BaseTool {
 			};
 		} else {
 			this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+			const radialIds = [...sel.circleIds, ...sel.arcIds];
+			if (radialIds.length === 1 && !ctx.sketch.hasRadiusConstraint(radialIds[0])) {
+				this.beginRadiusPlacement(radialIds[0]);
+			}
 		}
+	}
+
+	beginRadiusPlacement(id: string, returnToSelect = false): void {
+		const { sketch } = this.ctx;
+		const circle = sketch.circles.get(id);
+		const entity = circle ?? sketch.arcs.get(id);
+		if (!entity) return;
+
+		const radius = Math.max(0.01, Number(entity.radius.toFixed(2)));
+		this.radiusDraft = {
+			constraint: new RadiusConstraint('radius-preview', id, radius, 1, undefined, circle ? 'diameter' : 'radius'),
+			returnToSelect,
+		};
+		sketch.selectEntity(id, circle ? 'circle' : 'arc', false);
+		this.ctx.showToast('Click to place the dimension label');
+		this.ctx.requestRender();
 	}
 
 	override deactivate(): void {
@@ -157,6 +191,7 @@ export class DimensionTool extends BaseTool {
 	}
 
 	override cancel(): void {
+		this.radiusDraft = null;
 		this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 		this.ctx.renderer.clearPreviews();
 		this.ctx.sketch.clearSelection();
@@ -164,6 +199,7 @@ export class DimensionTool extends BaseTool {
 	}
 
 	override isHighlightEnabled(): boolean {
+		if (this.radiusDraft) return false;
 		return (
 			this.state.step < 2 ||
 			Boolean(this.state.step === 2 && this.state.point1Id && this.state.point2Id && !this.state.point3Id)
@@ -202,6 +238,24 @@ export class DimensionTool extends BaseTool {
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {
 		const screen = e.screen;
+		if (this.radiusDraft) {
+			const { sketch, viewport } = this.ctx;
+			const { constraint: draft, returnToSelect } = this.radiusDraft;
+			this.radiusDraft = null;
+			draft.moveLabelTo(screen, sketch, viewport);
+			const constraint = sketch.addRadiusConstraint(draft.circleId, undefined, undefined, draft);
+			this.ctx.renderer.clearPreviews();
+			if (returnToSelect) this.ctx.setTool('select');
+			if (constraint) {
+				sketch.selectEntity(constraint.id, 'constraint', false);
+				this.ctx.showToast(
+					constraint.displayMode === 'diameter' ? 'Diameter constraint applied' : 'Radius constraint applied'
+				);
+				this.ctx.requestRender();
+				this.ctx.onEditDimension?.(constraint, e.client);
+			}
+			return true;
+		}
 		const world = e.world;
 		const snap = this.ctx.findSnap(screen);
 
@@ -303,16 +357,16 @@ export class DimensionTool extends BaseTool {
 				};
 				this.ctx.requestRender();
 			} else if ((type === 'circle' || type === 'arc') && id) {
-				const existed = this.ctx.sketch.hasRadiusConstraint(id);
-				const c = this.ctx.sketch.addRadiusConstraint(id);
-				if (c) {
-					this.ctx.showToast(existed ? 'Editing radius constraint' : 'Radius constraint applied');
-					this.ctx.sketch.clearSelection();
-					this.ctx.sketch.selectEntity(c.id, 'constraint', false);
-					this.ctx.requestRender();
-					if (this.ctx.onEditDimension) {
-						this.ctx.onEditDimension(c, e.client);
+				const { sketch } = this.ctx;
+				if (sketch.hasRadiusConstraint(id)) {
+					const constraint = sketch.addRadiusConstraint(id);
+					if (constraint) {
+						sketch.selectEntity(constraint.id, 'constraint', false);
+						this.ctx.requestRender();
+						this.ctx.onEditDimension?.(constraint, e.client);
 					}
+				} else {
+					this.beginRadiusPlacement(id);
 				}
 			} else {
 				this.ctx.sketch.clearSelection();
@@ -854,6 +908,12 @@ export class DimensionTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		const screen = ctx.cursorScreen;
+		if (this.radiusDraft) {
+			const { constraint } = this.radiusDraft;
+			constraint.moveLabelTo(screen, ctx.sketch, ctx.viewport);
+			constraint.renderDimension(ctx.sketch, ctx.viewport, ctx.targetGroup);
+			return;
+		}
 		const world = ctx.cursorWorld;
 
 		let p1Id: string | null = null;

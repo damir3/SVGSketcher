@@ -3,7 +3,7 @@ import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { addScalar, subScalar, sub, type Vec2 } from '../../../math/vector';
+import { angleFromToDeg, directionAngleDeg, addScalar, subScalar, sub, type Vec2 } from '../../../math/vector';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import { calculateObjectsCentroid } from './utils';
@@ -425,7 +425,7 @@ export class CircularPatternTool extends BaseTool {
 			const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 			if (!center) return false;
 			this.angleDrag = {
-				previousPointerAngle: (Math.atan2(e.world.y - center.y, e.world.x - center.x) * 180) / Math.PI,
+				previousPointerAngle: angleFromToDeg(center, e.world),
 				accumulatedDelta: 0,
 				startAngle: this.state.angle,
 			};
@@ -530,7 +530,7 @@ export class CircularPatternTool extends BaseTool {
 		if (!center) return;
 		const dir = sub(e.world, center);
 		if (Math.hypot(dir.x, dir.y) < 1e-4) return;
-		const radialAngle = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+		const radialAngle = directionAngleDeg(dir);
 		let step = radialAngle - this.angleDrag.previousPointerAngle;
 		while (step > 180) step -= 360;
 		while (step < -180) step += 360;

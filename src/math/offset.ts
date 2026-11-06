@@ -1,8 +1,21 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint } from '../model/types';
 import { CoincidentConstraint } from '../solver/constraints';
-import { vec, addScaled, cross, dist, dot, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
+import {
+	angleFromTo,
+	vec,
+	addScaled,
+	cross,
+	dist,
+	dot,
+	mid,
+	normalize,
+	normalizeOrNull,
+	sub,
+	type Vec2,
+} from './vector';
 import { computeNaturalFitHandles } from './spline';
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import { OffsetConstraint, type OffsetPair, type OffsetSplinePoint } from '../solver/constraints/offset';
 
 export type OffsetDirection = 'one_side' | 'two_sides' | 'symmetric';
@@ -546,19 +559,12 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const maj = sketch.points.get(el.majorAxisPointId);
 		const min = sketch.points.get(el.minorAxisPointId);
 		if (!center || !maj || !min) return [];
-		const a = dist(center, maj);
-		const b = dist(center, min);
-		const angle = Math.atan2(maj.y - center.y, maj.x - center.x);
-		const cosA = Math.cos(angle);
-		const sinA = Math.sin(angle);
+		const radii = vec(dist(center, maj), dist(center, min));
+		const { axisU, axisV } = ellipseAxes(angleFromTo(center, maj));
 		const pts: Vec2[] = [];
 		for (let i = 0; i < numSamples; i++) {
 			const theta = (i / numSamples) * Math.PI * 2;
-			const end = vec(a * Math.cos(theta), b * Math.sin(theta));
-			pts.push({
-				x: center.x + end.x * cosA - end.y * sinA,
-				y: center.y + end.x * sinA + end.y * cosA,
-			});
+			pts.push(ellipsePointAtParameter(theta, center, radii, axisU, axisV));
 		}
 		pts.push({ ...pts[0] });
 		return pts;
@@ -572,8 +578,8 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pEnd = sketch.points.get(item.endPointId || arc.endPointId);
 		if (!center || !pStart || !pEnd) return [];
 
-		const aStart = Math.atan2(pStart.y - center.y, pStart.x - center.x);
-		const aEnd = Math.atan2(pEnd.y - center.y, pEnd.x - center.x);
+		const aStart = angleFromTo(center, pStart);
+		const aEnd = angleFromTo(center, pEnd);
 		const isReversed = item.startPointId === arc.endPointId;
 		const effectiveClockwise = isReversed ? !arc.clockwise : !!arc.clockwise;
 
@@ -636,20 +642,10 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pStart = sketch.points.get(item.startPointId || ea.startPointId);
 		const pEnd = sketch.points.get(item.endPointId || ea.endPointId);
 		if (!center || !maj || !min || !pStart || !pEnd) return [];
-		const a = dist(center, maj);
-		const b = dist(center, min);
-		const rot = Math.atan2(maj.y - center.y, maj.x - center.x);
-		const cosR = Math.cos(rot),
-			sinR = Math.sin(rot);
-
-		const toEllipseParam = (p: Vec2) => {
-			const dir = sub(p, center);
-			const end = vec(dir.x * cosR + dir.y * sinR, -dir.x * sinR + dir.y * cosR);
-			return Math.atan2(end.y / b, end.x / a);
-		};
-
-		let tStart = toEllipseParam(pStart);
-		let tEnd = toEllipseParam(pEnd);
+		const radii = vec(dist(center, maj), dist(center, min));
+		const { axisU, axisV } = ellipseAxes(angleFromTo(center, maj));
+		const tStart = ellipseParameterAtPoint(pStart, center, radii, axisU, axisV);
+		const tEnd = ellipseParameterAtPoint(pEnd, center, radii, axisU, axisV);
 		const isReversed = item.startPointId === ea.endPointId;
 		const effectiveClockwise = isReversed ? !ea.clockwise : !!ea.clockwise;
 
@@ -660,11 +656,7 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		for (let i = 0; i <= numSamples; i++) {
 			const t = i / numSamples;
 			const ang = effectiveClockwise ? tStart - t * sweep : tStart + t * sweep;
-			const end = vec(a * Math.cos(ang), b * Math.sin(ang));
-			pts.push({
-				x: center.x + end.x * cosR - end.y * sinR,
-				y: center.y + end.x * sinR + end.y * cosR,
-			});
+			pts.push(ellipsePointAtParameter(ang, center, radii, axisU, axisV));
 		}
 		return pts;
 	}
@@ -766,21 +758,18 @@ function computeSingleOffsetSide(
 		if (!el || !center || !maj || !min) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
 		const a = dist(center, maj);
 		const b = dist(center, min);
-		const rot = Math.atan2(maj.y - center.y, maj.x - center.x);
-		const cosR = Math.cos(rot),
-			sinR = Math.sin(rot);
+		const { axisU, axisV } = ellipseAxes(angleFromTo(center, maj));
+		const radii = vec(a, b);
 
 		const samples = 24;
 		const fitPts: Vec2[] = [];
 		for (let i = 0; i < samples; i++) {
 			const theta = (i / samples) * Math.PI * 2;
-			// Position on ellipse
-			const end = vec(a * Math.cos(theta), b * Math.sin(theta));
-			const p = vec(center.x + end.x * cosR - end.y * sinR, center.y + end.x * sinR + end.y * cosR);
+			const p = ellipsePointAtParameter(theta, center, radii, axisU, axisV);
 			// Tangent
 			const tangent = vec(
-				-a * Math.sin(theta) * cosR - b * Math.cos(theta) * sinR,
-				-a * Math.sin(theta) * sinR + b * Math.cos(theta) * cosR
+				-a * Math.sin(theta) * axisU.x + b * Math.cos(theta) * axisV.x,
+				-a * Math.sin(theta) * axisU.y + b * Math.cos(theta) * axisV.y
 			);
 			const uT = normalize(tangent);
 			// Outward normal: points away from center
@@ -1346,8 +1335,8 @@ export function calculateOffsetGeometry(
 		const p1 = arc ? sketch.points.get(refItem.startPointId || arc.startPointId) : null;
 		const p2 = arc ? sketch.points.get(refItem.endPointId || arc.endPointId) : null;
 		if (arc && center && p1 && p2) {
-			const a1 = Math.atan2(p1.y - center.y, p1.x - center.x);
-			const a2 = Math.atan2(p2.y - center.y, p2.x - center.x);
+			const a1 = angleFromTo(center, p1);
+			const a2 = angleFromTo(center, p2);
 			let sweep = arc.clockwise ? a1 - a2 : a2 - a1;
 			while (sweep < 0) sweep += 2 * Math.PI;
 			while (sweep >= 2 * Math.PI) sweep -= 2 * Math.PI;

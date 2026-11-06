@@ -1,6 +1,7 @@
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../../../math/ellipse';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dot, add, addScaled, dist, distancesFrom, scale, vec, sub, type Vec2 } from '../../../math/vector';
+import { angleFromTo, dot, dist, distancesFrom, vec, sub, type Vec2 } from '../../../math/vector';
 import {
 	renderEllipseMajorAxisPreviewVisual,
 	renderEllipsePreviewVisual,
@@ -212,12 +213,9 @@ export class EllipseTool extends BaseTool {
 			const axisU = vec((majWorld.x - centerWorld.x) / rxVal, (majWorld.y - centerWorld.y) / rxVal);
 			const axisV = vec((minWorld.x - centerWorld.x) / ryVal, (minWorld.y - centerWorld.y) / ryVal);
 
-			const dir = sub(effectiveWorld, centerWorld);
-			const u = dot(dir, axisU);
-			const v = dot(dir, axisV);
-			const t = Math.atan2(v / ryVal, u / rxVal);
-
-			const proj = add(centerWorld, addScaled(scale(axisU, rxVal * Math.cos(t)), axisV, ryVal * Math.sin(t)));
+			const radii = vec(rxVal, ryVal);
+			const t = ellipseParameterAtPoint(effectiveWorld, centerWorld, radii, axisU, axisV);
+			const proj = ellipsePointAtParameter(t, centerWorld, radii, axisU, axisV);
 
 			let startPtId: string;
 			if (
@@ -243,16 +241,9 @@ export class EllipseTool extends BaseTool {
 			const sMin = this.ctx.viewport.worldToScreen(minWorld);
 			const sStart = this.ctx.viewport.worldToScreen(this.startWorldPtPos);
 			const r = distancesFrom(sCenter, sMaj, sMin);
-			const rx_s = Math.max(r.x, 0.1);
-			const ry_s = Math.max(r.y, 0.1);
-			const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
-			const ux_s = Math.cos(theta);
-			const uy_s = Math.sin(theta);
-			const vx_s = -Math.sin(theta);
-			const vy_s = Math.cos(theta);
-			const us = (sStart.x - sCenter.x) * ux_s + (sStart.y - sCenter.y) * uy_s;
-			const vs = (sStart.x - sCenter.x) * vx_s + (sStart.y - sCenter.y) * vy_s;
-			this.ellipticalArcPrevAngle = Math.atan2(vs / ry_s, us / rx_s);
+			const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
+			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(angleFromTo(sCenter, sMaj));
+			this.ellipticalArcPrevAngle = ellipseParameterAtPoint(sStart, sCenter, paramRadii, screenAxisU, screenAxisV);
 			this.ellipticalArcTotalAngle = 0;
 			this.drawingStep = 4;
 			this.onStateChange?.();
@@ -271,12 +262,9 @@ export class EllipseTool extends BaseTool {
 			const axisU = vec((majWorld.x - centerWorld.x) / rxVal, (majWorld.y - centerWorld.y) / rxVal);
 			const axisV = vec((minWorld.x - centerWorld.x) / ryVal, (minWorld.y - centerWorld.y) / ryVal);
 
-			const dir = sub(effectiveWorld, centerWorld);
-			const u = dot(dir, axisU);
-			const v = dot(dir, axisV);
-			const te = Math.atan2(v / ryVal, u / rxVal);
-
-			const proj = add(centerWorld, addScaled(scale(axisU, rxVal * Math.cos(te)), axisV, ryVal * Math.sin(te)));
+			const radii = vec(rxVal, ryVal);
+			const te = ellipseParameterAtPoint(effectiveWorld, centerWorld, radii, axisU, axisV);
+			const proj = ellipsePointAtParameter(te, centerWorld, radii, axisU, axisV);
 
 			// Screen orientation calculation for clockwise flag
 			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
@@ -286,22 +274,12 @@ export class EllipseTool extends BaseTool {
 			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld);
 
 			const r = distancesFrom(sCenter, sMaj, sMin);
-			const rx_s = Math.max(r.x, 0.1);
-			const ry_s = Math.max(r.y, 0.1);
+			const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
 
-			const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
-			const ux_s = Math.cos(theta);
-			const uy_s = Math.sin(theta);
-			const vx_s = -Math.sin(theta);
-			const vy_s = Math.cos(theta);
+			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(angleFromTo(sCenter, sMaj));
 
-			const us = (sStart.x - sCenter.x) * ux_s + (sStart.y - sCenter.y) * uy_s;
-			const vs = (sStart.x - sCenter.x) * vx_s + (sStart.y - sCenter.y) * vy_s;
-			const ue = (sCur.x - sCenter.x) * ux_s + (sCur.y - sCenter.y) * uy_s;
-			const ve = (sCur.x - sCenter.x) * vx_s + (sCur.y - sCenter.y) * vy_s;
-
-			const ts_sc = Math.atan2(vs / ry_s, us / rx_s);
-			const te_sc = Math.atan2(ve / ry_s, ue / rx_s);
+			const ts_sc = ellipseParameterAtPoint(sStart, sCenter, paramRadii, screenAxisU, screenAxisV);
+			const te_sc = ellipseParameterAtPoint(sCur, sCenter, paramRadii, screenAxisU, screenAxisV);
 			if (this.ellipticalArcPrevAngle !== null) {
 				let dAngle = te_sc - this.ellipticalArcPrevAngle;
 				while (dAngle > Math.PI) dAngle -= TWO_PI;
@@ -370,22 +348,12 @@ export class EllipseTool extends BaseTool {
 				const se = this.ctx.viewport.worldToScreen(effectiveWorld);
 
 				const r = distancesFrom(sc, smaj, smin);
-				const rx_s = Math.max(r.x, 0.1);
-				const ry_s = Math.max(r.y, 0.1);
+				const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
 
-				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-				const ux_s = Math.cos(theta);
-				const uy_s = Math.sin(theta);
-				const vx_s = -Math.sin(theta);
-				const vy_s = Math.cos(theta);
+				const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
 
-				const us = (ss.x - sc.x) * ux_s + (ss.y - sc.y) * uy_s;
-				const vs = (ss.x - sc.x) * vx_s + (ss.y - sc.y) * vy_s;
-				const ue = (se.x - sc.x) * ux_s + (se.y - sc.y) * uy_s;
-				const ve = (se.x - sc.x) * vx_s + (se.y - sc.y) * vy_s;
-
-				const ts = Math.atan2(vs / ry_s, us / rx_s);
-				const te = Math.atan2(ve / ry_s, ue / rx_s);
+				const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
+				const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
 
 				if (this.ellipticalArcPrevAngle === null) {
 					this.ellipticalArcPrevAngle = ts;
@@ -466,23 +434,13 @@ export class EllipseTool extends BaseTool {
 				const ss = ctx.viewport.worldToScreen(startWorld);
 				const se = ctx.viewport.worldToScreen(effectiveWorld);
 
-				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-				const ux_s = Math.cos(theta);
-				const uy_s = Math.sin(theta);
-				const vx_s = -Math.sin(theta);
-				const vy_s = Math.cos(theta);
-
-				const us = (ss.x - sc.x) * ux_s + (ss.y - sc.y) * uy_s;
-				const vs = (ss.x - sc.x) * vx_s + (ss.y - sc.y) * vy_s;
-				const ue = (se.x - sc.x) * ux_s + (se.y - sc.y) * uy_s;
-				const ve = (se.x - sc.x) * vx_s + (se.y - sc.y) * vy_s;
+				const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
 
 				const r = distancesFrom(sc, smaj, smin);
-				const rx_s = Math.max(r.x, 0.1);
-				const ry_s = Math.max(r.y, 0.1);
+				const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
 
-				const ts = Math.atan2(vs / ry_s, us / rx_s);
-				const te = Math.atan2(ve / ry_s, ue / rx_s);
+				const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
+				const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
 
 				let clockwise = this.ellipticalArcTotalAngle >= 0;
 				if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {

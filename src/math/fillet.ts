@@ -1,5 +1,5 @@
 import type { Vec2 } from './vector';
-import { add, addScaled, cross, dist, dot, mix, normalize, sub } from './vector';
+import { angleFromTo, add, addScaled, cross, dist, dot, mix, normalize, sub } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline } from '../model/types';
 import { CoincidentConstraint, MidpointConstraint } from '../solver/constraints';
@@ -252,9 +252,9 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
 		const sproj = addScaled(sc, dCenter, r);
 		const ss = { x: curve.start.x, y: -curve.start.y };
 		const se = { x: curve.end.x, y: -curve.end.y };
-		const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-		const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-		const ap = Math.atan2(sproj.y - sc.y, sproj.x - sc.x);
+		const as = angleFromTo(sc, ss);
+		const ae = angleFromTo(sc, se);
+		const ap = angleFromTo(sc, sproj);
 		const clockwise = curve.clockwise;
 
 		let sweep = 0;
@@ -317,8 +317,8 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
  * between t1 and t2 on a circle centered at center.
  */
 function computeFilletArcClockwise(center: Vec2, t1: Vec2, t2: Vec2): boolean {
-	const asScreen = Math.atan2(-(t1.y - center.y), t1.x - center.x);
-	const aeScreen = Math.atan2(-(t2.y - center.y), t2.x - center.x);
+	const asScreen = -angleFromTo(center, t1);
+	const aeScreen = -angleFromTo(center, t2);
 	let sweepCW = (aeScreen - asScreen) % TWO_PI;
 	if (sweepCW < 0) sweepCW += TWO_PI;
 	return sweepCW < Math.PI;

@@ -19,7 +19,8 @@ import {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 } from '../solver/constraints';
-import { dot, vec, addScaled, dist, normalize, scale, sub, type Vec2 } from './vector';
+import { angleFromTo, dot, vec, addScaled, dist, normalize, scale, sub, type Vec2 } from './vector';
+import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import {
 	type GeoCurve,
 	type GeoSegment,
@@ -218,8 +219,8 @@ function findExtendCandidateForArc(
 	const edge: 'start' | 'end' = dEnd <= dStart ? 'end' : 'start';
 	const fromPoint = edge === 'end' ? pEnd : pStart;
 
-	const thetaS = Math.atan2(pStart.y - c.y, pStart.x - c.x);
-	const thetaE = Math.atan2(pEnd.y - c.y, pEnd.x - c.x);
+	const thetaS = angleFromTo(c, pStart);
+	const thetaE = angleFromTo(c, pEnd);
 
 	let currentSweep = target.clockwise ? thetaS - thetaE : thetaE - thetaS;
 	while (currentSweep < 0) currentSweep += 2 * Math.PI;
@@ -245,7 +246,7 @@ function findExtendCandidateForArc(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(fullCircle, other);
 		for (const pt of inters) {
-			const thetaP = Math.atan2(pt.y - c.y, pt.x - c.x);
+			const thetaP = angleFromTo(c, pt);
 			let sweep: number;
 			if (edge === 'end') {
 				sweep = target.clockwise ? thetaE - thetaP : thetaP - thetaE;
@@ -335,20 +336,10 @@ function findExtendCandidateForEllipticalArc(
 
 	const maj = target.majorAxisPoint;
 	const min = target.minorAxisPoint;
-	const a = dist(c, maj);
-	const b = dist(c, min);
-	const rot = Math.atan2(maj.y - c.y, maj.x - c.x);
-	const cosR = Math.cos(rot),
-		sinR = Math.sin(rot);
-
-	const toParam = (p: Vec2) => {
-		const dir = sub(p, c);
-		const local = vec(dir.x * cosR + dir.y * sinR, -dir.x * sinR + dir.y * cosR);
-		return Math.atan2(local.y / b, local.x / a);
-	};
-
-	const thetaS = toParam(pStart);
-	const thetaE = toParam(pEnd);
+	const radii = vec(dist(c, maj), dist(c, min));
+	const { axisU, axisV } = ellipseAxes(angleFromTo(c, maj));
+	const thetaS = ellipseParameterAtPoint(pStart, c, radii, axisU, axisV);
+	const thetaE = ellipseParameterAtPoint(pEnd, c, radii, axisU, axisV);
 	let currentSweep = target.clockwise ? thetaS - thetaE : thetaE - thetaS;
 	while (currentSweep < 0) currentSweep += 2 * Math.PI;
 	while (currentSweep >= 2 * Math.PI) currentSweep -= 2 * Math.PI;
@@ -362,7 +353,7 @@ function findExtendCandidateForEllipticalArc(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(fullEllipse, other);
 		for (const pt of inters) {
-			const thetaP = toParam(pt);
+			const thetaP = ellipseParameterAtPoint(pt, c, radii, axisU, axisV);
 			let sweep: number;
 			if (edge === 'end') {
 				sweep = target.clockwise ? thetaE - thetaP : thetaP - thetaE;

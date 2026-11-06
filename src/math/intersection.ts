@@ -1,6 +1,18 @@
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import type { Vec2 } from './vector';
 import { AABB } from './aabb';
-import { dot, addScaled, cross, distancesFrom, mid, mix, projectPointOntoSegment, sub, vec } from './vector';
+import {
+	angleFromTo,
+	dot,
+	addScaled,
+	cross,
+	distancesFrom,
+	mid,
+	mix,
+	projectPointOntoSegment,
+	sub,
+	vec,
+} from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
 import {
@@ -179,8 +191,8 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const sc = { x: curve.center.x, y: -curve.center.y };
 		const ss = { x: curve.start.x, y: -curve.start.y };
 		const se = { x: curve.end.x, y: -curve.end.y };
-		const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-		const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+		const as = angleFromTo(sc, ss);
+		const ae = angleFromTo(sc, se);
 		let sweep = curve.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		const u = Math.max(0, Math.min(1, param));
@@ -195,15 +207,8 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
 		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const r = distancesFrom(sc, smaj, smin);
-		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const u = vec(Math.cos(theta), Math.sin(theta));
-		const v = vec(-Math.sin(theta), Math.cos(theta));
-		const up = r.x * Math.cos(param);
-		const vp = r.y * Math.sin(param);
-		const sq = {
-			x: sc.x + up * u.x + vp * v.x,
-			y: sc.y + up * u.y + vp * v.y,
-		};
+		const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(sc, smaj));
+		const sq = ellipsePointAtParameter(param, sc, r, u, v);
 		return { x: sq.x, y: -sq.y };
 	} else if (curve.type === 'elliptical_arc') {
 		const sc = { x: curve.center.x, y: -curve.center.y };
@@ -212,27 +217,14 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const ss = { x: curve.start.x, y: -curve.start.y };
 		const se = { x: curve.end.x, y: -curve.end.y };
 		const r = distancesFrom(sc, smaj, smin);
-		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const axisU = vec(Math.cos(theta), Math.sin(theta));
-		const v = vec(-Math.sin(theta), Math.cos(theta));
-		const startOffset = sub(ss, sc);
-		const us = dot(startOffset, axisU);
-		const vs = dot(startOffset, v);
-		const endOffset = sub(se, sc);
-		const ue = dot(endOffset, axisU);
-		const ve = dot(endOffset, v);
-		const ts = Math.atan2(vs / r.y, us / r.x);
-		const te = Math.atan2(ve / r.y, ue / r.x);
+		const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+		const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
+		const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		const u = Math.max(0, Math.min(1, param));
 		const t = curve.clockwise ? ts + u * sweep : ts - u * sweep;
-		const up = r.x * Math.cos(t);
-		const vp = r.y * Math.sin(t);
-		const sq = {
-			x: sc.x + up * axisU.x + vp * v.x,
-			y: sc.y + up * axisU.y + vp * v.y,
-		};
+		const sq = ellipsePointAtParameter(t, sc, r, axisU, axisV);
 		return { x: sq.x, y: -sq.y };
 	}
 	return { x: 0, y: 0 };
@@ -253,7 +245,7 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 	} else if (curve.type === 'circle') {
 		const sc = { x: curve.center.x, y: -curve.center.y };
 		const sp = { x: pt.x, y: -pt.y };
-		let ang = Math.atan2(sp.y - sc.y, sp.x - sc.x);
+		let ang = angleFromTo(sc, sp);
 		if (ang < 0) ang += TWO_PI;
 		return ang;
 	} else if (curve.type === 'arc') {
@@ -261,9 +253,9 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const ss = { x: curve.start.x, y: -curve.start.y };
 		const se = { x: curve.end.x, y: -curve.end.y };
 		const sp = { x: pt.x, y: -pt.y };
-		const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-		const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-		const ap = Math.atan2(sp.y - sc.y, sp.x - sc.x);
+		const as = angleFromTo(sc, ss);
+		const ae = angleFromTo(sc, se);
+		const ap = angleFromTo(sc, sp);
 		let sweep = curve.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		let delta = curve.clockwise ? (ap - as) % TWO_PI : (as - ap) % TWO_PI;
@@ -276,13 +268,9 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const sp = { x: pt.x, y: -pt.y };
 		const r = distancesFrom(sc, smaj, smin);
-		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const u = vec(Math.cos(theta), Math.sin(theta));
-		const v = vec(-Math.sin(theta), Math.cos(theta));
-		const dir = sub(sp, sc);
-		const up = dot(dir, u);
-		const vp = dot(dir, v);
-		let t = Math.atan2(vp / Math.max(r.y, 1e-6), up / Math.max(r.x, 1e-6));
+		const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+		const paramRadii = vec(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
+		let t = ellipseParameterAtPoint(sp, sc, paramRadii, axisU, axisV);
 		if (t < 0) t += TWO_PI;
 		return t;
 	} else if (curve.type === 'elliptical_arc') {
@@ -293,21 +281,11 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const se = { x: curve.end.x, y: -curve.end.y };
 		const sp = { x: pt.x, y: -pt.y };
 		const r = distancesFrom(sc, smaj, smin);
-		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const u = vec(Math.cos(theta), Math.sin(theta));
-		const v = vec(-Math.sin(theta), Math.cos(theta));
-		const startOffset = sub(ss, sc);
-		const us = dot(startOffset, u);
-		const vs = dot(startOffset, v);
-		const endOffset = sub(se, sc);
-		const ue = dot(endOffset, u);
-		const ve = dot(endOffset, v);
-		const ts = Math.atan2(vs / Math.max(r.y, 1e-6), us / Math.max(r.x, 1e-6));
-		const te = Math.atan2(ve / Math.max(r.y, 1e-6), ue / Math.max(r.x, 1e-6));
-		const dp = sub(sp, sc);
-		const up = dot(dp, u);
-		const vp = dot(dp, v);
-		const tp = Math.atan2(vp / Math.max(r.y, 1e-6), up / Math.max(r.x, 1e-6));
+		const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+		const paramRadii = vec(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
+		const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
+		const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
+		const tp = ellipseParameterAtPoint(sp, sc, paramRadii, axisU, axisV);
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		let delta = curve.clockwise ? (tp - ts) % TWO_PI : (ts - tp) % TWO_PI;
@@ -326,9 +304,9 @@ function isPointOnArc(pt: Vec2, arc: GeoArc, tol = 1e-3): boolean {
 	const ss = { x: arc.start.x, y: -arc.start.y };
 	const se = { x: arc.end.x, y: -arc.end.y };
 	const sp = { x: pt.x, y: -pt.y };
-	const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-	const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
-	const ap = Math.atan2(sp.y - sc.y, sp.x - sc.x);
+	const as = angleFromTo(sc, ss);
+	const ae = angleFromTo(sc, se);
+	const ap = angleFromTo(sc, sp);
 	let sweep = arc.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 	if (sweep < 0) sweep += TWO_PI;
 	let delta = arc.clockwise ? (ap - as) % TWO_PI : (as - ap) % TWO_PI;
@@ -349,21 +327,10 @@ function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): bo
 	const sp = { x: pt.x, y: -pt.y };
 	const r = distancesFrom(sc, smaj, smin);
 	if (r.x < 1e-6 || r.y < 1e-6) return false;
-	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
-	const startOffset = sub(ss, sc);
-	const us = dot(startOffset, u);
-	const vs = dot(startOffset, v);
-	const endOffset = sub(se, sc);
-	const ue = dot(endOffset, u);
-	const ve = dot(endOffset, v);
-	const ts = Math.atan2(vs / r.y, us / r.x);
-	const te = Math.atan2(ve / r.y, ue / r.x);
-	const dp = sub(sp, sc);
-	const up = dot(dp, u);
-	const vp = dot(dp, v);
-	const tp = Math.atan2(vp / r.y, up / r.x);
+	const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+	const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
+	const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
+	const tp = ellipseParameterAtPoint(sp, sc, r, axisU, axisV);
 	let sweep = arc.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 	if (sweep < 0) sweep += TWO_PI;
 	let delta = arc.clockwise ? (tp - ts) % TWO_PI : (ts - tp) % TWO_PI;
@@ -444,9 +411,7 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 	const r = distancesFrom(sc, smaj, smin);
 	if (r.x < 1e-6 || r.y < 1e-6) return [];
 
-	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(sc, smaj));
 
 	// Transform line segment endpoints to ellipse-local coordinates
 	const d1 = sub(s1, sc);
@@ -539,12 +504,11 @@ export function intersectEllipseEllipse(
 		const r1 = distancesFrom(sc1, maj, min);
 		rx1 = r1.x;
 		ry1 = r1.y;
-		theta1 = Math.atan2(maj.y - sc1.y, maj.x - sc1.x);
+		theta1 = angleFromTo(sc1, maj);
 	}
 	if (rx1 < 1e-6 || ry1 < 1e-6) return [];
 
-	const u1 = vec(Math.cos(theta1), Math.sin(theta1));
-	const v1 = vec(-Math.sin(theta1), Math.cos(theta1));
+	const { axisU: u1, axisV: v1 } = ellipseAxes(theta1);
 
 	// Parametrize e2 implicit equation in SVG space
 	const sc2 = { x: e2.center.x, y: -e2.center.y };
@@ -561,22 +525,14 @@ export function intersectEllipseEllipse(
 		const r2 = distancesFrom(sc2, maj, min);
 		rx2 = r2.x;
 		ry2 = r2.y;
-		theta2 = Math.atan2(maj.y - sc2.y, maj.x - sc2.x);
+		theta2 = angleFromTo(sc2, maj);
 	}
 	if (rx2 < 1e-6 || ry2 < 1e-6) return [];
 
-	const u2 = vec(Math.cos(theta2), Math.sin(theta2));
-	const v2 = vec(-Math.sin(theta2), Math.cos(theta2));
+	const { axisU: u2, axisV: v2 } = ellipseAxes(theta2);
 
-	// Evaluate point on e1 at parameter t
-	const pointOnE1 = (t: number): Vec2 => {
-		const up = rx1 * Math.cos(t);
-		const vp = ry1 * Math.sin(t);
-		return {
-			x: sc1.x + up * u1.x + vp * v1.x,
-			y: sc1.y + up * u1.y + vp * v1.y,
-		};
-	};
+	const radii1 = vec(rx1, ry1);
+	const pointOnE1 = (t: number): Vec2 => ellipsePointAtParameter(t, sc1, radii1, u1, v1);
 
 	// Implicit value F2 of a point on e2: F2 = 0 on perimeter
 	const implicitE2 = (p: Vec2): number => {
@@ -838,9 +794,7 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 			const min = { x: other.minorAxisPoint.x, y: -other.minorAxisPoint.y };
 			const r = distancesFrom(sc, maj, min);
 			if (r.x < 1e-6 || r.y < 1e-6) continue;
-			const theta = Math.atan2(maj.y - sc.y, maj.x - sc.x);
-			const u = vec(Math.cos(theta), Math.sin(theta));
-			const v = vec(-Math.sin(theta), Math.cos(theta));
+			const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(sc, maj));
 
 			const f = (p: Vec2) => {
 				const sp = { x: p.x, y: -p.y };

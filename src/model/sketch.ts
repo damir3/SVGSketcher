@@ -92,7 +92,19 @@ import {
 	type SelectionState,
 } from './types';
 import type { GeoCurve } from '../math/intersection';
-import { addScaled, cross, dist, dot, mid, reflectPoint, scale, sub, vec, type Vec2 } from '../math/vector';
+import {
+	angleFromTo,
+	addScaled,
+	cross,
+	dist,
+	dot,
+	mid,
+	reflectPoint,
+	scale,
+	sub,
+	vec,
+	type Vec2,
+} from '../math/vector';
 import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { calculateOffsetGeometry } from '../math/offset';
@@ -1509,7 +1521,8 @@ export class SketchDocument {
 	addRadiusConstraint(
 		circleOrArcId: string,
 		targetRadius?: number,
-		displayMode?: 'radius' | 'diameter'
+		displayMode?: 'radius' | 'diameter',
+		placement?: Pick<RadiusConstraint, 'leaderAngle' | 'leaderOffset'>
 	): RadiusConstraint | null {
 		const isCircle = this.circles.has(circleOrArcId);
 		const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
@@ -1542,7 +1555,8 @@ export class SketchDocument {
 		}
 
 		const r = targetRadius ?? Math.max(0.01, Number(entity.radius.toFixed(2)));
-		const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r, 1.0, undefined, defaultMode);
+		const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r, 1.0, placement?.leaderAngle, defaultMode);
+		c.leaderOffset = placement?.leaderOffset;
 		this.addConstraint(c);
 		return c;
 	}
@@ -3056,7 +3070,7 @@ export class SketchDocument {
 					const start = this.points.get(arc.startPointId);
 					const end = this.points.get(arc.endPointId);
 					if (center && start && end && !this.isPointFixed(arc.endPointId)) {
-						const as = Math.atan2(start.y - center.y, start.x - center.x);
+						const as = angleFromTo(center, start);
 						const sweepRad = (clampedAngle * Math.PI) / 180;
 						const newAe = arc.clockwise ? as - sweepRad : as + sweepRad;
 						end.x = center.x + Math.cos(newAe) * arc.radius;
@@ -3083,12 +3097,12 @@ export class SketchDocument {
 				const end = this.points.get(arc.endPointId);
 				if (center && start && end) {
 					if (!this.isPointFixed(arc.startPointId)) {
-						const as = Math.atan2(start.y - center.y, start.x - center.x);
+						const as = angleFromTo(center, start);
 						start.x = center.x + Math.cos(as) * targetRad;
 						start.y = center.y + Math.sin(as) * targetRad;
 					}
 					if (!this.isPointFixed(arc.endPointId)) {
-						const ae = Math.atan2(end.y - center.y, end.x - center.x);
+						const ae = angleFromTo(center, end);
 						end.x = center.x + Math.cos(ae) * targetRad;
 						end.y = center.y + Math.sin(ae) * targetRad;
 					}

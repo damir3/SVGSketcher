@@ -5,7 +5,7 @@ import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgPath, createSvgRect, createSvgText } from '../../canvas/svg';
 import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
-import { addScaled, cross, scale, sub, vec } from '../../math/vector';
+import { angleFromTo, addScaled, cross, scale, sub, vec } from '../../math/vector';
 
 /**
  * Dimensional constraint: angle between two lines equals targetAngle (in degrees)
@@ -136,8 +136,8 @@ export class AngleConstraint extends BaseConstraint {
 		const sRay1 = ctx.viewport.worldToScreen(addScaled(geom.pInt, u1, 20));
 		const sRay2 = ctx.viewport.worldToScreen(addScaled(geom.pInt, u2, 20));
 
-		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+		const a1 = angleFromTo(sCenter, sRay1);
+		const a2 = angleFromTo(sCenter, sRay2);
 
 		const TWO_PI = 2 * Math.PI;
 		let delta = a2 - a1;
@@ -257,8 +257,8 @@ export class AngleConstraint extends BaseConstraint {
 		const sRay1 = viewport.worldToScreen(addScaled(geom.pInt, u1, 20));
 		const sRay2 = viewport.worldToScreen(addScaled(geom.pInt, u2, 20));
 
-		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+		const a1 = angleFromTo(sCenter, sRay1);
+		const a2 = angleFromTo(sCenter, sRay2);
 
 		const TWO_PI = 2 * Math.PI;
 		let delta = a2 - a1;
@@ -279,7 +279,7 @@ export class AngleConstraint extends BaseConstraint {
 		const dCenter = Math.hypot(screen.x - sCenter.x, screen.y - sCenter.y);
 		const dRadial = Math.abs(dCenter - rScreen);
 		if (dRadial <= LINE_DISTANCE_PX) {
-			const pAngle = Math.atan2(screen.y - sCenter.y, screen.x - sCenter.x);
+			const pAngle = angleFromTo(sCenter, screen);
 			const sweepAngle = delta;
 			let ptSweep = pAngle - a1;
 			if (sweepAngle > 0) {

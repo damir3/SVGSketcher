@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, vec, type Vec2 } from '../../../math/vector';
+import { angleFromTo, dist, vec, type Vec2 } from '../../../math/vector';
 import { ToolPopup } from '../../../ui/tool-popup';
 import type { SketchPoint, SketchLine } from '../../../model/types';
 import type { PatternCopyData, PointToLineDistanceConstraint } from '../../../solver/constraints';
@@ -118,7 +118,7 @@ export class PolygonTool extends BaseTool {
 			const curPos = snap ? snap.worldPos : world;
 			const currentDist = dist(this.centerWorldPos!, curPos);
 			const radius = this.radiusLocked ? this.radius : Math.max(1, currentDist);
-			const angleRad = Math.atan2(curPos.y - this.centerWorldPos!.y, curPos.x - this.centerWorldPos!.x);
+			const angleRad = angleFromTo(this.centerWorldPos!, curPos);
 			this.commitPolygon(this.centerPtId!, this.sides, radius, angleRad, this.radiusLocked);
 		}
 	}
@@ -131,10 +131,7 @@ export class PolygonTool extends BaseTool {
 				this.radius = Math.max(1, dist(this.centerWorldPos, effectiveWorld));
 				this.popup.setValue('radius', this.radius);
 			}
-			this.currentAngle = Math.atan2(
-				effectiveWorld.y - this.centerWorldPos.y,
-				effectiveWorld.x - this.centerWorldPos.x
-			);
+			this.currentAngle = angleFromTo(this.centerWorldPos, effectiveWorld);
 
 			if (this.popup.isOpen()) {
 				this.popup.updatePosition(e.screen);

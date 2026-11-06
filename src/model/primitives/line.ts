@@ -1,4 +1,4 @@
-import { dist, type Vec2 } from '../../math/vector';
+import { angleFromToDeg, dist, type Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
 import type { GeoSegment } from '../../math/intersection';
@@ -95,7 +95,7 @@ export class SketchLine implements ISketchPrimitive {
 				getValue: ctx => {
 					const p1 = ctx.sketch.points.get(this.p1Id);
 					const p2 = ctx.sketch.points.get(this.p2Id);
-					return p1 && p2 ? Number(((Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI).toFixed(2)) : 0;
+					return p1 && p2 ? Number(angleFromToDeg(p1, p2).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setLineAngle(this.id, val),
 			},

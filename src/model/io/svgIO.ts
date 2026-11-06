@@ -1,3 +1,4 @@
+import { ellipseAxes, ellipseParameterAtPoint } from '../../math/ellipse';
 import type { SketchDocument } from '../sketch';
 import type { SketchSnapshot } from '../history';
 import type { SketchPoint } from '../types';
@@ -7,7 +8,7 @@ import { SVG_EXPORT_STYLE } from '../../canvas/styles';
 import { getFontSync } from '../../canvas/fonts';
 import { generateTextSvgPathData } from '../../math/textPath';
 import type { GeoCurve } from '../../math/intersection';
-import { sub, cross, distancesFrom, dot, vec, type Vec2 } from '../../math/vector';
+import { angleFromTo, angleFromToDeg, cross, distancesFrom, dot, vec, type Vec2 } from '../../math/vector';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -742,8 +743,8 @@ export function exportSketchToSVG(
 			const ss = { x: start.x, y: -start.y };
 			const se = { x: end.x, y: -end.y };
 
-			const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-			const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+			const as = angleFromTo(sc, ss);
+			const ae = angleFromTo(sc, se);
 			const clockwise = !!arc.clockwise;
 
 			let sweepAngle = 0;
@@ -779,7 +780,7 @@ export function exportSketchToSVG(
 			const smaj = { x: maj.x, y: -maj.y };
 			const smin = { x: min.x, y: -min.y };
 			const r = distancesFrom(sc, smaj, smin);
-			const deg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+			const deg = angleFromToDeg(sc, smaj);
 			const dash = el.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
@@ -808,21 +809,13 @@ export function exportSketchToSVG(
 			const se = { x: end.x, y: -end.y };
 
 			const r = distancesFrom(sc, smaj, smin);
-			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+			const theta = angleFromTo(sc, smaj);
 			const thetaDeg = (theta * 180) / Math.PI;
 
-			const u = vec(Math.cos(theta), Math.sin(theta));
-			const v = vec(-u.y, u.x);
+			const { axisU: u, axisV: v } = ellipseAxes(theta);
 
-			const startOffset = sub(ss, sc);
-			const us = dot(startOffset, u);
-			const vs = dot(startOffset, v);
-			const endOffset = sub(se, sc);
-			const ue = dot(endOffset, u);
-			const ve = dot(endOffset, v);
-
-			const ts = Math.atan2(vs / r.y, us / r.x);
-			const te = Math.atan2(ve / r.y, ue / r.x);
+			const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
+			const te = ellipseParameterAtPoint(se, sc, r, u, v);
 
 			const clockwise = !!elarc.clockwise;
 			let sweepAngle = 0;

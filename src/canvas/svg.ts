@@ -1,5 +1,6 @@
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
 import { SVG_NS, type SvgAttrs, TOOLTIP_RECT_ATTRS, TOOLTIP_TEXT_ATTRS } from './styles';
-import { dot, sub, vec, distancesFrom, type Vec2 } from '../math/vector';
+import { angleFromTo, vec, distancesFrom, type Vec2 } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
 	return typeof v === 'number' ? (Number.isInteger(v) ? v.toString() : v.toFixed(1)) : String(v);
@@ -129,8 +130,8 @@ export function renderTooltip(parent: SVGElement, position: Vec2, textStr: strin
 const TWO_PI = 2 * Math.PI;
 
 export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
-	const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-	const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+	const as = angleFromTo(sc, ss);
+	const ae = angleFromTo(sc, se);
 
 	let sweepAngle = 0;
 	const sweepFlag = clockwise ? 1 : 0;
@@ -163,21 +164,13 @@ export function getEllipticalArcSvgPath(
 	const r = distancesFrom(sc, smaj, smin);
 	if (r.x < 0.1 || r.y < 0.1) return '';
 
-	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
+	const theta = angleFromTo(sc, smaj);
 	const thetaDeg = (theta * 180) / Math.PI;
 
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU: u, axisV: v } = ellipseAxes(theta);
 
-	const startOffset = sub(ss, sc);
-	const us = dot(startOffset, u);
-	const vs = dot(startOffset, v);
-	const endOffset = sub(se, sc);
-	const ue = dot(endOffset, u);
-	const ve = dot(endOffset, v);
-
-	const ts = Math.atan2(vs / r.y, us / r.x);
-	const te = Math.atan2(ve / r.y, ue / r.x);
+	const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
+	const te = ellipseParameterAtPoint(se, sc, r, u, v);
 
 	let sweepAngle = 0;
 	const sweepFlag = clockwise ? 1 : 0;
@@ -194,9 +187,7 @@ export function getEllipticalArcSvgPath(
 	}
 
 	const tmid = clockwise ? ts + sweepAngle * 0.5 : ts - sweepAngle * 0.5;
-	const umid = r.x * Math.cos(tmid);
-	const vmid = r.y * Math.sin(tmid);
-	const midpoint = vec(sc.x + umid * u.x + vmid * v.x, sc.y + umid * u.y + vmid * v.y);
+	const midpoint = ellipsePointAtParameter(tmid, sc, r, u, v);
 
 	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${midpoint.x.toFixed(2)} ${midpoint.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 }

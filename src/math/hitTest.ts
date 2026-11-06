@@ -1,4 +1,5 @@
-import { dot, vec, sub, type Vec2, dist, distancesFrom, projectPointOntoSegment } from './vector';
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
+import { ORIGIN, angleFromTo, sub, type Vec2, dist, distancesFrom, projectPointOntoSegment } from './vector';
 import { getSplineParamAtPoint, type BezierSegment } from './spline';
 
 const TWO_PI = 2 * Math.PI;
@@ -41,9 +42,9 @@ export function distanceToArc(
 	const dToPerimeter = Math.abs(dToCenter - radius);
 	if (dToPerimeter > thresholdPx) return null;
 
-	const as = Math.atan2(start.y - center.y, start.x - center.x);
-	const ae = Math.atan2(end.y - center.y, end.x - center.x);
-	const ap = Math.atan2(point.y - center.y, point.x - center.x);
+	const as = angleFromTo(center, start);
+	const ae = angleFromTo(center, end);
+	const ap = angleFromTo(center, point);
 
 	let sweepAngle = clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 	if (sweepAngle < 0) sweepAngle += TWO_PI;
@@ -65,19 +66,12 @@ export function distanceToEllipse(point: Vec2, center: Vec2, majorPt: Vec2, mino
 	const r = distancesFrom(center, majorPt, minorPt);
 	if (r.x < 0.1 || r.y < 0.1) return null;
 
-	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
-	const axisU = vec(Math.cos(theta), Math.sin(theta));
-	const axisV = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU, axisV } = ellipseAxes(angleFromTo(center, majorPt));
 
 	const dir = sub(point, center);
-	const u = dot(dir, axisU);
-	const v = dot(dir, axisV);
 
-	const t = Math.atan2(v / r.y, u / r.x);
-	const ellipsePoint = vec(
-		r.x * Math.cos(t) * axisU.x + r.y * Math.sin(t) * axisV.x,
-		r.x * Math.cos(t) * axisU.y + r.y * Math.sin(t) * axisV.y
-	);
+	const t = ellipseParameterAtPoint(point, center, r, axisU, axisV);
+	const ellipsePoint = ellipsePointAtParameter(t, ORIGIN, r, axisU, axisV);
 
 	return Math.hypot(dir.x - ellipsePoint.x, dir.y - ellipsePoint.y);
 }
@@ -99,32 +93,18 @@ export function distanceToEllipticalArc(
 	const r = distancesFrom(center, majorPt, minorPt);
 	if (r.x < 0.1 || r.y < 0.1) return null;
 
-	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
-	const axisU = vec(Math.cos(theta), Math.sin(theta));
-	const axisV = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU, axisV } = ellipseAxes(angleFromTo(center, majorPt));
 
 	const dir = sub(point, center);
-	const u = dot(dir, axisU);
-	const v = dot(dir, axisV);
 
-	const t = Math.atan2(v / r.y, u / r.x);
-	const ellipsePoint = vec(
-		r.x * Math.cos(t) * axisU.x + r.y * Math.sin(t) * axisV.x,
-		r.x * Math.cos(t) * axisU.y + r.y * Math.sin(t) * axisV.y
-	);
+	const t = ellipseParameterAtPoint(point, center, r, axisU, axisV);
+	const ellipsePoint = ellipsePointAtParameter(t, ORIGIN, r, axisU, axisV);
 
 	const dPerimeter = Math.hypot(dir.x - ellipsePoint.x, dir.y - ellipsePoint.y);
 	if (dPerimeter > thresholdPx) return null;
 
-	const startOffset = sub(startPt, center);
-	const us = dot(startOffset, axisU);
-	const vs = dot(startOffset, axisV);
-	const endOffset = sub(endPt, center);
-	const ue = dot(endOffset, axisU);
-	const ve = dot(endOffset, axisV);
-
-	const ts = Math.atan2(vs / r.y, us / r.x);
-	const te = Math.atan2(ve / r.y, ue / r.x);
+	const ts = ellipseParameterAtPoint(startPt, center, r, axisU, axisV);
+	const te = ellipseParameterAtPoint(endPt, center, r, axisU, axisV);
 
 	let sweepAngle = clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 	if (sweepAngle < 0) sweepAngle += TWO_PI;
@@ -150,22 +130,4 @@ export function distanceToSpline(point: Vec2, screenSegments: BezierSegment[]): 
  */
 export function distanceToLinearDimension(point: Vec2, d1: Vec2, d2: Vec2): number {
 	return projectPointOntoSegment(point, d1, d2).dist;
-}
-
-/**
- * Calculates distance from a query point to a radial dimension leader line and shelf.
- */
-export function distanceToRadiusDimension(point: Vec2, center: Vec2, radius: number, screenAngle: number): number {
-	const cosA = Math.cos(screenAngle);
-	const sinA = Math.sin(screenAngle);
-	const edge = { x: center.x + cosA * radius, y: center.y + sinA * radius };
-	const dirX = cosA >= 0 ? 1 : -1;
-	const dirY = sinA >= 0 ? 1 : -1;
-	const tip = { x: edge.x + dirX * 30, y: edge.y + dirY * 20 };
-
-	const dTip = dist(point, tip);
-	const dShelf = projectPointOntoSegment(point, edge, tip).dist;
-	const dRadial = projectPointOntoSegment(point, center, edge).dist;
-
-	return Math.min(dTip, dShelf, dRadial);
 }

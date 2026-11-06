@@ -1,4 +1,5 @@
-import { dot, vec, distancesFrom, sub, type Vec2 } from './vector';
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
+import { angleFromTo, dot, vec, distancesFrom, sub, type Vec2 } from './vector';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -112,8 +113,8 @@ export function arcIntersectsAABB(
 	if (end.x >= min.x && end.x <= max.x && end.y >= min.y && end.y <= max.y) return true;
 	if (center.x >= min.x && center.x <= max.x && center.y >= min.y && center.y <= max.y) return true;
 
-	const as = Math.atan2(start.y - center.y, start.x - center.x);
-	const ae = Math.atan2(end.y - center.y, end.x - center.x);
+	const as = angleFromTo(center, start);
+	const ae = angleFromTo(center, end);
 
 	let sweepAngle = 0;
 	if (clockwise) {
@@ -154,9 +155,7 @@ export function ellipseIntersectsAABB(center: Vec2, majorPt: Vec2, minorPt: Vec2
 	const r = distancesFrom(center, majorPt, minorPt);
 	if (r.x < 0.01 || r.y < 0.01) return false;
 
-	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(center, majorPt));
 
 	const steps = 36;
 	let prevX = center.x + r.x * u.x;
@@ -164,9 +163,7 @@ export function ellipseIntersectsAABB(center: Vec2, majorPt: Vec2, minorPt: Vec2
 
 	for (let i = 1; i <= steps; i++) {
 		const t = (i / steps) * TWO_PI;
-		const cosT = Math.cos(t);
-		const sinT = Math.sin(t);
-		const curr = vec(center.x + r.x * cosT * u.x + r.y * sinT * v.x, center.y + r.x * cosT * u.y + r.y * sinT * v.y);
+		const curr = ellipsePointAtParameter(t, center, r, u, v);
 
 		if (curr.x >= min.x && curr.x <= max.x && curr.y >= min.y && curr.y <= max.y) return true;
 		if (segmentIntersectsAABB({ x: prevX, y: prevY }, curr, min, max)) return true;
@@ -198,19 +195,10 @@ export function ellipticalArcIntersectsAABB(
 	const r = distancesFrom(center, majorPt, minorPt);
 	if (r.x < 0.01 || r.y < 0.01) return false;
 
-	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
-	const u = vec(Math.cos(theta), Math.sin(theta));
-	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(center, majorPt));
 
-	const startOffset = sub(startPt, center);
-	const us = dot(startOffset, u);
-	const vs = dot(startOffset, v);
-	const endOffset = sub(endPt, center);
-	const ue = dot(endOffset, u);
-	const ve = dot(endOffset, v);
-
-	const ts = Math.atan2(vs / r.y, us / r.x);
-	const te = Math.atan2(ve / r.y, ue / r.x);
+	const ts = ellipseParameterAtPoint(startPt, center, r, u, v);
+	const te = ellipseParameterAtPoint(endPt, center, r, u, v);
 
 	let sweepAngle = 0;
 	if (clockwise) {
@@ -228,9 +216,7 @@ export function ellipticalArcIntersectsAABB(
 	for (let i = 1; i <= steps; i++) {
 		const frac = i / steps;
 		const t = clockwise ? ts + frac * sweepAngle : ts - frac * sweepAngle;
-		const cosT = Math.cos(t);
-		const sinT = Math.sin(t);
-		const curr = vec(center.x + r.x * cosT * u.x + r.y * sinT * v.x, center.y + r.x * cosT * u.y + r.y * sinT * v.y);
+		const curr = ellipsePointAtParameter(t, center, r, u, v);
 
 		if (curr.x >= min.x && curr.x <= max.x && curr.y >= min.y && curr.y <= max.y) return true;
 		if (segmentIntersectsAABB({ x: prevX, y: prevY }, curr, min, max)) return true;

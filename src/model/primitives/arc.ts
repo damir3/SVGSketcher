@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { angleFromTo, type Vec2 } from '../../math/vector';
 import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
 import type { GeoArc } from '../../math/intersection';
@@ -115,8 +115,8 @@ export class SketchArc implements ISketchPrimitive {
 					const start = ctx.sketch.points.get(this.startPointId);
 					const end = ctx.sketch.points.get(this.endPointId);
 					if (center && start && end) {
-						const as = Math.atan2(start.y - center.y, start.x - center.x);
-						const ae = Math.atan2(end.y - center.y, end.x - center.x);
+						const as = angleFromTo(center, start);
+						const ae = angleFromTo(center, end);
 						let sweep = this.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
 						if (sweep < 0) sweep += 2 * Math.PI;
 						return Number(((sweep * 180) / Math.PI).toFixed(2));

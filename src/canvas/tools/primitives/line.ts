@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, vec, type Vec2 } from '../../../math/vector';
+import { angleFromToDeg, dist, vec, type Vec2 } from '../../../math/vector';
 import { createSvgLine, renderTooltip } from '../../svg';
 import { getPreviewStrokeAttrs } from '../../styles';
 
@@ -90,8 +90,7 @@ export class LineTool extends BaseTool {
 			const s2 = ctx.viewport.worldToScreen(effectiveWorld);
 
 			const length = dist(this.startWorldPos, effectiveWorld);
-			const angleDeg =
-				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) / Math.PI;
+			const angleDeg = angleFromToDeg(this.startWorldPos, effectiveWorld);
 
 			createSvgLine(s1, s2, getPreviewStrokeAttrs(ctx.isConstruction, false, true), ctx.targetGroup);
 

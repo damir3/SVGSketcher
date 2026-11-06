@@ -9,6 +9,9 @@ import {
 	type ConstraintRenderContext,
 } from '../solver/constraints';
 import {
+	angleFromTo,
+	angleFromToDeg,
+	directionAngle,
 	dot,
 	addScaled,
 	ORIGIN,
@@ -889,7 +892,7 @@ export class SVGRenderer {
 			const r = distancesFrom(sc, smaj, smin);
 			if (r.x < 0.1 || r.y < 0.1) continue;
 
-			const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
+			const thetaDeg = angleFromToDeg(sc, smaj);
 			const isSelected =
 				sketch.selection.ellipseIds.has(ellipse.id) ||
 				!!options.mirrorHighlight?.selectedObjectIds.has(ellipse.id) ||
@@ -1183,7 +1186,7 @@ export class SVGRenderer {
 				const wScreen = widthWorld * viewport.zoom;
 				const hBoxScreen = heightWorld * viewport.zoom;
 
-				const angleCad = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+				const angleCad = angleFromTo(p0, p1);
 				const angleScreenDeg = (-angleCad * 180) / Math.PI;
 
 				const textG = createSvgElement(
@@ -1651,9 +1654,9 @@ export class SVGRenderer {
 		const sCenter = viewport.worldToScreen(center);
 		const ss = viewport.worldToScreen(start);
 		const se = viewport.worldToScreen(end);
-		const as = Math.atan2(ss.y - sCenter.y, ss.x - sCenter.x);
-		const ae = Math.atan2(se.y - sCenter.y, se.x - sCenter.x);
-		const aPt = Math.atan2(point.y - sCenter.y, point.x - sCenter.x);
+		const as = angleFromTo(sCenter, ss);
+		const ae = angleFromTo(sCenter, se);
+		const aPt = angleFromTo(sCenter, point);
 		const clockwise = !!arc.clockwise;
 
 		let totalSweep = 0;
@@ -1753,8 +1756,8 @@ export class SVGRenderer {
 			if (start && end) {
 				const ss = viewport.worldToScreen(start);
 				const se = viewport.worldToScreen(end);
-				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
-				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
+				const as = angleFromTo(sc, ss);
+				const ae = angleFromTo(sc, se);
 				const clockwise = !!arc.clockwise;
 
 				let sweepAngle = 0;
@@ -2121,7 +2124,7 @@ export class SVGRenderer {
 						const srmaj = viewport.worldToScreen(rmaj);
 						const srmin = viewport.worldToScreen(rmin);
 						const r = distancesFrom(src, srmaj, srmin);
-						const thetaDeg = (Math.atan2(srmaj.y - src.y, srmaj.x - src.x) * 180) / Math.PI;
+						const thetaDeg = angleFromToDeg(src, srmaj);
 
 						createSvgEllipse(
 							src,
@@ -2300,8 +2303,8 @@ export class SVGRenderer {
 	): void {
 		this.previewGroup.innerHTML = '';
 
-		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
-		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
+		const a1 = angleFromTo(sCenter, sRay1);
+		const a2 = angleFromTo(sCenter, sRay2);
 
 		let delta = a2 - a1;
 		while (delta > Math.PI) delta -= TWO_PI;
@@ -2517,7 +2520,7 @@ export class SVGRenderer {
 					const srmaj = viewport.worldToScreen(rmaj);
 					const srmin = viewport.worldToScreen(rmin);
 					const r = distancesFrom(src, srmaj, srmin);
-					const thetaDeg = (Math.atan2(srmaj.y - src.y, srmaj.x - src.x) * 180) / Math.PI;
+					const thetaDeg = angleFromToDeg(src, srmaj);
 
 					createSvgEllipse(
 						src,
@@ -3073,8 +3076,8 @@ export class SVGRenderer {
 				const vV = sub(sV, sT1);
 				const lenV = Math.hypot(vV.x, vV.y);
 				if (lenV > 1e-4) {
-					const angV = Math.atan2(vV.y, vV.x);
-					const angChamfer = Math.atan2(uSChamfer.y, uSChamfer.x);
+					const angV = directionAngle(vV);
+					const angChamfer = directionAngle(uSChamfer);
 					let diff = angChamfer - angV;
 					while (diff > Math.PI) diff -= 2 * Math.PI;
 					while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -3130,8 +3133,8 @@ export class SVGRenderer {
 				const vV = sub(sV, sT2);
 				const lenV = Math.hypot(vV.x, vV.y);
 				if (lenV > 1e-4) {
-					const angV = Math.atan2(vV.y, vV.x);
-					const angChamfer = Math.atan2(uSChamfer.y, uSChamfer.x);
+					const angV = directionAngle(vV);
+					const angChamfer = directionAngle(uSChamfer);
 					let diff = angChamfer - angV;
 					while (diff > Math.PI) diff -= 2 * Math.PI;
 					while (diff < -Math.PI) diff += 2 * Math.PI;
@@ -3216,7 +3219,7 @@ export class SVGRenderer {
 					if (center && maj && min) {
 						const sc = viewport.worldToScreen(center);
 						const r = scale(distancesFrom(center, maj, min), viewport.zoom);
-						const thetaDeg = (Math.atan2(maj.y - center.y, maj.x - center.x) * 180) / Math.PI;
+						const thetaDeg = angleFromToDeg(center, maj);
 						createSvgEllipse(
 							sc,
 							r,
