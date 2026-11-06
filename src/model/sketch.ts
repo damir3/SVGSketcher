@@ -855,6 +855,26 @@ export class SketchDocument {
 		return c;
 	}
 
+	addCoincidentConstraints(pointIds: Iterable<string>): boolean {
+		const ids = new Set(pointIds);
+		const hasOrigin = ids.delete('origin');
+		const [anchor, ...others] = ids;
+		if (!anchor || (!hasOrigin && others.length === 0)) return false;
+		if ([...ids].some(id => !this.points.has(id))) return false;
+
+		// Coincidence is transitive, so any selected segment endpoints would collapse the segment.
+		if ([...this.lines.values()].some(line => ids.has(line.p1Id) && ids.has(line.p2Id))) return false;
+
+		this.beginTransaction();
+		if (hasOrigin) {
+			for (const id of ids) this.addOriginCoincidentConstraint(id);
+		} else {
+			for (const id of others) this.addCoincidentConstraint(anchor, id);
+		}
+		this.commitTransaction();
+		return true;
+	}
+
 	addHorizontalConstraint(p1Id: string, p2Id: string): HorizontalConstraint {
 		const existing = [...this.constraints.values()].find(
 			c =>

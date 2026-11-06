@@ -14,11 +14,61 @@ import {
 import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
 import { determineDistanceOrientation, DimensionTool } from '../src/canvas/tools/constraints/dimension';
 import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
+import { CanvasInteraction } from '../src/canvas/interaction';
+import { Viewport } from '../src/canvas/viewport';
 import { LineTool } from '../src/canvas/tools/primitives/line';
 import { angleToXAxisDeg, vec, sub } from '../src/math/vector';
 
 describe('Origin & Axis Constraints', () => {
 	describe('Origin Distance & Coincident Constraints', () => {
+		it('applies Coincident to the points in a mixed box selection and preserves the selection', () => {
+			const sketch = new SketchDocument();
+			const points = [sketch.addPoint(vec(10, 20)), sketch.addPoint(vec(30, 40)), sketch.addPoint(vec(50, 60))];
+			const outside = sketch.addPoint(vec(80, 20));
+			const line = sketch.addLine(points[0].id, outside.id);
+			const viewport = new Viewport(800, 600);
+			const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+				sketch,
+				viewport,
+				svg: { style: {}, classList: { toggle() {}, remove() {} } },
+				tools: new Map([['coincident', new ConstraintTool('coincident')]]),
+				highlightManager: { clear() {} },
+				renderer: { updateRegionHover() {}, clearPreviews() {} },
+				splinePointsStart: new Map(),
+				render() {},
+			});
+			interaction['finishBoxSelection'](viewport.worldToScreen(vec(60, 70)), viewport.worldToScreen(vec(5, 15)), false);
+			assert.deepEqual(
+				[...sketch.selection.pointIds],
+				points.map(({ id }) => id)
+			);
+			assert.ok(sketch.selection.lineIds.has(line.id));
+
+			interaction.setTool('coincident');
+
+			assert.deepEqual(
+				[...sketch.selection.pointIds],
+				points.map(({ id }) => id)
+			);
+			assert.ok(sketch.selection.lineIds.has(line.id));
+			assert.equal(sketch.constraints.size, 2);
+			for (const point of points) {
+				assert.ok(Math.hypot(point.x - points[0].x, point.y - points[0].y) < 1e-4);
+			}
+			assert.ok(sketch.undo());
+			assert.equal(sketch.constraints.size, 0);
+		});
+
+		it('makes the entire point group coincident with the origin when selected', () => {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint(vec(10, 20));
+			const p2 = sketch.addPoint(vec(30, 40));
+
+			assert.ok(sketch.addCoincidentConstraints([p1.id, 'origin', p2.id]));
+			assert.ok(Math.hypot(p1.x, p1.y) < 1e-4);
+			assert.ok(Math.hypot(p2.x, p2.y) < 1e-4);
+		});
+
 		it('constrains a point coincident to (0, 0)', () => {
 			const sketch = new SketchDocument();
 			const p = sketch.addPoint({ x: 50, y: 80 });

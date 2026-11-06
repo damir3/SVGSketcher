@@ -29,7 +29,7 @@ import {
 	projectPointOntoSegment,
 	type Vec2,
 } from '../math/vector';
-import { AABB } from '../math/aabb';
+import { AABB, curveContainedInAABB } from '../math/aabb';
 import type { IConstraint } from '../solver/types';
 import {
 	DistanceConstraint,
@@ -408,6 +408,8 @@ export class CanvasInteraction {
 		try {
 			if (tool !== 'dimension' && this.canApplyConstraint(tool)) {
 				this.applyConstraint(tool);
+				// A preselected point group is a complete command. Keep its selection and current tool.
+				if (tool === 'coincident' && this.sketch.selection.pointIds.size >= 2) return;
 			}
 
 			const prevTool = this.activeToolInstance;
@@ -3115,7 +3117,7 @@ export class CanvasInteraction {
 				return pCount >= 1;
 			case 'coincident':
 				return (
-					(pCount === 2 && lCount === 0 && cCount === 0 && eCount === 0 && sCount === 0) ||
+					pCount >= 2 ||
 					(pCount === 1 && lCount === 1 && cCount === 0 && eCount === 0 && sCount === 0) ||
 					(pCount === 1 && cCount === 1 && lCount === 0 && eCount === 0 && sCount === 0) ||
 					(pCount === 1 && eCount === 1 && lCount === 0 && cCount === 0 && sCount === 0) ||
@@ -3190,16 +3192,12 @@ export class CanvasInteraction {
 				break;
 			}
 			case 'coincident': {
-				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
-					if (pIds.includes('origin')) {
-						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
-						this.sketch.addOriginCoincidentConstraint(userPtId);
-						applied = true;
-						toastMsg = 'Coincident with (0,0) applied';
+				if (pIds.length >= 2) {
+					applied = this.sketch.addCoincidentConstraints(pIds);
+					if (applied) {
+						toastMsg = pIds.includes('origin') ? 'Coincident with (0,0) applied' : 'Coincident constraint applied';
 					} else {
-						this.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
-						applied = true;
-						toastMsg = 'Coincident constraint applied';
+						showToast('Cannot make these points coincident');
 					}
 				} else if (
 					pIds.length === 1 &&
@@ -3714,6 +3712,15 @@ export class CanvasInteraction {
 
 		const bounds = AABB.fromPoints([w1, w2])!;
 		const { min, max } = bounds;
+		const crossing = s2.x < s1.x;
+		const matches = (entity: {
+			intersectsAABB(min: Vec2, max: Vec2, sketch: SketchDocument): boolean;
+			toGeoCurve(sketch: SketchDocument): Exclude<GeoCurve, { type: 'spline' }> | null;
+		}): boolean => {
+			if (crossing) return entity.intersectsAABB(min, max, this.sketch);
+			const curve = entity.toGeoCurve(this.sketch);
+			return curve !== null && curveContainedInAABB(curve, min, max);
+		};
 
 		const itemsToSelect: Array<{
 			id: string;
@@ -3729,35 +3736,35 @@ export class CanvasInteraction {
 
 		// 2. Lines
 		for (const line of this.sketch.lines.values()) {
-			if (line.intersectsAABB(min, max, this.sketch)) {
+			if (matches(line)) {
 				itemsToSelect.push({ id: line.id, type: 'line' });
 			}
 		}
 
 		// 3. Circles
 		for (const circle of this.sketch.circles.values()) {
-			if (circle.intersectsAABB(min, max, this.sketch)) {
+			if (matches(circle)) {
 				itemsToSelect.push({ id: circle.id, type: 'circle' });
 			}
 		}
 
 		// 4. Arcs
 		for (const arc of this.sketch.arcs.values()) {
-			if (arc.intersectsAABB(min, max, this.sketch)) {
+			if (matches(arc)) {
 				itemsToSelect.push({ id: arc.id, type: 'arc' });
 			}
 		}
 
 		// 5. Ellipses
 		for (const ellipse of this.sketch.ellipses.values()) {
-			if (ellipse.intersectsAABB(min, max, this.sketch)) {
+			if (matches(ellipse)) {
 				itemsToSelect.push({ id: ellipse.id, type: 'ellipse' });
 			}
 		}
 
 		// 6. Elliptical Arcs
 		for (const elArc of this.sketch.ellipticalArcs.values()) {
-			if (elArc.intersectsAABB(min, max, this.sketch)) {
+			if (matches(elArc)) {
 				itemsToSelect.push({ id: elArc.id, type: 'elliptical_arc' });
 			}
 		}

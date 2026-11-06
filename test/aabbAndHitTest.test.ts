@@ -1,5 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { CanvasInteraction } from '../src/canvas/interaction';
+import { Viewport } from '../src/canvas/viewport';
 import {
 	pointIntersectsAABB,
 	segmentIntersectsAABB,
@@ -22,6 +24,37 @@ import { SketchDocument } from '../src/model/sketch';
 import { deserializeConstraint, serializeConstraint } from '../src/solver/constraints/serialization';
 import { RadiusConstraint } from '../src/solver/constraints/radius';
 import { DimensionTool } from '../src/canvas/tools/constraints/dimension';
+
+it('box selection requires containment from the left and includes crossings from the right', () => {
+	const sketch = new SketchDocument();
+	const viewport = new Viewport(800, 600);
+	const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+		sketch,
+		viewport,
+	});
+	const inside = sketch.addPoint(vec(12, 12));
+	const outside = sketch.addPoint(vec(25, 12));
+	const line = sketch.addLine(inside.id, outside.id);
+	const circle = sketch.addCircle(inside.id, 3);
+	const center = sketch.addPoint(vec(0, 0));
+	const arcStart = sketch.addPoint(vec(12, 16));
+	const arcEnd = sketch.addPoint(vec(16, 12));
+	const arc = sketch.addArc(center.id, arcStart.id, arcEnd.id, 20, true);
+	const longArc = sketch.addArc(center.id, arcStart.id, arcEnd.id, 20, false);
+	const left = viewport.worldToScreen(vec(10, 20));
+	const right = viewport.worldToScreen(vec(20, 10));
+
+	interaction['finishBoxSelection'](left, right, false);
+	assert.ok(sketch.selection.pointIds.has(inside.id));
+	assert.ok(!sketch.selection.lineIds.has(line.id));
+	assert.ok(!sketch.selection.circleIds.has(circle.id));
+	assert.deepEqual([...sketch.selection.arcIds], [arc.id]);
+
+	interaction['finishBoxSelection'](right, left, false);
+	assert.ok(sketch.selection.lineIds.has(line.id));
+	assert.ok(sketch.selection.circleIds.has(circle.id));
+	assert.ok(sketch.selection.arcIds.has(longArc.id));
+});
 
 describe('AABB Geometry Intersections', () => {
 	const min = vec(10, 10);

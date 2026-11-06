@@ -70,6 +70,7 @@ import {
 	EXTENSION_LINE_ATTRS,
 	PREVIEW_EXTENSION_LINE_ATTRS,
 	SELECTION_BOX_ATTRS,
+	CROSSING_SELECTION_BOX_ATTRS,
 	MIRROR_LINE_ATTRS,
 	DIR1_LINE_ATTRS,
 	DIR2_LINE_ATTRS,
@@ -2390,7 +2391,8 @@ export class SVGRenderer {
 		const width = Math.abs(s2.x - s1.x);
 		const height = Math.abs(s2.y - s1.y);
 
-		createSvgRect(min, { x: width, y: height }, SELECTION_BOX_ATTRS, this.overlayGroup);
+		const attrs = s2.x < s1.x ? CROSSING_SELECTION_BOX_ATTRS : SELECTION_BOX_ATTRS;
+		createSvgRect(min, { x: width, y: height }, attrs, this.overlayGroup);
 	}
 
 	renderMirrorPreview(

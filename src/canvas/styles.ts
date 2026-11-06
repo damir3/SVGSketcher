@@ -24,6 +24,7 @@ export const COLORS = {
 	guideStartEllipse: 'rgba(2, 132, 199, 0.3)',
 	extLineDim: 'rgba(2, 132, 199, 1)',
 	selectionBoxFill: 'rgba(14, 165, 233, 0.12)',
+	crossingSelectionBoxFill: 'rgba(22, 163, 74, 0.12)',
 	pointSnapFill: 'rgba(2, 132, 199, 0.2)',
 	objectSnapFill: 'rgba(16, 185, 129, 0.25)',
 	objectSnapStroke: '#0e9c6d',
@@ -222,6 +223,12 @@ export const SELECTION_BOX_ATTRS: SvgAttrs = {
 	'stroke-width': STROKE_WIDTH.thin,
 	'stroke-dasharray': DASH_ARRAY.selectionBox,
 	'pointer-events': 'none',
+};
+
+export const CROSSING_SELECTION_BOX_ATTRS: SvgAttrs = {
+	...SELECTION_BOX_ATTRS,
+	fill: COLORS.crossingSelectionBoxFill,
+	stroke: COLORS.constrained,
 };
 
 export const SYMMETRY_CHORD_ATTRS: SvgAttrs = {

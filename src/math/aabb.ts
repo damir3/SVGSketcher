@@ -1,4 +1,5 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
+import type { GeoCurve } from './intersection';
 import { angleFromTo, dot, vec, distancesFrom, sub, type Vec2 } from './vector';
 
 const TWO_PI = 2 * Math.PI;
@@ -38,6 +39,47 @@ export class AABB {
  */
 export function pointIntersectsAABB(p: Vec2, min: Vec2, max: Vec2): boolean {
 	return p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y;
+}
+
+export function curveContainedInAABB(curve: Exclude<GeoCurve, { type: 'spline' }>, min: Vec2, max: Vec2): boolean {
+	const contains = (point: Vec2) => pointIntersectsAABB(point, min, max);
+	if (curve.type === 'segment') return contains(curve.p1) && contains(curve.p2);
+
+	const { center } = curve;
+	const radii =
+		curve.type === 'circle' || curve.type === 'arc'
+			? vec(curve.radius, curve.radius)
+			: distancesFrom(center, curve.majorAxisPoint, curve.minorAxisPoint);
+	const angle = 'majorAxisPoint' in curve ? angleFromTo(center, curve.majorAxisPoint) : 0;
+	const { axisU, axisV } = ellipseAxes(angle);
+	const x = Math.hypot(radii.x * axisU.x, radii.y * axisV.x);
+	const y = Math.hypot(radii.x * axisU.y, radii.y * axisV.y);
+	if (curve.type === 'circle' || curve.type === 'ellipse') {
+		return contains(vec(center.x - x, center.y - y)) && contains(vec(center.x + x, center.y + y));
+	}
+
+	if (!contains(curve.start) || !contains(curve.end)) return false;
+	const parameterAt = (point: Vec2) =>
+		curve.type === 'arc' ? angleFromTo(center, point) : ellipseParameterAtPoint(point, center, radii, axisU, axisV);
+	const start = parameterAt(curve.start);
+	const end = parameterAt(curve.end);
+	// Clockwise in screen coordinates means decreasing parameter in world coordinates.
+	const direction = curve.clockwise ? -1 : 1;
+	const distanceFromStart = (t: number) => {
+		const delta = ((t - start) * direction) % TWO_PI;
+		return delta < 0 ? delta + TWO_PI : delta;
+	};
+	const sweep = distanceFromStart(end);
+
+	// Only endpoints and the extrema on the swept portion can reach the box edges.
+	const tx = Math.atan2(radii.y * axisV.x, radii.x * axisU.x);
+	const ty = Math.atan2(radii.y * axisV.y, radii.x * axisU.y);
+	return (
+		(distanceFromStart(tx) > sweep || center.x + x <= max.x) &&
+		(distanceFromStart(tx + Math.PI) > sweep || center.x - x >= min.x) &&
+		(distanceFromStart(ty) > sweep || center.y + y <= max.y) &&
+		(distanceFromStart(ty + Math.PI) > sweep || center.y - y >= min.y)
+	);
 }
 
 /**

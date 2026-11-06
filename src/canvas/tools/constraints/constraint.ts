@@ -509,7 +509,7 @@ export class ConstraintTool extends BaseTool {
 				return pCount >= 1;
 			case 'coincident':
 				return (
-					(pCount === 2 && lCount === 0 && cCount === 0 && eCount === 0 && sCount === 0) ||
+					pCount >= 2 ||
 					(pCount === 1 && lCount === 1 && cCount === 0 && eCount === 0 && sCount === 0) ||
 					(pCount === 1 && cCount === 1 && lCount === 0 && eCount === 0 && sCount === 0) ||
 					(pCount === 1 && eCount === 1 && lCount === 0 && cCount === 0 && sCount === 0) ||
@@ -574,16 +574,12 @@ export class ConstraintTool extends BaseTool {
 				break;
 			}
 			case 'coincident': {
-				if (pIds.length === 2 && lIds.length === 0 && cIds.length === 0 && eIds.length === 0 && sIds.length === 0) {
-					if (pIds.includes('origin')) {
-						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
-						this.ctx.sketch.addOriginCoincidentConstraint(userPtId);
-						applied = true;
-						toastMsg = 'Coincident with (0,0) applied';
+				if (pIds.length >= 2) {
+					applied = this.ctx.sketch.addCoincidentConstraints(pIds);
+					if (applied) {
+						toastMsg = pIds.includes('origin') ? 'Coincident with (0,0) applied' : 'Coincident constraint applied';
 					} else {
-						this.ctx.sketch.addCoincidentConstraint(pIds[0], pIds[1]);
-						applied = true;
-						toastMsg = 'Coincident constraint applied';
+						this.ctx.showToast('Cannot make these points coincident');
 					}
 				} else if (
 					pIds.length === 1 &&
