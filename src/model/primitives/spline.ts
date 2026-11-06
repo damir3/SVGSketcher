@@ -91,10 +91,10 @@ export class SketchSpline implements ISketchPrimitive {
 		if (!geo) return null;
 
 		return geo.bezierSegments.map(seg => [
-			viewport.worldToScreen(seg[0].x, seg[0].y),
-			viewport.worldToScreen(seg[1].x, seg[1].y),
-			viewport.worldToScreen(seg[2].x, seg[2].y),
-			viewport.worldToScreen(seg[3].x, seg[3].y),
+			viewport.worldToScreen(seg[0]),
+			viewport.worldToScreen(seg[1]),
+			viewport.worldToScreen(seg[2]),
+			viewport.worldToScreen(seg[3]),
 		]);
 	}
 

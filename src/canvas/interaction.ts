@@ -11,7 +11,7 @@ import {
 	SNAP_GRID_DISTANCE_PX,
 	SNAP_POINT_DISTANCE_PX,
 } from './distances';
-import { dist, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
+import { ORIGIN, dist, distancesFrom, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
 import { AABB } from '../math/aabb';
 import type { IConstraint } from '../solver/types';
 import {
@@ -171,7 +171,7 @@ export class CanvasInteraction {
 			/Mac|iPod|iPhone|iPad/.test(navigator.platform) ||
 			/Macintosh/.test(navigator.userAgent));
 	private isSnapModifierPressed = false;
-	private lastMouseScreen: Vec2 = { x: 0, y: 0 };
+	private lastMouseScreen: Vec2 = ORIGIN;
 	private regionHoverPoint: Vec2 | null = null;
 
 	private isSnapModifier(e: MouseEvent | KeyboardEvent): boolean {
@@ -180,7 +180,7 @@ export class CanvasInteraction {
 
 	// Double click tracking
 	private lastClickTime = 0;
-	private lastClickPos: Vec2 = { x: 0, y: 0 };
+	private lastClickPos: Vec2 = ORIGIN;
 	private lastDoubleClickedTime = 0;
 
 	// Dimension edit callback
@@ -314,7 +314,7 @@ export class CanvasInteraction {
 
 	createToolMouseEvent(e: MouseEvent): ToolMouseEvent {
 		const screen = this.getScreenPos(e);
-		const world = this.viewport.screenToWorld(screen.x, screen.y);
+		const world = this.viewport.screenToWorld(screen);
 		const snapMode = this.activeToolInstance?.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
 		const allowGrid = snapMode !== 'no-grid';
 		const allowSnap = snapMode !== false;
@@ -348,7 +348,7 @@ export class CanvasInteraction {
 		this.renderer.clearPreviews();
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
 			const screen = this.lastMouseScreen;
-			const world = this.viewport.screenToWorld(screen.x, screen.y);
+			const world = this.viewport.screenToWorld(screen);
 			const snapMode = this.activeToolInstance.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
 			const allowGrid = snapMode !== 'no-grid';
 			const allowSnap = snapMode !== false;
@@ -530,7 +530,7 @@ export class CanvasInteraction {
 		// Update popup positions on screen during zoom / pan
 		const polygonTool = this.tools.get('polygon') as PolygonTool | undefined;
 		if (polygonTool?.popup.isOpen() && polygonTool.centerWorldPos) {
-			const sCtr = this.viewport.worldToScreen(polygonTool.centerWorldPos.x, polygonTool.centerWorldPos.y);
+			const sCtr = this.viewport.worldToScreen(polygonTool.centerWorldPos);
 			polygonTool.popup.updatePosition(sCtr);
 		}
 
@@ -897,7 +897,7 @@ export class CanvasInteraction {
 			}
 			if (isHiddenSplinePoint) continue;
 
-			const s = this.viewport.worldToScreen(pt.x, pt.y);
+			const s = this.viewport.worldToScreen(pt);
 			const d = dist(screenPos, s);
 			if (d < closestPointDist) {
 				closestPointDist = d;
@@ -906,7 +906,7 @@ export class CanvasInteraction {
 		}
 
 		if (excludePointId !== 'origin') {
-			const sOrigin = this.viewport.worldToScreen(0, 0);
+			const sOrigin = this.viewport.worldToScreen(ORIGIN);
 			const dOrigin = dist(screenPos, sOrigin);
 			if (dOrigin < closestPointDist) {
 				closestPointDist = dOrigin;
@@ -948,8 +948,8 @@ export class CanvasInteraction {
 			const p2 = this.sketch.points.get(line.p2Id);
 			if (!p1 || !p2) continue;
 
-			const s1 = this.viewport.worldToScreen(p1.x, p1.y);
-			const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+			const s1 = this.viewport.worldToScreen(p1);
+			const s2 = this.viewport.worldToScreen(p2);
 			const proj = projectPointOntoSegment(screenPos, s1, s2);
 			if (proj.dist < closestGeomDist) {
 				closestGeomDist = proj.dist;
@@ -970,7 +970,7 @@ export class CanvasInteraction {
 			const center = this.sketch.points.get(circle.centerId);
 			if (!center) continue;
 
-			const sc = this.viewport.worldToScreen(center.x, center.y);
+			const sc = this.viewport.worldToScreen(center);
 			const sr = circle.radius * this.viewport.zoom;
 			const dToCenter = dist(screenPos, sc);
 			const dToPerimeter = Math.abs(dToCenter - sr);
@@ -981,7 +981,7 @@ export class CanvasInteraction {
 				const dy = screenPos.y - sc.y;
 				const d = Math.max(Math.hypot(dx, dy), 1e-6);
 				const snappedScreen = vec(sc.x + (dx / d) * sr, sc.y + (dy / d) * sr);
-				const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+				const worldPos = this.viewport.screenToWorld(snappedScreen);
 				foundGeom = {
 					type: 'circle',
 					id: circle.id,
@@ -1003,9 +1003,9 @@ export class CanvasInteraction {
 			const end = this.sketch.points.get(arc.endPointId);
 			if (!center || !start || !end) continue;
 
-			const sc = this.viewport.worldToScreen(center.x, center.y);
-			const ss = this.viewport.worldToScreen(start.x, start.y);
-			const se = this.viewport.worldToScreen(end.x, end.y);
+			const sc = this.viewport.worldToScreen(center);
+			const ss = this.viewport.worldToScreen(start);
+			const se = this.viewport.worldToScreen(end);
 			const sr = arc.radius * this.viewport.zoom;
 
 			const dToCenter = dist(screenPos, sc);
@@ -1037,7 +1037,7 @@ export class CanvasInteraction {
 				const clampedPAngle = Math.max(0, Math.min(sweepAngle, pAngle));
 				const actualAng = clockwise ? as + clampedPAngle : as - clampedPAngle;
 				const snappedScreen = vec(sc.x + Math.cos(actualAng) * sr, sc.y + Math.sin(actualAng) * sr);
-				const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+				const worldPos = this.viewport.screenToWorld(snappedScreen);
 				foundGeom = {
 					type: 'circle',
 					id: arc.id,
@@ -1062,39 +1062,38 @@ export class CanvasInteraction {
 			const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
 			if (!center || !majorPt || !minorPt) continue;
 
-			const sc = this.viewport.worldToScreen(center.x, center.y);
-			const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
-			const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+			const sc = this.viewport.worldToScreen(center);
+			const smaj = this.viewport.worldToScreen(majorPt);
+			const smin = this.viewport.worldToScreen(minorPt);
 
 			const uX = smaj.x - sc.x;
 			const uY = smaj.y - sc.y;
 			const vX = smin.x - sc.x;
 			const vY = smin.y - sc.y;
 
-			const rx = Math.hypot(uX, uY);
-			const ry = Math.hypot(vX, vY);
-			if (rx < 1 || ry < 1) continue;
+			const r = distancesFrom(sc, smaj, smin);
+			if (r.x < 1 || r.y < 1) continue;
 
-			const uHatX = uX / rx;
-			const uHatY = uY / rx;
-			const vHatX = vX / ry;
-			const vHatY = vY / ry;
+			const uHatX = uX / r.x;
+			const uHatY = uY / r.x;
+			const vHatX = vX / r.y;
+			const vHatY = vY / r.y;
 
 			const dx = screenPos.x - sc.x;
 			const dy = screenPos.y - sc.y;
 			const u = dx * uHatX + dy * uHatY;
 			const v = dx * vHatX + dy * vHatY;
 
-			const t = Math.atan2(v / ry, u / rx);
-			const uProj = rx * Math.cos(t);
-			const vProj = ry * Math.sin(t);
+			const t = Math.atan2(v / r.y, u / r.x);
+			const uProj = r.x * Math.cos(t);
+			const vProj = r.y * Math.sin(t);
 
 			const snappedScreen = vec(sc.x + uProj * uHatX + vProj * vHatX, sc.y + uProj * uHatY + vProj * vHatY);
 			const dToPerimeter = dist(screenPos, snappedScreen);
 
 			if (dToPerimeter < closestGeomDist) {
 				closestGeomDist = dToPerimeter;
-				const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+				const worldPos = this.viewport.screenToWorld(snappedScreen);
 				foundGeom = {
 					type: 'ellipse',
 					id: ellipse.id,
@@ -1123,13 +1122,12 @@ export class CanvasInteraction {
 			const endPt = this.sketch.points.get(arc.endPointId);
 			if (!center || !majorPt || !minorPt || !startPt || !endPt) continue;
 
-			const sc = this.viewport.worldToScreen(center.x, center.y);
-			const smaj = this.viewport.worldToScreen(majorPt.x, majorPt.y);
-			const smin = this.viewport.worldToScreen(minorPt.x, minorPt.y);
+			const sc = this.viewport.worldToScreen(center);
+			const smaj = this.viewport.worldToScreen(majorPt);
+			const smin = this.viewport.worldToScreen(minorPt);
 
-			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-			if (rx < 1 || ry < 1) continue;
+			const r = distancesFrom(sc, smaj, smin);
+			if (r.x < 1 || r.y < 1) continue;
 
 			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 			const ux = Math.cos(theta);
@@ -1142,17 +1140,17 @@ export class CanvasInteraction {
 			const u = dx * ux + dy * uy;
 			const v = dx * vx + dy * vy;
 
-			const t = Math.atan2(v / ry, u / rx);
+			const t = Math.atan2(v / r.y, u / r.x);
 
-			const ss = this.viewport.worldToScreen(startPt.x, startPt.y);
-			const se = this.viewport.worldToScreen(endPt.x, endPt.y);
+			const ss = this.viewport.worldToScreen(startPt);
+			const se = this.viewport.worldToScreen(endPt);
 			const usScreen = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
 			const vsScreen = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
 			const ueScreen = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
 			const veScreen = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
 
-			const ts = Math.atan2(vsScreen / ry, usScreen / rx);
-			const te = Math.atan2(veScreen / ry, ueScreen / rx);
+			const ts = Math.atan2(vsScreen / r.y, usScreen / r.x);
+			const te = Math.atan2(veScreen / r.y, ueScreen / r.x);
 			const clockwise = !!arc.clockwise;
 
 			let sweepAngle = clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
@@ -1160,18 +1158,18 @@ export class CanvasInteraction {
 			let pAngle = clockwise ? (t - ts) % TWO_PI : (ts - t) % TWO_PI;
 			if (pAngle < 0) pAngle += TWO_PI;
 
-			const angTolerance = geomSnapDistPx / Math.max(Math.min(rx, ry), 1);
+			const angTolerance = geomSnapDistPx / Math.max(Math.min(r.x, r.y), 1);
 			if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
 				const clampedPAngle = pAngle >= TWO_PI - angTolerance ? 0 : Math.min(sweepAngle, Math.max(0, pAngle));
 				const actualT = clockwise ? ts + clampedPAngle : ts - clampedPAngle;
-				const uProj = rx * Math.cos(actualT);
-				const vProj = ry * Math.sin(actualT);
+				const uProj = r.x * Math.cos(actualT);
+				const vProj = r.y * Math.sin(actualT);
 				const snappedScreen = vec(sc.x + uProj * ux + vProj * vx, sc.y + uProj * uy + vProj * vy);
 				const dToPerimeter = dist(screenPos, snappedScreen);
 
 				if (dToPerimeter < closestGeomDist) {
 					closestGeomDist = dToPerimeter;
-					const worldPos = this.viewport.screenToWorld(snappedScreen.x, snappedScreen.y);
+					const worldPos = this.viewport.screenToWorld(snappedScreen);
 					foundGeom = {
 						type: 'ellipse',
 						id: arc.id,
@@ -1204,7 +1202,7 @@ export class CanvasInteraction {
 			const proj = getSplineParamAtPoint(screenSegments, screenPos);
 			if (proj.distance < closestGeomDist) {
 				closestGeomDist = proj.distance;
-				const worldPos = this.viewport.screenToWorld(proj.point.x, proj.point.y);
+				const worldPos = this.viewport.screenToWorld(proj.point);
 				foundGeom = {
 					type: 'spline',
 					id: spline.id,
@@ -1228,17 +1226,17 @@ export class CanvasInteraction {
 			return null;
 		}
 
-		const sOrigin = this.viewport.worldToScreen(0, 0);
+		const sOrigin = this.viewport.worldToScreen(ORIGIN);
 		const dAxisX = Math.abs(screenPos.y - sOrigin.y);
 		const dAxisY = Math.abs(screenPos.x - sOrigin.x);
 
-		const world = this.viewport.screenToWorld(screenPos.x, screenPos.y);
+		const world = this.viewport.screenToWorld(screenPos);
 		const { step, subStep } = this.viewport.getGridStep();
 		const subStepPx = subStep * this.viewport.zoom;
 		const gridStep = subStepPx >= 6 ? subStep : step;
 		const nearestWorldX = this.cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep);
 		const nearestWorldY = this.cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep);
-		const nearestScreen = this.viewport.worldToScreen(nearestWorldX, nearestWorldY);
+		const nearestScreen = this.viewport.worldToScreen({ x: nearestWorldX, y: nearestWorldY });
 
 		if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
 			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestWorldX : world.x;
@@ -1428,10 +1426,10 @@ export class CanvasInteraction {
 		}
 
 		return bezierSegments.map(seg => [
-			this.viewport.worldToScreen(seg[0].x, seg[0].y),
-			this.viewport.worldToScreen(seg[1].x, seg[1].y),
-			this.viewport.worldToScreen(seg[2].x, seg[2].y),
-			this.viewport.worldToScreen(seg[3].x, seg[3].y),
+			this.viewport.worldToScreen(seg[0]),
+			this.viewport.worldToScreen(seg[1]),
+			this.viewport.worldToScreen(seg[2]),
+			this.viewport.worldToScreen(seg[3]),
 		]);
 	}
 
@@ -1449,7 +1447,7 @@ export class CanvasInteraction {
 		}
 
 		if (excludePointId !== 'origin') {
-			const sOrigin = this.viewport.worldToScreen(0, 0);
+			const sOrigin = this.viewport.worldToScreen(ORIGIN);
 			const dOrigin = Math.hypot(screen.x - sOrigin.x, screen.y - sOrigin.y);
 			if (dOrigin < closestDist) {
 				closestDist = dOrigin;
@@ -1702,7 +1700,7 @@ export class CanvasInteraction {
 			}
 		}
 
-		const world = this.viewport.screenToWorld(screen.x, screen.y);
+		const world = this.viewport.screenToWorld(screen);
 		const snap = this.findSnap(screen);
 
 		// Check for Text rotation gizmo handle dragging
@@ -1893,7 +1891,7 @@ export class CanvasInteraction {
 													id = hitText.id;
 													type = 'text';
 												} else {
-													const sOrigin = this.viewport.worldToScreen(0, 0);
+													const sOrigin = this.viewport.worldToScreen(ORIGIN);
 													if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
 														id = 'axis_x';
 														type = 'line';
@@ -2101,7 +2099,7 @@ export class CanvasInteraction {
 	private handleMouseMove(e: MouseEvent): void {
 		this.isSnapModifierPressed = this.isSnapModifier(e);
 		const screen = this.getScreenPos(e);
-		const world = this.viewport.screenToWorld(screen.x, screen.y);
+		const world = this.viewport.screenToWorld(screen);
 
 		// Pan handling
 		if (this.isPanning) {
@@ -2237,8 +2235,8 @@ export class CanvasInteraction {
 					const p1 = this.sketch.points.get(constraint.p1Id);
 					const p2 = this.sketch.points.get(constraint.p2Id);
 					if (p1 && p2) {
-						const s1 = this.viewport.worldToScreen(p1.x, p1.y);
-						const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+						const s1 = this.viewport.worldToScreen(p1);
+						const s2 = this.viewport.worldToScreen(p2);
 						const midX = (s1.x + s2.x) * 0.5;
 						const midY = (s1.y + s2.y) * 0.5;
 						if (constraint.orientation === 'horizontal') {
@@ -2267,9 +2265,9 @@ export class CanvasInteraction {
 					const p1 = this.sketch.points.get(constraint.lineP1Id);
 					const p2 = this.sketch.points.get(constraint.lineP2Id);
 					if (pt && p1 && p2) {
-						const sp = this.viewport.worldToScreen(pt.x, pt.y);
-						const s1 = this.viewport.worldToScreen(p1.x, p1.y);
-						const s2 = this.viewport.worldToScreen(p2.x, p2.y);
+						const sp = this.viewport.worldToScreen(pt);
+						const s1 = this.viewport.worldToScreen(p1);
+						const s2 = this.viewport.worldToScreen(p2);
 						const dx = s2.x - s1.x;
 						const dy = s2.y - s1.y;
 						const lineLen = Math.hypot(dx, dy);
@@ -2285,14 +2283,14 @@ export class CanvasInteraction {
 				} else if (constraint instanceof OriginDistanceConstraint && !constraint.isCoincident) {
 					const pt = this.sketch.points.get(constraint.pointId);
 					if (pt) {
-						const sp = this.viewport.worldToScreen(pt.x, pt.y);
-						const sOrigin = this.viewport.worldToScreen(0, 0);
+						const sp = this.viewport.worldToScreen(pt);
+						const sOrigin = this.viewport.worldToScreen(ORIGIN);
 						if (constraint.orientation === 'vertical') {
 							const screenOffset = screen.x - sp.x;
 							constraint.offset = screenOffset / this.viewport.zoom;
 							this.render();
 						} else if (constraint.orientation === 'horizontal') {
-							const sAxisY = this.viewport.worldToScreen(0, 100);
+							const sAxisY = this.viewport.worldToScreen({ x: 0, y: 100 });
 							const dy = sAxisY.y - sOrigin.y;
 							const lineLen = Math.hypot(0, dy);
 							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
@@ -2319,14 +2317,14 @@ export class CanvasInteraction {
 					const p2 = this.sketch.points.get(constraint.lineP2Id);
 					if (p1 && p2) {
 						const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
-						const sp = this.viewport.worldToScreen(midPt.x, midPt.y);
+						const sp = this.viewport.worldToScreen(midPt);
 						if (constraint.axis === 'x') {
 							const screenOffset = screen.x - sp.x;
 							constraint.offset = screenOffset / this.viewport.zoom;
 							this.render();
 						} else {
-							const sOrigin = this.viewport.worldToScreen(0, 0);
-							const sAxisY = this.viewport.worldToScreen(0, 100);
+							const sOrigin = this.viewport.worldToScreen(ORIGIN);
+							const sAxisY = this.viewport.worldToScreen({ x: 0, y: 100 });
 							const dy = sAxisY.y - sOrigin.y;
 							const lineLen = Math.hypot(0, dy);
 							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
@@ -2372,7 +2370,7 @@ export class CanvasInteraction {
 					if (entity) {
 						const center = this.sketch.points.get(entity.centerId);
 						if (center) {
-							const sc = this.viewport.worldToScreen(center.x, center.y);
+							const sc = this.viewport.worldToScreen(center);
 							constraint.leaderAngle = Math.atan2(screen.y - sc.y, screen.x - sc.x);
 							this.render();
 						}
@@ -2865,7 +2863,7 @@ export class CanvasInteraction {
 		const screen = this.getScreenPos(e);
 		// Smooth continuous zoom factor depending exponentially on deltaY via Math.pow
 		const zoomFactor = Math.pow(2, -e.deltaY * 0.0015);
-		this.viewport.zoomAt(screen.x, screen.y, zoomFactor);
+		this.viewport.zoomAt(screen, zoomFactor);
 		this.render();
 		this.onViewportChange?.();
 	}
@@ -3368,7 +3366,7 @@ export class CanvasInteraction {
 							: `Distance to ${axis.toUpperCase()}-axis applied`;
 						if (c && this.onEditDimension) {
 							const pt = this.sketch.points.get(pIds[0])!;
-							const s = this.viewport.worldToScreen(pt.x, pt.y);
+							const s = this.viewport.worldToScreen(pt);
 							const rect = this.svg.getBoundingClientRect();
 							this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 						}
@@ -3383,7 +3381,7 @@ export class CanvasInteraction {
 								: 'Point-to-line distance constraint applied';
 							if (c && this.onEditDimension) {
 								const pt = this.sketch.points.get(pIds[0])!;
-								const s = this.viewport.worldToScreen(pt.x, pt.y);
+								const s = this.viewport.worldToScreen(pt);
 								const rect = this.svg.getBoundingClientRect();
 								this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 							}
@@ -3400,7 +3398,7 @@ export class CanvasInteraction {
 						const p2 = this.sketch.points.get(l.p2Id);
 						const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
 						const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
-						const s = this.viewport.worldToScreen(midX, midY);
+						const s = this.viewport.worldToScreen({ x: midX, y: midY });
 						const rect = this.svg.getBoundingClientRect();
 						this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 					}
@@ -3419,9 +3417,15 @@ export class CanvasInteraction {
 							const p4 = this.sketch.points.get(l2.p2Id)!;
 							const geom = this.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, lIds[0], lIds[1]);
 							const rScreen = Math.max(28, (c.arcRadius ?? 40) * this.viewport.zoom);
-							const sCenter = this.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-							const sRay1 = this.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-							const sRay2 = this.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+							const sCenter = this.viewport.worldToScreen(geom.pInt);
+							const sRay1 = this.viewport.worldToScreen({
+								x: geom.pInt.x + geom.u1.x * 20,
+								y: geom.pInt.y + geom.u1.y * 20,
+							});
+							const sRay2 = this.viewport.worldToScreen({
+								x: geom.pInt.x + geom.u2.x * 20,
+								y: geom.pInt.y + geom.u2.y * 20,
+							});
 							const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
 							const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
 							let delta = a2 - a1;
@@ -3448,9 +3452,15 @@ export class CanvasInteraction {
 							if (p1 && p2 && p3) {
 								const geom = this.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
 								const rScreen = Math.max(28, (c.arcRadius ?? 40) * this.viewport.zoom);
-								const sCenter = this.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-								const sRay1 = this.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-								const sRay2 = this.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+								const sCenter = this.viewport.worldToScreen(geom.pInt);
+								const sRay1 = this.viewport.worldToScreen({
+									x: geom.pInt.x + geom.u1.x * 20,
+									y: geom.pInt.y + geom.u1.y * 20,
+								});
+								const sRay2 = this.viewport.worldToScreen({
+									x: geom.pInt.x + geom.u2.x * 20,
+									y: geom.pInt.y + geom.u2.y * 20,
+								});
 								const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
 								const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
 								let delta = a2 - a1;
@@ -3474,7 +3484,7 @@ export class CanvasInteraction {
 						toastMsg = existed ? 'Editing distance to (0,0)' : 'Distance to (0,0) applied';
 						if (c && this.onEditDimension) {
 							const pt = this.sketch.points.get(userPtId)!;
-							const s = this.viewport.worldToScreen(pt.x, pt.y);
+							const s = this.viewport.worldToScreen(pt);
 							const rect = this.svg.getBoundingClientRect();
 							this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 						}
@@ -3488,7 +3498,7 @@ export class CanvasInteraction {
 							const p2 = this.sketch.points.get(pIds[1]);
 							const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
 							const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
-							const s = this.viewport.worldToScreen(midX, midY);
+							const s = this.viewport.worldToScreen({ x: midX, y: midY });
 							const rect = this.svg.getBoundingClientRect();
 							this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 						}
@@ -3501,7 +3511,7 @@ export class CanvasInteraction {
 					if (c && this.onEditDimension) {
 						const circ = this.sketch.circles.get(cIds[0]) ?? this.sketch.arcs.get(cIds[0]);
 						const center = circ ? this.sketch.points.get(circ.centerId) : null;
-						const s = center ? this.viewport.worldToScreen(center.x, center.y) : { x: 100, y: 100 };
+						const s = center ? this.viewport.worldToScreen(center) : { x: 100, y: 100 };
 						const rect = this.svg.getBoundingClientRect();
 						this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 					}
@@ -3722,8 +3732,8 @@ export class CanvasInteraction {
 		const minScreenY = Math.min(s1.y, s2.y);
 		const maxScreenY = Math.max(s1.y, s2.y);
 
-		const w1 = this.viewport.screenToWorld(minScreenX, minScreenY);
-		const w2 = this.viewport.screenToWorld(maxScreenX, maxScreenY);
+		const w1 = this.viewport.screenToWorld({ x: minScreenX, y: minScreenY });
+		const w2 = this.viewport.screenToWorld({ x: maxScreenX, y: maxScreenY });
 
 		const bounds = AABB.fromPoints([w1, w2])!;
 		const { min, max } = bounds;

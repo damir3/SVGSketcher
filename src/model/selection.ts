@@ -1,4 +1,5 @@
 import type { SketchDocument } from './sketch';
+import { distancesFrom } from '../math/vector';
 import { AABB } from '../math/aabb';
 import type { SketchPoint } from './types';
 
@@ -323,9 +324,8 @@ export function getBoundingBox(sketch: SketchDocument): AABB | null {
 		const maj = sketch.points.get(e.majorAxisPointId);
 		const min = sketch.points.get(e.minorAxisPointId);
 		if (center && maj && min) {
-			const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
-			const ry = Math.hypot(min.x - center.x, min.y - center.y);
-			const rMax = Math.max(rx, ry);
+			const r = distancesFrom(center, maj, min);
+			const rMax = Math.max(r.x, r.y);
 			bounds.addPoint({ x: center.x - rMax, y: center.y - rMax });
 			bounds.addPoint({ x: center.x + rMax, y: center.y + rMax });
 		}
@@ -336,9 +336,8 @@ export function getBoundingBox(sketch: SketchDocument): AABB | null {
 		const maj = sketch.points.get(ea.majorAxisPointId);
 		const min = sketch.points.get(ea.minorAxisPointId);
 		if (center && maj && min) {
-			const rx = Math.hypot(maj.x - center.x, maj.y - center.y);
-			const ry = Math.hypot(min.x - center.x, min.y - center.y);
-			const rMax = Math.max(rx, ry);
+			const r = distancesFrom(center, maj, min);
+			const rMax = Math.max(r.x, r.y);
 			bounds.addPoint({ x: center.x - rMax, y: center.y - rMax });
 			bounds.addPoint({ x: center.x + rMax, y: center.y + rMax });
 		}

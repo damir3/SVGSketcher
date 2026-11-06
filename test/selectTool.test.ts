@@ -20,7 +20,8 @@ function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {})
 			remove: (cls: string) => classNames.delete(cls),
 			contains: (cls: string) => classNames.has(cls),
 		},
-		getAttribute: (name: string) => (name === 'class' ? Array.from(classNames).join(' ') : (attributes.get(name) ?? null)),
+		getAttribute: (name: string) =>
+			name === 'class' ? Array.from(classNames).join(' ') : (attributes.get(name) ?? null),
 		setAttribute: (name: string, val: string) => {
 			attributes.set(name, String(val));
 		},
@@ -79,8 +80,8 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		zoom: 1,
 		panX: 0,
 		panY: 0,
-		screenToWorld: (x: number, y: number) => vec(x, y),
-		worldToScreen: (x: number, y: number) => vec(x, y),
+		screenToWorld: (p: { x: number; y: number }) => vec(p.x, p.y),
+		worldToScreen: (p: { x: number; y: number }) => vec(p.x, p.y),
 	} as any;
 
 	const renderer = {
@@ -102,7 +103,7 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		setCursor: () => {},
 		findPointNear: (screen: Vec2, radius = 10) => {
 			for (const pt of sketch.points.values()) {
-				const s = viewport.worldToScreen(pt.x, pt.y);
+				const s = viewport.worldToScreen(pt);
 				const dx = s.x - screen.x;
 				const dy = s.y - screen.y;
 				if (Math.hypot(dx, dy) <= radius) {
@@ -185,12 +186,16 @@ describe('Select Tool Hover Mechanism', () => {
 
 	it('highlights hovered element with select-hover class', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
-		const lineG = createMockSvgElement('g', { 'data-id': line.id, 'data-type': 'line', class: 'sketch-entity sketch-line' });
+		const lineG = createMockSvgElement('g', {
+			'data-id': line.id,
+			'data-type': 'line',
+			class: 'sketch-entity sketch-line',
+		});
 		svgRoot.appendChild(lineG);
 
 		const ctx = createMockContext(sketch, svgRoot);
@@ -223,8 +228,8 @@ describe('Select Tool Hover Mechanism', () => {
 
 	it('prioritizes vertex point when hovered near an endpoint', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -240,12 +245,12 @@ describe('Select Tool Hover Mechanism', () => {
 
 	it('synchronizes select-hover across multiple elements with same data-id (e.g. badges)', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		const line1 = sketch.addLine(p1.id, p2.id);
 
-		const p3 = sketch.addPoint(0, 50);
-		const p4 = sketch.addPoint(50, 50);
+		const p3 = sketch.addPoint({ x: 0, y: 50 });
+		const p4 = sketch.addPoint({ x: 50, y: 50 });
 		const line2 = sketch.addLine(p3.id, p4.id);
 
 		const c = sketch.addEqualLengthConstraint(line1.id, line2.id);
@@ -291,9 +296,9 @@ describe('Select Tool Hover Mechanism', () => {
 
 	it('allows hovering and selecting spline tangent handles', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 50);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 		const s = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -315,9 +320,21 @@ describe('Select Tool Hover Mechanism', () => {
 	it('does not highlight origin or coordinate axes on hover', () => {
 		const sketch = new SketchDocument();
 		const svgRoot = createMockSvgElement('svg');
-		const axisXG = createMockSvgElement('g', { 'data-id': 'axis_x', 'data-type': 'line', class: 'sketch-entity sketch-line sketch-axis-line' });
-		const axisYG = createMockSvgElement('g', { 'data-id': 'axis_y', 'data-type': 'line', class: 'sketch-entity sketch-line sketch-axis-line' });
-		const originG = createMockSvgElement('g', { 'data-id': 'origin', 'data-type': 'point', class: 'sketch-origin-marker' });
+		const axisXG = createMockSvgElement('g', {
+			'data-id': 'axis_x',
+			'data-type': 'line',
+			class: 'sketch-entity sketch-line sketch-axis-line',
+		});
+		const axisYG = createMockSvgElement('g', {
+			'data-id': 'axis_y',
+			'data-type': 'line',
+			class: 'sketch-entity sketch-line sketch-axis-line',
+		});
+		const originG = createMockSvgElement('g', {
+			'data-id': 'origin',
+			'data-type': 'point',
+			class: 'sketch-origin-marker',
+		});
 		svgRoot.appendChild(axisXG);
 		svgRoot.appendChild(axisYG);
 		svgRoot.appendChild(originG);

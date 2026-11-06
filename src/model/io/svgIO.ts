@@ -7,7 +7,7 @@ import { SVG_EXPORT_STYLE } from '../../canvas/styles';
 import { getFontSync } from '../../canvas/fonts';
 import { generateTextSvgPathData } from '../../math/textPath';
 import type { GeoCurve } from '../../math/intersection';
-import type { Vec2 } from '../../math/vector';
+import { distancesFrom, type Vec2 } from '../../math/vector';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -431,7 +431,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 		const key = `${mapped[0].toFixed(10)},${mapped[1].toFixed(10)}`;
 		let id = pathPointIds.get(key);
 		if (!id) {
-			id = sketch.addPoint(mapped[0], mapped[1]).id;
+			id = sketch.addPoint({ x: mapped[0], y: mapped[1] }).id;
 			pathPointIds.set(key, id);
 		}
 		return id;
@@ -439,7 +439,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 	const addPolyline = (coords: Array<[number, number]>, closed = false) => {
 		const points = coords.map(([x, y]) => point(x, y, activeMatrix));
-		const pointIds = points.map(([x, y]) => sketch.addPoint(x, y).id);
+		const pointIds = points.map(([x, y]) => sketch.addPoint({ x: x, y: y }).id);
 		for (let i = 1; i < points.length; i++) {
 			sketch.addLine(pointIds[i - 1], pointIds[i]);
 		}
@@ -518,13 +518,13 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 				const start = getPathPointId(segment.start);
 				const end = getPathPointId(segment.end);
 				const clockwise = ux * vy - uy * vx < 0 === (segment.sweep === 1);
-				const centerId = sketch.addPoint(center[0], center[1]).id;
+				const centerId = sketch.addPoint({ x: center[0], y: center[1] }).id;
 
 				if (Math.abs(majorRadius - minorRadius) < 1e-8) {
 					sketch.addArc(centerId, start, end, majorRadius, clockwise);
 				} else {
-					const majorId = sketch.addPoint(major[0], major[1]).id;
-					const minorId = sketch.addPoint(minor[0], minor[1]).id;
+					const majorId = sketch.addPoint({ x: major[0], y: major[1] }).id;
+					const minorId = sketch.addPoint({ x: minor[0], y: minor[1] }).id;
 					sketch.addEllipticalArc(centerId, majorId, minorId, start, end, clockwise);
 				}
 				i++;
@@ -629,12 +629,12 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 						center[1] + minorRadius * Math.cos(angle),
 					];
 
-					const c = sketch.addPoint(center[0], center[1]);
+					const c = sketch.addPoint({ x: center[0], y: center[1] });
 					if (Math.abs(majorRadius - minorRadius) < 1e-8 && shape.tag === 'circle') {
 						sketch.addCircle(c.id, majorRadius);
 					} else {
-						const p1 = sketch.addPoint(major[0], major[1]);
-						const p2 = sketch.addPoint(minor[0], minor[1]);
+						const p1 = sketch.addPoint({ x: major[0], y: major[1] });
+						const p2 = sketch.addPoint({ x: minor[0], y: minor[1] });
 						sketch.addEllipse(c.id, p1.id, p2.id);
 					}
 					break;
@@ -785,14 +785,13 @@ export function exportSketchToSVG(
 			const sc = { x: center.x, y: -center.y };
 			const smaj = { x: maj.x, y: -maj.y };
 			const smin = { x: min.x, y: -min.y };
-			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+			const r = distancesFrom(sc, smaj, smin);
 			const deg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
 			const dash = el.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${rx.toFixed(2)}" ry="${ry.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -815,8 +814,7 @@ export function exportSketchToSVG(
 			const ss = { x: start.x, y: -start.y };
 			const se = { x: end.x, y: -end.y };
 
-			const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-			const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+			const r = distancesFrom(sc, smaj, smin);
 			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 			const thetaDeg = (theta * 180) / Math.PI;
 
@@ -830,8 +828,8 @@ export function exportSketchToSVG(
 			const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
 			const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
 
-			const ts = Math.atan2(vs / ry, us / rx);
-			const te = Math.atan2(ve / ry, ue / rx);
+			const ts = Math.atan2(vs / r.y, us / r.x);
+			const te = Math.atan2(ve / r.y, ue / r.x);
 
 			const clockwise = !!elarc.clockwise;
 			let sweepAngle = 0;
@@ -850,7 +848,7 @@ export function exportSketchToSVG(
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			elements.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}

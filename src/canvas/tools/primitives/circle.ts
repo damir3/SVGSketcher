@@ -160,7 +160,7 @@ export class CircleTool extends BaseTool {
 
 	private finish(center: Vec2, radius: number, existingCenterId?: string, dimensionMode?: 'radius' | 'diameter'): void {
 		const sketch = this.ctx.sketch;
-		const point = existingCenterId ? sketch.points.get(existingCenterId)! : sketch.addPoint(center.x, center.y);
+		const point = existingCenterId ? sketch.points.get(existingCenterId)! : sketch.addPoint(center);
 		const circle = sketch.addCircle(point.id, Math.max(radius, 0.1), this.ctx.isConstructionMode);
 
 		if (this._mode === 'three_tangent' || this._mode === 'two_tangent') {
@@ -236,7 +236,7 @@ export class CircleTool extends BaseTool {
 					this.center = snap.worldPos;
 				} else {
 					this.center = snap ? snap.worldPos : e.world;
-					const point = sketch.addPoint(this.center.x, this.center.y);
+					const point = sketch.addPoint(this.center);
 					this.centerId = point.id;
 					this.ctx.applySnapConstraintIfNeeded?.(point.id, snap);
 				}
@@ -528,13 +528,11 @@ export class CircleTool extends BaseTool {
 			const pointB = line && this.ctx.sketch.points.get(line.p2Id);
 			if (!pointA || !pointB) continue;
 
-			const screenA = ctx.viewport.worldToScreen(pointA.x, pointA.y);
-			const screenB = ctx.viewport.worldToScreen(pointB.x, pointB.y);
+			const screenA = ctx.viewport.worldToScreen(pointA);
+			const screenB = ctx.viewport.worldToScreen(pointB);
 			createSvgLine(
-				screenA.x,
-				screenA.y,
-				screenB.x,
-				screenB.y,
+				screenA,
+				screenB,
 				{
 					stroke: '#38bdf8',
 					'stroke-width': 3,
@@ -585,25 +583,17 @@ export class CircleTool extends BaseTool {
 		const dx = cursor.x - this.center!.x;
 		const dy = cursor.y - this.center!.y;
 		const length = Math.hypot(dx, dy) || 1;
-		const edge = ctx.viewport.worldToScreen(
-			this.center!.x + (dx / length) * radius,
-			this.center!.y + (dy / length) * radius
-		);
-		const centerScreen = ctx.viewport.worldToScreen(this.center!.x, this.center!.y);
+		const edge = ctx.viewport.worldToScreen({
+			x: this.center!.x + (dx / length) * radius,
+			y: this.center!.y + (dy / length) * radius,
+		});
+		const centerScreen = ctx.viewport.worldToScreen(this.center!);
 		const radiusPixels = radius * ctx.viewport.zoom;
 
-		createSvgCircle(
-			centerScreen.x,
-			centerScreen.y,
-			radiusPixels,
-			getPreviewStrokeAttrs(ctx.isConstruction, false),
-			ctx.targetGroup
-		);
+		createSvgCircle(centerScreen, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
 		createSvgLine(
-			2 * centerScreen.x - edge.x,
-			2 * centerScreen.y - edge.y,
-			edge.x,
-			edge.y,
+			{ x: 2 * centerScreen.x - edge.x, y: 2 * centerScreen.y - edge.y },
+			edge,
 			AUX_RAY_ATTRS,
 			ctx.targetGroup
 		);
@@ -628,9 +618,9 @@ export class CircleTool extends BaseTool {
 		const length = Math.hypot(bx, by) || 1;
 		const dx = (-by / length) * circle.radius;
 		const dy = (bx / length) * circle.radius;
-		const pointA = ctx.viewport.worldToScreen(circle.center.x - dx, circle.center.y - dy);
-		const pointB = ctx.viewport.worldToScreen(circle.center.x + dx, circle.center.y + dy);
-		createSvgLine(pointA.x, pointA.y, pointB.x, pointB.y, AUX_RAY_ATTRS, ctx.targetGroup);
+		const pointA = ctx.viewport.worldToScreen({ x: circle.center.x - dx, y: circle.center.y - dy });
+		const pointB = ctx.viewport.worldToScreen({ x: circle.center.x + dx, y: circle.center.y + dy });
+		createSvgLine(pointA, pointB, AUX_RAY_ATTRS, ctx.targetGroup);
 	}
 
 	private renderTwoPointPreview(ctx: ToolRenderContext, cursor: Vec2): void {
@@ -643,11 +633,11 @@ export class CircleTool extends BaseTool {
 			? vec(firstPoint.x + (dx / length) * diameter, firstPoint.y + (dy / length) * diameter)
 			: cursor;
 		const center = vec((firstPoint.x + secondPoint.x) / 2, (firstPoint.y + secondPoint.y) / 2);
-		const screenA = ctx.viewport.worldToScreen(firstPoint.x, firstPoint.y);
-		const screenB = ctx.viewport.worldToScreen(secondPoint.x, secondPoint.y);
+		const screenA = ctx.viewport.worldToScreen(firstPoint);
+		const screenB = ctx.viewport.worldToScreen(secondPoint);
 
 		this.drawPreviewCircle(ctx, center, diameter / 2);
-		createSvgLine(screenA.x, screenA.y, screenB.x, screenB.y, AUX_RAY_ATTRS, ctx.targetGroup);
+		createSvgLine(screenA, screenB, AUX_RAY_ATTRS, ctx.targetGroup);
 		this.drawPointMarker(ctx, firstPoint);
 	}
 
@@ -659,18 +649,16 @@ export class CircleTool extends BaseTool {
 		if (circle) {
 			this.drawPreviewCircle(ctx, circle.center, circle.radius);
 
-			const firstPoint = ctx.viewport.worldToScreen(this.points[0].x, this.points[0].y);
-			const center = ctx.viewport.worldToScreen(circle.center.x, circle.center.y);
+			const firstPoint = ctx.viewport.worldToScreen(this.points[0]);
+			const center = ctx.viewport.worldToScreen(circle.center);
 			const dx = firstPoint.x - center.x;
 			const dy = firstPoint.y - center.y;
 			const length = Math.hypot(dx, dy) || 1;
 			const radiusPixels = circle.radius * ctx.viewport.zoom;
 
 			createSvgLine(
-				center.x - (dx / length) * radiusPixels,
-				center.y - (dy / length) * radiusPixels,
-				center.x + (dx / length) * radiusPixels,
-				center.y + (dy / length) * radiusPixels,
+				{ x: center.x - (dx / length) * radiusPixels, y: center.y - (dy / length) * radiusPixels },
+				{ x: center.x + (dx / length) * radiusPixels, y: center.y + (dy / length) * radiusPixels },
 				AUX_RAY_ATTRS,
 				ctx.targetGroup
 			);
@@ -692,10 +680,9 @@ export class CircleTool extends BaseTool {
 	}
 
 	private drawPointMarker(ctx: ToolRenderContext, point: Vec2): void {
-		const screen = ctx.viewport.worldToScreen(point.x, point.y);
+		const screen = ctx.viewport.worldToScreen(point);
 		createSvgCircle(
-			screen.x,
-			screen.y,
+			screen,
 			4,
 			{
 				fill: '#38bdf8',
@@ -710,16 +697,10 @@ export class CircleTool extends BaseTool {
 	private drawPreviewCircle(ctx: ToolRenderContext, center: Vec2, radius: number): void {
 		if (!Number.isFinite(radius) || radius <= 0) return;
 
-		const screenCenter = ctx.viewport.worldToScreen(center.x, center.y);
-		const screenEdge = ctx.viewport.worldToScreen(center.x + radius, center.y);
+		const screenCenter = ctx.viewport.worldToScreen(center);
+		const screenEdge = ctx.viewport.worldToScreen({ x: center.x + radius, y: center.y });
 		const radiusPixels = Math.hypot(screenEdge.x - screenCenter.x, screenEdge.y - screenCenter.y);
-		createSvgCircle(
-			screenCenter.x,
-			screenCenter.y,
-			radiusPixels,
-			getPreviewStrokeAttrs(ctx.isConstruction, false),
-			ctx.targetGroup
-		);
+		createSvgCircle(screenCenter, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
 	}
 
 	private lineIntersection(): Vec2 | null {

@@ -5,7 +5,14 @@ import { HistoryManager, type SketchSnapshot } from '../src/model/history';
 function snapshot(x: number, idCounter = 0): SketchSnapshot {
 	return {
 		points: [{ id: 'Point-1', x, y: 0, fixed: false } as any],
-		lines: [], circles: [], arcs: [], ellipses: [], ellipticalArcs: [], constraints: [], parameters: [], idCounter,
+		lines: [],
+		circles: [],
+		arcs: [],
+		ellipses: [],
+		ellipticalArcs: [],
+		constraints: [],
+		parameters: [],
+		idCounter,
 	};
 }
 

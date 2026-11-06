@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, vec, type Vec2 } from '../../../math/vector';
+import { dist, distancesFrom, vec, type Vec2 } from '../../../math/vector';
 import {
 	renderEllipseMajorAxisPreviewVisual,
 	renderEllipsePreviewVisual,
@@ -121,7 +121,7 @@ export class EllipseTool extends BaseTool {
 				this.centerWorldPos = snap.worldPos;
 			} else {
 				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos.x, ptPos.y);
+				const pt = sketch.addPoint(ptPos);
 				cId = pt.id;
 				this.centerWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -142,7 +142,7 @@ export class EllipseTool extends BaseTool {
 				p1Id = snap.id;
 				this.majWorldPos = snap.worldPos;
 			} else {
-				const pt = sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
+				const pt = sketch.addPoint(effectiveWorld);
 				p1Id = pt.id;
 				this.majWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -184,7 +184,7 @@ export class EllipseTool extends BaseTool {
 				p2Id = snap.id;
 				this.minWorldPos = snap.worldPos;
 			} else {
-				const pt = sketch.addPoint(minorAxisPos.x, minorAxisPos.y);
+				const pt = sketch.addPoint(minorAxisPos);
 				p2Id = pt.id;
 				this.minWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -239,18 +239,19 @@ export class EllipseTool extends BaseTool {
 				startPtId = snap.id;
 				this.startWorldPtPos = snap.worldPos;
 			} else {
-				const pt = sketch.addPoint(projX, projY);
+				const pt = sketch.addPoint({ x: projX, y: projY });
 				startPtId = pt.id;
 				this.startWorldPtPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 			this.startPtId = startPtId;
-			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const sMaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-			const sMin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
-			const sStart = this.ctx.viewport.worldToScreen(this.startWorldPtPos.x, this.startWorldPtPos.y);
-			const rx_s = Math.max(Math.hypot(sMaj.x - sCenter.x, sMaj.y - sCenter.y), 0.1);
-			const ry_s = Math.max(Math.hypot(sMin.x - sCenter.x, sMin.y - sCenter.y), 0.1);
+			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
+			const sMaj = this.ctx.viewport.worldToScreen(majWorld);
+			const sMin = this.ctx.viewport.worldToScreen(minWorld);
+			const sStart = this.ctx.viewport.worldToScreen(this.startWorldPtPos);
+			const r = distancesFrom(sCenter, sMaj, sMin);
+			const rx_s = Math.max(r.x, 0.1);
+			const ry_s = Math.max(r.y, 0.1);
 			const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
 			const ux_s = Math.cos(theta);
 			const uy_s = Math.sin(theta);
@@ -289,14 +290,15 @@ export class EllipseTool extends BaseTool {
 			const projY = centerWorld.y + rxVal * Math.cos(te) * uy + ryVal * Math.sin(te) * vy;
 
 			// Screen orientation calculation for clockwise flag
-			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const sMaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-			const sMin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
-			const sStart = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
-			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
+			const sMaj = this.ctx.viewport.worldToScreen(majWorld);
+			const sMin = this.ctx.viewport.worldToScreen(minWorld);
+			const sStart = this.ctx.viewport.worldToScreen(startWorld);
+			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld);
 
-			const rx_s = Math.max(Math.hypot(sMaj.x - sCenter.x, sMaj.y - sCenter.y), 0.1);
-			const ry_s = Math.max(Math.hypot(sMin.x - sCenter.x, sMin.y - sCenter.y), 0.1);
+			const r = distancesFrom(sCenter, sMaj, sMin);
+			const rx_s = Math.max(r.x, 0.1);
+			const ry_s = Math.max(r.y, 0.1);
 
 			const theta = Math.atan2(sMaj.y - sCenter.y, sMaj.x - sCenter.x);
 			const ux_s = Math.cos(theta);
@@ -339,7 +341,7 @@ export class EllipseTool extends BaseTool {
 			) {
 				endPtId = snap.id;
 			} else {
-				const pt = sketch.addPoint(projX, projY);
+				const pt = sketch.addPoint({ x: projX, y: projY });
 				endPtId = pt.id;
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
@@ -372,14 +374,15 @@ export class EllipseTool extends BaseTool {
 			const rxVal = dist(centerWorld, majWorld);
 			const ryVal = dist(centerWorld, minWorld);
 			if (rxVal >= 0.1 && ryVal >= 0.1) {
-				const sc = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-				const smaj = this.ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const smin = this.ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
-				const ss = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
-				const se = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+				const sc = this.ctx.viewport.worldToScreen(centerWorld);
+				const smaj = this.ctx.viewport.worldToScreen(majWorld);
+				const smin = this.ctx.viewport.worldToScreen(minWorld);
+				const ss = this.ctx.viewport.worldToScreen(startWorld);
+				const se = this.ctx.viewport.worldToScreen(effectiveWorld);
 
-				const rx_s = Math.max(Math.hypot(smaj.x - sc.x, smaj.y - sc.y), 0.1);
-				const ry_s = Math.max(Math.hypot(smin.x - sc.x, smin.y - sc.y), 0.1);
+				const r = distancesFrom(sc, smaj, smin);
+				const rx_s = Math.max(r.x, 0.1);
+				const ry_s = Math.max(r.y, 0.1);
 
 				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 				const ux_s = Math.cos(theta);
@@ -415,8 +418,8 @@ export class EllipseTool extends BaseTool {
 		const effectiveWorld = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos);
+			const s2 = ctx.viewport.worldToScreen(effectiveWorld);
 			const rx = dist(this.centerWorldPos, effectiveWorld);
 			renderEllipseMajorAxisPreviewVisual(ctx.targetGroup, s1, s2, rx, ctx.isConstruction);
 		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
@@ -436,10 +439,10 @@ export class EllipseTool extends BaseTool {
 				if (ryVal < 1) ryVal = 1;
 				const sign = dx * vx + dy * vy < 0 ? -1 : 1;
 
-				const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-				const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
+				const sc = ctx.viewport.worldToScreen(centerWorld);
+				const smaj = ctx.viewport.worldToScreen(majWorld);
 				const sminWorld = vec(centerWorld.x + sign * ryVal * vx, centerWorld.y + sign * ryVal * vy);
-				const smin = ctx.viewport.worldToScreen(sminWorld.x, sminWorld.y);
+				const smin = ctx.viewport.worldToScreen(sminWorld);
 
 				renderEllipsePreviewVisual(ctx.targetGroup, sc, smaj, smin, majLen, ryVal, ctx.isConstruction);
 			}
@@ -450,10 +453,10 @@ export class EllipseTool extends BaseTool {
 			const rxVal = dist(centerWorld, majWorld);
 			const ryVal = dist(centerWorld, minWorld);
 
-			const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-			const smin = ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
-			const ss = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const sc = ctx.viewport.worldToScreen(centerWorld);
+			const smaj = ctx.viewport.worldToScreen(majWorld);
+			const smin = ctx.viewport.worldToScreen(minWorld);
+			const ss = ctx.viewport.worldToScreen(effectiveWorld);
 
 			renderEllipticalArcStartPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss, rxVal, ryVal, ctx.isConstruction);
 		} else if (
@@ -471,11 +474,11 @@ export class EllipseTool extends BaseTool {
 			const rxVal = dist(centerWorld, majWorld);
 			const ryVal = dist(centerWorld, minWorld);
 			if (rxVal >= 0.1 && ryVal >= 0.1) {
-				const sc = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-				const smaj = ctx.viewport.worldToScreen(majWorld.x, majWorld.y);
-				const smin = ctx.viewport.worldToScreen(minWorld.x, minWorld.y);
-				const ss = ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
-				const se = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+				const sc = ctx.viewport.worldToScreen(centerWorld);
+				const smaj = ctx.viewport.worldToScreen(majWorld);
+				const smin = ctx.viewport.worldToScreen(minWorld);
+				const ss = ctx.viewport.worldToScreen(startWorld);
+				const se = ctx.viewport.worldToScreen(effectiveWorld);
 
 				const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 				const ux_s = Math.cos(theta);
@@ -488,8 +491,9 @@ export class EllipseTool extends BaseTool {
 				const ue = (se.x - sc.x) * ux_s + (se.y - sc.y) * uy_s;
 				const ve = (se.x - sc.x) * vx_s + (se.y - sc.y) * vy_s;
 
-				const rx_s = Math.max(Math.hypot(smaj.x - sc.x, smaj.y - sc.y), 0.1);
-				const ry_s = Math.max(Math.hypot(smin.x - sc.x, smin.y - sc.y), 0.1);
+				const r = distancesFrom(sc, smaj, smin);
+				const rx_s = Math.max(r.x, 0.1);
+				const ry_s = Math.max(r.y, 0.1);
 
 				const ts = Math.atan2(vs / ry_s, us / rx_s);
 				const te = Math.atan2(ve / ry_s, ue / rx_s);

@@ -3,7 +3,7 @@ import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { dist, type Vec2 } from '../../../math/vector';
+import { addScalar, dist, subScalar, type Vec2 } from '../../../math/vector';
 import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
@@ -517,7 +517,7 @@ export class RectangularPatternTool extends BaseTool {
 		const centroidWorld = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
 		if (!centroidWorld) return null;
 
-		const sCentroid = this.ctx.viewport.worldToScreen(centroidWorld.x, centroidWorld.y);
+		const sCentroid = this.ctx.viewport.worldToScreen(centroidWorld);
 		const pts: Vec2[] = [sCentroid];
 
 		let hasHandles = false;
@@ -525,7 +525,7 @@ export class RectangularPatternTool extends BaseTool {
 			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
 				if (!handle.constraintId) {
 					hasHandles = true;
-					pts.push({ x: handle.x - 20, y: handle.y - 20 }, { x: handle.x + 20, y: handle.y + 20 });
+					pts.push(subScalar(handle, 20), addScalar(handle, 20));
 				}
 			}
 		}
@@ -544,26 +544,21 @@ export class RectangularPatternTool extends BaseTool {
 				line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
 			);
 
-			const p1 = this.ctx.viewport.worldToScreen(
-				centroidWorld.x + this.state.distance1 * u1.x,
-				centroidWorld.y + this.state.distance1 * u1.y
-			);
-			const p2 = this.ctx.viewport.worldToScreen(
-				centroidWorld.x + this.state.distance2 * u2.x,
-				centroidWorld.y + this.state.distance2 * u2.y
-			);
-			pts.push(
-				{ x: p1.x - 48, y: p1.y - 48 },
-				{ x: p1.x + 48, y: p1.y + 48 },
-				{ x: p2.x - 48, y: p2.y - 48 },
-				{ x: p2.x + 48, y: p2.y + 48 }
-			);
+			const p1 = this.ctx.viewport.worldToScreen({
+				x: centroidWorld.x + this.state.distance1 * u1.x,
+				y: centroidWorld.y + this.state.distance1 * u1.y,
+			});
+			const p2 = this.ctx.viewport.worldToScreen({
+				x: centroidWorld.x + this.state.distance2 * u2.x,
+				y: centroidWorld.y + this.state.distance2 * u2.y,
+			});
+			pts.push(subScalar(p1, 48), addScalar(p1, 48), subScalar(p2, 48), addScalar(p2, 48));
 		}
 
 		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
 				if (!entry.constraintId) {
-					pts.push({ x: entry.x - 14, y: entry.y - 14 }, { x: entry.x + 14, y: entry.y + 14 });
+					pts.push(subScalar(entry, 14), addScalar(entry, 14));
 				}
 			}
 		}

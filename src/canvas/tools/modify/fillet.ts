@@ -223,15 +223,15 @@ export class FilletTool extends BaseTool {
 		const pts: Vec2[] = [];
 
 		if (activePf.result) {
-			pts.push(this.ctx.viewport.worldToScreen(activePf.result.midArc.x, activePf.result.midArc.y));
-			pts.push(this.ctx.viewport.worldToScreen(activePf.result.center.x, activePf.result.center.y));
+			pts.push(this.ctx.viewport.worldToScreen(activePf.result.midArc));
+			pts.push(this.ctx.viewport.worldToScreen(activePf.result.center));
 		}
 		if (activePf.vertexPointId) {
 			const pt = this.ctx.sketch.points.get(activePf.vertexPointId);
-			if (pt) pts.push(this.ctx.viewport.worldToScreen(pt.x, pt.y));
+			if (pt) pts.push(this.ctx.viewport.worldToScreen(pt));
 		}
 		if (activePf.clickPos1) {
-			pts.push(this.ctx.viewport.worldToScreen(activePf.clickPos1.x, activePf.clickPos1.y));
+			pts.push(this.ctx.viewport.worldToScreen(activePf.clickPos1));
 		}
 		if (this.ctx.renderer?.filletGizmoHandle) {
 			const gh = this.ctx.renderer.filletGizmoHandle;
@@ -457,8 +457,8 @@ export class FilletTool extends BaseTool {
 		this.ctx.setCursor('default');
 
 		const sPos = candidate.result
-			? this.ctx.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
-			: this.ctx.viewport.worldToScreen(pt.x, pt.y);
+			? this.ctx.viewport.worldToScreen(candidate.result.midArc)
+			: this.ctx.viewport.worldToScreen(pt);
 
 		const bbox = this.getGizmoBoundingBox();
 		if (this.pendingFillets.length === 1) {
@@ -575,10 +575,10 @@ export class FilletTool extends BaseTool {
 		this.ctx.setCursor('default');
 
 		const sPos = candidate.result
-			? this.ctx.viewport.worldToScreen(candidate.result.midArc.x, candidate.result.midArc.y)
+			? this.ctx.viewport.worldToScreen(candidate.result.midArc)
 			: sharedCornerPt
-				? this.ctx.viewport.worldToScreen(sharedCornerPt.x, sharedCornerPt.y)
-				: this.ctx.viewport.worldToScreen(clickPos1.x, clickPos1.y);
+				? this.ctx.viewport.worldToScreen(sharedCornerPt)
+				: this.ctx.viewport.worldToScreen(clickPos1);
 
 		const bbox = this.getGizmoBoundingBox();
 		if (this.pendingFillets.length === 1) {

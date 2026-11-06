@@ -165,10 +165,10 @@ describe('Text Model & Entity Lifecycle', () => {
 	it('creates a Text entity with construction rectangle', () => {
 		const sketch = new SketchDocument();
 
-		const p0 = sketch.addPoint(-50, 20);
-		const p1 = sketch.addPoint(50, 20);
-		const p2 = sketch.addPoint(50, -20);
-		const p3 = sketch.addPoint(-50, -20);
+		const p0 = sketch.addPoint({ x: -50, y: 20 });
+		const p1 = sketch.addPoint({ x: 50, y: 20 });
+		const p2 = sketch.addPoint({ x: 50, y: -20 });
+		const p3 = sketch.addPoint({ x: -50, y: -20 });
 
 		const l0 = sketch.addLine(p0.id, p1.id, true);
 		const l1 = sketch.addLine(p1.id, p2.id, true);
@@ -208,10 +208,10 @@ describe('Text Model & Entity Lifecycle', () => {
 
 	it('deleting a rectangle point cascades to deleting the text entity', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 10);
-		const p1 = sketch.addPoint(20, 10);
-		const p2 = sketch.addPoint(20, 0);
-		const p3 = sketch.addPoint(0, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 10 });
+		const p1 = sketch.addPoint({ x: 20, y: 10 });
+		const p2 = sketch.addPoint({ x: 20, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 0 });
 		const l0 = sketch.addLine(p0.id, p1.id, true);
 		const l1 = sketch.addLine(p1.id, p2.id, true);
 		const l2 = sketch.addLine(p2.id, p3.id, true);
@@ -232,10 +232,10 @@ describe('Text Model & Entity Lifecycle', () => {
 
 	it('deleting a rectangle line cascades to deleting the text entity', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 10);
-		const p1 = sketch.addPoint(20, 10);
-		const p2 = sketch.addPoint(20, 0);
-		const p3 = sketch.addPoint(0, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 10 });
+		const p1 = sketch.addPoint({ x: 20, y: 10 });
+		const p2 = sketch.addPoint({ x: 20, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 0 });
 		const l0 = sketch.addLine(p0.id, p1.id, true);
 		const l1 = sketch.addLine(p1.id, p2.id, true);
 		const l2 = sketch.addLine(p2.id, p3.id, true);
@@ -256,8 +256,8 @@ describe('Text Model & Entity Lifecycle', () => {
 
 	it('creates Text On Path and cascades deletion when path is deleted', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const text = sketch.addText({
@@ -276,10 +276,10 @@ describe('Text Model & Entity Lifecycle', () => {
 
 	it('undo and redo restore text entities cleanly', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 20);
-		const p1 = sketch.addPoint(40, 20);
-		const p2 = sketch.addPoint(40, 0);
-		const p3 = sketch.addPoint(0, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 20 });
+		const p1 = sketch.addPoint({ x: 40, y: 20 });
+		const p2 = sketch.addPoint({ x: 40, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 0 });
 		const l0 = sketch.addLine(p0.id, p1.id, true);
 		const l1 = sketch.addLine(p1.id, p2.id, true);
 		const l2 = sketch.addLine(p2.id, p3.id, true);
@@ -454,10 +454,10 @@ describe('Text Layout & Path Mathematics', () => {
 describe('SVG Export with Text Elements', () => {
 	it('exports text converted to vector <path> with required SVG_EXPORT_STYLE properties', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(-30, 10);
-		const p1 = sketch.addPoint(30, 10);
-		const p2 = sketch.addPoint(30, -10);
-		const p3 = sketch.addPoint(-30, -10);
+		const p0 = sketch.addPoint({ x: -30, y: 10 });
+		const p1 = sketch.addPoint({ x: 30, y: 10 });
+		const p2 = sketch.addPoint({ x: 30, y: -10 });
+		const p3 = sketch.addPoint({ x: -30, y: -10 });
 		const l0 = sketch.addLine(p0.id, p1.id, true);
 		const l1 = sketch.addLine(p1.id, p2.id, true);
 		const l2 = sketch.addLine(p2.id, p3.id, true);
@@ -488,11 +488,14 @@ describe('SVG Export with Text Elements', () => {
 			'Text path should have stroke = SVG_EXPORT_STYLE.regionStroke'
 		);
 		assert.ok(!svgOutput.includes('<line'), 'Text rectangle construction lines should not be exported');
-		assert.ok(!svgOutput.includes('<circle'), 'Text rectangle corner points should not be exported as isolated circles');
+		assert.ok(
+			!svgOutput.includes('<circle'),
+			'Text rectangle corner points should not be exported as isolated circles'
+		);
 
 		// Verify other geometry (non-text construction lines and normal lines) are still exported
-		const otherP1 = sketch.addPoint(50, 50);
-		const otherP2 = sketch.addPoint(100, 50);
+		const otherP1 = sketch.addPoint({ x: 50, y: 50 });
+		const otherP2 = sketch.addPoint({ x: 100, y: 50 });
 		sketch.addLine(otherP1.id, otherP2.id, false);
 		const svgWithOther = exportSketchToSVG(sketch);
 		assert.ok(svgWithOther.includes('<line'), 'Regular lines should still be exported');
@@ -639,12 +642,12 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const tool = new TextTool();
 		tool.mode = 'text_on_path';
 
-		const pA = sketch.addPoint(0, 0);
-		const pB = sketch.addPoint(50, 0);
+		const pA = sketch.addPoint({ x: 0, y: 0 });
+		const pB = sketch.addPoint({ x: 50, y: 0 });
 		const line1 = sketch.addLine(pA.id, pB.id, false);
 
-		const pC = sketch.addPoint(0, 50);
-		const pD = sketch.addPoint(50, 50);
+		const pC = sketch.addPoint({ x: 0, y: 50 });
+		const pD = sketch.addPoint({ x: 50, y: 50 });
 		const line2 = sketch.addLine(pC.id, pD.id, false);
 
 		let hoverItem: any = { id: line1.id, type: 'line' };
@@ -751,7 +754,10 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		assert.ok(htmlTextMode.includes('width: 80%'), 'Textarea must occupy 80% panel width');
 		// Check font select
 		assert.ok(htmlTextMode.includes('id="text-tool-select-font"'));
-		assert.ok(!htmlTextMode.includes('id="text-tool-btn-sysfonts"'), 'Dedicated system fonts button removed in favor of select option');
+		assert.ok(
+			!htmlTextMode.includes('id="text-tool-btn-sysfonts"'),
+			'Dedicated system fonts button removed in favor of select option'
+		);
 		// Check bold/italic toggles with SVG icons
 		assert.ok(htmlTextMode.includes('id="text-tool-btn-bold"') && htmlTextMode.includes('title="Bold"'));
 		assert.ok(htmlTextMode.includes('id="text-tool-btn-italic"') && htmlTextMode.includes('title="Italic"'));
@@ -936,9 +942,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 	});
 
 	it('supports Local Font Access API and custom font loading', async () => {
-		const { isLocalFontAccessSupported, querySystemFonts, AVAILABLE_FONTS } = await import(
-			'../src/canvas/fonts'
-		);
+		const { isLocalFontAccessSupported, querySystemFonts, AVAILABLE_FONTS } = await import('../src/canvas/fonts');
 
 		// When window.queryLocalFonts is not present
 		assert.equal(isLocalFontAccessSupported(), false);
@@ -1388,10 +1392,10 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 	it('SketchText implements IInspectable and renders TextInspectorPanel when selected', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(-20, 10);
-		const p1 = sketch.addPoint(20, 10);
-		const p2 = sketch.addPoint(20, -10);
-		const p3 = sketch.addPoint(-20, -10);
+		const p0 = sketch.addPoint({ x: -20, y: 10 });
+		const p1 = sketch.addPoint({ x: 20, y: 10 });
+		const p2 = sketch.addPoint({ x: 20, y: -10 });
+		const p3 = sketch.addPoint({ x: -20, y: -10 });
 
 		const l0 = sketch.addLine(p0.id, p1.id, true);
 		const l1 = sketch.addLine(p1.id, p2.id, true);
@@ -1585,8 +1589,14 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		};
 		const leftNormalBounds = boundsForPath(dLeftNormal);
 		const leftFlippedBounds = boundsForPath(dLeftFlipped);
-		assert.ok(Math.abs(leftNormalBounds.min.x - -49) < 2, `Normal min.x should be near -49, got ${leftNormalBounds.min.x}`);
-		assert.ok(Math.abs(leftFlippedBounds.min.x - -49) < 2, `Flipped min.x should still be near -49, got ${leftFlippedBounds.min.x}`);
+		assert.ok(
+			Math.abs(leftNormalBounds.min.x - -49) < 2,
+			`Normal min.x should be near -49, got ${leftNormalBounds.min.x}`
+		);
+		assert.ok(
+			Math.abs(leftFlippedBounds.min.x - -49) < 2,
+			`Flipped min.x should still be near -49, got ${leftFlippedBounds.min.x}`
+		);
 
 		// Test Top Alignment with and without vertical flip
 		const dTopNormal = generateTextSvgPathData(
@@ -1626,12 +1636,17 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		);
 
 		const yCoordsNormalTop = (dTopNormal.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
-		const yCoordsFlippedTop = (dTopFlipped.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
+		const yCoordsFlippedTop = (dTopFlipped.match(/[-+]?\d*\.?\d+/g) || [])
+			.filter((_, idx) => idx % 2 === 1)
+			.map(Number);
 
 		const topNormalBounds = AABB.fromPoints(yCoordsNormalTop.map(y => vec(0, y)))!;
 		const topFlippedBounds = AABB.fromPoints(yCoordsFlippedTop.map(y => vec(0, y)))!;
 		assert.ok(Math.abs(topNormalBounds.max.y - 19) < 3, `Normal max.y should be near 19, got ${topNormalBounds.max.y}`);
-		assert.ok(Math.abs(topFlippedBounds.max.y - 19) < 3, `Flipped max.y should still be near 19, got ${topFlippedBounds.max.y}`);
+		assert.ok(
+			Math.abs(topFlippedBounds.max.y - 19) < 3,
+			`Flipped max.y should still be near 19, got ${topFlippedBounds.max.y}`
+		);
 	});
 
 	it('bindTextCardEvents handles Fit to Path checkbox changes and Mode switching', () => {
@@ -1705,9 +1720,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const splineCurve: GeoSpline = {
 			type: 'spline',
 			id: 'spline1',
-			bezierSegments: [
-				[vec(0, 0), vec(20, 30), vec(80, -30), vec(100, 0)],
-			],
+			bezierSegments: [[vec(0, 0), vec(20, 30), vec(80, -30), vec(100, 0)]],
 			isClosed: false,
 		};
 
@@ -1873,10 +1886,19 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const yLineBelow = (dLineBelow.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
 
 		// Flip H does NOT move text below or invert Y (all Y >= -0.1)
-		assert.ok(yLineFlipH.every(y => y >= -0.1), 'Flip H must remain above the line (Y >= 0)');
+		assert.ok(
+			yLineFlipH.every(y => y >= -0.1),
+			'Flip H must remain above the line (Y >= 0)'
+		);
 		// Flip V does NOT move text below (all Y >= -0.1), but inverts glyph orientation
-		assert.ok(yLineFlipV.every(y => y >= -0.1), 'Flip V must remain above the line (Y >= 0)');
+		assert.ok(
+			yLineFlipV.every(y => y >= -0.1),
+			'Flip V must remain above the line (Y >= 0)'
+		);
 		// Below places text below the line (all Y <= 0.1)
-		assert.ok(yLineBelow.every(y => y <= 0.1), 'Placement Below must place text below the line (Y <= 0)');
+		assert.ok(
+			yLineBelow.every(y => y <= 0.1),
+			'Placement Below must place text below the line (Y <= 0)'
+		);
 	});
 });

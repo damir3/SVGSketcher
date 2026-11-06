@@ -141,9 +141,9 @@ export class AngleConstraint extends BaseConstraint {
 		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
 		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
 
-		const sCenter = ctx.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-		const sRay1 = ctx.viewport.worldToScreen(geom.pInt.x + u1.x * 20, geom.pInt.y + u1.y * 20);
-		const sRay2 = ctx.viewport.worldToScreen(geom.pInt.x + u2.x * 20, geom.pInt.y + u2.y * 20);
+		const sCenter = ctx.viewport.worldToScreen(geom.pInt);
+		const sRay1 = ctx.viewport.worldToScreen({ x: geom.pInt.x + u1.x * 20, y: geom.pInt.y + u1.y * 20 });
+		const sRay2 = ctx.viewport.worldToScreen({ x: geom.pInt.x + u2.x * 20, y: geom.pInt.y + u2.y * 20 });
 
 		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
 		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
@@ -179,10 +179,10 @@ export class AngleConstraint extends BaseConstraint {
 		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
 
 		// Dashed extension lines if arc points extend beyond the physical line segments
-		const sp1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-		const sp2 = ctx.viewport.worldToScreen(p2.x, p2.y);
-		const sp3 = ctx.viewport.worldToScreen(p3.x, p3.y);
-		const sp4 = ctx.viewport.worldToScreen(p4.x, p4.y);
+		const sp1 = ctx.viewport.worldToScreen(p1);
+		const sp2 = ctx.viewport.worldToScreen(p2);
+		const sp3 = ctx.viewport.worldToScreen(p3);
+		const sp4 = ctx.viewport.worldToScreen(p4);
 
 		if (ctx.renderDashedExtensionLines) {
 			const isUserLine1 = Boolean(this.line1Id && ctx.sketch.lines.has(this.line1Id));
@@ -219,10 +219,8 @@ export class AngleConstraint extends BaseConstraint {
 		const textLen = textVal.length * 8 + 14;
 
 		createSvgRect(
-			midX - textLen * 0.5,
-			midY - 10,
-			textLen,
-			20,
+			{ x: midX - textLen * 0.5, y: midY - 10 },
+			{ x: textLen, y: 20 },
 			{
 				rx: 4,
 				fill: COLORS.white,
@@ -233,8 +231,7 @@ export class AngleConstraint extends BaseConstraint {
 		);
 
 		createSvgText(
-			midX,
-			midY + 4,
+			{ x: midX, y: midY + 4 },
 			textVal,
 			{
 				'text-anchor': 'middle',
@@ -268,9 +265,9 @@ export class AngleConstraint extends BaseConstraint {
 		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
 		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
 
-		const sCenter = viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-		const sRay1 = viewport.worldToScreen(geom.pInt.x + u1.x * 20, geom.pInt.y + u1.y * 20);
-		const sRay2 = viewport.worldToScreen(geom.pInt.x + u2.x * 20, geom.pInt.y + u2.y * 20);
+		const sCenter = viewport.worldToScreen(geom.pInt);
+		const sRay1 = viewport.worldToScreen({ x: geom.pInt.x + u1.x * 20, y: geom.pInt.y + u1.y * 20 });
+		const sRay2 = viewport.worldToScreen({ x: geom.pInt.x + u2.x * 20, y: geom.pInt.y + u2.y * 20 });
 
 		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
 		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);

@@ -731,9 +731,9 @@ export function commitFilletToSketch(
 	if (!res) return null;
 
 	// 1. Create tangent points and arc center
-	const pT1 = sketch.addPoint(res.t1.x, res.t1.y);
-	const pT2 = sketch.addPoint(res.t2.x, res.t2.y);
-	const pCenter = sketch.addPoint(res.center.x, res.center.y);
+	const pT1 = sketch.addPoint(res.t1);
+	const pT2 = sketch.addPoint(res.t2);
+	const pCenter = sketch.addPoint(res.center);
 
 	// 2. Create the fillet arc
 	const filletArc = sketch.addArc(pCenter.id, pT1.id, pT2.id, res.radius, res.clockwise);
@@ -1051,7 +1051,7 @@ function replaceSplineWithInterval(
 				}
 			}
 			if (!matchedId) {
-				const newPt = sketch.addPoint(pos.x, pos.y);
+				const newPt = sketch.addPoint(pos);
 				matchedId = newPt.id;
 			}
 			controlPtIds.push(matchedId);
@@ -1105,7 +1105,7 @@ function replaceSplineWithInterval(
 		} else if (j === M) {
 			newPointIds.push(endPointId);
 		} else {
-			const pt = sketch.addPoint(rawPoints[j].x, rawPoints[j].y);
+			const pt = sketch.addPoint(rawPoints[j]);
 			newPointIds.push(pt.id);
 		}
 	}

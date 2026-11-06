@@ -25,16 +25,16 @@ const TWO_PI = 2 * Math.PI;
  * `clockwise = true` (sweepFlag = 1 in screen space) in order to pass through `midPoint`.
  */
 function isArcClockwiseThroughPoint(
-	viewport: { worldToScreen(x: number, y: number): Vec2 },
+	viewport: { worldToScreen(point: Vec2): Vec2 },
 	center: Vec2,
 	start: Vec2,
 	end: Vec2,
 	midPoint: Vec2
 ): boolean {
-	const sc = viewport.worldToScreen(center.x, center.y);
-	const ss = viewport.worldToScreen(start.x, start.y);
-	const se = viewport.worldToScreen(end.x, end.y);
-	const sm = viewport.worldToScreen(midPoint.x, midPoint.y);
+	const sc = viewport.worldToScreen(center);
+	const ss = viewport.worldToScreen(start);
+	const se = viewport.worldToScreen(end);
+	const sm = viewport.worldToScreen(midPoint);
 
 	const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
 	const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
@@ -1052,20 +1052,20 @@ export class SlotTool extends BaseTool {
 			const hasRadius = this.radius !== null;
 			const { c1, c2, u, n, effectiveR } = this.computeLinearCenters(p1, p2, this.radius ?? 0);
 
-			const sc1 = ctx.viewport.worldToScreen(c1.x, c1.y);
-			const sc2 = ctx.viewport.worldToScreen(c2.x, c2.y);
-			createSvgLine(sc1.x, sc1.y, sc2.x, sc2.y, AUX_AXIS_ATTRS, ctx.targetGroup);
-			createSvgCircle(sc1.x, sc1.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-			createSvgCircle(sc2.x, sc2.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			const sc1 = ctx.viewport.worldToScreen(c1);
+			const sc2 = ctx.viewport.worldToScreen(c2);
+			createSvgLine(sc1, sc2, AUX_AXIS_ATTRS, ctx.targetGroup);
+			createSvgCircle(sc1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(sc2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 
 			if (this._mode === 'center_point') {
-				const sm = ctx.viewport.worldToScreen(p1.x, p1.y);
-				createSvgCircle(sm.x, sm.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				const sm = ctx.viewport.worldToScreen(p1);
+				createSvgCircle(sm, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 			} else if (this._mode === 'overall') {
-				const se1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-				const se2 = ctx.viewport.worldToScreen(p2.x, p2.y);
-				createSvgCircle(se1.x, se1.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-				createSvgCircle(se2.x, se2.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				const se1 = ctx.viewport.worldToScreen(p1);
+				const se2 = ctx.viewport.worldToScreen(p2);
+				createSvgCircle(se1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgCircle(se2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 			}
 
 			if (hasRadius && (this.drawingStep === 2 || this.isRadiusLocked || this.popup.isLocked('radius'))) {
@@ -1074,14 +1074,14 @@ export class SlotTool extends BaseTool {
 				const pt3 = vec(c2.x - effectiveR * n.x, c2.y - effectiveR * n.y);
 				const pt4 = vec(c1.x - effectiveR * n.x, c1.y - effectiveR * n.y);
 
-				const sPt1 = ctx.viewport.worldToScreen(pt1.x, pt1.y);
-				const sPt2 = ctx.viewport.worldToScreen(pt2.x, pt2.y);
-				const sPt3 = ctx.viewport.worldToScreen(pt3.x, pt3.y);
-				const sPt4 = ctx.viewport.worldToScreen(pt4.x, pt4.y);
+				const sPt1 = ctx.viewport.worldToScreen(pt1);
+				const sPt2 = ctx.viewport.worldToScreen(pt2);
+				const sPt3 = ctx.viewport.worldToScreen(pt3);
+				const sPt4 = ctx.viewport.worldToScreen(pt4);
 				const sr = effectiveR * ctx.viewport.zoom;
 
-				createSvgLine(sPt1.x, sPt1.y, sPt2.x, sPt2.y, previewAttrs, ctx.targetGroup);
-				createSvgLine(sPt3.x, sPt3.y, sPt4.x, sPt4.y, previewAttrs, ctx.targetGroup);
+				createSvgLine(sPt1, sPt2, previewAttrs, ctx.targetGroup);
+				createSvgLine(sPt3, sPt4, previewAttrs, ctx.targetGroup);
 
 				const mid1 = vec(c1.x - effectiveR * u.x, c1.y - effectiveR * u.y);
 				const mid2 = vec(c2.x + effectiveR * u.x, c2.y + effectiveR * u.y);
@@ -1095,14 +1095,14 @@ export class SlotTool extends BaseTool {
 		}
 
 		if (this._mode === 'three_point_arc') {
-			const s1 = ctx.viewport.worldToScreen(this.firstWorldPos.x, this.firstWorldPos.y);
-			createSvgCircle(s1.x, s1.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			const s1 = ctx.viewport.worldToScreen(this.firstWorldPos);
+			createSvgCircle(s1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 
 			if (this.drawingStep === 1) {
 				const p2 = this.computeLinearSecondPoint(effectiveWorld);
-				const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
-				createSvgLine(s1.x, s1.y, s2.x, s2.y, AUX_AXIS_ATTRS, ctx.targetGroup);
-				createSvgCircle(s2.x, s2.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				const s2 = ctx.viewport.worldToScreen(p2);
+				createSvgLine(s1, s2, AUX_AXIS_ATTRS, ctx.targetGroup);
+				createSvgCircle(s2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 				return;
 			}
 
@@ -1111,11 +1111,11 @@ export class SlotTool extends BaseTool {
 				const p2 = this.secondWorldPos;
 				const p3 = ctx.cursorWorld;
 				const circum = getCircumcircle(p1, p2, p3);
-				const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
-				createSvgCircle(s2.x, s2.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				const s2 = ctx.viewport.worldToScreen(p2);
+				createSvgCircle(s2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 
 				if (!circum || circum.radius < 1 || circum.radius > 50000) {
-					createSvgLine(s1.x, s1.y, s2.x, s2.y, AUX_AXIS_ATTRS, ctx.targetGroup);
+					createSvgLine(s1, s2, AUX_AXIS_ATTRS, ctx.targetGroup);
 					return;
 				}
 
@@ -1156,16 +1156,16 @@ export class SlotTool extends BaseTool {
 
 		if (this._mode === 'center_point_arc') {
 			const center = this.arcCenterWorld!;
-			const sCenter = ctx.viewport.worldToScreen(center.x, center.y);
-			createSvgCircle(sCenter.x, sCenter.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			const sCenter = ctx.viewport.worldToScreen(center);
+			createSvgCircle(sCenter, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 
 			if (this.drawingStep === 1) {
 				const p1 = this.computeLinearSecondPoint(effectiveWorld);
-				const sCur = ctx.viewport.worldToScreen(p1.x, p1.y);
+				const sCur = ctx.viewport.worldToScreen(p1);
 				const rScreen = dist(center, p1) * ctx.viewport.zoom;
-				createSvgLine(sCenter.x, sCenter.y, sCur.x, sCur.y, AUX_RAY_ATTRS, ctx.targetGroup);
-				createSvgCircle(sCenter.x, sCenter.y, rScreen, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
-				createSvgCircle(sCur.x, sCur.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+				createSvgLine(sCenter, sCur, AUX_RAY_ATTRS, ctx.targetGroup);
+				createSvgCircle(sCenter, rScreen, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
+				createSvgCircle(sCur, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 				return;
 			}
 
@@ -1210,14 +1210,14 @@ export class SlotTool extends BaseTool {
 		drawSlotOutline: boolean
 	): void {
 		const geom = this.computeArcSlotGeometry(center, c1, c2, rArc, sweepSign, slotRadius ?? 1);
-		const sCenter = ctx.viewport.worldToScreen(center.x, center.y);
-		const sc1 = ctx.viewport.worldToScreen(c1.x, c1.y);
-		const sc2 = ctx.viewport.worldToScreen(c2.x, c2.y);
+		const sCenter = ctx.viewport.worldToScreen(center);
+		const sc1 = ctx.viewport.worldToScreen(c1);
+		const sc2 = ctx.viewport.worldToScreen(c2);
 
 		// Centerline arc and key points (no radial construction lines)
-		createSvgCircle(sCenter.x, sCenter.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-		createSvgCircle(sc1.x, sc1.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
-		createSvgCircle(sc2.x, sc2.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+		createSvgCircle(sCenter, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+		createSvgCircle(sc1, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+		createSvgCircle(sc2, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 
 		const cwCenter = isArcClockwiseThroughPoint(ctx.viewport, center, c1, c2, geom.midCenterArc);
 		createSvgPath(
@@ -1229,10 +1229,10 @@ export class SlotTool extends BaseTool {
 		if (!drawSlotOutline || slotRadius === null) return;
 
 		const previewAttrs = getPreviewStrokeAttrs(ctx.isConstruction);
-		const sP1In = ctx.viewport.worldToScreen(geom.p1Inner.x, geom.p1Inner.y);
-		const sP1Out = ctx.viewport.worldToScreen(geom.p1Outer.x, geom.p1Outer.y);
-		const sP2In = ctx.viewport.worldToScreen(geom.p2Inner.x, geom.p2Inner.y);
-		const sP2Out = ctx.viewport.worldToScreen(geom.p2Outer.x, geom.p2Outer.y);
+		const sP1In = ctx.viewport.worldToScreen(geom.p1Inner);
+		const sP1Out = ctx.viewport.worldToScreen(geom.p1Outer);
+		const sP2In = ctx.viewport.worldToScreen(geom.p2Inner);
+		const sP2Out = ctx.viewport.worldToScreen(geom.p2Outer);
 
 		const cwOuter = isArcClockwiseThroughPoint(ctx.viewport, center, geom.p1Outer, geom.p2Outer, geom.midOuterArc);
 		const cwInner = isArcClockwiseThroughPoint(ctx.viewport, center, geom.p1Inner, geom.p2Inner, geom.midInnerArc);
@@ -1338,7 +1338,7 @@ export class SlotTool extends BaseTool {
 		if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id) && !excludeIds.includes(snap.id)) {
 			return snap.id;
 		}
-		const pt = sketch.addPoint(pos.x, pos.y);
+		const pt = sketch.addPoint(pos);
 		if (snap) {
 			this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 		}
@@ -1367,15 +1367,15 @@ export class SlotTool extends BaseTool {
 			c2Id = this.addOrReusePoint(c2, this.secondSnap, [c1Id]);
 		} else if (this._mode === 'center_point') {
 			centerMidPtId = this.addOrReusePoint(p1, this.firstSnap);
-			const ptC1 = sketch.addPoint(c1.x, c1.y);
+			const ptC1 = sketch.addPoint(c1);
 			c1Id = ptC1.id;
 			c2Id = this.addOrReusePoint(c2, this.secondSnap, [centerMidPtId, c1Id]);
 		} else {
 			// overall mode: p1 and p2 are the outer edge points E1 and E2
 			edge1PtId = this.addOrReusePoint(p1, this.firstSnap);
 			edge2PtId = this.addOrReusePoint(p2, this.secondSnap, [edge1PtId]);
-			const ptC1 = sketch.addPoint(c1.x, c1.y);
-			const ptC2 = sketch.addPoint(c2.x, c2.y);
+			const ptC1 = sketch.addPoint(c1);
+			const ptC2 = sketch.addPoint(c2);
 			c1Id = ptC1.id;
 			c2Id = ptC2.id;
 		}
@@ -1386,10 +1386,10 @@ export class SlotTool extends BaseTool {
 		const pt3Pos = vec(c2.x - effectiveR * n.x, c2.y - effectiveR * n.y);
 		const pt4Pos = vec(c1.x - effectiveR * n.x, c1.y - effectiveR * n.y);
 
-		const pt1 = sketch.addPoint(pt1Pos.x, pt1Pos.y);
-		const pt2 = sketch.addPoint(pt2Pos.x, pt2Pos.y);
-		const pt3 = sketch.addPoint(pt3Pos.x, pt3Pos.y);
-		const pt4 = sketch.addPoint(pt4Pos.x, pt4Pos.y);
+		const pt1 = sketch.addPoint(pt1Pos);
+		const pt2 = sketch.addPoint(pt2Pos);
+		const pt3 = sketch.addPoint(pt3Pos);
+		const pt4 = sketch.addPoint(pt4Pos);
 
 		// Centerline construction line and side lines
 		const axisLine = sketch.addLine(c1Id, c2Id, true);
@@ -1483,14 +1483,14 @@ export class SlotTool extends BaseTool {
 			// three_point_arc: firstSnap = c1, secondSnap = c2
 			c1Id = this.addOrReusePoint(c1, this.firstSnap);
 			c2Id = this.addOrReusePoint(c2, this.secondSnap, [c1Id]);
-			const ptCenter = sketch.addPoint(center.x, center.y);
+			const ptCenter = sketch.addPoint(center);
 			centerId = ptCenter.id;
 		}
 
-		const p1In = sketch.addPoint(geom.p1Inner.x, geom.p1Inner.y);
-		const p1Out = sketch.addPoint(geom.p1Outer.x, geom.p1Outer.y);
-		const p2In = sketch.addPoint(geom.p2Inner.x, geom.p2Inner.y);
-		const p2Out = sketch.addPoint(geom.p2Outer.x, geom.p2Outer.y);
+		const p1In = sketch.addPoint(geom.p1Inner);
+		const p1Out = sketch.addPoint(geom.p1Outer);
+		const p2In = sketch.addPoint(geom.p2Inner);
+		const p2Out = sketch.addPoint(geom.p2Outer);
 
 		const cwCenter = isArcClockwiseThroughPoint(this.ctx.viewport, center, c1, c2, geom.midCenterArc);
 		const cwOuter = isArcClockwiseThroughPoint(this.ctx.viewport, center, geom.p1Outer, geom.p2Outer, geom.midOuterArc);

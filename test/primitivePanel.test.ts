@@ -6,8 +6,8 @@ import { dist } from '../src/math/vector';
 describe('PrimitivePanel Integration', () => {
 	it('SketchLine uses PrimitivePanel for sidebar inspector rendering', () => {
 		const doc = new SketchDocument();
-		const p1 = doc.addPoint(0, 0);
-		const p2 = doc.addPoint(100, 0);
+		const p1 = doc.addPoint({ x: 0, y: 0 });
+		const p2 = doc.addPoint({ x: 100, y: 0 });
 		const line = doc.addLine(p1.id, p2.id);
 
 		assert.ok(line.sidebarPanel, 'Line should have sidebarPanel');
@@ -27,7 +27,7 @@ describe('PrimitivePanel Integration', () => {
 
 	it('SketchCircle uses PrimitivePanel for sidebar inspector rendering', () => {
 		const doc = new SketchDocument();
-		const p = doc.addPoint(10, 20);
+		const p = doc.addPoint({ x: 10, y: 20 });
 		const circle = doc.addCircle(p.id, 25);
 
 		assert.ok(circle.sidebarPanel, 'Circle should have sidebarPanel');
@@ -47,7 +47,7 @@ describe('PrimitivePanel Integration', () => {
 
 	it('SketchPoint uses PrimitivePanel for sidebar inspector rendering', () => {
 		const doc = new SketchDocument();
-		const pt = doc.addPoint(42.5, -17.25);
+		const pt = doc.addPoint({ x: 42.5, y: -17.25 });
 
 		assert.ok(pt.sidebarPanel, 'Point should have sidebarPanel');
 

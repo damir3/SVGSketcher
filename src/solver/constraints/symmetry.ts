@@ -97,15 +97,15 @@ export class SymmetryConstraint extends BaseConstraint {
 		const p2 = ctx.sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return;
 
-		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const s1 = ctx.viewport.worldToScreen(p1);
+		const s2 = ctx.viewport.worldToScreen(p2);
 
 		if (ctx.isSelected) {
-			createSvgLine(s1.x, s1.y, s2.x, s2.y, SYMMETRY_CHORD_ATTRS, ctx.targetGroup);
+			createSvgLine(s1, s2, SYMMETRY_CHORD_ATTRS, ctx.targetGroup);
 		}
 
-		ctx.renderBadge(this.id, s1.x + 12, s1.y - 12, 'symmetry', COLORS.primary);
-		ctx.renderBadge(this.id, s2.x + 12, s2.y - 12, 'symmetry', COLORS.primary);
+		ctx.renderBadge(this.id, { x: s1.x + 12, y: s1.y - 12 }, 'symmetry', COLORS.primary);
+		ctx.renderBadge(this.id, { x: s2.x + 12, y: s2.y - 12 }, 'symmetry', COLORS.primary);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
@@ -113,8 +113,8 @@ export class SymmetryConstraint extends BaseConstraint {
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return null;
 
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
 		const d1 = distanceToPoint(screen, { x: s1.x + 12, y: s1.y - 12 });
 		const d2 = distanceToPoint(screen, { x: s2.x + 12, y: s2.y - 12 });
 		return Math.min(d1, d2);

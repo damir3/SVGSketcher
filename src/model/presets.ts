@@ -1,3 +1,4 @@
+import { ORIGIN } from '../math/vector';
 import type { SketchDocument } from './sketch';
 
 export function loadTrianglePreset(sketch: SketchDocument): void {
@@ -5,9 +6,9 @@ export function loadTrianglePreset(sketch: SketchDocument): void {
 	sketch.clear();
 
 	// Create points
-	const pA = sketch.addPoint(-50, 0);
-	const pB = sketch.addPoint(50, 0);
-	const pC = sketch.addPoint(0, 80);
+	const pA = sketch.addPoint({ x: -50, y: 0 });
+	const pB = sketch.addPoint({ x: 50, y: 0 });
+	const pC = sketch.addPoint({ x: 0, y: 80 });
 
 	// Fix origin / vertex A
 	sketch.addFixedConstraint(pA.id);
@@ -31,12 +32,12 @@ export function loadBracketPreset(sketch: SketchDocument): void {
 	sketch.clear();
 
 	// 6 vertices of L-bracket
-	const p0 = sketch.addPoint(0, 0);
-	const p1 = sketch.addPoint(140, 0);
-	const p2 = sketch.addPoint(140, 30);
-	const p3 = sketch.addPoint(35, 30);
-	const p4 = sketch.addPoint(35, 120);
-	const p5 = sketch.addPoint(0, 120);
+	const p0 = sketch.addPoint(ORIGIN);
+	const p1 = sketch.addPoint({ x: 140, y: 0 });
+	const p2 = sketch.addPoint({ x: 140, y: 30 });
+	const p3 = sketch.addPoint({ x: 35, y: 30 });
+	const p4 = sketch.addPoint({ x: 35, y: 120 });
+	const p5 = sketch.addPoint({ x: 0, y: 120 });
 
 	sketch.addFixedConstraint(p0.id);
 
@@ -68,14 +69,14 @@ export function loadFourBarLinkagePreset(sketch: SketchDocument): void {
 	sketch.clear();
 
 	// Ground pivots
-	const pA = sketch.addPoint(-100, -40);
-	const pD = sketch.addPoint(100, -40);
+	const pA = sketch.addPoint({ x: -100, y: -40 });
+	const pD = sketch.addPoint({ x: 100, y: -40 });
 	sketch.addFixedConstraint(pA.id);
 	sketch.addFixedConstraint(pD.id);
 
 	// Moving joints
-	const pB = sketch.addPoint(-60, 30);
-	const pC = sketch.addPoint(70, 45);
+	const pB = sketch.addPoint({ x: -60, y: 30 });
+	const pC = sketch.addPoint({ x: 70, y: 45 });
 
 	// Links
 	sketch.addLine(pA.id, pD.id, true); // Construction line for ground
@@ -95,13 +96,13 @@ export function loadCircleTangentPreset(sketch: SketchDocument): void {
 	sketch.beginTransaction();
 	sketch.clear();
 
-	const cCenter = sketch.addPoint(-50, 0);
+	const cCenter = sketch.addPoint({ x: -50, y: 0 });
 	sketch.addFixedConstraint(cCenter.id);
 	const circ = sketch.addCircle(cCenter.id, 50);
 	sketch.addRadiusConstraint(circ.id, 50);
 
-	const p1 = sketch.addPoint(-120, 80);
-	const p2 = sketch.addPoint(100, 80);
+	const p1 = sketch.addPoint({ x: -120, y: 80 });
+	const p2 = sketch.addPoint({ x: 100, y: 80 });
 	const line = sketch.addLine(p1.id, p2.id);
 
 	sketch.addHorizontalConstraint(p1.id, p2.id);

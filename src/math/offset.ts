@@ -1487,7 +1487,7 @@ export function commitOffsetToSketch(
 					x: 0,
 					y: 0,
 				};
-				cornerPoints.push(sketch.addPoint(pt.x, pt.y));
+				cornerPoints.push(sketch.addPoint(pt));
 			}
 		}
 
@@ -1495,7 +1495,7 @@ export function commitOffsetToSketch(
 			const prim = side.primitives[i];
 
 			if (prim.type === 'circle') {
-				const centerPt = sketch.addPoint(prim.circleCenter!.x, prim.circleCenter!.y);
+				const centerPt = sketch.addPoint(prim.circleCenter!);
 				const circle = sketch.addCircle(centerPt.id, prim.circleRadius!);
 				createdIds.push(circle.id);
 
@@ -1518,8 +1518,8 @@ export function commitOffsetToSketch(
 					p1 = cornerPoints[i];
 					p2 = cornerPoints[(i + 1) % cornerPoints.length];
 				} else {
-					p1 = sketch.addPoint(prim.p1!.x, prim.p1!.y);
-					p2 = sketch.addPoint(prim.p2!.x, prim.p2!.y);
+					p1 = sketch.addPoint(prim.p1!);
+					p2 = sketch.addPoint(prim.p2!);
 				}
 				const line = sketch.addLine(p1.id, p2.id);
 				createdIds.push(line.id);
@@ -1548,15 +1548,15 @@ export function commitOffsetToSketch(
 					});
 				}
 			} else if (prim.type === 'arc') {
-				const centerPt = sketch.addPoint(prim.center!.x, prim.center!.y);
+				const centerPt = sketch.addPoint(prim.center!);
 				let pStart: SketchPoint;
 				let pEnd: SketchPoint;
 				if (numPrims > 1) {
 					pStart = cornerPoints[i];
 					pEnd = cornerPoints[(i + 1) % cornerPoints.length];
 				} else {
-					pStart = sketch.addPoint(prim.start!.x, prim.start!.y);
-					pEnd = sketch.addPoint(prim.end!.x, prim.end!.y);
+					pStart = sketch.addPoint(prim.start!);
+					pEnd = sketch.addPoint(prim.end!);
 				}
 				const arc = sketch.addArc(centerPt.id, pStart.id, pEnd.id, prim.radius!, !!prim.clockwise);
 				createdIds.push(arc.id);
@@ -1580,7 +1580,7 @@ export function commitOffsetToSketch(
 					ptIds.push(cornerPoints[i].id);
 					for (let k = 1; k < prim.fitPoints!.length - 1; k++) {
 						const pt = prim.fitPoints![k];
-						const sp = sketch.addPoint(pt.x, pt.y);
+						const sp = sketch.addPoint(pt);
 						ptIds.push(sp.id);
 						if (prim.fitBases && prim.fitNormals) {
 							splinePoints.push({
@@ -1596,7 +1596,7 @@ export function commitOffsetToSketch(
 				} else {
 					for (let k = 0; k < prim.fitPoints!.length; k++) {
 						const pt = prim.fitPoints![k];
-						const sp = sketch.addPoint(pt.x, pt.y);
+						const sp = sketch.addPoint(pt);
 						ptIds.push(sp.id);
 						if (prim.fitBases && prim.fitNormals) {
 							splinePoints.push({

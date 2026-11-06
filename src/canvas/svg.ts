@@ -1,5 +1,5 @@
 import { SVG_NS, type SvgAttrs, TOOLTIP_RECT_ATTRS, TOOLTIP_TEXT_ATTRS } from './styles';
-import type { Vec2 } from '../math/vector';
+import { distancesFrom, type Vec2 } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
 	return typeof v === 'number' ? (Number.isInteger(v) ? v.toString() : v.toFixed(1)) : String(v);
@@ -35,21 +35,14 @@ export function createSvgElement<K extends keyof SVGElementTagNameMap>(
 	return el;
 }
 
-export function createSvgLine(
-	x1: number | string,
-	y1: number | string,
-	x2: number | string,
-	y2: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGLineElement {
+export function createSvgLine(start: Vec2, end: Vec2, attrs?: SvgAttrs, parent?: SVGElement): SVGLineElement {
 	return createSvgElement(
 		'line',
 		{
-			x1: fmtCoord(x1),
-			y1: fmtCoord(y1),
-			x2: fmtCoord(x2),
-			y2: fmtCoord(y2),
+			x1: fmtCoord(start.x),
+			y1: fmtCoord(start.y),
+			x2: fmtCoord(end.x),
+			y2: fmtCoord(end.y),
 			...attrs,
 		},
 		parent
@@ -57,8 +50,7 @@ export function createSvgLine(
 }
 
 export function createSvgCircle(
-	cx: number | string,
-	cy: number | string,
+	center: Vec2,
 	r: number | string,
 	attrs?: SvgAttrs,
 	parent?: SVGElement
@@ -66,8 +58,8 @@ export function createSvgCircle(
 	return createSvgElement(
 		'circle',
 		{
-			cx: fmtCoord(cx),
-			cy: fmtCoord(cy),
+			cx: fmtCoord(center.x),
+			cy: fmtCoord(center.y),
 			r: fmtCoord(r),
 			...attrs,
 		},
@@ -75,42 +67,28 @@ export function createSvgCircle(
 	);
 }
 
-export function createSvgRect(
-	x: number | string,
-	y: number | string,
-	width: number | string,
-	height: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGRectElement {
+export function createSvgRect(position: Vec2, size: Vec2, attrs?: SvgAttrs, parent?: SVGElement): SVGRectElement {
 	return createSvgElement(
 		'rect',
 		{
-			x: fmtCoord(x),
-			y: fmtCoord(y),
-			width: fmtCoord(width),
-			height: fmtCoord(height),
+			x: fmtCoord(position.x),
+			y: fmtCoord(position.y),
+			width: fmtCoord(size.x),
+			height: fmtCoord(size.y),
 			...attrs,
 		},
 		parent
 	);
 }
 
-export function createSvgEllipse(
-	cx: number | string,
-	cy: number | string,
-	rx: number | string,
-	ry: number | string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGEllipseElement {
+export function createSvgEllipse(center: Vec2, r: Vec2, attrs?: SvgAttrs, parent?: SVGElement): SVGEllipseElement {
 	return createSvgElement(
 		'ellipse',
 		{
-			cx: fmtCoord(cx),
-			cy: fmtCoord(cy),
-			rx: fmtCoord(rx),
-			ry: fmtCoord(ry),
+			cx: fmtCoord(center.x),
+			cy: fmtCoord(center.y),
+			rx: fmtCoord(r.x),
+			ry: fmtCoord(r.y),
 			...attrs,
 		},
 		parent
@@ -128,18 +106,12 @@ export function createSvgPath(d: string, attrs?: SvgAttrs, parent?: SVGElement):
 	);
 }
 
-export function createSvgText(
-	x: number | string,
-	y: number | string,
-	text: string,
-	attrs?: SvgAttrs,
-	parent?: SVGElement
-): SVGTextElement {
+export function createSvgText(position: Vec2, text: string, attrs?: SvgAttrs, parent?: SVGElement): SVGTextElement {
 	return createSvgElement(
 		'text',
 		{
-			x: fmtCoord(x),
-			y: fmtCoord(y),
+			x: fmtCoord(position.x),
+			y: fmtCoord(position.y),
 			...attrs,
 		},
 		parent,
@@ -147,11 +119,11 @@ export function createSvgText(
 	);
 }
 
-export function renderTooltip(parent: SVGElement, x: number, y: number, textStr: string): void {
+export function renderTooltip(parent: SVGElement, position: Vec2, textStr: string): void {
 	const g = createSvgElement('g', undefined, parent);
 	const width = textStr.length * 7.5 + 14;
-	createSvgRect(x - width * 0.5, y - 11, width, 22, TOOLTIP_RECT_ATTRS, g);
-	createSvgText(x, y + 4, textStr, TOOLTIP_TEXT_ATTRS, g);
+	createSvgRect({ x: position.x - width * 0.5, y: position.y - 11 }, { x: width, y: 22 }, TOOLTIP_RECT_ATTRS, g);
+	createSvgText({ x: position.x, y: position.y + 4 }, textStr, TOOLTIP_TEXT_ATTRS, g);
 }
 
 const TWO_PI = 2 * Math.PI;
@@ -189,9 +161,8 @@ export function getEllipticalArcSvgPath(
 	se: Vec2,
 	clockwise: boolean
 ): string {
-	const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-	const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-	if (rx < 0.1 || ry < 0.1) return '';
+	const r = distancesFrom(sc, smaj, smin);
+	if (r.x < 0.1 || r.y < 0.1) return '';
 
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 	const thetaDeg = (theta * 180) / Math.PI;
@@ -206,8 +177,8 @@ export function getEllipticalArcSvgPath(
 	const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
 	const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
 
-	const ts = Math.atan2(vs / ry, us / rx);
-	const te = Math.atan2(ve / ry, ue / rx);
+	const ts = Math.atan2(vs / r.y, us / r.x);
+	const te = Math.atan2(ve / r.y, ue / r.x);
 
 	let sweepAngle = 0;
 	const sweepFlag = clockwise ? 1 : 0;
@@ -220,14 +191,14 @@ export function getEllipticalArcSvgPath(
 	}
 
 	if (sweepAngle <= Math.PI * 0.75) {
-		return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+		return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 	}
 
 	const tmid = clockwise ? ts + sweepAngle * 0.5 : ts - sweepAngle * 0.5;
-	const umid = rx * Math.cos(tmid);
-	const vmid = ry * Math.sin(tmid);
+	const umid = r.x * Math.cos(tmid);
+	const vmid = r.y * Math.sin(tmid);
 	const mx = sc.x + umid * ux + vmid * vx;
 	const my = sc.y + umid * uy + vmid * vy;
 
-	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 }

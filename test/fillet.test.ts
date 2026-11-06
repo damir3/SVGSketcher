@@ -19,9 +19,9 @@ import {
 describe('Fillet Connected Primitives Discovery', () => {
 	it('identifies valid corner with exactly 2 lines meeting at a vertex', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
-		const p3 = sketch.addPoint(0, 100);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(p1.id, p2.id);
 		sketch.addLine(p1.id, p3.id);
@@ -34,8 +34,8 @@ describe('Fillet Connected Primitives Discovery', () => {
 
 	it('rejects endpoint with only 1 line', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		sketch.addLine(p1.id, p2.id);
 
 		const result = getConnectedPrimitivesForPoint(sketch, p2.id);
@@ -45,10 +45,10 @@ describe('Fillet Connected Primitives Discovery', () => {
 
 	it('rejects vertex with 3 or more lines', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
-		const p3 = sketch.addPoint(-100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
+		const p3 = sketch.addPoint({ x: -100, y: 0 });
 
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
@@ -62,12 +62,12 @@ describe('Fillet Connected Primitives Discovery', () => {
 	it('supports coincident points across coincident constraints', () => {
 		const sketch = new SketchDocument();
 		// Two separate points at the same spot connected by CoincidentConstraint
-		const pA = sketch.addPoint(0, 0);
-		const pB = sketch.addPoint(0, 0);
+		const pA = sketch.addPoint({ x: 0, y: 0 });
+		const pB = sketch.addPoint({ x: 0, y: 0 });
 		sketch.addCoincidentConstraint(pA.id, pB.id);
 
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(pA.id, p1.id);
 		sketch.addLine(pB.id, p2.id);
@@ -88,9 +88,9 @@ describe('Fillet Connected Primitives Discovery', () => {
 
 	it('ignores internal spline tangent handle lines', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
-		const p3 = sketch.addPoint(0, 100);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(p1.id, p2.id);
 		sketch.addFitSpline([p1.id, p3.id]);
@@ -100,16 +100,22 @@ describe('Fillet Connected Primitives Discovery', () => {
 		const result = getConnectedPrimitivesForPoint(sketch, p1.id);
 		assert.equal(result.valid, true);
 		assert.equal(result.primitives.length, 2);
-		assert.equal(result.primitives.some(p => p.type === 'line'), true);
-		assert.equal(result.primitives.some(p => p.type === 'spline'), true);
+		assert.equal(
+			result.primitives.some(p => p.type === 'line'),
+			true
+		);
+		assert.equal(
+			result.primitives.some(p => p.type === 'spline'),
+			true
+		);
 	});
 
 	it('supports line and arc meeting at vertex', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
-		const pCenter = sketch.addPoint(0, 50);
-		const pArcEnd = sketch.addPoint(0, 100);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
+		const pCenter = sketch.addPoint({ x: 0, y: 50 });
+		const pArcEnd = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(p1.id, p2.id);
 		sketch.addArc(pCenter.id, p1.id, pArcEnd.id, 50, false);
@@ -117,17 +123,23 @@ describe('Fillet Connected Primitives Discovery', () => {
 		const result = getConnectedPrimitivesForPoint(sketch, p1.id);
 		assert.equal(result.valid, true);
 		assert.equal(result.primitives.length, 2);
-		assert.equal(result.primitives.some(p => p.type === 'line'), true);
-		assert.equal(result.primitives.some(p => p.type === 'arc'), true);
+		assert.equal(
+			result.primitives.some(p => p.type === 'line'),
+			true
+		);
+		assert.equal(
+			result.primitives.some(p => p.type === 'arc'),
+			true
+		);
 	});
 });
 
 describe('Fillet Mathematics & Geometry', () => {
 	it('calculates exact orthogonal 90-degree corner fillet', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
@@ -160,9 +172,9 @@ describe('Fillet Mathematics & Geometry', () => {
 
 	it('calculates correct convex orientation on upward peak corner (not inverted bowl)', () => {
 		const sketch = new SketchDocument();
-		const pPeak = sketch.addPoint(0, 100);
-		const pLeft = sketch.addPoint(-50, 0);
-		const pRight = sketch.addPoint(50, 0);
+		const pPeak = sketch.addPoint({ x: 0, y: 100 });
+		const pLeft = sketch.addPoint({ x: -50, y: 0 });
+		const pRight = sketch.addPoint({ x: 50, y: 0 });
 
 		const l1 = sketch.addLine(pPeak.id, pLeft.id);
 		const l2 = sketch.addLine(pPeak.id, pRight.id);
@@ -196,15 +208,19 @@ describe('Fillet Mathematics & Geometry', () => {
 			endPointId2: pPeak.id,
 		});
 		assert.ok(resRev);
-		assert.equal(resRev.clockwise, false, 'Fillet arc from right to left over top peak must be counter-clockwise in screen space');
+		assert.equal(
+			resRev.clockwise,
+			false,
+			'Fillet arc from right to left over top peak must be counter-clockwise in screen space'
+		);
 		assert.ok(resRev.midArc.y > resRev.center.y);
 	});
 
 	it('calculates acute corner fillet', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(100, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id); // 45 degree angle
@@ -230,8 +246,8 @@ describe('Fillet Mathematics & Geometry', () => {
 	it('calculates fillet between disjoint lines via extensions', () => {
 		const sketch = new SketchDocument();
 		// Two lines that would intersect at (50, 50) if extended
-		const l1 = sketch.addLine(sketch.addPoint(0, 50).id, sketch.addPoint(40, 50).id);
-		const l2 = sketch.addLine(sketch.addPoint(50, 0).id, sketch.addPoint(50, 40).id);
+		const l1 = sketch.addLine(sketch.addPoint({ x: 0, y: 50 }).id, sketch.addPoint({ x: 40, y: 50 }).id);
+		const l2 = sketch.addLine(sketch.addPoint({ x: 50, y: 0 }).id, sketch.addPoint({ x: 50, y: 40 }).id);
 
 		const c1 = sketchPrimitiveToGeoCurve(sketch, 'line', l1.id)!;
 		const c2 = sketchPrimitiveToGeoCurve(sketch, 'line', l2.id)!;
@@ -251,10 +267,10 @@ describe('Fillet Mathematics & Geometry', () => {
 
 	it('calculates fillet between Line and Arc', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const pCenter = sketch.addPoint(-50, 0);
-		const pArcEnd = sketch.addPoint(-50, 50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const pCenter = sketch.addPoint({ x: -50, y: 0 });
+		const pArcEnd = sketch.addPoint({ x: -50, y: 50 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const arc = sketch.addArc(pCenter.id, p0.id, pArcEnd.id, 50, false);
@@ -278,10 +294,10 @@ describe('Fillet Mathematics & Geometry', () => {
 
 	it('calculates fillet between Line and Spline with tangential extension', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const pSp1 = sketch.addPoint(0, 50);
-		const pSp2 = sketch.addPoint(20, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const pSp1 = sketch.addPoint({ x: 0, y: 50 });
+		const pSp2 = sketch.addPoint({ x: 20, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const spline = sketch.addFitSpline([p0.id, pSp1.id, pSp2.id]);
@@ -305,12 +321,12 @@ describe('Fillet Mathematics & Geometry', () => {
 
 	it('calculates fillet between disjoint Fit Spline and Line in correct quadrant', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(-150, 90);
-		const p2 = sketch.addPoint(-75, 90);
+		const p1 = sketch.addPoint({ x: -150, y: 90 });
+		const p2 = sketch.addPoint({ x: -75, y: 90 });
 		const spline = sketch.addFitSpline([p1.id, p2.id]);
 
-		const p3 = sketch.addPoint(-50, 65);
-		const p4 = sketch.addPoint(-50, -20);
+		const p3 = sketch.addPoint({ x: -50, y: 65 });
+		const p4 = sketch.addPoint({ x: -50, y: -20 });
 		const line = sketch.addLine(p3.id, p4.id);
 
 		const c1 = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id)!;
@@ -324,14 +340,14 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		assert.ok(res);
 		// Corner intersection is (-50, 90)
-		assert.ok(Math.abs(res.cornerVertex.x - (-50)) < 1e-3);
+		assert.ok(Math.abs(res.cornerVertex.x - -50) < 1e-3);
 		assert.ok(Math.abs(res.cornerVertex.y - 90) < 1e-3);
 		// Center must be in the lower-left quadrant: (-70, 70)
-		assert.ok(Math.abs(res.center.x - (-70)) < 1e-3, `center.x was ${res.center.x}, expected -70`);
+		assert.ok(Math.abs(res.center.x - -70) < 1e-3, `center.x was ${res.center.x}, expected -70`);
 		assert.ok(Math.abs(res.center.y - 70) < 1e-3, `center.y was ${res.center.y}, expected 70`);
 		// Tangent points
-		assert.ok(Math.abs(res.t1.x - (-70)) < 1e-3 && Math.abs(res.t1.y - 90) < 1e-3);
-		assert.ok(Math.abs(res.t2.x - (-50)) < 1e-3 && Math.abs(res.t2.y - 70) < 1e-3);
+		assert.ok(Math.abs(res.t1.x - -70) < 1e-3 && Math.abs(res.t1.y - 90) < 1e-3);
+		assert.ok(Math.abs(res.t2.x - -50) < 1e-3 && Math.abs(res.t2.y - 70) < 1e-3);
 		// midArc must be below y = 90
 		assert.ok(res.midArc.y < 90, `midArc.y was ${res.midArc.y}, must be below 90`);
 
@@ -347,19 +363,19 @@ describe('Fillet Mathematics & Geometry', () => {
 		sketch.solve();
 
 		const centerPt = sketch.points.get(commitRes.centerId)!;
-		assert.ok(Math.abs(centerPt.x - (-70)) < 1e-3);
+		assert.ok(Math.abs(centerPt.x - -70) < 1e-3);
 		assert.ok(Math.abs(centerPt.y - 70) < 1e-3);
 	});
 
 	it('calculates fillet between Control Spline and Line meeting at vertex and preserves control spline type', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(20, 50);
-		const p2 = sketch.addPoint(40, 80);
-		const p3 = sketch.addPoint(60, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 20, y: 50 });
+		const p2 = sketch.addPoint({ x: 40, y: 80 });
+		const p3 = sketch.addPoint({ x: 60, y: 100 });
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id]);
 
-		const pEnd = sketch.addPoint(100, 0);
+		const pEnd = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p0.id, pEnd.id);
 
 		const conn = getConnectedPrimitivesForPoint(sketch, p0.id);
@@ -403,14 +419,14 @@ describe('Fillet Mathematics & Geometry', () => {
 
 	it('calculates fillet between disjoint Control Spline and Line via extension', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(-150, 90);
-		const p2 = sketch.addPoint(-125, 90);
-		const p3 = sketch.addPoint(-100, 90);
-		const p4 = sketch.addPoint(-75, 90);
+		const p1 = sketch.addPoint({ x: -150, y: 90 });
+		const p2 = sketch.addPoint({ x: -125, y: 90 });
+		const p3 = sketch.addPoint({ x: -100, y: 90 });
+		const p4 = sketch.addPoint({ x: -75, y: 90 });
 		const spline = sketch.addControlSpline([p1.id, p2.id, p3.id, p4.id]);
 
-		const p5 = sketch.addPoint(-50, 65);
-		const p6 = sketch.addPoint(-50, -20);
+		const p5 = sketch.addPoint({ x: -50, y: 65 });
+		const p6 = sketch.addPoint({ x: -50, y: -20 });
 		const line = sketch.addLine(p5.id, p6.id);
 
 		const c1 = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id)!;
@@ -423,9 +439,9 @@ describe('Fillet Mathematics & Geometry', () => {
 		});
 
 		assert.ok(res);
-		assert.ok(Math.abs(res.cornerVertex.x - (-50)) < 1e-3);
+		assert.ok(Math.abs(res.cornerVertex.x - -50) < 1e-3);
 		assert.ok(Math.abs(res.cornerVertex.y - 90) < 1e-3);
-		assert.ok(Math.abs(res.center.x - (-70)) < 1e-3);
+		assert.ok(Math.abs(res.center.x - -70) < 1e-3);
 		assert.ok(Math.abs(res.center.y - 70) < 1e-3);
 	});
 });
@@ -433,9 +449,9 @@ describe('Fillet Mathematics & Geometry', () => {
 describe('Fillet Commit and Document Integration', () => {
 	it('commits single fillet: trims lines, creates arc, adds Tangent and Radius constraints', () => {
 		const sketch = new SketchDocument();
-		const pCorner = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const pCorner = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const line1 = sketch.addLine(pCorner.id, p1.id);
 		const line2 = sketch.addLine(pCorner.id, p2.id);
@@ -497,10 +513,10 @@ describe('Fillet Commit and Document Integration', () => {
 	it('commits multiple fillets: first gets RadiusConstraint, subsequent get EqualRadiusConstraint', () => {
 		const sketch = new SketchDocument();
 		// Create a rectangle (0,0) to (100, 100)
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(100, 100);
-		const p3 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
+		const p3 = sketch.addPoint({ x: 0, y: 100 });
 
 		const lBottom = sketch.addLine(p0.id, p1.id);
 		const lRight = sketch.addLine(p1.id, p2.id);
@@ -564,15 +580,15 @@ describe('Fillet Commit and Document Integration', () => {
 		assert.equal(eqRadConstraints.length, 1);
 		assert.ok(
 			(eqRadConstraints[0].circle1Id === commit0.arcId && eqRadConstraints[0].circle2Id === commit1.arcId) ||
-			(eqRadConstraints[0].circle1Id === commit1.arcId && eqRadConstraints[0].circle2Id === commit0.arcId)
+				(eqRadConstraints[0].circle1Id === commit1.arcId && eqRadConstraints[0].circle2Id === commit0.arcId)
 		);
 	});
 
 	it('history undo and redo completely restore sketch before and after fillet', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 0);
-		const p2 = sketch.addPoint(0, 50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 50 });
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
 
@@ -618,13 +634,13 @@ describe('Fillet Commit and Document Integration', () => {
 
 	it('commits fillet on Control Spline and creates TangentLineCircleConstraint on control segment', () => {
 		const sketch = new SketchDocument();
-		const pCorner = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(0, 100);
-		const p2 = sketch.addPoint(50, 100);
-		const p3 = sketch.addPoint(50, 0);
+		const pCorner = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 0, y: 100 });
+		const p2 = sketch.addPoint({ x: 50, y: 100 });
+		const p3 = sketch.addPoint({ x: 50, y: 0 });
 
 		const spline = sketch.addControlSpline([pCorner.id, p1.id, p2.id, p3.id]);
-		const pLineEnd = sketch.addPoint(100, 0);
+		const pLineEnd = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(pCorner.id, pLineEnd.id);
 
 		const c1 = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id)!;
@@ -678,9 +694,9 @@ describe('Fillet Commit and Document Integration', () => {
 
 	it('fillet gizmo drag delta in arrow direction increases radius and opposite decreases radius', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
 
@@ -709,7 +725,8 @@ describe('Fillet Commit and Document Integration', () => {
 			x: startMouseWorld.x + inwardDir.x * 5,
 			y: startMouseWorld.y + inwardDir.y * 5,
 		};
-		const deltaInward = (dragMouseInward.x - startMouseWorld.x) * inwardDir.x + (dragMouseInward.y - startMouseWorld.y) * inwardDir.y;
+		const deltaInward =
+			(dragMouseInward.x - startMouseWorld.x) * inwardDir.x + (dragMouseInward.y - startMouseWorld.y) * inwardDir.y;
 		const newRadiusInward = Math.max(0.5, Math.round((startRadius + deltaInward) * 2) / 2);
 		assert.equal(newRadiusInward, 15, 'Dragging along arrow direction must INCREASE radius');
 
@@ -718,7 +735,8 @@ describe('Fillet Commit and Document Integration', () => {
 			x: startMouseWorld.x - inwardDir.x * 4,
 			y: startMouseWorld.y - inwardDir.y * 4,
 		};
-		const deltaOutward = (dragMouseOutward.x - startMouseWorld.x) * inwardDir.x + (dragMouseOutward.y - startMouseWorld.y) * inwardDir.y;
+		const deltaOutward =
+			(dragMouseOutward.x - startMouseWorld.x) * inwardDir.x + (dragMouseOutward.y - startMouseWorld.y) * inwardDir.y;
 		const newRadiusOutward = Math.max(0.5, Math.round((startRadius + deltaOutward) * 2) / 2);
 		assert.equal(newRadiusOutward, 6, 'Dragging opposite arrow direction must DECREASE radius');
 	});
@@ -726,9 +744,9 @@ describe('Fillet Commit and Document Integration', () => {
 	it('trims correct endpoints on acute corner with large fillet radius where param <= 0.5', () => {
 		const sketch = new SketchDocument();
 		// Triangle with base from (-50, 0) to (50, 0) and peak at (0, 75)
-		const pBottomLeft = sketch.addPoint(-50, 0);
-		const pBottomRight = sketch.addPoint(50, 0);
-		const pPeak = sketch.addPoint(0, 75);
+		const pBottomLeft = sketch.addPoint({ x: -50, y: 0 });
+		const pBottomRight = sketch.addPoint({ x: 50, y: 0 });
+		const pPeak = sketch.addPoint({ x: 0, y: 75 });
 
 		// Both lines drawn from bottom upwards to the peak (pPeak is p2Id for both lines)
 		const lineLeft = sketch.addLine(pBottomLeft.id, pPeak.id);
@@ -780,10 +798,10 @@ describe('Fillet Commit and Document Integration', () => {
 	it('fillet orientation is strictly anchored to corner interior and never flips to exterior at large radius', () => {
 		const sketch = new SketchDocument();
 		// Bowl shape: line from (-50, 0) to (50, 0) and fit spline from (-50, 0) down to (0, -75) to (50, 0)
-		const p1 = sketch.addPoint(-50, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: -50, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
-		const pMid = sketch.addPoint(0, -75);
+		const pMid = sketch.addPoint({ x: 0, y: -75 });
 		const spline = sketch.addFitSpline([p1.id, pMid.id, p2.id]);
 
 		const cLine = sketchPrimitiveToGeoCurve(sketch, 'line', line.id)!;
@@ -812,52 +830,62 @@ describe('Fillet Commit and Document Integration', () => {
 
 	it('findMaxFilletRadius accurately detects maximum radius for corner or returns null when unfilletable', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(-50, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: -50, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
-		const p3 = sketch.addPoint(-50, -100);
-		const p4 = sketch.addPoint(50, -100);
+		const p3 = sketch.addPoint({ x: -50, y: -100 });
+		const p4 = sketch.addPoint({ x: 50, y: -100 });
 		const spline = sketch.addControlSpline([p1.id, p3.id, p4.id, p2.id]);
 
 		const cLine = sketchPrimitiveToGeoCurve(sketch, 'line', line.id)!;
 		const cSpline = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id)!;
 
-		const maxR = findMaxFilletRadius(cLine, cSpline, {
-			cornerVertex: { x: p1.x, y: p1.y },
-			endPointId1: p1.id,
-			endPointId2: p1.id,
-		}, 100);
+		const maxR = findMaxFilletRadius(
+			cLine,
+			cSpline,
+			{
+				cornerVertex: { x: p1.x, y: p1.y },
+				endPointId1: p1.id,
+				endPointId2: p1.id,
+			},
+			100
+		);
 
 		assert.ok(maxR !== null, 'maxR must not be null');
 		// Theoretical limit is 37.5 mm
 		assert.ok(maxR >= 36.5 && maxR <= 37.5, `maxR was ${maxR}, expected ~37.4`);
 
 		// Orthogonal lines: maxR returns requested max (e.g. 50)
-		const pA = sketch.addPoint(0, 0);
-		const pB = sketch.addPoint(100, 0);
-		const pC = sketch.addPoint(0, 100);
+		const pA = sketch.addPoint({ x: 0, y: 0 });
+		const pB = sketch.addPoint({ x: 100, y: 0 });
+		const pC = sketch.addPoint({ x: 0, y: 100 });
 		const lineA = sketch.addLine(pA.id, pB.id);
 		const lineB = sketch.addLine(pA.id, pC.id);
 		const cLineA = sketchPrimitiveToGeoCurve(sketch, 'line', lineA.id)!;
 		const cLineB = sketchPrimitiveToGeoCurve(sketch, 'line', lineB.id)!;
-		const maxOrthogonal = findMaxFilletRadius(cLineA, cLineB, {
-			cornerVertex: { x: 0, y: 0 },
-			endPointId1: pA.id,
-			endPointId2: pA.id,
-		}, 50);
+		const maxOrthogonal = findMaxFilletRadius(
+			cLineA,
+			cLineB,
+			{
+				cornerVertex: { x: 0, y: 0 },
+				endPointId1: pA.id,
+				endPointId2: pA.id,
+			},
+			50
+		);
 		assert.equal(maxOrthogonal, 50);
 	});
 
 	it('cleans up old unreferenced point of line after creating fillet with spline', () => {
 		const sketch = new SketchDocument();
-		const pLine1 = sketch.addPoint(-50, 0);
-		const pLine2 = sketch.addPoint(50, 0);
+		const pLine1 = sketch.addPoint({ x: -50, y: 0 });
+		const pLine2 = sketch.addPoint({ x: 50, y: 0 });
 		const line = sketch.addLine(pLine1.id, pLine2.id);
 
-		const pSpline0 = sketch.addPoint(-50, 0);
-		const pSpline1 = sketch.addPoint(-50, -100);
-		const pSpline2 = sketch.addPoint(50, -100);
-		const pSpline3 = sketch.addPoint(50, 0);
+		const pSpline0 = sketch.addPoint({ x: -50, y: 0 });
+		const pSpline1 = sketch.addPoint({ x: -50, y: -100 });
+		const pSpline2 = sketch.addPoint({ x: 50, y: -100 });
+		const pSpline3 = sketch.addPoint({ x: 50, y: 0 });
 		const spline = sketch.addControlSpline([pSpline0.id, pSpline1.id, pSpline2.id, pSpline3.id]);
 
 		const cLine = sketchPrimitiveToGeoCurve(sketch, 'line', line.id)!;
@@ -884,6 +912,3 @@ describe('Fillet Commit and Document Integration', () => {
 		assert.equal(sketch.points.has(pSpline0.id), false, 'pSpline0 should be deleted');
 	});
 });
-
-
-

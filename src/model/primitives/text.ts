@@ -1,5 +1,5 @@
 import type { Vec2 } from '../../math/vector';
-import { dist, dot, vec } from '../../math/vector';
+import { dist, dot, mid, vec } from '../../math/vector';
 import type { SketchDocument } from '../sketch';
 import type { IInspectable, ISidebarPanel } from '../../ui/panels/inspector/types';
 import { TextInspectorPanel } from '../../ui/panels/primitives/textPanel';
@@ -122,7 +122,7 @@ export class SketchText implements IInspectable {
 			const corners = this.getRectangleCorners(sketch);
 			if (!corners) return null;
 			const [p0, p1, p2, p3] = corners;
-			const world = viewport.screenToWorld(screenPos.x, screenPos.y);
+			const world = viewport.screenToWorld(screenPos);
 
 			// Test if inside oriented rectangle
 			const u = vec(p1.x - p0.x, p1.y - p0.y);
@@ -140,8 +140,8 @@ export class SketchText implements IInspectable {
 			}
 
 			// Distance to center in screen pixels
-			const centerWorld = vec((p0.x + p2.x) / 2, (p0.y + p2.y) / 2);
-			const centerScreen = viewport.worldToScreen(centerWorld.x, centerWorld.y);
+			const centerWorld = mid(p0, p2);
+			const centerScreen = viewport.worldToScreen(centerWorld);
 			return dist(screenPos, centerScreen);
 		}
 

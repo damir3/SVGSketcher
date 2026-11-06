@@ -1,5 +1,5 @@
 import type { Vec2 } from './vector';
-import { dist, normalize, vec } from './vector';
+import { dist, mid, normalize, vec } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import { CoincidentConstraint } from '../solver/constraints';
 
@@ -314,7 +314,7 @@ export function calculateChamferGeometry(
 	);
 
 	const chamferLength = dist(t1, t2);
-	const midPoint = vec((t1.x + t2.x) / 2, (t1.y + t2.y) / 2);
+	const midPoint = mid(t1, t2);
 	const bisectorDir = normalize(vec(candidate.dir1.x + candidate.dir2.x, candidate.dir1.y + candidate.dir2.y));
 
 	return {
@@ -357,8 +357,8 @@ export function commitChamferToSketch(
 	sketch.beginTransaction();
 
 	// 1. Add points for the chamfer endpoints
-	const pA = sketch.addPoint(res.t1.x, res.t1.y);
-	const pB = sketch.addPoint(res.t2.x, res.t2.y);
+	const pA = sketch.addPoint(res.t1);
+	const pB = sketch.addPoint(res.t2);
 
 	// 2. Add the chamfer line
 	const chamferLine = sketch.addLine(pA.id, pB.id);

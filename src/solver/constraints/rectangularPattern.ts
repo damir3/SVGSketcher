@@ -433,7 +433,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 
 		if (ptCount === 0) return;
 		const centroidWorld = { x: sumX / ptCount, y: sumY / ptCount };
-		const sCtr = ctx.viewport.worldToScreen(centroidWorld.x, centroidWorld.y);
+		const sCtr = ctx.viewport.worldToScreen(centroidWorld);
 
 		const paramMap = new Map<string, number>();
 		for (const [pid, pt] of ctx.sketch.points.entries()) {
@@ -499,8 +499,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 							}
 							centroid =
 								cCount > 0
-									? ctx.viewport.worldToScreen(cSumX / cCount, cSumY / cCount)
-									: ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+									? ctx.viewport.worldToScreen({ x: cSumX / cCount, y: cSumY / cCount })
+									: ctx.viewport.worldToScreen({ x: centroidWorld.x + offset.dx, y: centroidWorld.y + offset.dy });
 						} else if (ctx.renderTransformedObjects) {
 							const copyWorldPoints = ctx.renderTransformedObjects(this.sourceObjectIds, offset, {
 								targetGroup: ctx.targetGroup,
@@ -516,12 +516,18 @@ export class RectangularPatternConstraint extends BaseConstraint {
 									cSumX += p.x;
 									cSumY += p.y;
 								}
-								centroid = ctx.viewport.worldToScreen(cSumX / copyWorldPoints.length, cSumY / copyWorldPoints.length);
+								centroid = ctx.viewport.worldToScreen({
+									x: cSumX / copyWorldPoints.length,
+									y: cSumY / copyWorldPoints.length,
+								});
 							} else {
-								centroid = ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+								centroid = ctx.viewport.worldToScreen({
+									x: centroidWorld.x + offset.dx,
+									y: centroidWorld.y + offset.dy,
+								});
 							}
 						} else {
-							centroid = ctx.viewport.worldToScreen(centroidWorld.x + offset.dx, centroidWorld.y + offset.dy);
+							centroid = ctx.viewport.worldToScreen({ x: centroidWorld.x + offset.dx, y: centroidWorld.y + offset.dy });
 						}
 
 						if (ctx.patternCheckboxPositions) {
@@ -541,7 +547,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			}
 		}
 
-		ctx.renderBadge(this.id, sCtr.x + 14, sCtr.y - 14, 'rectangular_pattern', COLORS.primary);
+		ctx.renderBadge(this.id, { x: sCtr.x + 14, y: sCtr.y - 14 }, 'rectangular_pattern', COLORS.primary);
 	}
 
 	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({

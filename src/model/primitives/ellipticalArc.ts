@@ -66,11 +66,11 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 		const endPt = sketch.points.get(this.endPointId);
 		if (!center || !majorPt || !minorPt || !startPt || !endPt) return null;
 
-		const sc = viewport.worldToScreen(center.x, center.y);
-		const smaj = viewport.worldToScreen(majorPt.x, majorPt.y);
-		const smin = viewport.worldToScreen(minorPt.x, minorPt.y);
-		const ss = viewport.worldToScreen(startPt.x, startPt.y);
-		const se = viewport.worldToScreen(endPt.x, endPt.y);
+		const sc = viewport.worldToScreen(center);
+		const smaj = viewport.worldToScreen(majorPt);
+		const smin = viewport.worldToScreen(minorPt);
+		const ss = viewport.worldToScreen(startPt);
+		const se = viewport.worldToScreen(endPt);
 
 		return distanceToEllipticalArc(screen, sc, smaj, smin, ss, se, !!this.clockwise, thresholdPx);
 	}

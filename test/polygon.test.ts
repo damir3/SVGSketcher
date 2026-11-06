@@ -8,7 +8,7 @@ import { dist } from '../src/math/vector';
 describe('Polygon Geometry and Constraints', () => {
 	it('addPolygon creates correct number of vertices, edges, and CircularPatternConstraint', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(0, 0);
+		const center = doc.addPoint({ x: 0, y: 0 });
 
 		// Hexagon (6 sides) with inradius 50 mm
 		const inradius = 50;
@@ -53,14 +53,14 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('addPolygon works with arbitrary N (e.g. pentagon N=5, octagon N=8)', () => {
 		const doc = new SketchDocument();
-		const c5 = doc.addPoint(100, 100);
+		const c5 = doc.addPoint({ x: 100, y: 100 });
 		const poly5 = doc.addPolygon(c5.id, 30, 5, Math.PI / 4);
 		assert.ok(poly5);
 		assert.equal(poly5.vertices.length, 5);
 		assert.equal(poly5.lines.length, 5);
 		assert.equal(poly5.constraint.quantity, 5);
 
-		const c8 = doc.addPoint(-100, -100);
+		const c8 = doc.addPoint({ x: -100, y: -100 });
 		const poly8 = doc.addPolygon(c8.id, 40, 8, 0);
 		assert.ok(poly8);
 		assert.equal(poly8.vertices.length, 8);
@@ -70,7 +70,7 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('polygon solver maintains regular polygon geometry when solved', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(10, 20);
+		const center = doc.addPoint({ x: 10, y: 20 });
 		const inradius = 45;
 		const poly = doc.addPolygon(center.id, inradius, 6, 0);
 		assert.ok(poly);
@@ -94,7 +94,7 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('polygon constraint cannot be edited via updateCircularPattern (isReadOnly)', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(0, 0);
+		const center = doc.addPoint({ x: 0, y: 0 });
 		const poly = doc.addPolygon(center.id, 50, 6, 0);
 		assert.ok(poly);
 
@@ -107,7 +107,7 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('deleting polygon constraint keeps vertices and edges intact', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(0, 0);
+		const center = doc.addPoint({ x: 0, y: 0 });
 		const poly = doc.addPolygon(center.id, 50, 6, 0);
 		assert.ok(poly);
 
@@ -130,7 +130,7 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('deleting a vertex cleans up the polygon circular pattern constraint', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(0, 0);
+		const center = doc.addPoint({ x: 0, y: 0 });
 		const poly = doc.addPolygon(center.id, 50, 6, 0);
 		assert.ok(poly);
 
@@ -147,7 +147,7 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('history undo and redo properly restore polygon and its isReadOnly flag', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(0, 0);
+		const center = doc.addPoint({ x: 0, y: 0 });
 
 		// Add polygon
 		const poly = doc.addPolygon(center.id, 50, 6, 0);
@@ -182,7 +182,11 @@ describe('Polygon Geometry and Constraints', () => {
 			false,
 			[],
 			[
-				{ copyIndex: 1, pointPairs: [{ sourcePtId: 'p_v0', patternPtId: 'p_v1' }], createdEntityIds: [{ id: 'p_v1', type: 'point' }] }
+				{
+					copyIndex: 1,
+					pointPairs: [{ sourcePtId: 'p_v0', patternPtId: 'p_v1' }],
+					createdEntityIds: [{ id: 'p_v1', type: 'point' }],
+				},
 			],
 			1.0,
 			true // isReadOnly
@@ -199,7 +203,7 @@ describe('Polygon Geometry and Constraints', () => {
 
 	it('addPolygon with addDistanceConstraint = true creates PointToLineDistanceConstraint', () => {
 		const doc = new SketchDocument();
-		const center = doc.addPoint(0, 0);
+		const center = doc.addPoint({ x: 0, y: 0 });
 		const inradius = 40;
 		const poly = doc.addPolygon(center.id, inradius, 6, 0, false, true);
 		assert.ok(poly);

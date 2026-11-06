@@ -102,7 +102,8 @@ describe('Spline Mathematics', () => {
 	it('fitPointsToBezier for 4 points of a square closely approximates a circle', () => {
 		// 4 points on circle of radius R=50 centered at (50, 50)
 		const R = 50;
-		const cx = 50, cy = 50;
+		const cx = 50,
+			cy = 50;
 		const pts = [
 			{ x: cx + R, y: cy },
 			{ x: cx, y: cy + R },
@@ -167,8 +168,18 @@ describe('Spline Mathematics', () => {
 
 	it('getSplinePointAtParam and getSplineParamAtPoint round-trip', () => {
 		const segs: BezierSegment[] = [
-			[{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: 30, y: 20 }, { x: 40, y: 0 }],
-			[{ x: 40, y: 0 }, { x: 50, y: -20 }, { x: 70, y: -20 }, { x: 80, y: 0 }],
+			[
+				{ x: 0, y: 0 },
+				{ x: 10, y: 20 },
+				{ x: 30, y: 20 },
+				{ x: 40, y: 0 },
+			],
+			[
+				{ x: 40, y: 0 },
+				{ x: 50, y: -20 },
+				{ x: 70, y: -20 },
+				{ x: 80, y: 0 },
+			],
 		];
 
 		const targetParam = 0.65;
@@ -179,7 +190,12 @@ describe('Spline Mathematics', () => {
 
 	it('extractSplineInterval extracts subsegment correctly', () => {
 		const segs: BezierSegment[] = [
-			[{ x: 0, y: 0 }, { x: 10, y: 30 }, { x: 30, y: 30 }, { x: 40, y: 0 }],
+			[
+				{ x: 0, y: 0 },
+				{ x: 10, y: 30 },
+				{ x: 30, y: 30 },
+				{ x: 40, y: 0 },
+			],
 		];
 
 		const sub = extractSplineInterval(segs, 0.25, 0.75);
@@ -195,7 +211,12 @@ describe('Spline Mathematics', () => {
 
 	it('getSplineSvgPath creates valid path data and closes with Z when isClosed is true', () => {
 		const segs: BezierSegment[] = [
-			[{ x: 0, y: 0 }, { x: 10, y: 10 }, { x: 20, y: 10 }, { x: 30, y: 0 }],
+			[
+				{ x: 0, y: 0 },
+				{ x: 10, y: 10 },
+				{ x: 20, y: 10 },
+				{ x: 30, y: 0 },
+			],
 		];
 		const openPath = getSplineSvgPath(segs, p => p, false);
 		assert.ok(openPath.startsWith('M 0.00 0.00 C 10.00 10.00'));
@@ -209,9 +230,9 @@ describe('Spline Mathematics', () => {
 describe('SketchDocument Spline Integration', () => {
 	it('addFitSpline creates spline with tangent lines and midpoint constraints', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 40);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 40 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 		assert.equal(spline.splineType, 'fit');
@@ -229,8 +250,10 @@ describe('SketchDocument Spline Integration', () => {
 			// Corresponding midpoint constraint
 			const midPtId = spline.pointIds[i];
 			const midC = Array.from(sketch.constraints.values()).find(
-				c => c instanceof MidpointConstraint && c.midId === midPtId &&
-				((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
+				c =>
+					c instanceof MidpointConstraint &&
+					c.midId === midPtId &&
+					((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
 			);
 			assert.ok(midC, `Midpoint constraint exists for fit point ${midPtId}`);
 		}
@@ -246,10 +269,10 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('addControlSpline creates control point spline with control polygon lines', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(20, 50);
-		const p3 = sketch.addPoint(70, 50);
-		const p4 = sketch.addPoint(90, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 20, y: 50 });
+		const p3 = sketch.addPoint({ x: 70, y: 50 });
+		const p4 = sketch.addPoint({ x: 90, y: 0 });
 
 		const spline = sketch.addControlSpline([p1.id, p2.id, p3.id, p4.id]);
 		assert.equal(spline.splineType, 'control');
@@ -278,17 +301,17 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('supports tangent constraint between arc and control spline control segment', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(0, 50);
-		const p2 = sketch.addPoint(50, 50);
-		const p3 = sketch.addPoint(50, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 0, y: 50 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
+		const p3 = sketch.addPoint({ x: 50, y: 0 });
 
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id]);
 		assert.ok(spline.tangentLineIds && spline.tangentLineIds.length === 3);
 
-		const pCenter = sketch.addPoint(100, 50);
-		const pArcStart = sketch.addPoint(0, 50);
-		const pArcEnd = sketch.addPoint(100, 150);
+		const pCenter = sketch.addPoint({ x: 100, y: 50 });
+		const pArcStart = sketch.addPoint({ x: 0, y: 50 });
+		const pArcEnd = sketch.addPoint({ x: 100, y: 150 });
 		const arc = sketch.addArc(pCenter.id, pArcStart.id, pArcEnd.id, 100);
 
 		// Add tangent constraint between first control segment (line 0) and the arc
@@ -304,10 +327,10 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('addFitSpline creates closed loop with isClosed true when endpoints coincident', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 50);
-		const p2 = sketch.addPoint(50, 100);
-		const p3 = sketch.addPoint(100, 50);
-		const p4 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 50 });
+		const p2 = sketch.addPoint({ x: 50, y: 100 });
+		const p3 = sketch.addPoint({ x: 100, y: 50 });
+		const p4 = sketch.addPoint({ x: 50, y: 0 });
 
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id, p4.id, p1.id]);
 		assert.equal(spline.isClosed, true);
@@ -317,9 +340,9 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('deleting fit spline cascades to tangent lines and midpoint constraints', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 30);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 30 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 		assert.equal(sketch.lines.size, 3);
@@ -333,9 +356,9 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('deleting a fit point keeps the fit spline intact if >= 2 points remain', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 30);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 30 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 		assert.equal(spline.pointIds.length, 3);
@@ -357,11 +380,11 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('deleting a control point keeps control spline intact if >= 4 points remain', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(20, 50);
-		const p2 = sketch.addPoint(50, 50);
-		const p3 = sketch.addPoint(80, 50);
-		const p4 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 20, y: 50 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
+		const p3 = sketch.addPoint({ x: 80, y: 50 });
+		const p4 = sketch.addPoint({ x: 100, y: 0 });
 
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id, p4.id]);
 		assert.equal(spline.pointIds.length, 5);
@@ -380,8 +403,8 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('cannot delete tangent handle lines or tangent handle points directly', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 30);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 30 });
 
 		const spline = sketch.addFitSpline([p1.id, p2.id]);
 		assert.equal(spline.tangentLineIds?.length, 2);
@@ -408,9 +431,9 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('undo and redo properly restore splines and their handles', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 30);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 30 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 
 		sketch.addFitSpline([p1.id, p2.id, p3.id]);
 		assert.equal(sketch.splines.size, 1);
@@ -429,8 +452,8 @@ describe('SketchDocument Spline Integration', () => {
 
 	it('internal spline midpoint constraints are hidden from entity constraints and protected from removal', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 50);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
 		const spline = sketch.addFitSpline([p1.id, p2.id]);
 		assert.equal(spline.tangentLineIds?.length, 2);
 
@@ -447,11 +470,17 @@ describe('SketchDocument Spline Integration', () => {
 
 		// getConstraintsForEntity on handle line must NOT return the internal constraint
 		const lineConstraints = sketch.getConstraintsForEntity('line', handleLineId);
-		assert.ok(!lineConstraints.some(c => c.id === internalC.id), 'Handle line must not list internal midpoint constraint');
+		assert.ok(
+			!lineConstraints.some(c => c.id === internalC.id),
+			'Handle line must not list internal midpoint constraint'
+		);
 
 		// getConstraintsForEntity on handle endpoint must NOT return the internal constraint
 		const handlePtConstraints = sketch.getConstraintsForEntity('point', handleLine.p1Id);
-		assert.ok(!handlePtConstraints.some(c => c.id === internalC.id), 'Handle endpoint must not list internal midpoint constraint');
+		assert.ok(
+			!handlePtConstraints.some(c => c.id === internalC.id),
+			'Handle endpoint must not list internal midpoint constraint'
+		);
 
 		// removeConstraint must ignore internal constraints
 		sketch.removeConstraint(internalC.id);
@@ -463,29 +492,46 @@ describe('SketchDocument Spline Integration', () => {
 		assert.ok(sketch.constraints.has(internalC.id), 'deleteSelected must not delete internal constraint');
 
 		// Regular user midpoint constraint is NOT internal
-		const up1 = sketch.addPoint(100, 100);
-		const up2 = sketch.addPoint(200, 200);
+		const up1 = sketch.addPoint({ x: 100, y: 100 });
+		const up2 = sketch.addPoint({ x: 200, y: 200 });
 		const uline = sketch.addLine(up1.id, up2.id);
-		const umidPt = sketch.addPoint(150, 150);
+		const umidPt = sketch.addPoint({ x: 150, y: 150 });
 		const userMidC = sketch.addMidpointConstraint(umidPt.id, uline.id);
 		assert.ok(userMidC);
-		assert.equal(sketch.isSplineInternalConstraint(userMidC), false, 'User midpoint constraint must not be considered internal');
+		assert.equal(
+			sketch.isSplineInternalConstraint(userMidC),
+			false,
+			'User midpoint constraint must not be considered internal'
+		);
 		const userLineConstraints = sketch.getConstraintsForEntity('line', uline.id);
-		assert.ok(userLineConstraints.some(c => c.id === userMidC.id), 'User midpoint constraint must be returned for line');
+		assert.ok(
+			userLineConstraints.some(c => c.id === userMidC.id),
+			'User midpoint constraint must be returned for line'
+		);
 	});
 });
 
 describe('Spline Intersections, Trim, and Break', () => {
 	it('intersectSplineCurve finds intersections between spline and line', () => {
 		const segs: BezierSegment[] = [
-			[{ x: 0, y: 0 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 100, y: 0 }],
+			[
+				{ x: 0, y: 0 },
+				{ x: 25, y: 50 },
+				{ x: 75, y: 50 },
+				{ x: 100, y: 0 },
+			],
 		];
 		const geoSpline: GeoSpline = {
 			type: 'spline',
 			id: 'sp1',
 			splineType: 'fit',
 			pointIds: ['p0', 'p1', 'p2', 'p3'],
-			points: [{ x: 0, y: 0 }, { x: 25, y: 50 }, { x: 75, y: 50 }, { x: 100, y: 0 }],
+			points: [
+				{ x: 0, y: 0 },
+				{ x: 25, y: 50 },
+				{ x: 75, y: 50 },
+				{ x: 100, y: 0 },
+			],
 			bezierSegments: segs,
 		};
 
@@ -507,14 +553,14 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('executeBreak splits spline into two splines at intersection', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 50);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 
 		// Crossing line at x=50, y from -10 to 60
-		const lp1 = sketch.addPoint(50, -10);
-		const lp2 = sketch.addPoint(50, 60);
+		const lp1 = sketch.addPoint({ x: 50, y: -10 });
+		const lp2 = sketch.addPoint({ x: 50, y: 60 });
 		sketch.addLine(lp1.id, lp2.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -532,14 +578,14 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('executeTrim trims the end of a spline intersected by a line', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 50);
-		const p3 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 
 		// Vertical cutting line at x=50
-		const lp1 = sketch.addPoint(50, -10);
-		const lp2 = sketch.addPoint(50, 60);
+		const lp1 = sketch.addPoint({ x: 50, y: -10 });
+		const lp2 = sketch.addPoint({ x: 50, y: 60 });
 		sketch.addLine(lp1.id, lp2.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -557,18 +603,18 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('trim on closed spline removes clicked interval and leaves single open spline without start/end seam', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(100, 50);
-		const p2 = sketch.addPoint(50, 100);
-		const p3 = sketch.addPoint(0, 50);
-		const p4 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 100, y: 50 });
+		const p2 = sketch.addPoint({ x: 50, y: 100 });
+		const p3 = sketch.addPoint({ x: 0, y: 50 });
+		const p4 = sketch.addPoint({ x: 50, y: 0 });
 
 		// Closed spline passing through 4 cardinal points
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id, p4.id, p1.id]);
 		assert.equal(spline.isClosed, true);
 
 		// Horizontal cutting line at y=50 cutting through p1 and p3
-		const lp1 = sketch.addPoint(-20, 50);
-		const lp2 = sketch.addPoint(120, 50);
+		const lp1 = sketch.addPoint({ x: -20, y: 50 });
+		const lp2 = sketch.addPoint({ x: 120, y: 50 });
 		sketch.addLine(lp1.id, lp2.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -592,15 +638,15 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('trim and break on closed spline preserve exact circular shape with zero distortion', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 50);
-		const p2 = sketch.addPoint(50, 100);
-		const p3 = sketch.addPoint(100, 50);
-		const p4 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 50 });
+		const p2 = sketch.addPoint({ x: 50, y: 100 });
+		const p3 = sketch.addPoint({ x: 100, y: 50 });
+		const p4 = sketch.addPoint({ x: 50, y: 0 });
 
 		// Circular fit spline: center (50, 50), radius 50
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id, p4.id, p1.id]);
-		const l1 = sketch.addPoint(-20, 40);
-		const l2 = sketch.addPoint(120, 60);
+		const l1 = sketch.addPoint({ x: -20, y: 40 });
+		const l2 = sketch.addPoint({ x: 120, y: 60 });
 		sketch.addLine(l1.id, l2.id, true);
 
 		const curves = getAllGeoCurves(sketch);
@@ -628,10 +674,10 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('control spline is always open even if endpoints match', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(0, 100);
-		const p2 = sketch.addPoint(100, 100);
-		const p3 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 0, y: 100 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 
 		const sp = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id, p0.id]);
 		assert.equal(sp.isClosed, false);
@@ -639,18 +685,18 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('trim on control spline allows trimming start [0, u] and end [u, 1] without distortion', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(0, 100);
-		const p2 = sketch.addPoint(100, 100);
-		const p3 = sketch.addPoint(100, 0);
-		const p4 = sketch.addPoint(50, -50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 0, y: 100 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
+		const p4 = sketch.addPoint({ x: 50, y: -50 });
 
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id, p4.id]);
 		assert.equal(spline.isClosed, false);
 
 		// Add a cutting line cutting across the spline
-		const l1 = sketch.addPoint(-20, 50);
-		const l2 = sketch.addPoint(120, 50);
+		const l1 = sketch.addPoint({ x: -20, y: 50 });
+		const l2 = sketch.addPoint({ x: 120, y: 50 });
 		sketch.addLine(l1.id, l2.id, true);
 
 		const curves = getAllGeoCurves(sketch);
@@ -685,15 +731,15 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('executeBreak on open control spline splits into two exact open control splines', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(0, 100);
-		const p2 = sketch.addPoint(100, 100);
-		const p3 = sketch.addPoint(100, 0);
-		const p4 = sketch.addPoint(50, -50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 0, y: 100 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
+		const p4 = sketch.addPoint({ x: 50, y: -50 });
 
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id, p4.id]);
-		const l1 = sketch.addPoint(-20, 50);
-		const l2 = sketch.addPoint(120, 50);
+		const l1 = sketch.addPoint({ x: -20, y: 50 });
+		const l2 = sketch.addPoint({ x: 120, y: 50 });
 		sketch.addLine(l1.id, l2.id, true);
 
 		const curves = getAllGeoCurves(sketch);
@@ -726,7 +772,10 @@ describe('Spline Intersections, Trim, and Break', () => {
 			id: 'sp1',
 			splineType: 'fit',
 			pointIds: ['p0', 'p1', 'p2', 'p3'],
-			points: [{ x: -50, y: 0 }, { x: 50, y: 0 }],
+			points: [
+				{ x: -50, y: 0 },
+				{ x: 50, y: 0 },
+			],
 			bezierSegments: [b1],
 		};
 
@@ -742,7 +791,10 @@ describe('Spline Intersections, Trim, and Break', () => {
 			id: 'sp2',
 			splineType: 'fit',
 			pointIds: ['q0', 'q1', 'q2', 'q3'],
-			points: [{ x: 0, y: -50 }, { x: 0, y: 50 }],
+			points: [
+				{ x: 0, y: -50 },
+				{ x: 0, y: 50 },
+			],
 			bezierSegments: [b2],
 		};
 
@@ -755,15 +807,15 @@ describe('Spline Intersections, Trim, and Break', () => {
 	it('executeTrim trims a spline intersected by another spline', () => {
 		const sketch = new SketchDocument();
 		// Horizontal spline
-		const h1 = sketch.addPoint(-50, 0);
-		const h2 = sketch.addPoint(0, 0);
-		const h3 = sketch.addPoint(50, 0);
+		const h1 = sketch.addPoint({ x: -50, y: 0 });
+		const h2 = sketch.addPoint({ x: 0, y: 0 });
+		const h3 = sketch.addPoint({ x: 50, y: 0 });
 		const spHorizontal = sketch.addFitSpline([h1.id, h2.id, h3.id]);
 
 		// Vertical spline crossing at (0, 0)
-		const v1 = sketch.addPoint(0, -50);
-		const v2 = sketch.addPoint(0, 0);
-		const v3 = sketch.addPoint(0, 50);
+		const v1 = sketch.addPoint({ x: 0, y: -50 });
+		const v2 = sketch.addPoint({ x: 0, y: 0 });
+		const v3 = sketch.addPoint({ x: 0, y: 50 });
 		sketch.addFitSpline([v1.id, v2.id, v3.id]);
 
 		const curves = getAllGeoCurves(sketch);
@@ -820,14 +872,14 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('executeTrim trims an ellipse intersected by another ellipse with non-zero centers', () => {
 		const sketch = new SketchDocument();
-		const c1 = sketch.addPoint(100, 100);
-		const maj1 = sketch.addPoint(150, 100);
-		const min1 = sketch.addPoint(100, 130);
+		const c1 = sketch.addPoint({ x: 100, y: 100 });
+		const maj1 = sketch.addPoint({ x: 150, y: 100 });
+		const min1 = sketch.addPoint({ x: 100, y: 130 });
 		const el1 = sketch.addEllipse(c1.id, maj1.id, min1.id);
 
-		const c2 = sketch.addPoint(140, 100);
-		const maj2 = sketch.addPoint(190, 100);
-		const min2 = sketch.addPoint(140, 130);
+		const c2 = sketch.addPoint({ x: 140, y: 100 });
+		const maj2 = sketch.addPoint({ x: 190, y: 100 });
+		const min2 = sketch.addPoint({ x: 140, y: 130 });
 		sketch.addEllipse(c2.id, maj2.id, min2.id);
 
 		const curves = getAllGeoCurves(sketch);

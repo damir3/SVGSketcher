@@ -99,7 +99,7 @@ export class PolygonTool extends BaseTool {
 				this.centerWorldPos = snap.worldPos;
 			} else {
 				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos.x, ptPos.y);
+				const pt = sketch.addPoint(ptPos);
 				cId = pt.id;
 				this.centerWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -144,21 +144,21 @@ export class PolygonTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const sCtr = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
+			const sCtr = ctx.viewport.worldToScreen(this.centerWorldPos);
 			const N = Math.max(3, Math.round(this.sides));
 			const R = this.radius / Math.cos(Math.PI / N);
 			const sInradius = this.radius * ctx.viewport.zoom;
 
 			// 1. Inscribed guide circle
-			createSvgCircle(sCtr.x, sCtr.y, sInradius, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
+			createSvgCircle(sCtr, sInradius, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
 
 			// 2. Auxiliary ray from center to current point
 			const midWorld: Vec2 = {
 				x: this.centerWorldPos.x + this.radius * Math.cos(this.currentAngle),
 				y: this.centerWorldPos.y + this.radius * Math.sin(this.currentAngle),
 			};
-			const midScreen = ctx.viewport.worldToScreen(midWorld.x, midWorld.y);
-			createSvgLine(sCtr.x, sCtr.y, midScreen.x, midScreen.y, AUX_RAY_ATTRS, ctx.targetGroup);
+			const midScreen = ctx.viewport.worldToScreen(midWorld);
+			createSvgLine(sCtr, midScreen, AUX_RAY_ATTRS, ctx.targetGroup);
 
 			// 3. Polygon vertices in world coordinates, transformed to screen
 			const baseAngle = this.currentAngle - Math.PI / N;
@@ -168,7 +168,7 @@ export class PolygonTool extends BaseTool {
 				const a = baseAngle + i * step;
 				const wx = this.centerWorldPos.x + R * Math.cos(a);
 				const wy = this.centerWorldPos.y + R * Math.sin(a);
-				pts.push(ctx.viewport.worldToScreen(wx, wy));
+				pts.push(ctx.viewport.worldToScreen({ x: wx, y: wy }));
 			}
 
 			// 4. Polygon outline path
@@ -183,14 +183,14 @@ export class PolygonTool extends BaseTool {
 
 			// 5. Draw vertex dots
 			for (const pt of pts) {
-				createSvgCircle(pt.x, pt.y, 2.5, POLYGON_VERTEX_ATTRS, ctx.targetGroup);
+				createSvgCircle(pt, 2.5, POLYGON_VERTEX_ATTRS, ctx.targetGroup);
 			}
 
 			// 6. Center marker
-			createSvgCircle(sCtr.x, sCtr.y, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
+			createSvgCircle(sCtr, 3, POLYGON_CENTER_ATTRS, ctx.targetGroup);
 
 			// 7. Midpoint marker on incircle
-			createSvgCircle(midScreen.x, midScreen.y, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, ctx.targetGroup);
+			createSvgCircle(midScreen, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, ctx.targetGroup);
 		}
 	}
 
@@ -248,7 +248,7 @@ export class PolygonTool extends BaseTool {
 			const a = baseAngle + k * step;
 			const vx = centerPt.x + R * Math.cos(a);
 			const vy = centerPt.y + R * Math.sin(a);
-			const pt = this.ctx.sketch.addPoint(vx, vy, false);
+			const pt = this.ctx.sketch.addPoint({ x: vx, y: vy }, false);
 			vertices.push(pt);
 		}
 

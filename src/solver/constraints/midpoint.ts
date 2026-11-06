@@ -68,14 +68,14 @@ export class MidpointConstraint extends BaseConstraint {
 		}
 		const pt = ctx.sketch.points.get(this.midId);
 		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
-		ctx.renderBadge(this.id, s.x, s.y - 14, 'M', COLORS.primary);
+		const s = ctx.viewport.worldToScreen(pt);
+		ctx.renderBadge(this.id, { x: s.x, y: s.y - 14 }, 'M', COLORS.primary);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
 		const pt = sketch.points.get(this.midId);
 		if (!pt) return null;
-		const s = viewport.worldToScreen(pt.x, pt.y);
+		const s = viewport.worldToScreen(pt);
 		return distanceToPoint(screen, { x: s.x, y: s.y - 14 });
 	}
 }

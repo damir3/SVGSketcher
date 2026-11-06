@@ -34,7 +34,7 @@ export class SketchCircle implements ISketchPrimitive {
 	distanceTo(screen: Vec2, sketch: any, viewport: any, _thresholdPx?: number): number | null {
 		const center = sketch.points.get(this.centerId);
 		if (!center) return null;
-		const sc = viewport.worldToScreen(center.x, center.y);
+		const sc = viewport.worldToScreen(center);
 		const sr = this.radius * viewport.zoom;
 		return distanceToCircle(screen, sc, sr);
 	}

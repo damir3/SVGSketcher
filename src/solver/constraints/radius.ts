@@ -59,7 +59,7 @@ export class RadiusConstraint extends BaseConstraint {
 		const center = ctx.sketch.points.get(entity.centerId);
 		if (!center) return;
 
-		const sc = ctx.viewport.worldToScreen(center.x, center.y);
+		const sc = ctx.viewport.worldToScreen(center);
 		const sr = entity.radius * ctx.viewport.zoom;
 
 		// Leader angle in screen space (screen Y is positive downwards)
@@ -70,8 +70,8 @@ export class RadiusConstraint extends BaseConstraint {
 			const start = ctx.sketch.points.get(arc.startPointId);
 			const end = ctx.sketch.points.get(arc.endPointId);
 			if (start && end) {
-				const ss = ctx.viewport.worldToScreen(start.x, start.y);
-				const se = ctx.viewport.worldToScreen(end.x, end.y);
+				const ss = ctx.viewport.worldToScreen(start);
+				const se = ctx.viewport.worldToScreen(end);
 				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
 				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
 				const clockwise = !!arc.clockwise;
@@ -142,10 +142,8 @@ export class RadiusConstraint extends BaseConstraint {
 
 		// A diameter dimension crosses the full circle; a radius dimension starts at its center.
 		createSvgLine(
-			isDiameter ? opposite.x : sc.x,
-			isDiameter ? opposite.y : sc.y,
-			edge.x,
-			edge.y,
+			{ x: isDiameter ? opposite.x : sc.x, y: isDiameter ? opposite.y : sc.y },
+			edge,
 			{
 				stroke: color,
 				'stroke-width': STROKE_WIDTH.dimension,
@@ -156,10 +154,8 @@ export class RadiusConstraint extends BaseConstraint {
 
 		// Shelf line from edge to tip
 		createSvgLine(
-			edge.x,
-			edge.y,
-			tip.x,
-			tip.y,
+			edge,
+			tip,
 			{
 				stroke: color,
 				'stroke-width': STROKE_WIDTH.dimension,
@@ -175,10 +171,8 @@ export class RadiusConstraint extends BaseConstraint {
 
 		const rectX = dirX > 0 ? tip.x : tip.x - textLen;
 		createSvgRect(
-			rectX,
-			tip.y - 12,
-			textLen,
-			20,
+			{ x: rectX, y: tip.y - 12 },
+			{ x: textLen, y: 20 },
 			{
 				rx: 4,
 				fill: COLORS.white,
@@ -189,8 +183,7 @@ export class RadiusConstraint extends BaseConstraint {
 		);
 
 		createSvgText(
-			rectX + textLen * 0.5,
-			tip.y + 3,
+			{ x: rectX + textLen * 0.5, y: tip.y + 3 },
 			textVal,
 			{
 				'text-anchor': 'middle',
@@ -211,7 +204,7 @@ export class RadiusConstraint extends BaseConstraint {
 		const center = sketch.points.get(entity.centerId);
 		if (!center) return null;
 
-		const sc = viewport.worldToScreen(center.x, center.y);
+		const sc = viewport.worldToScreen(center);
 		const sr = entity.radius * viewport.zoom;
 
 		let screenAngle = -Math.PI / 4;
@@ -219,8 +212,8 @@ export class RadiusConstraint extends BaseConstraint {
 			const start = sketch.points.get(arc.startPointId);
 			const end = sketch.points.get(arc.endPointId);
 			if (start && end) {
-				const ss = viewport.worldToScreen(start.x, start.y);
-				const se = viewport.worldToScreen(end.x, end.y);
+				const ss = viewport.worldToScreen(start);
+				const se = viewport.worldToScreen(end);
 				const as = Math.atan2(ss.y - sc.y, ss.x - sc.x);
 				const ae = Math.atan2(se.y - sc.y, se.x - sc.x);
 				const clockwise = !!arc.clockwise;

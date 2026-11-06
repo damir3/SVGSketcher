@@ -1,5 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from './vector';
+import { distancesFrom } from './vector';
 import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurves } from './intersection';
 import { extractSplineInterval, type BezierSegment } from './spline';
 
@@ -103,8 +104,9 @@ function exactRingPath(points: Vec2[], edges: BoundaryEdge[]): string {
 			const center = curve.center,
 				major = curve.majorAxisPoint,
 				minor = curve.minorAxisPoint;
-			rx = Math.hypot(major.x - center.x, major.y - center.y);
-			ry = Math.hypot(minor.x - center.x, minor.y - center.y);
+			const r = distancesFrom(center, major, minor);
+			rx = r.x;
+			ry = r.y;
 			rotation = (Math.atan2(-(major.y - center.y), major.x - center.x) * 180) / Math.PI;
 			sweep = curve.type === 'ellipse' ? (run.forward ? 1 : 0) : curve.clockwise === run.forward ? 1 : 0;
 		}
@@ -126,8 +128,7 @@ function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc
 		const minor = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const start = { x: curve.start.x, y: -curve.start.y };
 		const end = { x: curve.end.x, y: -curve.end.y };
-		const rx = Math.hypot(major.x - center.x, major.y - center.y),
-			ry = Math.hypot(minor.x - center.x, minor.y - center.y);
+		const r = distancesFrom(center, major, minor);
 		const theta = Math.atan2(major.y - center.y, major.x - center.x);
 		const ux = Math.cos(theta),
 			uy = Math.sin(theta),
@@ -136,7 +137,7 @@ function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc
 		const param = (point: Vec2) => {
 			const dx = point.x - center.x,
 				dy = point.y - center.y;
-			return Math.atan2((dx * vx + dy * vy) / Math.max(ry, 1e-6), (dx * ux + dy * uy) / Math.max(rx, 1e-6));
+			return Math.atan2((dx * vx + dy * vy) / Math.max(r.y, 1e-6), (dx * ux + dy * uy) / Math.max(r.x, 1e-6));
 		};
 		const ts = param(start),
 			te = param(end);

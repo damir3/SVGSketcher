@@ -556,7 +556,7 @@ export function executeExtend(
 		let newEndPtId = movingEndId;
 
 		if (isSharedEndpoint || movingPt.fixed) {
-			const newPt = sketch.addPoint(toPoint.x, toPoint.y);
+			const newPt = sketch.addPoint(toPoint);
 			newEndPtId = newPt.id;
 			if (edge === 'end') {
 				line.p2Id = newEndPtId;
@@ -727,7 +727,7 @@ export function executeExtend(
 
 		let newEndPtId = movingEndId;
 		if (otherEntities.length > 0 || movingPt.fixed) {
-			const newPt = sketch.addPoint(toPoint.x, toPoint.y);
+			const newPt = sketch.addPoint(toPoint);
 			newEndPtId = newPt.id;
 			if (edge === 'end') {
 				arc.endPointId = newEndPtId;
@@ -797,7 +797,7 @@ export function executeExtend(
 		const spline = sketch.splines.get(targetId);
 		if (!spline) return null;
 
-		const newPt = sketch.addPoint(toPoint.x, toPoint.y);
+		const newPt = sketch.addPoint(toPoint);
 		const isControl = spline.splineType === 'control';
 
 		if (isControl) {
@@ -855,8 +855,8 @@ export function executeExtend(
 				for (let i = 0; i < pts.length; i++) {
 					const h = handles[i];
 					const pFit = pts[i];
-					const h1 = sketch.addPoint(h.h1.x, h.h1.y);
-					const h2 = sketch.addPoint(h.h2.x, h.h2.y);
+					const h1 = sketch.addPoint(h.h1);
+					const h2 = sketch.addPoint(h.h2);
 					const hLine = sketch.addLine(h1.id, h2.id);
 					hLine.isConstruction = true;
 					hLine.isSplineHandle = true;

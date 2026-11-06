@@ -1,13 +1,13 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
-import type { Vec2 } from '../../../math/vector';
+import { ORIGIN, type Vec2 } from '../../../math/vector';
 
 export class PanTool extends BaseTool {
 	readonly id = 'pan' as const;
 	override readonly defaultCursor = 'grab';
 
 	private isPanning = false;
-	private lastMouseScreen: Vec2 = { x: 0, y: 0 };
+	private lastMouseScreen: Vec2 = ORIGIN;
 
 	override activate(ctx: ToolContext): void {
 		super.activate(ctx);

@@ -100,11 +100,11 @@ describe('OffsetTool UI and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 0);
-			const p2 = sketch.addPoint(50, 50);
-			const pFar1 = sketch.addPoint(200, 200);
-			const pFar2 = sketch.addPoint(250, 200);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 0 });
+			const p2 = sketch.addPoint({ x: 50, y: 50 });
+			const pFar1 = sketch.addPoint({ x: 200, y: 200 });
+			const pFar2 = sketch.addPoint({ x: 250, y: 200 });
 
 			const l0 = sketch.addLine(p0.id, p1.id);
 			const l1 = sketch.addLine(p1.id, p2.id);
@@ -116,8 +116,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -177,10 +177,10 @@ describe('OffsetTool UI and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 0);
-			const p2 = sketch.addPoint(50, 50);
-			const p3 = sketch.addPoint(0, 50);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 0 });
+			const p2 = sketch.addPoint({ x: 50, y: 50 });
+			const p3 = sketch.addPoint({ x: 0, y: 50 });
 
 			const l0 = sketch.addLine(p0.id, p1.id);
 			sketch.addLine(p1.id, p2.id);
@@ -193,8 +193,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -231,8 +231,8 @@ describe('OffsetTool UI and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
 			const l0 = sketch.addLine(p0.id, p1.id);
 
 			const tool = new OffsetTool();
@@ -241,8 +241,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [
@@ -314,8 +314,8 @@ describe('OffsetTool UI and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
 			const l0 = sketch.addLine(p0.id, p1.id);
 
 			const tool = new OffsetTool();
@@ -326,8 +326,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -379,10 +379,10 @@ describe('OffsetTool UI and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 0);
-			const p2 = sketch.addPoint(50, 50);
-			const p3 = sketch.addPoint(0, 50);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 0 });
+			const p2 = sketch.addPoint({ x: 50, y: 50 });
+			const p3 = sketch.addPoint({ x: 0, y: 50 });
 			const l0 = sketch.addLine(p0.id, p1.id);
 			sketch.addLine(p1.id, p2.id);
 			sketch.addLine(p2.id, p3.id);
@@ -394,8 +394,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -453,8 +453,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -524,8 +524,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Recalculate with negative distance on a single line
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
 			const l0 = sketch.addLine(p0.id, p1.id);
 
 			tool.dist1 = -15;
@@ -534,8 +534,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -593,8 +593,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: { offsetGizmoHandles: [] },
 				findLineNear: () => firstLine,
@@ -621,9 +621,12 @@ describe('OffsetTool UI and Workflow', () => {
 			const pA = sketch.points.get('Point-1')!;
 			const pB = sketch.points.get('Point-2')!;
 			const pC = sketch.points.get('Point-3')!;
-			const origAx = pA.x, origAy = pA.y;
-			const origBx = pB.x, origBy = pB.y;
-			const origCx = pC.x, origCy = pC.y;
+			const origAx = pA.x,
+				origAy = pA.y;
+			const origBx = pB.x,
+				origBy = pB.y;
+			const origCx = pC.x,
+				origCy = pC.y;
 
 			// Find offset constraint
 			const offConstraint = Array.from(sketch.constraints.values()).find(c => c.type === 'offset')!;
@@ -642,7 +645,7 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Verify offset vertices expanded to distance 30
 			const offBottom = sketch.points.get('Point-4')!;
-			assert.ok(Math.abs(offBottom.y - (-30)) < 0.1, `Offset bottom y was ${offBottom.y}, expected -30`);
+			assert.ok(Math.abs(offBottom.y - -30) < 0.1, `Offset bottom y was ${offBottom.y}, expected -30`);
 		} finally {
 			cleanup();
 		}
@@ -652,8 +655,8 @@ describe('OffsetTool UI and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
 			const l0 = sketch.addLine(p0.id, p1.id);
 
 			const tool = new OffsetTool();
@@ -662,8 +665,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x: x + 200, y: 150 - y }),
-					screenToWorld: (x: number, y: number) => ({ x: x - 200, y: 150 - y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 200, y: 150 - p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 200, y: 150 - p.y }),
 				},
 				renderer: {
 					offsetGizmoHandles: [],

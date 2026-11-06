@@ -48,8 +48,8 @@ export class SketchLine implements ISketchPrimitive {
 		const p1 = sketch.points.get(this.p1Id);
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return null;
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
 		return distanceToSegment(screen, s1, s2);
 	}
 

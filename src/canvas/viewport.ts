@@ -1,4 +1,4 @@
-import { vec, type Vec2 } from '../math/vector';
+import { mid, vec, type Vec2 } from '../math/vector';
 import type { AABB } from '../math/aabb';
 
 export class Viewport {
@@ -40,11 +40,9 @@ export class Viewport {
 
 		const zoom = Math.min(Math.max(fitZoom, 0.05), 50.0);
 
-		const centerX = (min.x + max.x) / 2;
-		const centerY = (min.y + max.y) / 2;
-
-		const panX = this.width / 2 - centerX * zoom;
-		const panY = this.height / 2 + centerY * zoom;
+		const center = mid(min, max);
+		const panX = this.width / 2 - center.x * zoom;
+		const panY = this.height / 2 + center.y * zoom;
 
 		return { panX, panY, zoom };
 	}
@@ -56,26 +54,26 @@ export class Viewport {
 		this.panY = target.panY;
 	}
 
-	screenToWorld(sx: number, sy: number): Vec2 {
+	screenToWorld(screen: Vec2): Vec2 {
 		// CAD standard: Y points UP in world coordinates
-		const wx = (sx - this.panX) / this.zoom;
-		const wy = -(sy - this.panY) / this.zoom;
+		const wx = (screen.x - this.panX) / this.zoom;
+		const wy = -(screen.y - this.panY) / this.zoom;
 		return vec(wx, wy);
 	}
 
-	worldToScreen(wx: number, wy: number): Vec2 {
-		const sx = this.panX + wx * this.zoom;
-		const sy = this.panY - wy * this.zoom;
+	worldToScreen(world: Vec2): Vec2 {
+		const sx = this.panX + world.x * this.zoom;
+		const sy = this.panY - world.y * this.zoom;
 		return vec(sx, sy);
 	}
 
-	zoomAt(sx: number, sy: number, factor: number): void {
-		const worldBefore = this.screenToWorld(sx, sy);
+	zoomAt(screen: Vec2, factor: number): void {
+		const worldBefore = this.screenToWorld(screen);
 		const newZoom = Math.min(Math.max(this.zoom * factor, 0.05), 50.0);
 		this.zoom = newZoom;
-		const screenAfter = this.worldToScreen(worldBefore.x, worldBefore.y);
-		this.panX += sx - screenAfter.x;
-		this.panY += sy - screenAfter.y;
+		const screenAfter = this.worldToScreen(worldBefore);
+		this.panX += screen.x - screenAfter.x;
+		this.panY += screen.y - screenAfter.y;
 	}
 
 	pan(deltaScreenX: number, deltaScreenY: number): void {

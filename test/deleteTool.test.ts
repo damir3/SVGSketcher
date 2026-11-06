@@ -20,7 +20,8 @@ function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {})
 			remove: (cls: string) => classNames.delete(cls),
 			contains: (cls: string) => classNames.has(cls),
 		},
-		getAttribute: (name: string) => (name === 'class' ? Array.from(classNames).join(' ') : (attributes.get(name) ?? null)),
+		getAttribute: (name: string) =>
+			name === 'class' ? Array.from(classNames).join(' ') : (attributes.get(name) ?? null),
 		setAttribute: (name: string, val: string) => {
 			attributes.set(name, String(val));
 		},
@@ -73,8 +74,8 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 		zoom: 1,
 		panX: 0,
 		panY: 0,
-		worldToScreen: (x: number, y: number) => ({ x, y }),
-		screenToWorld: (x: number, y: number) => ({ x, y }),
+		worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+		screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 	};
 
 	const svgObj = {
@@ -224,8 +225,8 @@ describe('Delete Tool', () => {
 
 	it('detects and deletes a line when clicked in the middle', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const { ctx, toasts } = createMockDeleteContext(sketch);
@@ -243,8 +244,8 @@ describe('Delete Tool', () => {
 
 	it('prioritizes vertex point when clicked near an endpoint', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		sketch.addLine(p1.id, p2.id);
 
 		const { ctx } = createMockDeleteContext(sketch);
@@ -262,7 +263,7 @@ describe('Delete Tool', () => {
 
 	it('detects and deletes a circle', () => {
 		const sketch = new SketchDocument();
-		const center = sketch.addPoint(50, 50);
+		const center = sketch.addPoint({ x: 50, y: 50 });
 		const circle = sketch.addCircle(center.id, 20);
 
 		const { ctx } = createMockDeleteContext(sketch);
@@ -280,9 +281,9 @@ describe('Delete Tool', () => {
 
 	it('detects and deletes an arc', () => {
 		const sketch = new SketchDocument();
-		const center = sketch.addPoint(0, 0);
-		const start = sketch.addPoint(20, 0);
-		const end = sketch.addPoint(0, 20);
+		const center = sketch.addPoint({ x: 0, y: 0 });
+		const start = sketch.addPoint({ x: 20, y: 0 });
+		const end = sketch.addPoint({ x: 0, y: 20 });
 		const arc = sketch.addArc(center.id, start.id, end.id, 20, true);
 
 		const { ctx } = createMockDeleteContext(sketch);
@@ -301,8 +302,8 @@ describe('Delete Tool', () => {
 
 	it('detects and deletes a dimensional constraint', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		sketch.addLine(p1.id, p2.id);
 		const distConstraint = sketch.addDistanceConstraint(p1.id, p2.id, 100);
 
@@ -321,8 +322,8 @@ describe('Delete Tool', () => {
 
 	it('detects constraint badge in SVG DOM via bounding rect proximity', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 		const hConstraint = sketch.addHorizontalConstraint(line.id);
 		assert.ok(hConstraint);
@@ -365,9 +366,9 @@ describe('Delete Tool', () => {
 	it('does not target spline handle lines or spline handle points', () => {
 		const sketch = new SketchDocument();
 		const fitPoints = [
-			sketch.addPoint(0, 0),
-			sketch.addPoint(50, 50),
-			sketch.addPoint(100, 0),
+			sketch.addPoint({ x: 0, y: 0 }),
+			sketch.addPoint({ x: 50, y: 50 }),
+			sketch.addPoint({ x: 100, y: 0 }),
 		];
 		const spline = sketch.addFitSpline(fitPoints.map(p => p.id));
 		assert.ok(spline);
@@ -382,7 +383,7 @@ describe('Delete Tool', () => {
 		assert.ok(handleLine);
 
 		const hp1 = sketch.points.get(handleLine.p1Id)!;
-		const midHandle = vec((hp1.x + 1), (hp1.y + 1));
+		const midHandle = vec(hp1.x + 1, hp1.y + 1);
 		const target = ctx.highlightManager!.update(tool, midHandle);
 		if (target) {
 			assert.notEqual(target.id, handleLine.id);
@@ -393,8 +394,8 @@ describe('Delete Tool', () => {
 
 	it('highlights hovered element with delete-hover class', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const lineEl = createMockSvgElement('g', { 'data-id': line.id });
@@ -420,8 +421,8 @@ describe('Delete Tool', () => {
 
 	it('supports undo/redo after deleting an entity', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const { ctx } = createMockDeleteContext(sketch);

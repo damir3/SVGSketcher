@@ -25,7 +25,7 @@ export class LineTool extends BaseTool {
 				this.startWorldPos = snap.worldPos;
 			} else {
 				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos.x, ptPos.y);
+				const pt = sketch.addPoint(ptPos);
 				pId = pt.id;
 				this.startWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -43,7 +43,7 @@ export class LineTool extends BaseTool {
 					const axisSnap = this.ctx.getAxisSnappedWorldPos(this.startWorldPos, ptPos, snap);
 					ptPos = axisSnap.pos;
 				}
-				const pt = sketch.addPoint(ptPos.x, ptPos.y);
+				const pt = sketch.addPoint(ptPos);
 				p2Id = pt.id;
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
@@ -78,7 +78,7 @@ export class LineTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.startWorldPos) {
-			const s1 = ctx.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
+			const s1 = ctx.viewport.worldToScreen(this.startWorldPos);
 			let effectiveWorld = ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			let axisBadge: 'H' | 'V' | undefined;
 
@@ -87,19 +87,19 @@ export class LineTool extends BaseTool {
 				effectiveWorld = axisSnap.pos;
 				axisBadge = axisSnap.axis === 'horizontal' ? 'H' : axisSnap.axis === 'vertical' ? 'V' : undefined;
 			}
-			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const s2 = ctx.viewport.worldToScreen(effectiveWorld);
 
 			const length = dist(this.startWorldPos, effectiveWorld);
 			const angleDeg =
 				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) / Math.PI;
 
-			createSvgLine(s1.x, s1.y, s2.x, s2.y, getPreviewStrokeAttrs(ctx.isConstruction, false, true), ctx.targetGroup);
+			createSvgLine(s1, s2, getPreviewStrokeAttrs(ctx.isConstruction, false, true), ctx.targetGroup);
 
 			// Length & Angle Tooltip
 			const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 - 16 };
 			const badgeText = axisBadge ? ` [${axisBadge}]` : '';
 			const label = `${length.toFixed(1)} mm | ${angleDeg.toFixed(1)}°${badgeText}`;
-			renderTooltip(ctx.targetGroup, mid.x, mid.y, label);
+			renderTooltip(ctx.targetGroup, mid, label);
 		}
 	}
 

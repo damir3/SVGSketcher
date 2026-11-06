@@ -395,10 +395,10 @@ export class SketchDocument {
 	}
 
 	// --- Point methods ---
-	addPoint(x: number, y: number, fixed = false): SketchPoint {
+	addPoint(point: Vec2, fixed = false): SketchPoint {
 		this.pushHistory();
 		const id = this.nextId('Point');
-		const pt = new SketchPoint({ id, x, y, fixed });
+		const pt = new SketchPoint({ id, x: point.x, y: point.y, fixed });
 		this.points.set(id, pt);
 		this.rebuildParamManager();
 		this.solve();
@@ -1900,7 +1900,7 @@ export class SketchDocument {
 			const a = baseAngle + k * step;
 			const vx = centerPt.x + R * Math.cos(a);
 			const vy = centerPt.y + R * Math.sin(a);
-			const pt = this.addPoint(vx, vy, false);
+			const pt = this.addPoint({ x: vx, y: vy }, false);
 			vertices.push(pt);
 		}
 

@@ -1,4 +1,4 @@
-import { type Vec2, dist, projectPointOntoSegment } from './vector';
+import { type Vec2, dist, distancesFrom, projectPointOntoSegment } from './vector';
 import { getSplineParamAtPoint, type BezierSegment } from './spline';
 
 const TWO_PI = 2 * Math.PI;
@@ -62,9 +62,8 @@ export function distanceToArc(
  * Returns null if the ellipse is degenerate (rx < 0.1 or ry < 0.1).
  */
 export function distanceToEllipse(point: Vec2, center: Vec2, majorPt: Vec2, minorPt: Vec2): number | null {
-	const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
-	const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
-	if (rx < 0.1 || ry < 0.1) return null;
+	const r = distancesFrom(center, majorPt, minorPt);
+	if (r.x < 0.1 || r.y < 0.1) return null;
 
 	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
 	const ux = Math.cos(theta);
@@ -77,9 +76,9 @@ export function distanceToEllipse(point: Vec2, center: Vec2, majorPt: Vec2, mino
 	const u = dx * ux + dy * uy;
 	const v = dx * vx + dy * vy;
 
-	const t = Math.atan2(v / ry, u / rx);
-	const ex = rx * Math.cos(t) * ux + ry * Math.sin(t) * vx;
-	const ey = rx * Math.cos(t) * uy + ry * Math.sin(t) * vy;
+	const t = Math.atan2(v / r.y, u / r.x);
+	const ex = r.x * Math.cos(t) * ux + r.y * Math.sin(t) * vx;
+	const ey = r.x * Math.cos(t) * uy + r.y * Math.sin(t) * vy;
 
 	return Math.hypot(dx - ex, dy - ey);
 }
@@ -98,9 +97,8 @@ export function distanceToEllipticalArc(
 	clockwise: boolean,
 	thresholdPx = 18
 ): number | null {
-	const rx = Math.hypot(majorPt.x - center.x, majorPt.y - center.y);
-	const ry = Math.hypot(minorPt.x - center.x, minorPt.y - center.y);
-	if (rx < 0.1 || ry < 0.1) return null;
+	const r = distancesFrom(center, majorPt, minorPt);
+	if (r.x < 0.1 || r.y < 0.1) return null;
 
 	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
 	const ux = Math.cos(theta);
@@ -113,9 +111,9 @@ export function distanceToEllipticalArc(
 	const u = dx * ux + dy * uy;
 	const v = dx * vx + dy * vy;
 
-	const t = Math.atan2(v / ry, u / rx);
-	const ex = rx * Math.cos(t) * ux + ry * Math.sin(t) * vx;
-	const ey = rx * Math.cos(t) * uy + ry * Math.sin(t) * vy;
+	const t = Math.atan2(v / r.y, u / r.x);
+	const ex = r.x * Math.cos(t) * ux + r.y * Math.sin(t) * vx;
+	const ey = r.x * Math.cos(t) * uy + r.y * Math.sin(t) * vy;
 
 	const dPerimeter = Math.hypot(dx - ex, dy - ey);
 	if (dPerimeter > thresholdPx) return null;
@@ -125,15 +123,15 @@ export function distanceToEllipticalArc(
 	const ue = (endPt.x - center.x) * ux + (endPt.y - center.y) * uy;
 	const ve = (endPt.x - center.x) * vx + (endPt.y - center.y) * vy;
 
-	const ts = Math.atan2(vs / ry, us / rx);
-	const te = Math.atan2(ve / ry, ue / rx);
+	const ts = Math.atan2(vs / r.y, us / r.x);
+	const te = Math.atan2(ve / r.y, ue / r.x);
 
 	let sweepAngle = clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 	if (sweepAngle < 0) sweepAngle += TWO_PI;
 	let pAngle = clockwise ? (t - ts) % TWO_PI : (ts - t) % TWO_PI;
 	if (pAngle < 0) pAngle += TWO_PI;
 
-	const angTolerance = thresholdPx / Math.max(Math.min(rx, ry), 1);
+	const angTolerance = thresholdPx / Math.max(Math.min(r.x, r.y), 1);
 	if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
 		return dPerimeter;
 	}

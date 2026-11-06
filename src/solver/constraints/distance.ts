@@ -114,8 +114,8 @@ export class DistanceConstraint extends BaseConstraint {
 		const p2 = ctx.sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return;
 
-		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const s1 = ctx.viewport.worldToScreen(p1);
+		const s2 = ctx.viewport.worldToScreen(p2);
 		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 32;
 		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
 		if (!geom) return;
@@ -136,8 +136,8 @@ export class DistanceConstraint extends BaseConstraint {
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return null;
 
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
 		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 32;
 		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
 		if (!geom) return null;

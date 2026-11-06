@@ -11,10 +11,10 @@ import { ConstraintPanel } from '../src/ui/panels/constraints/constraintPanel';
 describe('ConstraintPanel Integration', () => {
 	it('BaseConstraint (e.g. ParallelConstraint) defaults to ConstraintPanel', () => {
 		const doc = new SketchDocument();
-		const p1 = doc.addPoint(0, 0);
-		const p2 = doc.addPoint(10, 0);
-		const p3 = doc.addPoint(0, 5);
-		const p4 = doc.addPoint(10, 5);
+		const p1 = doc.addPoint({ x: 0, y: 0 });
+		const p2 = doc.addPoint({ x: 10, y: 0 });
+		const p3 = doc.addPoint({ x: 0, y: 5 });
+		const p4 = doc.addPoint({ x: 10, y: 5 });
 		const l1 = doc.addLine(p1.id, p2.id);
 		const l2 = doc.addLine(p3.id, p4.id);
 		const c = new ParallelConstraint('c_par', l1.id, l2.id, p1.id, p2.id, p3.id, p4.id);
@@ -34,8 +34,8 @@ describe('ConstraintPanel Integration', () => {
 
 	it('DistanceConstraint renders dimension value and fx expression', () => {
 		const doc = new SketchDocument();
-		const p1 = doc.addPoint(0, 0);
-		const p2 = doc.addPoint(50, 0);
+		const p1 = doc.addPoint({ x: 0, y: 0 });
+		const p2 = doc.addPoint({ x: 50, y: 0 });
 		const c = new DistanceConstraint('c_dist', p1.id, p2.id, 50);
 		c.expression = 'len / 2';
 
@@ -53,7 +53,7 @@ describe('ConstraintPanel Integration', () => {
 
 	it('RadiusConstraint renders segmented control for mode and dimension', () => {
 		const doc = new SketchDocument();
-		const p = doc.addPoint(0, 0);
+		const p = doc.addPoint({ x: 0, y: 0 });
 		const circle = doc.addCircle(p.id, 25);
 		const c = new RadiusConstraint('c_rad', circle.id, 25, 1.0, undefined, 'radius');
 
@@ -70,17 +70,7 @@ describe('ConstraintPanel Integration', () => {
 
 	it('CircularPatternConstraint renders distribution, angle, quantity, and suppression', () => {
 		const doc = new SketchDocument();
-		const c = new CircularPatternConstraint(
-			'c_cpat',
-			'center_pt',
-			['src1'],
-			'full',
-			360,
-			4,
-			false,
-			[],
-			[]
-		);
+		const c = new CircularPatternConstraint('c_cpat', 'center_pt', ['src1'], 'full', 360, 4, false, [], []);
 
 		const mockCtx: any = {
 			sketch: doc,

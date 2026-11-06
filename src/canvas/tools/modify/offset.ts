@@ -297,7 +297,7 @@ export class OffsetTool extends BaseTool {
 	getGizmoBoundingBox(): ScreenBoundingBox | null {
 		if (!this.geomResult || !this.ctx) return null;
 
-		const sAnchor = this.ctx.viewport.worldToScreen(this.geomResult.gizmoAnchor.x, this.geomResult.gizmoAnchor.y);
+		const sAnchor = this.ctx.viewport.worldToScreen(this.geomResult.gizmoAnchor);
 
 		const pts: Vec2[] = [sAnchor];
 
@@ -309,7 +309,7 @@ export class OffsetTool extends BaseTool {
 				x: anchor.x + sign * offsetVal * norm.x,
 				y: anchor.y + sign * offsetVal * norm.y,
 			};
-			pts.push(this.ctx.viewport.worldToScreen(w.x, w.y));
+			pts.push(this.ctx.viewport.worldToScreen(w));
 		};
 
 		if (this.direction === 'one_side') {

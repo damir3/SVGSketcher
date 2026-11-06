@@ -45,7 +45,7 @@ function setupMockDocument() {
 describe('Grid Snapping & Drag Precision', () => {
 	it('dragPoint snaps/moves free point to exact coordinates with 0 offset (no 0.023 residual error)', () => {
 		const sketch = new SketchDocument();
-		const pt = sketch.addPoint(0, 0);
+		const pt = sketch.addPoint({ x: 0, y: 0 });
 
 		// Incremental drag simulation (similar to real mouse move trajectory)
 		for (let i = 1; i <= 20; i++) {
@@ -60,8 +60,8 @@ describe('Grid Snapping & Drag Precision', () => {
 
 	it('dragLine moves line endpoints exactly to target coordinates', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		sketch.dragLine(line.id, 20, 30, 70, 30);
@@ -74,7 +74,7 @@ describe('Grid Snapping & Drag Precision', () => {
 
 	it('dragCircle moves center point exactly to target coordinates', () => {
 		const sketch = new SketchDocument();
-		const c = sketch.addPoint(0, 0);
+		const c = sketch.addPoint({ x: 0, y: 0 });
 		const circle = sketch.addCircle(c.id, 25);
 
 		sketch.dragCircle(circle.id, 40, 60);
@@ -91,7 +91,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			viewport.zoom = 4.0; // 4 px per world unit -> gridStep = 5 mm, gridStepPx = 20 px
 			const fakeSvg = {
 				style: {},
-			classList: { add: () => {}, remove: () => {}, toggle: () => {} },
+				classList: { add: () => {}, remove: () => {}, toggle: () => {} },
 				getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
 				addEventListener: () => {},
 				removeEventListener: () => {},
@@ -106,7 +106,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			const interaction = new CanvasInteraction(fakeSvg, sketch, viewport, renderer);
 
 			// Test grid point at (20, 20) in world space (away from origin and axes)
-			const gridPointScreen = viewport.worldToScreen(20, 20);
+			const gridPointScreen = viewport.worldToScreen({ x: 20, y: 20 });
 			assert.equal(gridPointScreen.x, 480);
 			assert.equal(gridPointScreen.y, 220);
 
@@ -128,7 +128,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(snapNoGrid, null, 'Grid snap should be suppressed when allowGrid=false');
 
 			// But existing point is still found even when allowGrid=false
-			sketch.addPoint(20, 20);
+			sketch.addPoint({ x: 20, y: 20 });
 			const snapPt = interaction.findSnap(vec(gridPointScreen.x + 3, gridPointScreen.y), undefined, false);
 			assert.ok(snapPt, 'Point snap should still be found when allowGrid=false');
 			assert.equal(snapPt.type, 'point');
@@ -159,7 +159,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			} as any;
 			const interaction = new CanvasInteraction(fakeSvg, sketch, viewport, renderer);
 
-			const pt = sketch.addPoint(12.34, 15.67);
+			const pt = sketch.addPoint({ x: 12.34, y: 15.67 });
 
 			// Simulate point drag
 			(interaction as any).isDraggingPoint = true;
@@ -168,7 +168,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			(interaction as any).hasDragged = true;
 
 			// Release mouse near screen pos corresponding to world (25, 20)
-			const targetScreen = viewport.worldToScreen(25, 20);
+			const targetScreen = viewport.worldToScreen({ x: 25, y: 20 });
 			(interaction as any).handleMouseUp({
 				clientX: targetScreen.x + 2,
 				clientY: targetScreen.y - 1,
@@ -205,7 +205,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			const interaction = new CanvasInteraction(fakeSvg, sketch, viewport, renderer);
 
 			// Test X-axis at world (20, 0)
-			const sX = viewport.worldToScreen(20, 0);
+			const sX = viewport.worldToScreen({ x: 20, y: 0 });
 
 			// Cursor 2px offset along X and 2px offset along Y (both <= 4px threshold)
 			const snapXNear = interaction.findSnap(vec(sX.x + 2, sX.y + 2));
@@ -230,7 +230,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(snapXNoGrid, null, 'Axis snap should be suppressed when allowGrid=false');
 
 			// Test Y-axis at world (0, 20)
-			const sY = viewport.worldToScreen(0, 20);
+			const sY = viewport.worldToScreen({ x: 0, y: 20 });
 
 			// Cursor 2px offset along X (<10px axis snap) and 2px offset along Y (<= 4px grid snap)
 			const snapYNear = interaction.findSnap(vec(sY.x + 2, sY.y + 2));
@@ -281,12 +281,12 @@ describe('Grid Snapping & Drag Precision', () => {
 			const interaction = new CanvasInteraction(fakeSvg, sketch, viewport, renderer);
 
 			// Add a sketch line near the X-axis (y = 1)
-			const p1 = sketch.addPoint(10, 1);
-			const p2 = sketch.addPoint(50, 1);
+			const p1 = sketch.addPoint({ x: 10, y: 1 });
+			const p2 = sketch.addPoint({ x: 50, y: 1 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			// Screen position of world (20, 1)
-			const sLine = viewport.worldToScreen(20, 1);
+			const sLine = viewport.worldToScreen({ x: 20, y: 1 });
 			const snap = interaction.findSnap(sLine);
 			assert.ok(snap, 'Snap should be found');
 			assert.equal(snap.type, 'line');

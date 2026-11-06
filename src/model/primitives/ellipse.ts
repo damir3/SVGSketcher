@@ -49,9 +49,9 @@ export class SketchEllipse implements ISketchPrimitive {
 		const minorPt = sketch.points.get(this.minorAxisPointId);
 		if (!center || !majorPt || !minorPt) return null;
 
-		const sc = viewport.worldToScreen(center.x, center.y);
-		const smaj = viewport.worldToScreen(majorPt.x, majorPt.y);
-		const smin = viewport.worldToScreen(minorPt.x, minorPt.y);
+		const sc = viewport.worldToScreen(center);
+		const smaj = viewport.worldToScreen(majorPt);
+		const smin = viewport.worldToScreen(minorPt);
 
 		return distanceToEllipse(screen, sc, smaj, smin);
 	}

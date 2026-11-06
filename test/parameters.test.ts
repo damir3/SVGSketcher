@@ -52,8 +52,8 @@ describe('CAD Parameters, Equations & Geometry Integration', () => {
 		const doc = new SketchDocument();
 		doc.addParameter('len', '100');
 
-		const p1 = doc.addPoint(0, 0, true);
-		const p2 = doc.addPoint(50, 0);
+		const p1 = doc.addPoint({ x: 0, y: 0 }, true);
+		const p2 = doc.addPoint({ x: 50, y: 0 });
 		doc.addLine(p1.id, p2.id);
 
 		// Add distance constraint
@@ -80,7 +80,7 @@ describe('CAD Parameters, Equations & Geometry Integration', () => {
 		const doc = new SketchDocument();
 		doc.addParameter('dia', '40');
 
-		const center = doc.addPoint(0, 0, true);
+		const center = doc.addPoint({ x: 0, y: 0 }, true);
 		const circle = doc.addCircle(center.id, 10);
 		const radC = doc.addRadiusConstraint(circle.id);
 		assert.ok(radC);
@@ -101,8 +101,8 @@ describe('CAD Parameters, Equations & Geometry Integration', () => {
 
 		// Add parameter
 		doc.addParameter('w', '50');
-		const p1 = doc.addPoint(0, 0, true);
-		const p2 = doc.addPoint(10, 0);
+		const p1 = doc.addPoint({ x: 0, y: 0 }, true);
+		const p2 = doc.addPoint({ x: 10, y: 0 });
 		const distC = doc.addDistanceConstraint(p1.id, p2.id, 10, 'horizontal');
 		doc.updateDimensionalConstraint(distC.id, 'w');
 
@@ -130,8 +130,8 @@ describe('CAD Parameters, Equations & Geometry Integration', () => {
 		doc.addParameter('box_w', '75', 'Box width');
 		doc.addParameter('box_h', 'box_w / 2', 'Box height');
 
-		const p1 = doc.addPoint(0, 0, true);
-		const p2 = doc.addPoint(75, 0);
+		const p1 = doc.addPoint({ x: 0, y: 0 }, true);
+		const p2 = doc.addPoint({ x: 75, y: 0 });
 		const distC = doc.addDistanceConstraint(p1.id, p2.id, 75, 'horizontal');
 		doc.updateDimensionalConstraint(distC.id, 'box_w');
 
@@ -151,9 +151,7 @@ describe('CAD Parameters, Equations & Geometry Integration', () => {
 		assert.equal(doc2.getParameter('box_h')?.value, 37.5);
 
 		// Constraint expressions are restored
-		const importedDistC = Array.from(doc2.constraints.values()).find(
-			c => c instanceof DistanceConstraint
-		);
+		const importedDistC = Array.from(doc2.constraints.values()).find(c => c instanceof DistanceConstraint);
 		assert.ok(importedDistC);
 		assert.equal(importedDistC.expression, 'box_w');
 		assert.equal(importedDistC.targetDistance, 75);
@@ -169,8 +167,8 @@ describe('CAD Parameters, Equations & Geometry Integration', () => {
 		doc.addParameter('old_name', '10');
 		doc.addParameter('dep', 'old_name * 3');
 
-		const p1 = doc.addPoint(0, 0, true);
-		const p2 = doc.addPoint(10, 0);
+		const p1 = doc.addPoint({ x: 0, y: 0 }, true);
+		const p2 = doc.addPoint({ x: 10, y: 0 });
 		const distC = doc.addDistanceConstraint(p1.id, p2.id, 10, 'horizontal');
 		doc.updateDimensionalConstraint(distC.id, 'old_name + 5');
 

@@ -90,9 +90,9 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const center = ctx.sketch.points.get(entity.centerId);
 		if (!center) return;
 
-		const sCenter = ctx.viewport.worldToScreen(center.x, center.y);
-		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const sCenter = ctx.viewport.worldToScreen(center);
+		const s1 = ctx.viewport.worldToScreen(p1);
+		const s2 = ctx.viewport.worldToScreen(p2);
 		const rScreen = entity.radius * ctx.viewport.zoom;
 
 		const dx = s2.x - s1.x;
@@ -131,14 +131,14 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const distToSeg = isAxis ? 0 : t < 0 ? -t : t > lineLen ? t - lineLen : 0;
 		const distToCirc = Math.abs(normDist - rScreen);
 
-		const isNearArc = arc && ctx.isAngleNearArc ? ctx.isAngleNearArc(arc, center, tanX, tanY, rScreen) : true;
+		const isNearArc = arc && ctx.isAngleNearArc ? ctx.isAngleNearArc(arc, center, { x: tanX, y: tanY }, rScreen) : true;
 		const isNear = distToSeg < 60 && distToCirc < 60 && isNearArc;
 
 		if (isNear) {
 			const offset = 14;
 			const badgeX = tanX - dirX * offset;
 			const badgeY = tanY - dirY * offset;
-			ctx.renderBadge(this.id, badgeX, badgeY, 'tangent');
+			ctx.renderBadge(this.id, { x: badgeX, y: badgeY }, 'tangent');
 			return;
 		}
 

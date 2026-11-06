@@ -42,7 +42,7 @@ export class FixedConstraint extends BaseConstraint {
 	override render(ctx: ConstraintRenderContext): void {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
-		ctx.renderBadge(this.id, s.x + 12, s.y - 12, 'fixed', COLORS.fixed);
+		const s = ctx.viewport.worldToScreen(pt);
+		ctx.renderBadge(this.id, { x: s.x + 12, y: s.y - 12 }, 'fixed', COLORS.fixed);
 	}
 }

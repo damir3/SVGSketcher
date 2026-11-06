@@ -1,6 +1,7 @@
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
 import type { LinearDimensionVisualOptions } from '../../canvas/dimensionGeometry';
+import type { Vec2 } from '../../math/vector';
 
 export type { LinearDimensionVisualOptions };
 
@@ -11,7 +12,7 @@ export interface ConstraintRenderContext {
 	isSelected: boolean;
 	readonly lineBadgeCounts?: Map<string, number>;
 
-	renderBadge(id: string, x: number, y: number, label: string, color?: string): void;
+	renderBadge(id: string, position: Vec2, label: string, color?: string): void;
 	renderBadgeOnSegment(id: string, p1Id: string, p2Id: string, label: string): void;
 	renderBadgeOnCircle(id: string, circleId: string, label: string): void;
 	renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void;
@@ -64,9 +65,8 @@ export interface ConstraintRenderContext {
 	): void;
 	isAngleNearArc?(
 		arc: { startPointId: string; endPointId: string; clockwise?: boolean },
-		center: { x: number; y: number },
-		px: number,
-		py: number,
+		center: Vec2,
+		point: Vec2,
 		rScreen: number
 	): boolean;
 }

@@ -2,7 +2,7 @@ import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { dist, type Vec2 } from '../../../math/vector';
+import { ORIGIN, dist, type Vec2 } from '../../../math/vector';
 
 export interface DimensionState {
 	step: number;
@@ -249,7 +249,7 @@ export class DimensionTool extends BaseTool {
 							id = hitArc.id;
 							type = 'arc';
 						} else {
-							const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
+							const sOrigin = this.ctx.viewport.worldToScreen(ORIGIN);
 							if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
 								id = 'axis_x';
 								type = 'line';
@@ -394,9 +394,9 @@ export class DimensionTool extends BaseTool {
 						const lp2 = this.ctx.sketch.points.get(l.p2Id);
 						let offsetWorld = 0;
 						if (pt && lp1 && lp2) {
-							const sp = this.ctx.viewport.worldToScreen(pt.x, pt.y);
-							const s1 = this.ctx.viewport.worldToScreen(lp1.x, lp1.y);
-							const s2 = this.ctx.viewport.worldToScreen(lp2.x, lp2.y);
+							const sp = this.ctx.viewport.worldToScreen(pt);
+							const s1 = this.ctx.viewport.worldToScreen(lp1);
+							const s2 = this.ctx.viewport.worldToScreen(lp2);
 							const dx = s2.x - s1.x;
 							const dy = s2.y - s1.y;
 							const lineLen = Math.hypot(dx, dy);
@@ -530,9 +530,9 @@ export class DimensionTool extends BaseTool {
 				const lp2 = this.ctx.sketch.points.get(l1.p2Id);
 				let offsetWorld = 0;
 				if (pt && lp1 && lp2) {
-					const sp = this.ctx.viewport.worldToScreen(pt.x, pt.y);
-					const s1 = this.ctx.viewport.worldToScreen(lp1.x, lp1.y);
-					const s2 = this.ctx.viewport.worldToScreen(lp2.x, lp2.y);
+					const sp = this.ctx.viewport.worldToScreen(pt);
+					const s1 = this.ctx.viewport.worldToScreen(lp1);
+					const s2 = this.ctx.viewport.worldToScreen(lp2);
 					const dx = s2.x - s1.x;
 					const dy = s2.y - s1.y;
 					const lineLen = Math.hypot(dx, dy);
@@ -575,8 +575,8 @@ export class DimensionTool extends BaseTool {
 			const p1 = this.ctx.sketch.points.get(l1.p1Id);
 			const p2 = this.ctx.sketch.points.get(l1.p2Id);
 			if (p1 && p2) {
-				const s1 = this.ctx.viewport.worldToScreen(p1.x, p1.y);
-				const s2 = this.ctx.viewport.worldToScreen(p2.x, p2.y);
+				const s1 = this.ctx.viewport.worldToScreen(p1);
+				const s2 = this.ctx.viewport.worldToScreen(p2);
 				const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
 				const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
 
@@ -672,12 +672,12 @@ export class DimensionTool extends BaseTool {
 					const userPtId = this.state.point1Id === 'origin' ? this.state.point2Id! : this.state.point1Id!;
 					const userPt = this.ctx.sketch.points.get(userPtId);
 					if (userPt) {
-						const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
-						const sPt = this.ctx.viewport.worldToScreen(userPt.x, userPt.y);
+						const sOrigin = this.ctx.viewport.worldToScreen(ORIGIN);
+						const sPt = this.ctx.viewport.worldToScreen(userPt);
 						const { orientation, offsetScreen } = determineDistanceOrientation(sOrigin, sPt, screen);
 						let offsetWorld = offsetScreen / this.ctx.viewport.zoom;
 						if (orientation === 'horizontal') {
-							const sAxisY = this.ctx.viewport.worldToScreen(0, 100);
+							const sAxisY = this.ctx.viewport.worldToScreen({ x: 0, y: 100 });
 							const dy = sAxisY.y - sOrigin.y;
 							const lineLen = Math.hypot(0, dy);
 							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
@@ -720,8 +720,8 @@ export class DimensionTool extends BaseTool {
 				const p1 = this.ctx.sketch.points.get(this.state.point1Id);
 				const p2 = this.ctx.sketch.points.get(this.state.point2Id);
 				if (p1 && p2) {
-					const s1 = this.ctx.viewport.worldToScreen(p1.x, p1.y);
-					const s2 = this.ctx.viewport.worldToScreen(p2.x, p2.y);
+					const s1 = this.ctx.viewport.worldToScreen(p1);
+					const s2 = this.ctx.viewport.worldToScreen(p2);
 					const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
 					const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
 
@@ -768,9 +768,9 @@ export class DimensionTool extends BaseTool {
 					const p1 = this.ctx.sketch.points.get(l.p1Id);
 					const p2 = this.ctx.sketch.points.get(l.p2Id);
 					if (p1 && p2) {
-						const sp = this.ctx.viewport.worldToScreen(pt.x, pt.y);
-						const s1 = this.ctx.viewport.worldToScreen(p1.x, p1.y);
-						const s2 = this.ctx.viewport.worldToScreen(p2.x, p2.y);
+						const sp = this.ctx.viewport.worldToScreen(pt);
+						const s1 = this.ctx.viewport.worldToScreen(p1);
+						const s2 = this.ctx.viewport.worldToScreen(p2);
 						const dx = s2.x - s1.x;
 						const dy = s2.y - s1.y;
 						const lineLen = Math.hypot(dx, dy);
@@ -883,9 +883,9 @@ export class DimensionTool extends BaseTool {
 						const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
 						const cross = (hitPt.x - p1.x) * dy - (hitPt.y - p1.y) * dx;
 						const perpDist = Math.abs(cross) / lineLen;
-						const sp = ctx.viewport.worldToScreen(hitPt.x, hitPt.y);
-						const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-						const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+						const sp = ctx.viewport.worldToScreen(hitPt);
+						const s1 = ctx.viewport.worldToScreen(p1);
+						const s2 = ctx.viewport.worldToScreen(p2);
 						this.ctx.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, perpDist);
 						return;
 					}
@@ -900,13 +900,13 @@ export class DimensionTool extends BaseTool {
 			const p3 = ctx.sketch.points.get(this.state.point3Id);
 			if (p1 && p2 && p3) {
 				const geom = ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
-				const sCenter = ctx.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-				const sRay1 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-				const sRay2 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+				const sCenter = ctx.viewport.worldToScreen(geom.pInt);
+				const sRay1 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u1.x * 20, y: geom.pInt.y + geom.u1.y * 20 });
+				const sRay2 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u2.x * 20, y: geom.pInt.y + geom.u2.y * 20 });
 				const hasSeg1 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point1Id));
 				const hasSeg2 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point3Id));
-				const sp1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-				const sp3 = ctx.viewport.worldToScreen(p3.x, p3.y);
+				const sp1 = ctx.viewport.worldToScreen(p1);
+				const sp3 = ctx.viewport.worldToScreen(p3);
 				this.ctx.renderer.renderAnglePreview(
 					sCenter,
 					sRay1,
@@ -938,13 +938,19 @@ export class DimensionTool extends BaseTool {
 				const p3 = ctx.sketch.points.get(hoverPtId);
 				if (p1 && p2 && p3) {
 					const geom = ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
-					const sCenter = ctx.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-					const sRay1 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-					const sRay2 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+					const sCenter = ctx.viewport.worldToScreen(geom.pInt);
+					const sRay1 = ctx.viewport.worldToScreen({
+						x: geom.pInt.x + geom.u1.x * 20,
+						y: geom.pInt.y + geom.u1.y * 20,
+					});
+					const sRay2 = ctx.viewport.worldToScreen({
+						x: geom.pInt.x + geom.u2.x * 20,
+						y: geom.pInt.y + geom.u2.y * 20,
+					});
 					const hasSeg1 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point1Id));
 					const hasSeg2 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, hoverPtId));
-					const sp1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-					const sp3 = ctx.viewport.worldToScreen(p3.x, p3.y);
+					const sp1 = ctx.viewport.worldToScreen(p1);
+					const sp3 = ctx.viewport.worldToScreen(p3);
 					this.ctx.renderer.renderAnglePreview(
 						sCenter,
 						sRay1,
@@ -964,7 +970,7 @@ export class DimensionTool extends BaseTool {
 		} else if (this.state.step === 1 && this.state.point1Id) {
 			const p1 = ctx.sketch.points.get(this.state.point1Id);
 			if (p1) {
-				const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
+				const s1 = ctx.viewport.worldToScreen(p1);
 
 				// 1. TOP PRIORITY: Snap to any other point
 				const snapPt =
@@ -980,7 +986,7 @@ export class DimensionTool extends BaseTool {
 									return {
 										id: pt.id,
 										worldPos: { x: pt.x, y: pt.y },
-										screenPos: ctx.viewport.worldToScreen(pt.x, pt.y),
+										screenPos: ctx.viewport.worldToScreen(pt),
 									};
 								}
 								return null;
@@ -1006,9 +1012,9 @@ export class DimensionTool extends BaseTool {
 						const cross = (p1.x - lp1.x) * dy - (p1.y - lp1.y) * dx;
 						const perpDist = Math.abs(cross) / lineLen;
 						if (perpDist >= 0.5) {
-							const sp = ctx.viewport.worldToScreen(p1.x, p1.y);
-							const s1Line = ctx.viewport.worldToScreen(lp1.x, lp1.y);
-							const s2Line = ctx.viewport.worldToScreen(lp2.x, lp2.y);
+							const sp = ctx.viewport.worldToScreen(p1);
+							const s1Line = ctx.viewport.worldToScreen(lp1);
+							const s2Line = ctx.viewport.worldToScreen(lp2);
 							this.ctx.renderer.renderPointToLineDistancePreview(sp, s1Line, s2Line, screen, perpDist);
 							return;
 						}
@@ -1025,8 +1031,8 @@ export class DimensionTool extends BaseTool {
 			const p1 = ctx.sketch.points.get(p1Id);
 			const p2 = ctx.sketch.points.get(p2Id);
 			if (p1 && p2) {
-				const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-				const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+				const s1 = ctx.viewport.worldToScreen(p1);
+				const s2 = ctx.viewport.worldToScreen(p2);
 				const { orientation } = determineDistanceOrientation(s1, s2, screen);
 				let currentDist = dist(p1, p2);
 				if (orientation === 'horizontal') {
@@ -1050,13 +1056,19 @@ export class DimensionTool extends BaseTool {
 				const p4 = ctx.sketch.points.get(l2.p2Id);
 				if (p1 && p2 && p3 && p4) {
 					const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, line1Id, line2Id);
-					const sCenter = ctx.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-					const sRay1 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-					const sRay2 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
-					const sp1 = hasUserLine1 ? ctx.viewport.worldToScreen(p1.x, p1.y) : undefined;
-					const sp2 = hasUserLine1 ? ctx.viewport.worldToScreen(p2.x, p2.y) : undefined;
-					const sp3 = hasUserLine2 ? ctx.viewport.worldToScreen(p3.x, p3.y) : undefined;
-					const sp4 = hasUserLine2 ? ctx.viewport.worldToScreen(p4.x, p4.y) : undefined;
+					const sCenter = ctx.viewport.worldToScreen(geom.pInt);
+					const sRay1 = ctx.viewport.worldToScreen({
+						x: geom.pInt.x + geom.u1.x * 20,
+						y: geom.pInt.y + geom.u1.y * 20,
+					});
+					const sRay2 = ctx.viewport.worldToScreen({
+						x: geom.pInt.x + geom.u2.x * 20,
+						y: geom.pInt.y + geom.u2.y * 20,
+					});
+					const sp1 = hasUserLine1 ? ctx.viewport.worldToScreen(p1) : undefined;
+					const sp2 = hasUserLine1 ? ctx.viewport.worldToScreen(p2) : undefined;
+					const sp3 = hasUserLine2 ? ctx.viewport.worldToScreen(p3) : undefined;
+					const sp4 = hasUserLine2 ? ctx.viewport.worldToScreen(p4) : undefined;
 					this.ctx.renderer.renderAnglePreview(sCenter, sRay1, sRay2, screen, geom.initialAngleDeg, sp1, sp2, sp3, sp4);
 				}
 			}
@@ -1067,9 +1079,9 @@ export class DimensionTool extends BaseTool {
 				const p1 = ctx.sketch.points.get(l.p1Id);
 				const p2 = ctx.sketch.points.get(l.p2Id);
 				if (p1 && p2) {
-					const sp = ctx.viewport.worldToScreen(pt.x, pt.y);
-					const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-					const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+					const sp = ctx.viewport.worldToScreen(pt);
+					const s1 = ctx.viewport.worldToScreen(p1);
+					const s2 = ctx.viewport.worldToScreen(p2);
 					const dx = p2.x - p1.x;
 					const dy = p2.y - p1.y;
 					const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);

@@ -310,7 +310,7 @@ export class MirrorTool extends BaseTool {
 
 			// Reflect point
 			const refPos = reflectPoint(pt.x, pt.y);
-			const newPt = this.ctx.sketch.addPoint(refPos.x, refPos.y, false);
+			const newPt = this.ctx.sketch.addPoint(refPos, false);
 			pointMap.set(origPtId, newPt.id);
 
 			// Automatically add SymmetryConstraint

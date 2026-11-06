@@ -1,6 +1,6 @@
 import type { Vec2 } from './vector';
 import { AABB } from './aabb';
-import { projectPointOntoSegment } from './vector';
+import { distancesFrom, projectPointOntoSegment } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
 import {
@@ -197,15 +197,14 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const sc = { x: curve.center.x, y: -curve.center.y };
 		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
 		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
-		const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-		const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 		const ux = Math.cos(theta),
 			uy = Math.sin(theta);
 		const vx = -Math.sin(theta),
 			vy = Math.cos(theta);
-		const up = rx * Math.cos(param);
-		const vp = ry * Math.sin(param);
+		const up = r.x * Math.cos(param);
+		const vp = r.y * Math.sin(param);
 		const sq = {
 			x: sc.x + up * ux + vp * vx,
 			y: sc.y + up * uy + vp * vy,
@@ -217,8 +216,7 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const ss = { x: curve.start.x, y: -curve.start.y };
 		const se = { x: curve.end.x, y: -curve.end.y };
-		const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-		const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 		const ux = Math.cos(theta),
 			uy = Math.sin(theta);
@@ -228,14 +226,14 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
 		const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
 		const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
-		const ts = Math.atan2(vs / ry, us / rx);
-		const te = Math.atan2(ve / ry, ue / rx);
+		const ts = Math.atan2(vs / r.y, us / r.x);
+		const te = Math.atan2(ve / r.y, ue / r.x);
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		const u = Math.max(0, Math.min(1, param));
 		const t = curve.clockwise ? ts + u * sweep : ts - u * sweep;
-		const up = rx * Math.cos(t);
-		const vp = ry * Math.sin(t);
+		const up = r.x * Math.cos(t);
+		const vp = r.y * Math.sin(t);
 		const sq = {
 			x: sc.x + up * ux + vp * vx,
 			y: sc.y + up * uy + vp * vy,
@@ -283,8 +281,7 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
 		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const sp = { x: pt.x, y: -pt.y };
-		const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-		const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 		const ux = Math.cos(theta),
 			uy = Math.sin(theta);
@@ -294,7 +291,7 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 			dy = sp.y - sc.y;
 		const up = dx * ux + dy * uy;
 		const vp = dx * vx + dy * vy;
-		let t = Math.atan2(vp / Math.max(ry, 1e-6), up / Math.max(rx, 1e-6));
+		let t = Math.atan2(vp / Math.max(r.y, 1e-6), up / Math.max(r.x, 1e-6));
 		if (t < 0) t += TWO_PI;
 		return t;
 	} else if (curve.type === 'elliptical_arc') {
@@ -304,8 +301,7 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const ss = { x: curve.start.x, y: -curve.start.y };
 		const se = { x: curve.end.x, y: -curve.end.y };
 		const sp = { x: pt.x, y: -pt.y };
-		const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-		const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
+		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 		const ux = Math.cos(theta),
 			uy = Math.sin(theta);
@@ -315,12 +311,12 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
 		const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
 		const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
-		const ts = Math.atan2(vs / Math.max(ry, 1e-6), us / Math.max(rx, 1e-6));
-		const te = Math.atan2(ve / Math.max(ry, 1e-6), ue / Math.max(rx, 1e-6));
+		const ts = Math.atan2(vs / Math.max(r.y, 1e-6), us / Math.max(r.x, 1e-6));
+		const te = Math.atan2(ve / Math.max(r.y, 1e-6), ue / Math.max(r.x, 1e-6));
 		const dp = { x: sp.x - sc.x, y: sp.y - sc.y };
 		const up = dp.x * ux + dp.y * uy;
 		const vp = dp.x * vx + dp.y * vy;
-		const tp = Math.atan2(vp / Math.max(ry, 1e-6), up / Math.max(rx, 1e-6));
+		const tp = Math.atan2(vp / Math.max(r.y, 1e-6), up / Math.max(r.x, 1e-6));
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		let delta = curve.clockwise ? (tp - ts) % TWO_PI : (ts - tp) % TWO_PI;
@@ -360,9 +356,8 @@ function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): bo
 	const ss = { x: arc.start.x, y: -arc.start.y };
 	const se = { x: arc.end.x, y: -arc.end.y };
 	const sp = { x: pt.x, y: -pt.y };
-	const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-	const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-	if (rx < 1e-6 || ry < 1e-6) return false;
+	const r = distancesFrom(sc, smaj, smin);
+	if (r.x < 1e-6 || r.y < 1e-6) return false;
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 	const ux = Math.cos(theta),
 		uy = Math.sin(theta);
@@ -372,17 +367,17 @@ function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): bo
 	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
 	const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
 	const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
-	const ts = Math.atan2(vs / ry, us / rx);
-	const te = Math.atan2(ve / ry, ue / rx);
+	const ts = Math.atan2(vs / r.y, us / r.x);
+	const te = Math.atan2(ve / r.y, ue / r.x);
 	const dp = { x: sp.x - sc.x, y: sp.y - sc.y };
 	const up = dp.x * ux + dp.y * uy;
 	const vp = dp.x * vx + dp.y * vy;
-	const tp = Math.atan2(vp / ry, up / rx);
+	const tp = Math.atan2(vp / r.y, up / r.x);
 	let sweep = arc.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 	if (sweep < 0) sweep += TWO_PI;
 	let delta = arc.clockwise ? (tp - ts) % TWO_PI : (ts - tp) % TWO_PI;
 	if (delta < 0) delta += TWO_PI;
-	const angTol = tol / Math.max(Math.min(rx, ry), 1);
+	const angTol = tol / Math.max(Math.min(r.x, r.y), 1);
 	return delta <= sweep + angTol || delta >= TWO_PI - angTol;
 }
 
@@ -467,9 +462,8 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 	const s1 = { x: s.p1.x, y: -s.p1.y };
 	const s2 = { x: s.p2.x, y: -s.p2.y };
 
-	const rx = Math.hypot(smaj.x - sc.x, smaj.y - sc.y);
-	const ry = Math.hypot(smin.x - sc.x, smin.y - sc.y);
-	if (rx < 1e-6 || ry < 1e-6) return [];
+	const r = distancesFrom(sc, smaj, smin);
+	if (r.x < 1e-6 || r.y < 1e-6) return [];
 
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 	const ux = Math.cos(theta),
@@ -489,11 +483,11 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 	const du = u2 - u1;
 	const dv = v2 - v1;
 
-	const A = ry * ry * du * du + rx * rx * dv * dv;
+	const A = r.y * r.y * du * du + r.x * r.x * dv * dv;
 	if (A < 1e-12) return [];
 
-	const B = 2 * (ry * ry * u1 * du + rx * rx * v1 * dv);
-	const C0 = ry * ry * u1 * u1 + rx * rx * v1 * v1 - rx * rx * ry * ry;
+	const B = 2 * (r.y * r.y * u1 * du + r.x * r.x * v1 * dv);
+	const C0 = r.y * r.y * u1 * u1 + r.x * r.x * v1 * v1 - r.x * r.x * r.y * r.y;
 
 	const disc = B * B - 4 * A * C0;
 	if (disc < -1e-7) return [];
@@ -571,8 +565,9 @@ export function intersectEllipseEllipse(
 	} else {
 		const maj = { x: e1.majorAxisPoint.x, y: -e1.majorAxisPoint.y };
 		const min = { x: e1.minorAxisPoint.x, y: -e1.minorAxisPoint.y };
-		rx1 = Math.hypot(maj.x - sc1.x, maj.y - sc1.y);
-		ry1 = Math.hypot(min.x - sc1.x, min.y - sc1.y);
+		const r1 = distancesFrom(sc1, maj, min);
+		rx1 = r1.x;
+		ry1 = r1.y;
 		theta1 = Math.atan2(maj.y - sc1.y, maj.x - sc1.x);
 	}
 	if (rx1 < 1e-6 || ry1 < 1e-6) return [];
@@ -594,8 +589,9 @@ export function intersectEllipseEllipse(
 	} else {
 		const maj = { x: e2.majorAxisPoint.x, y: -e2.majorAxisPoint.y };
 		const min = { x: e2.minorAxisPoint.x, y: -e2.minorAxisPoint.y };
-		rx2 = Math.hypot(maj.x - sc2.x, maj.y - sc2.y);
-		ry2 = Math.hypot(min.x - sc2.x, min.y - sc2.y);
+		const r2 = distancesFrom(sc2, maj, min);
+		rx2 = r2.x;
+		ry2 = r2.y;
 		theta2 = Math.atan2(maj.y - sc2.y, maj.x - sc2.x);
 	}
 	if (rx2 < 1e-6 || ry2 < 1e-6) return [];
@@ -875,9 +871,8 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 			const sc = { x: other.center.x, y: -other.center.y };
 			const maj = { x: other.majorAxisPoint.x, y: -other.majorAxisPoint.y };
 			const min = { x: other.minorAxisPoint.x, y: -other.minorAxisPoint.y };
-			const rx = Math.hypot(maj.x - sc.x, maj.y - sc.y);
-			const ry = Math.hypot(min.x - sc.x, min.y - sc.y);
-			if (rx < 1e-6 || ry < 1e-6) continue;
+			const r = distancesFrom(sc, maj, min);
+			if (r.x < 1e-6 || r.y < 1e-6) continue;
 			const theta = Math.atan2(maj.y - sc.y, maj.x - sc.x);
 			const ux = Math.cos(theta),
 				uy = Math.sin(theta);
@@ -890,7 +885,7 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 				const dy = sp.y - sc.y;
 				const up = dx * ux + dy * uy;
 				const vp = dx * vx + dy * vy;
-				return (up * up) / (rx * rx) + (vp * vp) / (ry * ry) - 1.0;
+				return (up * up) / (r.x * r.x) + (vp * vp) / (r.y * r.y) - 1.0;
 			};
 			const rPts = findBezierImplicitRoots(b, f);
 			for (const rPt of rPts) {
@@ -1123,7 +1118,7 @@ export function createCutPoint(
 	cuttingCurveType?: CurveType,
 	eps = 1e-3
 ): SketchPoint {
-	const newPt = sketch.addPoint(pos.x, pos.y);
+	const newPt = sketch.addPoint(pos);
 
 	// Check if there is already an existing point at pos (excluding newPt)
 	let attachedCoincident = false;
@@ -1332,7 +1327,7 @@ function replaceSplineWithInterval(
 			}
 		}
 		if (!matchedId) {
-			const newPt = sketch.addPoint(pos.x, pos.y);
+			const newPt = sketch.addPoint(pos);
 			matchedId = newPt.id;
 		}
 		ptIds.push(matchedId);
@@ -1371,7 +1366,7 @@ function replaceSplineWithInterval(
 				}
 			}
 			if (!matchedId) {
-				const newPt = sketch.addPoint(pos.x, pos.y);
+				const newPt = sketch.addPoint(pos);
 				matchedId = newPt.id;
 			}
 			controlPtIds.push(matchedId);

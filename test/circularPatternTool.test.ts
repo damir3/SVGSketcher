@@ -52,18 +52,18 @@ const makeEl = () => {
 describe('CircularPatternTool & Panel Integration', () => {
 	it('updates panel card on state changes and enables Apply button', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 10);
-		const p2 = sketch.addPoint(20, 20);
+		const p1 = sketch.addPoint({ x: 10, y: 10 });
+		const p2 = sketch.addPoint({ x: 20, y: 20 });
 		const line = sketch.addLine(p1.id, p2.id);
-		const center = sketch.addPoint(0, 0);
+		const center = sketch.addPoint({ x: 0, y: 0 });
 
 		const tool = new CircularPatternTool();
 
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (x: number, y: number) => ({ x, y }),
-				screenToWorld: (x: number, y: number) => ({ x, y }),
+				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -134,8 +134,8 @@ describe('CircularPatternTool & Panel Integration', () => {
 
 	it('supports selecting origin as the center point', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 0);
-		const p2 = sketch.addPoint(20, 0);
+		const p1 = sketch.addPoint({ x: 10, y: 0 });
+		const p2 = sketch.addPoint({ x: 20, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const tool = new CircularPatternTool();
@@ -143,8 +143,8 @@ describe('CircularPatternTool & Panel Integration', () => {
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (x: number, y: number) => ({ x, y }),
-				screenToWorld: (x: number, y: number) => ({ x, y }),
+				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -204,16 +204,16 @@ describe('CircularPatternTool & Panel Integration', () => {
 	it('supports expression for circular pattern angle and updates constraint', () => {
 		const sketch = new SketchDocument();
 		sketch.addParameter('myAngle', '120');
-		const p1 = sketch.addPoint(10, 0);
-		const p2 = sketch.addPoint(20, 0);
+		const p1 = sketch.addPoint({ x: 10, y: 0 });
+		const p2 = sketch.addPoint({ x: 20, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const tool = new CircularPatternTool();
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (x: number, y: number) => ({ x, y }),
-				screenToWorld: (x: number, y: number) => ({ x, y }),
+				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -281,16 +281,16 @@ describe('RectangularPatternTool & Panel Integration', () => {
 	it('updates panel card and popup, supports expression for distance and updates constraint', () => {
 		const sketch = new SketchDocument();
 		sketch.addParameter('gap', '25');
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(10, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 10, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const tool = new RectangularPatternTool();
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (x: number, y: number) => ({ x, y }),
-				screenToWorld: (x: number, y: number) => ({ x, y }),
+				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),

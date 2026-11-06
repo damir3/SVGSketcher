@@ -31,12 +31,14 @@ describe('Constraint snapshot serialization', () => {
 			3,
 			true,
 			[2],
-			[{
-				copyIndex: 1,
-				pointPairs: [{ sourcePtId: 'Point-source', patternPtId: 'Point-copy' }],
-				radiusPairs: [{ sourceCircleId: 'Circle-source', patternCircleId: 'Circle-copy' }],
-				createdEntityIds: [{ id: 'Point-copy', type: 'point' }],
-			}],
+			[
+				{
+					copyIndex: 1,
+					pointPairs: [{ sourcePtId: 'Point-source', patternPtId: 'Point-copy' }],
+					radiusPairs: [{ sourceCircleId: 'Circle-source', patternCircleId: 'Circle-copy' }],
+					createdEntityIds: [{ id: 'Point-copy', type: 'point' }],
+				},
+			],
 			0.8,
 			true,
 			'angle * 3'

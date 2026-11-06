@@ -4,6 +4,7 @@ import symmetryRaw from '../assets/icons/badge-symmetry.svg?raw';
 import circularPatternRaw from '../assets/icons/badge-circular-pattern.svg?raw';
 import rectangularPatternRaw from '../assets/icons/badge-rectangular-pattern.svg?raw';
 import badgeTangentRaw from '../assets/icons/badge-tangent.svg?raw';
+import type { Vec2 } from '../math/vector';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -34,13 +35,13 @@ const BADGE_ICONS: Record<string, BadgeIconDef> = {
 	tangent: parseSvgIcon(badgeTangentRaw, 13, 13),
 };
 
-export function getBadgeIcon(name: string, x: number, y: number, color: string): SVGElement | null {
+export function getBadgeIcon(name: string, position: Vec2, color: string): SVGElement | null {
 	const def = BADGE_ICONS[name];
 	if (!def || !def.d) return null;
 
 	const svg = document.createElementNS(SVG_NS, 'svg');
-	svg.setAttribute('x', (x - def.width * 0.5).toFixed(1));
-	svg.setAttribute('y', (y - def.height * 0.5).toFixed(1));
+	svg.setAttribute('x', (position.x - def.width * 0.5).toFixed(1));
+	svg.setAttribute('y', (position.y - def.height * 0.5).toFixed(1));
 	svg.setAttribute('width', def.width.toString());
 	svg.setAttribute('height', def.height.toString());
 	svg.setAttribute('viewBox', def.viewBox);

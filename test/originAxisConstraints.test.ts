@@ -21,7 +21,7 @@ describe('Origin & Axis Constraints', () => {
 	describe('Origin Distance & Coincident Constraints', () => {
 		it('constrains a point coincident to (0, 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(50, 80);
+			const p = sketch.addPoint({ x: 50, y: 80 });
 
 			const c = sketch.addOriginCoincidentConstraint(p.id);
 			assert.ok(c, 'Constraint should be created');
@@ -34,7 +34,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point to aligned distance from (0, 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(30, 40); // 3-4-5 triangle, distance 50
+			const p = sketch.addPoint({ x: 30, y: 40 }); // 3-4-5 triangle, distance 50
 
 			const c = sketch.addOriginDistanceConstraint(p.id, 100, 'aligned');
 			assert.ok(c);
@@ -46,7 +46,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point to horizontal distance from (0, 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(20, 60);
+			const p = sketch.addPoint({ x: 20, y: 60 });
 
 			const c = sketch.addOriginDistanceConstraint(p.id, 45, 'horizontal');
 			assert.ok(c);
@@ -56,7 +56,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point to vertical distance from (0, 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(70, 20);
+			const p = sketch.addPoint({ x: 70, y: 20 });
 
 			const c = sketch.addOriginDistanceConstraint(p.id, 55, 'vertical');
 			assert.ok(c);
@@ -66,7 +66,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('updates dimensional constraint for origin distance', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(30, 40);
+			const p = sketch.addPoint({ x: 30, y: 40 });
 			const c = sketch.addOriginDistanceConstraint(p.id, 50, 'aligned');
 			assert.ok(c);
 
@@ -82,7 +82,7 @@ describe('Origin & Axis Constraints', () => {
 	describe('Point To Axis Constraints (via OriginDistanceConstraint)', () => {
 		it('constrains a point to lie on the X-axis (y = 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(35, 90);
+			const p = sketch.addPoint({ x: 35, y: 90 });
 
 			const c = sketch.addPointOnAxisConstraint(p.id, 'x');
 			assert.ok(c);
@@ -96,7 +96,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point to lie on the Y-axis (x = 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(60, 42);
+			const p = sketch.addPoint({ x: 60, y: 42 });
 
 			const c = sketch.addPointOnAxisConstraint(p.id, 'y');
 			assert.ok(c);
@@ -110,7 +110,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point to distance from X-axis (|y| = d)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(50, 15);
+			const p = sketch.addPoint({ x: 50, y: 15 });
 
 			const c = sketch.addPointToAxisDistanceConstraint(p.id, 'x', 30);
 			assert.ok(c);
@@ -123,7 +123,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point to distance from Y-axis (|x| = d)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(15, 50);
+			const p = sketch.addPoint({ x: 15, y: 50 });
 
 			const c = sketch.addPointToAxisDistanceConstraint(p.id, 'y', 40);
 			assert.ok(c);
@@ -136,7 +136,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('updates dimensional constraint for point-to-axis distance', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(20, 20);
+			const p = sketch.addPoint({ x: 20, y: 20 });
 			const c = sketch.addPointToAxisDistanceConstraint(p.id, 'x', 20);
 			assert.ok(c);
 
@@ -151,8 +151,8 @@ describe('Origin & Axis Constraints', () => {
 	describe('Line To Axis Constraints', () => {
 		it('constrains a line collinear with X-axis (y1 = 0, y2 = 0)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 25);
-			const p2 = sketch.addPoint(60, 45);
+			const p1 = sketch.addPoint({ x: 10, y: 25 });
+			const p2 = sketch.addPoint({ x: 60, y: 45 });
 			const l = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addLineCollinearWithAxisConstraint(l.id, 'x');
@@ -166,8 +166,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a line collinear with Y-axis (x1 = 0, x2 = 0)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(25, 10);
-			const p2 = sketch.addPoint(45, 70);
+			const p1 = sketch.addPoint({ x: 25, y: 10 });
+			const p2 = sketch.addPoint({ x: 45, y: 70 });
 			const l = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addLineCollinearWithAxisConstraint(l.id, 'y');
@@ -181,8 +181,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a line distance to X-axis (line becomes horizontal at distance d)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 15);
-			const p2 = sketch.addPoint(70, 25);
+			const p1 = sketch.addPoint({ x: 10, y: 15 });
+			const p2 = sketch.addPoint({ x: 70, y: 25 });
 			const l = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addLineToAxisDistanceConstraint(l.id, 'x', 50);
@@ -195,8 +195,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a line distance to Y-axis (line becomes vertical at distance d)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(15, 10);
-			const p2 = sketch.addPoint(25, 80);
+			const p1 = sketch.addPoint({ x: 15, y: 10 });
+			const p2 = sketch.addPoint({ x: 25, y: 80 });
 			const l = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addLineToAxisDistanceConstraint(l.id, 'y', 40);
@@ -209,8 +209,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('updates dimensional constraint for line-to-axis distance', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 20);
-			const p2 = sketch.addPoint(60, 20);
+			const p1 = sketch.addPoint({ x: 10, y: 20 });
+			const p2 = sketch.addPoint({ x: 60, y: 20 });
 			const l = sketch.addLine(p1.id, p2.id);
 			const c = sketch.addLineToAxisDistanceConstraint(l.id, 'x', 20);
 			assert.ok(c);
@@ -227,7 +227,7 @@ describe('Origin & Axis Constraints', () => {
 	describe('Serialization & History (Undo / Redo)', () => {
 		it('serializes and deserializes OriginDistanceConstraint correctly', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(30, 40);
+			const p = sketch.addPoint({ x: 30, y: 40 });
 			const c1 = sketch.addOriginDistanceConstraint(p.id, 50, 'aligned');
 			assert.ok(c1);
 
@@ -243,8 +243,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('serializes and deserializes LineToAxisDistanceConstraint correctly', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 20);
-			const p2 = sketch.addPoint(50, 20);
+			const p1 = sketch.addPoint({ x: 10, y: 20 });
+			const p2 = sketch.addPoint({ x: 50, y: 20 });
 			const l = sketch.addLine(p1.id, p2.id);
 			const c1 = sketch.addLineToAxisDistanceConstraint(l.id, 'y', 35);
 			assert.ok(c1);
@@ -261,7 +261,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('supports undo and redo for origin and axis constraints', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(40, 40);
+			const p = sketch.addPoint({ x: 40, y: 40 });
 
 			sketch.pushHistory();
 			const c = sketch.addOriginCoincidentConstraint(p.id);
@@ -286,7 +286,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('links axis and origin constraints with getConstraintsForEntity and getEntitiesForConstraint', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(10, 20);
+			const p = sketch.addPoint({ x: 10, y: 20 });
 			const cOrigin = sketch.addOriginDistanceConstraint(p.id, 25, 'aligned');
 			const cAxis = sketch.addPointOnAxisConstraint(p.id, 'x');
 			assert.ok(cOrigin);
@@ -324,7 +324,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('renders standard coincident badge for point coincident to origin', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(0, 0);
+			const p = sketch.addPoint({ x: 0, y: 0 });
 			const c = sketch.addOriginCoincidentConstraint(p.id);
 			assert.ok(c);
 
@@ -334,13 +334,13 @@ describe('Origin & Axis Constraints', () => {
 			const mockRenderCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
-				renderBadge: (_id: string, x: number, y: number, label: string) => {
+				renderBadge: (_id: string, position: { x: number; y: number }, label: string) => {
 					renderedLabel = label;
-					renderedX = x;
-					renderedY = y;
+					renderedX = position.x;
+					renderedY = position.y;
 				},
 			};
 
@@ -355,7 +355,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('renders standard point-on-line badge for point on axis (targetDistance = 0)', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(50, 0);
+			const p = sketch.addPoint({ x: 50, y: 0 });
 			const c = sketch.addPointOnAxisConstraint(p.id, 'x');
 			assert.ok(c);
 
@@ -365,13 +365,13 @@ describe('Origin & Axis Constraints', () => {
 			const mockRenderCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
-				renderBadge: (_id: string, x: number, y: number, label: string) => {
+				renderBadge: (_id: string, position: { x: number; y: number }, label: string) => {
 					renderedLabel = label;
-					renderedX = x;
-					renderedY = y;
+					renderedX = position.x;
+					renderedY = position.y;
 				},
 			};
 
@@ -411,8 +411,8 @@ describe('Origin & Axis Constraints', () => {
 				sketch,
 				viewport: {
 					zoom: 1,
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: { clearPreviews: () => {} },
 				isConstructionMode: false,
@@ -461,7 +461,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('horizontal distance to axis callout moves up when dragging up', () => {
 			const sketch = new SketchDocument();
-			const p = sketch.addPoint(50, 50);
+			const p = sketch.addPoint({ x: 50, y: 50 });
 			const c = sketch.addOriginDistanceConstraint(p.id, 50, 'horizontal', 0);
 			assert.ok(c);
 
@@ -469,12 +469,12 @@ describe('Origin & Axis Constraints', () => {
 				zoom: 1,
 				panX: 0,
 				panY: 500, // screen Y = 500 - wy * zoom
-				worldToScreen: (wx: number, wy: number) => ({ x: wx, y: 500 - wy }),
+				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: 500 - p.y }),
 			};
 
-			const sp = viewport.worldToScreen(p.x, p.y); // (50, 450)
-			const sOrigin = viewport.worldToScreen(0, 0); // (0, 500)
-			const sAxisY = viewport.worldToScreen(0, 100); // (0, 400)
+			const sp = viewport.worldToScreen(p); // (50, 450)
+			const sOrigin = viewport.worldToScreen({ x: 0, y: 0 }); // (0, 500)
+			const sAxisY = viewport.worldToScreen({ x: 0, y: 100 }); // (0, 400)
 			const dy = sAxisY.y - sOrigin.y; // -100
 			const uy = dy / Math.hypot(0, dy); // -1
 
@@ -502,8 +502,8 @@ describe('Origin & Axis Constraints', () => {
 	describe('Line to Axis Angle Constraints', () => {
 		it('creates and solves AngleConstraint between line and X-axis', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 10);
-			const p2 = sketch.addPoint(60, 20);
+			const p1 = sketch.addPoint({ x: 10, y: 10 });
+			const p2 = sketch.addPoint({ x: 60, y: 20 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			// Fix p1 so p2 rotates around p1
@@ -535,8 +535,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('creates and solves AngleConstraint between line and Y-axis', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(20, 20);
-			const p2 = sketch.addPoint(40, 80);
+			const p1 = sketch.addPoint({ x: 20, y: 20 });
+			const p2 = sketch.addPoint({ x: 40, y: 80 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			// Fix p1
@@ -555,8 +555,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('DimensionTool creates AngleConstraint when clicking a line and then X-axis', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 10);
-			const p2 = sketch.addPoint(50, 40);
+			const p1 = sketch.addPoint({ x: 10, y: 10 });
+			const p2 = sketch.addPoint({ x: 50, y: 40 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			let editedConstraint: any = null;
@@ -566,8 +566,8 @@ describe('Origin & Axis Constraints', () => {
 					zoom: 1,
 					panX: 0,
 					panY: 0,
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
-					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					clearPreviews: () => {},
@@ -587,16 +587,20 @@ describe('Origin & Axis Constraints', () => {
 				},
 			};
 
-			const makeEvent = (pos: { x: number; y: number }, id?: string, type?: string) => ({
-				screen: pos,
-				world: pos,
-				client: pos,
-				raw: {
-					target: {
-						closest: () => (id ? { getAttribute: (attr: string) => attr === 'data-id' ? id : (attr === 'data-type' ? type : null) } : null),
+			const makeEvent = (pos: { x: number; y: number }, id?: string, type?: string) =>
+				({
+					screen: pos,
+					world: pos,
+					client: pos,
+					raw: {
+						target: {
+							closest: () =>
+								id
+									? { getAttribute: (attr: string) => (attr === 'data-id' ? id : attr === 'data-type' ? type : null) }
+									: null,
+						},
 					},
-				},
-			} as any);
+				}) as any;
 
 			const tool = new DimensionTool();
 			tool.activate(mockCtx);
@@ -626,8 +630,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('DimensionTool creates AngleConstraint when clicking X-axis first then line', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 10);
-			const p2 = sketch.addPoint(50, 40);
+			const p1 = sketch.addPoint({ x: 10, y: 10 });
+			const p2 = sketch.addPoint({ x: 50, y: 40 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			let editedConstraint: any = null;
@@ -637,8 +641,8 @@ describe('Origin & Axis Constraints', () => {
 					zoom: 1,
 					panX: 0,
 					panY: 0,
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
-					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				renderer: {
 					clearPreviews: () => {},
@@ -658,16 +662,20 @@ describe('Origin & Axis Constraints', () => {
 				},
 			};
 
-			const makeEvent = (pos: { x: number; y: number }, id?: string, type?: string) => ({
-				screen: pos,
-				world: pos,
-				client: pos,
-				raw: {
-					target: {
-						closest: () => (id ? { getAttribute: (attr: string) => attr === 'data-id' ? id : (attr === 'data-type' ? type : null) } : null),
+			const makeEvent = (pos: { x: number; y: number }, id?: string, type?: string) =>
+				({
+					screen: pos,
+					world: pos,
+					client: pos,
+					raw: {
+						target: {
+							closest: () =>
+								id
+									? { getAttribute: (attr: string) => (attr === 'data-id' ? id : attr === 'data-type' ? type : null) }
+									: null,
+						},
 					},
-				},
-			} as any);
+				}) as any;
 
 			const tool = new DimensionTool();
 			tool.activate(mockCtx);
@@ -695,8 +703,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('links constraints and entities for AngleConstraint with axis', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 10);
-			const p2 = sketch.addPoint(50, 40);
+			const p1 = sketch.addPoint({ x: 10, y: 10 });
+			const p2 = sketch.addPoint({ x: 50, y: 40 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addAngleConstraint(line.id, 'axis_x', 35);
@@ -715,8 +723,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('serializes and deserializes AngleConstraint with axis correctly', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 10);
-			const p2 = sketch.addPoint(50, 40);
+			const p1 = sketch.addPoint({ x: 10, y: 10 });
+			const p2 = sketch.addPoint({ x: 50, y: 40 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addAngleConstraint(line.id, 'axis_x', 35);
@@ -735,8 +743,8 @@ describe('Origin & Axis Constraints', () => {
 	describe('Symmetry Constraints with Axes and Origin', () => {
 		it('constrains two points symmetric across X-axis and Y-axis', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(30, 40);
-			const p2 = sketch.addPoint(10, -15);
+			const p1 = sketch.addPoint({ x: 30, y: 40 });
+			const p2 = sketch.addPoint({ x: 10, y: -15 });
 			sketch.addFixedConstraint(p1.id);
 
 			const cX = sketch.addSymmetryConstraint(p1.id, p2.id, 'axis_x');
@@ -745,7 +753,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(Math.abs(p2.x - 30) < 1e-3, `Expected p2.x ~ 30, got ${p2.x}`);
 			assert.ok(Math.abs(p2.y - -40) < 1e-3, `Expected p2.y ~ -40, got ${p2.y}`);
 
-			const p3 = sketch.addPoint(-10, 20);
+			const p3 = sketch.addPoint({ x: -10, y: 20 });
 			const cY = sketch.addSymmetryConstraint(p1.id, p3.id, 'axis_y');
 			assert.ok(cY instanceof SymmetryConstraint);
 			assert.equal(cY.lineId, 'axis_y');
@@ -755,8 +763,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains two points symmetric across Origin (0,0)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(25, 35);
-			const p2 = sketch.addPoint(-10, -15);
+			const p1 = sketch.addPoint({ x: 25, y: 35 });
+			const p2 = sketch.addPoint({ x: -10, y: -15 });
 			sketch.addFixedConstraint(p1.id);
 
 			const c = sketch.addSymmetryConstraint(p1.id, p2.id, 'origin');
@@ -768,13 +776,13 @@ describe('Origin & Axis Constraints', () => {
 
 		it('constrains a point and Origin (0,0) symmetric across a user line', () => {
 			const sketch = new SketchDocument();
-			const lp1 = sketch.addPoint(20, -50);
-			const lp2 = sketch.addPoint(20, 50);
+			const lp1 = sketch.addPoint({ x: 20, y: -50 });
+			const lp2 = sketch.addPoint({ x: 20, y: 50 });
 			const line = sketch.addLine(lp1.id, lp2.id);
 			sketch.addFixedConstraint(lp1.id);
 			sketch.addFixedConstraint(lp2.id);
 
-			const p = sketch.addPoint(30, 10);
+			const p = sketch.addPoint({ x: 30, y: 10 });
 			const c = sketch.addSymmetryConstraint(p.id, 'origin', line.id);
 			assert.ok(c instanceof SymmetryConstraint);
 			assert.ok(Math.abs(p.x - 40) < 1e-3, `Expected p.x ~ 40, got ${p.x}`);
@@ -783,16 +791,16 @@ describe('Origin & Axis Constraints', () => {
 
 		it('ConstraintTool(symmetry) supports 2 points + axis, 2 points + origin, 2 circles + axis/origin, and 2 lines + axis/origin', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(20, 30);
-			const p2 = sketch.addPoint(-10, 25);
+			const p1 = sketch.addPoint({ x: 20, y: 30 });
+			const p2 = sketch.addPoint({ x: -10, y: 25 });
 			sketch.addFixedConstraint(p1.id);
 
 			const mockCtx: any = {
 				sketch,
 				viewport: {
 					zoom: 1,
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
-					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				showToast: () => {},
 				requestRender: () => {},
@@ -811,7 +819,9 @@ describe('Origin & Axis Constraints', () => {
 					raw: {
 						target: {
 							closest: () =>
-								id ? { getAttribute: (attr: string) => (attr === 'data-id' ? id : attr === 'data-type' ? type : null) } : null,
+								id
+									? { getAttribute: (attr: string) => (attr === 'data-id' ? id : attr === 'data-type' ? type : null) }
+									: null,
 						},
 					},
 				}) as any;
@@ -828,7 +838,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(Math.abs(p2.y - 30) < 1e-3);
 
 			// 2. Two points + origin
-			const p3 = sketch.addPoint(-15, -20);
+			const p3 = sketch.addPoint({ x: -15, y: -20 });
 			tool.onMouseDown(makeEvent(vec(20, 30), p1.id, 'point'));
 			tool.onMouseDown(makeEvent(vec(-15, -20), p3.id, 'point'));
 			tool.onMouseDown(makeEvent(vec(0, 0), 'origin', 'point'));
@@ -837,12 +847,12 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(Math.abs(p3.y - -30) < 1e-3);
 
 			// 3. Two circles + X-axis
-			const c1Center = sketch.addPoint(40, 25);
+			const c1Center = sketch.addPoint({ x: 40, y: 25 });
 			const c1 = sketch.addCircle(c1Center.id, 12);
 			sketch.addFixedConstraint(c1Center.id);
 			sketch.addRadiusConstraint(c1.id, 12);
 
-			const c2Center = sketch.addPoint(35, -20);
+			const c2Center = sketch.addPoint({ x: 35, y: -20 });
 			const c2 = sketch.addCircle(c2Center.id, 8);
 
 			tool.onMouseDown(makeEvent(vec(40, 37), c1.id, 'circle'));
@@ -857,12 +867,12 @@ describe('Origin & Axis Constraints', () => {
 
 		it('links, renders, serializes, and preserves SymmetryConstraint with axes/origin during orphan cleanup', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(20, 30);
-			const p2 = sketch.addPoint(20, -30);
+			const p1 = sketch.addPoint({ x: 20, y: 30 });
+			const p2 = sketch.addPoint({ x: 20, y: -30 });
 			const cAxis = sketch.addSymmetryConstraint(p1.id, p2.id, 'axis_x')!;
 			assert.ok(cAxis);
 
-			const p3 = sketch.addPoint(-20, -30);
+			const p3 = sketch.addPoint({ x: -20, y: -30 });
 			const cOrigin = sketch.addSymmetryConstraint(p1.id, p3.id, 'origin')!;
 			assert.ok(cOrigin);
 
@@ -874,10 +884,16 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(sketch.getEntitiesForConstraint(cOrigin).some(e => e.id === 'origin' && e.type === 'point'));
 
 			// Check orphan cleanup preservation when deleting an unrelated point
-			const extraPt = sketch.addPoint(100, 100);
+			const extraPt = sketch.addPoint({ x: 100, y: 100 });
 			sketch.removeEntity(extraPt.id);
-			assert.ok(sketch.constraints.has(cAxis.id), 'Symmetry with axis_x should not be deleted by cleanOrphanConstraints');
-			assert.ok(sketch.constraints.has(cOrigin.id), 'Symmetry with origin should not be deleted by cleanOrphanConstraints');
+			assert.ok(
+				sketch.constraints.has(cAxis.id),
+				'Symmetry with axis_x should not be deleted by cleanOrphanConstraints'
+			);
+			assert.ok(
+				sketch.constraints.has(cOrigin.id),
+				'Symmetry with origin should not be deleted by cleanOrphanConstraints'
+			);
 
 			// Serialization
 			const restored = deserializeConstraint(serializeConstraint(cAxis)) as SymmetryConstraint;
@@ -889,8 +905,8 @@ describe('Origin & Axis Constraints', () => {
 	describe('Midpoint Constraints with Origin', () => {
 		it('constrains line midpoint to Origin (0,0)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(30, 40);
-			const p2 = sketch.addPoint(-20, -30);
+			const p1 = sketch.addPoint({ x: 30, y: 40 });
+			const p2 = sketch.addPoint({ x: -20, y: -30 });
 			const line = sketch.addLine(p1.id, p2.id);
 			sketch.addFixedConstraint(p1.id);
 
@@ -906,8 +922,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('renders badge at (0,0), links to origin, and survives cleanOrphanConstraints', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(20, 10);
-			const p2 = sketch.addPoint(-20, -10);
+			const p1 = sketch.addPoint({ x: 20, y: 10 });
+			const p2 = sketch.addPoint({ x: -20, y: -10 });
 			const line = sketch.addLine(p1.id, p2.id);
 			const c = sketch.addMidpointConstraint('origin', line.id)!;
 			assert.ok(c);
@@ -916,11 +932,11 @@ describe('Origin & Axis Constraints', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
-				renderBadge: (_id: string, x: number, y: number) => {
-					badgePos = { x, y };
+				renderBadge: (_id: string, position: { x: number; y: number }) => {
+					badgePos = position;
 				},
 			};
 			c.render(mockCtx);
@@ -930,7 +946,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(sketch.getConstraintsForEntity('point', 'origin').some(sc => sc.id === c.id));
 			assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === 'origin' && e.type === 'point'));
 
-			const extraPt = sketch.addPoint(99, 99);
+			const extraPt = sketch.addPoint({ x: 99, y: 99 });
 			sketch.removeEntity(extraPt.id);
 			assert.ok(sketch.constraints.has(c.id), 'Midpoint on origin should survive cleanOrphanConstraints');
 		});
@@ -939,7 +955,7 @@ describe('Origin & Axis Constraints', () => {
 	describe('Tangent Constraints with Coordinate Axes', () => {
 		it('constrains a circle tangent to X-axis and Y-axis', () => {
 			const sketch = new SketchDocument();
-			const center = sketch.addPoint(40, 35);
+			const center = sketch.addPoint({ x: 40, y: 35 });
 			const circle = sketch.addCircle(center.id, 20);
 			sketch.addRadiusConstraint(circle.id, 20);
 
@@ -956,7 +972,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('ConstraintTool(tangent) selects axis even when clicking near (0,0) over origin DOM element', () => {
 			const sketch = new SketchDocument();
-			const center = sketch.addPoint(0, 25);
+			const center = sketch.addPoint({ x: 0, y: 25 });
 			const circle = sketch.addCircle(center.id, 15);
 			sketch.addRadiusConstraint(circle.id, 15);
 
@@ -964,8 +980,8 @@ describe('Origin & Axis Constraints', () => {
 				sketch,
 				viewport: {
 					zoom: 1,
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
-					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				showToast: () => {},
 				requestRender: () => {},
@@ -1017,7 +1033,7 @@ describe('Origin & Axis Constraints', () => {
 
 		it('renders tangent badge on infinite axis, links entities, serializes, and survives cleanOrphanConstraints', () => {
 			const sketch = new SketchDocument();
-			const center = sketch.addPoint(200, 20);
+			const center = sketch.addPoint({ x: 200, y: 20 });
 			const circle = sketch.addCircle(center.id, 20);
 			const c = sketch.addTangentConstraint('axis_x', circle.id) as TangentLineCircleConstraint;
 			assert.ok(c);
@@ -1026,10 +1042,10 @@ describe('Origin & Axis Constraints', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
-				renderBadge: (_id: string, _x: number, _y: number, label: string) => {
+				renderBadge: (_id: string, _position: { x: number; y: number }, label: string) => {
 					if (label === 'tangent') renderedBadge = true;
 				},
 				renderBadgeOnSegment: () => {
@@ -1047,7 +1063,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(restored instanceof TangentLineCircleConstraint, true);
 			assert.equal(restored.lineId, 'axis_x');
 
-			const extraPt = sketch.addPoint(50, 50);
+			const extraPt = sketch.addPoint({ x: 50, y: 50 });
 			sketch.removeEntity(extraPt.id);
 			assert.ok(sketch.constraints.has(c.id), 'Tangent with axis_x should survive cleanOrphanConstraints');
 		});
@@ -1056,8 +1072,8 @@ describe('Origin & Axis Constraints', () => {
 	describe('Collinear Constraints with Coordinate Axes', () => {
 		it('addCollinearConstraint delegates to LineToAxisDistanceConstraint when given axis_x or axis_y', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 15);
-			const p2 = sketch.addPoint(50, 25);
+			const p1 = sketch.addPoint({ x: 10, y: 15 });
+			const p2 = sketch.addPoint({ x: 50, y: 25 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addCollinearConstraint(line.id, 'axis_x');
@@ -1077,10 +1093,10 @@ describe('Origin & Axis Constraints', () => {
 			// Exact coordinates and direction from sketch_1793864359069.svg:
 			// Line-5: Point-5 (bottom-right) -> Point-6 (top-right)
 			// Line-7: Point-7 (top-left) -> Point-8 (bottom-left)
-			const p5 = sketch.addPoint(101.79068827101727, 12.987276531412446);
-			const p6 = sketch.addPoint(83.87500000000027, 45.25141492374967);
-			const p7 = sketch.addPoint(-83.87500000000028, 45.25141492374967);
-			const p8 = sketch.addPoint(-101.79069099267647, 12.987276534860813);
+			const p5 = sketch.addPoint({ x: 101.79068827101727, y: 12.987276531412446 });
+			const p6 = sketch.addPoint({ x: 83.87500000000027, y: 45.25141492374967 });
+			const p7 = sketch.addPoint({ x: -83.87500000000028, y: 45.25141492374967 });
+			const p8 = sketch.addPoint({ x: -101.79069099267647, y: 12.987276534860813 });
 
 			const line5 = sketch.addLine(p5.id, p6.id);
 			const line7 = sketch.addLine(p7.id, p8.id);
@@ -1089,7 +1105,7 @@ describe('Origin & Axis Constraints', () => {
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
 				findPointNear: () => null,
@@ -1153,9 +1169,9 @@ describe('Origin & Axis Constraints', () => {
 	describe('Three-Point Constraints (Midpoint, Collinear, Angle)', () => {
 		it('Midpoint by 3 points picks the geometrically middle point regardless of selection order', () => {
 			const sketch = new SketchDocument();
-			const pA = sketch.addPoint(0, 0, true);
-			const pMid = sketch.addPoint(45, 18); // geometrically closest to midpoint (50, 10)
-			const pB = sketch.addPoint(100, 20, true);
+			const pA = sketch.addPoint({ x: 0, y: 0 }, true);
+			const pMid = sketch.addPoint({ x: 45, y: 18 }); // geometrically closest to midpoint (50, 10)
+			const pB = sketch.addPoint({ x: 100, y: 20 }, true);
 
 			// Pass points in order (pA, pB, pMid) — pMid should still be identified as midId
 			const c = sketch.addThreePointMidpointConstraint(pA.id, pB.id, pMid.id);
@@ -1173,14 +1189,14 @@ describe('Origin & Axis Constraints', () => {
 
 		it('ConstraintTool(midpoint) applies 3-point midpoint on 3 arbitrary points', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(10, 10, true);
-			const p2 = sketch.addPoint(90, 50, true);
-			const p3 = sketch.addPoint(48, 25); // middle point
+			const p1 = sketch.addPoint({ x: 10, y: 10 }, true);
+			const p2 = sketch.addPoint({ x: 90, y: 50 }, true);
+			const p3 = sketch.addPoint({ x: 48, y: 25 }); // middle point
 
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
 				findPointNear: () => null,
@@ -1216,9 +1232,9 @@ describe('Origin & Axis Constraints', () => {
 
 		it('Collinear by 3 points constrains 3 points onto one line and removes exactly 1 DoF', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(0, 0, true);
-			const p2 = sketch.addPoint(50, 25);
-			const p3 = sketch.addPoint(100, 0, true);
+			const p1 = sketch.addPoint({ x: 0, y: 0 }, true);
+			const p2 = sketch.addPoint({ x: 50, y: 25 });
+			const p3 = sketch.addPoint({ x: 100, y: 0 }, true);
 
 			const c = sketch.addThreePointCollinearConstraint(p1.id, p2.id, p3.id);
 			assert.ok(c instanceof CollinearConstraint);
@@ -1242,13 +1258,13 @@ describe('Origin & Axis Constraints', () => {
 
 		it('ConstraintTool(collinear) applies 3-point collinear on 3 points including origin', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(40, 40, true);
-			const p2 = sketch.addPoint(80, 60);
+			const p1 = sketch.addPoint({ x: 40, y: 40 }, true);
+			const p2 = sketch.addPoint({ x: 80, y: 60 });
 
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
 				findPointNear: () => null,
@@ -1285,9 +1301,9 @@ describe('Origin & Axis Constraints', () => {
 
 		it('Angle by 3 points uses the 2nd point as the vertex (∠P1-P2-P3) and solves target angle', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(100, 0, true);
-			const p2 = sketch.addPoint(0, 0, true); // vertex
-			const p3 = sketch.addPoint(60, 80); // initial angle ~53.13 deg
+			const p1 = sketch.addPoint({ x: 100, y: 0 }, true);
+			const p2 = sketch.addPoint({ x: 0, y: 0 }, true); // vertex
+			const p3 = sketch.addPoint({ x: 60, y: 80 }); // initial angle ~53.13 deg
 			sketch.addDistanceConstraint(p2.id, p3.id, 100);
 
 			const c = sketch.addThreePointAngleConstraint(p1.id, p2.id, p3.id, 90);
@@ -1325,16 +1341,16 @@ describe('Origin & Axis Constraints', () => {
 
 		it('DimensionTool creates 3-point angle constraint via 4 clicks (P1, vertex P2, P3, place arc)', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(100, 0, true);
-			const p2 = sketch.addPoint(0, 0, true); // vertex
-			const p3 = sketch.addPoint(0, 100);
+			const p1 = sketch.addPoint({ x: 100, y: 0 }, true);
+			const p2 = sketch.addPoint({ x: 0, y: 0 }, true); // vertex
+			const p3 = sketch.addPoint({ x: 0, y: 100 });
 
 			let editedConstraint: any = null;
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (wx: number, wy: number) => ({ x: wx, y: wy }),
-					screenToWorld: (sx: number, sy: number) => ({ x: sx, y: sy }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 					zoom: 1,
 				},
 				renderer: {

@@ -84,9 +84,9 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		const p2 = ctx.sketch.points.get(this.lineP2Id);
 		if (!pt || !p1 || !p2) return;
 
-		const sp = ctx.viewport.worldToScreen(pt.x, pt.y);
-		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+		const sp = ctx.viewport.worldToScreen(pt);
+		const s1 = ctx.viewport.worldToScreen(p1);
+		const s2 = ctx.viewport.worldToScreen(p2);
 		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
 		if (!geom) return;
@@ -108,9 +108,9 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		const p2 = sketch.points.get(this.lineP2Id);
 		if (!pt || !p1 || !p2) return null;
 
-		const sp = viewport.worldToScreen(pt.x, pt.y);
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
+		const sp = viewport.worldToScreen(pt);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
 		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
 		if (!geom) return null;

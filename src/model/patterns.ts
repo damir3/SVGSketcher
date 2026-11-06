@@ -56,7 +56,7 @@ export function generateCircularPatternCopy(
 		const rx = centerPt.x + dx * cosA - dy * sinA;
 		const ry = centerPt.y + dx * sinA + dy * cosA;
 
-		const newPt = sketch.addPoint(rx, ry, false);
+		const newPt = sketch.addPoint({ x: rx, y: ry }, false);
 		pointMap.set(origPtId, newPt.id);
 		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
 		createdEntityIds.push({ id: newPt.id, type: 'point' });
@@ -337,7 +337,7 @@ export function generateRectangularPatternCopy(
 		const tx = pt.x + offset.dx;
 		const ty = pt.y + offset.dy;
 
-		const newPt = sketch.addPoint(tx, ty, false);
+		const newPt = sketch.addPoint({ x: tx, y: ty }, false);
 		pointMap.set(origPtId, newPt.id);
 		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
 		createdEntityIds.push({ id: newPt.id, type: 'point' });

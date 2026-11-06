@@ -214,7 +214,7 @@ function initApp(): void {
 		const sx = e.clientX - rect.left;
 		const sy = e.clientY - rect.top;
 		const snap = interaction.isSnappingEnabled ? interaction.findSnap({ x: sx, y: sy }) : null;
-		const world = snap ? snap.worldPos : viewport.screenToWorld(sx, sy);
+		const world = snap ? snap.worldPos : viewport.screenToWorld({ x: sx, y: sy });
 		const { subStep } = viewport.getGridStep();
 		const decimals = subStep < 0.1 ? 2 : 1;
 		coordX.textContent = world.x.toFixed(decimals);

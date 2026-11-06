@@ -39,8 +39,8 @@ function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstr
 			zoom: 1,
 			panX: 0,
 			panY: 0,
-			worldToScreen: (x: number, y: number) => ({ x, y }),
-			screenToWorld: (x: number, y: number) => ({ x, y }),
+			worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+			screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 		} as any,
 		renderer: {
 			clearPreviews: () => {},
@@ -368,9 +368,9 @@ describe('Primitive Tools Creation', () => {
 		const { ctx } = createMockContext(sketch);
 
 		// Pre-create an anchor point and an anchor line
-		const existingPt = sketch.addPoint(0, 0);
-		const pLineA = sketch.addPoint(50, 0);
-		const pLineB = sketch.addPoint(50, 100);
+		const existingPt = sketch.addPoint({ x: 0, y: 0 });
+		const pLineA = sketch.addPoint({ x: 50, y: 0 });
+		const pLineB = sketch.addPoint({ x: 50, y: 100 });
 		const existingLine = sketch.addLine(pLineA.id, pLineB.id);
 
 		const rectTool = new RectangleTool('corner');
@@ -471,7 +471,9 @@ describe('Primitive Tools Creation', () => {
 		const tabBefore = {
 			key: 'Tab',
 			shiftKey: false,
-			preventDefault: () => { prevented = true; },
+			preventDefault: () => {
+				prevented = true;
+			},
 		} as unknown as KeyboardEvent;
 		assert.equal(rectTool.onKeyDown(tabBefore), undefined);
 		assert.equal(prevented, false);
@@ -485,7 +487,9 @@ describe('Primitive Tools Creation', () => {
 		const tabDuring = {
 			key: 'Tab',
 			shiftKey: false,
-			preventDefault: () => { tabPrevented = true; },
+			preventDefault: () => {
+				tabPrevented = true;
+			},
 		} as unknown as KeyboardEvent;
 		const tabHandled = rectTool.onKeyDown(tabDuring);
 		assert.equal(tabHandled, true);
@@ -497,7 +501,9 @@ describe('Primitive Tools Creation', () => {
 		let enterPrevented = false;
 		const enterEvent = {
 			key: 'Enter',
-			preventDefault: () => { enterPrevented = true; },
+			preventDefault: () => {
+				enterPrevented = true;
+			},
 		} as unknown as KeyboardEvent;
 		const enterHandled = rectTool.onKeyDown(enterEvent);
 		assert.equal(enterHandled, true);
@@ -675,12 +681,12 @@ describe('Primitive Tools Creation', () => {
 		try {
 			const sketch = new SketchDocument();
 			// Create cross: line1 horizontal (0, 50)-(100, 50), line2 vertical (50, 0)-(50, 100)
-			const p1 = sketch.addPoint(0, 50);
-			const p2 = sketch.addPoint(100, 50);
+			const p1 = sketch.addPoint({ x: 0, y: 50 });
+			const p2 = sketch.addPoint({ x: 100, y: 50 });
 			sketch.addLine(p1.id, p2.id);
 
-			const p3 = sketch.addPoint(50, 0);
-			const p4 = sketch.addPoint(50, 100);
+			const p3 = sketch.addPoint({ x: 50, y: 0 });
+			const p4 = sketch.addPoint({ x: 50, y: 100 });
 			sketch.addLine(p3.id, p4.id);
 
 			const { ctx } = createMockContext(sketch);
@@ -700,8 +706,12 @@ describe('Primitive Tools Creation', () => {
 
 			const targetGroup = {
 				elements: [] as any[],
-				appendChild(el: any) { this.elements.push(el); },
-				clear() { this.elements = []; },
+				appendChild(el: any) {
+					this.elements.push(el);
+				},
+				clear() {
+					this.elements = [];
+				},
 			};
 
 			// Before trim at (20, 50): preview renders candidate
@@ -773,8 +783,8 @@ describe('Primitive Tools Creation', () => {
 	it('ArcTool creates tangent arc connected to line and applies tangent constraint', () => {
 		const sketch = new SketchDocument();
 		// Add horizontal line from (0, 0) to (50, 0)
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		sketch.addLine(p1.id, p2.id);
 
 		const { ctx } = createMockContext(sketch);
@@ -810,9 +820,9 @@ describe('Primitive Tools Creation', () => {
 	it('ArcTool creates tangent arc connected to another arc and applies tangent constraint', () => {
 		const sketch = new SketchDocument();
 		// Add first arc centered at (0, 0) with radius 50 from (50, 0) to (0, 50)
-		const cPt = sketch.addPoint(0, 0);
-		const sPt = sketch.addPoint(50, 0);
-		const ePt = sketch.addPoint(0, 50);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
+		const sPt = sketch.addPoint({ x: 50, y: 0 });
+		const ePt = sketch.addPoint({ x: 0, y: 50 });
 		sketch.addArc(cPt.id, sPt.id, ePt.id, 50, false);
 
 		const { ctx } = createMockContext(sketch);
@@ -839,8 +849,8 @@ describe('Primitive Tools Creation', () => {
 	it('ArcTool creates tangent arc with sweep angle > 180 degrees without flipping sides', () => {
 		const sketch = new SketchDocument();
 		// Horizontal line from (0, 0) to (50, 0)
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		sketch.addLine(p1.id, p2.id);
 
 		const { ctx } = createMockContext(sketch);
@@ -862,10 +872,10 @@ describe('Primitive Tools Creation', () => {
 
 		const centerPt = sketch.points.get(arc.centerId)!;
 		assert.ok(Math.abs(centerPt.x - 50) < 1e-3, 'Center X must match tangent start X');
-		assert.ok(Math.abs(centerPt.y - (-30)) < 1e-3, 'Center Y must be -30');
+		assert.ok(Math.abs(centerPt.y - -30) < 1e-3, 'Center Y must be -30');
 		const endPt = sketch.points.get(arc.endPointId)!;
 		assert.ok(Math.abs(endPt.x - 20) < 1e-3, 'End point X must be 20');
-		assert.ok(Math.abs(endPt.y - (-30)) < 1e-3, 'End point Y must be -30');
+		assert.ok(Math.abs(endPt.y - -30) < 1e-3, 'End point Y must be -30');
 
 		sketch.solve();
 		assert.notEqual(sketch.lastSolverResult?.status, 'OVER_CONSTRAINED');
@@ -920,16 +930,17 @@ describe('Primitive Tools Creation', () => {
 			activeToolInstance: rectTool,
 		};
 
-		const makeAltKey = (code: string, key: string) => ({
-			altKey: true,
-			ctrlKey: false,
-			metaKey: false,
-			code,
-			key,
-			preventDefault: () => {
-				prevented++;
-			},
-		} as any);
+		const makeAltKey = (code: string, key: string) =>
+			({
+				altKey: true,
+				ctrlKey: false,
+				metaKey: false,
+				code,
+				key,
+				preventDefault: () => {
+					prevented++;
+				},
+			}) as any;
 
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit1', '1'));
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit2', '2'));
@@ -953,16 +964,17 @@ describe('Primitive Tools Creation', () => {
 			activeToolInstance: arcTool,
 		};
 
-		const makeAltKey = (code: string, key: string) => ({
-			altKey: true,
-			ctrlKey: false,
-			metaKey: false,
-			code,
-			key,
-			preventDefault: () => {
-				prevented++;
-			},
-		} as any);
+		const makeAltKey = (code: string, key: string) =>
+			({
+				altKey: true,
+				ctrlKey: false,
+				metaKey: false,
+				code,
+				key,
+				preventDefault: () => {
+					prevented++;
+				},
+			}) as any;
 
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit1', '1'));
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit2', '2'));
@@ -985,14 +997,15 @@ describe('Primitive Tools Creation', () => {
 		};
 
 		// On macOS, Option+1..4 produces characters like ¡, ™, £, ¢ while code is Digit1..4
-		const makeMacOptionKey = (code: string, key: string) => ({
-			altKey: true,
-			ctrlKey: false,
-			metaKey: false,
-			code,
-			key,
-			preventDefault: () => {},
-		} as any);
+		const makeMacOptionKey = (code: string, key: string) =>
+			({
+				altKey: true,
+				ctrlKey: false,
+				metaKey: false,
+				code,
+				key,
+				preventDefault: () => {},
+			}) as any;
 
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeMacOptionKey('Digit1', '¡'));
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeMacOptionKey('Digit2', '™'));
@@ -1334,8 +1347,12 @@ describe('Primitive Tools Creation', () => {
 		// Lock radius with expression
 		slotTool.lockRadius('slot_rad + 5');
 
-		const distConstraints = [...sketch.constraints.values()].filter(c => c instanceof DistanceConstraint) as DistanceConstraint[];
-		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint) as RadiusConstraint[];
+		const distConstraints = [...sketch.constraints.values()].filter(
+			c => c instanceof DistanceConstraint
+		) as DistanceConstraint[];
+		const radConstraints = [...sketch.constraints.values()].filter(
+			c => c instanceof RadiusConstraint
+		) as RadiusConstraint[];
 
 		assert.equal(distConstraints.length, 1);
 		assert.equal(distConstraints[0].targetDistance, 60);
@@ -1366,16 +1383,17 @@ describe('Primitive Tools Creation', () => {
 			activeToolInstance: slotTool,
 		};
 
-		const makeAltKey = (code: string, key: string) => ({
-			altKey: true,
-			ctrlKey: false,
-			metaKey: false,
-			code,
-			key,
-			preventDefault: () => {
-				prevented++;
-			},
-		} as any);
+		const makeAltKey = (code: string, key: string) =>
+			({
+				altKey: true,
+				ctrlKey: false,
+				metaKey: false,
+				code,
+				key,
+				preventDefault: () => {
+					prevented++;
+				},
+			}) as any;
 
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit1', '1'));
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit2', '2'));
@@ -1406,16 +1424,17 @@ describe('Primitive Tools Creation', () => {
 			activeToolInstance: splineTool,
 		};
 
-		const makeAltKey = (code: string, key: string) => ({
-			altKey: true,
-			ctrlKey: false,
-			metaKey: false,
-			code,
-			key,
-			preventDefault: () => {
-				prevented++;
-			},
-		} as any);
+		const makeAltKey = (code: string, key: string) =>
+			({
+				altKey: true,
+				ctrlKey: false,
+				metaKey: false,
+				code,
+				key,
+				preventDefault: () => {
+					prevented++;
+				},
+			}) as any;
 
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit1', '1'));
 		CanvasInteraction.prototype.handleKeyDown.call(fakeInteraction as any, makeAltKey('Digit2', '2'));
@@ -1428,7 +1447,7 @@ describe('Primitive Tools Creation', () => {
 describe('Inspector Primitive & Constraint Editing Methods', () => {
 	it('setPointCoords updates free point and fixed point coordinates', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 20);
+		const p1 = sketch.addPoint({ x: 10, y: 20 });
 		assert.ok(sketch.setPointCoords(p1.id, 35, -15));
 		assert.ok(Math.abs(p1.x - 35) < 1e-4);
 		assert.ok(Math.abs(p1.y - -15) < 1e-4);
@@ -1445,8 +1464,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 	it('setLineLength and setLineAngle update line geometry and existing distance constraint', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		// Without distance constraint
@@ -1469,7 +1488,7 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 	it('setCircleOrArcRadius and setArcAngle update circle, arc, and attached constraints', () => {
 		const sketch = new SketchDocument();
-		const cPt = sketch.addPoint(0, 0);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
 		const circle = sketch.addCircle(cPt.id, 25);
 
 		assert.ok(sketch.setCircleOrArcRadius(circle.id, 40));
@@ -1482,9 +1501,9 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.ok(Math.abs(circle.radius - 65) < 1e-4);
 
 		// Arc radius and angle
-		const ac = sketch.addPoint(0, 0);
-		const as = sketch.addPoint(30, 0);
-		const ae = sketch.addPoint(0, 30);
+		const ac = sketch.addPoint({ x: 0, y: 0 });
+		const as = sketch.addPoint({ x: 30, y: 0 });
+		const ae = sketch.addPoint({ x: 0, y: 30 });
 		const arc = sketch.addArc(ac.id, as.id, ae.id, 30, false);
 
 		assert.ok(sketch.setCircleOrArcRadius(arc.id, 50));
@@ -1494,15 +1513,15 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		assert.ok(sketch.setArcAngle(arc.id, 180));
 		const sweepRad = Math.atan2(ae.y - ac.y, ae.x - ac.x) - Math.atan2(as.y - ac.y, as.x - ac.x);
-		const sweepDeg = (((sweepRad < 0 ? sweepRad + 2 * Math.PI : sweepRad) * 180) / Math.PI);
+		const sweepDeg = ((sweepRad < 0 ? sweepRad + 2 * Math.PI : sweepRad) * 180) / Math.PI;
 		assert.ok(Math.abs(sweepDeg - 180) < 1e-2);
 	});
 
 	it('setEllipseParams and updateDimensionalConstraint update ellipse and dimensional constraints', () => {
 		const sketch = new SketchDocument();
-		const ec = sketch.addPoint(0, 0);
-		const emaj = sketch.addPoint(40, 0);
-		const emin = sketch.addPoint(0, 20);
+		const ec = sketch.addPoint({ x: 0, y: 0 });
+		const emaj = sketch.addPoint({ x: 40, y: 0 });
+		const emin = sketch.addPoint({ x: 0, y: 20 });
 		const ellipse = sketch.addEllipse(ec.id, emaj.id, emin.id);
 
 		assert.ok(sketch.setEllipseParams(ellipse.id, { rx: 60, ry: 30, rotationDeg: 45 }));
@@ -1512,8 +1531,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.ok(Math.abs(rotDeg - 45) < 1e-2);
 
 		// Dimensional constraints update
-		const p1 = sketch.addPoint(0, 100);
-		const p2 = sketch.addPoint(50, 100);
+		const p1 = sketch.addPoint({ x: 0, y: 100 });
+		const p2 = sketch.addPoint({ x: 50, y: 100 });
 		const dc = sketch.addDistanceConstraint(p1.id, p2.id, 50);
 		assert.ok(dc);
 		assert.ok(sketch.updateDimensionalConstraint(dc!.id, 95));
@@ -1523,9 +1542,9 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 	it('setLineLength and setCircleOrArcRadius achieve exact target values on EqualLength / EqualRadius constrained geometry', () => {
 		const sketch = new SketchDocument();
-		const pA = sketch.addPoint(-50, 0);
-		const pB = sketch.addPoint(50, 0);
-		const pC = sketch.addPoint(0, 80);
+		const pA = sketch.addPoint({ x: -50, y: 0 });
+		const pB = sketch.addPoint({ x: 50, y: 0 });
+		const pC = sketch.addPoint({ x: 0, y: 80 });
 		sketch.addFixedConstraint(pA.id);
 		sketch.addLine(pA.id, pB.id);
 		const lLeft = sketch.addLine(pA.id, pC.id);
@@ -1553,8 +1572,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.ok(Math.abs(Math.hypot(pC.x - pB.x, pC.y - pB.y) - 100) < 1e-2);
 
 		// EqualRadius circles
-		const c1Pt = sketch.addPoint(-100, 0);
-		const c2Pt = sketch.addPoint(100, 0);
+		const c1Pt = sketch.addPoint({ x: -100, y: 0 });
+		const c2Pt = sketch.addPoint({ x: 100, y: 0 });
 		const c1 = sketch.addCircle(c1Pt.id, 25);
 		const c2 = sketch.addCircle(c2Pt.id, 25);
 		sketch.addEqualRadiusConstraint(c1.id, c2.id);
@@ -1569,10 +1588,10 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		const sketch = new SketchDocument();
 
 		// Points & Lines
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
-		const p3 = sketch.addPoint(0, 100);
-		const p4 = sketch.addPoint(100, 100);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 100 });
+		const p4 = sketch.addPoint({ x: 100, y: 100 });
 		const l1 = sketch.addLine(p1.id, p2.id);
 		const l2 = sketch.addLine(p3.id, p4.id);
 
@@ -1589,7 +1608,7 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		);
 
 		// PointToLineDistanceConstraint
-		const freePt = sketch.addPoint(50, 50);
+		const freePt = sketch.addPoint({ x: 50, y: 50 });
 		const p2lDist = sketch.addPointToLineDistanceConstraint(freePt.id, l1.id, 50)!;
 		assert.ok(p2lDist);
 		const p2lEntities = sketch.getEntitiesForConstraint(p2lDist);
@@ -1607,8 +1626,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.ok(ptConstraints.some(c => c.id === p2lDist.id));
 
 		// Concentric circles
-		const cCenter1 = sketch.addPoint(200, 200);
-		const cCenter2 = sketch.addPoint(200, 200);
+		const cCenter1 = sketch.addPoint({ x: 200, y: 200 });
+		const cCenter2 = sketch.addPoint({ x: 200, y: 200 });
 		const c1 = sketch.addCircle(cCenter1.id, 30);
 		const c2 = sketch.addCircle(cCenter2.id, 60);
 		const conc = sketch.addConcentricConstraint(c1.id, c2.id)!;
@@ -1623,9 +1642,9 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		);
 
 		// Arc Angle Constraint
-		const arcCenter = sketch.addPoint(300, 300);
-		const arcStart = sketch.addPoint(350, 300);
-		const arcEnd = sketch.addPoint(300, 350);
+		const arcCenter = sketch.addPoint({ x: 300, y: 300 });
+		const arcStart = sketch.addPoint({ x: 350, y: 300 });
+		const arcEnd = sketch.addPoint({ x: 300, y: 350 });
 		const arc = sketch.addArc(arcCenter.id, arcStart.id, arcEnd.id, 50);
 		const arcAngle = sketch.addArcAngleConstraint(arc.id, 90)!;
 		assert.ok(arcAngle);
@@ -1789,8 +1808,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 
-		const targetPt = sketch.addPoint(40, 0);
-		const targetPt2 = sketch.addPoint(0, 40);
+		const targetPt = sketch.addPoint({ x: 40, y: 0 });
+		const targetPt2 = sketch.addPoint({ x: 0, y: 40 });
 
 		const arcTool = new ArcTool('center');
 		arcTool.activate(ctx);
@@ -1826,8 +1845,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 
-		const pTarget1 = sketch.addPoint(0, 0);
-		const pTarget2 = sketch.addPoint(40, 0);
+		const pTarget1 = sketch.addPoint({ x: 0, y: 0 });
+		const pTarget2 = sketch.addPoint({ x: 40, y: 0 });
 
 		const arcTool = new ArcTool('three_point');
 		arcTool.activate(ctx);
@@ -1865,10 +1884,10 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		const { ctx } = createMockContext(sketch);
 
 		// Create an existing line from (0, 0) to (50, 0) and target point at (80, 30)
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		sketch.addLine(p1.id, p2.id);
-		const targetEndPt = sketch.addPoint(80, 30);
+		const targetEndPt = sketch.addPoint({ x: 80, y: 30 });
 
 		const arcTool = new ArcTool('tangent');
 		arcTool.activate(ctx);
@@ -1937,5 +1956,3 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		assert.equal(sketch.ellipticalArcs.size, 1);
 	});
 });
-
-

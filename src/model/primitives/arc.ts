@@ -59,9 +59,9 @@ export class SketchArc implements ISketchPrimitive {
 		const end = sketch.points.get(this.endPointId);
 		if (!center || !start || !end) return null;
 
-		const sc = viewport.worldToScreen(center.x, center.y);
-		const ss = viewport.worldToScreen(start.x, start.y);
-		const se = viewport.worldToScreen(end.x, end.y);
+		const sc = viewport.worldToScreen(center);
+		const ss = viewport.worldToScreen(start);
+		const se = viewport.worldToScreen(end);
 		const sr = this.radius * viewport.zoom;
 
 		return distanceToArc(screen, sc, sr, ss, se, !!this.clockwise, thresholdPx);

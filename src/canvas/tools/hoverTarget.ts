@@ -1,5 +1,5 @@
 import type { ToolContext } from './types';
-import type { Vec2 } from '../../math/vector';
+import { ORIGIN, type Vec2 } from '../../math/vector';
 import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../distances';
 
 export interface HoverTarget {
@@ -84,7 +84,7 @@ export function findHoverTarget(
 	if (pt && (allowSplineHandles || !ctx.sketch.isSplineHandlePoint(pt.id))) {
 		return { type: 'point', id: pt.id };
 	}
-	const sOrigin = ctx.viewport.worldToScreen(0, 0);
+	const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
 	if (allowOrigin && Math.hypot(screen.x - sOrigin.x, screen.y - sOrigin.y) <= pointRadius) {
 		return { type: 'point', id: 'origin' };
 	}

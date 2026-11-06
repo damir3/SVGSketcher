@@ -257,8 +257,8 @@ export class OffsetConstraint extends BaseConstraint {
 	override render(ctx: ConstraintRenderContext): void {
 		const pts = this.getDimensionWorldPoints(ctx.sketch);
 		if (!pts) return;
-		const d1 = ctx.viewport.worldToScreen(pts.a.x, pts.a.y);
-		const d2 = ctx.viewport.worldToScreen(pts.b.x, pts.b.y);
+		const d1 = ctx.viewport.worldToScreen(pts.a);
+		const d2 = ctx.viewport.worldToScreen(pts.b);
 		if (Math.hypot(d2.x - d1.x, d2.y - d1.y) < 1e-3) return;
 		ctx.renderLinearDimensionVisual({
 			d1,
@@ -274,8 +274,8 @@ export class OffsetConstraint extends BaseConstraint {
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
 		const pts = this.getDimensionWorldPoints(sketch);
 		if (!pts) return null;
-		const d1 = viewport.worldToScreen(pts.a.x, pts.a.y);
-		const d2 = viewport.worldToScreen(pts.b.x, pts.b.y);
+		const d1 = viewport.worldToScreen(pts.a);
+		const d2 = viewport.worldToScreen(pts.b);
 		return distanceToLinearDimension(screen, d1, d2);
 	}
 

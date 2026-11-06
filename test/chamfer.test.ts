@@ -8,11 +8,7 @@ import {
 	calculateChamferGeometry,
 	commitChamferToSketch,
 } from '../src/math/chamfer';
-import {
-	PointOnLineConstraint,
-	DistanceConstraint,
-	AngleConstraint,
-} from '../src/solver/constraints';
+import { PointOnLineConstraint, DistanceConstraint, AngleConstraint } from '../src/solver/constraints';
 import { ChamferTool } from '../src/canvas/tools/modify/chamfer';
 import { dist, vec } from '../src/math/vector';
 
@@ -80,9 +76,9 @@ function setupMockDocument() {
 describe('Chamfer Corner Discovery', () => {
 	it('identifies a valid corner with exactly 2 lines meeting at a vertex', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
@@ -96,8 +92,8 @@ describe('Chamfer Corner Discovery', () => {
 
 	it('rejects an endpoint with only 1 connected line', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
 		sketch.addLine(p0.id, p1.id);
 
 		const res = getConnectedLinesForPoint(sketch, p1.id);
@@ -107,10 +103,10 @@ describe('Chamfer Corner Discovery', () => {
 
 	it('rejects a vertex with 3 or more lines', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
-		const p3 = sketch.addPoint(-100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
+		const p3 = sketch.addPoint({ x: -100, y: 0 });
 
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
@@ -123,9 +119,9 @@ describe('Chamfer Corner Discovery', () => {
 
 	it('rejects a corner connected to an arc', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const pCenter = sketch.addPoint(0, 50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const pCenter = sketch.addPoint({ x: 0, y: 50 });
 
 		sketch.addLine(p0.id, p1.id);
 		sketch.addArc(pCenter.id, p0.id, 50, 0, Math.PI / 2);
@@ -136,12 +132,12 @@ describe('Chamfer Corner Discovery', () => {
 
 	it('supports coincident vertices connected by CoincidentConstraint', () => {
 		const sketch = new SketchDocument();
-		const pA = sketch.addPoint(0, 0);
-		const pB = sketch.addPoint(0, 0);
+		const pA = sketch.addPoint({ x: 0, y: 0 });
+		const pB = sketch.addPoint({ x: 0, y: 0 });
 		sketch.addCoincidentConstraint(pA.id, pB.id);
 
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l1 = sketch.addLine(pA.id, p1.id);
 		const l2 = sketch.addLine(pB.id, p2.id);
@@ -157,9 +153,9 @@ describe('Chamfer Corner Discovery', () => {
 describe('Chamfer Candidate Construction', () => {
 	it('builds candidate from vertex point', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
@@ -172,9 +168,9 @@ describe('Chamfer Candidate Construction', () => {
 
 	it('builds candidate from two lines sharing a vertex', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
@@ -186,9 +182,9 @@ describe('Chamfer Candidate Construction', () => {
 
 	it('rejects collinear lines sharing a vertex (180 deg)', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(-100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: -100, y: 0 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
@@ -199,10 +195,10 @@ describe('Chamfer Candidate Construction', () => {
 
 	it('rejects disjoint lines not sharing a vertex', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
-		const p3 = sketch.addPoint(0, 50);
-		const p4 = sketch.addPoint(100, 50);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 50 });
+		const p4 = sketch.addPoint({ x: 100, y: 50 });
 
 		const l1 = sketch.addLine(p1.id, p2.id);
 		const l2 = sketch.addLine(p3.id, p4.id);
@@ -215,9 +211,9 @@ describe('Chamfer Candidate Construction', () => {
 describe('Chamfer Geometry Calculation', () => {
 	it('calculates equal distance chamfer on orthogonal corner', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
 
@@ -233,9 +229,9 @@ describe('Chamfer Geometry Calculation', () => {
 
 	it('calculates two distance chamfer with flip', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
 
@@ -256,9 +252,9 @@ describe('Chamfer Geometry Calculation', () => {
 
 	it('calculates distance and angle chamfer on 90-degree corner', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
 
@@ -286,9 +282,9 @@ describe('Chamfer Geometry Calculation', () => {
 
 	it('invalidates distance larger than line length', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(20, 0);
-		const p2 = sketch.addPoint(0, 20);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 20, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 20 });
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
 
@@ -300,9 +296,9 @@ describe('Chamfer Geometry Calculation', () => {
 
 	it('invalidates angle that exceeds corner geometric capability', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100); // 90 degree corner
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 }); // 90 degree corner
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
 
@@ -317,9 +313,9 @@ describe('Chamfer Geometry Calculation', () => {
 describe('Chamfer Commit and Document Integration', () => {
 	it('commits equal distance chamfer: vertex remains, lines shortened with PointOnLine and Distance constraints', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
@@ -346,8 +342,12 @@ describe('Chamfer Commit and Document Integration', () => {
 			c => c instanceof PointOnLineConstraint
 		) as PointOnLineConstraint[];
 		assert.equal(polConstraints.length, 2);
-		assert.ok(polConstraints.some(c => c.pointId === p0.id && (c.lineP1Id === updatedL1.p1Id || c.lineP2Id === updatedL1.p1Id)));
-		assert.ok(polConstraints.some(c => c.pointId === p0.id && (c.lineP1Id === updatedL2.p1Id || c.lineP2Id === updatedL2.p1Id)));
+		assert.ok(
+			polConstraints.some(c => c.pointId === p0.id && (c.lineP1Id === updatedL1.p1Id || c.lineP2Id === updatedL1.p1Id))
+		);
+		assert.ok(
+			polConstraints.some(c => c.pointId === p0.id && (c.lineP1Id === updatedL2.p1Id || c.lineP2Id === updatedL2.p1Id))
+		);
 
 		// 5. Distance constraints created at 10px and -10px
 		const distConstraints = [...sketch.constraints.values()].filter(
@@ -368,9 +368,9 @@ describe('Chamfer Commit and Document Integration', () => {
 
 	it('commits two distance chamfer with distinct distances', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
@@ -390,9 +390,9 @@ describe('Chamfer Commit and Document Integration', () => {
 
 	it('commits distance and angle chamfer: creates Distance and Angle constraints', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		sketch.addLine(p0.id, p1.id);
 		sketch.addLine(p0.id, p2.id);
@@ -422,9 +422,9 @@ describe('Chamfer Commit and Document Integration', () => {
 
 	it('undo and redo cleanly restore sketch before and after chamfer', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l1 = sketch.addLine(p0.id, p1.id);
 		const l2 = sketch.addLine(p0.id, p2.id);
@@ -457,9 +457,9 @@ describe('ChamferTool UI and Workflow', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
-			const p2 = sketch.addPoint(0, 100);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
+			const p2 = sketch.addPoint({ x: 0, y: 100 });
 			sketch.addLine(p0.id, p1.id);
 			sketch.addLine(p0.id, p2.id);
 
@@ -467,8 +467,8 @@ describe('ChamferTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-					screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 				},
 				renderer: {
 					chamferGizmoHandles: [],
@@ -502,9 +502,9 @@ describe('ChamferTool UI and Workflow', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
-			const p2 = sketch.addPoint(0, 100);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
+			const p2 = sketch.addPoint({ x: 0, y: 100 });
 			const l1 = sketch.addLine(p0.id, p1.id);
 			const l2 = sketch.addLine(p0.id, p2.id);
 
@@ -513,8 +513,8 @@ describe('ChamferTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-					screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 				},
 				renderer: {
 					chamferGizmoHandles: [],
@@ -559,9 +559,9 @@ describe('ChamferTool UI and Workflow', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(100, 0);
-			const p2 = sketch.addPoint(0, 100);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 100, y: 0 });
+			const p2 = sketch.addPoint({ x: 0, y: 100 });
 			sketch.addLine(p0.id, p1.id);
 			sketch.addLine(p0.id, p2.id);
 
@@ -569,8 +569,8 @@ describe('ChamferTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-					screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 				},
 				renderer: {
 					chamferGizmoHandles: [],
@@ -610,9 +610,9 @@ describe('ChamferTool UI and Workflow', () => {
 			const cleanupDoc = setupMockDocument();
 			try {
 				const sketch = new SketchDocument();
-				const p0 = sketch.addPoint(0, 0);
-				const p1 = sketch.addPoint(100, 0);
-				const p2 = sketch.addPoint(0, 100);
+				const p0 = sketch.addPoint({ x: 0, y: 0 });
+				const p1 = sketch.addPoint({ x: 100, y: 0 });
+				const p2 = sketch.addPoint({ x: 0, y: 100 });
 				sketch.addLine(p0.id, p1.id);
 				sketch.addLine(p0.id, p2.id);
 
@@ -624,8 +624,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-						screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 					},
 					renderer: {
 						chamferGizmoHandles: [
@@ -640,7 +640,9 @@ describe('ChamferTool UI and Workflow', () => {
 					},
 					findPointNear: () => p0,
 					findLineNear: () => null,
-					requestRender: () => { renders++; },
+					requestRender: () => {
+						renders++;
+					},
 					showToast: () => {},
 					setCursor: () => {},
 				};
@@ -678,9 +680,9 @@ describe('ChamferTool UI and Workflow', () => {
 			const cleanupDoc = setupMockDocument();
 			try {
 				const sketch = new SketchDocument();
-				const p0 = sketch.addPoint(0, 0);
-				const p1 = sketch.addPoint(100, 0);
-				const p2 = sketch.addPoint(0, 100);
+				const p0 = sketch.addPoint({ x: 0, y: 0 });
+				const p1 = sketch.addPoint({ x: 100, y: 0 });
+				const p2 = sketch.addPoint({ x: 0, y: 100 });
 				sketch.addLine(p0.id, p1.id);
 				sketch.addLine(p0.id, p2.id);
 
@@ -692,8 +694,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-						screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 					},
 					renderer: {
 						chamferGizmoHandles: [],
@@ -747,9 +749,9 @@ describe('ChamferTool UI and Workflow', () => {
 			const cleanupDoc = setupMockDocument();
 			try {
 				const sketch = new SketchDocument();
-				const p0 = sketch.addPoint(0, 0);
-				const p1 = sketch.addPoint(100, 0);
-				const p2 = sketch.addPoint(0, 100);
+				const p0 = sketch.addPoint({ x: 0, y: 0 });
+				const p1 = sketch.addPoint({ x: 100, y: 0 });
+				const p2 = sketch.addPoint({ x: 0, y: 100 });
 				sketch.addLine(p0.id, p1.id);
 				sketch.addLine(p0.id, p2.id);
 
@@ -761,8 +763,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-						screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 					},
 					renderer: {
 						chamferGizmoHandles: [],
@@ -826,9 +828,9 @@ describe('ChamferTool UI and Workflow', () => {
 				// Triangle with pA(-50, 0), pB(50, 0), pC(0, 80). Corner angle at pC is ~64 deg.
 				// Angle at A can reach 180 - 64 - 1 = 115 deg (not restricted to 63 deg!)
 				const triSketch = new SketchDocument();
-				const pA = triSketch.addPoint(-50, 0);
-				const pB = triSketch.addPoint(50, 0);
-				const pC = triSketch.addPoint(0, 80);
+				const pA = triSketch.addPoint({ x: -50, y: 0 });
+				const pB = triSketch.addPoint({ x: 50, y: 0 });
+				const pC = triSketch.addPoint({ x: 0, y: 80 });
 				triSketch.addLine(pA.id, pC.id);
 				triSketch.addLine(pB.id, pC.id);
 
@@ -877,9 +879,9 @@ describe('ChamferTool UI and Workflow', () => {
 			const cleanupDoc = setupMockDocument();
 			try {
 				const sketch = new SketchDocument();
-				const p0 = sketch.addPoint(0, 0);
-				const p1 = sketch.addPoint(100, 0);
-				const p2 = sketch.addPoint(0, 100);
+				const p0 = sketch.addPoint({ x: 0, y: 0 });
+				const p1 = sketch.addPoint({ x: 100, y: 0 });
+				const p2 = sketch.addPoint({ x: 0, y: 100 });
 				sketch.addLine(p0.id, p1.id);
 				sketch.addLine(p0.id, p2.id);
 
@@ -888,8 +890,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (x: number, y: number) => ({ x: x + 400, y: 300 - y }),
-						screenToWorld: (x: number, y: number) => ({ x: x - 400, y: 300 - y }),
+						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
+						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
 					},
 					renderer: {
 						chamferGizmoHandles: [] as any[],

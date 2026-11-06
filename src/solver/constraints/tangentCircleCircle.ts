@@ -104,8 +104,8 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		const center2 = ctx.sketch.points.get(entity2.centerId);
 		if (!center1 || !center2) return;
 
-		const sCenter1 = ctx.viewport.worldToScreen(center1.x, center1.y);
-		const sCenter2 = ctx.viewport.worldToScreen(center2.x, center2.y);
+		const sCenter1 = ctx.viewport.worldToScreen(center1);
+		const sCenter2 = ctx.viewport.worldToScreen(center2);
 		const r1Screen = entity1.radius * ctx.viewport.zoom;
 		const r2Screen = entity2.radius * ctx.viewport.zoom;
 
@@ -152,11 +152,11 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 
 		let isNearArc1 = true;
 		if (arc1 && ctx.isAngleNearArc) {
-			isNearArc1 = ctx.isAngleNearArc(arc1, center1, tanX, tanY, r1Screen);
+			isNearArc1 = ctx.isAngleNearArc(arc1, center1, { x: tanX, y: tanY }, r1Screen);
 		}
 		let isNearArc2 = true;
 		if (arc2 && ctx.isAngleNearArc) {
-			isNearArc2 = ctx.isAngleNearArc(arc2, center2, tanX, tanY, r2Screen);
+			isNearArc2 = ctx.isAngleNearArc(arc2, center2, { x: tanX, y: tanY }, r2Screen);
 		}
 
 		const isNear = distBetweenContactPts < 60 && isNearArc1 && isNearArc2;
@@ -167,7 +167,7 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 			const offset = 14;
 			const badgeX = tanX + nx * offset;
 			const badgeY = tanY + ny * offset;
-			ctx.renderBadge(this.id, badgeX, badgeY, 'tangent');
+			ctx.renderBadge(this.id, { x: badgeX, y: badgeY }, 'tangent');
 			return;
 		}
 

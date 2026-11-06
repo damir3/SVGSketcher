@@ -10,7 +10,7 @@ export class PointTool extends BaseTool {
 		const finalY = e.snap ? e.snap.worldPos.y : e.world.y;
 
 		sketch.beginTransaction();
-		const pt = sketch.addPoint(finalX, finalY);
+		const pt = sketch.addPoint({ x: finalX, y: finalY });
 		this.ctx.applySnapConstraintIfNeeded?.(pt.id, e.snap);
 		sketch.commitTransaction();
 

@@ -2,11 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { getAllGeoCurves } from '../src/math/intersection';
-import {
-	findExtendCandidate,
-	executeExtend,
-	findExtendTarget,
-} from '../src/math/extend';
+import { findExtendCandidate, executeExtend, findExtendTarget } from '../src/math/extend';
 import { ExtendTool } from '../src/canvas/tools/modify/extend';
 
 function setupMockDocument() {
@@ -55,13 +51,13 @@ describe('Extend Tool Math and Logic', () => {
 	it('extends a line to the nearest intersection with another line', () => {
 		const sketch = new SketchDocument();
 		// Horizontal line from (0, 0) to (50, 0)
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 0 });
 		const l1 = sketch.addLine(p0.id, p1.id);
 
 		// Target vertical line at x = 80 from y = -50 to y = 50
-		const pA = sketch.addPoint(80, -50);
-		const pB = sketch.addPoint(80, 50);
+		const pA = sketch.addPoint({ x: 80, y: -50 });
+		const pB = sketch.addPoint({ x: 80, y: 50 });
 		sketch.addLine(pA.id, pB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -91,8 +87,8 @@ describe('Extend Tool Math and Logic', () => {
 
 	it('extends a line by +50mm when there is no intersection ahead', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
 		const l1 = sketch.addLine(p0.id, p1.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -125,14 +121,14 @@ describe('Extend Tool Math and Logic', () => {
 	it('extends an arc along its circular trajectory to the next intersection', () => {
 		const sketch = new SketchDocument();
 		// Arc from 0 deg to 90 deg (radius 50, CCW)
-		const c = sketch.addPoint(0, 0);
-		const pStart = sketch.addPoint(50, 0); // 0 deg
-		const pEnd = sketch.addPoint(0, 50); // 90 deg
+		const c = sketch.addPoint({ x: 0, y: 0 });
+		const pStart = sketch.addPoint({ x: 50, y: 0 }); // 0 deg
+		const pEnd = sketch.addPoint({ x: 0, y: 50 }); // 90 deg
 		const arc = sketch.addArc(c.id, pStart.id, pEnd.id, 50, false);
 
 		// Target line crossing circle at 180 deg: x = -50, from y = -20 to y = 20
-		const lA = sketch.addPoint(-50, -20);
-		const lB = sketch.addPoint(-50, 20);
+		const lA = sketch.addPoint({ x: -50, y: -20 });
+		const lB = sketch.addPoint({ x: -50, y: 20 });
 		sketch.addLine(lA.id, lB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -144,7 +140,7 @@ describe('Extend Tool Math and Logic', () => {
 		assert.equal(cand.targetType, 'arc');
 		assert.equal(cand.edge, 'end');
 		assert.equal(cand.becomesFullLoop, false);
-		assert.ok(Math.abs(cand.toPoint.x - (-50)) < 1e-3);
+		assert.ok(Math.abs(cand.toPoint.x - -50) < 1e-3);
 		assert.ok(Math.abs(cand.toPoint.y - 0) < 1e-3);
 
 		sketch.beginTransaction();
@@ -153,15 +149,15 @@ describe('Extend Tool Math and Logic', () => {
 
 		const updatedArc = sketch.arcs.get(arc.id)!;
 		const ptEnd = sketch.points.get(updatedArc.endPointId)!;
-		assert.ok(Math.abs(ptEnd.x - (-50)) < 1e-3);
+		assert.ok(Math.abs(ptEnd.x - -50) < 1e-3);
 		assert.ok(Math.abs(ptEnd.y - 0) < 1e-3);
 	});
 
 	it('extends an arc to a full circle when there is no intersection ahead', () => {
 		const sketch = new SketchDocument();
-		const c = sketch.addPoint(0, 0);
-		const pStart = sketch.addPoint(50, 0);
-		const pEnd = sketch.addPoint(0, 50);
+		const c = sketch.addPoint({ x: 0, y: 0 });
+		const pStart = sketch.addPoint({ x: 50, y: 0 });
+		const pEnd = sketch.addPoint({ x: 0, y: 50 });
 		const arc = sketch.addArc(c.id, pStart.id, pEnd.id, 50, false);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -186,15 +182,15 @@ describe('Extend Tool Math and Logic', () => {
 	it('extends an open spline along its endpoint tangent to an intersection', () => {
 		const sketch = new SketchDocument();
 		// Spline from (0, 0) to (90, 0)
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(30, 40);
-		const p2 = sketch.addPoint(60, 40);
-		const p3 = sketch.addPoint(90, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 30, y: 40 });
+		const p2 = sketch.addPoint({ x: 60, y: 40 });
+		const p3 = sketch.addPoint({ x: 90, y: 0 });
 		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id, p3.id]);
 
 		// Target line at x = 120
-		const lA = sketch.addPoint(120, -100);
-		const lB = sketch.addPoint(120, 100);
+		const lA = sketch.addPoint({ x: 120, y: -100 });
+		const lB = sketch.addPoint({ x: 120, y: 100 });
 		sketch.addLine(lA.id, lB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -206,7 +202,7 @@ describe('Extend Tool Math and Logic', () => {
 		assert.equal(cand.targetType, 'spline');
 		assert.equal(cand.edge, 'end');
 		assert.ok(Math.abs(cand.toPoint.x - 120) < 1e-2);
-		assert.ok(Math.abs(cand.toPoint.y - (-40)) < 1e-2);
+		assert.ok(Math.abs(cand.toPoint.y - -40) < 1e-2);
 
 		sketch.beginTransaction();
 		const res = executeExtend(sketch, cand);
@@ -224,10 +220,10 @@ describe('Extend Tool Math and Logic', () => {
 
 	it('extends an open spline by +50mm along its tangent when there is no intersection', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(30, 40);
-		const p2 = sketch.addPoint(60, 40);
-		const p3 = sketch.addPoint(90, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 30, y: 40 });
+		const p2 = sketch.addPoint({ x: 60, y: 40 });
+		const p3 = sketch.addPoint({ x: 90, y: 0 });
 		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id, p3.id]);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -238,7 +234,7 @@ describe('Extend Tool Math and Logic', () => {
 		assert.equal(cand.edge, 'end');
 		// Tangent at end is (30, -40) -> normalized (0.6, -0.8). +50mm => (90 + 30, 0 - 40) = (120, -40)
 		assert.ok(Math.abs(cand.toPoint.x - 120) < 0.5);
-		assert.ok(Math.abs(cand.toPoint.y - (-40)) < 0.5);
+		assert.ok(Math.abs(cand.toPoint.y - -40) < 0.5);
 
 		sketch.beginTransaction();
 		executeExtend(sketch, cand);
@@ -253,10 +249,10 @@ describe('Extend Tool Math and Logic', () => {
 
 	it('extends a control spline safely preserving all control points', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(-50, 0);
-		const p1 = sketch.addPoint(-50, 100);
-		const p2 = sketch.addPoint(50, 100);
-		const p3 = sketch.addPoint(50, 0);
+		const p0 = sketch.addPoint({ x: -50, y: 0 });
+		const p1 = sketch.addPoint({ x: -50, y: 100 });
+		const p2 = sketch.addPoint({ x: 50, y: 100 });
+		const p3 = sketch.addPoint({ x: 50, y: 0 });
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id]);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -281,19 +277,19 @@ describe('Extend Tool Math and Logic', () => {
 	it('removes conflicting point_on_line and external alignment constraints without dragging other entities', () => {
 		const sketch = new SketchDocument();
 		// Line-3: diagonal line from (50, 0) to (0, 80)
-		const p2 = sketch.addPoint(50, 0);
-		const p3 = sketch.addPoint(0, 80);
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
+		const p3 = sketch.addPoint({ x: 0, y: 80 });
 		sketch.addLine(p2.id, p3.id);
 
 		// Line-4: horizontal line from (-50, 30) to (-5, 30)
-		const p4 = sketch.addPoint(-50, 30);
-		const p5 = sketch.addPoint(-5, 30);
+		const p4 = sketch.addPoint({ x: -50, y: 30 });
+		const p5 = sketch.addPoint({ x: -5, y: 30 });
 		const l4 = sketch.addLine(p4.id, p5.id);
 		sketch.addHorizontalConstraint(p4.id, p5.id);
 
 		// Line-5: vertical line at x = -5 from y = 0 to y = 60
-		const p8 = sketch.addPoint(-5, 0);
-		const p6 = sketch.addPoint(-5, 60);
+		const p8 = sketch.addPoint({ x: -5, y: 0 });
+		const p6 = sketch.addPoint({ x: -5, y: 60 });
 		sketch.addLine(p8.id, p6.id);
 		sketch.addVerticalConstraint(p5.id, p6.id);
 		sketch.addPointOnLineConstraint(p5.id, p8.id); // p5 on Line-5
@@ -323,17 +319,17 @@ describe('Extend Tool Math and Logic', () => {
 
 	it('transfers horizontal and vertical constraints to the new endpoint when extending a shared corner', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 30);
-		const p2 = sketch.addPoint(50, 30);
-		const p3 = sketch.addPoint(50, 80);
+		const p1 = sketch.addPoint({ x: 0, y: 30 });
+		const p2 = sketch.addPoint({ x: 50, y: 30 });
+		const p3 = sketch.addPoint({ x: 50, y: 80 });
 
 		const lineA = sketch.addLine(p1.id, p2.id);
 		sketch.addLine(p2.id, p3.id); // p2 is shared with this vertical line
 		const cHoriz = sketch.addHorizontalConstraint(p1.id, p2.id);
 
 		// Target line at x = 100
-		const pA = sketch.addPoint(100, 0);
-		const pB = sketch.addPoint(100, 60);
+		const pA = sketch.addPoint({ x: 100, y: 0 });
+		const pB = sketch.addPoint({ x: 100, y: 60 });
 		sketch.addLine(pA.id, pB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -362,29 +358,29 @@ describe('Extend Tool Math and Logic', () => {
 
 	it('transfers Parallel, Perpendicular, and Angle constraints to the new endpoint', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 50);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 50 });
 		const l1 = sketch.addLine(p1.id, p2.id);
 
 		// Shared vertical line at p2
-		const p3 = sketch.addPoint(50, 100);
+		const p3 = sketch.addPoint({ x: 50, y: 100 });
 		sketch.addLine(p2.id, p3.id);
 
 		// Parallel line l2
-		const p4 = sketch.addPoint(0, 50);
-		const p5 = sketch.addPoint(50, 100);
+		const p4 = sketch.addPoint({ x: 0, y: 50 });
+		const p5 = sketch.addPoint({ x: 50, y: 100 });
 		const l2 = sketch.addLine(p4.id, p5.id);
 		const cPar = sketch.addParallelConstraint(l1.id, l2.id)!;
 
 		// Perpendicular line l3
-		const p6 = sketch.addPoint(0, 50);
-		const p7 = sketch.addPoint(50, 0);
+		const p6 = sketch.addPoint({ x: 0, y: 50 });
+		const p7 = sketch.addPoint({ x: 50, y: 0 });
 		const l3 = sketch.addLine(p6.id, p7.id);
 		const cPerp = sketch.addPerpendicularConstraint(l1.id, l3.id)!;
 
 		// Target line at x = 100
-		const pA = sketch.addPoint(100, -50);
-		const pB = sketch.addPoint(100, 150);
+		const pA = sketch.addPoint({ x: 100, y: -50 });
+		const pB = sketch.addPoint({ x: 100, y: 150 });
 		sketch.addLine(pA.id, pB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
@@ -409,12 +405,12 @@ describe('Extend Tool Math and Logic', () => {
 
 	it('removes conflicting EqualLengthConstraint when extending a line', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(50, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
 		const l1 = sketch.addLine(p1.id, p2.id);
 
-		const p3 = sketch.addPoint(0, 50);
-		const p4 = sketch.addPoint(50, 50);
+		const p3 = sketch.addPoint({ x: 0, y: 50 });
+		const p4 = sketch.addPoint({ x: 50, y: 50 });
 		const l2 = sketch.addLine(p3.id, p4.id);
 
 		const cEq = sketch.addEqualLengthConstraint(l1.id, l2.id)!;
@@ -438,12 +434,12 @@ describe('ExtendTool Interaction and Workflow', () => {
 		const cleanup = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 0 });
 			const l1 = sketch.addLine(p0.id, p1.id);
 
-			const pA = sketch.addPoint(80, -50);
-			const pB = sketch.addPoint(80, 50);
+			const pA = sketch.addPoint({ x: 80, y: -50 });
+			const pB = sketch.addPoint({ x: 80, y: 50 });
 			sketch.addLine(pA.id, pB.id);
 
 			const tool = new ExtendTool();
@@ -452,8 +448,8 @@ describe('ExtendTool Interaction and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (x: number, y: number) => ({ x, y }),
-					screenToWorld: (x: number, y: number) => ({ x, y }),
+					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 				},
 				requestRender: () => {},
 				setCursor: () => {},

@@ -70,9 +70,9 @@ export class PerpendicularConstraint extends BaseConstraint {
 		const isNearSegments = distToSeg1 < 30 && distToSeg2 < 30;
 
 		if (isSharedPoint || isNearSegments) {
-			const sCenter = ctx.viewport.worldToScreen(geom.pInt.x, geom.pInt.y);
-			const sRay1 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u1.x * 20, geom.pInt.y + geom.u1.y * 20);
-			const sRay2 = ctx.viewport.worldToScreen(geom.pInt.x + geom.u2.x * 20, geom.pInt.y + geom.u2.y * 20);
+			const sCenter = ctx.viewport.worldToScreen(geom.pInt);
+			const sRay1 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u1.x * 20, y: geom.pInt.y + geom.u1.y * 20 });
+			const sRay2 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u2.x * 20, y: geom.pInt.y + geom.u2.y * 20 });
 
 			const d1 = { x: sRay1.x - sCenter.x, y: sRay1.y - sCenter.y };
 			const d2 = { x: sRay2.x - sCenter.x, y: sRay2.y - sCenter.y };
@@ -95,7 +95,7 @@ export class PerpendicularConstraint extends BaseConstraint {
 			const offset = 18;
 			const badgeX = sCenter.x + dir.x * offset;
 			const badgeY = sCenter.y + dir.y * offset;
-			ctx.renderBadge(this.id, badgeX, badgeY, '⊥');
+			ctx.renderBadge(this.id, { x: badgeX, y: badgeY }, '⊥');
 			return;
 		}
 

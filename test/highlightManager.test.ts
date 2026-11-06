@@ -36,7 +36,8 @@ function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {})
 			remove: (cls: string) => classNames.delete(cls),
 			contains: (cls: string) => classNames.has(cls),
 		},
-		getAttribute: (name: string) => (name === 'class' ? Array.from(classNames).join(' ') : (attributes.get(name) ?? null)),
+		getAttribute: (name: string) =>
+			name === 'class' ? Array.from(classNames).join(' ') : (attributes.get(name) ?? null),
 		setAttribute: (name: string, val: string) => {
 			attributes.set(name, String(val));
 		},
@@ -64,13 +65,17 @@ function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {})
 	};
 }
 
-function createMockContext(sketch: SketchDocument, svgRoot: any, rendererExtras: Record<string, any> = {}): ToolContext {
+function createMockContext(
+	sketch: SketchDocument,
+	svgRoot: any,
+	rendererExtras: Record<string, any> = {}
+): ToolContext {
 	const viewport = {
 		zoom: 1,
 		panX: 0,
 		panY: 0,
-		screenToWorld: (x: number, y: number) => vec(x, y),
-		worldToScreen: (x: number, y: number) => vec(x, y),
+		screenToWorld: (p: { x: number; y: number }) => vec(p.x, p.y),
+		worldToScreen: (p: { x: number; y: number }) => vec(p.x, p.y),
 	} as any;
 
 	const ctx: any = {
@@ -143,8 +148,8 @@ class TestCustomTool extends BaseTool {
 describe('HighlightManager centralized highlighting', () => {
 	it('does not highlight when tool has isHighlightEnabled() = false', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -164,8 +169,8 @@ describe('HighlightManager centralized highlighting', () => {
 
 	it('respects canHighlight() predicate to reject disallowed targets', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -185,8 +190,8 @@ describe('HighlightManager centralized highlighting', () => {
 
 	it('applies custom class and custom color styling when tool provides them', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -213,8 +218,8 @@ describe('HighlightManager centralized highlighting', () => {
 
 	it('refreshes highlight after DOM re-render without losing hover state', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -242,8 +247,8 @@ describe('HighlightManager centralized highlighting', () => {
 
 	it('clears hover state during refresh if entity was deleted from sketch', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -292,10 +297,10 @@ describe('HighlightManager centralized highlighting', () => {
 describe('Constraint and Transform tools hovering', () => {
 	it('ConstraintTool: highlights only compatible entities for the active constraint', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
-		const center = sketch.addPoint(200, 200);
+		const center = sketch.addPoint({ x: 200, y: 200 });
 		const circle = sketch.addCircle(center.id, 30);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -342,11 +347,11 @@ describe('Constraint and Transform tools hovering', () => {
 
 	it('DimensionTool: highlights in step 0 and 1, disabled in step 2', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line1 = sketch.addLine(p1.id, p2.id);
-		const p3 = sketch.addPoint(0, 50);
-		const p4 = sketch.addPoint(100, 50);
+		const p3 = sketch.addPoint({ x: 0, y: 50 });
+		const p4 = sketch.addPoint({ x: 100, y: 50 });
 		const line2 = sketch.addLine(p3.id, p4.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -381,8 +386,8 @@ describe('Constraint and Transform tools hovering', () => {
 
 	it('MirrorTool: highlights all primitives in objects phase, only lines in mirror_line phase', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -413,8 +418,8 @@ describe('Constraint and Transform tools hovering', () => {
 
 	it('CircularPatternTool: highlights primitives in objects phase, only points in center_point phase, disables over checkboxes', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');
@@ -456,8 +461,8 @@ describe('Constraint and Transform tools hovering', () => {
 
 	it('RectangularPatternTool: highlights primitives in objects phase, only lines in direction phases, disables over handles and dragging', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
 		const svgRoot = createMockSvgElement('svg');

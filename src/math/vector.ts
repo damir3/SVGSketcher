@@ -3,14 +3,32 @@ export interface Vec2 {
 	y: number;
 }
 
+export const ORIGIN: Readonly<Vec2> = Object.freeze({ x: 0, y: 0 });
+
 export function vec(x: number, y: number): Vec2 {
 	return { x, y };
+}
+
+export function mid(a: Vec2, b: Vec2): Vec2 {
+	return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+export function abs(a: Vec2, b: Vec2): Vec2 {
+	return { x: Math.abs(a.x - b.x), y: Math.abs(a.y - b.y) };
+}
+
+export function mul(a: Vec2, b: Vec2): Vec2 {
+	return { x: a.x * b.x, y: a.y * b.y };
 }
 
 export function dist(a: Vec2, b: Vec2): number {
 	const dx = b.x - a.x;
 	const dy = b.y - a.y;
 	return Math.hypot(dx, dy);
+}
+
+export function distancesFrom(origin: Vec2, a: Vec2, b: Vec2): Vec2 {
+	return { x: dist(origin, a), y: dist(origin, b) };
 }
 
 export function distSq(a: Vec2, b: Vec2): number {
@@ -20,7 +38,8 @@ export function distSq(a: Vec2, b: Vec2): number {
 }
 
 export function dot(a: Vec2, b: Vec2): number {
-	return a.x * b.x + a.y * b.y;
+	const products = mul(a, b);
+	return products.x + products.y;
 }
 
 export function cross(a: Vec2, b: Vec2): number {
@@ -33,6 +52,14 @@ export function add(a: Vec2, b: Vec2): Vec2 {
 
 export function sub(a: Vec2, b: Vec2): Vec2 {
 	return { x: a.x - b.x, y: a.y - b.y };
+}
+
+export function addScalar(a: Vec2, f: number): Vec2 {
+	return { x: a.x + f, y: a.y + f };
+}
+
+export function subScalar(a: Vec2, f: number): Vec2 {
+	return { x: a.x - f, y: a.y - f };
 }
 
 export function scale(v: Vec2, s: number): Vec2 {

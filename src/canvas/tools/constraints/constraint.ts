@@ -1,3 +1,4 @@
+import { ORIGIN } from '../../../math/vector';
 import { LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent } from '../types';
@@ -120,7 +121,7 @@ export class ConstraintTool extends BaseTool {
 									id = hitSpline.id;
 									type = 'spline';
 								} else if (this.isEntityCompatibleWithConstraint('line')) {
-									const sOrigin = this.ctx.viewport.worldToScreen(0, 0);
+									const sOrigin = this.ctx.viewport.worldToScreen(ORIGIN);
 									if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
 										id = 'axis_x';
 										type = 'line';

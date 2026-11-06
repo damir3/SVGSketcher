@@ -26,7 +26,7 @@ export class SketchPoint implements ISketchPrimitive {
 	}
 
 	distanceTo(screen: Vec2, _sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const s = viewport.worldToScreen(this.x, this.y);
+		const s = viewport.worldToScreen(this);
 		return distanceToPoint(screen, s);
 	}
 

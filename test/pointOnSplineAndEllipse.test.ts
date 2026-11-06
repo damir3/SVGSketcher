@@ -105,9 +105,9 @@ function createMockCtx(sketch: SketchDocument, vp: Viewport, interaction?: Canva
 describe('Point on Ellipse Constraint', () => {
 	it('constrains a free point to lie on an ellipse and solves successfully', () => {
 		const sketch = new SketchDocument();
-		const cPt = sketch.addPoint(0, 0);
-		const majPt = sketch.addPoint(50, 0);
-		const minPt = sketch.addPoint(0, 20);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
+		const majPt = sketch.addPoint({ x: 50, y: 0 });
+		const minPt = sketch.addPoint({ x: 0, y: 20 });
 		const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
 
 		// Fix ellipse definition points
@@ -116,7 +116,7 @@ describe('Point on Ellipse Constraint', () => {
 		sketch.addFixedConstraint(minPt.id);
 
 		// Free point near the ellipse
-		const testPt = sketch.addPoint(45, 15);
+		const testPt = sketch.addPoint({ x: 45, y: 15 });
 		const c = sketch.addPointOnEllipseConstraint(testPt.id, ellipse.id);
 
 		assert.ok(c instanceof PointOnEllipseConstraint, 'Constraint created');
@@ -131,18 +131,18 @@ describe('Point on Ellipse Constraint', () => {
 
 	it('constrains a free point to lie on an elliptical arc', () => {
 		const sketch = new SketchDocument();
-		const cPt = sketch.addPoint(0, 0);
-		const majPt = sketch.addPoint(40, 0);
-		const minPt = sketch.addPoint(0, 30);
-		const startPt = sketch.addPoint(40, 0);
-		const endPt = sketch.addPoint(0, 30);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
+		const majPt = sketch.addPoint({ x: 40, y: 0 });
+		const minPt = sketch.addPoint({ x: 0, y: 30 });
+		const startPt = sketch.addPoint({ x: 40, y: 0 });
+		const endPt = sketch.addPoint({ x: 0, y: 30 });
 		const arc = sketch.addEllipticalArc(cPt.id, majPt.id, minPt.id, startPt.id, endPt.id);
 
 		sketch.addFixedConstraint(cPt.id);
 		sketch.addFixedConstraint(majPt.id);
 		sketch.addFixedConstraint(minPt.id);
 
-		const testPt = sketch.addPoint(30, 25);
+		const testPt = sketch.addPoint({ x: 30, y: 25 });
 		const c = sketch.addPointOnEllipseConstraint(testPt.id, arc.id);
 
 		assert.ok(c instanceof PointOnEllipseConstraint, 'Constraint created for elliptical arc');
@@ -153,16 +153,16 @@ describe('Point on Ellipse Constraint', () => {
 
 	it('rejects ellipse definition points and duplicate constraints', () => {
 		const sketch = new SketchDocument();
-		const cPt = sketch.addPoint(0, 0);
-		const majPt = sketch.addPoint(50, 0);
-		const minPt = sketch.addPoint(0, 20);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
+		const majPt = sketch.addPoint({ x: 50, y: 0 });
+		const minPt = sketch.addPoint({ x: 0, y: 20 });
 		const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
 
 		assert.equal(sketch.addPointOnEllipseConstraint(cPt.id, ellipse.id), null);
 		assert.equal(sketch.addPointOnEllipseConstraint(majPt.id, ellipse.id), null);
 		assert.equal(sketch.addPointOnEllipseConstraint(minPt.id, ellipse.id), null);
 
-		const freePt = sketch.addPoint(10, 10);
+		const freePt = sketch.addPoint({ x: 10, y: 10 });
 		const c1 = sketch.addPointOnEllipseConstraint(freePt.id, ellipse.id);
 		assert.ok(c1);
 		const c2 = sketch.addPointOnEllipseConstraint(freePt.id, ellipse.id);
@@ -171,11 +171,11 @@ describe('Point on Ellipse Constraint', () => {
 
 	it('supports snapshot serialization and deserialization (undo/redo)', () => {
 		const sketch = new SketchDocument();
-		const cPt = sketch.addPoint(0, 0);
-		const majPt = sketch.addPoint(60, 0);
-		const minPt = sketch.addPoint(0, 30);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
+		const majPt = sketch.addPoint({ x: 60, y: 0 });
+		const minPt = sketch.addPoint({ x: 0, y: 30 });
 		const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
-		const freePt = sketch.addPoint(50, 10);
+		const freePt = sketch.addPoint({ x: 50, y: 10 });
 
 		sketch.addPointOnEllipseConstraint(freePt.id, ellipse.id);
 
@@ -191,11 +191,11 @@ describe('Point on Ellipse Constraint', () => {
 
 	it('deleting ellipse cascades to remove PointOnEllipseConstraint', () => {
 		const sketch = new SketchDocument();
-		const cPt = sketch.addPoint(0, 0);
-		const majPt = sketch.addPoint(50, 0);
-		const minPt = sketch.addPoint(0, 20);
+		const cPt = sketch.addPoint({ x: 0, y: 0 });
+		const majPt = sketch.addPoint({ x: 50, y: 0 });
+		const minPt = sketch.addPoint({ x: 0, y: 20 });
 		const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
-		const freePt = sketch.addPoint(45, 15);
+		const freePt = sketch.addPoint({ x: 45, y: 15 });
 		sketch.addPointOnEllipseConstraint(freePt.id, ellipse.id);
 
 		assert.equal([...sketch.constraints.values()].filter(c => c instanceof PointOnEllipseConstraint).length, 1);
@@ -207,16 +207,16 @@ describe('Point on Ellipse Constraint', () => {
 describe('Point on Spline Constraint', () => {
 	it('constrains a free point to lie on a fit spline', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 40);
-		const p2 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 40 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
 
 		sketch.addFixedConstraint(p0.id);
 		sketch.addFixedConstraint(p1.id);
 		sketch.addFixedConstraint(p2.id);
 
-		const testPt = sketch.addPoint(50, 10);
+		const testPt = sketch.addPoint({ x: 50, y: 10 });
 		const c = sketch.addPointOnSplineConstraint(testPt.id, spline.id);
 
 		assert.ok(c instanceof PointOnSplineConstraint, 'Constraint created');
@@ -232,10 +232,10 @@ describe('Point on Spline Constraint', () => {
 
 	it('constrains a free point to lie on a control spline', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(20, 50);
-		const p2 = sketch.addPoint(80, 50);
-		const p3 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 20, y: 50 });
+		const p2 = sketch.addPoint({ x: 80, y: 50 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id]);
 
 		sketch.addFixedConstraint(p0.id);
@@ -243,7 +243,7 @@ describe('Point on Spline Constraint', () => {
 		sketch.addFixedConstraint(p2.id);
 		sketch.addFixedConstraint(p3.id);
 
-		const testPt = sketch.addPoint(50, 0);
+		const testPt = sketch.addPoint({ x: 50, y: 0 });
 		const c = sketch.addPointOnSplineConstraint(testPt.id, spline.id);
 
 		assert.ok(c instanceof PointOnSplineConstraint, 'Control spline constraint created');
@@ -258,15 +258,15 @@ describe('Point on Spline Constraint', () => {
 
 	it('rejects fit points and handle points and duplicate constraints', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 30);
-		const p2 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 30 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
 
 		assert.equal(sketch.addPointOnSplineConstraint(p0.id, spline.id), null);
 		assert.equal(sketch.addPointOnSplineConstraint(p1.id, spline.id), null);
 
-		const testPt = sketch.addPoint(20, 20);
+		const testPt = sketch.addPoint({ x: 20, y: 20 });
 		const c1 = sketch.addPointOnSplineConstraint(testPt.id, spline.id);
 		assert.ok(c1);
 		const c2 = sketch.addPointOnSplineConstraint(testPt.id, spline.id);
@@ -275,11 +275,11 @@ describe('Point on Spline Constraint', () => {
 
 	it('supports snapshot serialization and deserialization (undo/redo)', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 40);
-		const p2 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 40 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
-		const freePt = sketch.addPoint(50, 20);
+		const freePt = sketch.addPoint({ x: 50, y: 20 });
 
 		sketch.addPointOnSplineConstraint(freePt.id, spline.id);
 
@@ -295,11 +295,11 @@ describe('Point on Spline Constraint', () => {
 
 	it('deleting spline cascades to remove PointOnSplineConstraint', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 40);
-		const p2 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 40 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
-		const freePt = sketch.addPoint(50, 20);
+		const freePt = sketch.addPoint({ x: 50, y: 20 });
 		sketch.addPointOnSplineConstraint(freePt.id, spline.id);
 
 		assert.equal([...sketch.constraints.values()].filter(c => c instanceof PointOnSplineConstraint).length, 1);
@@ -313,11 +313,11 @@ describe('Coincident Tool with Ellipse and Spline', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const cPt = sketch.addPoint(0, 0);
-			const majPt = sketch.addPoint(50, 0);
-			const minPt = sketch.addPoint(0, 20);
+			const cPt = sketch.addPoint({ x: 0, y: 0 });
+			const majPt = sketch.addPoint({ x: 50, y: 0 });
+			const minPt = sketch.addPoint({ x: 0, y: 20 });
 			const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
-			const pt = sketch.addPoint(40, 10);
+			const pt = sketch.addPoint({ x: 40, y: 10 });
 
 			const vp = new Viewport(800, 600);
 			const tool = new ConstraintTool('coincident');
@@ -336,7 +336,7 @@ describe('Coincident Tool with Ellipse and Spline', () => {
 			// Clear and test reverse order: ellipse then point
 			sketch.removeConstraint(elConstraints[0].id);
 			(tool as any).handleConstraintEntityClick(ellipse.id, 'ellipse');
-			const pt2 = sketch.addPoint(30, 15);
+			const pt2 = sketch.addPoint({ x: 30, y: 15 });
 			(tool as any).handleConstraintEntityClick(pt2.id, 'point');
 
 			elConstraints = [...sketch.constraints.values()].filter(c => c instanceof PointOnEllipseConstraint);
@@ -351,11 +351,11 @@ describe('Coincident Tool with Ellipse and Spline', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 40);
-			const p2 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 40 });
+			const p2 = sketch.addPoint({ x: 100, y: 0 });
 			const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
-			const pt = sketch.addPoint(50, 20);
+			const pt = sketch.addPoint({ x: 50, y: 20 });
 
 			const vp = new Viewport(800, 600);
 			const tool = new ConstraintTool('coincident');
@@ -374,7 +374,7 @@ describe('Coincident Tool with Ellipse and Spline', () => {
 			// Clear and test reverse order: spline then point
 			sketch.removeConstraint(spConstraints[0].id);
 			(tool as any).handleConstraintEntityClick(spline.id, 'spline');
-			const pt2 = sketch.addPoint(60, 25);
+			const pt2 = sketch.addPoint({ x: 60, y: 25 });
 			(tool as any).handleConstraintEntityClick(pt2.id, 'point');
 
 			spConstraints = [...sketch.constraints.values()].filter(c => c instanceof PointOnSplineConstraint);
@@ -392,11 +392,11 @@ describe('Coincident Tool with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const cPt = sketch.addPoint(0, 0);
-			const majPt = sketch.addPoint(50, 0);
-			const minPt = sketch.addPoint(0, 20);
+			const cPt = sketch.addPoint({ x: 0, y: 0 });
+			const majPt = sketch.addPoint({ x: 50, y: 0 });
+			const minPt = sketch.addPoint({ x: 0, y: 20 });
 			const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
-			const pt = sketch.addPoint(30, 15);
+			const pt = sketch.addPoint({ x: 30, y: 15 });
 
 			sketch.selection.pointIds.add(pt.id);
 			sketch.selection.ellipseIds.add(ellipse.id);
@@ -419,11 +419,11 @@ describe('Coincident Tool with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 40);
-			const p2 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 40 });
+			const p2 = sketch.addPoint({ x: 100, y: 0 });
 			const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
-			const pt = sketch.addPoint(40, 30);
+			const pt = sketch.addPoint({ x: 40, y: 30 });
 
 			sketch.selection.pointIds.add(pt.id);
 			sketch.selection.splineIds.add(spline.id);
@@ -449,15 +449,15 @@ describe('Snapping with Ellipse and Spline', () => {
 			const interaction = createMockInteraction(sketch, vp);
 
 			// Center away from axes (100, 100)
-			const cPt = sketch.addPoint(100, 100);
-			const majPt = sketch.addPoint(180, 100); // rx = 80
-			const minPt = sketch.addPoint(100, 140); // ry = 40
+			const cPt = sketch.addPoint({ x: 100, y: 100 });
+			const majPt = sketch.addPoint({ x: 180, y: 100 }); // rx = 80
+			const minPt = sketch.addPoint({ x: 100, y: 140 }); // ry = 40
 			const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
 
 			// Query along ellipse perimeter away from definition points: at theta = 45 deg
 			// x = 100 + 80*cos(pi/4) ~ 156.57, y = 100 + 40*sin(pi/4) ~ 128.28
 			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
-			const s = vp.worldToScreen(pEl.x, pEl.y);
+			const s = vp.worldToScreen(pEl);
 			const snap = interaction.findSnap(vec(s.x + 2, s.y - 2));
 			assert.ok(snap, 'Snap found');
 			assert.equal(snap.type, 'ellipse');
@@ -476,13 +476,13 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 40);
-			const p2 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 40 });
+			const p2 = sketch.addPoint({ x: 100, y: 0 });
 			const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
 
 			// Point along spline body away from fit points and axes
-			const sMid = vp.worldToScreen(25, 25);
+			const sMid = vp.worldToScreen({ x: 25, y: 25 });
 			const snapMid = interaction.findSnap(sMid);
 			assert.ok(snapMid, 'Snap found along spline body');
 			assert.equal(snapMid.type, 'spline');
@@ -499,13 +499,13 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const cPt = sketch.addPoint(100, 100);
-			const majPt = sketch.addPoint(180, 100);
-			const minPt = sketch.addPoint(100, 140);
+			const cPt = sketch.addPoint({ x: 100, y: 100 });
+			const majPt = sketch.addPoint({ x: 180, y: 100 });
+			const minPt = sketch.addPoint({ x: 100, y: 140 });
 			const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
 
 			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
-			const s = vp.worldToScreen(pEl.x, pEl.y);
+			const s = vp.worldToScreen(pEl);
 			const snap = interaction.findSnap(s);
 			assert.ok(snap && snap.type === 'ellipse');
 
@@ -538,12 +538,12 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const p0 = sketch.addPoint(0, 0);
-			const p1 = sketch.addPoint(50, 40);
-			const p2 = sketch.addPoint(100, 0);
+			const p0 = sketch.addPoint({ x: 0, y: 0 });
+			const p1 = sketch.addPoint({ x: 50, y: 40 });
+			const p2 = sketch.addPoint({ x: 100, y: 0 });
 			const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
 
-			const sMid = vp.worldToScreen(25, 25);
+			const sMid = vp.worldToScreen({ x: 25, y: 25 });
 			const snap = interaction.findSnap(sMid);
 			assert.ok(snap && snap.type === 'spline');
 
@@ -576,9 +576,9 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const cPt = sketch.addPoint(100, 100);
-			const majPt = sketch.addPoint(180, 100);
-			const minPt = sketch.addPoint(100, 140);
+			const cPt = sketch.addPoint({ x: 100, y: 100 });
+			const majPt = sketch.addPoint({ x: 180, y: 100 });
+			const minPt = sketch.addPoint({ x: 100, y: 140 });
 			const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
 
 			const tool = new LineTool();
@@ -586,7 +586,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			tool.activate(mockCtx);
 
 			// Step 1: Start free line at (50, 50)
-			const sStart = vp.worldToScreen(50, 50);
+			const sStart = vp.worldToScreen({ x: 50, y: 50 });
 			tool.onMouseDown({
 				screen: sStart,
 				world: vec(50, 50),
@@ -599,7 +599,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			// Step 2: Snap to ellipse at perimeter
 			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
-			const sEllipse = vp.worldToScreen(pEl.x, pEl.y);
+			const sEllipse = vp.worldToScreen(pEl);
 			const snapEllipse = interaction.findSnap(sEllipse);
 			assert.ok(snapEllipse && snapEllipse.type === 'ellipse');
 
@@ -629,16 +629,16 @@ describe('Snapping with Ellipse and Spline', () => {
 			const interaction = createMockInteraction(sketch, vp);
 
 			// Elliptical arc in first quadrant: center (100, 100), rx=60, ry=30, span from (160, 100) to (100, 130)
-			const cPt = sketch.addPoint(100, 100);
-			const majPt = sketch.addPoint(160, 100);
-			const minPt = sketch.addPoint(100, 130);
-			const startPt = sketch.addPoint(160, 100);
-			const endPt = sketch.addPoint(100, 130);
+			const cPt = sketch.addPoint({ x: 100, y: 100 });
+			const majPt = sketch.addPoint({ x: 160, y: 100 });
+			const minPt = sketch.addPoint({ x: 100, y: 130 });
+			const startPt = sketch.addPoint({ x: 160, y: 100 });
+			const endPt = sketch.addPoint({ x: 100, y: 130 });
 			const arc = sketch.addEllipticalArc(cPt.id, majPt.id, minPt.id, startPt.id, endPt.id);
 
 			// Point inside angular span: theta = pi/4
 			const pIn = vec(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
-			const sIn = vp.worldToScreen(pIn.x, pIn.y);
+			const sIn = vp.worldToScreen(pIn);
 			const snapIn = interaction.findSnap(vec(sIn.x + 2, sIn.y - 2));
 			assert.ok(snapIn, 'Snap should be found within angular span');
 			assert.equal(snapIn.type, 'ellipse');
@@ -646,7 +646,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			// Point outside angular span: theta = pi (x=40, y=100)
 			const pOut = vec(40, 100);
-			const sOut = vp.worldToScreen(pOut.x, pOut.y);
+			const sOut = vp.worldToScreen(pOut);
 			const snapOut = interaction.findSnap(sOut);
 			// Should NOT snap to arc.id
 			if (snapOut) {
@@ -664,15 +664,15 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const cPt = sketch.addPoint(100, 100);
-			const majPt = sketch.addPoint(160, 100);
-			const minPt = sketch.addPoint(100, 130);
-			const startPt = sketch.addPoint(160, 100);
-			const endPt = sketch.addPoint(100, 130);
+			const cPt = sketch.addPoint({ x: 100, y: 100 });
+			const majPt = sketch.addPoint({ x: 160, y: 100 });
+			const minPt = sketch.addPoint({ x: 100, y: 130 });
+			const startPt = sketch.addPoint({ x: 160, y: 100 });
+			const endPt = sketch.addPoint({ x: 100, y: 130 });
 			const arc = sketch.addEllipticalArc(cPt.id, majPt.id, minPt.id, startPt.id, endPt.id);
 
 			const pIn = vec(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
-			const s = vp.worldToScreen(pIn.x, pIn.y);
+			const s = vp.worldToScreen(pIn);
 			const snap = interaction.findSnap(s);
 			assert.ok(snap && snap.id === arc.id);
 
@@ -705,17 +705,17 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const cPt = sketch.addPoint(100, 100);
-			const majPt = sketch.addPoint(160, 100);
-			const minPt = sketch.addPoint(100, 130);
-			const startPt = sketch.addPoint(160, 100);
-			const endPt = sketch.addPoint(100, 130);
+			const cPt = sketch.addPoint({ x: 100, y: 100 });
+			const majPt = sketch.addPoint({ x: 160, y: 100 });
+			const minPt = sketch.addPoint({ x: 100, y: 130 });
+			const startPt = sketch.addPoint({ x: 160, y: 100 });
+			const endPt = sketch.addPoint({ x: 100, y: 130 });
 			const arc = sketch.addEllipticalArc(cPt.id, majPt.id, minPt.id, startPt.id, endPt.id);
 
-			const freePt = sketch.addPoint(200, 200);
+			const freePt = sketch.addPoint({ x: 200, y: 200 });
 
 			const pIn = vec(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
-			const sIn = vp.worldToScreen(pIn.x, pIn.y);
+			const sIn = vp.worldToScreen(pIn);
 
 			(interaction as any).isDraggingPoint = true;
 			(interaction as any).draggedPointId = freePt.id;
@@ -742,7 +742,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const interaction = createMockInteraction(sketch, vp);
 
 			// Test X-axis at x=150, y=0 (screen y = sOrigin.y)
-			const sX = vp.worldToScreen(150, 0);
+			const sX = vp.worldToScreen({ x: 150, y: 0 });
 			const snapX = interaction.findSnap(vec(sX.x, sX.y + 3));
 			assert.ok(snapX, 'Snap found on X axis');
 			assert.equal(snapX.type, 'line');
@@ -750,7 +750,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			assert.equal(snapX.worldPos.y, 0);
 
 			// Test Y-axis at x=0, y=150 (screen x = sOrigin.x)
-			const sY = vp.worldToScreen(0, 150);
+			const sY = vp.worldToScreen({ x: 0, y: 150 });
 			const snapY = interaction.findSnap(vec(sY.x + 3, sY.y));
 			assert.ok(snapY, 'Snap found on Y axis');
 			assert.equal(snapY.type, 'line');
@@ -769,7 +769,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const interaction = createMockInteraction(sketch, vp);
 
 			// 1. PointTool on X-axis
-			const sX = vp.worldToScreen(150, 0);
+			const sX = vp.worldToScreen({ x: 150, y: 0 });
 			const snapX = interaction.findSnap(sX);
 			assert.ok(snapX && snapX.id === 'axis_x');
 
@@ -789,13 +789,17 @@ describe('Snapping with Ellipse and Spline', () => {
 			const pt1 = [...sketch.points.values()].find(p => Math.abs(p.x - 150) < 1);
 			assert.ok(pt1);
 			const cX = [...sketch.constraints.values()].find(
-				c => c instanceof OriginDistanceConstraint && c.pointId === pt1.id && c.orientation === 'vertical' && c.targetDistance === 0
+				c =>
+					c instanceof OriginDistanceConstraint &&
+					c.pointId === pt1.id &&
+					c.orientation === 'vertical' &&
+					c.targetDistance === 0
 			);
 			assert.ok(cX, 'PointOnAxisConstraint applied for X-axis via PointTool');
 
 			// 2. Drag and drop on Y-axis
-			const freePt = sketch.addPoint(50, 150);
-			const sY = vp.worldToScreen(0, 150);
+			const freePt = sketch.addPoint({ x: 50, y: 150 });
+			const sY = vp.worldToScreen({ x: 0, y: 150 });
 
 			(interaction as any).isDraggingPoint = true;
 			(interaction as any).draggedPointId = freePt.id;
@@ -806,7 +810,11 @@ describe('Snapping with Ellipse and Spline', () => {
 			} as any);
 
 			const cY = [...sketch.constraints.values()].find(
-				c => c instanceof OriginDistanceConstraint && c.pointId === freePt.id && c.orientation === 'horizontal' && c.targetDistance === 0
+				c =>
+					c instanceof OriginDistanceConstraint &&
+					c.pointId === freePt.id &&
+					c.orientation === 'horizontal' &&
+					c.targetDistance === 0
 			);
 			assert.ok(cY, 'PointOnAxisConstraint applied for Y-axis via drag drop');
 		} finally {
@@ -821,7 +829,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const sOrigin = vp.worldToScreen(0, 0);
+			const sOrigin = vp.worldToScreen({ x: 0, y: 0 });
 			const snap = interaction.findSnap(vec(sOrigin.x + 3, sOrigin.y - 3));
 			assert.ok(snap, 'Snap found at origin');
 			assert.equal(snap.type, 'point');
@@ -840,7 +848,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const sOrigin = vp.worldToScreen(0, 0);
+			const sOrigin = vp.worldToScreen({ x: 0, y: 0 });
 			const snapOrigin = interaction.findSnap(sOrigin);
 			assert.ok(snapOrigin && snapOrigin.id === 'origin');
 
@@ -860,7 +868,8 @@ describe('Snapping with Ellipse and Spline', () => {
 			const ptOrigin = [...sketch.points.values()].find(p => p.x === 0 && p.y === 0);
 			assert.ok(ptOrigin);
 			const cOrigin = [...sketch.constraints.values()].find(
-				c => c instanceof OriginDistanceConstraint && c.pointId === ptOrigin.id && c.isCoincident && c.targetDistance === 0
+				c =>
+					c instanceof OriginDistanceConstraint && c.pointId === ptOrigin.id && c.isCoincident && c.targetDistance === 0
 			);
 			assert.ok(cOrigin, 'OriginCoincidentConstraint applied via PointTool');
 		} finally {
@@ -875,8 +884,8 @@ describe('Snapping with Ellipse and Spline', () => {
 			const vp = new Viewport(800, 600);
 			const interaction = createMockInteraction(sketch, vp);
 
-			const sOrigin = vp.worldToScreen(0, 0);
-			const freePt = sketch.addPoint(80, 80);
+			const sOrigin = vp.worldToScreen({ x: 0, y: 0 });
+			const freePt = sketch.addPoint({ x: 80, y: 80 });
 
 			(interaction as any).isDraggingPoint = true;
 			(interaction as any).draggedPointId = freePt.id;
@@ -887,7 +896,8 @@ describe('Snapping with Ellipse and Spline', () => {
 			} as any);
 
 			const cDragOrigin = [...sketch.constraints.values()].find(
-				c => c instanceof OriginDistanceConstraint && c.pointId === freePt.id && c.isCoincident && c.targetDistance === 0
+				c =>
+					c instanceof OriginDistanceConstraint && c.pointId === freePt.id && c.isCoincident && c.targetDistance === 0
 			);
 			assert.ok(cDragOrigin, 'OriginCoincidentConstraint applied via drag drop');
 		} finally {
@@ -907,7 +917,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			tool.activate(mockCtx);
 
 			// Line ending on origin
-			const sStart = vp.worldToScreen(50, 50);
+			const sStart = vp.worldToScreen({ x: 50, y: 50 });
 			tool.onMouseDown({
 				screen: sStart,
 				world: vec(50, 50),
@@ -918,7 +928,7 @@ describe('Snapping with Ellipse and Spline', () => {
 				effectiveScreen: sStart,
 			});
 
-			const sOrigin = vp.worldToScreen(0, 0);
+			const sOrigin = vp.worldToScreen({ x: 0, y: 0 });
 			const snapOrigin = interaction.findSnap(sOrigin);
 			assert.ok(snapOrigin && snapOrigin.id === 'origin');
 
@@ -949,7 +959,7 @@ describe('Snapping with Ellipse and Spline', () => {
 				effectiveScreen: sStart,
 			});
 
-			const sAxis = vp.worldToScreen(100, 0);
+			const sAxis = vp.worldToScreen({ x: 100, y: 0 });
 			const snapAxis = interaction.findSnap(sAxis);
 			assert.ok(snapAxis && snapAxis.id === 'axis_x');
 

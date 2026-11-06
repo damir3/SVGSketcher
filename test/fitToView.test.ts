@@ -46,17 +46,17 @@ function setupMockDocument() {
 describe('Fit to View & Selection Bounding Box', () => {
 	it('returns null when nothing is selected', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 100);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
 		sketch.addLine(p1.id, p2.id);
 		assert.equal(sketch.getSelectionBoundingBox(), null);
 	});
 
 	it('computes selection bounding box for a selected point', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(15, -25);
-		const p2 = sketch.addPoint(100, 100);
-		const p3 = sketch.addPoint(200, 200);
+		const p1 = sketch.addPoint({ x: 15, y: -25 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
+		const p3 = sketch.addPoint({ x: 200, y: 200 });
 		sketch.addLine(p2.id, p3.id);
 
 		sketch.selectEntity(p1.id, 'point');
@@ -70,12 +70,12 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes selection bounding box for a selected line', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 20);
-		const p2 = sketch.addPoint(50, 80);
+		const p1 = sketch.addPoint({ x: 10, y: 20 });
+		const p2 = sketch.addPoint({ x: 50, y: 80 });
 		const line = sketch.addLine(p1.id, p2.id);
 
-		const pOther1 = sketch.addPoint(1000, 1000);
-		const pOther2 = sketch.addPoint(2000, 2000);
+		const pOther1 = sketch.addPoint({ x: 1000, y: 1000 });
+		const pOther2 = sketch.addPoint({ x: 2000, y: 2000 });
 		sketch.addLine(pOther1.id, pOther2.id);
 
 		sketch.selectEntity(line.id, 'line');
@@ -89,11 +89,11 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes selection bounding box for a selected circle', () => {
 		const sketch = new SketchDocument();
-		const center = sketch.addPoint(30, 40);
+		const center = sketch.addPoint({ x: 30, y: 40 });
 		const circle = sketch.addCircle(center.id, 25);
 
-		const pOther1 = sketch.addPoint(500, 500);
-		const pOther2 = sketch.addPoint(600, 600);
+		const pOther1 = sketch.addPoint({ x: 500, y: 500 });
+		const pOther2 = sketch.addPoint({ x: 600, y: 600 });
 		sketch.addLine(pOther1.id, pOther2.id);
 
 		sketch.selectEntity(circle.id, 'circle');
@@ -107,12 +107,12 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes selection bounding box for a selected arc', () => {
 		const sketch = new SketchDocument();
-		const center = sketch.addPoint(10, 10);
-		const pStart = sketch.addPoint(30, 10);
-		const pEnd = sketch.addPoint(10, 30);
+		const center = sketch.addPoint({ x: 10, y: 10 });
+		const pStart = sketch.addPoint({ x: 30, y: 10 });
+		const pEnd = sketch.addPoint({ x: 10, y: 30 });
 		const arc = sketch.addArc(center.id, pStart.id, pEnd.id, 20);
 
-		const pOther = sketch.addPoint(500, 500);
+		const pOther = sketch.addPoint({ x: 500, y: 500 });
 		sketch.addCircle(pOther.id, 50);
 
 		sketch.selectEntity(arc.id, 'arc');
@@ -126,12 +126,12 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes selection bounding box for a selected ellipse', () => {
 		const sketch = new SketchDocument();
-		const center = sketch.addPoint(50, 50);
-		const maj = sketch.addPoint(100, 50);
-		const min = sketch.addPoint(50, 70);
+		const center = sketch.addPoint({ x: 50, y: 50 });
+		const maj = sketch.addPoint({ x: 100, y: 50 });
+		const min = sketch.addPoint({ x: 50, y: 70 });
 		const ellipse = sketch.addEllipse(center.id, maj.id, min.id);
 
-		const pOther = sketch.addPoint(1000, 1000);
+		const pOther = sketch.addPoint({ x: 1000, y: 1000 });
 		sketch.addCircle(pOther.id, 50);
 
 		sketch.selectEntity(ellipse.id, 'ellipse');
@@ -145,12 +145,12 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes selection bounding box for a selected spline', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 10);
-		const p2 = sketch.addPoint(20, 40);
-		const p3 = sketch.addPoint(30, 15);
+		const p1 = sketch.addPoint({ x: 10, y: 10 });
+		const p2 = sketch.addPoint({ x: 20, y: 40 });
+		const p3 = sketch.addPoint({ x: 30, y: 15 });
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id]);
 
-		const pOther = sketch.addPoint(500, 500);
+		const pOther = sketch.addPoint({ x: 500, y: 500 });
 		sketch.addCircle(pOther.id, 50);
 
 		sketch.selectEntity(spline.id, 'spline');
@@ -164,15 +164,15 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes combined bounding box for multiple selected items', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 10);
-		const p2 = sketch.addPoint(20, 20);
+		const p1 = sketch.addPoint({ x: 10, y: 10 });
+		const p2 = sketch.addPoint({ x: 20, y: 20 });
 		const l1 = sketch.addLine(p1.id, p2.id);
 
-		const p3 = sketch.addPoint(100, 50);
-		const p4 = sketch.addPoint(120, 80);
+		const p3 = sketch.addPoint({ x: 100, y: 50 });
+		const p4 = sketch.addPoint({ x: 120, y: 80 });
 		const l2 = sketch.addLine(p3.id, p4.id);
 
-		const pOther = sketch.addPoint(500, 500);
+		const pOther = sketch.addPoint({ x: 500, y: 500 });
 		sketch.addCircle(pOther.id, 50);
 
 		sketch.selectEntities([
@@ -189,11 +189,11 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('computes bounding box for entities of a selected constraint if only constraint is selected', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 20);
-		const p2 = sketch.addPoint(30, 40);
+		const p1 = sketch.addPoint({ x: 10, y: 20 });
+		const p2 = sketch.addPoint({ x: 30, y: 40 });
 		const c = sketch.addDistanceConstraint(p1.id, p2.id, 28.28);
 
-		const pOther = sketch.addPoint(500, 500);
+		const pOther = sketch.addPoint({ x: 500, y: 500 });
 		sketch.addCircle(pOther.id, 50);
 
 		sketch.clearSelection();
@@ -222,12 +222,12 @@ describe('Fit to View & Selection Bounding Box', () => {
 		try {
 			const sketch = new SketchDocument();
 			const vp = new Viewport(800, 600);
-			const p1 = sketch.addPoint(0, 0);
-			const p2 = sketch.addPoint(20, 20);
+			const p1 = sketch.addPoint({ x: 0, y: 0 });
+			const p2 = sketch.addPoint({ x: 20, y: 20 });
 			const l1 = sketch.addLine(p1.id, p2.id);
 
-			const p3 = sketch.addPoint(200, 200);
-			const p4 = sketch.addPoint(300, 300);
+			const p3 = sketch.addPoint({ x: 200, y: 200 });
+			const p4 = sketch.addPoint({ x: 300, y: 300 });
 			sketch.addLine(p3.id, p4.id);
 
 			const fakeSvg = {
@@ -278,8 +278,8 @@ describe('Fit to View & Selection Bounding Box', () => {
 		try {
 			const sketch = new SketchDocument();
 			const vp = new Viewport(800, 600);
-			const p1 = sketch.addPoint(0, 0);
-			const p2 = sketch.addPoint(100, 100);
+			const p1 = sketch.addPoint({ x: 0, y: 0 });
+			const p2 = sketch.addPoint({ x: 100, y: 100 });
 			sketch.addLine(p1.id, p2.id);
 
 			const fakeSvg = {

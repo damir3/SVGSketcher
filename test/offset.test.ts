@@ -12,7 +12,7 @@ import { dist } from '../src/math/vector';
 describe('Offset Chain Building and Continuation', () => {
 	it('builds closed chain for circle and ellipse', () => {
 		const sketch = new SketchDocument();
-		const cp = sketch.addPoint(0, 0);
+		const cp = sketch.addPoint({ x: 0, y: 0 });
 		const circle = sketch.addCircle(cp.id, 20);
 
 		const chain = toggleOrExtendChain(sketch, null, circle.id, 'circle', true);
@@ -29,10 +29,10 @@ describe('Offset Chain Building and Continuation', () => {
 	it('automatically traverses connected lines with chainSelection = true until branching or loop closes', () => {
 		const sketch = new SketchDocument();
 		// Create a rectangle: p0 -> p1 -> p2 -> p3 -> p0
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(100, 50);
-		const p3 = sketch.addPoint(0, 50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 50 });
+		const p3 = sketch.addPoint({ x: 0, y: 50 });
 
 		const l0 = sketch.addLine(p0.id, p1.id);
 		const l1 = sketch.addLine(p1.id, p2.id);
@@ -56,10 +56,10 @@ describe('Offset Chain Building and Continuation', () => {
 	it('stops traversal at branch point where multiple lines emanate', () => {
 		const sketch = new SketchDocument();
 		// T-junction: p0 -> p1, and at p1 there are two lines: p1 -> p2 and p1 -> p3
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(50, 0);
-		const p2 = sketch.addPoint(100, 50);
-		const p3 = sketch.addPoint(100, -50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 50 });
+		const p3 = sketch.addPoint({ x: 100, y: -50 });
 
 		const l0 = sketch.addLine(p0.id, p1.id);
 		const l1 = sketch.addLine(p1.id, p2.id);
@@ -88,7 +88,7 @@ describe('Offset Chain Building and Continuation', () => {
 describe('Offset Geometry Calculation', () => {
 	it('calculates one_side offset for circle', () => {
 		const sketch = new SketchDocument();
-		const cp = sketch.addPoint(0, 0);
+		const cp = sketch.addPoint({ x: 0, y: 0 });
 		const circle = sketch.addCircle(cp.id, 20);
 		const chain = toggleOrExtendChain(sketch, null, circle.id, 'circle', true)!;
 
@@ -114,10 +114,10 @@ describe('Offset Geometry Calculation', () => {
 	it('calculates rectangular closed chain offset with corner intersections', () => {
 		const sketch = new SketchDocument();
 		// Square 100x100: (0,0) -> (100,0) -> (100,100) -> (0,100) -> (0,0)
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
-		const p2 = sketch.addPoint(100, 100);
-		const p3 = sketch.addPoint(0, 100);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 100 });
+		const p3 = sketch.addPoint({ x: 0, y: 100 });
 
 		const l0 = sketch.addLine(p0.id, p1.id);
 		const l1 = sketch.addLine(p1.id, p2.id);
@@ -147,8 +147,8 @@ describe('Offset Geometry Calculation', () => {
 
 	it('commits offset to sketch with OffsetConstraint', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(100, 0);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 100, y: 0 });
 		const l0 = sketch.addLine(p0.id, p1.id);
 
 		const chain = toggleOrExtendChain(sketch, null, l0.id, 'line', false)!;
@@ -171,9 +171,9 @@ describe('Offset Geometry Calculation', () => {
 
 	it('positions gizmo anchor at the exact middle of the first selected primitive', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(-50, 0);
-		const p1 = sketch.addPoint(50, 0);
-		const p2 = sketch.addPoint(0, 80);
+		const p0 = sketch.addPoint({ x: -50, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 80 });
 
 		const lBottom = sketch.addLine(p0.id, p1.id);
 		const lLeft = sketch.addLine(p0.id, p2.id);
@@ -185,7 +185,7 @@ describe('Offset Geometry Calculation', () => {
 		assert.equal(geom1.gizmoAnchor.x, 0);
 		assert.equal(geom1.gizmoAnchor.y, 0);
 		assert.ok(Math.abs(geom1.gizmoNormal.x - 0) < 1e-4);
-		assert.ok(Math.abs(geom1.gizmoNormal.y - (-1)) < 1e-4);
+		assert.ok(Math.abs(geom1.gizmoNormal.y - -1) < 1e-4);
 
 		// Selecting left leg first: middle should be (-25, 40)
 		const chain2 = toggleOrExtendChain(sketch, null, lLeft.id, 'line', true)!;
@@ -196,10 +196,10 @@ describe('Offset Geometry Calculation', () => {
 
 	it('correctly offsets a closed loop formed by a line and a spline with shared vertices and tangent corner joins', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(0, 0);
-		const p1 = sketch.addPoint(75, 0);
-		const p2 = sketch.addPoint(0, 50);
-		const p3 = sketch.addPoint(75, 50);
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 75, y: 0 });
+		const p2 = sketch.addPoint({ x: 0, y: 50 });
+		const p3 = sketch.addPoint({ x: 75, y: 50 });
 
 		const line = sketch.addLine(p0.id, p1.id);
 		const spline = sketch.addFitSpline([p0.id, p2.id, p3.id, p1.id]);
@@ -218,8 +218,8 @@ describe('Offset Geometry Calculation', () => {
 		const offLine = side.primitives[0];
 		assert.equal(offLine.type, 'line');
 		// Line stays horizontal at y = -10 (outward)
-		assert.ok(Math.abs(offLine.p1!.y - (-10)) < 1e-4);
-		assert.ok(Math.abs(offLine.p2!.y - (-10)) < 1e-4);
+		assert.ok(Math.abs(offLine.p1!.y - -10) < 1e-4);
+		assert.ok(Math.abs(offLine.p2!.y - -10) < 1e-4);
 		assert.ok(offLine.p1!.x < 0);
 		assert.ok(offLine.p2!.x > 75);
 
@@ -239,8 +239,8 @@ describe('Offset Geometry Calculation', () => {
 		sketch.solve();
 		const pt1 = sketch.points.get(createdLine.p1Id)!;
 		const pt2 = sketch.points.get(createdLine.p2Id)!;
-		assert.ok(Math.abs(pt1.y - (-10)) < 1e-4);
-		assert.ok(Math.abs(pt2.y - (-10)) < 1e-4);
+		assert.ok(Math.abs(pt1.y - -10) < 1e-4);
+		assert.ok(Math.abs(pt2.y - -10) < 1e-4);
 
 		const midPtId = createdSpline.pointIds[Math.floor(createdSpline.pointIds.length / 2)];
 		const initialSplineMidY = sketch.points.get(midPtId)!.y;
@@ -249,8 +249,8 @@ describe('Offset Geometry Calculation', () => {
 		sketch.updateDimensionalConstraint(res.constraintIds[0], 30);
 
 		// Line moves to y = -30
-		assert.ok(Math.abs(sketch.points.get(createdLine.p1Id)!.y - (-30)) < 1e-4);
-		assert.ok(Math.abs(sketch.points.get(createdLine.p2Id)!.y - (-30)) < 1e-4);
+		assert.ok(Math.abs(sketch.points.get(createdLine.p1Id)!.y - -30) < 1e-4);
+		assert.ok(Math.abs(sketch.points.get(createdLine.p2Id)!.y - -30) < 1e-4);
 
 		// Created spline expands along its normal by +20 distance
 		const updatedSplineMidY = sketch.points.get(midPtId)!.y;
@@ -263,9 +263,9 @@ describe('Offset Geometry Calculation', () => {
 		// Now update offset constraint distance down to 3: corners and handles must update cleanly
 		sketch.updateDimensionalConstraint(res.constraintIds[0], 3);
 
-		assert.ok(Math.abs(sketch.points.get(createdLine.p1Id)!.y - (-3)) < 1e-4);
-		assert.ok(Math.abs(sketch.points.get(createdLine.p2Id)!.y - (-3)) < 1e-4);
-		assert.ok(Math.abs(sketch.points.get(createdLine.p1Id)!.x - (-3)) < 0.1);
+		assert.ok(Math.abs(sketch.points.get(createdLine.p1Id)!.y - -3) < 1e-4);
+		assert.ok(Math.abs(sketch.points.get(createdLine.p2Id)!.y - -3) < 1e-4);
+		assert.ok(Math.abs(sketch.points.get(createdLine.p1Id)!.x - -3) < 0.1);
 		assert.ok(Math.abs(sketch.points.get(createdLine.p2Id)!.x - 78) < 0.1);
 
 		// Verify tangent handle at corner is strictly vertical (matching original curve vertical tangent)
@@ -273,16 +273,16 @@ describe('Offset Geometry Calculation', () => {
 		const lastHandleLine = sketch.lines.get(lastHandleLineId)!;
 		const h1 = sketch.points.get(lastHandleLine.p1Id)!;
 		const h2 = sketch.points.get(lastHandleLine.p2Id)!;
-		assert.ok(Math.abs(h1.x - (-3)) < 1e-4, `h1.x was ${h1.x}, expected -3`);
-		assert.ok(Math.abs(h2.x - (-3)) < 1e-4, `h2.x was ${h2.x}, expected -3`);
+		assert.ok(Math.abs(h1.x - -3) < 1e-4, `h1.x was ${h1.x}, expected -3`);
+		assert.ok(Math.abs(h2.x - -3) < 1e-4, `h2.x was ${h2.x}, expected -3`);
 	});
 
 	it('correctly offsets a control point spline (B-spline) rather than treating it as a fit spline', () => {
 		const sketch = new SketchDocument();
-		const p0 = sketch.addPoint(-50, 0);
-		const p1 = sketch.addPoint(50, 0);
-		const p2 = sketch.addPoint(-50, 100);
-		const p3 = sketch.addPoint(50, 100);
+		const p0 = sketch.addPoint({ x: -50, y: 0 });
+		const p1 = sketch.addPoint({ x: 50, y: 0 });
+		const p2 = sketch.addPoint({ x: -50, y: 100 });
+		const p3 = sketch.addPoint({ x: 50, y: 100 });
 
 		const line = sketch.addLine(p0.id, p1.id);
 		// Control spline with 4 points: curve passes through (-50, 0), top at y = 75, ends at (50, 0)

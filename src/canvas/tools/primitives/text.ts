@@ -366,10 +366,10 @@ export class TextTool extends BaseTool {
 					}
 				}
 
-				const p0 = sketch.addPoint(min.x, max.y, false);
-				const p1 = sketch.addPoint(max.x, max.y, false);
-				const p2 = sketch.addPoint(max.x, min.y, false);
-				const p3 = sketch.addPoint(min.x, min.y, false);
+				const p0 = sketch.addPoint({ x: min.x, y: max.y }, false);
+				const p1 = sketch.addPoint(max, false);
+				const p2 = sketch.addPoint({ x: max.x, y: min.y }, false);
+				const p3 = sketch.addPoint(min, false);
 
 				const l0 = sketch.addLine(p0.id, p1.id, true);
 				const l1 = sketch.addLine(p1.id, p2.id, true);
@@ -411,10 +411,10 @@ export class TextTool extends BaseTool {
 		}
 
 		// Add 4 construction points: p0(TL), p1(TR), p2(BR), p3(BL) in CAD Y-up
-		const p0 = sketch.addPoint(min.x, max.y, false);
-		const p1 = sketch.addPoint(max.x, max.y, false);
-		const p2 = sketch.addPoint(max.x, min.y, false);
-		const p3 = sketch.addPoint(min.x, min.y, false);
+		const p0 = sketch.addPoint({ x: min.x, y: max.y }, false);
+		const p1 = sketch.addPoint(max, false);
+		const p2 = sketch.addPoint({ x: max.x, y: min.y }, false);
+		const p3 = sketch.addPoint(min, false);
 
 		// Add 4 construction lines
 		const l0 = sketch.addLine(p0.id, p1.id, true);
@@ -553,8 +553,8 @@ export class TextTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		if (this.mode === 'text' && this.drawingStep === 1 && this.startWorld && this.currentWorld) {
-			const s1 = ctx.viewport.worldToScreen(this.startWorld.x, this.startWorld.y);
-			const s2 = ctx.viewport.worldToScreen(this.currentWorld.x, this.currentWorld.y);
+			const s1 = ctx.viewport.worldToScreen(this.startWorld);
+			const s2 = ctx.viewport.worldToScreen(this.currentWorld);
 
 			const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
 			const max = { x: Math.max(s1.x, s2.x), y: Math.max(s1.y, s2.y) };
@@ -562,10 +562,8 @@ export class TextTool extends BaseTool {
 			const h = Math.max(1, max.y - min.y);
 
 			createSvgRect(
-				min.x,
-				min.y,
-				w,
-				h,
+				min,
+				{ x: w, y: h },
 				{
 					stroke: COLORS.primary,
 					'stroke-width': 1.5,
@@ -623,8 +621,7 @@ export class TextTool extends BaseTool {
 			for (let i = 0; i < lines.length; i++) {
 				const lineY = startY + i * lineHeightPx;
 				createSvgText(
-					posX,
-					lineY,
+					{ x: posX, y: lineY },
 					lines[i] || ' ',
 					{
 						fill: COLORS.primary,
@@ -644,9 +641,9 @@ export class TextTool extends BaseTool {
 			const geo = this.ctx.sketch.toGeoCurve(this.hoverCandidate.id, this.hoverCandidate.type);
 			if (geo) {
 				if (geo.type === 'segment') {
-					const s1 = ctx.viewport.worldToScreen(geo.p1.x, geo.p1.y);
-					const s2 = ctx.viewport.worldToScreen(geo.p2.x, geo.p2.y);
-					createSvgLine(s1.x, s1.y, s2.x, s2.y, { stroke: COLORS.primary, 'stroke-width': 3 }, ctx.targetGroup);
+					const s1 = ctx.viewport.worldToScreen(geo.p1);
+					const s2 = ctx.viewport.worldToScreen(geo.p2);
+					createSvgLine(s1, s2, { stroke: COLORS.primary, 'stroke-width': 3 }, ctx.targetGroup);
 				}
 			}
 		}

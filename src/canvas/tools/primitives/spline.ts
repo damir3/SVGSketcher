@@ -117,7 +117,7 @@ export class SplineTool extends BaseTool {
 				this.ctx.showToast('Closed spline created');
 				return;
 			}
-			const firstPtPos = this.ctx.viewport.worldToScreen(this.points[0].x, this.points[0].y);
+			const firstPtPos = this.ctx.viewport.worldToScreen(this.points[0]);
 			if (dist(screen, firstPtPos) <= POINT_DISTANCE_PX) {
 				this.finishSpline(true);
 				this.ctx.showToast('Closed spline created');
@@ -132,7 +132,7 @@ export class SplineTool extends BaseTool {
 			pPos = snap.worldPos;
 		} else {
 			pPos = snap ? snap.worldPos : world;
-			const pt = sketch.addPoint(pPos.x, pPos.y);
+			const pt = sketch.addPoint(pPos);
 			pId = pt.id;
 			this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 		}
@@ -159,8 +159,8 @@ export class SplineTool extends BaseTool {
 		const lastPtId = this.points[this.points.length - 1].id;
 		const snap = this.ctx.findSnap(sPos, lastPtId);
 		const effectiveWorld = snap ? snap.worldPos : ctx.cursorWorld;
-		const screenPts = this.points.map(p => ctx.viewport.worldToScreen(p.x, p.y));
-		const curScreen = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+		const screenPts = this.points.map(p => ctx.viewport.worldToScreen(p));
+		const curScreen = ctx.viewport.worldToScreen(effectiveWorld);
 		const { checkmarkPos } = renderSplinePreviewVisual(
 			ctx.targetGroup,
 			this._mode,
@@ -204,7 +204,7 @@ export class SplineTool extends BaseTool {
 		const next = this.undonePoints.pop()!;
 		let ptId = next.id;
 		if (!ptId || !this.ctx.sketch.points.has(ptId)) {
-			const pt = this.ctx.sketch.addPoint(next.x, next.y);
+			const pt = this.ctx.sketch.addPoint(next);
 			ptId = pt.id;
 		}
 		this.points.push({ id: ptId, x: next.x, y: next.y });

@@ -1,3 +1,4 @@
+import { ORIGIN } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -125,21 +126,21 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
 
-		const sp = ctx.viewport.worldToScreen(pt.x, pt.y);
-		const sOrigin = ctx.viewport.worldToScreen(0, 0);
+		const sp = ctx.viewport.worldToScreen(pt);
+		const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
 
 		if (this.isCoincident) {
-			ctx.renderBadge(this.id, sOrigin.x - 12, sOrigin.y - 12, '●', COLORS.primary);
+			ctx.renderBadge(this.id, { x: sOrigin.x - 12, y: sOrigin.y - 12 }, '●', COLORS.primary);
 			return;
 		}
 
 		if (this.targetDistance === 0) {
-			ctx.renderBadge(this.id, sp.x, sp.y + 14, '⚲', COLORS.primary);
+			ctx.renderBadge(this.id, { x: sp.x, y: sp.y + 14 }, '⚲', COLORS.primary);
 			return;
 		}
 
 		if (this.orientation === 'vertical') {
-			const sAxisX = ctx.viewport.worldToScreen(100, 0);
+			const sAxisX = ctx.viewport.worldToScreen({ x: 100, y: 0 });
 			const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisX, offsetScreen);
 			if (!geom) return;
@@ -156,7 +157,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		if (this.orientation === 'horizontal') {
-			const sAxisY = ctx.viewport.worldToScreen(0, 100);
+			const sAxisY = ctx.viewport.worldToScreen({ x: 0, y: 100 });
 			const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisY, offsetScreen);
 			if (!geom) return;
@@ -192,8 +193,8 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		const pt = sketch.points.get(this.pointId);
 		if (!pt) return null;
 
-		const sp = viewport.worldToScreen(pt.x, pt.y);
-		const sOrigin = viewport.worldToScreen(0, 0);
+		const sp = viewport.worldToScreen(pt);
+		const sOrigin = viewport.worldToScreen(ORIGIN);
 
 		if (this.isCoincident) {
 			return distanceToPoint(screen, { x: sOrigin.x - 12, y: sOrigin.y - 12 });
@@ -204,7 +205,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		if (this.orientation === 'vertical') {
-			const sAxisX = viewport.worldToScreen(100, 0);
+			const sAxisX = viewport.worldToScreen({ x: 100, y: 0 });
 			const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisX, offsetScreen);
 			if (!geom) return null;
@@ -212,7 +213,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		if (this.orientation === 'horizontal') {
-			const sAxisY = viewport.worldToScreen(0, 100);
+			const sAxisY = viewport.worldToScreen({ x: 0, y: 100 });
 			const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisY, offsetScreen);
 			if (!geom) return null;
@@ -361,20 +362,21 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const p2 = ctx.sketch.points.get(this.lineP2Id);
 		if (!p1 || !p2) return;
 
-		const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-		const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
-		const sOrigin = ctx.viewport.worldToScreen(0, 0);
+		const s1 = ctx.viewport.worldToScreen(p1);
+		const s2 = ctx.viewport.worldToScreen(p2);
+		const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
 
 		if (this.isCollinear) {
 			const midX = (s1.x + s2.x) * 0.5;
 			const midY = (s1.y + s2.y) * 0.5;
-			ctx.renderBadge(this.id, midX, midY, 'collinear', COLORS.primary);
+			ctx.renderBadge(this.id, { x: midX, y: midY }, 'collinear', COLORS.primary);
 			return;
 		}
 
 		const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
-		const sp = ctx.viewport.worldToScreen(midPt.x, midPt.y);
-		const sAxis2 = this.axis === 'x' ? ctx.viewport.worldToScreen(100, 0) : ctx.viewport.worldToScreen(0, 100);
+		const sp = ctx.viewport.worldToScreen(midPt);
+		const sAxis2 =
+			this.axis === 'x' ? ctx.viewport.worldToScreen({ x: 100, y: 0 }) : ctx.viewport.worldToScreen({ x: 0, y: 100 });
 
 		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);
@@ -396,9 +398,9 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const p2 = sketch.points.get(this.lineP2Id);
 		if (!p1 || !p2) return null;
 
-		const s1 = viewport.worldToScreen(p1.x, p1.y);
-		const s2 = viewport.worldToScreen(p2.x, p2.y);
-		const sOrigin = viewport.worldToScreen(0, 0);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
+		const sOrigin = viewport.worldToScreen(ORIGIN);
 
 		if (this.isCollinear) {
 			const midX = (s1.x + s2.x) * 0.5;
@@ -407,8 +409,9 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		}
 
 		const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
-		const sp = viewport.worldToScreen(midPt.x, midPt.y);
-		const sAxis2 = this.axis === 'x' ? viewport.worldToScreen(100, 0) : viewport.worldToScreen(0, 100);
+		const sp = viewport.worldToScreen(midPt);
+		const sAxis2 =
+			this.axis === 'x' ? viewport.worldToScreen({ x: 100, y: 0 }) : viewport.worldToScreen({ x: 0, y: 100 });
 
 		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);

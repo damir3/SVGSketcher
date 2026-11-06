@@ -50,7 +50,7 @@ export class PointOnLineConstraint extends BaseConstraint {
 	override render(ctx: ConstraintRenderContext): void {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt.x, pt.y);
-		ctx.renderBadge(this.id, s.x, s.y + 14, '⚲', COLORS.primary);
+		const s = ctx.viewport.worldToScreen(pt);
+		ctx.renderBadge(this.id, { x: s.x, y: s.y + 14 }, '⚲', COLORS.primary);
 	}
 }

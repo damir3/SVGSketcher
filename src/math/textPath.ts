@@ -1,5 +1,5 @@
 import * as opentype from 'opentype.js';
-import { vec, dist, normalize, type Vec2 } from './vector';
+import { vec, dist, mid, normalize, type Vec2 } from './vector';
 import type { GeoCurve, GeoSegment, GeoCircle, GeoArc, GeoSpline } from './intersection';
 import { evaluateBezier, evaluateBezierDerivative } from './spline';
 
@@ -200,7 +200,7 @@ export function generateTextSvgPathData(
 
 		if (width <= 1e-3 || height <= 1e-3) return '';
 
-		const center = vec((p0.x + _p2.x) / 2, (p0.y + _p2.y) / 2);
+		const center = mid(p0, _p2);
 		const ux = normalize(vec(p1.x - p0.x, p1.y - p0.y));
 		const uy = normalize(vec(p0.x - p3.x, p0.y - p3.y));
 

@@ -3,7 +3,7 @@ import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import type { Vec2 } from '../../../math/vector';
+import { addScalar, subScalar, type Vec2 } from '../../../math/vector';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import { calculateObjectsCentroid } from './utils';
@@ -342,15 +342,15 @@ export class CircularPatternTool extends BaseTool {
 		if (this.state.centerPointId) {
 			const pt = this.ctx.sketch.points.get(this.state.centerPointId);
 			if (pt) {
-				const sCenter = this.ctx.viewport.worldToScreen(pt.x, pt.y);
-				pts.push({ x: sCenter.x - 20, y: sCenter.y - 20 }, { x: sCenter.x + 20, y: sCenter.y + 20 });
+				const sCenter = this.ctx.viewport.worldToScreen(pt);
+				pts.push(subScalar(sCenter, 20), addScalar(sCenter, 20));
 			}
 		}
 
 		const centroid = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
 		const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 		if (centroid) {
-			pts.push(this.ctx.viewport.worldToScreen(centroid.x, centroid.y));
+			pts.push(this.ctx.viewport.worldToScreen(centroid));
 			if (center) {
 				const bboxQuantity = 12;
 				for (let k = 1; k < bboxQuantity; k++) {
@@ -362,8 +362,8 @@ export class CircularPatternTool extends BaseTool {
 						x: center.x + dx * Math.cos(radians) - dy * Math.sin(radians),
 						y: center.y + dx * Math.sin(radians) + dy * Math.cos(radians),
 					};
-					const screen = this.ctx.viewport.worldToScreen(copy.x, copy.y);
-					pts.push({ x: screen.x - 14, y: screen.y - 14 }, { x: screen.x + 14, y: screen.y + 14 });
+					const screen = this.ctx.viewport.worldToScreen(copy);
+					pts.push(subScalar(screen, 14), addScalar(screen, 14));
 				}
 			}
 		}

@@ -265,7 +265,7 @@ export class ArcTool extends BaseTool {
 				this.startWorldPos = snap.worldPos;
 			} else {
 				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos.x, ptPos.y);
+				const pt = sketch.addPoint(ptPos);
 				pId = pt.id;
 				this.startWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -286,7 +286,7 @@ export class ArcTool extends BaseTool {
 				p2Id = snap.id;
 				this.arcPoint2WorldPos = snap.worldPos;
 			} else {
-				const pt = sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
+				const pt = sketch.addPoint(effectiveWorld);
 				p2Id = pt.id;
 				this.arcPoint2WorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -306,10 +306,10 @@ export class ArcTool extends BaseTool {
 				return;
 			}
 
-			const s1 = this.ctx.viewport.worldToScreen(p1.x, p1.y);
-			const s2 = this.ctx.viewport.worldToScreen(p2.x, p2.y);
-			const s3 = this.ctx.viewport.worldToScreen(p3.x, p3.y);
-			const sc = this.ctx.viewport.worldToScreen(circum.center.x, circum.center.y);
+			const s1 = this.ctx.viewport.worldToScreen(p1);
+			const s2 = this.ctx.viewport.worldToScreen(p2);
+			const s3 = this.ctx.viewport.worldToScreen(p3);
+			const sc = this.ctx.viewport.worldToScreen(circum.center);
 
 			const as = Math.atan2(s1.y - sc.y, s1.x - sc.x);
 			const ae = Math.atan2(s2.y - sc.y, s2.x - sc.x);
@@ -322,7 +322,7 @@ export class ArcTool extends BaseTool {
 
 			const clockwise = testCW > 0 && testCW < sweepCW;
 
-			const centerPt = sketch.addPoint(circum.center.x, circum.center.y);
+			const centerPt = sketch.addPoint(circum.center);
 			sketch.addArc(
 				centerPt.id,
 				this.startPointId!,
@@ -340,9 +340,9 @@ export class ArcTool extends BaseTool {
 
 	private renderPreviewThreePoint(ctx: ToolRenderContext): void {
 		if (this.drawingStep === 1 && this.startWorldPos) {
-			const s1 = ctx.viewport.worldToScreen(this.startWorldPos.x, this.startWorldPos.y);
+			const s1 = ctx.viewport.worldToScreen(this.startWorldPos);
 			const effectiveWorld = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
-			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const s2 = ctx.viewport.worldToScreen(effectiveWorld);
 			const length = dist(this.startWorldPos, effectiveWorld);
 			const angleDeg =
 				(Math.atan2(effectiveWorld.y - this.startWorldPos.y, effectiveWorld.x - this.startWorldPos.x) * 180) / Math.PI;
@@ -353,16 +353,16 @@ export class ArcTool extends BaseTool {
 			const p3 = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 			const circum = getCircumcircle(p1, p2, p3);
 
-			const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-			const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+			const s1 = ctx.viewport.worldToScreen(p1);
+			const s2 = ctx.viewport.worldToScreen(p2);
 
 			if (!circum || circum.radius < 1 || circum.radius > 50000) {
 				const length = dist(p1, p2);
 				const angleDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
 				renderLinePreviewVisual(ctx.targetGroup, s1, s2, length, angleDeg, ctx.isConstruction);
 			} else {
-				const sc = ctx.viewport.worldToScreen(circum.center.x, circum.center.y);
-				const s3 = ctx.viewport.worldToScreen(p3.x, p3.y);
+				const sc = ctx.viewport.worldToScreen(circum.center);
+				const s3 = ctx.viewport.worldToScreen(p3);
 				const sr = circum.radius * ctx.viewport.zoom;
 
 				const as = Math.atan2(s1.y - sc.y, s1.x - sc.x);
@@ -407,7 +407,7 @@ export class ArcTool extends BaseTool {
 				this.centerWorldPos = snap.worldPos;
 			} else {
 				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos.x, ptPos.y);
+				const pt = sketch.addPoint(ptPos);
 				cId = pt.id;
 				this.centerWorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
@@ -428,14 +428,14 @@ export class ArcTool extends BaseTool {
 				p1Id = snap.id;
 				this.arcPoint1WorldPos = snap.worldPos;
 			} else {
-				const pt = sketch.addPoint(effectiveWorld.x, effectiveWorld.y);
+				const pt = sketch.addPoint(effectiveWorld);
 				p1Id = pt.id;
 				this.arcPoint1WorldPos = vec(pt.x, pt.y);
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 			this.arcPoint1Id = p1Id;
-			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const sStart = this.ctx.viewport.worldToScreen(this.arcPoint1WorldPos.x, this.arcPoint1WorldPos.y);
+			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
+			const sStart = this.ctx.viewport.worldToScreen(this.arcPoint1WorldPos);
 			this.arcCenterPrevAngle = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
 			this.arcCenterTotalAngle = 0;
 			this.drawingStep = 2;
@@ -447,9 +447,9 @@ export class ArcTool extends BaseTool {
 			const radius = Math.max(1, dist(centerWorld, startWorld));
 
 			const effectiveWorld = snap ? snap.worldPos : world;
-			const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const sStart = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
-			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
+			const sStart = this.ctx.viewport.worldToScreen(startWorld);
+			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld);
 
 			const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
 			const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
@@ -486,7 +486,7 @@ export class ArcTool extends BaseTool {
 			) {
 				endPointId = snap.id;
 			} else {
-				const pt = sketch.addPoint(endWorldX, endWorldY);
+				const pt = sketch.addPoint({ x: endWorldX, y: endWorldY });
 				endPointId = pt.id;
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
@@ -503,9 +503,9 @@ export class ArcTool extends BaseTool {
 		const centerWorld = this.centerWorldPos!;
 		const startWorld = this.arcPoint1WorldPos!;
 
-		const sCenter = this.ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-		const sStart = this.ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
-		const sCur = this.ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+		const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
+		const sStart = this.ctx.viewport.worldToScreen(startWorld);
+		const sCur = this.ctx.viewport.worldToScreen(effectiveWorld);
 
 		const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
 		const acur = Math.atan2(sCur.y - sCenter.y, sCur.x - sCenter.x);
@@ -527,8 +527,8 @@ export class ArcTool extends BaseTool {
 	private renderPreviewCenter(ctx: ToolRenderContext): void {
 		const effectiveWorld = this.shouldSnap() !== false && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos.x, this.centerWorldPos.y);
-			const s2 = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos);
+			const s2 = ctx.viewport.worldToScreen(effectiveWorld);
 			const radius = dist(this.centerWorldPos, effectiveWorld);
 			renderCirclePreviewVisual(ctx.targetGroup, s1, s2, radius, ctx.isConstruction, true);
 		} else if (this.drawingStep === 2 && this.centerWorldPos && this.arcPoint1WorldPos) {
@@ -536,9 +536,9 @@ export class ArcTool extends BaseTool {
 			const startWorld = this.arcPoint1WorldPos;
 			const radius = Math.max(1, dist(centerWorld, startWorld));
 
-			const sCenter = ctx.viewport.worldToScreen(centerWorld.x, centerWorld.y);
-			const sStart = ctx.viewport.worldToScreen(startWorld.x, startWorld.y);
-			const sCur = ctx.viewport.worldToScreen(effectiveWorld.x, effectiveWorld.y);
+			const sCenter = ctx.viewport.worldToScreen(centerWorld);
+			const sStart = ctx.viewport.worldToScreen(startWorld);
+			const sCur = ctx.viewport.worldToScreen(effectiveWorld);
 			const sr = radius * ctx.viewport.zoom;
 
 			const as = Math.atan2(sStart.y - sCenter.y, sStart.x - sCenter.x);
@@ -557,7 +557,7 @@ export class ArcTool extends BaseTool {
 				centerWorld.x + radius * Math.cos(worldAngle),
 				centerWorld.y + radius * Math.sin(worldAngle)
 			);
-			const sEnd = ctx.viewport.worldToScreen(endWorld.x, endWorld.y);
+			const sEnd = ctx.viewport.worldToScreen(endWorld);
 
 			let sweepAngle = 0;
 			if (clockwise) {
@@ -645,12 +645,12 @@ export class ArcTool extends BaseTool {
 			) {
 				endPointId = snap.id;
 			} else {
-				const pt = sketch.addPoint(p2.x, p2.y);
+				const pt = sketch.addPoint(p2);
 				endPointId = pt.id;
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 
-			const centerPt = sketch.addPoint(geom.center.x, geom.center.y);
+			const centerPt = sketch.addPoint(geom.center);
 			const arc = sketch.addArc(
 				centerPt.id,
 				this.tangentStartPointId!,
@@ -711,12 +711,12 @@ export class ArcTool extends BaseTool {
 
 		const center = vec(p1.x + s * nx, p1.y + s * ny);
 
-		const sCenter = this.ctx.viewport.worldToScreen(center.x, center.y);
-		const s1 = this.ctx.viewport.worldToScreen(p1.x, p1.y);
-		const s2 = this.ctx.viewport.worldToScreen(p2.x, p2.y);
+		const sCenter = this.ctx.viewport.worldToScreen(center);
+		const s1 = this.ctx.viewport.worldToScreen(p1);
+		const s2 = this.ctx.viewport.worldToScreen(p2);
 		const sT = vec(
-			this.ctx.viewport.worldToScreen(p1.x + tx, p1.y + ty).x - s1.x,
-			this.ctx.viewport.worldToScreen(p1.x + tx, p1.y + ty).y - s1.y
+			this.ctx.viewport.worldToScreen({ x: p1.x + tx, y: p1.y + ty }).x - s1.x,
+			this.ctx.viewport.worldToScreen({ x: p1.x + tx, y: p1.y + ty }).y - s1.y
 		);
 
 		// In 2D screen coords (Y down), cross product of (s1 - sCenter) and tangent indicates rotation direction
@@ -762,8 +762,8 @@ export class ArcTool extends BaseTool {
 					ctx.isConstruction
 				);
 			} else {
-				const s1 = ctx.viewport.worldToScreen(p1.x, p1.y);
-				const s2 = ctx.viewport.worldToScreen(p2.x, p2.y);
+				const s1 = ctx.viewport.worldToScreen(p1);
+				const s2 = ctx.viewport.worldToScreen(p2);
 				const length = dist(p1, p2);
 				const angleDeg = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
 				renderLinePreviewVisual(ctx.targetGroup, s1, s2, length, angleDeg, ctx.isConstruction);

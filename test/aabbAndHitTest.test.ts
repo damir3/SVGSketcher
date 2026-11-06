@@ -65,18 +65,12 @@ describe('AABB Geometry Intersections', () => {
 		// Arc 1: Facing right towards AABB (-45 deg to +45 deg)
 		const startRight = vec(radius * Math.cos(-Math.PI / 4), 30 + radius * Math.sin(-Math.PI / 4));
 		const endRight = vec(radius * Math.cos(Math.PI / 4), 30 + radius * Math.sin(Math.PI / 4));
-		assert.equal(
-			arcIntersectsAABB(center, radius, startRight, endRight, true, min, max),
-			true
-		);
+		assert.equal(arcIntersectsAABB(center, radius, startRight, endRight, true, min, max), true);
 
 		// Arc 2: Facing left away from AABB (135 deg to 225 deg)
 		const startLeft = vec(radius * Math.cos((3 * Math.PI) / 4), 30 + radius * Math.sin((3 * Math.PI) / 4));
 		const endLeft = vec(radius * Math.cos((-3 * Math.PI) / 4), 30 + radius * Math.sin((-3 * Math.PI) / 4));
-		assert.equal(
-			arcIntersectsAABB(center, radius, startLeft, endLeft, true, min, max),
-			false
-		);
+		assert.equal(arcIntersectsAABB(center, radius, startLeft, endLeft, true, min, max), false);
 	});
 
 	it('ellipseIntersectsAABB and ellipticalArcIntersectsAABB detect intersection accurately', () => {
@@ -96,10 +90,7 @@ describe('AABB Geometry Intersections', () => {
 		// Elliptical arc crossing
 		const startPt = vec(45, 30);
 		const endPt = vec(30, 40);
-		assert.equal(
-			ellipticalArcIntersectsAABB(center, majorPt, minorPt, startPt, endPt, true, min, max),
-			true
-		);
+		assert.equal(ellipticalArcIntersectsAABB(center, majorPt, minorPt, startPt, endPt, true, min, max), true);
 	});
 });
 
@@ -189,20 +180,20 @@ describe('Hit Testing and Distance Mathematics', () => {
 describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 	const viewport = {
 		zoom: 1,
-		worldToScreen: (x: number, y: number) => ({ x, y }),
-		screenToWorld: (x: number, y: number) => ({ x, y }),
+		worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+		screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
 	} as any;
 
 	it('primitives implement distanceTo and intersectsAABB polymorphically', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(10, 10);
-		const p2 = sketch.addPoint(50, 10);
+		const p1 = sketch.addPoint({ x: 10, y: 10 });
+		const p2 = sketch.addPoint({ x: 50, y: 10 });
 		const line = sketch.addLine(p1.id, p2.id);
-		const circleCenter = sketch.addPoint(100, 100);
+		const circleCenter = sketch.addPoint({ x: 100, y: 100 });
 		const circle = sketch.addCircle(circleCenter.id, 25);
-		const arcCenter = sketch.addPoint(200, 200);
-		const arcStart = sketch.addPoint(225, 200);
-		const arcEnd = sketch.addPoint(200, 225);
+		const arcCenter = sketch.addPoint({ x: 200, y: 200 });
+		const arcStart = sketch.addPoint({ x: 225, y: 200 });
+		const arcEnd = sketch.addPoint({ x: 200, y: 225 });
 		const arc = sketch.addArc(arcCenter.id, arcStart.id, arcEnd.id, 25, true);
 
 		// Point hit test and AABB
@@ -229,8 +220,8 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 
 	it('constraints implement distanceTo polymorphically', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(100, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
 		const distC = sketch.addDistanceConstraint(p1.id, p2.id);
 		assert.ok(distC);
 		distC.offset = 20;
@@ -247,30 +238,30 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 
 	it('primitives and SketchDocument implement toGeoCurve polymorphically', () => {
 		const sketch = new SketchDocument();
-		const p1 = sketch.addPoint(0, 0);
-		const p2 = sketch.addPoint(10, 0);
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 10, y: 0 });
 		const line = sketch.addLine(p1.id, p2.id);
 
-		const cCenter = sketch.addPoint(50, 50);
+		const cCenter = sketch.addPoint({ x: 50, y: 50 });
 		const circle = sketch.addCircle(cCenter.id, 20);
 
-		const aCenter = sketch.addPoint(100, 100);
-		const aStart = sketch.addPoint(120, 100);
-		const aEnd = sketch.addPoint(100, 120);
+		const aCenter = sketch.addPoint({ x: 100, y: 100 });
+		const aStart = sketch.addPoint({ x: 120, y: 100 });
+		const aEnd = sketch.addPoint({ x: 100, y: 120 });
 		const arc = sketch.addArc(aCenter.id, aStart.id, aEnd.id, 20, true);
 
-		const eCenter = sketch.addPoint(200, 200);
-		const eMajor = sketch.addPoint(240, 200);
-		const eMinor = sketch.addPoint(200, 220);
+		const eCenter = sketch.addPoint({ x: 200, y: 200 });
+		const eMajor = sketch.addPoint({ x: 240, y: 200 });
+		const eMinor = sketch.addPoint({ x: 200, y: 220 });
 		const ellipse = sketch.addEllipse(eCenter.id, eMajor.id, eMinor.id);
 
-		const eaStart = sketch.addPoint(240, 200);
-		const eaEnd = sketch.addPoint(200, 220);
+		const eaStart = sketch.addPoint({ x: 240, y: 200 });
+		const eaEnd = sketch.addPoint({ x: 200, y: 220 });
 		const ellipticalArc = sketch.addEllipticalArc(eCenter.id, eMajor.id, eMinor.id, eaStart.id, eaEnd.id, true);
 
-		const sp1 = sketch.addPoint(0, 0);
-		const sp2 = sketch.addPoint(10, 20);
-		const sp3 = sketch.addPoint(20, 0);
+		const sp1 = sketch.addPoint({ x: 0, y: 0 });
+		const sp2 = sketch.addPoint({ x: 10, y: 20 });
+		const sp3 = sketch.addPoint({ x: 20, y: 0 });
 		const spline = sketch.addFitSpline([sp1.id, sp2.id, sp3.id]);
 
 		// Point
@@ -324,4 +315,3 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		assert.equal(sketch.toGeoCurve('unknown-id', 'line'), null);
 	});
 });
-

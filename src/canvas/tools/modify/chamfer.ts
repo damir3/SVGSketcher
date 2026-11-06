@@ -361,7 +361,7 @@ export class ChamferTool extends BaseTool {
 	getGizmoBoundingBox(): ScreenBoundingBox | null {
 		if (!this.candidate || !this.ctx) return null;
 
-		const sVertex = this.ctx.viewport.worldToScreen(this.candidate.vertexPos.x, this.candidate.vertexPos.y);
+		const sVertex = this.ctx.viewport.worldToScreen(this.candidate.vertexPos);
 		const pts: Vec2[] = [sVertex];
 
 		if (this.ctx.renderer?.chamferGizmoHandles) {
@@ -372,10 +372,10 @@ export class ChamferTool extends BaseTool {
 		}
 
 		if (this.candidate.result?.t1) {
-			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t1.x, this.candidate.result.t1.y));
+			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t1));
 		}
 		if (this.candidate.result?.t2) {
-			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t2.x, this.candidate.result.t2.y));
+			pts.push(this.ctx.viewport.worldToScreen(this.candidate.result.t2));
 		}
 
 		return AABB.fromPoints(pts);
@@ -387,7 +387,7 @@ export class ChamferTool extends BaseTool {
 		this.recalculate();
 
 		if (this.candidate.result) {
-			const sPos = this.ctx.viewport.worldToScreen(this.candidate.vertexPos.x, this.candidate.vertexPos.y);
+			const sPos = this.ctx.viewport.worldToScreen(this.candidate.vertexPos);
 			this.setMode(this.mode);
 			this.popup.setValue('dist1', this.dist1);
 			this.popup.setValue('dist2', this.dist2);

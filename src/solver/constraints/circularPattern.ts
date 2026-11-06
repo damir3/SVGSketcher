@@ -222,7 +222,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		const pCtr = ctx.sketch.points.get(this.centerPtId);
 		if (!pCtr) return;
 
-		const sCtr = ctx.viewport.worldToScreen(pCtr.x, pCtr.y);
+		const sCtr = ctx.viewport.worldToScreen(pCtr);
 		const isConstraintActive = ctx.isConstraintOnlySelected ? ctx.isConstraintOnlySelected(this.id) : false;
 
 		// Render suppression checkboxes and suppressed objects only when constraint itself is selected
@@ -255,7 +255,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 					}
 					centroid =
 						count > 0
-							? ctx.viewport.worldToScreen(sumX / count, sumY / count)
+							? ctx.viewport.worldToScreen({ x: sumX / count, y: sumY / count })
 							: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
 				} else if (ctx.renderTransformedObjects) {
 					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
@@ -278,7 +278,10 @@ export class CircularPatternConstraint extends BaseConstraint {
 							sumX += p.x;
 							sumY += p.y;
 						}
-						centroid = ctx.viewport.worldToScreen(sumX / copyWorldPoints.length, sumY / copyWorldPoints.length);
+						centroid = ctx.viewport.worldToScreen({
+							x: sumX / copyWorldPoints.length,
+							y: sumY / copyWorldPoints.length,
+						});
 					} else {
 						centroid = {
 							x: sCtr.x + 40 * Math.cos(rad),
@@ -309,7 +312,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 			}
 		}
 
-		ctx.renderBadge(this.id, sCtr.x + 14, sCtr.y - 14, 'circular_pattern', COLORS.primary);
+		ctx.renderBadge(this.id, { x: sCtr.x + 14, y: sCtr.y - 14 }, 'circular_pattern', COLORS.primary);
 	}
 
 	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
