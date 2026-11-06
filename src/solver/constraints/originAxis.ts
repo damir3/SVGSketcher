@@ -1,6 +1,6 @@
-import { ORIGIN } from '../../math/vector';
+import { mid, ORIGIN } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS } from '../../canvas/styles';
@@ -65,29 +65,28 @@ export class OriginDistanceConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
-		const py = paramMap.get(`${this.pointId}.y`) ?? 0;
+		const p = readParamPoint(paramMap, this.pointId);
 
 		if (this.isCoincident) {
-			return [px * this.weight, py * this.weight];
+			return [p.x * this.weight, p.y * this.weight];
 		}
 
 		if (this.orientation === 'horizontal') {
 			if (this.targetDistance === 0) {
-				return [px * this.weight];
+				return [p.x * this.weight];
 			}
-			return [(px - this.side * this.targetDistance) * this.weight];
+			return [(p.x - this.side * this.targetDistance) * this.weight];
 		}
 
 		if (this.orientation === 'vertical') {
 			if (this.targetDistance === 0) {
-				return [py * this.weight];
+				return [p.y * this.weight];
 			}
-			return [(py - this.side * this.targetDistance) * this.weight];
+			return [(p.y - this.side * this.targetDistance) * this.weight];
 		}
 
 		// Aligned: hypot(px, py) = targetDistance
-		const curDist = Math.hypot(px, py);
+		const curDist = Math.hypot(p.x, p.y);
 		return [(curDist - this.targetDistance) * this.weight];
 	}
 
@@ -114,11 +113,10 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		// Aligned: d(hypot)/dx = x / hypot, d(hypot)/dy = y / hypot
-		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
-		const py = paramMap.get(`${this.pointId}.y`) ?? 0;
-		const curDist = Math.max(Math.hypot(px, py), 1e-7);
-		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, (px / curDist) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow, (py / curDist) * this.weight);
+		const p = readParamPoint(paramMap, this.pointId);
+		const curDist = Math.max(Math.hypot(p.x, p.y), 1e-7);
+		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, (p.x / curDist) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow, (p.y / curDist) * this.weight);
 		return res;
 	}
 
@@ -317,28 +315,26 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p1x = paramMap.get(`${this.lineP1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.lineP1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.lineP2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.lineP2Id}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.lineP1Id);
+		const p2 = readParamPoint(paramMap, this.lineP2Id);
 
 		if (this.isCollinear) {
 			if (this.axis === 'x') {
-				return [p1y * this.weight, p2y * this.weight];
+				return [p1.y * this.weight, p2.y * this.weight];
 			} else {
-				return [p1x * this.weight, p2x * this.weight];
+				return [p1.x * this.weight, p2.x * this.weight];
 			}
 		}
 
 		if (this.axis === 'x') {
 			return [
-				(p1y - this.side * this.targetDistance) * this.weight,
-				(p2y - this.side * this.targetDistance) * this.weight,
+				(p1.y - this.side * this.targetDistance) * this.weight,
+				(p2.y - this.side * this.targetDistance) * this.weight,
 			];
 		} else {
 			return [
-				(p1x - this.side * this.targetDistance) * this.weight,
-				(p2x - this.side * this.targetDistance) * this.weight,
+				(p1.x - this.side * this.targetDistance) * this.weight,
+				(p2.x - this.side * this.targetDistance) * this.weight,
 			];
 		}
 	}
@@ -367,13 +363,11 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
 
 		if (this.isCollinear) {
-			const midX = (s1.x + s2.x) * 0.5;
-			const midY = (s1.y + s2.y) * 0.5;
-			ctx.renderBadge(this.id, { x: midX, y: midY }, 'collinear', COLORS.primary);
+			ctx.renderBadge(this.id, mid(s1, s2), 'collinear', COLORS.primary);
 			return;
 		}
 
-		const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
+		const midPt = mid(p1, p2);
 		const sp = ctx.viewport.worldToScreen(midPt);
 		const sAxis2 =
 			this.axis === 'x' ? ctx.viewport.worldToScreen({ x: 100, y: 0 }) : ctx.viewport.worldToScreen({ x: 0, y: 100 });
@@ -403,12 +397,10 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const sOrigin = viewport.worldToScreen(ORIGIN);
 
 		if (this.isCollinear) {
-			const midX = (s1.x + s2.x) * 0.5;
-			const midY = (s1.y + s2.y) * 0.5;
-			return distanceToPoint(screen, { x: midX, y: midY });
+			return distanceToPoint(screen, mid(s1, s2));
 		}
 
-		const midPt = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
+		const midPt = mid(p1, p2);
 		const sp = viewport.worldToScreen(midPt);
 		const sAxis2 =
 			this.axis === 'x' ? viewport.worldToScreen({ x: 100, y: 0 }) : viewport.worldToScreen({ x: 0, y: 100 });

@@ -19,7 +19,7 @@ import {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 } from '../solver/constraints';
-import { dist, normalize, type Vec2 } from './vector';
+import { dot, vec, addScaled, dist, normalize, scale, sub, type Vec2 } from './vector';
 import {
 	type GeoCurve,
 	type GeoSegment,
@@ -144,10 +144,7 @@ function findExtendCandidateForLine(
 	const edge: 'start' | 'end' = d2 <= d1 ? 'end' : 'start';
 	const fromPoint = edge === 'end' ? p2 : p1;
 	const baseOtherPoint = edge === 'end' ? p1 : p2;
-	const dir = normalize({
-		x: fromPoint.x - baseOtherPoint.x,
-		y: fromPoint.y - baseOtherPoint.y,
-	});
+	const dir = normalize(sub(fromPoint, baseOtherPoint));
 
 	// Forward ray segment
 	const rayLen = 50000;
@@ -155,7 +152,7 @@ function findExtendCandidateForLine(
 		type: 'segment',
 		id: '__extend_ray__',
 		p1: fromPoint,
-		p2: { x: fromPoint.x + rayLen * dir.x, y: fromPoint.y + rayLen * dir.y },
+		p2: addScaled(fromPoint, dir, rayLen),
 	};
 
 	let closestT = Infinity;
@@ -166,7 +163,7 @@ function findExtendCandidateForLine(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(raySegment, other);
 		for (const pt of inters) {
-			const t = (pt.x - fromPoint.x) * dir.x + (pt.y - fromPoint.y) * dir.y;
+			const t = dot(sub(pt, fromPoint), dir);
 			if (t > 1e-3 && t < closestT) {
 				closestT = t;
 				closestPt = pt;
@@ -185,7 +182,7 @@ function findExtendCandidateForLine(
 		intersectedCurveType = intersectedCurve?.type;
 	} else {
 		// No intersection ahead: extend by +50mm
-		toPoint = { x: fromPoint.x + 50 * dir.x, y: fromPoint.y + 50 * dir.y };
+		toPoint = addScaled(fromPoint, dir, 50);
 	}
 
 	return {
@@ -345,11 +342,9 @@ function findExtendCandidateForEllipticalArc(
 		sinR = Math.sin(rot);
 
 	const toParam = (p: Vec2) => {
-		const dx = p.x - c.x,
-			dy = p.y - c.y;
-		const ex = dx * cosR + dy * sinR;
-		const ey = -dx * sinR + dy * cosR;
-		return Math.atan2(ey / b, ex / a);
+		const dir = sub(p, c);
+		const local = vec(dir.x * cosR + dir.y * sinR, -dir.x * sinR + dir.y * cosR);
+		return Math.atan2(local.y / b, local.x / a);
 	};
 
 	const thetaS = toParam(pStart);
@@ -451,7 +446,7 @@ function findExtendCandidateForSpline(
 		dir = normalize(tEnd);
 	} else {
 		const tStart = getSplineTangentAtParam(target.bezierSegments, 0.0);
-		dir = normalize({ x: -tStart.x, y: -tStart.y });
+		dir = normalize(scale(tStart, -1));
 	}
 
 	const rayLen = 50000;
@@ -459,7 +454,7 @@ function findExtendCandidateForSpline(
 		type: 'segment',
 		id: '__extend_ray__',
 		p1: fromPoint,
-		p2: { x: fromPoint.x + rayLen * dir.x, y: fromPoint.y + rayLen * dir.y },
+		p2: addScaled(fromPoint, dir, rayLen),
 	};
 
 	let closestT = Infinity;
@@ -470,7 +465,7 @@ function findExtendCandidateForSpline(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(raySegment, other);
 		for (const pt of inters) {
-			const t = (pt.x - fromPoint.x) * dir.x + (pt.y - fromPoint.y) * dir.y;
+			const t = dot(sub(pt, fromPoint), dir);
 			if (t > 1e-3 && t < closestT) {
 				closestT = t;
 				closestPt = pt;
@@ -489,7 +484,7 @@ function findExtendCandidateForSpline(
 		intersectedCurveType = intersectedCurve?.type;
 	} else {
 		// No intersection ahead: extend by +50mm
-		toPoint = { x: fromPoint.x + 50 * dir.x, y: fromPoint.y + 50 * dir.y };
+		toPoint = addScaled(fromPoint, dir, 50);
 	}
 
 	return {

@@ -1,5 +1,6 @@
+import { sub, vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
@@ -23,15 +24,12 @@ export class PointOnCircleConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
-		const py = paramMap.get(`${this.pointId}.y`) ?? 0;
-		const cx = paramMap.get(`${this.circleCenterId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.circleCenterId}.y`) ?? 0;
+		const p = readParamPoint(paramMap, this.pointId);
+		const center = readParamPoint(paramMap, this.circleCenterId);
 		const r = paramMap.get(`${this.circleId}.r`) ?? 10;
 
-		const dx = px - cx;
-		const dy = py - cy;
-		const cur = Math.hypot(dx, dy);
+		const dir = sub(p, center);
+		const cur = Math.hypot(dir.x, dir.y);
 
 		return [(cur - r) * this.weight];
 	}
@@ -42,22 +40,18 @@ export class PointOnCircleConstraint extends BaseConstraint {
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
-		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
-		const py = paramMap.get(`${this.pointId}.y`) ?? 0;
-		const cx = paramMap.get(`${this.circleCenterId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.circleCenterId}.y`) ?? 0;
+		const p = readParamPoint(paramMap, this.pointId);
+		const center = readParamPoint(paramMap, this.circleCenterId);
 
-		const dx = px - cx;
-		const dy = py - cy;
-		const cur = Math.max(Math.hypot(dx, dy), 1e-7);
+		const dir = sub(p, center);
+		const cur = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
 
-		const dPx = (dx / cur) * this.weight;
-		const dPy = (dy / cur) * this.weight;
+		const dP = vec((dir.x / cur) * this.weight, (dir.y / cur) * this.weight);
 
-		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, dPx);
-		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow, dPy);
-		this.addJacobianEntry(res, paramIndices, `${this.circleCenterId}.x`, baseRow, -dPx);
-		this.addJacobianEntry(res, paramIndices, `${this.circleCenterId}.y`, baseRow, -dPy);
+		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, dP.x);
+		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow, dP.y);
+		this.addJacobianEntry(res, paramIndices, `${this.circleCenterId}.x`, baseRow, -dP.x);
+		this.addJacobianEntry(res, paramIndices, `${this.circleCenterId}.y`, baseRow, -dP.y);
 		this.addJacobianEntry(res, paramIndices, `${this.circleId}.r`, baseRow, -1.0 * this.weight);
 
 		return res;

@@ -1,5 +1,6 @@
+import { cross, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
@@ -23,20 +24,15 @@ export class PointOnLineConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
-		const py = paramMap.get(`${this.pointId}.y`) ?? 0;
-		const p1x = paramMap.get(`${this.lineP1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.lineP1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.lineP2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.lineP2Id}.y`) ?? 0;
+		const p = readParamPoint(paramMap, this.pointId);
+		const p1 = readParamPoint(paramMap, this.lineP1Id);
+		const p2 = readParamPoint(paramMap, this.lineP2Id);
 
-		const dx = p2x - p1x;
-		const dy = p2y - p1y;
-		const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+		const dir = sub(p2, p1);
+		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
 
 		// Perpendicular distance from point to line
-		const cross = (px - p1x) * dy - (py - p1y) * dx;
-		return [(cross / lineLen) * this.weight];
+		return [(cross(sub(p, p1), dir) / lineLen) * this.weight];
 	}
 
 	override jacobian(

@@ -1,3 +1,4 @@
+import { vec, sub } from '../math/vector';
 import type { SketchDocument } from './sketch';
 import {
 	CircularPatternConstraint,
@@ -51,12 +52,9 @@ export function generateCircularPatternCopy(
 			return centerPtId;
 		}
 
-		const dx = pt.x - centerPt.x;
-		const dy = pt.y - centerPt.y;
-		const rx = centerPt.x + dx * cosA - dy * sinA;
-		const ry = centerPt.y + dx * sinA + dy * cosA;
-
-		const newPt = sketch.addPoint({ x: rx, y: ry }, false);
+		const dir = sub(pt, centerPt);
+		const rotated = vec(centerPt.x + dir.x * cosA - dir.y * sinA, centerPt.y + dir.x * sinA + dir.y * cosA);
+		const newPt = sketch.addPoint(rotated, false);
 		pointMap.set(origPtId, newPt.id);
 		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
 		createdEntityIds.push({ id: newPt.id, type: 'point' });
@@ -282,10 +280,9 @@ export function updateCircularPattern(
 				const sPt = sketch.points.get(pair.sourcePtId);
 				const pPt = sketch.points.get(pair.patternPtId);
 				if (sPt && pPt) {
-					const dx = sPt.x - centerPt.x;
-					const dy = sPt.y - centerPt.y;
-					pPt.x = centerPt.x + dx * cosA - dy * sinA;
-					pPt.y = centerPt.y + dx * sinA + dy * cosA;
+					const dir = sub(sPt, centerPt);
+					pPt.x = centerPt.x + dir.x * cosA - dir.y * sinA;
+					pPt.y = centerPt.y + dir.x * sinA + dir.y * cosA;
 				}
 			}
 		}
@@ -334,10 +331,8 @@ export function generateRectangularPatternCopy(
 		const pt = sketch.points.get(origPtId);
 		if (!pt) return origPtId;
 
-		const tx = pt.x + offset.dx;
-		const ty = pt.y + offset.dy;
-
-		const newPt = sketch.addPoint({ x: tx, y: ty }, false);
+		const translated = vec(pt.x + offset.dx, pt.y + offset.dy);
+		const newPt = sketch.addPoint(translated, false);
 		pointMap.set(origPtId, newPt.id);
 		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
 		createdEntityIds.push({ id: newPt.id, type: 'point' });

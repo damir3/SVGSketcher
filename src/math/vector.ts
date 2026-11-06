@@ -10,7 +10,11 @@ export function vec(x: number, y: number): Vec2 {
 }
 
 export function mid(a: Vec2, b: Vec2): Vec2 {
-	return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+	return { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
+}
+
+export function mix(a: Vec2, b: Vec2, t: number): Vec2 {
+	return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
 export function abs(a: Vec2, b: Vec2): Vec2 {
@@ -38,8 +42,7 @@ export function distSq(a: Vec2, b: Vec2): number {
 }
 
 export function dot(a: Vec2, b: Vec2): number {
-	const products = mul(a, b);
-	return products.x + products.y;
+	return a.x * b.x + a.y * b.y;
 }
 
 export function cross(a: Vec2, b: Vec2): number {
@@ -48,6 +51,32 @@ export function cross(a: Vec2, b: Vec2): number {
 
 export function add(a: Vec2, b: Vec2): Vec2 {
 	return { x: a.x + b.x, y: a.y + b.y };
+}
+
+export function addScaled(a: Vec2, b: Vec2, s: number): Vec2 {
+	return { x: a.x + b.x * s, y: a.y + b.y * s };
+}
+
+/** Reflects p across the line through axisPoint with the given unit normal. */
+export function reflectPoint(p: Vec2, axisPoint: Vec2, unitNormal: Vec2): Vec2 {
+	const signedDistance = dot(sub(p, axisPoint), unitNormal);
+	return addScaled(p, unitNormal, -2 * signedDistance);
+}
+
+export function sum(vectors: Iterable<Vec2>): Vec2 {
+	let x = 0;
+	let y = 0;
+	for (const v of vectors) {
+		x += v.x;
+		y += v.y;
+	}
+	return { x, y };
+}
+
+export function centroid(vectors: Iterable<Vec2>): Vec2 {
+	const pts = Array.isArray(vectors) ? vectors : [...vectors];
+	if (pts.length === 0) return { x: 0, y: 0 };
+	return scale(sum(pts), 1.0 / pts.length);
 }
 
 export function sub(a: Vec2, b: Vec2): Vec2 {
@@ -69,7 +98,13 @@ export function scale(v: Vec2, s: number): Vec2 {
 export function normalize(v: Vec2): Vec2 {
 	const len = Math.hypot(v.x, v.y);
 	if (len < 1e-12) return { x: 1, y: 0 };
-	return { x: v.x / len, y: v.y / len };
+	return scale(v, 1 / len);
+}
+
+export function normalizeOrNull(v: Vec2, minLength = 0): Vec2 | null {
+	const len = Math.hypot(v.x, v.y);
+	if (len <= minLength) return null;
+	return scale(v, 1 / len);
 }
 
 export function angle(a: Vec2, b: Vec2): number {
@@ -84,7 +119,7 @@ export function projectPointOntoSegment(p: Vec2, a: Vec2, b: Vec2): { point: Vec
 	}
 	const ap = sub(p, a);
 	const t = Math.max(0, Math.min(1, dot(ap, ab) / l2));
-	const projection = add(a, scale(ab, t));
+	const projection = addScaled(a, ab, t);
 	return { point: projection, t, dist: dist(p, projection) };
 }
 
@@ -96,7 +131,7 @@ export function projectPointOntoLine(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; 
 	}
 	const ap = sub(p, a);
 	const t = dot(ap, ab) / l2;
-	const projection = add(a, scale(ab, t));
+	const projection = addScaled(a, ab, t);
 	return { point: projection, t, dist: dist(p, projection) };
 }
 
@@ -104,9 +139,9 @@ export function getCircumcircle(p1: Vec2, p2: Vec2, p3: Vec2): { center: Vec2; r
 	const d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
 	if (Math.abs(d) < 1e-6) return null;
 
-	const p1Sq = p1.x * p1.x + p1.y * p1.y;
-	const p2Sq = p2.x * p2.x + p2.y * p2.y;
-	const p3Sq = p3.x * p3.x + p3.y * p3.y;
+	const p1Sq = dot(p1, p1);
+	const p2Sq = dot(p2, p2);
+	const p3Sq = dot(p3, p3);
 
 	const xc = (p1Sq * (p2.y - p3.y) + p2Sq * (p3.y - p1.y) + p3Sq * (p1.y - p2.y)) / d;
 	const yc = (p1Sq * (p3.x - p2.x) + p2Sq * (p1.x - p3.x) + p3Sq * (p2.x - p1.x)) / d;

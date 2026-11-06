@@ -1,3 +1,4 @@
+import { sub } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -721,9 +722,8 @@ describe('Spline Intersections, Trim, and Break', () => {
 		let maxDiff = 0;
 		for (let s = 0; s < expectedSub.length; s++) {
 			for (let k = 0; k < 4; k++) {
-				const dx = Math.abs(trimmedCurve.bezierSegments[s][k].x - expectedSub[s][k].x);
-				const dy = Math.abs(trimmedCurve.bezierSegments[s][k].y - expectedSub[s][k].y);
-				maxDiff = Math.max(maxDiff, dx, dy);
+				const dir = sub(trimmedCurve.bezierSegments[s][k], expectedSub[s][k]);
+				maxDiff = Math.max(maxDiff, Math.abs(dir.x), Math.abs(dir.y));
 			}
 		}
 		assert.ok(maxDiff < 0.05, `Max difference was ${maxDiff}, expected < 0.05 px`);

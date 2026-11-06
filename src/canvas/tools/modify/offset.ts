@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import { AABB } from '../../../math/aabb';
 import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
-import { dist, type Vec2 } from '../../../math/vector';
+import { dot, addScaled, dist, sub, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import { VariationToolPanel } from '../../../ui/panels/tools';
@@ -305,10 +305,7 @@ export class OffsetTool extends BaseTool {
 		const norm = this.geomResult.gizmoNormal;
 
 		const addTargetWorld = (offsetVal: number, sign: number) => {
-			const w = {
-				x: anchor.x + sign * offsetVal * norm.x,
-				y: anchor.y + sign * offsetVal * norm.y,
-			};
+			const w = addScaled(anchor, norm, sign * offsetVal);
 			pts.push(this.ctx.viewport.worldToScreen(w));
 		};
 
@@ -468,12 +465,11 @@ export class OffsetTool extends BaseTool {
 			this.ctx.setCursor('grabbing');
 			const { handle, startMouseWorld, startValue } = this.gizmoDragState;
 
-			const deltaX = world.x - startMouseWorld.x;
-			const deltaY = world.y - startMouseWorld.y;
-			const delta = deltaX * handle.normal.x + deltaY * handle.normal.y;
-			let newDist = Math.round((startValue + delta) * 2) / 2;
+			const delta = sub(world, startMouseWorld);
+			const offset = dot(delta, handle.normal);
+			let newDist = Math.round((startValue + offset) * 2) / 2;
 			if (Math.abs(newDist) < 0.1) {
-				newDist = startValue + delta < 0 ? -0.5 : 0.5;
+				newDist = startValue + offset < 0 ? -0.5 : 0.5;
 			}
 
 			if (handle.type === 'dist1') {

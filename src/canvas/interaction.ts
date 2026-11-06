@@ -11,7 +11,21 @@ import {
 	SNAP_GRID_DISTANCE_PX,
 	SNAP_POINT_DISTANCE_PX,
 } from './distances';
-import { ORIGIN, dist, distancesFrom, vec, projectPointOntoSegment, type Vec2 } from '../math/vector';
+import {
+	addScaled,
+	dot,
+	ORIGIN,
+	dist,
+	mid,
+	distancesFrom,
+	mix,
+	normalizeOrNull,
+	scale,
+	sub,
+	vec,
+	projectPointOntoSegment,
+	type Vec2,
+} from '../math/vector';
 import { AABB } from '../math/aabb';
 import type { IConstraint } from '../solver/types';
 import {
@@ -585,15 +599,13 @@ export class CanvasInteraction {
 	animateViewportTo(targetPanX: number, targetPanY: number, targetZoom: number, duration = 700): void {
 		this.cancelAnimation();
 
-		const startPanX = this.viewport.panX;
-		const startPanY = this.viewport.panY;
+		const startPan = vec(this.viewport.panX, this.viewport.panY);
 		const startZoom = this.viewport.zoom;
 
-		const dPanX = Math.abs(startPanX - targetPanX);
-		const dPanY = Math.abs(startPanY - targetPanY);
+		const dPan = vec(Math.abs(startPan.x - targetPanX), Math.abs(startPan.y - targetPanY));
 		const dZoom = Math.abs(startZoom - targetZoom);
 
-		if (dPanX < 0.5 && dPanY < 0.5 && dZoom < 0.001) {
+		if (dPan.x < 0.5 && dPan.y < 0.5 && dZoom < 0.001) {
 			this.viewport.panX = targetPanX;
 			this.viewport.panY = targetPanY;
 			this.viewport.zoom = targetZoom;
@@ -621,8 +633,8 @@ export class CanvasInteraction {
 			const progress = Math.min(1, Math.max(0, elapsed / duration));
 			const eased = easeInOut(progress, 3); // cubic ease-in-out
 
-			this.viewport.panX = startPanX + (targetPanX - startPanX) * eased;
-			this.viewport.panY = startPanY + (targetPanY - startPanY) * eased;
+			this.viewport.panX = startPan.x + (targetPanX - startPan.x) * eased;
+			this.viewport.panY = startPan.y + (targetPanY - startPan.y) * eased;
 			this.viewport.zoom = startZoom + (targetZoom - startZoom) * eased;
 
 			this.render();
@@ -953,7 +965,7 @@ export class CanvasInteraction {
 			const proj = projectPointOntoSegment(screenPos, s1, s2);
 			if (proj.dist < closestGeomDist) {
 				closestGeomDist = proj.dist;
-				const worldPos = vec(p1.x + proj.t * (p2.x - p1.x), p1.y + proj.t * (p2.y - p1.y));
+				const worldPos = mix(p1, p2, proj.t);
 				foundGeom = {
 					type: 'line',
 					id: line.id,
@@ -977,10 +989,9 @@ export class CanvasInteraction {
 
 			if (dToPerimeter < closestGeomDist) {
 				closestGeomDist = dToPerimeter;
-				const dx = screenPos.x - sc.x;
-				const dy = screenPos.y - sc.y;
-				const d = Math.max(Math.hypot(dx, dy), 1e-6);
-				const snappedScreen = vec(sc.x + (dx / d) * sr, sc.y + (dy / d) * sr);
+				const dir = sub(screenPos, sc);
+				const d = Math.max(Math.hypot(dir.x, dir.y), 1e-6);
+				const snappedScreen = addScaled(sc, dir, sr / d);
 				const worldPos = this.viewport.screenToWorld(snappedScreen);
 				foundGeom = {
 					type: 'circle',
@@ -1066,29 +1077,24 @@ export class CanvasInteraction {
 			const smaj = this.viewport.worldToScreen(majorPt);
 			const smin = this.viewport.worldToScreen(minorPt);
 
-			const uX = smaj.x - sc.x;
-			const uY = smaj.y - sc.y;
-			const vX = smin.x - sc.x;
-			const vY = smin.y - sc.y;
+			const axisU = sub(smaj, sc);
+			const axisV = sub(smin, sc);
 
 			const r = distancesFrom(sc, smaj, smin);
 			if (r.x < 1 || r.y < 1) continue;
 
-			const uHatX = uX / r.x;
-			const uHatY = uY / r.x;
-			const vHatX = vX / r.y;
-			const vHatY = vY / r.y;
+			const uHat = scale(axisU, 1 / r.x);
+			const vHat = scale(axisV, 1 / r.y);
 
-			const dx = screenPos.x - sc.x;
-			const dy = screenPos.y - sc.y;
-			const u = dx * uHatX + dy * uHatY;
-			const v = dx * vHatX + dy * vHatY;
+			const dir = sub(screenPos, sc);
+			const u = dot(dir, uHat);
+			const v = dot(dir, vHat);
 
 			const t = Math.atan2(v / r.y, u / r.x);
 			const uProj = r.x * Math.cos(t);
 			const vProj = r.y * Math.sin(t);
 
-			const snappedScreen = vec(sc.x + uProj * uHatX + vProj * vHatX, sc.y + uProj * uHatY + vProj * vHatY);
+			const snappedScreen = vec(sc.x + uProj * uHat.x + vProj * vHat.x, sc.y + uProj * uHat.y + vProj * vHat.y);
 			const dToPerimeter = dist(screenPos, snappedScreen);
 
 			if (dToPerimeter < closestGeomDist) {
@@ -1130,24 +1136,23 @@ export class CanvasInteraction {
 			if (r.x < 1 || r.y < 1) continue;
 
 			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-			const ux = Math.cos(theta);
-			const uy = Math.sin(theta);
-			const vx = -Math.sin(theta);
-			const vy = Math.cos(theta);
+			const axisU = vec(Math.cos(theta), Math.sin(theta));
+			const axisV = vec(-Math.sin(theta), Math.cos(theta));
 
-			const dx = screenPos.x - sc.x;
-			const dy = screenPos.y - sc.y;
-			const u = dx * ux + dy * uy;
-			const v = dx * vx + dy * vy;
+			const dir = sub(screenPos, sc);
+			const u = dot(dir, axisU);
+			const v = dot(dir, axisV);
 
 			const t = Math.atan2(v / r.y, u / r.x);
 
 			const ss = this.viewport.worldToScreen(startPt);
 			const se = this.viewport.worldToScreen(endPt);
-			const usScreen = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-			const vsScreen = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-			const ueScreen = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-			const veScreen = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+			const startOffset = sub(ss, sc);
+			const usScreen = dot(startOffset, axisU);
+			const vsScreen = dot(startOffset, axisV);
+			const endOffset = sub(se, sc);
+			const ueScreen = dot(endOffset, axisU);
+			const veScreen = dot(endOffset, axisV);
 
 			const ts = Math.atan2(vsScreen / r.y, usScreen / r.x);
 			const te = Math.atan2(veScreen / r.y, ueScreen / r.x);
@@ -1164,7 +1169,7 @@ export class CanvasInteraction {
 				const actualT = clockwise ? ts + clampedPAngle : ts - clampedPAngle;
 				const uProj = r.x * Math.cos(actualT);
 				const vProj = r.y * Math.sin(actualT);
-				const snappedScreen = vec(sc.x + uProj * ux + vProj * vx, sc.y + uProj * uy + vProj * vy);
+				const snappedScreen = vec(sc.x + uProj * axisU.x + vProj * axisV.x, sc.y + uProj * axisU.y + vProj * axisV.y);
 				const dToPerimeter = dist(screenPos, snappedScreen);
 
 				if (dToPerimeter < closestGeomDist) {
@@ -1234,12 +1239,14 @@ export class CanvasInteraction {
 		const { step, subStep } = this.viewport.getGridStep();
 		const subStepPx = subStep * this.viewport.zoom;
 		const gridStep = subStepPx >= 6 ? subStep : step;
-		const nearestWorldX = this.cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep);
-		const nearestWorldY = this.cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep);
-		const nearestScreen = this.viewport.worldToScreen({ x: nearestWorldX, y: nearestWorldY });
+		const nearestWorld = vec(
+			this.cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep),
+			this.cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep)
+		);
+		const nearestScreen = this.viewport.worldToScreen(nearestWorld);
 
 		if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
-			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestWorldX : world.x;
+			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestWorld.x : world.x;
 			const snapScreenX =
 				Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestScreen.x : screenPos.x;
 			return {
@@ -1251,7 +1258,7 @@ export class CanvasInteraction {
 		}
 
 		if (dAxisY < geomSnapDistPx) {
-			const snapY = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestWorldY : world.y;
+			const snapY = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestWorld.y : world.y;
 			const snapScreenY =
 				Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestScreen.y : screenPos.y;
 			return {
@@ -1265,7 +1272,7 @@ export class CanvasInteraction {
 		if (dist(screenPos, nearestScreen) <= SNAP_GRID_DISTANCE_PX) {
 			return {
 				type: 'grid',
-				worldPos: vec(nearestWorldX, nearestWorldY),
+				worldPos: nearestWorld,
 				screenPos: nearestScreen,
 			};
 		}
@@ -1331,11 +1338,10 @@ export class CanvasInteraction {
 		const p2 = this.sketch.getPoint(p2Id);
 		if (!p1 || !p2) return;
 
-		const dx = Math.abs(p2.x - p1.x);
-		const dy = Math.abs(p2.y - p1.y);
-		if (dx < 1e-6 && dy < 1e-6) return;
+		const dir = sub(p2, p1);
+		if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) return;
 
-		const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+		const angleDeg = (Math.atan2(Math.abs(dir.y), Math.abs(dir.x)) * 180) / Math.PI;
 
 		// Horizontal check
 		if (angleDeg < 1.0) {
@@ -1378,13 +1384,12 @@ export class CanvasInteraction {
 			return { pos: targetPos, axis: null };
 		}
 
-		const dx = Math.abs(targetPos.x - startPos.x);
-		const dy = Math.abs(targetPos.y - startPos.y);
-		if (dx < 1e-6 && dy < 1e-6) {
+		const dir = sub(targetPos, startPos);
+		if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) {
 			return { pos: targetPos, axis: null };
 		}
 
-		const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
+		const angleDeg = (Math.atan2(Math.abs(dir.y), Math.abs(dir.x)) * 180) / Math.PI;
 
 		if (angleDeg < 1.0) {
 			return {
@@ -1418,8 +1423,8 @@ export class CanvasInteraction {
 				const p2 = this.sketch.points.get(line.p2Id);
 				if (!p1 || !p2) return null;
 				return {
-					h1: { x: p1.x, y: p1.y },
-					h2: { x: p2.x, y: p2.y },
+					h1: p1,
+					h2: p2,
 				};
 			});
 			bezierSegments = fitPointsToBezier(pts, handles);
@@ -1736,7 +1741,7 @@ export class CanvasInteraction {
 
 		// Check for Rectangular Pattern Gizmo handle dragging (in select mode on selected pattern constraint)
 		for (const handle of this.renderer.rectangularGizmoHandles.values()) {
-			if (dist(screen, { x: handle.x, y: handle.y }) <= GIZMO_DISTANCE_PX) {
+			if (dist(screen, handle) <= GIZMO_DISTANCE_PX) {
 				let centroidWorld: Vec2 | null = null;
 				let u: Vec2 | null = null;
 				let startDistance = 0;
@@ -2105,9 +2110,8 @@ export class CanvasInteraction {
 		if (this.isPanning) {
 			this.regionHoverPoint = null;
 			this.renderer.updateRegionHover(null);
-			const dx = screen.x - this.lastMouseScreen.x;
-			const dy = screen.y - this.lastMouseScreen.y;
-			this.viewport.pan(dx, dy);
+			const dir = sub(screen, this.lastMouseScreen);
+			this.viewport.pan(dir.x, dir.y);
 			this.lastMouseScreen = screen;
 			this.render();
 			return;
@@ -2118,8 +2122,8 @@ export class CanvasInteraction {
 		// Gizmo drag handling (Rectangular pattern distance1 / distance2 in select mode)
 		if (this.gizmoDragState) {
 			const { axis, centroidWorld, u, startMouseWorld, startDistance, constraintId } = this.gizmoDragState;
-			const startProj = (startMouseWorld.x - centroidWorld.x) * u.x + (startMouseWorld.y - centroidWorld.y) * u.y;
-			const currentProj = (world.x - centroidWorld.x) * u.x + (world.y - centroidWorld.y) * u.y;
+			const startProj = dot(sub(startMouseWorld, centroidWorld), u);
+			const currentProj = dot(sub(world, centroidWorld), u);
 			const delta = currentProj - startProj;
 			let newDist = startDistance + delta;
 			if (Math.abs(newDist) < 0.25) {
@@ -2167,9 +2171,8 @@ export class CanvasInteraction {
 					const rotatePoint = (p: Vec2, center: Vec2, rad: number): Vec2 => {
 						const cos = Math.cos(rad);
 						const sin = Math.sin(rad);
-						const dx = p.x - center.x;
-						const dy = p.y - center.y;
-						return vec(center.x + dx * cos - dy * sin, center.y + dx * sin + dy * cos);
+						const dir = sub(p, center);
+						return vec(center.x + dir.x * cos - dir.y * sin, center.y + dir.x * sin + dir.y * cos);
 					};
 
 					const pt0 = this.sketch.points.get(text.rectanglePointIds[0]);
@@ -2203,13 +2206,12 @@ export class CanvasInteraction {
 
 		// Text Center Drag Gizmo handling
 		if (this.textDragState) {
-			const dx = world.x - this.textDragState.startWorld.x;
-			const dy = world.y - this.textDragState.startWorld.y;
+			const dir = sub(world, this.textDragState.startWorld);
 			for (const [pid, initPos] of this.textDragState.initialPoints) {
 				const pt = this.sketch.points.get(pid);
 				if (pt) {
-					pt.x = initPos.x + dx;
-					pt.y = initPos.y + dy;
+					pt.x = initPos.x + dir.x;
+					pt.y = initPos.y + dir.y;
 				}
 			}
 			this.sketch.solve();
@@ -2237,24 +2239,20 @@ export class CanvasInteraction {
 					if (p1 && p2) {
 						const s1 = this.viewport.worldToScreen(p1);
 						const s2 = this.viewport.worldToScreen(p2);
-						const midX = (s1.x + s2.x) * 0.5;
-						const midY = (s1.y + s2.y) * 0.5;
+						const midPoint = mid(s1, s2);
 						if (constraint.orientation === 'horizontal') {
-							const screenOffset = screen.y - midY;
+							const screenOffset = screen.y - midPoint.y;
 							constraint.offset = screenOffset / this.viewport.zoom;
 							this.render();
 						} else if (constraint.orientation === 'vertical') {
-							const screenOffset = screen.x - midX;
+							const screenOffset = screen.x - midPoint.x;
 							constraint.offset = screenOffset / this.viewport.zoom;
 							this.render();
 						} else {
-							const dx = s2.x - s1.x;
-							const dy = s2.y - s1.y;
-							const len = Math.hypot(dx, dy);
-							if (len > 1e-4) {
-								const nx = -dy / len;
-								const ny = dx / len;
-								const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
+							const dir = normalizeOrNull(sub(s2, s1), 1e-4);
+							if (dir) {
+								const normal = vec(-dir.y, dir.x);
+								const screenOffset = dot(sub(screen, midPoint), normal);
 								constraint.offset = screenOffset / this.viewport.zoom;
 								this.render();
 							}
@@ -2268,14 +2266,10 @@ export class CanvasInteraction {
 						const sp = this.viewport.worldToScreen(pt);
 						const s1 = this.viewport.worldToScreen(p1);
 						const s2 = this.viewport.worldToScreen(p2);
-						const dx = s2.x - s1.x;
-						const dy = s2.y - s1.y;
-						const lineLen = Math.hypot(dx, dy);
-						if (lineLen > 1e-4) {
-							const ux = dx / lineLen;
-							const uy = dy / lineLen;
-							const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
-							const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+						const dir = normalizeOrNull(sub(s2, s1), 1e-4);
+						if (dir) {
+							const tProj = dot(sub(sp, s1), dir);
+							const tCursor = dot(sub(screen, s1), dir);
 							constraint.offset = (tCursor - tProj) / this.viewport.zoom;
 							this.render();
 						}
@@ -2298,15 +2292,11 @@ export class CanvasInteraction {
 							constraint.offset = screenOffset / this.viewport.zoom;
 							this.render();
 						} else {
-							const midX = (sOrigin.x + sp.x) * 0.5;
-							const midY = (sOrigin.y + sp.y) * 0.5;
-							const dx = sp.x - sOrigin.x;
-							const dy = sp.y - sOrigin.y;
-							const len = Math.hypot(dx, dy);
-							if (len > 1e-4) {
-								const nx = -dy / len;
-								const ny = dx / len;
-								const screenOffset = (screen.x - midX) * nx + (screen.y - midY) * ny;
+							const midPoint = mid(sOrigin, sp);
+							const dir = normalizeOrNull(sub(sp, sOrigin), 1e-4);
+							if (dir) {
+								const normal = vec(-dir.y, dir.x);
+								const screenOffset = dot(sub(screen, midPoint), normal);
 								constraint.offset = screenOffset / this.viewport.zoom;
 								this.render();
 							}
@@ -2398,14 +2388,13 @@ export class CanvasInteraction {
 		// Drag line handling
 		if (this.isDraggingLine && this.draggedLineId && this.dragLineStartWorld && this.lineP1Start && this.lineP2Start) {
 			this.hasDragged = true;
-			const dx = world.x - this.dragLineStartWorld.x;
-			const dy = world.y - this.dragLineStartWorld.y;
+			const dir = sub(world, this.dragLineStartWorld);
 			this.sketch.dragLine(
 				this.draggedLineId,
-				this.lineP1Start.x + dx,
-				this.lineP1Start.y + dy,
-				this.lineP2Start.x + dx,
-				this.lineP2Start.y + dy
+				this.lineP1Start.x + dir.x,
+				this.lineP1Start.y + dir.y,
+				this.lineP2Start.x + dir.x,
+				this.lineP2Start.y + dir.y
 			);
 			this.render();
 			return;
@@ -2424,9 +2413,12 @@ export class CanvasInteraction {
 				this.sketch.dragCircleRadius(this.draggedCircleId, newRadius);
 				this.render();
 			} else {
-				const dx = world.x - this.dragCircleStartWorld.x;
-				const dy = world.y - this.dragCircleStartWorld.y;
-				this.sketch.dragCircle(this.draggedCircleId, this.circleCenterStart.x + dx, this.circleCenterStart.y + dy);
+				const dir = sub(world, this.dragCircleStartWorld);
+				this.sketch.dragCircle(
+					this.draggedCircleId,
+					this.circleCenterStart.x + dir.x,
+					this.circleCenterStart.y + dir.y
+				);
 				this.render();
 			}
 			return;
@@ -2442,8 +2434,7 @@ export class CanvasInteraction {
 			this.arcEndPointStart
 		) {
 			this.hasDragged = true;
-			const dx = world.x - this.dragArcStartWorld.x;
-			const dy = world.y - this.dragArcStartWorld.y;
+			const dir = sub(world, this.dragArcStartWorld);
 
 			const arc = this.sketch.arcs.get(this.draggedArcId);
 			if (arc) {
@@ -2451,16 +2442,16 @@ export class CanvasInteraction {
 				const start = this.sketch.points.get(arc.startPointId);
 				const end = this.sketch.points.get(arc.endPointId);
 				if (center && !center.fixed) {
-					center.x = this.arcCenterStart.x + dx;
-					center.y = this.arcCenterStart.y + dy;
+					center.x = this.arcCenterStart.x + dir.x;
+					center.y = this.arcCenterStart.y + dir.y;
 				}
 				if (start && !start.fixed) {
-					start.x = this.arcStartPointStart.x + dx;
-					start.y = this.arcStartPointStart.y + dy;
+					start.x = this.arcStartPointStart.x + dir.x;
+					start.y = this.arcStartPointStart.y + dir.y;
 				}
 				if (end && !end.fixed) {
-					end.x = this.arcEndPointStart.x + dx;
-					end.y = this.arcEndPointStart.y + dy;
+					end.x = this.arcEndPointStart.x + dir.x;
+					end.y = this.arcEndPointStart.y + dir.y;
 				}
 				this.sketch.solve();
 				this.render();
@@ -2478,8 +2469,7 @@ export class CanvasInteraction {
 			this.ellipseMinorPointStart
 		) {
 			this.hasDragged = true;
-			const dx = world.x - this.dragEllipseStartWorld.x;
-			const dy = world.y - this.dragEllipseStartWorld.y;
+			const dir = sub(world, this.dragEllipseStartWorld);
 
 			const ellipse = this.sketch.ellipses.get(this.draggedEllipseId);
 			if (ellipse) {
@@ -2487,16 +2477,16 @@ export class CanvasInteraction {
 				const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
 				const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
 				if (center && !center.fixed) {
-					center.x = this.ellipseCenterStart.x + dx;
-					center.y = this.ellipseCenterStart.y + dy;
+					center.x = this.ellipseCenterStart.x + dir.x;
+					center.y = this.ellipseCenterStart.y + dir.y;
 				}
 				if (majorPt && !majorPt.fixed) {
-					majorPt.x = this.ellipseMajorPointStart.x + dx;
-					majorPt.y = this.ellipseMajorPointStart.y + dy;
+					majorPt.x = this.ellipseMajorPointStart.x + dir.x;
+					majorPt.y = this.ellipseMajorPointStart.y + dir.y;
 				}
 				if (minorPt && !minorPt.fixed) {
-					minorPt.x = this.ellipseMinorPointStart.x + dx;
-					minorPt.y = this.ellipseMinorPointStart.y + dy;
+					minorPt.x = this.ellipseMinorPointStart.x + dir.x;
+					minorPt.y = this.ellipseMinorPointStart.y + dir.y;
 				}
 				this.sketch.solve();
 				this.render();
@@ -2516,8 +2506,7 @@ export class CanvasInteraction {
 			this.ellipticalArcEndPointStart
 		) {
 			this.hasDragged = true;
-			const dx = world.x - this.dragEllipticalArcStartWorld.x;
-			const dy = world.y - this.dragEllipticalArcStartWorld.y;
+			const dir = sub(world, this.dragEllipticalArcStartWorld);
 
 			const arc = this.sketch.ellipticalArcs.get(this.draggedEllipticalArcId);
 			if (arc) {
@@ -2527,24 +2516,24 @@ export class CanvasInteraction {
 				const start = this.sketch.points.get(arc.startPointId);
 				const end = this.sketch.points.get(arc.endPointId);
 				if (center && !center.fixed) {
-					center.x = this.ellipticalArcCenterStart.x + dx;
-					center.y = this.ellipticalArcCenterStart.y + dy;
+					center.x = this.ellipticalArcCenterStart.x + dir.x;
+					center.y = this.ellipticalArcCenterStart.y + dir.y;
 				}
 				if (majorPt && !majorPt.fixed) {
-					majorPt.x = this.ellipticalArcMajorPointStart.x + dx;
-					majorPt.y = this.ellipticalArcMajorPointStart.y + dy;
+					majorPt.x = this.ellipticalArcMajorPointStart.x + dir.x;
+					majorPt.y = this.ellipticalArcMajorPointStart.y + dir.y;
 				}
 				if (minorPt && !minorPt.fixed) {
-					minorPt.x = this.ellipticalArcMinorPointStart.x + dx;
-					minorPt.y = this.ellipticalArcMinorPointStart.y + dy;
+					minorPt.x = this.ellipticalArcMinorPointStart.x + dir.x;
+					minorPt.y = this.ellipticalArcMinorPointStart.y + dir.y;
 				}
 				if (start && !start.fixed) {
-					start.x = this.ellipticalArcStartPointStart.x + dx;
-					start.y = this.ellipticalArcStartPointStart.y + dy;
+					start.x = this.ellipticalArcStartPointStart.x + dir.x;
+					start.y = this.ellipticalArcStartPointStart.y + dir.y;
 				}
 				if (end && !end.fixed) {
-					end.x = this.ellipticalArcEndPointStart.x + dx;
-					end.y = this.ellipticalArcEndPointStart.y + dy;
+					end.x = this.ellipticalArcEndPointStart.x + dir.x;
+					end.y = this.ellipticalArcEndPointStart.y + dir.y;
 				}
 				this.sketch.solve();
 				this.render();
@@ -2555,14 +2544,13 @@ export class CanvasInteraction {
 		// Drag spline handling
 		if (this.isDraggingSpline && this.draggedSplineId && this.dragSplineStartWorld) {
 			this.hasDragged = true;
-			const dx = world.x - this.dragSplineStartWorld.x;
-			const dy = world.y - this.dragSplineStartWorld.y;
+			const dir = sub(world, this.dragSplineStartWorld);
 
 			for (const [pid, startPos] of this.splinePointsStart.entries()) {
 				const pt = this.sketch.points.get(pid);
 				if (pt && !pt.fixed) {
-					pt.x = startPos.x + dx;
-					pt.y = startPos.y + dy;
+					pt.x = startPos.x + dir.x;
+					pt.y = startPos.y + dir.y;
 				}
 			}
 			this.sketch.solve();
@@ -3296,9 +3284,8 @@ export class CanvasInteraction {
 					const p1 = this.sketch.points.get(l.p1Id);
 					const p2 = this.sketch.points.get(l.p2Id);
 					if (p1 && p2) {
-						const dx = Math.abs(p2.x - p1.x);
-						const dy = Math.abs(p2.y - p1.y);
-						if (dx >= dy) {
+						const dir = sub(p2, p1);
+						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
 							this.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
 							applied = true;
 							toastMsg = 'Horizontal constraint applied';
@@ -3312,9 +3299,8 @@ export class CanvasInteraction {
 					const p1 = this.sketch.points.get(pIds[0]);
 					const p2 = this.sketch.points.get(pIds[1]);
 					if (p1 && p2) {
-						const dx = Math.abs(p2.x - p1.x);
-						const dy = Math.abs(p2.y - p1.y);
-						if (dx >= dy) {
+						const dir = sub(p2, p1);
+						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
 							this.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
 							applied = true;
 							toastMsg = 'Horizontal constraint applied';
@@ -3396,9 +3382,8 @@ export class CanvasInteraction {
 					if (c && this.onEditDimension) {
 						const p1 = this.sketch.points.get(l.p1Id);
 						const p2 = this.sketch.points.get(l.p2Id);
-						const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
-						const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
-						const s = this.viewport.worldToScreen({ x: midX, y: midY });
+						const midPoint = p1 && p2 ? mid(p1, p2) : ORIGIN;
+						const s = this.viewport.worldToScreen(midPoint);
 						const rect = this.svg.getBoundingClientRect();
 						this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 					}
@@ -3433,10 +3418,9 @@ export class CanvasInteraction {
 							while (delta > Math.PI) delta -= TWO_PI;
 							while (delta < -Math.PI) delta += TWO_PI;
 							const midAngle = a1 + delta * 0.5;
-							const midX = sCenter.x + rScreen * Math.cos(midAngle);
-							const midY = sCenter.y + rScreen * Math.sin(midAngle);
+							const midPoint = vec(sCenter.x + rScreen * Math.cos(midAngle), sCenter.y + rScreen * Math.sin(midAngle));
 							const rect = this.svg.getBoundingClientRect();
-							this.onEditDimension(c, vec(rect.left + midX, rect.top + midY));
+							this.onEditDimension(c, vec(rect.left + midPoint.x, rect.top + midPoint.y));
 						}
 					}
 				} else if (pIds.length === 3 && lIds.length === 0) {
@@ -3468,10 +3452,12 @@ export class CanvasInteraction {
 								while (delta > Math.PI) delta -= TWO_PI;
 								while (delta < -Math.PI) delta += TWO_PI;
 								const midAngle = a1 + delta * 0.5;
-								const midX = sCenter.x + rScreen * Math.cos(midAngle);
-								const midY = sCenter.y + rScreen * Math.sin(midAngle);
+								const midpoint = vec(
+									sCenter.x + rScreen * Math.cos(midAngle),
+									sCenter.y + rScreen * Math.sin(midAngle)
+								);
 								const rect = this.svg.getBoundingClientRect();
-								this.onEditDimension(c, vec(rect.left + midX, rect.top + midY));
+								this.onEditDimension(c, vec(rect.left + midpoint.x, rect.top + midpoint.y));
 							}
 						}
 					}
@@ -3496,9 +3482,8 @@ export class CanvasInteraction {
 						if (c && this.onEditDimension) {
 							const p1 = this.sketch.points.get(pIds[0]);
 							const p2 = this.sketch.points.get(pIds[1]);
-							const midX = p1 && p2 ? (p1.x + p2.x) / 2 : 0;
-							const midY = p1 && p2 ? (p1.y + p2.y) / 2 : 0;
-							const s = this.viewport.worldToScreen({ x: midX, y: midY });
+							const midPoint = p1 && p2 ? mid(p1, p2) : ORIGIN;
+							const s = this.viewport.worldToScreen(midPoint);
 							const rect = this.svg.getBoundingClientRect();
 							this.onEditDimension(c, vec(rect.left + s.x, rect.top + s.y));
 						}
@@ -3727,13 +3712,11 @@ export class CanvasInteraction {
 	}
 
 	private finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {
-		const minScreenX = Math.min(s1.x, s2.x);
-		const maxScreenX = Math.max(s1.x, s2.x);
-		const minScreenY = Math.min(s1.y, s2.y);
-		const maxScreenY = Math.max(s1.y, s2.y);
+		const minScreen = vec(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
+		const maxScreen = vec(Math.max(s1.x, s2.x), Math.max(s1.y, s2.y));
 
-		const w1 = this.viewport.screenToWorld({ x: minScreenX, y: minScreenY });
-		const w2 = this.viewport.screenToWorld({ x: maxScreenX, y: maxScreenY });
+		const w1 = this.viewport.screenToWorld(minScreen);
+		const w2 = this.viewport.screenToWorld(maxScreen);
 
 		const bounds = AABB.fromPoints([w1, w2])!;
 		const { min, max } = bounds;

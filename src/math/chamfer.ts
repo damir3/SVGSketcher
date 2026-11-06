@@ -1,5 +1,5 @@
 import type { Vec2 } from './vector';
-import { dist, mid, normalize, vec } from './vector';
+import { centroid, dist, dot, mid, normalize, vec } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import { CoincidentConstraint } from '../solver/constraints';
 
@@ -182,11 +182,11 @@ function buildChamferCandidate(
 	const dir1 = vec(v1.x / len1, v1.y / len1);
 	const dir2 = vec(v2.x / len2, v2.y / len2);
 
-	const dot = Math.max(-1, Math.min(1, dir1.x * dir2.x + dir1.y * dir2.y));
+	const dotValue = Math.max(-1, Math.min(1, dot(dir1, dir2)));
 	// Check collinearity
-	if (Math.abs(dot) > 0.9999) return null;
+	if (Math.abs(dotValue) > 0.9999) return null;
 
-	const cornerAngleRad = Math.acos(dot);
+	const cornerAngleRad = Math.acos(dotValue);
 
 	return {
 		id: `chamfer_${line1Id}_${line2Id}`,
@@ -260,7 +260,7 @@ export function calculateChamferGeometry(
 		);
 		const vAB = vec(pt2.x - pt1.x, pt2.y - pt1.y);
 		const vAV = vec(-candidate.dir1.x, -candidate.dir1.y);
-		const dotAB_AV = Math.max(-1, Math.min(1, (vAB.x * vAV.x + vAB.y * vAV.y) / (Math.hypot(vAB.x, vAB.y) || 1)));
+		const dotAB_AV = Math.max(-1, Math.min(1, dot(vAB, vAV) / (Math.hypot(vAB.x, vAB.y) || 1)));
 		effAngleDeg = Math.acos(dotAB_AV) * (180 / Math.PI);
 	} else if (mode === 'distance_angle') {
 		const d = Math.max(0.1, dist1Input);
@@ -407,17 +407,14 @@ export function commitChamferToSketch(
 		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
 		if (c2 && expressions?.dist2) c2.expression = expressions.dist2;
 	} else if (mode === 'distance_angle') {
-		const centroid = {
-			x: (candidate.vertexPos.x + res.t1.x + res.t2.x) / 3,
-			y: (candidate.vertexPos.y + res.t1.y + res.t2.y) / 3,
-		};
+		const cornerCentroid = centroid([candidate.vertexPos, res.t1, res.t2]);
 		if (!flip) {
 			// Distance along line 1
 			const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
 			if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
 			// Angle between chamfer line and line 1
 			if (l1) {
-				const cAng = sketch.addAngleConstraint(chamferLine.id, l1.id, res.angleDeg, 30, centroid);
+				const cAng = sketch.addAngleConstraint(chamferLine.id, l1.id, res.angleDeg, 30, cornerCentroid);
 				if (cAng && expressions?.angle) cAng.expression = expressions.angle;
 			}
 		} else {
@@ -426,7 +423,7 @@ export function commitChamferToSketch(
 			if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
 			// Angle between chamfer line and line 2
 			if (l2) {
-				const cAng = sketch.addAngleConstraint(chamferLine.id, l2.id, res.angleDeg, 30, centroid);
+				const cAng = sketch.addAngleConstraint(chamferLine.id, l2.id, res.angleDeg, 30, cornerCentroid);
 				if (cAng && expressions?.angle) cAng.expression = expressions.angle;
 			}
 		}

@@ -1,3 +1,4 @@
+import { cross, vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -24,18 +25,21 @@ export class ParallelConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const dx1 = (paramMap.get(`${this.l1P2}.x`) ?? 0) - (paramMap.get(`${this.l1P1}.x`) ?? 0);
-		const dy1 = (paramMap.get(`${this.l1P2}.y`) ?? 0) - (paramMap.get(`${this.l1P1}.y`) ?? 0);
-		const dx2 = (paramMap.get(`${this.l2P2}.x`) ?? 0) - (paramMap.get(`${this.l2P1}.x`) ?? 0);
-		const dy2 = (paramMap.get(`${this.l2P2}.y`) ?? 0) - (paramMap.get(`${this.l2P1}.y`) ?? 0);
+		const dir1 = vec(
+			(paramMap.get(`${this.l1P2}.x`) ?? 0) - (paramMap.get(`${this.l1P1}.x`) ?? 0),
+			(paramMap.get(`${this.l1P2}.y`) ?? 0) - (paramMap.get(`${this.l1P1}.y`) ?? 0)
+		);
+		const dir2 = vec(
+			(paramMap.get(`${this.l2P2}.x`) ?? 0) - (paramMap.get(`${this.l2P1}.x`) ?? 0),
+			(paramMap.get(`${this.l2P2}.y`) ?? 0) - (paramMap.get(`${this.l2P1}.y`) ?? 0)
+		);
 
-		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
-		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
+		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
+		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
 		const avgL = (l1 + l2) * 0.5;
 
 		// Cross product normalized to dimensional scale
-		const cross = (dx1 * dy2 - dy1 * dx2) / (l1 * l2);
-		return [cross * avgL * this.weight];
+		return [(cross(dir1, dir2) / (l1 * l2)) * avgL * this.weight];
 	}
 
 	override jacobian(

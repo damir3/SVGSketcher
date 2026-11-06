@@ -1,10 +1,10 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
-import type { Vec2 } from '../../math/vector';
+import { cross, dot, vec, addScaled, mid, sub, type Vec2 } from '../../math/vector';
 
 /**
  * Line pair: both endpoints of the offset line lie at signed distance `side * d`
@@ -115,16 +115,12 @@ export class OffsetConstraint extends BaseConstraint {
 	}
 
 	private lineResidual(pm: Map<string, number>, p: OffsetLinePair, ptId: string): number {
-		const px = pm.get(`${ptId}.x`) ?? 0;
-		const py = pm.get(`${ptId}.y`) ?? 0;
-		const x1 = pm.get(`${p.origP1Id}.x`) ?? 0;
-		const y1 = pm.get(`${p.origP1Id}.y`) ?? 0;
-		const x2 = pm.get(`${p.origP2Id}.x`) ?? 0;
-		const y2 = pm.get(`${p.origP2Id}.y`) ?? 0;
-		const dx = x2 - x1;
-		const dy = y2 - y1;
-		const len = Math.max(Math.hypot(dx, dy), 1e-9);
-		const hLeft = (dx * (py - y1) - dy * (px - x1)) / len;
+		const point = readParamPoint(pm, ptId);
+		const p1 = readParamPoint(pm, p.origP1Id);
+		const p2 = readParamPoint(pm, p.origP2Id);
+		const dir = sub(p2, p1);
+		const len = Math.max(Math.hypot(dir.x, dir.y), 1e-9);
+		const hLeft = cross(dir, sub(point, p1)) / len;
 		return (hLeft - p.side * this.targetDistance) * this.weight;
 	}
 
@@ -135,23 +131,22 @@ export class OffsetConstraint extends BaseConstraint {
 				res.push(this.lineResidual(pm, p, p.offP1Id));
 				res.push(this.lineResidual(pm, p, p.offP2Id));
 			} else if (p.kind === 'circle') {
-				const ox = pm.get(`${p.origCenterId}.x`) ?? 0;
-				const oy = pm.get(`${p.origCenterId}.y`) ?? 0;
-				const fx = pm.get(`${p.offCenterId}.x`) ?? 0;
-				const fy = pm.get(`${p.offCenterId}.y`) ?? 0;
+				const o = readParamPoint(pm, p.origCenterId);
+				const f = readParamPoint(pm, p.offCenterId);
 				const ro = pm.get(`${p.origId}.r`) ?? 0;
 				const rf = pm.get(`${p.offId}.r`) ?? 0;
-				res.push((fx - ox) * this.weight);
-				res.push((fy - oy) * this.weight);
+				res.push((f.x - o.x) * this.weight);
+				res.push((f.y - o.y) * this.weight);
 				res.push((rf - ro - p.side * this.targetDistance) * this.weight);
 			} else if (p.kind === 'spline') {
 				for (const sp of p.points) {
-					const px = pm.get(`${sp.pointId}.x`) ?? 0;
-					const py = pm.get(`${sp.pointId}.y`) ?? 0;
-					const targetX = sp.basePos.x + sp.side * this.targetDistance * sp.normal.x;
-					const targetY = sp.basePos.y + sp.side * this.targetDistance * sp.normal.y;
-					res.push((px - targetX) * this.weight);
-					res.push((py - targetY) * this.weight);
+					const point = readParamPoint(pm, sp.pointId);
+					const target = vec(
+						sp.basePos.x + sp.side * this.targetDistance * sp.normal.x,
+						sp.basePos.y + sp.side * this.targetDistance * sp.normal.y
+					);
+					res.push((point.x - target.x) * this.weight);
+					res.push((point.y - target.y) * this.weight);
 				}
 			}
 		}
@@ -211,13 +206,12 @@ export class OffsetConstraint extends BaseConstraint {
 			const f1 = sketch.points.get(p.offP1Id);
 			const f2 = sketch.points.get(p.offP2Id);
 			if (!o1 || !o2 || !f1 || !f2) return null;
-			const fm = { x: (f1.x + f2.x) / 2, y: (f1.y + f2.y) / 2 };
-			const dx = o2.x - o1.x;
-			const dy = o2.y - o1.y;
-			const l2 = dx * dx + dy * dy;
+			const fm = mid(f1, f2);
+			const dir = sub(o2, o1);
+			const l2 = dot(dir, dir);
 			if (l2 < 1e-12) return null;
-			const t = ((fm.x - o1.x) * dx + (fm.y - o1.y) * dy) / l2;
-			return { a: { x: o1.x + t * dx, y: o1.y + t * dy }, b: fm };
+			const t = dot(sub(fm, o1), dir) / l2;
+			return { a: addScaled(o1, dir, t), b: fm };
 		}
 		if (p.kind === 'spline') {
 			const midSp = p.points[Math.floor(p.points.length / 2)];
@@ -249,8 +243,8 @@ export class OffsetConstraint extends BaseConstraint {
 		}
 		const u = { x: Math.cos(ang), y: Math.sin(ang) };
 		return {
-			a: { x: c.x + u.x * orig.radius, y: c.y + u.y * orig.radius },
-			b: { x: cOff.x + u.x * off.radius, y: cOff.y + u.y * off.radius },
+			a: addScaled(c, u, orig.radius),
+			b: addScaled(cOff, u, off.radius),
 		};
 	}
 

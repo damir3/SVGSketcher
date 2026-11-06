@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { SnapResult, ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, projectPointOntoSegment, getCircumcircle, vec, type Vec2 } from '../../../math/vector';
+import { dot, sub, dist, projectPointOntoSegment, getCircumcircle, vec, type Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, getArcSvgPath } from '../../svg';
 import {
 	AUX_AXIS_ATTRS,
@@ -850,14 +850,12 @@ export class SlotTool extends BaseTool {
 
 	private computeLinearSecondPoint(effectiveWorld: Vec2): Vec2 {
 		const p1 = this.firstWorldPos!;
-		const vx = effectiveWorld.x - p1.x;
-		const vy = effectiveWorld.y - p1.y;
-		const d = Math.hypot(vx, vy);
+		const v = sub(effectiveWorld, p1);
+		const d = Math.hypot(v.x, v.y);
 
 		if (this.isDistanceLocked || this.popup.isLocked('distance')) {
-			const dirX = d > 1e-4 ? vx / d : 1;
-			const dirY = d > 1e-4 ? vy / d : 0;
-			return vec(p1.x + dirX * this.distance, p1.y + dirY * this.distance);
+			const dir = vec(d > 1e-4 ? v.x / d : 1, d > 1e-4 ? v.y / d : 0);
+			return vec(p1.x + dir.x * this.distance, p1.y + dir.y * this.distance);
 		}
 		return effectiveWorld;
 	}
@@ -867,10 +865,9 @@ export class SlotTool extends BaseTool {
 		p2: Vec2,
 		radius: number
 	): { c1: Vec2; c2: Vec2; u: Vec2; n: Vec2; effectiveR: number } {
-		const vx = p2.x - p1.x;
-		const vy = p2.y - p1.y;
-		const len = Math.hypot(vx, vy);
-		const u = len > 1e-4 ? vec(vx / len, vy / len) : vec(1, 0);
+		const v = sub(p2, p1);
+		const len = Math.hypot(v.x, v.y);
+		const u = len > 1e-4 ? vec(v.x / len, v.y / len) : vec(1, 0);
 		const n = vec(-u.y, u.x);
 
 		if (this._mode === 'center_to_center') {
@@ -894,12 +891,11 @@ export class SlotTool extends BaseTool {
 		const p2 = this.secondWorldPos!;
 
 		if (this._mode === 'overall') {
-			const vx = p2.x - p1.x;
-			const vy = p2.y - p1.y;
-			const len = Math.hypot(vx, vy);
-			const u = len > 1e-4 ? vec(vx / len, vy / len) : vec(1, 0);
+			const v = sub(p2, p1);
+			const len = Math.hypot(v.x, v.y);
+			const u = len > 1e-4 ? vec(v.x / len, v.y / len) : vec(1, 0);
 			const n = vec(-u.y, u.x);
-			const perpDist = Math.abs((effectiveWorld.x - p1.x) * n.x + (effectiveWorld.y - p1.y) * n.y);
+			const perpDist = Math.abs(dot(sub(effectiveWorld, p1), n));
 			const maxR = Math.max(0.1, len / 2 - 0.1);
 			return Math.max(0.1, Math.min(perpDist > 0.1 ? perpDist : dist(p2, effectiveWorld), maxR));
 		}

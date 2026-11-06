@@ -1,6 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from './vector';
-import { distancesFrom } from './vector';
+import { dot, vec, cross, distancesFrom, sub } from './vector';
 import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurves } from './intersection';
 import { extractSplineInterval, type BezierSegment } from './spline';
 
@@ -13,7 +13,6 @@ export interface SketchRegion {
 
 const KEY_SCALE = 1e5;
 const key = (p: Vec2) => `${Math.round(p.x * KEY_SCALE)},${Math.round(p.y * KEY_SCALE)}`;
-const cross = (a: Vec2, b: Vec2) => a.x * b.y - a.y * b.x;
 const polygonArea = (points: Vec2[]) =>
 	points.reduce((sum, p, i) => sum + cross(p, points[(i + 1) % points.length]), 0) / 2;
 function pointInPolygon(point: Vec2, points: Vec2[]): boolean {
@@ -130,14 +129,11 @@ function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc
 		const end = { x: curve.end.x, y: -curve.end.y };
 		const r = distancesFrom(center, major, minor);
 		const theta = Math.atan2(major.y - center.y, major.x - center.x);
-		const ux = Math.cos(theta),
-			uy = Math.sin(theta),
-			vx = -Math.sin(theta),
-			vy = Math.cos(theta);
+		const u = vec(Math.cos(theta), Math.sin(theta)),
+			v = vec(-Math.sin(theta), Math.cos(theta));
 		const param = (point: Vec2) => {
-			const dx = point.x - center.x,
-				dy = point.y - center.y;
-			return Math.atan2((dx * vx + dy * vy) / Math.max(r.y, 1e-6), (dx * ux + dy * uy) / Math.max(r.x, 1e-6));
+			const dir = sub(point, center);
+			return Math.atan2(dot(dir, v) / Math.max(r.y, 1e-6), dot(dir, u) / Math.max(r.x, 1e-6));
 		};
 		const ts = param(start),
 			te = param(end);

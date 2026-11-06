@@ -1,9 +1,10 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
+import { sub, vec, centroid, type Vec2 } from '../../math/vector';
 
 export interface PatternPointPair {
 	sourcePtId: string;
@@ -121,8 +122,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const errors: number[] = [];
-		const cx = paramMap.get(`${this.centerPtId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.centerPtId}.y`) ?? 0;
+		const center = readParamPoint(paramMap, this.centerPtId);
 		const suppressedSet = new Set(this.suppressedIndices);
 
 		for (const copy of this.copies) {
@@ -134,18 +134,14 @@ export class CircularPatternConstraint extends BaseConstraint {
 			const sinA = Math.sin(rad);
 
 			for (const pair of copy.pointPairs) {
-				const sx = paramMap.get(`${pair.sourcePtId}.x`) ?? 0;
-				const sy = paramMap.get(`${pair.sourcePtId}.y`) ?? 0;
-				const px = paramMap.get(`${pair.patternPtId}.x`) ?? 0;
-				const py = paramMap.get(`${pair.patternPtId}.y`) ?? 0;
+				const s = readParamPoint(paramMap, pair.sourcePtId);
+				const p = readParamPoint(paramMap, pair.patternPtId);
 
-				const dx = sx - cx;
-				const dy = sy - cy;
-				const targetX = cx + dx * cosA - dy * sinA;
-				const targetY = cy + dx * sinA + dy * cosA;
+				const dir = sub(s, center);
+				const target = vec(center.x + dir.x * cosA - dir.y * sinA, center.y + dir.x * sinA + dir.y * cosA);
 
-				errors.push((px - targetX) * this.weight);
-				errors.push((py - targetY) * this.weight);
+				errors.push((p.x - target.x) * this.weight);
+				errors.push((p.y - target.y) * this.weight);
 			}
 
 			if (copy.radiusPairs) {
@@ -238,24 +234,18 @@ export class CircularPatternConstraint extends BaseConstraint {
 				const aDeg = computePatternCopyAngle(k, N, this.distribution, this.totalAngle);
 				const rad = (aDeg * Math.PI) / 180;
 
-				let centroid: { x: number; y: number };
+				let copyCentroid: { x: number; y: number };
 				const copy = this.copies.find(cp => cp.copyIndex === k);
 
 				if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-					let sumX = 0,
-						sumY = 0,
-						count = 0;
+					const pts: Vec2[] = [];
 					for (const pair of copy.pointPairs) {
 						const pt = ctx.sketch.points.get(pair.patternPtId);
-						if (pt) {
-							sumX += pt.x;
-							sumY += pt.y;
-							count++;
-						}
+						if (pt) pts.push(pt);
 					}
-					centroid =
-						count > 0
-							? ctx.viewport.worldToScreen({ x: sumX / count, y: sumY / count })
+					copyCentroid =
+						pts.length > 0
+							? ctx.viewport.worldToScreen(centroid(pts))
 							: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
 				} else if (ctx.renderTransformedObjects) {
 					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
@@ -272,24 +262,15 @@ export class CircularPatternConstraint extends BaseConstraint {
 					);
 
 					if (copyWorldPoints.length > 0) {
-						let sumX = 0,
-							sumY = 0;
-						for (const p of copyWorldPoints) {
-							sumX += p.x;
-							sumY += p.y;
-						}
-						centroid = ctx.viewport.worldToScreen({
-							x: sumX / copyWorldPoints.length,
-							y: sumY / copyWorldPoints.length,
-						});
+						copyCentroid = ctx.viewport.worldToScreen(centroid(copyWorldPoints));
 					} else {
-						centroid = {
+						copyCentroid = {
 							x: sCtr.x + 40 * Math.cos(rad),
 							y: sCtr.y + 40 * Math.sin(rad),
 						};
 					}
 				} else {
-					centroid = {
+					copyCentroid = {
 						x: sCtr.x + 40 * Math.cos(rad),
 						y: sCtr.y + 40 * Math.sin(rad),
 					};
@@ -298,8 +279,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 				// Register screen position for hit-testing
 				if (ctx.patternCheckboxPositions) {
 					ctx.patternCheckboxPositions.set(`c-${this.id}-${k}`, {
-						x: centroid.x,
-						y: centroid.y,
+						x: copyCentroid.x,
+						y: copyCentroid.y,
 						copyIndex: k,
 						constraintId: this.id,
 					});
@@ -307,7 +288,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 
 				// Render suppression checkbox over copy
 				if (ctx.renderPatternSuppressionCheckbox) {
-					ctx.renderPatternSuppressionCheckbox(centroid, k, isSuppressed, this.id);
+					ctx.renderPatternSuppressionCheckbox(copyCentroid, k, isSuppressed, this.id);
 				}
 			}
 		}

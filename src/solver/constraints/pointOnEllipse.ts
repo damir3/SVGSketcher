@@ -1,5 +1,6 @@
+import { dot, scale, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
@@ -41,33 +42,24 @@ export class PointOnEllipseConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const px = paramMap.get(`${this.pointId}.x`) ?? 0;
-		const py = paramMap.get(`${this.pointId}.y`) ?? 0;
-		const cx = paramMap.get(`${this.centerId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.centerId}.y`) ?? 0;
-		const x1 = paramMap.get(`${this.majorAxisPointId}.x`) ?? 0;
-		const y1 = paramMap.get(`${this.majorAxisPointId}.y`) ?? 0;
-		const x2 = paramMap.get(`${this.minorAxisPointId}.x`) ?? 0;
-		const y2 = paramMap.get(`${this.minorAxisPointId}.y`) ?? 0;
+		const p = readParamPoint(paramMap, this.pointId);
+		const center = readParamPoint(paramMap, this.centerId);
+		const p1 = readParamPoint(paramMap, this.majorAxisPointId);
+		const p2 = readParamPoint(paramMap, this.minorAxisPointId);
 
-		const uX = x1 - cx;
-		const uY = y1 - cy;
-		const vX = x2 - cx;
-		const vY = y2 - cy;
+		const axisU = sub(p1, center);
+		const axisV = sub(p2, center);
 
-		const rx = Math.max(Math.hypot(uX, uY), 1e-7);
-		const ry = Math.max(Math.hypot(vX, vY), 1e-7);
+		const rx = Math.max(Math.hypot(axisU.x, axisU.y), 1e-7);
+		const ry = Math.max(Math.hypot(axisV.x, axisV.y), 1e-7);
 		const avgR = (rx + ry) * 0.5;
 
-		const uHatX = uX / rx;
-		const uHatY = uY / rx;
-		const vHatX = vX / ry;
-		const vHatY = vY / ry;
+		const uHat = scale(axisU, 1 / rx);
+		const vHat = scale(axisV, 1 / ry);
 
-		const dx = px - cx;
-		const dy = py - cy;
-		const u = dx * uHatX + dy * uHatY;
-		const v = dx * vHatX + dy * vHatY;
+		const dir = sub(p, center);
+		const u = dot(dir, uHat);
+		const v = dot(dir, vHat);
 
 		const res = ((u * u) / (rx * rx) + (v * v) / (ry * ry) - 1.0) * avgR * this.weight;
 		return [res];

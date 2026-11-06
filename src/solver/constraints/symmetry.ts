@@ -1,5 +1,6 @@
+import { cross, dot, mid, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS, SYMMETRY_CHORD_ATTRS } from '../../canvas/styles';
 import { createSvgLine } from '../../canvas/svg';
@@ -49,35 +50,26 @@ export class SymmetryConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.p1Id);
+		const p2 = readParamPoint(paramMap, this.p2Id);
 
 		if (this.lineId === 'origin' || (this.lineP1Id === 'origin' && !this.lineP2Id)) {
-			return [(p1x + p2x) * 0.5 * this.weight, (p1y + p2y) * 0.5 * this.weight];
+			return [(p1.x + p2.x) * 0.5 * this.weight, (p1.y + p2.y) * 0.5 * this.weight];
 		}
 
-		const ax = paramMap.get(`${this.lineP1Id}.x`) ?? 0;
-		const ay = paramMap.get(`${this.lineP1Id}.y`) ?? 0;
-		const bx = paramMap.get(`${this.lineP2Id}.x`) ?? 0;
-		const by = paramMap.get(`${this.lineP2Id}.y`) ?? 0;
+		const a = readParamPoint(paramMap, this.lineP1Id);
+		const b = readParamPoint(paramMap, this.lineP2Id);
 
-		const dx = bx - ax;
-		const dy = by - ay;
-		const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+		const dir = sub(b, a);
+		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
 
 		// Equation 0: Midpoint of (P1, P2) lies on the line AB
-		const mx = (p1x + p2x) * 0.5;
-		const my = (p1y + p2y) * 0.5;
-		const cross = (mx - ax) * dy - (my - ay) * dx;
-		const eq0 = (cross / lineLen) * this.weight;
+		const midpoint = mid(p1, p2);
+		const eq0 = (cross(sub(midpoint, a), dir) / lineLen) * this.weight;
 
 		// Equation 1: Chord vector (P2 - P1) is perpendicular to line AB
-		const cx = p2x - p1x;
-		const cy = p2y - p1y;
-		const dot = (cx * dx + cy * dy) / lineLen;
-		const eq1 = dot * this.weight;
+		const chord = sub(p2, p1);
+		const eq1 = (dot(chord, dir) / lineLen) * this.weight;
 
 		return [eq0, eq1];
 	}

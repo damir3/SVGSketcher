@@ -1,5 +1,5 @@
 import type { Vec2 } from './vector';
-import { dist } from './vector';
+import { dot, add, addScaled, dist, mix, normalizeOrNull, scale, sub, sum } from './vector';
 
 export type BezierSegment = [Vec2, Vec2, Vec2, Vec2];
 
@@ -13,10 +13,7 @@ export function evaluateBezier(b: BezierSegment, t: number): Vec2 {
 	const uuu = uu * u;
 	const ttt = tt * t;
 
-	return {
-		x: uuu * b[0].x + 3 * uu * t * b[1].x + 3 * u * tt * b[2].x + ttt * b[3].x,
-		y: uuu * b[0].y + 3 * uu * t * b[1].y + 3 * u * tt * b[2].y + ttt * b[3].y,
-	};
+	return sum([scale(b[0], uuu), scale(b[1], 3 * uu * t), scale(b[2], 3 * u * tt), scale(b[3], ttt)]);
 }
 
 /**
@@ -28,17 +25,7 @@ export function evaluateBezierDerivative(b: BezierSegment, t: number): Vec2 {
 	const c1 = 6 * u * t;
 	const c2 = 3 * t * t;
 
-	const d1x = b[1].x - b[0].x;
-	const d1y = b[1].y - b[0].y;
-	const d2x = b[2].x - b[1].x;
-	const d2y = b[2].y - b[1].y;
-	const d3x = b[3].x - b[2].x;
-	const d3y = b[3].y - b[2].y;
-
-	return {
-		x: c0 * d1x + c1 * d2x + c2 * d3x,
-		y: c0 * d1y + c1 * d2y + c2 * d3y,
-	};
+	return sum([scale(sub(b[1], b[0]), c0), scale(sub(b[2], b[1]), c1), scale(sub(b[3], b[2]), c2)]);
 }
 
 /**
@@ -49,16 +36,14 @@ export function splitBezier(b: BezierSegment, t: number): { left: BezierSegment;
 		p1 = b[1],
 		p2 = b[2],
 		p3 = b[3];
-	const u = 1 - t;
+	const p01 = mix(p0, p1, t);
+	const p12 = mix(p1, p2, t);
+	const p23 = mix(p2, p3, t);
 
-	const p01 = { x: u * p0.x + t * p1.x, y: u * p0.y + t * p1.y };
-	const p12 = { x: u * p1.x + t * p2.x, y: u * p1.y + t * p2.y };
-	const p23 = { x: u * p2.x + t * p3.x, y: u * p2.y + t * p3.y };
+	const p012 = mix(p01, p12, t);
+	const p123 = mix(p12, p23, t);
 
-	const p012 = { x: u * p01.x + t * p12.x, y: u * p01.y + t * p12.y };
-	const p123 = { x: u * p12.x + t * p23.x, y: u * p12.y + t * p23.y };
-
-	const p0123 = { x: u * p012.x + t * p123.x, y: u * p012.y + t * p123.y };
+	const p0123 = mix(p012, p123, t);
 
 	return {
 		left: [p0, p01, p012, p0123],
@@ -74,13 +59,12 @@ export function bsplineToBezier(pts: Vec2[], explicitKnots?: number[]): BezierSe
 	if (n < 1) return [];
 
 	if (n === 1) {
-		const dx = (pts[1].x - pts[0].x) / 3;
-		const dy = (pts[1].y - pts[0].y) / 3;
+		const delta = sub(pts[1], pts[0]);
 		return [
 			[
 				{ x: pts[0].x, y: pts[0].y },
-				{ x: pts[0].x + dx, y: pts[0].y + dy },
-				{ x: pts[1].x - dx, y: pts[1].y - dy },
+				addScaled(pts[0], delta, 1 / 3),
+				addScaled(pts[1], delta, -1 / 3),
 				{ x: pts[1].x, y: pts[1].y },
 			],
 		];
@@ -175,18 +159,15 @@ export function computeNaturalFitHandles(fitPts: Vec2[]): Array<{ h1: Vec2; h2: 
 	const isClosed = n >= 2 && Math.hypot(fitPts[0].x - fitPts[n].x, fitPts[0].y - fitPts[n].y) < 1e-4;
 
 	if (n === 1) {
-		const v = {
-			x: (fitPts[1].x - fitPts[0].x) / 3,
-			y: (fitPts[1].y - fitPts[0].y) / 3,
-		};
+		const v = scale(sub(fitPts[1], fitPts[0]), 1 / 3);
 		return [
 			{
-				h1: { x: fitPts[0].x - v.x, y: fitPts[0].y - v.y },
-				h2: { x: fitPts[0].x + v.x, y: fitPts[0].y + v.y },
+				h1: sub(fitPts[0], v),
+				h2: add(fitPts[0], v),
 			},
 			{
-				h1: { x: fitPts[1].x - v.x, y: fitPts[1].y - v.y },
-				h2: { x: fitPts[1].x + v.x, y: fitPts[1].y + v.y },
+				h1: sub(fitPts[1], v),
+				h2: add(fitPts[1], v),
 			},
 		];
 	}
@@ -199,74 +180,58 @@ export function computeNaturalFitHandles(fitPts: Vec2[]): Array<{ h1: Vec2; h2: 
 		if (isClosed && (i === 0 || i === n)) {
 			const prev = fitPts[n - 1];
 			const next = fitPts[1];
-			const dx = next.x - prev.x;
-			const dy = next.y - prev.y;
-			const len = Math.hypot(dx, dy);
+			const dir = sub(next, prev);
+			const unitDir = normalizeOrNull(dir, 1e-6);
 
-			const d1 = Math.hypot(fi.x - prev.x, fi.y - prev.y);
-			const d2 = Math.hypot(next.x - fi.x, next.y - fi.y);
-			let scale = (d1 + d2) / 6;
+			const incoming = sub(fi, prev);
+			const outgoing = sub(next, fi);
+			const d1 = Math.hypot(incoming.x, incoming.y);
+			const d2 = Math.hypot(outgoing.x, outgoing.y);
+			let handleLength = (d1 + d2) / 6;
 
 			if (d1 > 1e-6 && d2 > 1e-6) {
-				const cosTheta = Math.max(
-					-0.999,
-					Math.min(1, ((fi.x - prev.x) * (next.x - fi.x) + (fi.y - prev.y) * (next.y - fi.y)) / (d1 * d2))
-				);
+				const cosTheta = Math.max(-0.999, Math.min(1, dot(incoming, outgoing) / (d1 * d2)));
 				const curvatureFactor = 1 / (3 * (1 + Math.sqrt(Math.max(0, (1 + cosTheta) * 0.5))));
-				scale = (d1 + d2) * curvatureFactor;
+				handleLength = (d1 + d2) * curvatureFactor;
 			}
 
-			if (len > 1e-6) {
-				h = {
-					x: (dx / len) * scale,
-					y: (dy / len) * scale,
-				};
+			if (unitDir) {
+				h = scale(unitDir, handleLength);
 			} else {
-				h = { x: dx / 6, y: dy / 6 };
+				h = scale(dir, 1.0 / 6);
 			}
 		} else if (i === 0) {
-			h = {
-				x: (fitPts[1].x - fitPts[0].x) / 3,
-				y: (fitPts[1].y - fitPts[0].y) / 3,
-			};
+			h = scale(sub(fitPts[1], fitPts[0]), 1.0 / 3);
 		} else if (i === n) {
-			h = {
-				x: (fitPts[n].x - fitPts[n - 1].x) / 3,
-				y: (fitPts[n].y - fitPts[n - 1].y) / 3,
-			};
+			h = scale(sub(fitPts[n], fitPts[n - 1]), 1.0 / 3);
 		} else {
 			const prev = fitPts[i - 1];
 			const next = fitPts[i + 1];
-			const dx = next.x - prev.x;
-			const dy = next.y - prev.y;
-			const len = Math.hypot(dx, dy);
+			const dir = sub(next, prev);
+			const unitDir = normalizeOrNull(dir, 1e-6);
 
-			const d1 = Math.hypot(fi.x - prev.x, fi.y - prev.y);
-			const d2 = Math.hypot(next.x - fi.x, next.y - fi.y);
-			let scale = (d1 + d2) / 6;
+			const incoming = sub(fi, prev);
+			const outgoing = sub(next, fi);
+			const d1 = Math.hypot(incoming.x, incoming.y);
+			const d2 = Math.hypot(outgoing.x, outgoing.y);
+			let handleLength = (d1 + d2) / 6;
 
 			if (d1 > 1e-6 && d2 > 1e-6) {
-				const cosTheta = Math.max(
-					-0.999,
-					Math.min(1, ((fi.x - prev.x) * (next.x - fi.x) + (fi.y - prev.y) * (next.y - fi.y)) / (d1 * d2))
-				);
+				const cosTheta = Math.max(-0.999, Math.min(1, dot(incoming, outgoing) / (d1 * d2)));
 				const curvatureFactor = 1 / (3 * (1 + Math.sqrt(Math.max(0, (1 + cosTheta) * 0.5))));
-				scale = (d1 + d2) * curvatureFactor;
+				handleLength = (d1 + d2) * curvatureFactor;
 			}
 
-			if (len > 1e-6) {
-				h = {
-					x: (dx / len) * scale,
-					y: (dy / len) * scale,
-				};
+			if (unitDir) {
+				h = scale(unitDir, handleLength);
 			} else {
-				h = { x: dx / 6, y: dy / 6 };
+				h = scale(dir, 1.0 / 6);
 			}
 		}
 
 		handles.push({
-			h1: { x: fi.x - h.x, y: fi.y - h.y },
-			h2: { x: fi.x + h.x, y: fi.y + h.y },
+			h1: sub(fi, h),
+			h2: add(fi, h),
 		});
 	}
 	return handles;

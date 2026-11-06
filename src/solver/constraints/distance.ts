@@ -1,5 +1,6 @@
+import { sub, vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
@@ -43,26 +44,23 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.p1Id);
+		const p2 = readParamPoint(paramMap, this.p2Id);
 
 		if (this.orientation === 'horizontal') {
-			const dx = p2x - p1x;
+			const dx = p2.x - p1.x;
 			const sign = dx >= 0 ? 1 : -1;
 			return [(dx * sign - this.targetDistance) * this.weight];
 		}
 
 		if (this.orientation === 'vertical') {
-			const dy = p2y - p1y;
+			const dy = p2.y - p1.y;
 			const sign = dy >= 0 ? 1 : -1;
 			return [(dy * sign - this.targetDistance) * this.weight];
 		}
 
-		const dx = p2x - p1x;
-		const dy = p2y - p1y;
-		const cur = Math.hypot(dx, dy);
+		const dir = sub(p2, p1);
+		const cur = Math.hypot(dir.x, dir.y);
 
 		return [(cur - this.targetDistance) * this.weight];
 	}
@@ -73,13 +71,11 @@ export class DistanceConstraint extends BaseConstraint {
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
-		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.p1Id);
+		const p2 = readParamPoint(paramMap, this.p2Id);
 
 		if (this.orientation === 'horizontal') {
-			const dx = p2x - p1x;
+			const dx = p2.x - p1.x;
 			const sign = dx >= 0 ? 1 : -1;
 			this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -sign * this.weight);
 			this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, sign * this.weight);
@@ -87,24 +83,22 @@ export class DistanceConstraint extends BaseConstraint {
 		}
 
 		if (this.orientation === 'vertical') {
-			const dy = p2y - p1y;
+			const dy = p2.y - p1.y;
 			const sign = dy >= 0 ? 1 : -1;
 			this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -sign * this.weight);
 			this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, sign * this.weight);
 			return res;
 		}
 
-		const dx = p2x - p1x;
-		const dy = p2y - p1y;
-		const cur = Math.max(Math.hypot(dx, dy), 1e-7);
+		const dir = sub(p2, p1);
+		const cur = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
 
-		const dP2x = (dx / cur) * this.weight;
-		const dP2y = (dy / cur) * this.weight;
+		const dP2 = vec((dir.x / cur) * this.weight, (dir.y / cur) * this.weight);
 
-		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -dP2x);
-		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -dP2y);
-		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, dP2x);
-		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, dP2y);
+		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -dP2.x);
+		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -dP2.y);
+		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, dP2.x);
+		this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, dP2.y);
 
 		return res;
 	}

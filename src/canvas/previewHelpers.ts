@@ -1,4 +1,4 @@
-import { abs, distancesFrom, vec, type Vec2 } from '../math/vector';
+import { dot, sub, abs, distancesFrom, vec, type Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
@@ -104,11 +104,10 @@ export function renderArcPreviewVisual(
 	createSvgLine(sc, se, AUX_RAY_ATTRS, parent);
 
 	const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
-	const midX = sc.x + sr * Math.cos(midAngle);
-	const midY = sc.y + sr * Math.sin(midAngle);
+	const midPoint = { x: sc.x + sr * Math.cos(midAngle), y: sc.y + sr * Math.sin(midAngle) };
 
 	const deg = sweepDeg ?? (sweepAngle * 180) / Math.PI;
-	renderTooltip(parent, { x: midX, y: midY }, `R ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
+	renderTooltip(parent, midPoint, `R ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
 }
 
 export function renderRectanglePreviewVisual(
@@ -156,9 +155,8 @@ export function renderPolygonPreviewVisual(
 	const pts: Vec2[] = [];
 	for (let i = 0; i < N; i++) {
 		const a = baseAngle + i * step;
-		const wx = centerWorld.x + R * Math.cos(a);
-		const wy = centerWorld.y + R * Math.sin(a);
-		pts.push(viewport.worldToScreen({ x: wx, y: wy }));
+		const w = vec(centerWorld.x + R * Math.cos(a), centerWorld.y + R * Math.sin(a));
+		pts.push(viewport.worldToScreen(w));
 	}
 
 	if (pts.length >= 3) {
@@ -214,7 +212,7 @@ export function renderEllipsePreviewVisual(
 
 	createSvgEllipse(
 		sc,
-		{ x: r.x, y: r.y },
+		r,
 		{
 			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 			...getPreviewStrokeAttrs(isConstruction, isGuide),
@@ -244,7 +242,7 @@ export function renderEllipticalArcStartPreviewVisual(
 
 	createSvgEllipse(
 		sc,
-		{ x: r.x, y: r.y },
+		r,
 		{
 			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 			stroke: COLORS.guideStartEllipse,
@@ -255,18 +253,17 @@ export function renderEllipticalArcStartPreviewVisual(
 		parent
 	);
 
-	const ux = Math.cos(theta);
-	const uy = Math.sin(theta);
-	const vx = -Math.sin(theta);
-	const vy = Math.cos(theta);
+	const u = vec(Math.cos(theta), Math.sin(theta));
+	const v = vec(-Math.sin(theta), Math.cos(theta));
 
-	const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
+	const startOffset = sub(ss, sc);
+	const us = dot(startOffset, u);
+	const vs = dot(startOffset, v);
 	const ts = Math.atan2(vs / r.y, us / r.x);
 
 	const projSs = vec(
-		sc.x + r.x * Math.cos(ts) * ux + r.y * Math.sin(ts) * vx,
-		sc.y + r.x * Math.cos(ts) * uy + r.y * Math.sin(ts) * vy
+		sc.x + r.x * Math.cos(ts) * u.x + r.y * Math.sin(ts) * v.x,
+		sc.y + r.x * Math.cos(ts) * u.y + r.y * Math.sin(ts) * v.y
 	);
 
 	createSvgLine(sc, projSs, AUX_RAY_ATTRS, parent);
@@ -298,7 +295,7 @@ export function renderEllipticalArcPreviewVisual(
 
 	createSvgEllipse(
 		sc,
-		{ x: r.x, y: r.y },
+		r,
 		{
 			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 			...GUIDE_OUTLINE_ATTRS,
@@ -306,15 +303,15 @@ export function renderEllipticalArcPreviewVisual(
 		parent
 	);
 
-	const ux = Math.cos(theta);
-	const uy = Math.sin(theta);
-	const vx = -Math.sin(theta);
-	const vy = Math.cos(theta);
+	const u = vec(Math.cos(theta), Math.sin(theta));
+	const v = vec(-Math.sin(theta), Math.cos(theta));
 
-	const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-	const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-	const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+	const startOffset = sub(ss, sc);
+	const us = dot(startOffset, u);
+	const vs = dot(startOffset, v);
+	const endOffset = sub(se, sc);
+	const ue = dot(endOffset, u);
+	const ve = dot(endOffset, v);
 
 	const ts = Math.atan2(vs / r.y, us / r.x);
 	const te = Math.atan2(ve / r.y, ue / r.x);
@@ -329,8 +326,8 @@ export function renderEllipticalArcPreviewVisual(
 	}
 
 	const projSe = vec(
-		sc.x + r.x * Math.cos(te) * ux + r.y * Math.sin(te) * vx,
-		sc.y + r.x * Math.cos(te) * uy + r.y * Math.sin(te) * vy
+		sc.x + r.x * Math.cos(te) * u.x + r.y * Math.sin(te) * v.x,
+		sc.y + r.x * Math.cos(te) * u.y + r.y * Math.sin(te) * v.y
 	);
 
 	const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, projSe, clockwise);
@@ -422,7 +419,7 @@ export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandi
 			const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
 			createSvgEllipse(
 				sc,
-				{ x: r.x, y: r.y },
+				r,
 				{
 					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 					...TRIM_STROKE_ATTRS,
@@ -549,7 +546,7 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 				const thetaDeg = (Math.atan2(smaj.y - sc.y, smaj.x - sc.x) * 180) / Math.PI;
 				createSvgEllipse(
 					sc,
-					{ x: r.x, y: r.y },
+					r,
 					{
 						transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 						...EXTEND_PREVIEW_ATTRS,

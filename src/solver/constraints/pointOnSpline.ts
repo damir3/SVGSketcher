@@ -1,3 +1,4 @@
+import { dot, sub, vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -69,10 +70,9 @@ export class PointOnSplineConstraint extends BaseConstraint {
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const pts: Vec2[] = [];
 		for (const pid of this.splinePointIds) {
-			const x = paramMap.get(`${pid}.x`);
-			const y = paramMap.get(`${pid}.y`);
-			if (x === undefined || y === undefined) return [0];
-			pts.push({ x, y });
+			const point = { x: paramMap.get(`${pid}.x`), y: paramMap.get(`${pid}.y`) };
+			if (point.x === undefined || point.y === undefined) return [0];
+			pts.push(point);
 		}
 		if (pts.length < 2) return [0];
 
@@ -84,32 +84,25 @@ export class PointOnSplineConstraint extends BaseConstraint {
 			if (this.handlePoints && this.handlePoints.length > 0) {
 				handles = this.handlePoints.map(hp => {
 					if (!hp) return null;
-					const h1x = paramMap.get(`${hp.p1Id}.x`);
-					const h1y = paramMap.get(`${hp.p1Id}.y`);
-					const h2x = paramMap.get(`${hp.p2Id}.x`);
-					const h2y = paramMap.get(`${hp.p2Id}.y`);
-					if (h1x === undefined || h1y === undefined || h2x === undefined || h2y === undefined) return null;
-					return {
-						h1: { x: h1x, y: h1y },
-						h2: { x: h2x, y: h2y },
-					};
+					const h1 = { x: paramMap.get(`${hp.p1Id}.x`), y: paramMap.get(`${hp.p1Id}.y`) };
+					const h2 = { x: paramMap.get(`${hp.p2Id}.x`), y: paramMap.get(`${hp.p2Id}.y`) };
+					if (h1.x === undefined || h1.y === undefined || h2.x === undefined || h2.y === undefined) return null;
+					return { h1, h2 };
 				});
 			}
 			bezierSegments = fitPointsToBezier(pts, handles);
 		}
 		if (bezierSegments.length === 0) return [0];
 
-		const px = paramMap.get(`${this.pointId}.x`);
-		const py = paramMap.get(`${this.pointId}.y`);
-		if (px === undefined || py === undefined) return [0];
+		const point = { x: paramMap.get(`${this.pointId}.x`), y: paramMap.get(`${this.pointId}.y`) };
+		if (point.x === undefined || point.y === undefined) return [0];
 
-		const proj = getSplineParamAtPoint(bezierSegments, { x: px, y: py });
+		const proj = getSplineParamAtPoint(bezierSegments, point);
 		const tangent = getSplineTangentAtParam(bezierSegments, proj.param);
 		const tLen = Math.max(Math.hypot(tangent.x, tangent.y), 1e-7);
-		const nx = -tangent.y / tLen;
-		const ny = tangent.x / tLen;
+		const normal = vec(-tangent.y / tLen, tangent.x / tLen);
 
-		const signedDist = (px - proj.point.x) * nx + (py - proj.point.y) * ny;
+		const signedDist = dot(sub(point, proj.point), normal);
 		return [signedDist * this.weight];
 	}
 

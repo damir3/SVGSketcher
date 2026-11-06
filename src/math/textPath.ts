@@ -1,5 +1,5 @@
 import * as opentype from 'opentype.js';
-import { vec, dist, mid, normalize, type Vec2 } from './vector';
+import { vec, dist, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
 import type { GeoCurve, GeoSegment, GeoCircle, GeoArc, GeoSpline } from './intersection';
 import { evaluateBezier, evaluateBezierDerivative } from './spline';
 
@@ -34,7 +34,8 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 		case 'segment': {
 			const seg = curve as GeoSegment;
 			const totalLen = dist(seg.p1, seg.p2);
-			const dir = totalLen > 1e-9 ? normalize(vec(seg.p2.x - seg.p1.x, seg.p2.y - seg.p1.y)) : vec(1, 0);
+			const delta = sub(seg.p2, seg.p1);
+			const dir = totalLen > 1e-9 ? vec(delta.x / totalLen, delta.y / totalLen) : vec(1, 0);
 			const norm = vec(-dir.y, dir.x);
 			return {
 				length: totalLen,
@@ -153,7 +154,7 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 					const seg = segments[segIdx];
 					const pt = evaluateBezier(seg, t);
 					const d = evaluateBezierDerivative(seg, t);
-					const tan = dist(d, vec(0, 0)) > 1e-9 ? normalize(d) : vec(1, 0);
+					const tan = normalizeOrNull(d, 1e-9) ?? vec(1, 0);
 					const norm = vec(-tan.y, tan.x);
 					return {
 						point: pt,
@@ -270,13 +271,12 @@ export function generateTextSvgPathData(
 						}
 
 						// Map to CAD coordinates
-						const cadX = center.x + lx * ux.x + ly * uy.x;
-						const cadY = center.y + lx * ux.y + ly * uy.y;
+						const cad = vec(center.x + lx * ux.x + ly * uy.x, center.y + lx * ux.y + ly * uy.y);
 
 						if (isSvgCoord) {
-							return vec(cadX, -cadY);
+							return vec(cad.x, -cad.y);
 						}
-						return vec(cadX, cadY);
+						return cad;
 					};
 
 					appendTransformedCommand(pathObj, cmd, transformLocal);
@@ -358,13 +358,12 @@ export function generateTextSvgPathData(
 					}
 					let dy = localY + baseNormalOffset;
 
-					const cadX = sample.point.x + dx * tan.x + dy * norm.x;
-					const cadY = sample.point.y + dx * tan.y + dy * norm.y;
+					const cad = vec(sample.point.x + dx * tan.x + dy * norm.x, sample.point.y + dx * tan.y + dy * norm.y);
 
 					if (isSvgCoord) {
-						return vec(cadX, -cadY);
+						return vec(cad.x, -cad.y);
 					}
-					return vec(cadX, cadY);
+					return cad;
 				};
 
 				appendTransformedCommand(pathObj, cmd, transformCurve);

@@ -1,7 +1,7 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
-import { dist, projectPointOntoSegment } from '../../math/vector';
+import { dot, vec, add, addScaled, dist, projectPointOntoSegment, scale, sub } from '../../math/vector';
 
 /**
  * Constrains two lines to be perpendicular (dot product of unit vectors = 0)
@@ -25,16 +25,20 @@ export class PerpendicularConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const dx1 = (paramMap.get(`${this.l1P2}.x`) ?? 0) - (paramMap.get(`${this.l1P1}.x`) ?? 0);
-		const dy1 = (paramMap.get(`${this.l1P2}.y`) ?? 0) - (paramMap.get(`${this.l1P1}.y`) ?? 0);
-		const dx2 = (paramMap.get(`${this.l2P2}.x`) ?? 0) - (paramMap.get(`${this.l2P1}.x`) ?? 0);
-		const dy2 = (paramMap.get(`${this.l2P2}.y`) ?? 0) - (paramMap.get(`${this.l2P1}.y`) ?? 0);
+		const dir1 = vec(
+			(paramMap.get(`${this.l1P2}.x`) ?? 0) - (paramMap.get(`${this.l1P1}.x`) ?? 0),
+			(paramMap.get(`${this.l1P2}.y`) ?? 0) - (paramMap.get(`${this.l1P1}.y`) ?? 0)
+		);
+		const dir2 = vec(
+			(paramMap.get(`${this.l2P2}.x`) ?? 0) - (paramMap.get(`${this.l2P1}.x`) ?? 0),
+			(paramMap.get(`${this.l2P2}.y`) ?? 0) - (paramMap.get(`${this.l2P1}.y`) ?? 0)
+		);
 
-		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
-		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
+		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
+		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
 		const avgL = (l1 + l2) * 0.5;
 
-		const dotProd = (dx1 * dx2 + dy1 * dy2) / (l1 * l2);
+		const dotProd = dot(dir1, dir2) / (l1 * l2);
 		return [dotProd * avgL * this.weight];
 	}
 
@@ -71,31 +75,30 @@ export class PerpendicularConstraint extends BaseConstraint {
 
 		if (isSharedPoint || isNearSegments) {
 			const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-			const sRay1 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u1.x * 20, y: geom.pInt.y + geom.u1.y * 20 });
-			const sRay2 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u2.x * 20, y: geom.pInt.y + geom.u2.y * 20 });
+			const sRay1 = ctx.viewport.worldToScreen(addScaled(geom.pInt, geom.u1, 20));
+			const sRay2 = ctx.viewport.worldToScreen(addScaled(geom.pInt, geom.u2, 20));
 
-			const d1 = { x: sRay1.x - sCenter.x, y: sRay1.y - sCenter.y };
-			const d2 = { x: sRay2.x - sCenter.x, y: sRay2.y - sCenter.y };
+			const d1 = sub(sRay1, sCenter);
+			const d2 = sub(sRay2, sCenter);
 			const l1 = Math.hypot(d1.x, d1.y);
 			const l2 = Math.hypot(d2.x, d2.y);
 
 			let dir = { x: 1, y: -1 };
 			if (l1 > 1e-4 && l2 > 1e-4) {
-				const u1 = { x: d1.x / l1, y: d1.y / l1 };
-				const u2 = { x: d2.x / l2, y: d2.y / l2 };
-				const bis = { x: u1.x + u2.x, y: u1.y + u2.y };
+				const u1 = scale(d1, 1.0 / l1);
+				const u2 = scale(d2, 1.0 / l2);
+				const bis = add(u1, u2);
 				const bisLen = Math.hypot(bis.x, bis.y);
 				if (bisLen > 1e-3) {
-					dir = { x: bis.x / bisLen, y: bis.y / bisLen };
+					dir = scale(bis, 1.0 / bisLen);
 				} else {
 					dir = { x: -u1.y, y: u1.x };
 				}
 			}
 
 			const offset = 18;
-			const badgeX = sCenter.x + dir.x * offset;
-			const badgeY = sCenter.y + dir.y * offset;
-			ctx.renderBadge(this.id, { x: badgeX, y: badgeY }, '⊥');
+			const badge = addScaled(sCenter, dir, offset);
+			ctx.renderBadge(this.id, badge, '⊥');
 			return;
 		}
 

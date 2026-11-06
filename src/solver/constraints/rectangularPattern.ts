@@ -1,10 +1,11 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { PatternPointPair, PatternRadiusPair } from './circularPattern';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
+import { sub, vec, centroid, scale, type Vec2 } from '../../math/vector';
 
 export interface RectangularPatternCopyData {
 	copyIndex: number;
@@ -56,29 +57,23 @@ export function computeRectangularPatternDirections(
 ): { u1: { x: number; y: number }; u2: { x: number; y: number } } {
 	let u1 = { x: 1, y: 0 };
 	if (line1) {
-		const x1a = paramMap.get(`${line1.p1Id}.x`) ?? 0;
-		const y1a = paramMap.get(`${line1.p1Id}.y`) ?? 0;
-		const x1b = paramMap.get(`${line1.p2Id}.x`) ?? 0;
-		const y1b = paramMap.get(`${line1.p2Id}.y`) ?? 0;
-		const dx1 = x1b - x1a;
-		const dy1 = y1b - y1a;
-		const len1 = Math.hypot(dx1, dy1);
+		const p1a = readParamPoint(paramMap, line1.p1Id);
+		const p1b = readParamPoint(paramMap, line1.p2Id);
+		const dir1 = sub(p1b, p1a);
+		const len1 = Math.hypot(dir1.x, dir1.y);
 		if (len1 > 1e-6) {
-			u1 = { x: dx1 / len1, y: dy1 / len1 };
+			u1 = scale(dir1, 1.0 / len1);
 		}
 	}
 
 	let u2 = { x: -u1.y, y: u1.x };
 	if (line2) {
-		const x2a = paramMap.get(`${line2.p1Id}.x`) ?? 0;
-		const y2a = paramMap.get(`${line2.p1Id}.y`) ?? 0;
-		const x2b = paramMap.get(`${line2.p2Id}.x`) ?? 0;
-		const y2b = paramMap.get(`${line2.p2Id}.y`) ?? 0;
-		const dx2 = x2b - x2a;
-		const dy2 = y2b - y2a;
-		const len2 = Math.hypot(dx2, dy2);
+		const p2a = readParamPoint(paramMap, line2.p1Id);
+		const p2b = readParamPoint(paramMap, line2.p2Id);
+		const dir2 = sub(p2b, p2a);
+		const len2 = Math.hypot(dir2.x, dir2.y);
 		if (len2 > 1e-6) {
-			u2 = { x: dx2 / len2, y: dy2 / len2 };
+			u2 = scale(dir2, 1.0 / len2);
 		}
 	}
 
@@ -208,16 +203,13 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			);
 
 			for (const pair of copy.pointPairs) {
-				const sx = paramMap.get(`${pair.sourcePtId}.x`) ?? 0;
-				const sy = paramMap.get(`${pair.sourcePtId}.y`) ?? 0;
-				const px = paramMap.get(`${pair.patternPtId}.x`) ?? 0;
-				const py = paramMap.get(`${pair.patternPtId}.y`) ?? 0;
+				const s = readParamPoint(paramMap, pair.sourcePtId);
+				const p = readParamPoint(paramMap, pair.patternPtId);
 
-				const targetX = sx + offset.dx;
-				const targetY = sy + offset.dy;
+				const target = vec(s.x + offset.dx, s.y + offset.dy);
 
-				errors.push((px - targetX) * this.weight);
-				errors.push((py - targetY) * this.weight);
+				errors.push((p.x - target.x) * this.weight);
+				errors.push((p.y - target.y) * this.weight);
 			}
 
 			if (copy.radiusPairs) {
@@ -250,13 +242,10 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			du1_dy1b_y = 0;
 		let hasL1 = false;
 		if (line1) {
-			const x1a = paramMap.get(`${line1.p1Id}.x`) ?? 0;
-			const y1a = paramMap.get(`${line1.p1Id}.y`) ?? 0;
-			const x1b = paramMap.get(`${line1.p2Id}.x`) ?? 0;
-			const y1b = paramMap.get(`${line1.p2Id}.y`) ?? 0;
-			const dx1 = x1b - x1a;
-			const dy1 = y1b - y1a;
-			const L1 = Math.hypot(dx1, dy1);
+			const p1a = readParamPoint(paramMap, line1.p1Id);
+			const p1b = readParamPoint(paramMap, line1.p2Id);
+			const dir1 = sub(p1b, p1a);
+			const L1 = Math.hypot(dir1.x, dir1.y);
 			if (L1 > 1e-6) {
 				hasL1 = true;
 				const invL = 1 / L1;
@@ -273,13 +262,10 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			du2_dy2b_y = 0;
 		let hasL2 = false;
 		if (line2) {
-			const x2a = paramMap.get(`${line2.p1Id}.x`) ?? 0;
-			const y2a = paramMap.get(`${line2.p1Id}.y`) ?? 0;
-			const x2b = paramMap.get(`${line2.p2Id}.x`) ?? 0;
-			const y2b = paramMap.get(`${line2.p2Id}.y`) ?? 0;
-			const dx2 = x2b - x2a;
-			const dy2 = y2b - y2a;
-			const L2 = Math.hypot(dx2, dy2);
+			const p2a = readParamPoint(paramMap, line2.p1Id);
+			const p2b = readParamPoint(paramMap, line2.p2Id);
+			const dir2 = sub(p2b, p2a);
+			const L2 = Math.hypot(dir2.x, dir2.y);
 			if (L2 > 1e-6) {
 				hasL2 = true;
 				const invL = 1 / L2;
@@ -314,37 +300,39 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				if (colSy !== undefined) entries.push({ row: rowY, col: colSy, val: -this.weight });
 
 				if (hasL1 && line1) {
-					const dDeltaX_dx1b = o1 * du1_dx1b + (!hasL2 ? o2 * -du1_dx1b_y : 0);
-					const dDeltaX_dy1b = o1 * du1_dy1b + (!hasL2 ? o2 * -du1_dy1b_y : 0);
-					const dDeltaY_dx1b = o1 * du1_dx1b_y + (!hasL2 ? o2 * du1_dx1b : 0);
-					const dDeltaY_dy1b = o1 * du1_dy1b_y + (!hasL2 ? o2 * du1_dy1b : 0);
+					const dDeltaX_d1b = vec(
+						o1 * du1_dx1b + (!hasL2 ? o2 * -du1_dx1b_y : 0),
+						o1 * du1_dy1b + (!hasL2 ? o2 * -du1_dy1b_y : 0)
+					);
+					const dDeltaY_d1b = vec(
+						o1 * du1_dx1b_y + (!hasL2 ? o2 * du1_dx1b : 0),
+						o1 * du1_dy1b_y + (!hasL2 ? o2 * du1_dy1b : 0)
+					);
 
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.x`, rowX, -dDeltaX_dx1b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.y`, rowX, -dDeltaX_dy1b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.x`, rowX, dDeltaX_dx1b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.y`, rowX, dDeltaX_dy1b * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.x`, rowX, -dDeltaX_d1b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.y`, rowX, -dDeltaX_d1b.y * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.x`, rowX, dDeltaX_d1b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.y`, rowX, dDeltaX_d1b.y * this.weight);
 
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.x`, rowY, -dDeltaY_dx1b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.y`, rowY, -dDeltaY_dy1b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.x`, rowY, dDeltaY_dx1b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.y`, rowY, dDeltaY_dy1b * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.x`, rowY, -dDeltaY_d1b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.y`, rowY, -dDeltaY_d1b.y * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.x`, rowY, dDeltaY_d1b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.y`, rowY, dDeltaY_d1b.y * this.weight);
 				}
 
 				if (hasL2 && line2) {
-					const dDeltaX_dx2b = o2 * du2_dx2b;
-					const dDeltaX_dy2b = o2 * du2_dy2b;
-					const dDeltaY_dx2b = o2 * du2_dx2b_y;
-					const dDeltaY_dy2b = o2 * du2_dy2b_y;
+					const dDeltaX_d2b = vec(o2 * du2_dx2b, o2 * du2_dy2b);
+					const dDeltaY_d2b = vec(o2 * du2_dx2b_y, o2 * du2_dy2b_y);
 
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowX, -dDeltaX_dx2b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowX, -dDeltaX_dy2b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.x`, rowX, dDeltaX_dx2b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.y`, rowX, dDeltaX_dy2b * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowX, -dDeltaX_d2b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowX, -dDeltaX_d2b.y * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.x`, rowX, dDeltaX_d2b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.y`, rowX, dDeltaX_d2b.y * this.weight);
 
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowY, -dDeltaY_dx2b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowY, -dDeltaY_dy2b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.x`, rowY, dDeltaY_dx2b * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.y`, rowY, dDeltaY_dy2b * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowY, -dDeltaY_d2b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowY, -dDeltaY_d2b.y * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.x`, rowY, dDeltaY_d2b.x * this.weight);
+					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.y`, rowY, dDeltaY_d2b.y * this.weight);
 				}
 			}
 
@@ -362,77 +350,49 @@ export class RectangularPatternConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		let sumX = 0,
-			sumY = 0,
-			ptCount = 0;
+		const points: Vec2[] = [];
 		for (const objId of this.sourceObjectIds) {
 			const pt = ctx.sketch.points.get(objId);
 			if (pt) {
-				sumX += pt.x;
-				sumY += pt.y;
-				ptCount++;
+				points.push(pt);
 				continue;
 			}
 			const l = ctx.sketch.lines.get(objId);
 			if (l) {
 				const p1 = ctx.sketch.points.get(l.p1Id);
 				const p2 = ctx.sketch.points.get(l.p2Id);
-				if (p1) {
-					sumX += p1.x;
-					sumY += p1.y;
-					ptCount++;
-				}
-				if (p2) {
-					sumX += p2.x;
-					sumY += p2.y;
-					ptCount++;
-				}
+				if (p1) points.push(p1);
+				if (p2) points.push(p2);
 				continue;
 			}
 			const c = ctx.sketch.circles.get(objId);
 			if (c) {
 				const cp = ctx.sketch.points.get(c.centerId);
-				if (cp) {
-					sumX += cp.x;
-					sumY += cp.y;
-					ptCount++;
-				}
+				if (cp) points.push(cp);
 				continue;
 			}
 			const a = ctx.sketch.arcs.get(objId);
 			if (a) {
 				const cp = ctx.sketch.points.get(a.centerId);
-				if (cp) {
-					sumX += cp.x;
-					sumY += cp.y;
-					ptCount++;
-				}
+				if (cp) points.push(cp);
 				continue;
 			}
 			const el = ctx.sketch.ellipses.get(objId);
 			if (el) {
 				const cp = ctx.sketch.points.get(el.centerId);
-				if (cp) {
-					sumX += cp.x;
-					sumY += cp.y;
-					ptCount++;
-				}
+				if (cp) points.push(cp);
 				continue;
 			}
 			const ea = ctx.sketch.ellipticalArcs.get(objId);
 			if (ea) {
 				const cp = ctx.sketch.points.get(ea.centerId);
-				if (cp) {
-					sumX += cp.x;
-					sumY += cp.y;
-					ptCount++;
-				}
+				if (cp) points.push(cp);
 				continue;
 			}
 		}
 
-		if (ptCount === 0) return;
-		const centroidWorld = { x: sumX / ptCount, y: sumY / ptCount };
+		if (points.length === 0) return;
+		const centroidWorld = centroid(points);
 		const sCtr = ctx.viewport.worldToScreen(centroidWorld);
 
 		const paramMap = new Map<string, number>();
@@ -482,24 +442,18 @@ export class RectangularPatternConstraint extends BaseConstraint {
 							u2
 						);
 
-						let centroid: { x: number; y: number };
+						let copyCentroid: { x: number; y: number };
 						const copy = this.copies.find(cp => cp.copyIndex === copyIndex);
 
 						if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-							let cSumX = 0,
-								cSumY = 0,
-								cCount = 0;
+							const copyPts: Vec2[] = [];
 							for (const pair of copy.pointPairs) {
 								const pt = ctx.sketch.points.get(pair.patternPtId);
-								if (pt) {
-									cSumX += pt.x;
-									cSumY += pt.y;
-									cCount++;
-								}
+								if (pt) copyPts.push(pt);
 							}
-							centroid =
-								cCount > 0
-									? ctx.viewport.worldToScreen({ x: cSumX / cCount, y: cSumY / cCount })
+							copyCentroid =
+								copyPts.length > 0
+									? ctx.viewport.worldToScreen(centroid(copyPts))
 									: ctx.viewport.worldToScreen({ x: centroidWorld.x + offset.dx, y: centroidWorld.y + offset.dy });
 						} else if (ctx.renderTransformedObjects) {
 							const copyWorldPoints = ctx.renderTransformedObjects(this.sourceObjectIds, offset, {
@@ -510,37 +464,31 @@ export class RectangularPatternConstraint extends BaseConstraint {
 								skipRender: !isSuppressed,
 							});
 							if (copyWorldPoints.length > 0) {
-								let cSumX = 0,
-									cSumY = 0;
-								for (const p of copyWorldPoints) {
-									cSumX += p.x;
-									cSumY += p.y;
-								}
-								centroid = ctx.viewport.worldToScreen({
-									x: cSumX / copyWorldPoints.length,
-									y: cSumY / copyWorldPoints.length,
-								});
+								copyCentroid = ctx.viewport.worldToScreen(centroid(copyWorldPoints));
 							} else {
-								centroid = ctx.viewport.worldToScreen({
+								copyCentroid = ctx.viewport.worldToScreen({
 									x: centroidWorld.x + offset.dx,
 									y: centroidWorld.y + offset.dy,
 								});
 							}
 						} else {
-							centroid = ctx.viewport.worldToScreen({ x: centroidWorld.x + offset.dx, y: centroidWorld.y + offset.dy });
+							copyCentroid = ctx.viewport.worldToScreen({
+								x: centroidWorld.x + offset.dx,
+								y: centroidWorld.y + offset.dy,
+							});
 						}
 
 						if (ctx.patternCheckboxPositions) {
 							ctx.patternCheckboxPositions.set(`c-${this.id}-${copyIndex}`, {
-								x: centroid.x,
-								y: centroid.y,
+								x: copyCentroid.x,
+								y: copyCentroid.y,
 								copyIndex,
 								constraintId: this.id,
 							});
 						}
 
 						if (ctx.renderPatternSuppressionCheckbox) {
-							ctx.renderPatternSuppressionCheckbox(centroid, copyIndex, isSuppressed, this.id);
+							ctx.renderPatternSuppressionCheckbox(copyCentroid, copyIndex, isSuppressed, this.id);
 						}
 					}
 				}

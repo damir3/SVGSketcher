@@ -8,14 +8,13 @@ import {
 	DragPointConstraint,
 	AngleConstraint,
 } from '../solver/constraints';
-import { dist } from '../math/vector';
+import { add, addScaled, cross, dot, normalizeOrNull, scale, sub, vec } from '../math/vector';
 
 export function setPointCoords(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
 	const pt = sketch.points.get(pointId);
 	if (!pt || !isFinite(targetX) || !isFinite(targetY)) return false;
 
-	const dx = targetX - pt.x;
-	const dy = targetY - pt.y;
+	const dir = vec(targetX - pt.x, targetY - pt.y);
 
 	let hadFixed = false;
 	for (const c of sketch.constraints.values()) {
@@ -39,13 +38,13 @@ export function setPointCoords(sketch: SketchDocument, pointId: string, targetX:
 			const sPt = sketch.points.get(arc.startPointId);
 			const ePt = sketch.points.get(arc.endPointId);
 			if (sPt && !sketch.isPointFixed(arc.startPointId)) {
-				sPt.x += dx;
-				sPt.y += dy;
+				sPt.x += dir.x;
+				sPt.y += dir.y;
 				extraDrags.push(new DragPointConstraint(arc.startPointId, sPt.x, sPt.y, 0.005));
 			}
 			if (ePt && !sketch.isPointFixed(arc.endPointId)) {
-				ePt.x += dx;
-				ePt.y += dy;
+				ePt.x += dir.x;
+				ePt.y += dir.y;
 				extraDrags.push(new DragPointConstraint(arc.endPointId, ePt.x, ePt.y, 0.005));
 			}
 		}
@@ -55,26 +54,26 @@ export function setPointCoords(sketch: SketchDocument, pointId: string, targetX:
 			const majPt = sketch.points.get(el.majorAxisPointId);
 			const minPt = sketch.points.get(el.minorAxisPointId);
 			if (majPt && !sketch.isPointFixed(el.majorAxisPointId)) {
-				majPt.x += dx;
-				majPt.y += dy;
+				majPt.x += dir.x;
+				majPt.y += dir.y;
 				extraDrags.push(new DragPointConstraint(el.majorAxisPointId, majPt.x, majPt.y, 0.005));
 			}
 			if (minPt && !sketch.isPointFixed(el.minorAxisPointId)) {
-				minPt.x += dx;
-				minPt.y += dy;
+				minPt.x += dir.x;
+				minPt.y += dir.y;
 				extraDrags.push(new DragPointConstraint(el.minorAxisPointId, minPt.x, minPt.y, 0.005));
 			}
 			if ('startPointId' in el) {
 				const sPt = sketch.points.get(el.startPointId);
 				const ePt = sketch.points.get(el.endPointId);
 				if (sPt && !sketch.isPointFixed(el.startPointId)) {
-					sPt.x += dx;
-					sPt.y += dy;
+					sPt.x += dir.x;
+					sPt.y += dir.y;
 					extraDrags.push(new DragPointConstraint(el.startPointId, sPt.x, sPt.y, 0.005));
 				}
 				if (ePt && !sketch.isPointFixed(el.endPointId)) {
-					ePt.x += dx;
-					ePt.y += dy;
+					ePt.x += dir.x;
+					ePt.y += dir.y;
 					extraDrags.push(new DragPointConstraint(el.endPointId, ePt.x, ePt.y, 0.005));
 				}
 			}
@@ -102,11 +101,7 @@ export function setLineLength(sketch: SketchDocument, lineId: string, newLength:
 	const p2 = sketch.points.get(line.p2Id);
 	if (!p1 || !p2) return false;
 
-	const dx = p2.x - p1.x;
-	const dy = p2.y - p1.y;
-	const len = Math.hypot(dx, dy);
-	const ux = len > 1e-9 ? dx / len : 1;
-	const uy = len > 1e-9 ? dy / len : 0;
+	const dir = normalizeOrNull(sub(p2, p1), 1e-9) ?? { x: 1, y: 0 };
 
 	// Update any existing distance constraint on this line
 	let updatedExisting = false;
@@ -118,8 +113,8 @@ export function setLineLength(sketch: SketchDocument, lineId: string, newLength:
 			const orient = c.orientation ?? 'aligned';
 			if (
 				orient === 'aligned' ||
-				(orient === 'horizontal' && Math.abs(uy) < 1e-4) ||
-				(orient === 'vertical' && Math.abs(ux) < 1e-4)
+				(orient === 'horizontal' && Math.abs(dir.y) < 1e-4) ||
+				(orient === 'vertical' && Math.abs(dir.x) < 1e-4)
 			) {
 				c.targetDistance = newLength;
 				c.value = newLength;
@@ -131,11 +126,11 @@ export function setLineLength(sketch: SketchDocument, lineId: string, newLength:
 	const p1Fixed = sketch.isPointFixed(line.p1Id);
 	const p2Fixed = sketch.isPointFixed(line.p2Id);
 	if (p2Fixed && !p1Fixed) {
-		p1.x = p2.x - ux * newLength;
-		p1.y = p2.y - uy * newLength;
+		p1.x = p2.x - dir.x * newLength;
+		p1.y = p2.y - dir.y * newLength;
 	} else if (!p2Fixed) {
-		p2.x = p1.x + ux * newLength;
-		p2.y = p1.y + uy * newLength;
+		p2.x = p1.x + dir.x * newLength;
+		p2.y = p1.y + dir.y * newLength;
 	}
 
 	const fallbackDrags = [
@@ -164,19 +159,18 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 	const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
 	if (len < 1e-9) return false;
 	const rad = (newAngleDeg * Math.PI) / 180;
-	const ux = Math.cos(rad);
-	const uy = Math.sin(rad);
+	const u = vec(Math.cos(rad), Math.sin(rad));
 
 	const origValues = sketch.paramManager.getCurrentValues();
 
 	const p1Fixed = sketch.isPointFixed(line.p1Id);
 	const p2Fixed = sketch.isPointFixed(line.p2Id);
 	if (p2Fixed && !p1Fixed) {
-		p1.x = p2.x - ux * len;
-		p1.y = p2.y - uy * len;
+		p1.x = p2.x - u.x * len;
+		p1.y = p2.y - u.y * len;
 	} else if (!p2Fixed) {
-		p2.x = p1.x + ux * len;
-		p2.y = p1.y + uy * len;
+		p2.x = p1.x + u.x * len;
+		p2.y = p1.y + u.y * len;
 	}
 	const targetP1 = { x: p1.x, y: p1.y };
 	const targetP2 = { x: p2.x, y: p2.y };
@@ -191,30 +185,27 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 		isDimensional: false,
 		getEquationsCount: () => 1,
 		evaluate: paramMap => {
-			const x1 = paramMap.get(`${line.p1Id}.x`) ?? p1.x;
-			const y1 = paramMap.get(`${line.p1Id}.y`) ?? p1.y;
-			const x2 = paramMap.get(`${line.p2Id}.x`) ?? p2.x;
-			const y2 = paramMap.get(`${line.p2Id}.y`) ?? p2.y;
-			return [(y2 - y1) * ux - (x2 - x1) * uy];
+			const point1 = vec(paramMap.get(`${line.p1Id}.x`) ?? p1.x, paramMap.get(`${line.p1Id}.y`) ?? p1.y);
+			const point2 = vec(paramMap.get(`${line.p2Id}.x`) ?? p2.x, paramMap.get(`${line.p2Id}.y`) ?? p2.y);
+			return [cross(u, sub(point2, point1))];
 		},
 		jacobian: (paramIndices, baseRow) => {
 			const entries = [];
 			const idxX1 = paramIndices.get(`${line.p1Id}.x`);
-			if (idxX1 !== undefined) entries.push({ row: baseRow, col: idxX1, val: uy });
+			if (idxX1 !== undefined) entries.push({ row: baseRow, col: idxX1, val: u.y });
 			const idxY1 = paramIndices.get(`${line.p1Id}.y`);
-			if (idxY1 !== undefined) entries.push({ row: baseRow, col: idxY1, val: -ux });
+			if (idxY1 !== undefined) entries.push({ row: baseRow, col: idxY1, val: -u.x });
 			const idxX2 = paramIndices.get(`${line.p2Id}.x`);
-			if (idxX2 !== undefined) entries.push({ row: baseRow, col: idxX2, val: -uy });
+			if (idxX2 !== undefined) entries.push({ row: baseRow, col: idxX2, val: -u.y });
 			const idxY2 = paramIndices.get(`${line.p2Id}.y`);
-			if (idxY2 !== undefined) entries.push({ row: baseRow, col: idxY2, val: ux });
+			if (idxY2 !== undefined) entries.push({ row: baseRow, col: idxY2, val: u.x });
 			return entries;
 		},
 	};
 
 	const checkDirection = () => {
-		const dx = p2.x - p1.x;
-		const dy = p2.y - p1.y;
-		return Math.hypot(dx, dy) > 1e-3 && dx * ux + dy * uy > 0;
+		const dir = sub(p2, p1);
+		return Math.hypot(dir.x, dir.y) > 1e-3 && dot(dir, u) > 0;
 	};
 
 	const fallbackDrags = [
@@ -245,11 +236,12 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 					const op1 = sketch.points.get(otherLine.p1Id);
 					const op2 = sketch.points.get(otherLine.p2Id);
 					if (op1 && op2) {
-						const u1x = c.line1Id === lineId ? ux * c.s1 : ((op2.x - op1.x) / Math.max(dist(op1, op2), 1e-7)) * c.s1;
-						const u1y = c.line1Id === lineId ? uy * c.s1 : ((op2.y - op1.y) / Math.max(dist(op1, op2), 1e-7)) * c.s1;
-						const u2x = c.line2Id === lineId ? ux * c.s2 : ((op2.x - op1.x) / Math.max(dist(op1, op2), 1e-7)) * c.s2;
-						const u2y = c.line2Id === lineId ? uy * c.s2 : ((op2.y - op1.y) / Math.max(dist(op1, op2), 1e-7)) * c.s2;
-						const dotVal = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
+						const otherDir = sub(op2, op1);
+						const otherLen = Math.max(Math.hypot(otherDir.x, otherDir.y), 1e-7);
+						const otherUnit = vec(otherDir.x / otherLen, otherDir.y / otherLen);
+						const u1 = scale(c.line1Id === lineId ? u : otherUnit, c.s1);
+						const u2 = scale(c.line2Id === lineId ? u : otherUnit, c.s2);
+						const dotVal = Math.max(-1, Math.min(1, dot(u1, u2)));
 						const newRelAngle = Math.min(179.9, Math.max(0.1, (Math.acos(dotVal) * 180) / Math.PI));
 						c.targetAngle = newRelAngle;
 						c.value = newRelAngle;
@@ -312,10 +304,8 @@ export function setLinesRelativeAngle(
 	const len2 = Math.hypot(p4.x - p3.x, p4.y - p3.y);
 	if (len1 < 1e-7 || len2 < 1e-7) return false;
 
-	const origDx1 = p2.x - p1.x;
-	const origDy1 = p2.y - p1.y;
-	const origDx2 = p4.x - p3.x;
-	const origDy2 = p4.y - p3.y;
+	const originalDir1 = sub(p2, p1);
+	const originalDir2 = sub(p4, p3);
 
 	const tempRelAngle = new AngleConstraint(
 		'__temp_rel_ang',
@@ -335,19 +325,19 @@ export function setLinesRelativeAngle(
 	const tempDist2 = hasUserLine2 ? new DistanceConstraint('__temp_d2', l2.p1Id, l2.p2Id, len2, 1.0) : null;
 
 	const checkNonDegenerate = () => {
-		const d1 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-		const d2 = Math.hypot(p4.x - p3.x, p4.y - p3.y);
+		const dir1 = sub(p2, p1);
+		const dir2 = sub(p4, p3);
+		const d1 = Math.hypot(dir1.x, dir1.y);
+		const d2 = Math.hypot(dir2.x, dir2.y);
 		if (d1 < 1e-3 || d2 < 1e-3) return false;
-		const u1x = ((p2.x - p1.x) / d1) * geom.s1;
-		const u1y = ((p2.y - p1.y) / d1) * geom.s1;
-		const u2x = ((p4.x - p3.x) / d2) * geom.s2;
-		const u2y = ((p4.y - p3.y) / d2) * geom.s2;
-		const dotVal = Math.max(-1, Math.min(1, u1x * u2x + u1y * u2y));
+		const u1 = vec((dir1.x / d1) * geom.s1, (dir1.y / d1) * geom.s1);
+		const u2 = vec((dir2.x / d2) * geom.s2, (dir2.y / d2) * geom.s2);
+		const dotVal = Math.max(-1, Math.min(1, dot(u1, u2)));
 		const achievedDeg = (Math.acos(dotVal) * 180) / Math.PI;
 		return (
 			Math.abs(achievedDeg - clampedAngle) < 0.5 &&
-			(p2.x - p1.x) * origDx1 + (p2.y - p1.y) * origDy1 > -0.5 * d1 * len1 &&
-			(p4.x - p3.x) * origDx2 + (p4.y - p3.y) * origDy2 > -0.5 * d2 * len2
+			dot(dir1, originalDir1) > -0.5 * d1 * len1 &&
+			dot(dir2, originalDir2) > -0.5 * d2 * len2
 		);
 	};
 
@@ -512,34 +502,28 @@ export function setEllipseParams(
 	const minorPt = sketch.points.get(entity.minorAxisPointId);
 	if (!center || !majorPt || !minorPt) return false;
 
-	const uX = majorPt.x - center.x;
-	const uY = majorPt.y - center.y;
-	const vX = minorPt.x - center.x;
-	const vY = minorPt.y - center.y;
-	const curRx = Math.max(Math.hypot(uX, uY), 1e-7);
-	const curRy = Math.max(Math.hypot(vX, vY), 1e-7);
+	const u = sub(majorPt, center);
+	const v = sub(minorPt, center);
+	const curRx = Math.max(Math.hypot(u.x, u.y), 1e-7);
+	const curRy = Math.max(Math.hypot(v.x, v.y), 1e-7);
 
-	let uHatX = uX / curRx;
-	let uHatY = uY / curRx;
-	let vHatX = vX / curRy;
-	let vHatY = vY / curRy;
-	const sign = uHatX * vHatY - uHatY * vHatX >= 0 ? 1 : -1;
+	let uHat = scale(u, 1 / curRx);
+	let vHat = scale(v, 1 / curRy);
+	const sign = cross(uHat, vHat) >= 0 ? 1 : -1;
 
 	let tS = 0;
 	let tE = 0;
 	const startPt = 'startPointId' in entity ? sketch.points.get(entity.startPointId) : undefined;
 	const endPt = 'endPointId' in entity ? sketch.points.get(entity.endPointId) : undefined;
 	if (startPt && endPt) {
-		const dsX = startPt.x - center.x;
-		const dsY = startPt.y - center.y;
-		const uS = dsX * uHatX + dsY * uHatY;
-		const vS = dsX * vHatX + dsY * vHatY;
+		const ds = sub(startPt, center);
+		const uS = dot(ds, uHat);
+		const vS = dot(ds, vHat);
 		tS = Math.atan2(vS / curRy, uS / curRx);
 
-		const deX = endPt.x - center.x;
-		const deY = endPt.y - center.y;
-		const uE = deX * uHatX + deY * uHatY;
-		const vE = deX * vHatX + deY * vHatY;
+		const de = sub(endPt, center);
+		const uE = dot(de, uHat);
+		const vE = dot(de, vHat);
 		tE = Math.atan2(vE / curRy, uE / curRx);
 	}
 
@@ -562,19 +546,15 @@ export function setEllipseParams(
 	}
 	if (params.rotationDeg !== undefined && isFinite(params.rotationDeg)) {
 		const rad = (params.rotationDeg * Math.PI) / 180;
-		uHatX = Math.cos(rad);
-		uHatY = Math.sin(rad);
-		vHatX = -Math.sin(rad) * sign;
-		vHatY = Math.cos(rad) * sign;
+		uHat = { x: Math.cos(rad), y: Math.sin(rad) };
+		vHat = { x: -Math.sin(rad) * sign, y: Math.cos(rad) * sign };
 	}
 
 	if (!sketch.isPointFixed(entity.majorAxisPointId)) {
-		majorPt.x = center.x + uHatX * newRx;
-		majorPt.y = center.y + uHatY * newRx;
+		Object.assign(majorPt, addScaled(center, uHat, newRx));
 	}
 	if (!sketch.isPointFixed(entity.minorAxisPointId)) {
-		minorPt.x = center.x + vHatX * newRy;
-		minorPt.y = center.y + vHatY * newRy;
+		Object.assign(minorPt, addScaled(center, vHat, newRy));
 	}
 
 	const extraDrags: IConstraint[] = [
@@ -587,14 +567,12 @@ export function setEllipseParams(
 		if (!sketch.isPointFixed(entity.startPointId)) {
 			const uSNew = newRx * Math.cos(tS);
 			const vSNew = newRy * Math.sin(tS);
-			startPt.x = center.x + uSNew * uHatX + vSNew * vHatX;
-			startPt.y = center.y + uSNew * uHatY + vSNew * vHatY;
+			Object.assign(startPt, add(center, addScaled(scale(uHat, uSNew), vHat, vSNew)));
 		}
 		if (!sketch.isPointFixed(entity.endPointId)) {
 			const uENew = newRx * Math.cos(tE);
 			const vENew = newRy * Math.sin(tE);
-			endPt.x = center.x + uENew * uHatX + vENew * vHatX;
-			endPt.y = center.y + uENew * uHatY + vENew * vHatY;
+			Object.assign(endPt, add(center, addScaled(scale(uHat, uENew), vHat, vENew)));
 		}
 		extraDrags.push(
 			new DragPointConstraint(entity.startPointId, startPt.x, startPt.y, 0.005),

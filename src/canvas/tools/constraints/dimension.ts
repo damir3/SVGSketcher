@@ -2,7 +2,7 @@ import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { ORIGIN, dist, type Vec2 } from '../../../math/vector';
+import { ORIGIN, cross, dist, dot, mid, normalize, scale, sub, vec, type Vec2 } from '../../../math/vector';
 
 export interface DimensionState {
 	step: number;
@@ -21,29 +21,25 @@ export function determineDistanceOrientation(
 	orientation: 'aligned' | 'horizontal' | 'vertical';
 	offsetScreen: number;
 } {
-	const dx = s2.x - s1.x;
-	const dy = s2.y - s1.y;
-	const len = Math.hypot(dx, dy);
+	const len = dist(s1, s2);
 
-	const midX = (s1.x + s2.x) * 0.5;
-	const midY = (s1.y + s2.y) * 0.5;
-	const vx = cursor.x - midX;
-	const vy = cursor.y - midY;
+	const midPoint = mid(s1, s2);
+	const v = sub(cursor, midPoint);
 
 	if (len < 1e-4) {
 		return { orientation: 'aligned', offsetScreen: 0 };
 	}
 
-	const nx = -dy / len;
-	const ny = dx / len;
-	const normalOffset = vx * nx + vy * ny;
+	const dir = normalize(sub(s2, s1));
+	const normal = vec(-dir.y, dir.x);
+	const normalOffset = dot(v, normal);
 
 	// Angle of cursor from midpoint in degrees (-180 to 180)
 	// -90° is UP, +90° is DOWN, 0° is RIGHT, ±180° is LEFT
-	const theta = (Math.atan2(vy, vx) * 180) / Math.PI;
+	const theta = (Math.atan2(v.y, v.x) * 180) / Math.PI;
 
 	// Angle of line and line normal in degrees
-	const lineAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+	const lineAngle = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
 	const norm1 = lineAngle + 90;
 	const norm2 = lineAngle - 90;
 
@@ -57,18 +53,18 @@ export function determineDistanceOrientation(
 	const diffHorizontal = Math.min(angleDiff(theta, 0), angleDiff(theta, 180));
 
 	// If points are nearly horizontal (|dy| < 5px), vertical dimension makes no sense
-	if (Math.abs(dy) < 5) {
+	if (Math.abs(dir.y * len) < 5) {
 		return {
 			orientation: diffNormal <= 45 ? 'aligned' : 'horizontal',
-			offsetScreen: diffNormal <= 45 ? normalOffset : vy,
+			offsetScreen: diffNormal <= 45 ? normalOffset : v.y,
 		};
 	}
 
 	// If points are nearly vertical (|dx| < 5px), horizontal dimension makes no sense
-	if (Math.abs(dx) < 5) {
+	if (Math.abs(dir.x * len) < 5) {
 		return {
 			orientation: diffNormal <= 45 ? 'aligned' : 'vertical',
-			offsetScreen: diffNormal <= 45 ? normalOffset : vx,
+			offsetScreen: diffNormal <= 45 ? normalOffset : v.x,
 		};
 	}
 
@@ -81,12 +77,12 @@ export function determineDistanceOrientation(
 	} else if (diffVertical < diffHorizontal) {
 		return {
 			orientation: 'horizontal',
-			offsetScreen: vy,
+			offsetScreen: v.y,
 		};
 	} else {
 		return {
 			orientation: 'vertical',
-			offsetScreen: vx,
+			offsetScreen: v.x,
 		};
 	}
 }
@@ -397,14 +393,12 @@ export class DimensionTool extends BaseTool {
 							const sp = this.ctx.viewport.worldToScreen(pt);
 							const s1 = this.ctx.viewport.worldToScreen(lp1);
 							const s2 = this.ctx.viewport.worldToScreen(lp2);
-							const dx = s2.x - s1.x;
-							const dy = s2.y - s1.y;
-							const lineLen = Math.hypot(dx, dy);
+							const dir = sub(s2, s1);
+							const lineLen = Math.hypot(dir.x, dir.y);
 							if (lineLen > 1e-4) {
-								const ux = dx / lineLen;
-								const uy = dy / lineLen;
-								const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
-								const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+								const u = scale(dir, 1 / lineLen);
+								const tProj = dot(sub(sp, s1), u);
+								const tCursor = dot(sub(screen, s1), u);
 								let offsetScreen = tCursor - tProj;
 								if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
 									offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
@@ -533,14 +527,12 @@ export class DimensionTool extends BaseTool {
 					const sp = this.ctx.viewport.worldToScreen(pt);
 					const s1 = this.ctx.viewport.worldToScreen(lp1);
 					const s2 = this.ctx.viewport.worldToScreen(lp2);
-					const dx = s2.x - s1.x;
-					const dy = s2.y - s1.y;
-					const lineLen = Math.hypot(dx, dy);
+					const dir = sub(s2, s1);
+					const lineLen = Math.hypot(dir.x, dir.y);
 					if (lineLen > 1e-4) {
-						const ux = dx / lineLen;
-						const uy = dy / lineLen;
-						const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
-						const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+						const u = scale(dir, 1 / lineLen);
+						const tProj = dot(sub(sp, s1), u);
+						const tCursor = dot(sub(screen, s1), u);
 						let offsetScreen = tCursor - tProj;
 						if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
 							offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
@@ -771,14 +763,12 @@ export class DimensionTool extends BaseTool {
 						const sp = this.ctx.viewport.worldToScreen(pt);
 						const s1 = this.ctx.viewport.worldToScreen(p1);
 						const s2 = this.ctx.viewport.worldToScreen(p2);
-						const dx = s2.x - s1.x;
-						const dy = s2.y - s1.y;
-						const lineLen = Math.hypot(dx, dy);
+						const dir = sub(s2, s1);
+						const lineLen = Math.hypot(dir.x, dir.y);
 						if (lineLen > 1e-4) {
-							const ux = dx / lineLen;
-							const uy = dy / lineLen;
-							const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
-							const tCursor = (screen.x - s1.x) * ux + (screen.y - s1.y) * uy;
+							const u = scale(dir, 1 / lineLen);
+							const tProj = dot(sub(sp, s1), u);
+							const tCursor = dot(sub(screen, s1), u);
 							const offsetWorld = (tCursor - tProj) / this.ctx.viewport.zoom;
 
 							const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(this.state.point1Id, this.state.line1Id);
@@ -878,11 +868,9 @@ export class DimensionTool extends BaseTool {
 					const p1 = ctx.sketch.points.get(l1.p1Id);
 					const p2 = ctx.sketch.points.get(l1.p2Id);
 					if (p1 && p2) {
-						const dx = p2.x - p1.x;
-						const dy = p2.y - p1.y;
-						const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
-						const cross = (hitPt.x - p1.x) * dy - (hitPt.y - p1.y) * dx;
-						const perpDist = Math.abs(cross) / lineLen;
+						const dir = sub(p2, p1);
+						const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+						const perpDist = Math.abs(cross(sub(hitPt, p1), dir)) / lineLen;
 						const sp = ctx.viewport.worldToScreen(hitPt);
 						const s1 = ctx.viewport.worldToScreen(p1);
 						const s2 = ctx.viewport.worldToScreen(p2);
@@ -985,7 +973,7 @@ export class DimensionTool extends BaseTool {
 								if (pt && pt.id !== p1.id) {
 									return {
 										id: pt.id,
-										worldPos: { x: pt.x, y: pt.y },
+										worldPos: pt,
 										screenPos: ctx.viewport.worldToScreen(pt),
 									};
 								}
@@ -1006,11 +994,9 @@ export class DimensionTool extends BaseTool {
 					const lp1 = ctx.sketch.points.get(hitLine.p1Id);
 					const lp2 = ctx.sketch.points.get(hitLine.p2Id);
 					if (lp1 && lp2) {
-						const dx = lp2.x - lp1.x;
-						const dy = lp2.y - lp1.y;
-						const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
-						const cross = (p1.x - lp1.x) * dy - (p1.y - lp1.y) * dx;
-						const perpDist = Math.abs(cross) / lineLen;
+						const dir = sub(lp2, lp1);
+						const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+						const perpDist = Math.abs(cross(sub(p1, lp1), dir)) / lineLen;
 						if (perpDist >= 0.5) {
 							const sp = ctx.viewport.worldToScreen(p1);
 							const s1Line = ctx.viewport.worldToScreen(lp1);
@@ -1082,11 +1068,9 @@ export class DimensionTool extends BaseTool {
 					const sp = ctx.viewport.worldToScreen(pt);
 					const s1 = ctx.viewport.worldToScreen(p1);
 					const s2 = ctx.viewport.worldToScreen(p2);
-					const dx = p2.x - p1.x;
-					const dy = p2.y - p1.y;
-					const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
-					const cross = (pt.x - p1.x) * dy - (pt.y - p1.y) * dx;
-					const perpDist = Math.abs(cross) / lineLen;
+					const dir = sub(p2, p1);
+					const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+					const perpDist = Math.abs(cross(sub(pt, p1), dir)) / lineLen;
 					this.ctx.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, perpDist);
 				}
 			}

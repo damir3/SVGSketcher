@@ -66,8 +66,8 @@ export class SketchSpline implements ISketchPrimitive {
 				const p2 = sketch.points.get(line.p2Id);
 				if (!p1 || !p2) return null;
 				return {
-					h1: { x: p1.x, y: p1.y },
-					h2: { x: p2.x, y: p2.y },
+					h1: p1,
+					h2: p2,
 				};
 			});
 			bezierSegments = fitPointsToBezier(pts, handles);

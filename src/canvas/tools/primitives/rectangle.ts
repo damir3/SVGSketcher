@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext, SnapResult } from '../types';
-import { dist, vec, type Vec2 } from '../../../math/vector';
+import { dist, dot, vec, sub, type Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, createSvgRect } from '../../svg';
 import { AUX_AXIS_ATTRS, POLYGON_CENTER_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
@@ -301,17 +301,15 @@ export class RectangleTool extends BaseTool {
 		this.lastEffectiveWorld = effectiveWorld;
 
 		if (this._mode === 'corner') {
-			const dx = effectiveWorld.x - this.startWorldPos.x;
-			const dy = effectiveWorld.y - this.startWorldPos.y;
-			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dx));
-			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dy));
+			const dir = sub(effectiveWorld, this.startWorldPos);
+			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dir.x));
+			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dir.y));
 			this.updatePopupDimensions(this.width, this.height);
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'center') {
-			const dx = effectiveWorld.x - this.startWorldPos.x;
-			const dy = effectiveWorld.y - this.startWorldPos.y;
-			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dx) * 2);
-			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dy) * 2);
+			const dir = sub(effectiveWorld, this.startWorldPos);
+			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dir.x) * 2);
+			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dir.y) * 2);
 			this.updatePopupDimensions(this.width, this.height);
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'three_point') {
@@ -324,17 +322,16 @@ export class RectangleTool extends BaseTool {
 				const baseLen = Math.hypot(V.x, V.y);
 				const n = baseLen > 1e-4 ? vec(-V.y / baseLen, V.x / baseLen) : vec(0, 1);
 				const offset = vec(effectiveWorld.x - this.secondWorldPos.x, effectiveWorld.y - this.secondWorldPos.y);
-				const proj = offset.x * n.x + offset.y * n.y;
+				const proj = dot(offset, n);
 				if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(proj));
 				this.updatePopupDimensions(this.width, this.height);
 			}
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'rounded') {
 			if (this.drawingStep === 1) {
-				const dx = effectiveWorld.x - this.startWorldPos.x;
-				const dy = effectiveWorld.y - this.startWorldPos.y;
-				if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dx));
-				if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dy));
+				const dir = sub(effectiveWorld, this.startWorldPos);
+				if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dir.x));
+				if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dir.y));
 				const maxR = Math.max(0.1, Math.min(this.width, this.height) / 2);
 				if (!this.isRadiusLocked) {
 					this.radius = 0;
@@ -361,13 +358,12 @@ export class RectangleTool extends BaseTool {
 					} else {
 						const inwardSignX = Math.sign(c1.x - c2.x) || 1;
 						const inwardSignY = Math.sign(c1.y - c2.y) || 1;
-						const pullX = (effectiveWorld.x - c2.x) * inwardSignX;
-						const pullY = (effectiveWorld.y - c2.y) * inwardSignY;
+						const pullVector = vec((effectiveWorld.x - c2.x) * inwardSignX, (effectiveWorld.y - c2.y) * inwardSignY);
 
-						if (pullX <= 0 || pullY <= 0) {
+						if (pullVector.x <= 0 || pullVector.y <= 0) {
 							this.radius = 0;
 						} else {
-							const pull = Math.min(pullX, pullY);
+							const pull = Math.min(pullVector.x, pullVector.y);
 							this.radius = Math.min(maxR, Math.max(0, pull));
 						}
 					}
@@ -427,7 +423,7 @@ export class RectangleTool extends BaseTool {
 				const baseLen = Math.hypot(V.x, V.y);
 				const n = baseLen > 1e-4 ? vec(-V.y / baseLen, V.x / baseLen) : vec(0, 1);
 				const offset = vec(p3.x - p2.x, p3.y - p2.y);
-				const hSigned = offset.x * n.x + offset.y * n.y;
+				const hSigned = dot(offset, n);
 
 				const p0 = this.startWorldPos;
 				const p1 = p2;
@@ -515,16 +511,17 @@ export class RectangleTool extends BaseTool {
 
 	private computeCornerSecondPoint(effectiveWorld: Vec2): Vec2 {
 		const c1 = this.startWorldPos!;
-		const dx = effectiveWorld.x - c1.x;
-		const dy = effectiveWorld.y - c1.y;
+		const dir = sub(effectiveWorld, c1);
 
-		const signX = Math.sign(dx) || 1;
-		const signY = Math.sign(dy) || 1;
+		const signX = Math.sign(dir.x) || 1;
+		const signY = Math.sign(dir.y) || 1;
 
-		const c2x = this.isWidthLocked ? c1.x + signX * this.width : effectiveWorld.x;
-		const c2y = this.isHeightLocked ? c1.y + signY * this.height : effectiveWorld.y;
+		const c2 = vec(
+			this.isWidthLocked ? c1.x + signX * this.width : effectiveWorld.x,
+			this.isHeightLocked ? c1.y + signY * this.height : effectiveWorld.y
+		);
 
-		return vec(c2x, c2y);
+		return c2;
 	}
 
 	private computeCenterHalfDims(effectiveWorld: Vec2): { w: number; h: number } {
@@ -536,14 +533,12 @@ export class RectangleTool extends BaseTool {
 
 	private computeThreePointSecondPoint(effectiveWorld: Vec2): Vec2 {
 		const P1 = this.startWorldPos!;
-		const vx = effectiveWorld.x - P1.x;
-		const vy = effectiveWorld.y - P1.y;
-		const d = Math.hypot(vx, vy);
+		const v = sub(effectiveWorld, P1);
+		const d = Math.hypot(v.x, v.y);
 
 		if (this.isWidthLocked) {
-			const dirX = d > 1e-4 ? vx / d : 1;
-			const dirY = d > 1e-4 ? vy / d : 0;
-			return vec(P1.x + dirX * this.width, P1.y + dirY * this.width);
+			const dir = vec(d > 1e-4 ? v.x / d : 1, d > 1e-4 ? v.y / d : 0);
+			return vec(P1.x + dir.x * this.width, P1.y + dir.y * this.width);
 		}
 		return effectiveWorld;
 	}
@@ -556,7 +551,7 @@ export class RectangleTool extends BaseTool {
 		const n = baseLen > 1e-4 ? vec(-V.y / baseLen, V.x / baseLen) : vec(0, 1);
 
 		const offset = vec(effectiveWorld.x - P2.x, effectiveWorld.y - P2.y);
-		const proj = offset.x * n.x + offset.y * n.y;
+		const proj = dot(offset, n);
 
 		let signedH = proj;
 		if (this.isHeightLocked) {
@@ -571,10 +566,9 @@ export class RectangleTool extends BaseTool {
 		if (this._mode === 'corner') {
 			const c1 = this.startWorldPos!;
 			const eff = this.lastEffectiveWorld ?? vec(c1.x + this.width, c1.y + this.height);
-			const dx = eff.x - c1.x;
-			const dy = eff.y - c1.y;
-			const signX = Math.sign(dx) || 1;
-			const signY = Math.sign(dy) || 1;
+			const dir = sub(eff, c1);
+			const signX = Math.sign(dir.x) || 1;
+			const signY = Math.sign(dir.y) || 1;
 			const c2 = vec(c1.x + signX * this.width, c1.y + signY * this.height);
 			this.commitCorner(c1, c2, null);
 		} else if (this._mode === 'center') {
@@ -592,17 +586,16 @@ export class RectangleTool extends BaseTool {
 			const n = baseLen > 1e-4 ? vec(-V.y / baseLen, V.x / baseLen) : vec(0, 1);
 			const eff = this.lastEffectiveWorld ?? vec(P2.x + n.x * this.height, P2.y + n.y * this.height);
 			const offset = vec(eff.x - P2.x, eff.y - P2.y);
-			const proj = offset.x * n.x + offset.y * n.y;
+			const proj = dot(offset, n);
 			const signH = Math.sign(proj) || 1;
 			const P3 = vec(P2.x + signH * n.x * this.height, P2.y + signH * n.y * this.height);
 			this.commitThreePoint(P1, P2, P3, null);
 		} else if (this._mode === 'rounded') {
 			const c1 = this.startWorldPos!;
 			const eff = this.lastEffectiveWorld ?? vec(c1.x + this.width, c1.y + this.height);
-			const dx = eff.x - c1.x;
-			const dy = eff.y - c1.y;
-			const signX = Math.sign(dx) || 1;
-			const signY = Math.sign(dy) || 1;
+			const dir = sub(eff, c1);
+			const signX = Math.sign(dir.x) || 1;
+			const signY = Math.sign(dir.y) || 1;
 			const c2 = this.secondWorldPos ?? vec(c1.x + signX * this.width, c1.y + signY * this.height);
 			this.commitRounded(c1, c2, this.radius, this.secondSnap);
 		}
@@ -769,7 +762,7 @@ export class RectangleTool extends BaseTool {
 		const baseLen = Math.hypot(V.x, V.y);
 		const n = baseLen > 1e-4 ? vec(-V.y / baseLen, V.x / baseLen) : vec(0, 1);
 		const offset = vec(p3.x - p2.x, p3.y - p2.y);
-		const hSigned = offset.x * n.x + offset.y * n.y;
+		const hSigned = dot(offset, n);
 
 		const pCorner0 = sketch.addPoint(p1);
 		const pCorner1 = sketch.addPoint(p2);

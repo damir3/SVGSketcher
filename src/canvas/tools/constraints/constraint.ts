@@ -1,4 +1,4 @@
-import { ORIGIN } from '../../../math/vector';
+import { ORIGIN, sub } from '../../../math/vector';
 import { LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent } from '../types';
@@ -659,9 +659,8 @@ export class ConstraintTool extends BaseTool {
 					const p1 = this.ctx.sketch.points.get(l.p1Id);
 					const p2 = this.ctx.sketch.points.get(l.p2Id);
 					if (p1 && p2) {
-						const dx = Math.abs(p2.x - p1.x);
-						const dy = Math.abs(p2.y - p1.y);
-						if (dx >= dy) {
+						const dir = sub(p2, p1);
+						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
 							this.ctx.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
 							applied = true;
 							toastMsg = 'Horizontal constraint applied';
@@ -675,9 +674,8 @@ export class ConstraintTool extends BaseTool {
 					const p1 = this.ctx.sketch.points.get(pIds[0]);
 					const p2 = this.ctx.sketch.points.get(pIds[1]);
 					if (p1 && p2) {
-						const dx = Math.abs(p2.x - p1.x);
-						const dy = Math.abs(p2.y - p1.y);
-						if (dx >= dy) {
+						const dir = sub(p2, p1);
+						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
 							this.ctx.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
 							applied = true;
 							toastMsg = 'Horizontal constraint applied';

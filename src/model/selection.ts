@@ -1,5 +1,5 @@
 import type { SketchDocument } from './sketch';
-import { distancesFrom } from '../math/vector';
+import { sub, vec, distancesFrom } from '../math/vector';
 import { AABB } from '../math/aabb';
 import type { SketchPoint } from './types';
 
@@ -404,14 +404,11 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 			const maj = sketch.points.get(e.majorAxisPointId);
 			const min = sketch.points.get(e.minorAxisPointId);
 			if (center && maj && min) {
-				const ux = maj.x - center.x;
-				const uy = maj.y - center.y;
-				const vx = min.x - center.x;
-				const vy = min.y - center.y;
-				const dx = Math.sqrt(ux * ux + vx * vx);
-				const dy = Math.sqrt(uy * uy + vy * vy);
-				bounds.addPoint({ x: center.x - dx, y: center.y - dy });
-				bounds.addPoint({ x: center.x + dx, y: center.y + dy });
+				const u = sub(maj, center);
+				const v = sub(min, center);
+				const dir = vec(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
+				bounds.addPoint({ x: center.x - dir.x, y: center.y - dir.y });
+				bounds.addPoint({ x: center.x + dir.x, y: center.y + dir.y });
 				count++;
 			}
 		}
@@ -424,14 +421,11 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 			const maj = sketch.points.get(ea.majorAxisPointId);
 			const min = sketch.points.get(ea.minorAxisPointId);
 			if (center && maj && min) {
-				const ux = maj.x - center.x;
-				const uy = maj.y - center.y;
-				const vx = min.x - center.x;
-				const vy = min.y - center.y;
-				const dx = Math.sqrt(ux * ux + vx * vx);
-				const dy = Math.sqrt(uy * uy + vy * vy);
-				bounds.addPoint({ x: center.x - dx, y: center.y - dy });
-				bounds.addPoint({ x: center.x + dx, y: center.y + dy });
+				const u = sub(maj, center);
+				const v = sub(min, center);
+				const dir = vec(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
+				bounds.addPoint({ x: center.x - dir.x, y: center.y - dir.y });
+				bounds.addPoint({ x: center.x + dir.x, y: center.y + dir.y });
 				count++;
 			}
 			includePoint(sketch.points.get(ea.startPointId));

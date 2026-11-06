@@ -6,11 +6,10 @@ export class PointTool extends BaseTool {
 
 	override onMouseDown(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const finalX = e.snap ? e.snap.worldPos.x : e.world.x;
-		const finalY = e.snap ? e.snap.worldPos.y : e.world.y;
+		const finalPos = e.snap?.worldPos ?? e.world;
 
 		sketch.beginTransaction();
-		const pt = sketch.addPoint({ x: finalX, y: finalY });
+		const pt = sketch.addPoint(finalPos);
 		this.ctx.applySnapConstraintIfNeeded?.(pt.id, e.snap);
 		sketch.commitTransaction();
 

@@ -2,7 +2,7 @@ import { GIZMO_DISTANCE_PX } from '../../distances';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
-import { dist, normalize, vec, type Vec2 } from '../../../math/vector';
+import { sub, cross, dist, dot, normalize, vec, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import { VariationToolPanel } from '../../../ui/panels/tools';
@@ -421,14 +421,14 @@ export class ChamferTool extends BaseTool {
 					});
 					const halfAngle = this.candidate.cornerAngleRad / 2;
 					const cosHalf = Math.max(0.05, Math.cos(halfAngle));
-					const delta = (world.x - startMouseWorld.x) * bisector.x + (world.y - startMouseWorld.y) * bisector.y;
+					const delta = dot(sub(world, startMouseWorld), bisector);
 					const deltaD = delta / cosHalf;
 					const newDist = Math.max(0.5, Math.round((startValue + deltaD) * 2) / 2);
 					this.dist1 = newDist;
 					this.dist2 = newDist;
 				} else if (this.mode === 'two_distance') {
 					const dir = handle.dir || (handle.type === 'dist1' ? this.candidate.dir1 : this.candidate.dir2);
-					const delta = (world.x - startMouseWorld.x) * dir.x + (world.y - startMouseWorld.y) * dir.y;
+					const delta = dot(sub(world, startMouseWorld), dir);
 					const newDist = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
 					if (handle.type === 'dist1') {
 						if (!this.flip) {
@@ -445,7 +445,7 @@ export class ChamferTool extends BaseTool {
 					}
 				} else if (this.mode === 'distance_angle') {
 					const dir = handle.dir || (!this.flip ? this.candidate.dir1 : this.candidate.dir2);
-					const delta = (world.x - startMouseWorld.x) * dir.x + (world.y - startMouseWorld.y) * dir.y;
+					const delta = dot(sub(world, startMouseWorld), dir);
 					const newDist = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
 					this.dist1 = newDist;
 				}
@@ -463,14 +463,14 @@ export class ChamferTool extends BaseTool {
 					: vec(-this.candidate.dir2.x, -this.candidate.dir2.y);
 
 				// Determine which side of refDir points into the corner interior
-				const cross12 = this.candidate.dir1.x * this.candidate.dir2.y - this.candidate.dir1.y * this.candidate.dir2.x;
+				const cross12 = cross(this.candidate.dir1, this.candidate.dir2);
 				const interiorSign = !this.flip ? (cross12 >= 0 ? -1 : 1) : cross12 >= 0 ? 1 : -1;
 
 				const toMouse = vec(world.x - refVertex.x, world.y - refVertex.y);
 				const toMouseLen = Math.hypot(toMouse.x, toMouse.y);
 				if (toMouseLen > 1e-4) {
-					const crossMouse = refDir.x * toMouse.y - refDir.y * toMouse.x;
-					const dotMouse = refDir.x * toMouse.x + refDir.y * toMouse.y;
+					const crossMouse = cross(refDir, toMouse);
+					const dotMouse = dot(refDir, toMouse);
 					const signedCross = crossMouse * interiorSign;
 					const signedAngleRad = Math.atan2(signedCross, dotMouse);
 					const signedAngleDeg = (signedAngleRad * 180) / Math.PI;

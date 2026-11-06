@@ -1,4 +1,4 @@
-import { type Vec2, dist, distancesFrom, projectPointOntoSegment } from './vector';
+import { dot, vec, sub, type Vec2, dist, distancesFrom, projectPointOntoSegment } from './vector';
 import { getSplineParamAtPoint, type BezierSegment } from './spline';
 
 const TWO_PI = 2 * Math.PI;
@@ -66,21 +66,20 @@ export function distanceToEllipse(point: Vec2, center: Vec2, majorPt: Vec2, mino
 	if (r.x < 0.1 || r.y < 0.1) return null;
 
 	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
-	const ux = Math.cos(theta);
-	const uy = Math.sin(theta);
-	const vx = -Math.sin(theta);
-	const vy = Math.cos(theta);
+	const axisU = vec(Math.cos(theta), Math.sin(theta));
+	const axisV = vec(-Math.sin(theta), Math.cos(theta));
 
-	const dx = point.x - center.x;
-	const dy = point.y - center.y;
-	const u = dx * ux + dy * uy;
-	const v = dx * vx + dy * vy;
+	const dir = sub(point, center);
+	const u = dot(dir, axisU);
+	const v = dot(dir, axisV);
 
 	const t = Math.atan2(v / r.y, u / r.x);
-	const ex = r.x * Math.cos(t) * ux + r.y * Math.sin(t) * vx;
-	const ey = r.x * Math.cos(t) * uy + r.y * Math.sin(t) * vy;
+	const ellipsePoint = vec(
+		r.x * Math.cos(t) * axisU.x + r.y * Math.sin(t) * axisV.x,
+		r.x * Math.cos(t) * axisU.y + r.y * Math.sin(t) * axisV.y
+	);
 
-	return Math.hypot(dx - ex, dy - ey);
+	return Math.hypot(dir.x - ellipsePoint.x, dir.y - ellipsePoint.y);
 }
 
 /**
@@ -101,27 +100,28 @@ export function distanceToEllipticalArc(
 	if (r.x < 0.1 || r.y < 0.1) return null;
 
 	const theta = Math.atan2(majorPt.y - center.y, majorPt.x - center.x);
-	const ux = Math.cos(theta);
-	const uy = Math.sin(theta);
-	const vx = -Math.sin(theta);
-	const vy = Math.cos(theta);
+	const axisU = vec(Math.cos(theta), Math.sin(theta));
+	const axisV = vec(-Math.sin(theta), Math.cos(theta));
 
-	const dx = point.x - center.x;
-	const dy = point.y - center.y;
-	const u = dx * ux + dy * uy;
-	const v = dx * vx + dy * vy;
+	const dir = sub(point, center);
+	const u = dot(dir, axisU);
+	const v = dot(dir, axisV);
 
 	const t = Math.atan2(v / r.y, u / r.x);
-	const ex = r.x * Math.cos(t) * ux + r.y * Math.sin(t) * vx;
-	const ey = r.x * Math.cos(t) * uy + r.y * Math.sin(t) * vy;
+	const ellipsePoint = vec(
+		r.x * Math.cos(t) * axisU.x + r.y * Math.sin(t) * axisV.x,
+		r.x * Math.cos(t) * axisU.y + r.y * Math.sin(t) * axisV.y
+	);
 
-	const dPerimeter = Math.hypot(dx - ex, dy - ey);
+	const dPerimeter = Math.hypot(dir.x - ellipsePoint.x, dir.y - ellipsePoint.y);
 	if (dPerimeter > thresholdPx) return null;
 
-	const us = (startPt.x - center.x) * ux + (startPt.y - center.y) * uy;
-	const vs = (startPt.x - center.x) * vx + (startPt.y - center.y) * vy;
-	const ue = (endPt.x - center.x) * ux + (endPt.y - center.y) * uy;
-	const ve = (endPt.x - center.x) * vx + (endPt.y - center.y) * vy;
+	const startOffset = sub(startPt, center);
+	const us = dot(startOffset, axisU);
+	const vs = dot(startOffset, axisV);
+	const endOffset = sub(endPt, center);
+	const ue = dot(endOffset, axisU);
+	const ve = dot(endOffset, axisV);
 
 	const ts = Math.atan2(vs / r.y, us / r.x);
 	const te = Math.atan2(ve / r.y, ue / r.x);

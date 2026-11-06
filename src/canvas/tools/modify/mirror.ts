@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
-import { dist } from '../../../math/vector';
+import { dist, dot, reflectPoint, sub, vec, type Vec2 } from '../../../math/vector';
 
 export interface MirrorState {
 	phase: 'objects' | 'mirror_line';
@@ -262,30 +262,17 @@ export class MirrorTool extends BaseTool {
 		const pB = this.ctx.sketch.points.get(mirrorLine.p2Id);
 		if (!pA || !pB) return false;
 
-		const dx = pB.x - pA.x;
-		const dy = pB.y - pA.y;
-		const lineLen = Math.hypot(dx, dy);
+		const dir = sub(pB, pA);
+		const lineLen = Math.hypot(dir.x, dir.y);
 		if (lineLen < 1e-6) {
 			this.ctx.showToast('Mirror line length is zero');
 			return false;
 		}
 
 		// Unit normal to mirror line
-		const nx = -dy / lineLen;
-		const ny = dx / lineLen;
+		const normal = vec(-dir.y / lineLen, dir.x / lineLen);
 
-		const reflectPoint = (x: number, y: number): { x: number; y: number } => {
-			const distToLine = (x - pA.x) * nx + (y - pA.y) * ny;
-			return {
-				x: x - 2 * distToLine * nx,
-				y: y - 2 * distToLine * ny,
-			};
-		};
-
-		const isPointOnMirrorLine = (x: number, y: number, tol = 1e-3): boolean => {
-			const distToLine = Math.abs((x - pA.x) * nx + (y - pA.y) * ny);
-			return distToLine < tol;
-		};
+		const isPointOnMirrorLine = (p: Vec2): boolean => Math.abs(dot(sub(p, pA), normal)) < 1e-3;
 
 		this.ctx.sketch.beginTransaction();
 
@@ -300,7 +287,7 @@ export class MirrorTool extends BaseTool {
 			if (!pt) return origPtId;
 
 			// If point is strictly on the mirror line, reuse it
-			if (origPtId === mirrorLine.p1Id || origPtId === mirrorLine.p2Id || isPointOnMirrorLine(pt.x, pt.y)) {
+			if (origPtId === mirrorLine.p1Id || origPtId === mirrorLine.p2Id || isPointOnMirrorLine(pt)) {
 				pointMap.set(origPtId, origPtId);
 				if (origPtId !== mirrorLine.p1Id && origPtId !== mirrorLine.p2Id) {
 					this.ctx.sketch.addPointOnLineConstraint(origPtId, mirrorLine.id);
@@ -309,7 +296,7 @@ export class MirrorTool extends BaseTool {
 			}
 
 			// Reflect point
-			const refPos = reflectPoint(pt.x, pt.y);
+			const refPos = reflectPoint(pt, pA, normal);
 			const newPt = this.ctx.sketch.addPoint(refPos, false);
 			pointMap.set(origPtId, newPt.id);
 

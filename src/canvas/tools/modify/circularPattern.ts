@@ -3,7 +3,7 @@ import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { addScalar, subScalar, type Vec2 } from '../../../math/vector';
+import { addScalar, subScalar, sub, type Vec2 } from '../../../math/vector';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import { calculateObjectsCentroid } from './utils';
@@ -356,11 +356,10 @@ export class CircularPatternTool extends BaseTool {
 				for (let k = 1; k < bboxQuantity; k++) {
 					const radians =
 						(computePatternCopyAngle(k, bboxQuantity, this.state.distribution, this.state.angle) * Math.PI) / 180;
-					const dx = centroid.x - center.x;
-					const dy = centroid.y - center.y;
+					const dir = sub(centroid, center);
 					const copy = {
-						x: center.x + dx * Math.cos(radians) - dy * Math.sin(radians),
-						y: center.y + dx * Math.sin(radians) + dy * Math.cos(radians),
+						x: center.x + dir.x * Math.cos(radians) - dir.y * Math.sin(radians),
+						y: center.y + dir.x * Math.sin(radians) + dir.y * Math.cos(radians),
 					};
 					const screen = this.ctx.viewport.worldToScreen(copy);
 					pts.push(subScalar(screen, 14), addScalar(screen, 14));
@@ -529,10 +528,9 @@ export class CircularPatternTool extends BaseTool {
 		if (!this.angleDrag || !this.state || !this.ctx) return;
 		const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 		if (!center) return;
-		const dx = e.world.x - center.x;
-		const dy = e.world.y - center.y;
-		if (Math.hypot(dx, dy) < 1e-4) return;
-		const radialAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+		const dir = sub(e.world, center);
+		if (Math.hypot(dir.x, dir.y) < 1e-4) return;
+		const radialAngle = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
 		let step = radialAngle - this.angleDrag.previousPointerAngle;
 		while (step > 180) step -= 360;
 		while (step < -180) step += 360;

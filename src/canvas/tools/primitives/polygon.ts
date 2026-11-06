@@ -166,9 +166,8 @@ export class PolygonTool extends BaseTool {
 			const pts: Vec2[] = [];
 			for (let i = 0; i < N; i++) {
 				const a = baseAngle + i * step;
-				const wx = this.centerWorldPos.x + R * Math.cos(a);
-				const wy = this.centerWorldPos.y + R * Math.sin(a);
-				pts.push(ctx.viewport.worldToScreen({ x: wx, y: wy }));
+				const w = vec(this.centerWorldPos.x + R * Math.cos(a), this.centerWorldPos.y + R * Math.sin(a));
+				pts.push(ctx.viewport.worldToScreen(w));
 			}
 
 			// 4. Polygon outline path
@@ -246,9 +245,8 @@ export class PolygonTool extends BaseTool {
 		const vertices: SketchPoint[] = [];
 		for (let k = 0; k < N; k++) {
 			const a = baseAngle + k * step;
-			const vx = centerPt.x + R * Math.cos(a);
-			const vy = centerPt.y + R * Math.sin(a);
-			const pt = this.ctx.sketch.addPoint({ x: vx, y: vy }, false);
+			const v = vec(centerPt.x + R * Math.cos(a), centerPt.y + R * Math.sin(a));
+			const pt = this.ctx.sketch.addPoint(v, false);
 			vertices.push(pt);
 		}
 

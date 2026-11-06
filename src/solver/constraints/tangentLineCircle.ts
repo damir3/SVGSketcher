@@ -1,5 +1,6 @@
+import { cross, dot, addScaled, vec, scale, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 
 /**
@@ -51,21 +52,17 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const cx = paramMap.get(`${this.circleCenterId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.circleCenterId}.y`) ?? 0;
+		const center = readParamPoint(paramMap, this.circleCenterId);
 		const r = paramMap.get(`${this.circleId}.r`) ?? 10;
 
-		const p1x = paramMap.get(`${this.lineP1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.lineP1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.lineP2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.lineP2Id}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.lineP1Id);
+		const p2 = readParamPoint(paramMap, this.lineP2Id);
 
-		const dx = p2x - p1x;
-		const dy = p2y - p1y;
-		const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
+		const dir = sub(p2, p1);
+		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
 
 		// Signed distance from center to line
-		const signedDist = ((cx - p1x) * dy - (cy - p1y) * dx) / lineLen;
+		const signedDist = cross(sub(center, p1), dir) / lineLen;
 		return [(signedDist - this.initialSide * r) * this.weight];
 	}
 
@@ -95,50 +92,42 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const s2 = ctx.viewport.worldToScreen(p2);
 		const rScreen = entity.radius * ctx.viewport.zoom;
 
-		const dx = s2.x - s1.x;
-		const dy = s2.y - s1.y;
-		const lineLen = Math.hypot(dx, dy);
+		const dir = sub(s2, s1);
+		const lineLen = Math.hypot(dir.x, dir.y);
 		if (lineLen < 1e-4) return;
 
-		const ux = dx / lineLen;
-		const uy = dy / lineLen;
+		const u = scale(dir, 1 / lineLen);
 
-		const vx = sCenter.x - s1.x;
-		const vy = sCenter.y - s1.y;
-		const t = vx * ux + vy * uy;
-		const projX = s1.x + t * ux;
-		const projY = s1.y + t * uy;
+		const v = sub(sCenter, s1);
+		const t = dot(v, u);
+		const proj = addScaled(s1, u, t);
 
-		const normX = projX - sCenter.x;
-		const normY = projY - sCenter.y;
-		const normDist = Math.hypot(normX, normY);
+		const normal = sub(proj, sCenter);
+		const normDist = Math.hypot(normal.x, normal.y);
 
 		let dirX = 0;
 		let dirY = 0;
 		if (normDist > 1e-3) {
-			dirX = normX / normDist;
-			dirY = normY / normDist;
+			dirX = normal.x / normDist;
+			dirY = normal.y / normDist;
 		} else {
-			dirX = -uy;
-			dirY = ux;
+			dirX = -u.y;
+			dirY = u.x;
 		}
 
-		const circPtX = sCenter.x + dirX * rScreen;
-		const circPtY = sCenter.y + dirY * rScreen;
-		const tanX = (projX + circPtX) * 0.5;
-		const tanY = (projY + circPtY) * 0.5;
+		const circPt = vec(sCenter.x + dirX * rScreen, sCenter.y + dirY * rScreen);
+		const tan = vec((proj.x + circPt.x) * 0.5, (proj.y + circPt.y) * 0.5);
 
 		const distToSeg = isAxis ? 0 : t < 0 ? -t : t > lineLen ? t - lineLen : 0;
 		const distToCirc = Math.abs(normDist - rScreen);
 
-		const isNearArc = arc && ctx.isAngleNearArc ? ctx.isAngleNearArc(arc, center, { x: tanX, y: tanY }, rScreen) : true;
+		const isNearArc = arc && ctx.isAngleNearArc ? ctx.isAngleNearArc(arc, center, tan, rScreen) : true;
 		const isNear = distToSeg < 60 && distToCirc < 60 && isNearArc;
 
 		if (isNear) {
 			const offset = 14;
-			const badgeX = tanX - dirX * offset;
-			const badgeY = tanY - dirY * offset;
-			ctx.renderBadge(this.id, { x: badgeX, y: badgeY }, 'tangent');
+			const badge = vec(tan.x - dirX * offset, tan.y - dirY * offset);
+			ctx.renderBadge(this.id, badge, 'tangent');
 			return;
 		}
 

@@ -5,7 +5,7 @@ import { SelectTool } from '../src/canvas/tools/selection/select';
 import { HighlightManager } from '../src/canvas/highlightManager';
 import { DistanceConstraint } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
-import { vec, type Vec2 } from '../src/math/vector';
+import { vec, sub, type Vec2 } from '../src/math/vector';
 
 function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {}): any {
 	const children: any[] = [];
@@ -104,9 +104,8 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		findPointNear: (screen: Vec2, radius = 10) => {
 			for (const pt of sketch.points.values()) {
 				const s = viewport.worldToScreen(pt);
-				const dx = s.x - screen.x;
-				const dy = s.y - screen.y;
-				if (Math.hypot(dx, dy) <= radius) {
+				const dir = sub(s, screen);
+				if (Math.hypot(dir.x, dir.y) <= radius) {
 					return pt;
 				}
 			}

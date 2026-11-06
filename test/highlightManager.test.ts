@@ -5,7 +5,7 @@ import { HighlightManager } from '../src/canvas/highlightManager';
 import { BaseTool } from '../src/canvas/tools/base';
 import type { ToolContext } from '../src/canvas/tools/types';
 import type { HoverTarget } from '../src/canvas/tools/hoverTarget';
-import { vec, type Vec2 } from '../src/math/vector';
+import { vec, sub, type Vec2 } from '../src/math/vector';
 import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { DimensionTool } from '../src/canvas/tools/constraints/dimension';
 import { MirrorTool } from '../src/canvas/tools/modify/mirror';
@@ -94,9 +94,8 @@ function createMockContext(
 		showToast: () => {},
 		findPointNear: (screen: Vec2, radius = 14) => {
 			for (const pt of sketch.points.values()) {
-				const dx = pt.x - screen.x;
-				const dy = pt.y - screen.y;
-				if (Math.hypot(dx, dy) <= radius) return pt;
+				const dir = sub(pt, screen);
+				if (Math.hypot(dir.x, dir.y) <= radius) return pt;
 			}
 			return null;
 		},

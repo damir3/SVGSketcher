@@ -3,7 +3,7 @@ import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { addScalar, dist, subScalar, type Vec2 } from '../../../math/vector';
+import { dot, sub, addScaled, addScalar, dist, subScalar, type Vec2 } from '../../../math/vector';
 import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
@@ -470,7 +470,7 @@ export class RectangularPatternTool extends BaseTool {
 		if (this.gizmoDragState !== null) return false;
 		if (screen && this.ctx?.renderer?.rectangularGizmoHandles) {
 			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
-				if (!handle.constraintId && dist(screen, { x: handle.x, y: handle.y }) <= LINE_DISTANCE_PX) {
+				if (!handle.constraintId && dist(screen, handle) <= LINE_DISTANCE_PX) {
 					return false;
 				}
 			}
@@ -544,14 +544,8 @@ export class RectangularPatternTool extends BaseTool {
 				line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
 			);
 
-			const p1 = this.ctx.viewport.worldToScreen({
-				x: centroidWorld.x + this.state.distance1 * u1.x,
-				y: centroidWorld.y + this.state.distance1 * u1.y,
-			});
-			const p2 = this.ctx.viewport.worldToScreen({
-				x: centroidWorld.x + this.state.distance2 * u2.x,
-				y: centroidWorld.y + this.state.distance2 * u2.y,
-			});
+			const p1 = this.ctx.viewport.worldToScreen(addScaled(centroidWorld, u1, this.state.distance1));
+			const p2 = this.ctx.viewport.worldToScreen(addScaled(centroidWorld, u2, this.state.distance2));
 			pts.push(subScalar(p1, 48), addScalar(p1, 48), subScalar(p2, 48), addScalar(p2, 48));
 		}
 
@@ -610,7 +604,7 @@ export class RectangularPatternTool extends BaseTool {
 		// 1. Gizmo handle dragging hit-test
 		if (this.ctx.renderer?.rectangularGizmoHandles) {
 			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
-				if (!handle.constraintId && dist(e.screen, { x: handle.x, y: handle.y }) <= LINE_DISTANCE_PX) {
+				if (!handle.constraintId && dist(e.screen, handle) <= LINE_DISTANCE_PX) {
 					const startDistance = handle.axis === 1 ? this.state.distance1 : this.state.distance2;
 					const paramMap = new Map<string, number>();
 					for (const [pid, pt] of this.ctx.sketch.points.entries()) {
@@ -764,8 +758,8 @@ export class RectangularPatternTool extends BaseTool {
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this.gizmoDragState && this.state) {
 			const { axis, centroidWorld, u, startMouseWorld, startDistance } = this.gizmoDragState;
-			const startProj = (startMouseWorld.x - centroidWorld.x) * u.x + (startMouseWorld.y - centroidWorld.y) * u.y;
-			const currentProj = (e.world.x - centroidWorld.x) * u.x + (e.world.y - centroidWorld.y) * u.y;
+			const startProj = dot(sub(startMouseWorld, centroidWorld), u);
+			const currentProj = dot(sub(e.world, centroidWorld), u);
 			const delta = currentProj - startProj;
 			let newDist = startDistance + delta;
 			if (Math.abs(newDist) < 0.25) {

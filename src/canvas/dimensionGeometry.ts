@@ -1,4 +1,4 @@
-import type { Vec2 } from '../math/vector';
+import { dot, vec, add, addScaled, mid, normalizeOrNull, scale, sub, type Vec2 } from '../math/vector';
 
 export interface LinearDimensionGeometry {
 	d1: Vec2;
@@ -44,38 +44,33 @@ export function computeDistanceDimensionGeometry(
 	let extEnd2: Vec2;
 
 	if (orientation === 'horizontal') {
-		const midY = (s1.y + s2.y) * 0.5;
-		const dimY = cursor ? cursor.y : midY + screenOffset;
+		const midPoint = mid(s1, s2);
+		const dimY = cursor ? cursor.y : midPoint.y + screenOffset;
 		d1 = { x: s1.x, y: dimY };
 		d2 = { x: s2.x, y: dimY };
-		const extDir = dimY >= midY ? 1 : -1;
+		const extDir = dimY >= midPoint.y ? 1 : -1;
 		extEnd1 = { x: s1.x, y: dimY + extDir * 4 };
 		extEnd2 = { x: s2.x, y: dimY + extDir * 4 };
 	} else if (orientation === 'vertical') {
-		const midX = (s1.x + s2.x) * 0.5;
-		const dimX = cursor ? cursor.x : midX + screenOffset;
+		const midPoint = mid(s1, s2);
+		const dimX = cursor ? cursor.x : midPoint.x + screenOffset;
 		d1 = { x: dimX, y: s1.y };
 		d2 = { x: dimX, y: s2.y };
-		const extDir = dimX >= midX ? 1 : -1;
+		const extDir = dimX >= midPoint.x ? 1 : -1;
 		extEnd1 = { x: dimX + extDir * 4, y: s1.y };
 		extEnd2 = { x: dimX + extDir * 4, y: s2.y };
 	} else {
-		const dx = s2.x - s1.x;
-		const dy = s2.y - s1.y;
-		const len = Math.hypot(dx, dy);
-		if (len < 1e-4) return null;
+		const dir = normalizeOrNull(sub(s2, s1), 1e-4);
+		if (!dir) return null;
+		const normal = vec(-dir.y, dir.x);
+		const midPoint = mid(s1, s2);
+		const offset = cursor ? dot(sub(cursor, midPoint), normal) : screenOffset;
 
-		const nx = -dy / len;
-		const ny = dx / len;
-		const midX = (s1.x + s2.x) * 0.5;
-		const midY = (s1.y + s2.y) * 0.5;
-		const offset = cursor ? (cursor.x - midX) * nx + (cursor.y - midY) * ny : screenOffset;
-
-		d1 = { x: s1.x + nx * offset, y: s1.y + ny * offset };
-		d2 = { x: s2.x + nx * offset, y: s2.y + ny * offset };
+		d1 = { x: s1.x + normal.x * offset, y: s1.y + normal.y * offset };
+		d2 = { x: s2.x + normal.x * offset, y: s2.y + normal.y * offset };
 		const extDir = offset >= 0 ? 4 : -4;
-		extEnd1 = { x: d1.x + nx * extDir, y: d1.y + ny * extDir };
-		extEnd2 = { x: d2.x + nx * extDir, y: d2.y + ny * extDir };
+		extEnd1 = { x: d1.x + normal.x * extDir, y: d1.y + normal.y * extDir };
+		extEnd2 = { x: d2.x + normal.x * extDir, y: d2.y + normal.y * extDir };
 	}
 
 	return {
@@ -95,16 +90,14 @@ export function computePointToLineDimensionGeometry(
 	screenOffset = 0,
 	cursor?: Vec2
 ): LinearDimensionGeometry | null {
-	const dx = s2.x - s1.x;
-	const dy = s2.y - s1.y;
-	const lineLen = Math.hypot(dx, dy);
+	const delta = sub(s2, s1);
+	const lineLen = Math.hypot(delta.x, delta.y);
 	if (lineLen < 1e-4) return null;
 
-	const ux = dx / lineLen;
-	const uy = dy / lineLen;
+	const dir = scale(delta, 1.0 / lineLen);
 
-	const tProj = (sp.x - s1.x) * ux + (sp.y - s1.y) * uy;
-	let tDim = cursor ? (cursor.x - s1.x) * ux + (cursor.y - s1.y) * uy : tProj + screenOffset;
+	const tProj = dot(sub(sp, s1), dir);
+	let tDim = cursor ? dot(sub(cursor, s1), dir) : tProj + screenOffset;
 
 	// Ensure there is always a visible offset / выноска if none was specified or cursor is directly at projection
 	if (Math.abs(tDim - tProj) < 2) {
@@ -112,10 +105,9 @@ export function computePointToLineDimensionGeometry(
 		tDim = tProj + (screenOffset !== 0 ? screenOffset : defaultOffset);
 	}
 
-	const dBase = { x: s1.x + ux * tDim, y: s1.y + uy * tDim };
-	const hx = sp.x - (s1.x + ux * tProj);
-	const hy = sp.y - (s1.y + uy * tProj);
-	const dTop = { x: dBase.x + hx, y: dBase.y + hy };
+	const dBase = addScaled(s1, dir, tDim);
+	const h = vec(sp.x - (s1.x + dir.x * tProj), sp.y - (s1.y + dir.y * tProj));
+	const dTop = add(dBase, h);
 
 	const extensionLines: Array<{ from: Vec2; to: Vec2 }> = [];
 
@@ -124,7 +116,7 @@ export function computePointToLineDimensionGeometry(
 		const extDir = tDim >= tProj ? 1 : -1;
 		extensionLines.push({
 			from: sp,
-			to: { x: dTop.x + ux * extDir * 4, y: dTop.y + uy * extDir * 4 },
+			to: { x: dTop.x + dir.x * extDir * 4, y: dTop.y + dir.y * extDir * 4 },
 		});
 	}
 
@@ -132,12 +124,12 @@ export function computePointToLineDimensionGeometry(
 	if (tDim < 0) {
 		extensionLines.push({
 			from: s1,
-			to: { x: dBase.x - ux * 4, y: dBase.y - uy * 4 },
+			to: { x: dBase.x - dir.x * 4, y: dBase.y - dir.y * 4 },
 		});
 	} else if (tDim > lineLen) {
 		extensionLines.push({
 			from: s2,
-			to: { x: dBase.x + ux * 4, y: dBase.y + uy * 4 },
+			to: { x: dBase.x + dir.x * 4, y: dBase.y + dir.y * 4 },
 		});
 	}
 

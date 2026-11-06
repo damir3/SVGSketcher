@@ -1,6 +1,6 @@
 import type { Vec2 } from './vector';
 import { AABB } from './aabb';
-import { distancesFrom, projectPointOntoSegment } from './vector';
+import { dot, addScaled, cross, distancesFrom, mid, mix, projectPointOntoSegment, sub, vec } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
 import {
@@ -167,10 +167,7 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		return getSplinePointAtParam(curve.bezierSegments, param);
 	} else if (curve.type === 'segment') {
 		const t = Math.max(0, Math.min(1, param));
-		return {
-			x: curve.p1.x + t * (curve.p2.x - curve.p1.x),
-			y: curve.p1.y + t * (curve.p2.y - curve.p1.y),
-		};
+		return mix(curve.p1, curve.p2, t);
 	} else if (curve.type === 'circle') {
 		const sc = { x: curve.center.x, y: -curve.center.y };
 		const sq = {
@@ -199,15 +196,13 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
 		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const ux = Math.cos(theta),
-			uy = Math.sin(theta);
-		const vx = -Math.sin(theta),
-			vy = Math.cos(theta);
+		const u = vec(Math.cos(theta), Math.sin(theta));
+		const v = vec(-Math.sin(theta), Math.cos(theta));
 		const up = r.x * Math.cos(param);
 		const vp = r.y * Math.sin(param);
 		const sq = {
-			x: sc.x + up * ux + vp * vx,
-			y: sc.y + up * uy + vp * vy,
+			x: sc.x + up * u.x + vp * v.x,
+			y: sc.y + up * u.y + vp * v.y,
 		};
 		return { x: sq.x, y: -sq.y };
 	} else if (curve.type === 'elliptical_arc') {
@@ -218,14 +213,14 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const se = { x: curve.end.x, y: -curve.end.y };
 		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const ux = Math.cos(theta),
-			uy = Math.sin(theta);
-		const vx = -Math.sin(theta),
-			vy = Math.cos(theta);
-		const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-		const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-		const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-		const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+		const axisU = vec(Math.cos(theta), Math.sin(theta));
+		const v = vec(-Math.sin(theta), Math.cos(theta));
+		const startOffset = sub(ss, sc);
+		const us = dot(startOffset, axisU);
+		const vs = dot(startOffset, v);
+		const endOffset = sub(se, sc);
+		const ue = dot(endOffset, axisU);
+		const ve = dot(endOffset, v);
 		const ts = Math.atan2(vs / r.y, us / r.x);
 		const te = Math.atan2(ve / r.y, ue / r.x);
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
@@ -235,8 +230,8 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const up = r.x * Math.cos(t);
 		const vp = r.y * Math.sin(t);
 		const sq = {
-			x: sc.x + up * ux + vp * vx,
-			y: sc.y + up * uy + vp * vy,
+			x: sc.x + up * axisU.x + vp * v.x,
+			y: sc.y + up * axisU.y + vp * v.y,
 		};
 		return { x: sq.x, y: -sq.y };
 	}
@@ -250,11 +245,10 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 	if (curve.type === 'spline') {
 		return getSplineParamAtPoint(curve.bezierSegments, pt).param;
 	} else if (curve.type === 'segment') {
-		const dx = curve.p2.x - curve.p1.x;
-		const dy = curve.p2.y - curve.p1.y;
-		const l2 = dx * dx + dy * dy;
+		const dir = sub(curve.p2, curve.p1);
+		const l2 = dot(dir, dir);
 		if (l2 < 1e-12) return 0;
-		const t = ((pt.x - curve.p1.x) * dx + (pt.y - curve.p1.y) * dy) / l2;
+		const t = dot(sub(pt, curve.p1), dir) / l2;
 		return Math.max(0, Math.min(1, t));
 	} else if (curve.type === 'circle') {
 		const sc = { x: curve.center.x, y: -curve.center.y };
@@ -283,14 +277,11 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const sp = { x: pt.x, y: -pt.y };
 		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const ux = Math.cos(theta),
-			uy = Math.sin(theta);
-		const vx = -Math.sin(theta),
-			vy = Math.cos(theta);
-		const dx = sp.x - sc.x,
-			dy = sp.y - sc.y;
-		const up = dx * ux + dy * uy;
-		const vp = dx * vx + dy * vy;
+		const u = vec(Math.cos(theta), Math.sin(theta));
+		const v = vec(-Math.sin(theta), Math.cos(theta));
+		const dir = sub(sp, sc);
+		const up = dot(dir, u);
+		const vp = dot(dir, v);
 		let t = Math.atan2(vp / Math.max(r.y, 1e-6), up / Math.max(r.x, 1e-6));
 		if (t < 0) t += TWO_PI;
 		return t;
@@ -303,19 +294,19 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		const sp = { x: pt.x, y: -pt.y };
 		const r = distancesFrom(sc, smaj, smin);
 		const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-		const ux = Math.cos(theta),
-			uy = Math.sin(theta);
-		const vx = -Math.sin(theta),
-			vy = Math.cos(theta);
-		const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-		const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-		const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-		const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+		const u = vec(Math.cos(theta), Math.sin(theta));
+		const v = vec(-Math.sin(theta), Math.cos(theta));
+		const startOffset = sub(ss, sc);
+		const us = dot(startOffset, u);
+		const vs = dot(startOffset, v);
+		const endOffset = sub(se, sc);
+		const ue = dot(endOffset, u);
+		const ve = dot(endOffset, v);
 		const ts = Math.atan2(vs / Math.max(r.y, 1e-6), us / Math.max(r.x, 1e-6));
 		const te = Math.atan2(ve / Math.max(r.y, 1e-6), ue / Math.max(r.x, 1e-6));
-		const dp = { x: sp.x - sc.x, y: sp.y - sc.y };
-		const up = dp.x * ux + dp.y * uy;
-		const vp = dp.x * vx + dp.y * vy;
+		const dp = sub(sp, sc);
+		const up = dot(dp, u);
+		const vp = dot(dp, v);
 		const tp = Math.atan2(vp / Math.max(r.y, 1e-6), up / Math.max(r.x, 1e-6));
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
@@ -359,19 +350,19 @@ function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): bo
 	const r = distancesFrom(sc, smaj, smin);
 	if (r.x < 1e-6 || r.y < 1e-6) return false;
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-	const ux = Math.cos(theta),
-		uy = Math.sin(theta);
-	const vx = -Math.sin(theta),
-		vy = Math.cos(theta);
-	const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-	const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-	const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+	const u = vec(Math.cos(theta), Math.sin(theta));
+	const v = vec(-Math.sin(theta), Math.cos(theta));
+	const startOffset = sub(ss, sc);
+	const us = dot(startOffset, u);
+	const vs = dot(startOffset, v);
+	const endOffset = sub(se, sc);
+	const ue = dot(endOffset, u);
+	const ve = dot(endOffset, v);
 	const ts = Math.atan2(vs / r.y, us / r.x);
 	const te = Math.atan2(ve / r.y, ue / r.x);
-	const dp = { x: sp.x - sc.x, y: sp.y - sc.y };
-	const up = dp.x * ux + dp.y * uy;
-	const vp = dp.x * vx + dp.y * vy;
+	const dp = sub(sp, sc);
+	const up = dot(dp, u);
+	const vp = dot(dp, v);
 	const tp = Math.atan2(vp / r.y, up / r.x);
 	let sweep = arc.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
 	if (sweep < 0) sweep += TWO_PI;
@@ -393,30 +384,20 @@ function deduplicatePoints(pts: Vec2[], eps = 1e-4): Vec2[] {
 // --- INTERSECTION ROUTINES ---
 
 export function intersectSegmentSegment(s1: GeoSegment, s2: GeoSegment): Vec2[] {
-	const x1 = s1.p1.x,
-		y1 = s1.p1.y,
-		x2 = s1.p2.x,
-		y2 = s1.p2.y;
-	const x3 = s2.p1.x,
-		y3 = s2.p1.y,
-		x4 = s2.p2.x,
-		y4 = s2.p2.y;
+	const dir1 = sub(s1.p2, s1.p1);
+	const dir2 = sub(s2.p2, s2.p1);
 
-	const dx1 = x2 - x1;
-	const dy1 = y2 - y1;
-	const dx2 = x4 - x3;
-	const dy2 = y4 - y3;
-
-	const det = dx1 * dy2 - dy1 * dx2;
+	const det = cross(dir1, dir2);
 	if (Math.abs(det) < 1e-10) return [];
 
-	const t = ((x3 - x1) * dy2 - (y3 - y1) * dx2) / det;
-	const u = ((x3 - x1) * dy1 - (y3 - y1) * dx1) / det;
+	const delta = sub(s2.p1, s1.p1);
+	const t = cross(delta, dir2) / det;
+	const u = cross(delta, dir1) / det;
 
 	const eps = 1e-5;
 	if (t >= -eps && t <= 1 + eps && u >= -eps && u <= 1 + eps) {
 		const clampedT = Math.max(0, Math.min(1, t));
-		return [{ x: x1 + clampedT * dx1, y: y1 + clampedT * dy1 }];
+		return [addScaled(s1.p1, dir1, clampedT)];
 	}
 	return [];
 }
@@ -424,16 +405,14 @@ export function intersectSegmentSegment(s1: GeoSegment, s2: GeoSegment): Vec2[] 
 export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Vec2[] {
 	const p1 = s.p1;
 	const p2 = s.p2;
-	const vx = p2.x - p1.x;
-	const vy = p2.y - p1.y;
-	const wx = p1.x - c.center.x;
-	const wy = p1.y - c.center.y;
+	const v = sub(p2, p1);
+	const w = sub(p1, c.center);
 
-	const A = vx * vx + vy * vy;
+	const A = dot(v, v);
 	if (A < 1e-12) return [];
 
-	const B = 2 * (wx * vx + wy * vy);
-	const C0 = wx * wx + wy * wy - c.radius * c.radius;
+	const B = 2 * dot(w, v);
+	const C0 = dot(w, w) - c.radius * c.radius;
 
 	const disc = B * B - 4 * A * C0;
 	if (disc < -1e-7) return [];
@@ -446,7 +425,7 @@ export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Ve
 	for (const t of tCandidates) {
 		if (t >= -eps && t <= 1 + eps) {
 			const clampedT = Math.max(0, Math.min(1, t));
-			const pt: Vec2 = { x: p1.x + clampedT * vx, y: p1.y + clampedT * vy };
+			const pt = addScaled(p1, v, clampedT);
 			if (c.type === 'circle' || isPointOnArc(pt, c)) {
 				pts.push(pt);
 			}
@@ -466,19 +445,17 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 	if (r.x < 1e-6 || r.y < 1e-6) return [];
 
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
-	const ux = Math.cos(theta),
-		uy = Math.sin(theta);
-	const vx = -Math.sin(theta),
-		vy = Math.cos(theta);
+	const u = vec(Math.cos(theta), Math.sin(theta));
+	const v = vec(-Math.sin(theta), Math.cos(theta));
 
 	// Transform line segment endpoints to ellipse-local coordinates
-	const d1 = { x: s1.x - sc.x, y: s1.y - sc.y };
-	const d2 = { x: s2.x - sc.x, y: s2.y - sc.y };
+	const d1 = sub(s1, sc);
+	const d2 = sub(s2, sc);
 
-	const u1 = d1.x * ux + d1.y * uy;
-	const v1 = d1.x * vx + d1.y * vy;
-	const u2 = d2.x * ux + d2.y * uy;
-	const v2 = d2.x * vx + d2.y * vy;
+	const u1 = dot(d1, u);
+	const v1 = dot(d1, v);
+	const u2 = dot(d2, u);
+	const v2 = dot(d2, v);
 
 	const du = u2 - u1;
 	const dv = v2 - v1;
@@ -500,10 +477,7 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 	for (const t of tCandidates) {
 		if (t >= -eps && t <= 1 + eps) {
 			const clampedT = Math.max(0, Math.min(1, t));
-			const worldPt: Vec2 = {
-				x: s.p1.x + clampedT * (s.p2.x - s.p1.x),
-				y: s.p1.y + clampedT * (s.p2.y - s.p1.y),
-			};
+			const worldPt = mix(s.p1, s.p2, clampedT);
 			if (e.type === 'ellipse' || isPointOnEllipticalArc(worldPt, e)) {
 				pts.push(worldPt);
 			}
@@ -513,9 +487,8 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 }
 
 export function intersectCircleCircle(c1: GeoCircle | GeoArc, c2: GeoCircle | GeoArc): Vec2[] {
-	const dx = c2.center.x - c1.center.x;
-	const dy = c2.center.y - c1.center.y;
-	const d = Math.hypot(dx, dy);
+	const dir = sub(c2.center, c1.center);
+	const d = Math.hypot(dir.x, dir.y);
 
 	if (d < 1e-9) return []; // concentric or identical
 	if (d > c1.radius + c2.radius + 1e-5 || d < Math.abs(c1.radius - c2.radius) - 1e-5) return [];
@@ -524,17 +497,15 @@ export function intersectCircleCircle(c1: GeoCircle | GeoArc, c2: GeoCircle | Ge
 	const h2 = c1.radius * c1.radius - a * a;
 	const h = Math.sqrt(Math.max(0, h2));
 
-	const p0x = c1.center.x + (a / d) * dx;
-	const p0y = c1.center.y + (a / d) * dy;
+	const p0 = addScaled(c1.center, dir, a / d);
 
 	const candidates: Vec2[] = [];
 	if (h < 1e-7) {
-		candidates.push({ x: p0x, y: p0y });
+		candidates.push(p0);
 	} else {
-		const nx = -dy / d;
-		const ny = dx / d;
-		candidates.push({ x: p0x + h * nx, y: p0y + h * ny });
-		candidates.push({ x: p0x - h * nx, y: p0y - h * ny });
+		const normal = vec(-dir.y / d, dir.x / d);
+		candidates.push({ x: p0.x + h * normal.x, y: p0.y + h * normal.y });
+		candidates.push({ x: p0.x - h * normal.x, y: p0.y - h * normal.y });
 	}
 
 	const pts: Vec2[] = [];
@@ -572,10 +543,8 @@ export function intersectEllipseEllipse(
 	}
 	if (rx1 < 1e-6 || ry1 < 1e-6) return [];
 
-	const ux1 = Math.cos(theta1),
-		uy1 = Math.sin(theta1);
-	const vx1 = -Math.sin(theta1),
-		vy1 = Math.cos(theta1);
+	const u1 = vec(Math.cos(theta1), Math.sin(theta1));
+	const v1 = vec(-Math.sin(theta1), Math.cos(theta1));
 
 	// Parametrize e2 implicit equation in SVG space
 	const sc2 = { x: e2.center.x, y: -e2.center.y };
@@ -596,27 +565,24 @@ export function intersectEllipseEllipse(
 	}
 	if (rx2 < 1e-6 || ry2 < 1e-6) return [];
 
-	const ux2 = Math.cos(theta2),
-		uy2 = Math.sin(theta2);
-	const vx2 = -Math.sin(theta2),
-		vy2 = Math.cos(theta2);
+	const u2 = vec(Math.cos(theta2), Math.sin(theta2));
+	const v2 = vec(-Math.sin(theta2), Math.cos(theta2));
 
 	// Evaluate point on e1 at parameter t
 	const pointOnE1 = (t: number): Vec2 => {
 		const up = rx1 * Math.cos(t);
 		const vp = ry1 * Math.sin(t);
 		return {
-			x: sc1.x + up * ux1 + vp * vx1,
-			y: sc1.y + up * uy1 + vp * vy1,
+			x: sc1.x + up * u1.x + vp * v1.x,
+			y: sc1.y + up * u1.y + vp * v1.y,
 		};
 	};
 
 	// Implicit value F2 of a point on e2: F2 = 0 on perimeter
 	const implicitE2 = (p: Vec2): number => {
-		const dx = p.x - sc2.x;
-		const dy = p.y - sc2.y;
-		const u = dx * ux2 + dy * uy2;
-		const v = dx * vx2 + dy * vy2;
+		const dir = sub(p, sc2);
+		const u = dot(dir, u2);
+		const v = dot(dir, v2);
 		return (u * u) / (rx2 * rx2) + (v * v) / (ry2 * ry2) - 1.0;
 	};
 
@@ -777,17 +743,16 @@ export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec
 			for (let iter = 0; iter < 4; iter++) {
 				const p1 = evaluateBezier(b1, t);
 				const p2 = evaluateBezier(b2, u);
-				const fx = p1.x - p2.x;
-				const fy = p1.y - p2.y;
-				if (Math.hypot(fx, fy) < 1e-11) break;
+				const f = sub(p1, p2);
+				if (Math.hypot(f.x, f.y) < 1e-11) break;
 
 				const d1 = evaluateBezierDerivative(b1, t);
 				const d2 = evaluateBezierDerivative(b2, u);
-				const det = -d1.x * d2.y + d1.y * d2.x;
+				const det = cross(d2, d1);
 				if (Math.abs(det) < 1e-12) break;
 
-				const dt = (-d2.y * fx + d2.x * fy) / det;
-				const du = (-d1.y * fx + d1.x * fy) / det;
+				const dt = cross(d2, f) / det;
+				const du = cross(d1, f) / det;
 
 				t = Math.max(0, Math.min(1, t - dt));
 				u = Math.max(0, Math.min(1, u - du));
@@ -796,7 +761,7 @@ export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec
 			const p1 = evaluateBezier(b1, t);
 			const p2 = evaluateBezier(b2, u);
 			if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-3) {
-				pts.push({ x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 });
+				pts.push(mid(p1, p2));
 			}
 			continue;
 		}
@@ -874,17 +839,14 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 			const r = distancesFrom(sc, maj, min);
 			if (r.x < 1e-6 || r.y < 1e-6) continue;
 			const theta = Math.atan2(maj.y - sc.y, maj.x - sc.x);
-			const ux = Math.cos(theta),
-				uy = Math.sin(theta);
-			const vx = -Math.sin(theta),
-				vy = Math.cos(theta);
+			const u = vec(Math.cos(theta), Math.sin(theta));
+			const v = vec(-Math.sin(theta), Math.cos(theta));
 
 			const f = (p: Vec2) => {
 				const sp = { x: p.x, y: -p.y };
-				const dx = sp.x - sc.x;
-				const dy = sp.y - sc.y;
-				const up = dx * ux + dy * uy;
-				const vp = dx * vx + dy * vy;
+				const dir = sub(sp, sc);
+				const up = dot(dir, u);
+				const vp = dot(dir, v);
 				return (up * up) / (r.x * r.x) + (vp * vp) / (r.y * r.y) - 1.0;
 			};
 			const rPts = findBezierImplicitRoots(b, f);
@@ -1294,8 +1256,8 @@ function replaceSplineWithInterval(
 			const pJ = subSegments[j][0];
 			rawPoints.push(pJ);
 			rawHandles.push({
-				h1: { x: subSegments[j - 1][2].x, y: subSegments[j - 1][2].y },
-				h2: { x: subSegments[j][1].x, y: subSegments[j][1].y },
+				h1: subSegments[j - 1][2],
+				h2: subSegments[j][1],
 			});
 		}
 	}

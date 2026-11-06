@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, vec, type Vec2 } from '../../../math/vector';
+import { dist, vec, sub, type Vec2 } from '../../../math/vector';
 import type { IToolPanel } from '../../../ui/panels/tools/types';
 import type { SketchText } from '../../../model/primitives/text';
 import { COLORS } from '../../styles';
@@ -246,14 +246,13 @@ export class TextTool extends BaseTool {
 
 	private handleCenterDragMove(currentWorld: Vec2): void {
 		if (!this.dragStartWorld || this.dragInitialPoints.size === 0) return;
-		const dx = currentWorld.x - this.dragStartWorld.x;
-		const dy = currentWorld.y - this.dragStartWorld.y;
+		const dir = sub(currentWorld, this.dragStartWorld);
 
 		for (const [pid, initPos] of this.dragInitialPoints) {
 			const pt = this.ctx.sketch.points.get(pid);
 			if (pt) {
-				pt.x = initPos.x + dx;
-				pt.y = initPos.y + dy;
+				pt.x = initPos.x + dir.x;
+				pt.y = initPos.y + dir.y;
 			}
 		}
 
@@ -282,9 +281,8 @@ export class TextTool extends BaseTool {
 		const rotatePoint = (p: Vec2, center: Vec2, rad: number): Vec2 => {
 			const cos = Math.cos(rad);
 			const sin = Math.sin(rad);
-			const dx = p.x - center.x;
-			const dy = p.y - center.y;
-			return vec(center.x + dx * cos - dy * sin, center.y + dx * sin + dy * cos);
+			const dir = sub(p, center);
+			return vec(center.x + dir.x * cos - dir.y * sin, center.y + dir.x * sin + dir.y * cos);
 		};
 
 		const pt0 = this.ctx.sketch.points.get(text.rectanglePointIds[0]);
@@ -580,10 +578,9 @@ export class TextTool extends BaseTool {
 			const lineHeightPx = hScreen * 1.25;
 			const totalBlockHeightPx = (numLines - 1) * lineHeightPx;
 
-			const cx = min.x + w / 2;
-			const cy = min.y + h / 2;
+			const center = vec(min.x + w / 2, min.y + h / 2);
 
-			let posX = cx;
+			let posX = center.x;
 			let textAnchor = 'middle';
 			if (this.alignment === 'left') {
 				posX = min.x + 4;
@@ -593,20 +590,20 @@ export class TextTool extends BaseTool {
 				textAnchor = 'end';
 			}
 
-			let startY = cy;
+			let startY = center.y;
 			if (this.verticalAlignment === 'top') {
 				startY = min.y + hScreen / 2 + 4;
 			} else if (this.verticalAlignment === 'bottom') {
 				startY = max.y - hScreen / 2 - 4 - totalBlockHeightPx;
 			} else {
-				startY = cy - totalBlockHeightPx / 2;
+				startY = center.y - totalBlockHeightPx / 2;
 			}
 
 			const scaleX = this.flipHorizontal ? -1 : 1;
 			const scaleY = this.flipVertical ? -1 : 1;
 			const transformAttr =
 				this.flipHorizontal || this.flipVertical
-					? `translate(${cx}, ${cy}) scale(${scaleX}, ${scaleY}) translate(${-cx}, ${-cy})`
+					? `translate(${center.x}, ${center.y}) scale(${scaleX}, ${scaleY}) translate(${-center.x}, ${-center.y})`
 					: undefined;
 
 			const previewTextG = createSvgElement(

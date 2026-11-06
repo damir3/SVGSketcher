@@ -1,5 +1,5 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
@@ -21,12 +21,10 @@ export class CoincidentConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.p1Id);
+		const p2 = readParamPoint(paramMap, this.p2Id);
 
-		return [(p1x - p2x) * this.weight, (p1y - p2y) * this.weight];
+		return [(p1.x - p2.x) * this.weight, (p1.y - p2.y) * this.weight];
 	}
 
 	override jacobian(

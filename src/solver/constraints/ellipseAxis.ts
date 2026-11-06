@@ -1,5 +1,6 @@
+import { dot, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 
 /**
  * Constrains the major axis and minor axis of an ellipse / elliptical arc to be perpendicular
@@ -30,24 +31,19 @@ export class EllipseAxisConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const cx = paramMap.get(`${this.centerId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.centerId}.y`) ?? 0;
-		const x1 = paramMap.get(`${this.majorAxisPointId}.x`) ?? 0;
-		const y1 = paramMap.get(`${this.majorAxisPointId}.y`) ?? 0;
-		const x2 = paramMap.get(`${this.minorAxisPointId}.x`) ?? 0;
-		const y2 = paramMap.get(`${this.minorAxisPointId}.y`) ?? 0;
+		const center = readParamPoint(paramMap, this.centerId);
+		const p1 = readParamPoint(paramMap, this.majorAxisPointId);
+		const p2 = readParamPoint(paramMap, this.minorAxisPointId);
 
-		const dx1 = x1 - cx;
-		const dy1 = y1 - cy;
-		const dx2 = x2 - cx;
-		const dy2 = y2 - cy;
+		const dir1 = sub(p1, center);
+		const dir2 = sub(p2, center);
 
-		const r1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
-		const r2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
+		const r1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
+		const r2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
 		const avgR = (r1 + r2) * 0.5;
 
-		const dot = (dx1 * dx2 + dy1 * dy2) / (r1 * r2);
-		return [dot * avgR * this.weight];
+		const alignment = dot(dir1, dir2) / (r1 * r2);
+		return [alignment * avgR * this.weight];
 	}
 
 	override jacobian(

@@ -211,10 +211,9 @@ function initApp(): void {
 	// Track cursor coordinates and solver benchmark
 	svg.addEventListener('mousemove', e => {
 		const rect = svg.getBoundingClientRect();
-		const sx = e.clientX - rect.left;
-		const sy = e.clientY - rect.top;
-		const snap = interaction.isSnappingEnabled ? interaction.findSnap({ x: sx, y: sy }) : null;
-		const world = snap ? snap.worldPos : viewport.screenToWorld({ x: sx, y: sy });
+		const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+		const snap = interaction.isSnappingEnabled ? interaction.findSnap(screen) : null;
+		const world = snap ? snap.worldPos : viewport.screenToWorld(screen);
 		const { subStep } = viewport.getGridStep();
 		const decimals = subStep < 0.1 ? 2 : 1;
 		coordX.textContent = world.x.toFixed(decimals);

@@ -1,5 +1,6 @@
+import { dot, scale, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 
 /**
  * Constrains endpoints of an elliptical arc to lie on the ellipse defined by center, major axis, and minor axis
@@ -42,44 +43,33 @@ export class EllipticalArcEndpointsConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const cx = paramMap.get(`${this.centerId}.x`) ?? 0;
-		const cy = paramMap.get(`${this.centerId}.y`) ?? 0;
-		const x1 = paramMap.get(`${this.majorAxisPointId}.x`) ?? 0;
-		const y1 = paramMap.get(`${this.majorAxisPointId}.y`) ?? 0;
-		const x2 = paramMap.get(`${this.minorAxisPointId}.x`) ?? 0;
-		const y2 = paramMap.get(`${this.minorAxisPointId}.y`) ?? 0;
-		const sx = paramMap.get(`${this.startPointId}.x`) ?? 0;
-		const sy = paramMap.get(`${this.startPointId}.y`) ?? 0;
-		const ex = paramMap.get(`${this.endPointId}.x`) ?? 0;
-		const ey = paramMap.get(`${this.endPointId}.y`) ?? 0;
+		const center = readParamPoint(paramMap, this.centerId);
+		const p1 = readParamPoint(paramMap, this.majorAxisPointId);
+		const p2 = readParamPoint(paramMap, this.minorAxisPointId);
+		const s = readParamPoint(paramMap, this.startPointId);
+		const end = readParamPoint(paramMap, this.endPointId);
 
-		const uX = x1 - cx;
-		const uY = y1 - cy;
-		const vX = x2 - cx;
-		const vY = y2 - cy;
+		const u = sub(p1, center);
+		const v = sub(p2, center);
 
-		const rx = Math.max(Math.hypot(uX, uY), 1e-7);
-		const ry = Math.max(Math.hypot(vX, vY), 1e-7);
+		const rx = Math.max(Math.hypot(u.x, u.y), 1e-7);
+		const ry = Math.max(Math.hypot(v.x, v.y), 1e-7);
 		const avgR = (rx + ry) * 0.5;
 
 		// Unit axis vectors
-		const uHatX = uX / rx;
-		const uHatY = uY / rx;
-		const vHatX = vX / ry;
-		const vHatY = vY / ry;
+		const uHat = scale(u, 1 / rx);
+		const vHat = scale(v, 1 / ry);
 
 		// Start point local coords
-		const dsX = sx - cx;
-		const dsY = sy - cy;
-		const uS = dsX * uHatX + dsY * uHatY;
-		const vS = dsX * vHatX + dsY * vHatY;
+		const ds = sub(s, center);
+		const uS = dot(ds, uHat);
+		const vS = dot(ds, vHat);
 		const resS = ((uS * uS) / (rx * rx) + (vS * vS) / (ry * ry) - 1.0) * avgR * this.weight;
 
 		// End point local coords
-		const deX = ex - cx;
-		const deY = ey - cy;
-		const uE = deX * uHatX + deY * uHatY;
-		const vE = deX * vHatX + deY * vHatY;
+		const de = sub(end, center);
+		const uE = dot(de, uHat);
+		const vE = dot(de, vHat);
 		const resE = ((uE * uE) / (rx * rx) + (vE * vE) / (ry * ry) - 1.0) * avgR * this.weight;
 
 		return [resS, resE];

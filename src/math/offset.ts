@@ -1,7 +1,7 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint } from '../model/types';
 import { CoincidentConstraint } from '../solver/constraints';
-import { dist, normalize, type Vec2 } from './vector';
+import { vec, addScaled, cross, dist, dot, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
 import { computeNaturalFitHandles } from './spline';
 import { OffsetConstraint, type OffsetPair, type OffsetSplinePoint } from '../solver/constraints/offset';
 
@@ -519,10 +519,7 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const p1 = sketch.points.get(item.startPointId || l.p1Id);
 		const p2 = sketch.points.get(item.endPointId || l.p2Id);
 		if (!p1 || !p2) return [];
-		return [
-			{ x: p1.x, y: p1.y },
-			{ x: p2.x, y: p2.y },
-		];
+		return [p1, p2];
 	}
 
 	if (item.type === 'circle') {
@@ -557,11 +554,10 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pts: Vec2[] = [];
 		for (let i = 0; i < numSamples; i++) {
 			const theta = (i / numSamples) * Math.PI * 2;
-			const ex = a * Math.cos(theta);
-			const ey = b * Math.sin(theta);
+			const end = vec(a * Math.cos(theta), b * Math.sin(theta));
 			pts.push({
-				x: center.x + ex * cosA - ey * sinA,
-				y: center.y + ex * sinA + ey * cosA,
+				x: center.x + end.x * cosA - end.y * sinA,
+				y: center.y + end.x * sinA + end.y * cosA,
 			});
 		}
 		pts.push({ ...pts[0] });
@@ -610,17 +606,17 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 			const localT = totalT - segIdx;
 			const [p0, p1, p2, p3] = beziers[segIdx];
 			const mt = 1 - localT;
-			const x =
+			const point = vec(
 				mt * mt * mt * p0.x +
-				3 * mt * mt * localT * p1.x +
-				3 * mt * localT * localT * p2.x +
-				localT * localT * localT * p3.x;
-			const y =
+					3 * mt * mt * localT * p1.x +
+					3 * mt * localT * localT * p2.x +
+					localT * localT * localT * p3.x,
 				mt * mt * mt * p0.y +
-				3 * mt * mt * localT * p1.y +
-				3 * mt * localT * localT * p2.y +
-				localT * localT * localT * p3.y;
-			pts.push({ x, y });
+					3 * mt * mt * localT * p1.y +
+					3 * mt * localT * localT * p2.y +
+					localT * localT * localT * p3.y
+			);
+			pts.push(point);
 		}
 		const isReversed =
 			item.reversed ||
@@ -647,11 +643,9 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 			sinR = Math.sin(rot);
 
 		const toEllipseParam = (p: Vec2) => {
-			const dx = p.x - center.x,
-				dy = p.y - center.y;
-			const ex = dx * cosR + dy * sinR;
-			const ey = -dx * sinR + dy * cosR;
-			return Math.atan2(ey / b, ex / a);
+			const dir = sub(p, center);
+			const end = vec(dir.x * cosR + dir.y * sinR, -dir.x * sinR + dir.y * cosR);
+			return Math.atan2(end.y / b, end.x / a);
 		};
 
 		let tStart = toEllipseParam(pStart);
@@ -666,11 +660,10 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		for (let i = 0; i <= numSamples; i++) {
 			const t = i / numSamples;
 			const ang = effectiveClockwise ? tStart - t * sweep : tStart + t * sweep;
-			const ex = a * Math.cos(ang);
-			const ey = b * Math.sin(ang);
+			const end = vec(a * Math.cos(ang), b * Math.sin(ang));
 			pts.push({
-				x: center.x + ex * cosR - ey * sinR,
-				y: center.y + ex * sinR + ey * cosR,
+				x: center.x + end.x * cosR - end.y * sinR,
+				y: center.y + end.x * sinR + end.y * cosR,
 			});
 		}
 		return pts;
@@ -683,15 +676,11 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
  * Calculates 2D line intersection between infinite lines p1 + t*d1 and p2 + s*d2.
  */
 export function intersectLines2D(p1: Vec2, d1: Vec2, p2: Vec2, d2: Vec2): Vec2 | null {
-	const cross = d1.x * d2.y - d1.y * d2.x;
-	if (Math.abs(cross) < 1e-7) return null;
-	const dx = p2.x - p1.x;
-	const dy = p2.y - p1.y;
-	const t = (dx * d2.y - dy * d2.x) / cross;
-	return {
-		x: p1.x + t * d1.x,
-		y: p1.y + t * d1.y,
-	};
+	const determinant = cross(d1, d2);
+	if (Math.abs(determinant) < 1e-7) return null;
+	const dir = sub(p2, p1);
+	const t = cross(dir, d2) / determinant;
+	return addScaled(p1, d1, t);
 }
 
 /**
@@ -704,7 +693,7 @@ function isPolygonCounterClockwise(pts: Vec2[]): boolean {
 	const n = pts.length;
 	for (let i = 0; i < n; i++) {
 		const j = (i + 1) % n;
-		area += pts[i].x * pts[j].y - pts[j].x * pts[i].y;
+		area += cross(pts[i], pts[j]);
 	}
 	return area > 0;
 }
@@ -786,24 +775,24 @@ function computeSingleOffsetSide(
 		for (let i = 0; i < samples; i++) {
 			const theta = (i / samples) * Math.PI * 2;
 			// Position on ellipse
-			const ex = a * Math.cos(theta);
-			const ey = b * Math.sin(theta);
-			const px = center.x + ex * cosR - ey * sinR;
-			const py = center.y + ex * sinR + ey * cosR;
+			const end = vec(a * Math.cos(theta), b * Math.sin(theta));
+			const p = vec(center.x + end.x * cosR - end.y * sinR, center.y + end.x * sinR + end.y * cosR);
 			// Tangent
-			const tx = -a * Math.sin(theta) * cosR - b * Math.cos(theta) * sinR;
-			const ty = -a * Math.sin(theta) * sinR + b * Math.cos(theta) * cosR;
-			const uT = normalize({ x: tx, y: ty });
+			const tangent = vec(
+				-a * Math.sin(theta) * cosR - b * Math.cos(theta) * sinR,
+				-a * Math.sin(theta) * sinR + b * Math.cos(theta) * cosR
+			);
+			const uT = normalize(tangent);
 			// Outward normal: points away from center
 			let nx = uT.y;
 			let ny = -uT.x;
-			if ((px + nx - center.x) ** 2 + (py + ny - center.y) ** 2 < (px - center.x) ** 2 + (py - center.y) ** 2) {
+			if ((p.x + nx - center.x) ** 2 + (p.y + ny - center.y) ** 2 < (p.x - center.x) ** 2 + (p.y - center.y) ** 2) {
 				nx = -nx;
 				ny = -ny;
 			}
 			fitPts.push({
-				x: px + signedDistance * nx,
-				y: py + signedDistance * ny,
+				x: p.x + signedDistance * nx,
+				y: p.y + signedDistance * ny,
 			});
 		}
 		fitPts.push({ ...fitPts[0] });
@@ -871,9 +860,8 @@ function computeSingleOffsetSide(
 			const p2 = sketch.points.get(item.endPointId || l.p2Id);
 			if (!p1 || !p2) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
 
-			const dx = p2.x - p1.x;
-			const dy = p2.y - p1.y;
-			const uT = normalize({ x: dx, y: dy });
+			const dir = sub(p2, p1);
+			const uT = normalize(dir);
 
 			// Left normal is (-uT.y, uT.x). Right normal is (uT.y, -uT.x)
 			// For closed CCW: outward is right normal (uT.y, -uT.x).
@@ -886,8 +874,8 @@ function computeSingleOffsetSide(
 				norm = { x: -uT.y, y: uT.x };
 			}
 
-			const offP1 = { x: p1.x + signedDistance * norm.x, y: p1.y + signedDistance * norm.y };
-			const offP2 = { x: p2.x + signedDistance * norm.x, y: p2.y + signedDistance * norm.y };
+			const offP1 = addScaled(p1, norm, signedDistance);
+			const offP2 = addScaled(p2, norm, signedDistance);
 
 			rawItems.push({
 				sourceId: l.id,
@@ -905,10 +893,10 @@ function computeSingleOffsetSide(
 			if (!center || !p1 || !p2) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
 
 			const midSample = sampleChainItemPoints(sketch, item, 4)[2] || p1;
-			const toMid = normalize({ x: midSample.x - center.x, y: midSample.y - center.y });
+			const toMid = normalize(sub(midSample, center));
 
 			// Check if chain normal at mid points radially away from center
-			const uT = normalize({ x: p2.x - p1.x, y: p2.y - p1.y });
+			const uT = normalize(sub(p2, p1));
 			let chainNorm: Vec2;
 			if (chain.isClosed) {
 				chainNorm = isCCW ? { x: uT.y, y: -uT.x } : { x: -uT.y, y: uT.x };
@@ -916,7 +904,7 @@ function computeSingleOffsetSide(
 				chainNorm = { x: -uT.y, y: uT.x };
 			}
 
-			const radiallyOutward = chainNorm.x * toMid.x + chainNorm.y * toMid.y >= 0;
+			const radiallyOutward = dot(chainNorm, toMid) >= 0;
 			const rDelta = radiallyOutward ? signedDistance : -signedDistance;
 			const newR = arc.radius + rDelta;
 
@@ -930,11 +918,11 @@ function computeSingleOffsetSide(
 				};
 			}
 
-			const sRad1 = normalize({ x: p1.x - center.x, y: p1.y - center.y });
-			const sRad2 = normalize({ x: p2.x - center.x, y: p2.y - center.y });
+			const sRad1 = normalize(sub(p1, center));
+			const sRad2 = normalize(sub(p2, center));
 
-			const offP1 = { x: center.x + newR * sRad1.x, y: center.y + newR * sRad1.y };
-			const offP2 = { x: center.x + newR * sRad2.x, y: center.y + newR * sRad2.y };
+			const offP1 = addScaled(center, sRad1, newR);
+			const offP2 = addScaled(center, sRad2, newR);
 
 			const isReversed = item.startPointId === arc.endPointId;
 			const effectiveClockwise = isReversed ? !arc.clockwise : !!arc.clockwise;
@@ -959,7 +947,7 @@ function computeSingleOffsetSide(
 			for (let k = 0; k < samples.length; k++) {
 				const prev = samples[Math.max(0, k - 1)];
 				const next = samples[Math.min(samples.length - 1, k + 1)];
-				const uT = normalize({ x: next.x - prev.x, y: next.y - prev.y });
+				const uT = normalize(sub(next, prev));
 				let norm: Vec2;
 				if (chain.isClosed) {
 					norm = isCCW ? { x: uT.y, y: -uT.x } : { x: -uT.y, y: uT.x };
@@ -1069,12 +1057,12 @@ function computeSingleOffsetSide(
 			const p1 = cur.p1!;
 			const d = cur.dir!;
 			// Project c onto line
-			const tProj = (c.x - p1.x) * d.x + (c.y - p1.y) * d.y;
+			const tProj = dot(sub(c, p1), d);
 			const perpDistSq = (p1.x + tProj * d.x - c.x) ** 2 + (p1.y + tProj * d.y - c.y) ** 2;
 			if (perpDistSq <= r * r) {
 				const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-				const i1 = { x: p1.x + (tProj - dt) * d.x, y: p1.y + (tProj - dt) * d.y };
-				const i2 = { x: p1.x + (tProj + dt) * d.x, y: p1.y + (tProj + dt) * d.y };
+				const i1 = addScaled(p1, d, tProj - dt);
+				const i2 = addScaled(p1, d, tProj + dt);
 				const best = dist(i1, cur.p2!) < dist(i2, cur.p2!) ? i1 : i2;
 				cur.p2 = best;
 				next.start = best;
@@ -1084,12 +1072,12 @@ function computeSingleOffsetSide(
 			const r = cur.radius!;
 			const p1 = next.p1!;
 			const d = next.dir!;
-			const tProj = (c.x - p1.x) * d.x + (c.y - p1.y) * d.y;
+			const tProj = dot(sub(c, p1), d);
 			const perpDistSq = (p1.x + tProj * d.x - c.x) ** 2 + (p1.y + tProj * d.y - c.y) ** 2;
 			if (perpDistSq <= r * r) {
 				const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-				const i1 = { x: p1.x + (tProj - dt) * d.x, y: p1.y + (tProj - dt) * d.y };
-				const i2 = { x: p1.x + (tProj + dt) * d.x, y: p1.y + (tProj + dt) * d.y };
+				const i1 = addScaled(p1, d, tProj - dt);
+				const i2 = addScaled(p1, d, tProj + dt);
 				const best = dist(i1, cur.end!) < dist(i2, cur.end!) ? i1 : i2;
 				cur.end = best;
 				next.p1 = best;
@@ -1102,7 +1090,7 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[0];
-				const dSp = next.startTangent || normalize({ x: spPts[1].x - spPts[0].x, y: spPts[1].y - spPts[0].y });
+				const dSp = next.startTangent || normalize(sub(spPts[1], spPts[0]));
 				const inter = intersectLines2D(pLine, dLine, pSp, dSp);
 				if (inter && dist(inter, cur.p2!) <= 4 * Math.abs(signedDistance)) {
 					cur.p2 = inter;
@@ -1111,7 +1099,7 @@ function computeSingleOffsetSide(
 				}
 			}
 			if (!joined) {
-				const avg = { x: (cur.p2!.x + spPts[0].x) / 2, y: (cur.p2!.y + spPts[0].y) / 2 };
+				const avg = mid(cur.p2!, spPts[0]);
 				cur.p2 = avg;
 				spPts[0] = avg;
 			}
@@ -1152,13 +1140,13 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[0];
-				const dSp = next.startTangent || normalize({ x: spPts[1].x - spPts[0].x, y: spPts[1].y - spPts[0].y });
-				const tProj = (c.x - pSp.x) * dSp.x + (c.y - pSp.y) * dSp.y;
+				const dSp = next.startTangent || normalize(sub(spPts[1], spPts[0]));
+				const tProj = dot(sub(c, pSp), dSp);
 				const perpDistSq = (pSp.x + tProj * dSp.x - c.x) ** 2 + (pSp.y + tProj * dSp.y - c.y) ** 2;
 				if (perpDistSq <= r * r) {
 					const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-					const i1 = { x: pSp.x + (tProj - dt) * dSp.x, y: pSp.y + (tProj - dt) * dSp.y };
-					const i2 = { x: pSp.x + (tProj + dt) * dSp.x, y: pSp.y + (tProj + dt) * dSp.y };
+					const i1 = addScaled(pSp, dSp, tProj - dt);
+					const i2 = addScaled(pSp, dSp, tProj + dt);
 					const best = dist(i1, cur.end!) < dist(i2, cur.end!) ? i1 : i2;
 					cur.end = best;
 					spPts[0] = best;
@@ -1166,7 +1154,7 @@ function computeSingleOffsetSide(
 				}
 			}
 			if (!joined) {
-				const avg = { x: (cur.end!.x + spPts[0].x) / 2, y: (cur.end!.y + spPts[0].y) / 2 };
+				const avg = mid(cur.end!, spPts[0]);
 				cur.end = avg;
 				spPts[0] = avg;
 			}
@@ -1184,12 +1172,12 @@ function computeSingleOffsetSide(
 						x: pSp.x - spPts[spPts.length - 2].x,
 						y: pSp.y - spPts[spPts.length - 2].y,
 					});
-				const tProj = (c.x - pSp.x) * dSp.x + (c.y - pSp.y) * dSp.y;
+				const tProj = dot(sub(c, pSp), dSp);
 				const perpDistSq = (pSp.x + tProj * dSp.x - c.x) ** 2 + (pSp.y + tProj * dSp.y - c.y) ** 2;
 				if (perpDistSq <= r * r) {
 					const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-					const i1 = { x: pSp.x + (tProj - dt) * dSp.x, y: pSp.y + (tProj - dt) * dSp.y };
-					const i2 = { x: pSp.x + (tProj + dt) * dSp.x, y: pSp.y + (tProj + dt) * dSp.y };
+					const i1 = addScaled(pSp, dSp, tProj - dt);
+					const i2 = addScaled(pSp, dSp, tProj + dt);
 					const best = dist(i1, next.start!) < dist(i2, next.start!) ? i1 : i2;
 					spPts[spPts.length - 1] = best;
 					next.start = best;
@@ -1209,7 +1197,7 @@ function computeSingleOffsetSide(
 			const pCurEnd =
 				cur.type === 'line' ? cur.p2! : cur.type === 'arc' ? cur.end! : cur.fitPoints![cur.fitPoints!.length - 1];
 			const pNextStart = next.type === 'line' ? next.p1! : next.type === 'arc' ? next.start! : next.fitPoints![0];
-			const avg = { x: (pCurEnd.x + pNextStart.x) / 2, y: (pCurEnd.y + pNextStart.y) / 2 };
+			const avg = mid(pCurEnd, pNextStart);
 
 			if (cur.type === 'line') cur.p2 = avg;
 			else if (cur.type === 'arc') cur.end = avg;
@@ -1341,18 +1329,12 @@ export function calculateOffsetGeometry(
 		const p2 = l ? sketch.points.get(refItem.endPointId || l.p2Id) : null;
 		if (l && p1 && p2) {
 			// Exact middle of the first selected line
-			gizmoAnchor = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-			const dx = p2.x - p1.x;
-			const dy = p2.y - p1.y;
-			const len = Math.hypot(dx, dy) || 1;
-			const uT = { x: dx / len, y: dy / len };
+			gizmoAnchor = mid(p1, p2);
+			const uT = normalize(sub(p2, p1));
 			// Normal candidate (left of line direction)
 			gizmoNormal = { x: -uT.y, y: uT.x };
 			if (chain.isClosed && poly.length >= 3) {
-				const testPt = {
-					x: gizmoAnchor.x + 0.5 * gizmoNormal.x,
-					y: gizmoAnchor.y + 0.5 * gizmoNormal.y,
-				};
+				const testPt = addScaled(gizmoAnchor, gizmoNormal, 0.5);
 				if (isPointInPolygon(testPt, poly)) {
 					gizmoNormal = { x: -gizmoNormal.x, y: -gizmoNormal.y };
 				}
@@ -1378,10 +1360,7 @@ export function calculateOffsetGeometry(
 			};
 			gizmoNormal = { x: Math.cos(midAngle), y: Math.sin(midAngle) };
 			if (chain.isClosed && poly.length >= 3) {
-				const testPt = {
-					x: gizmoAnchor.x + 0.5 * gizmoNormal.x,
-					y: gizmoAnchor.y + 0.5 * gizmoNormal.y,
-				};
+				const testPt = addScaled(gizmoAnchor, gizmoNormal, 0.5);
 				if (isPointInPolygon(testPt, poly)) {
 					gizmoNormal = { x: -gizmoNormal.x, y: -gizmoNormal.y };
 				}
@@ -1400,7 +1379,7 @@ export function calculateOffsetGeometry(
 		const maj = el ? sketch.points.get(el.majorAxisPointId) : null;
 		if (el && center && maj) {
 			gizmoAnchor = { x: maj.x, y: maj.y };
-			gizmoNormal = normalize({ x: maj.x - center.x, y: maj.y - center.y });
+			gizmoNormal = normalize(sub(maj, center));
 		}
 	} else if (refItem.type === 'spline') {
 		const splinePts = sampleChainItemPoints(sketch, refItem, 64);
@@ -1409,13 +1388,10 @@ export function calculateOffsetGeometry(
 			gizmoAnchor = splinePts[midIdx];
 			const pPrev = splinePts[Math.max(0, midIdx - 1)];
 			const pNext = splinePts[Math.min(splinePts.length - 1, midIdx + 1)];
-			const uT = normalize({ x: pNext.x - pPrev.x, y: pNext.y - pPrev.y });
+			const uT = normalize(sub(pNext, pPrev));
 			gizmoNormal = { x: -uT.y, y: uT.x };
 			if (chain.isClosed && poly.length >= 3) {
-				const testPt = {
-					x: gizmoAnchor.x + 0.5 * gizmoNormal.x,
-					y: gizmoAnchor.y + 0.5 * gizmoNormal.y,
-				};
+				const testPt = addScaled(gizmoAnchor, gizmoNormal, 0.5);
 				if (isPointInPolygon(testPt, poly)) {
 					gizmoNormal = { x: -gizmoNormal.x, y: -gizmoNormal.y };
 				}
@@ -1530,10 +1506,8 @@ export function commitOffsetToSketch(
 					const op2 = sketch.points.get(origLine.p2Id);
 					let lineSide = 1;
 					if (op1 && op2 && prim.p1) {
-						const dx = op2.x - op1.x;
-						const dy = op2.y - op1.y;
-						const len = Math.hypot(dx, dy);
-						const hLeft = len > 1e-9 ? (dx * (prim.p1.y - op1.y) - dy * (prim.p1.x - op1.x)) / len : 0;
+						const dir = normalizeOrNull(sub(op2, op1), 1e-9);
+						const hLeft = dir ? cross(dir, sub(prim.p1, op1)) : 0;
 						lineSide = hLeft >= 0 ? 1 : -1;
 					}
 					offsetPairs.push({

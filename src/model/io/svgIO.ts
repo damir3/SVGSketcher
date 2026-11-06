@@ -7,7 +7,7 @@ import { SVG_EXPORT_STYLE } from '../../canvas/styles';
 import { getFontSync } from '../../canvas/fonts';
 import { generateTextSvgPathData } from '../../math/textPath';
 import type { GeoCurve } from '../../math/intersection';
-import { distancesFrom, type Vec2 } from '../../math/vector';
+import { sub, cross, distancesFrom, dot, vec, type Vec2 } from '../../math/vector';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -325,10 +325,9 @@ function getSvgArcCenter(segment: Extract<SvgPathSegment, { kind: 'arc' }>) {
 	const cos = Math.cos(phi);
 	const sin = Math.sin(phi);
 
-	const dx = (segment.start[0] - segment.end[0]) / 2;
-	const dy = (segment.start[1] - segment.end[1]) / 2;
-	const xp = cos * dx + sin * dy;
-	const yp = -sin * dx + cos * dy;
+	const deltaPoint = vec((segment.start[0] - segment.end[0]) / 2, (segment.start[1] - segment.end[1]) / 2);
+	const xp = cos * deltaPoint.x + sin * deltaPoint.y;
+	const yp = -sin * deltaPoint.x + cos * deltaPoint.y;
 
 	const lambda = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
 	if (lambda > 1) {
@@ -346,15 +345,13 @@ function getSvgArcCenter(segment: Extract<SvgPathSegment, { kind: 'arc' }>) {
 	const cx = cos * cxp - sin * cyp + (segment.start[0] + segment.end[0]) / 2;
 	const cy = sin * cxp + cos * cyp + (segment.start[1] + segment.end[1]) / 2;
 
-	const angle = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+	const angle = (u: Vec2, v: Vec2) => Math.atan2(cross(u, v), dot(u, v));
 
-	const ux = (xp - cxp) / rx;
-	const uy = (yp - cyp) / ry;
-	const vx = (-xp - cxp) / rx;
-	const vy = (-yp - cyp) / ry;
+	const u = vec((xp - cxp) / rx, (yp - cyp) / ry);
+	const v = vec((-xp - cxp) / rx, (-yp - cyp) / ry);
 
-	let start = angle(1, 0, ux, uy);
-	let delta = angle(ux, uy, vx, vy);
+	const start = angle(vec(1, 0), u);
+	let delta = angle(u, v);
 	if (!segment.sweep && delta > 0) delta -= 2 * Math.PI;
 	if (segment.sweep && delta < 0) delta += 2 * Math.PI;
 
@@ -492,14 +489,12 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 				const cos = Math.cos(arc.phi);
 				const sin = Math.sin(arc.phi);
 
-				const ux = arc.rx * (m[0] * cos + m[2] * sin);
-				const uy = -arc.rx * (m[1] * cos + m[3] * sin);
-				const vx = arc.ry * (-m[0] * sin + m[2] * cos);
-				const vy = arc.ry * (m[1] * sin - m[3] * cos);
+				const u = vec(arc.rx * (m[0] * cos + m[2] * sin), -arc.rx * (m[1] * cos + m[3] * sin));
+				const v = vec(arc.ry * (-m[0] * sin + m[2] * cos), arc.ry * (m[1] * sin - m[3] * cos));
 
-				const qxx = ux * ux + vx * vx;
-				const qxy = ux * uy + vx * vy;
-				const qyy = uy * uy + vy * vy;
+				const qxx = u.x * u.x + v.x * v.x;
+				const qxy = u.x * u.y + v.x * v.y;
+				const qyy = u.y * u.y + v.y * v.y;
 				const axisAngle = 0.5 * Math.atan2(2 * qxy, qxx - qyy);
 				const trace = qxx + qyy;
 				const rootValue = Math.hypot(qxx - qyy, 2 * qxy);
@@ -517,7 +512,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 				const start = getPathPointId(segment.start);
 				const end = getPathPointId(segment.end);
-				const clockwise = ux * vy - uy * vx < 0 === (segment.sweep === 1);
+				const clockwise = cross(u, v) < 0 === (segment.sweep === 1);
 				const centerId = sketch.addPoint({ x: center[0], y: center[1] }).id;
 
 				if (Math.abs(majorRadius - minorRadius) < 1e-8) {
@@ -606,14 +601,12 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 					const center = point(cx, cy, activeMatrix);
 					const matrix = multiplySvgMatrices(viewMatrix, activeMatrix);
-					const ux = matrix[0] * rx;
-					const uy = -matrix[1] * rx;
-					const vx = matrix[2] * ry;
-					const vy = -matrix[3] * ry;
+					const u = vec(matrix[0] * rx, -matrix[1] * rx);
+					const v = vec(matrix[2] * ry, -matrix[3] * ry);
 
-					const qxx = ux * ux + vx * vx;
-					const qxy = ux * uy + vx * vy;
-					const qyy = uy * uy + vy * vy;
+					const qxx = u.x * u.x + v.x * v.x;
+					const qxy = u.x * u.y + v.x * v.y;
+					const qyy = u.y * u.y + v.y * v.y;
 					const angle = 0.5 * Math.atan2(2 * qxy, qxx - qyy);
 					const trace = qxx + qyy;
 					const root = Math.hypot(qxx - qyy, 2 * qxy);
@@ -818,15 +811,15 @@ export function exportSketchToSVG(
 			const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 			const thetaDeg = (theta * 180) / Math.PI;
 
-			const ux = Math.cos(theta);
-			const uy = Math.sin(theta);
-			const vx = -Math.sin(theta);
-			const vy = Math.cos(theta);
+			const u = vec(Math.cos(theta), Math.sin(theta));
+			const v = vec(-u.y, u.x);
 
-			const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-			const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-			const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-			const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+			const startOffset = sub(ss, sc);
+			const us = dot(startOffset, u);
+			const vs = dot(startOffset, v);
+			const endOffset = sub(se, sc);
+			const ue = dot(endOffset, u);
+			const ve = dot(endOffset, v);
 
 			const ts = Math.atan2(vs / r.y, us / r.x);
 			const te = Math.atan2(ve / r.y, ue / r.x);

@@ -1,5 +1,5 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
@@ -21,12 +21,10 @@ export class ConcentricConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const c1x = paramMap.get(`${this.c1CenterId}.x`) ?? 0;
-		const c1y = paramMap.get(`${this.c1CenterId}.y`) ?? 0;
-		const c2x = paramMap.get(`${this.c2CenterId}.x`) ?? 0;
-		const c2y = paramMap.get(`${this.c2CenterId}.y`) ?? 0;
+		const c1 = readParamPoint(paramMap, this.c1CenterId);
+		const c2 = readParamPoint(paramMap, this.c2CenterId);
 
-		return [(c1x - c2x) * this.weight, (c1y - c2y) * this.weight];
+		return [(c1.x - c2.x) * this.weight, (c1.y - c2.y) * this.weight];
 	}
 
 	override jacobian(

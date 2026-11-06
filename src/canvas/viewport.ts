@@ -56,15 +56,11 @@ export class Viewport {
 
 	screenToWorld(screen: Vec2): Vec2 {
 		// CAD standard: Y points UP in world coordinates
-		const wx = (screen.x - this.panX) / this.zoom;
-		const wy = -(screen.y - this.panY) / this.zoom;
-		return vec(wx, wy);
+		return vec((screen.x - this.panX) / this.zoom, -(screen.y - this.panY) / this.zoom);
 	}
 
 	worldToScreen(world: Vec2): Vec2 {
-		const sx = this.panX + world.x * this.zoom;
-		const sy = this.panY - world.y * this.zoom;
-		return vec(sx, sy);
+		return vec(this.panX + world.x * this.zoom, this.panY - world.y * this.zoom);
 	}
 
 	zoomAt(screen: Vec2, factor: number): void {

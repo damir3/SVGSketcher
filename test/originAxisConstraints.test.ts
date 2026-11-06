@@ -15,7 +15,7 @@ import { serializeConstraint, deserializeConstraint } from '../src/solver/constr
 import { determineDistanceOrientation, DimensionTool } from '../src/canvas/tools/constraints/dimension';
 import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { LineTool } from '../src/canvas/tools/primitives/line';
-import { vec } from '../src/math/vector';
+import { vec, sub } from '../src/math/vector';
 
 describe('Origin & Axis Constraints', () => {
 	describe('Origin Distance & Coincident Constraints', () => {
@@ -517,9 +517,8 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(c.line2Id, 'axis_x');
 
 			// Check angle of line with X-axis
-			const dx = p2.x - p1.x;
-			const dy = p2.y - p1.y;
-			const actualAngle = (Math.atan2(Math.abs(dy), Math.abs(dx)) * 180) / Math.PI;
+			const dir = sub(p2, p1);
+			const actualAngle = (Math.atan2(Math.abs(dir.y), Math.abs(dir.x)) * 180) / Math.PI;
 			assert.ok(Math.abs(actualAngle - 30) < 0.5, `Expected angle ~ 30, got ${actualAngle}`);
 
 			// Update angle to 60 degrees
@@ -547,9 +546,8 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(c.targetAngle, 45);
 			assert.equal(c.line2Id, 'axis_y');
 
-			const dx = p2.x - p1.x;
-			const dy = p2.y - p1.y;
-			const actualAngleWithY = (Math.atan2(Math.abs(dx), Math.abs(dy)) * 180) / Math.PI;
+			const dir = sub(p2, p1);
+			const actualAngleWithY = (Math.atan2(Math.abs(dir.x), Math.abs(dir.y)) * 180) / Math.PI;
 			assert.ok(Math.abs(actualAngleWithY - 45) < 0.5, `Expected angle with Y ~ 45, got ${actualAngleWithY}`);
 		});
 

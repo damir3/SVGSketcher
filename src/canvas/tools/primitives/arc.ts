@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, vec, getCircumcircle, type Vec2 } from '../../../math/vector';
+import { cross, dot, dist, normalizeOrNull, sub, vec, getCircumcircle, type Vec2 } from '../../../math/vector';
 import { renderLinePreviewVisual, renderCirclePreviewVisual, renderArcPreviewVisual } from '../../previewHelpers';
 import type { SketchDocument } from '../../../model/sketch';
 import type { SketchLine, SketchArc } from '../../../model/types';
@@ -27,13 +27,11 @@ export function findConnectedCurveForTangent(sketch: SketchDocument, ptId: strin
 			const p1 = sketch.points.get(line.p1Id);
 			const p2 = sketch.points.get(line.p2Id);
 			if (!p1 || !p2) continue;
-			const dx = line.p1Id === ptId ? p1.x - p2.x : p2.x - p1.x;
-			const dy = line.p1Id === ptId ? p1.y - p2.y : p2.y - p1.y;
-			const len = Math.hypot(dx, dy);
-			if (len < 1e-6) continue;
+			const tangentDir = normalizeOrNull(line.p1Id === ptId ? sub(p1, p2) : sub(p2, p1), 1e-6);
+			if (!tangentDir) continue;
 			return {
 				entity: line,
-				tangentDir: vec(dx / len, dy / len),
+				tangentDir,
 			};
 		}
 	}
@@ -44,16 +42,12 @@ export function findConnectedCurveForTangent(sketch: SketchDocument, ptId: strin
 			const center = sketch.points.get(arc.centerId);
 			const pt = sketch.points.get(ptId);
 			if (!center || !pt) continue;
-			const rx = pt.x - center.x;
-			const ry = pt.y - center.y;
-			const rLen = Math.hypot(rx, ry);
+			const radial = sub(pt, center);
+			const rLen = Math.hypot(radial.x, radial.y);
 			if (rLen < 1e-6) continue;
 
-			// In world coordinates, unit radial vector is (rx/r, ry/r).
-			// Clockwise rotation in world coords is (ry/r, -rx/r).
-			// Counter-clockwise rotation in world coords is (-ry/r, rx/r).
 			const isCW = !!arc.clockwise;
-			const forwardTangent = isCW ? vec(ry / rLen, -rx / rLen) : vec(-ry / rLen, rx / rLen);
+			const forwardTangent = isCW ? vec(radial.y / rLen, -radial.x / rLen) : vec(-radial.y / rLen, radial.x / rLen);
 			const tangentDir = arc.endPointId === ptId ? forwardTangent : vec(-forwardTangent.x, -forwardTangent.y);
 			return {
 				entity: arc,
@@ -472,8 +466,10 @@ export class ArcTool extends BaseTool {
 			}
 
 			const worldAngle = Math.atan2(effectiveWorld.y - centerWorld.y, effectiveWorld.x - centerWorld.x);
-			const endWorldX = centerWorld.x + radius * Math.cos(worldAngle);
-			const endWorldY = centerWorld.y + radius * Math.sin(worldAngle);
+			const endWorld = {
+				x: centerWorld.x + radius * Math.cos(worldAngle),
+				y: centerWorld.y + radius * Math.sin(worldAngle),
+			};
 
 			let endPointId: string;
 			if (
@@ -486,7 +482,7 @@ export class ArcTool extends BaseTool {
 			) {
 				endPointId = snap.id;
 			} else {
-				const pt = sketch.addPoint({ x: endWorldX, y: endWorldY });
+				const pt = sketch.addPoint(endWorld);
 				endPointId = pt.id;
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
@@ -685,20 +681,17 @@ export class ArcTool extends BaseTool {
 		s1: Vec2;
 		s2: Vec2;
 	} | null {
-		const vx = p2.x - p1.x;
-		const vy = p2.y - p1.y;
-		const L = Math.hypot(vx, vy);
+		const v = sub(p2, p1);
+		const L = Math.hypot(v.x, v.y);
 		if (L < 1e-3) return null;
 
 		// Unit tangent leaving p1 in the direction of the connected curve
-		const tx = tangentDir.x;
-		const ty = tangentDir.y;
+		const tangent = tangentDir;
 
 		// Unit normal 90 degrees CCW from tangent in Cartesian coordinates
-		const nx = -ty;
-		const ny = tx;
+		const normal = vec(-tangent.y, tangent.x);
 
-		const denom = 2 * (vx * nx + vy * ny);
+		const denom = 2 * dot(v, normal);
 		if (Math.abs(denom) < 1e-4) {
 			return null;
 		}
@@ -709,20 +702,19 @@ export class ArcTool extends BaseTool {
 			return null;
 		}
 
-		const center = vec(p1.x + s * nx, p1.y + s * ny);
+		const center = vec(p1.x + s * normal.x, p1.y + s * normal.y);
 
 		const sCenter = this.ctx.viewport.worldToScreen(center);
 		const s1 = this.ctx.viewport.worldToScreen(p1);
 		const s2 = this.ctx.viewport.worldToScreen(p2);
 		const sT = vec(
-			this.ctx.viewport.worldToScreen({ x: p1.x + tx, y: p1.y + ty }).x - s1.x,
-			this.ctx.viewport.worldToScreen({ x: p1.x + tx, y: p1.y + ty }).y - s1.y
+			this.ctx.viewport.worldToScreen({ x: p1.x + tangent.x, y: p1.y + tangent.y }).x - s1.x,
+			this.ctx.viewport.worldToScreen({ x: p1.x + tangent.x, y: p1.y + tangent.y }).y - s1.y
 		);
 
 		// In 2D screen coords (Y down), cross product of (s1 - sCenter) and tangent indicates rotation direction
-		const ux = s1.x - sCenter.x;
-		const uy = s1.y - sCenter.y;
-		const cp = ux * sT.y - uy * sT.x;
+		const u = sub(s1, sCenter);
+		const cp = cross(u, sT);
 		const clockwise = cp > 0;
 
 		const a1 = Math.atan2(s1.y - sCenter.y, s1.x - sCenter.x);

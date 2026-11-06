@@ -1,5 +1,6 @@
+import { cross, mid, sub } from '../../math/vector';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 
 /**
@@ -28,37 +29,29 @@ export class CollinearConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p11x = paramMap.get(`${this.l1P1}.x`) ?? 0;
-		const p11y = paramMap.get(`${this.l1P1}.y`) ?? 0;
-		const p12x = paramMap.get(`${this.l1P2}.x`) ?? 0;
-		const p12y = paramMap.get(`${this.l1P2}.y`) ?? 0;
+		const p11 = readParamPoint(paramMap, this.l1P1);
+		const p12 = readParamPoint(paramMap, this.l1P2);
 
-		const p21x = paramMap.get(`${this.l2P1}.x`) ?? 0;
-		const p21y = paramMap.get(`${this.l2P1}.y`) ?? 0;
-		const p22x = paramMap.get(`${this.l2P2}.x`) ?? 0;
-		const p22y = paramMap.get(`${this.l2P2}.y`) ?? 0;
+		const p21 = readParamPoint(paramMap, this.l2P1);
+		const p22 = readParamPoint(paramMap, this.l2P2);
 
-		const dx1 = p12x - p11x;
-		const dy1 = p12y - p11y;
-		const dx2 = p22x - p21x;
-		const dy2 = p22y - p21y;
+		const dir1 = sub(p12, p11);
+		const dir2 = sub(p22, p21);
 
-		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
-		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
+		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
+		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
 		const avgL = (l1 + l2) * 0.5;
 
 		// Equation 0: Direction parallel (cross product of unit vectors)
-		const cross = (dx1 * dy2 - dy1 * dx2) / (l1 * l2);
-		const eq0 = cross * avgL * this.weight;
+		const eq0 = (cross(dir1, dir2) / (l1 * l2)) * avgL * this.weight;
 
 		if (this.isThreePoint()) {
 			return [eq0];
 		}
 
 		// Equation 1: Perpendicular distance from midpoint of line 2 to infinite line 1
-		const mid2x = (p21x + p22x) * 0.5;
-		const mid2y = (p21y + p22y) * 0.5;
-		const ptCross = (mid2x - p11x) * dy1 - (mid2y - p11y) * dx1;
+		const mid2 = mid(p21, p22);
+		const ptCross = cross(sub(mid2, p11), dir1);
 		const eq1 = (ptCross / l1) * this.weight;
 
 		return [eq0, eq1];

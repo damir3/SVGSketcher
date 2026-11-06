@@ -92,7 +92,7 @@ import {
 	type SelectionState,
 } from './types';
 import type { GeoCurve } from '../math/intersection';
-import { dist, type Vec2 } from '../math/vector';
+import { addScaled, cross, dist, dot, mid, reflectPoint, scale, sub, vec, type Vec2 } from '../math/vector';
 import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { calculateOffsetGeometry } from '../math/offset';
@@ -982,12 +982,11 @@ export class SketchDocument {
 			return existing;
 		}
 
-		const dx = p2.x - p1.x;
-		const dy = p2.y - p1.y;
-		const lineLen = Math.max(Math.hypot(dx, dy), 1e-7);
-		const cross = (pt.x - p1.x) * dy - (pt.y - p1.y) * dx;
-		const measured = Math.abs(cross) / lineLen;
-		const side = cross >= 0 ? 1 : -1;
+		const dir = sub(p2, p1);
+		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const signedArea = cross(sub(pt, p1), dir);
+		const measured = Math.abs(signedArea) / lineLen;
+		const side = signedArea >= 0 ? 1 : -1;
 
 		const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
 		const c = new PointToLineDistanceConstraint(
@@ -1239,14 +1238,14 @@ export class SketchDocument {
 			(line2Id && BUILT_IN_LINES.has(line2Id)) || BUILT_IN_LINES.has(p3.id) || BUILT_IN_LINES.has(p4.id)
 		);
 
-		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
-		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+		const v1 = sub(p2, p1);
+		const v2 = sub(p4, p3);
 		const l1 = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
 		const l2 = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
 
 		// Direction unit vectors along the raw segments (p1->p2, p3->p4)
-		const e1 = { x: v1.x / l1, y: v1.y / l1 };
-		const e2 = { x: v2.x / l2, y: v2.y / l2 };
+		const e1 = scale(v1, 1.0 / l1);
+		const e2 = scale(v2, 1.0 / l2);
 
 		let pInt: { x: number; y: number };
 		let defS1 = 1;
@@ -1281,57 +1280,57 @@ export class SketchDocument {
 			defS1 = -1;
 			defS2 = -1;
 		} else {
-			const det = v1.x * v2.y - v1.y * v2.x;
+			const det = cross(v1, v2);
 			if (Math.abs(det) < 1e-6) {
 				if (isAxis2) {
-					const m1 = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
+					const m1 = mid(p1, p2);
 					pInt = { x: m1.x * Math.abs(e2.x), y: m1.y * Math.abs(e2.y) };
 					defS1 = 1;
-					defS2 = v1.x * e2.x + v1.y * e2.y >= 0 ? 1 : -1;
+					defS2 = dot(v1, e2) >= 0 ? 1 : -1;
 				} else if (isAxis1) {
-					const m2 = { x: (p3.x + p4.x) * 0.5, y: (p3.y + p4.y) * 0.5 };
+					const m2 = mid(p3, p4);
 					pInt = { x: m2.x * Math.abs(e1.x), y: m2.y * Math.abs(e1.y) };
 					defS2 = 1;
-					defS1 = v2.x * e1.x + v2.y * e1.y >= 0 ? 1 : -1;
+					defS1 = dot(v2, e1) >= 0 ? 1 : -1;
 				} else {
-					pInt = { x: (p1.x + p3.x) * 0.5, y: (p1.y + p3.y) * 0.5 };
+					pInt = mid(p1, p3);
 					defS1 = 1;
 					defS2 = 1;
 				}
 			} else {
-				const t = ((p3.x - p1.x) * v2.y - (p3.y - p1.y) * v2.x) / det;
-				pInt = { x: p1.x + t * v1.x, y: p1.y + t * v1.y };
-				let m1 = { x: (p1.x + p2.x) * 0.5, y: (p1.y + p2.y) * 0.5 };
-				let m2 = { x: (p3.x + p4.x) * 0.5, y: (p3.y + p4.y) * 0.5 };
+				const t = cross(sub(p3, p1), v2) / det;
+				pInt = addScaled(p1, v1, t);
+				let m1 = mid(p1, p2);
+				let m2 = mid(p3, p4);
 				if (isAxis2) {
 					m2 = { x: m1.x * Math.abs(e2.x), y: m1.y * Math.abs(e2.y) };
 				} else if (isAxis1) {
 					m1 = { x: m2.x * Math.abs(e1.x), y: m2.y * Math.abs(e1.y) };
 				}
-				const w1 = { x: m1.x - pInt.x, y: m1.y - pInt.y };
-				const w2 = { x: m2.x - pInt.x, y: m2.y - pInt.y };
-				defS1 = w1.x * v1.x + w1.y * v1.y >= 0 ? 1 : -1;
-				defS2 = w2.x * v2.x + w2.y * v2.y >= 0 ? 1 : -1;
+				const w1 = sub(m1, pInt);
+				const w2 = sub(m2, pInt);
+				defS1 = dot(w1, v1) >= 0 ? 1 : -1;
+				defS2 = dot(w2, v2) >= 0 ? 1 : -1;
 			}
 		}
 
 		// Default rays pointing along the physical segments from pInt:
-		const u1Seg = { x: defS1 * e1.x, y: defS1 * e1.y };
-		const u2Seg = { x: defS2 * e2.x, y: defS2 * e2.y };
+		const u1Seg = scale(e1, defS1);
+		const u2Seg = scale(e2, defS2);
 
 		let s1 = defS1;
 		let s2 = defS2;
 
 		if (cursorPos) {
-			const w = { x: cursorPos.x - pInt.x, y: cursorPos.y - pInt.y };
+			const w = sub(cursorPos, pInt);
 			const wLen = Math.hypot(w.x, w.y);
 			if (wLen > 1e-3) {
 				// Decompose w in the basis of (u1Seg, u2Seg):
 				// w = alpha * u1Seg + beta * u2Seg
-				const detSeg = u1Seg.x * u2Seg.y - u1Seg.y * u2Seg.x;
+				const detSeg = cross(u1Seg, u2Seg);
 				if (Math.abs(detSeg) > 1e-6) {
-					const alpha = (w.x * u2Seg.y - w.y * u2Seg.x) / detSeg;
-					const beta = (u1Seg.x * w.y - u1Seg.y * w.x) / detSeg;
+					const alpha = cross(w, u2Seg) / detSeg;
+					const beta = cross(u1Seg, w) / detSeg;
 					const signAlpha = alpha >= 0 ? 1 : -1;
 					const signBeta = beta >= 0 ? 1 : -1;
 					s1 = signAlpha * defS1;
@@ -1340,12 +1339,12 @@ export class SketchDocument {
 			}
 		}
 
-		const u1 = { x: (s1 * v1.x) / l1, y: (s1 * v1.y) / l1 };
-		const u2 = { x: (s2 * v2.x) / l2, y: (s2 * v2.y) / l2 };
+		const u1 = scale(v1, s1 / l1);
+		const u2 = scale(v2, s2 / l2);
 
-		const dotVal = Math.min(1, Math.max(-1, u1.x * u2.x + u1.y * u2.y));
+		const dotVal = Math.min(1, Math.max(-1, dot(u1, u2)));
 		const initialAngleDeg = (Math.acos(dotVal) * 180) / Math.PI;
-		const crossVal = u1.x * u2.y - u1.y * u2.x;
+		const crossVal = cross(u1, u2);
 		const sign = crossVal >= 0 ? 1 : -1;
 
 		return { pInt, u1, u2, s1, s2, initialAngleDeg, sign };
@@ -1733,27 +1732,25 @@ export class SketchDocument {
 		const p22 = this.points.get(l2.p2Id);
 		if (!p11 || !p12 || !p21 || !p22) return [];
 
-		const reflectPoint = (p: { x: number; y: number }): { x: number; y: number } => {
+		const reflectAcrossAxis = (p: Vec2): Vec2 => {
 			if (axisId === 'origin') {
-				return { x: -p.x, y: -p.y };
+				return scale(p, -1);
 			}
 			const axisLine = this.getLine(axisId);
 			if (axisLine) {
 				const a = this.points.get(axisLine.p1Id);
 				const b = this.points.get(axisLine.p2Id);
 				if (a && b) {
-					const dx = b.x - a.x;
-					const dy = b.y - a.y;
-					const lenSq = dx * dx + dy * dy;
+					const dir = sub(b, a);
+					const lenSq = dot(dir, dir);
 					if (lenSq > 1e-12) {
-						const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
-						const fx = a.x + t * dx;
-						const fy = a.y + t * dy;
-						return { x: 2 * fx - p.x, y: 2 * fy - p.y };
+						const len = Math.sqrt(lenSq);
+						const normal = vec(-dir.y / len, dir.x / len);
+						return reflectPoint(p, a, normal);
 					}
 				}
 			}
-			return { x: p.x, y: p.y };
+			return p;
 		};
 
 		let swap = false;
@@ -1762,8 +1759,8 @@ export class SketchDocument {
 		} else if (l1.p1Id === l2.p1Id || l1.p2Id === l2.p2Id) {
 			swap = false;
 		} else {
-			const r1 = reflectPoint(p11);
-			const r2 = reflectPoint(p12);
+			const r1 = reflectAcrossAxis(p11);
+			const r2 = reflectAcrossAxis(p12);
 			const costDirect = (r1.x - p21.x) ** 2 + (r1.y - p21.y) ** 2 + (r2.x - p22.x) ** 2 + (r2.y - p22.y) ** 2;
 			const costSwapped = (r1.x - p22.x) ** 2 + (r1.y - p22.y) ** 2 + (r2.x - p21.x) ** 2 + (r2.y - p21.y) ** 2;
 			swap = costSwapped < costDirect;
@@ -1898,9 +1895,8 @@ export class SketchDocument {
 		const vertices: SketchPoint[] = [];
 		for (let k = 0; k < N; k++) {
 			const a = baseAngle + k * step;
-			const vx = centerPt.x + R * Math.cos(a);
-			const vy = centerPt.y + R * Math.sin(a);
-			const pt = this.addPoint({ x: vx, y: vy }, false);
+			const v = vec(centerPt.x + R * Math.cos(a), centerPt.y + R * Math.sin(a));
+			const pt = this.addPoint(v, false);
 			vertices.push(pt);
 		}
 
@@ -2267,10 +2263,8 @@ export class SketchDocument {
 		const p2 = this.points.get(line.p2Id);
 		const center = this.points.get(centerId);
 		if (!p1 || !p2 || !center) return 1;
-		const dx = p2.x - p1.x;
-		const dy = p2.y - p1.y;
-		const cross = (center.x - p1.x) * dy - (center.y - p1.y) * dx;
-		return cross >= 0 ? 1 : -1;
+		const dir = sub(p2, p1);
+		return cross(sub(center, p1), dir) >= 0 ? 1 : -1;
 	}
 
 	addConcentricConstraint(c1Id: string, c2Id: string): ConcentricConstraint | null {

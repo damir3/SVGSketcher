@@ -1,3 +1,4 @@
+import { vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -42,25 +43,29 @@ export class EqualLengthConstraint extends BaseConstraint {
 	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
 
-		const dx1 = (paramMap.get(`${this.line1P2}.x`) ?? 0) - (paramMap.get(`${this.line1P1}.x`) ?? 0);
-		const dy1 = (paramMap.get(`${this.line1P2}.y`) ?? 0) - (paramMap.get(`${this.line1P1}.y`) ?? 0);
-		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
+		const dir1 = vec(
+			(paramMap.get(`${this.line1P2}.x`) ?? 0) - (paramMap.get(`${this.line1P1}.x`) ?? 0),
+			(paramMap.get(`${this.line1P2}.y`) ?? 0) - (paramMap.get(`${this.line1P1}.y`) ?? 0)
+		);
+		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
 
-		const dx2 = (paramMap.get(`${this.line2P2}.x`) ?? 0) - (paramMap.get(`${this.line2P1}.x`) ?? 0);
-		const dy2 = (paramMap.get(`${this.line2P2}.y`) ?? 0) - (paramMap.get(`${this.line2P1}.y`) ?? 0);
-		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
+		const dir2 = vec(
+			(paramMap.get(`${this.line2P2}.x`) ?? 0) - (paramMap.get(`${this.line2P1}.x`) ?? 0),
+			(paramMap.get(`${this.line2P2}.y`) ?? 0) - (paramMap.get(`${this.line2P1}.y`) ?? 0)
+		);
+		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
 
 		// d(l1)/dx
-		this.addJacobianEntry(res, paramIndices, `${this.line1P1}.x`, baseRow, (-dx1 / l1) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.line1P1}.y`, baseRow, (-dy1 / l1) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.line1P2}.x`, baseRow, (dx1 / l1) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.line1P2}.y`, baseRow, (dy1 / l1) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line1P1}.x`, baseRow, (-dir1.x / l1) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line1P1}.y`, baseRow, (-dir1.y / l1) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line1P2}.x`, baseRow, (dir1.x / l1) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line1P2}.y`, baseRow, (dir1.y / l1) * this.weight);
 
 		// -d(l2)/dx
-		this.addJacobianEntry(res, paramIndices, `${this.line2P1}.x`, baseRow, (dx2 / l2) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.line2P1}.y`, baseRow, (dy2 / l2) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.line2P2}.x`, baseRow, (-dx2 / l2) * this.weight);
-		this.addJacobianEntry(res, paramIndices, `${this.line2P2}.y`, baseRow, (-dy2 / l2) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line2P1}.x`, baseRow, (dir2.x / l2) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line2P1}.y`, baseRow, (dir2.y / l2) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line2P2}.x`, baseRow, (-dir2.x / l2) * this.weight);
+		this.addJacobianEntry(res, paramIndices, `${this.line2P2}.y`, baseRow, (-dir2.y / l2) * this.weight);
 
 		return res;
 	}

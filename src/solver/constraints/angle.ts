@@ -1,10 +1,11 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgPath, createSvgRect, createSvgText } from '../../canvas/svg';
 import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
+import { addScaled, cross, scale, sub, vec } from '../../math/vector';
 
 /**
  * Dimensional constraint: angle between two lines equals targetAngle (in degrees)
@@ -74,28 +75,20 @@ export class AngleConstraint extends BaseConstraint {
 		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
 		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
 
-		const p1x = paramMap.get(`${this.l1P1}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.l1P1}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.l1P2}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.l1P2}.y`) ?? 0;
-		const p3x = paramMap.get(`${this.l2P1}.x`) ?? 0;
-		const p3y = paramMap.get(`${this.l2P1}.y`) ?? 0;
-		const p4x = paramMap.get(`${this.l2P2}.x`) ?? 0;
-		const p4y = paramMap.get(`${this.l2P2}.y`) ?? 0;
+		const p1 = readParamPoint(paramMap, this.l1P1);
+		const p2 = readParamPoint(paramMap, this.l1P2);
+		const p3 = readParamPoint(paramMap, this.l2P1);
+		const p4 = readParamPoint(paramMap, this.l2P2);
 
-		const dx1 = (p2x - p1x) * this.s1;
-		const dy1 = (p2y - p1y) * this.s1;
-		const dx2 = (p4x - p3x) * this.s2;
-		const dy2 = (p4y - p3y) * this.s2;
+		const dir1 = vec((p2.x - p1.x) * this.s1, (p2.y - p1.y) * this.s1);
+		const dir2 = vec((p4.x - p3.x) * this.s2, (p4.y - p3.y) * this.s2);
 
-		const l1 = Math.max(Math.hypot(dx1, dy1), 1e-7);
-		const l2 = Math.max(Math.hypot(dx2, dy2), 1e-7);
+		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
+		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
 		const avgL = isAxis1 ? l2 : isAxis2 ? l1 : (l1 + l2) * 0.5;
 
-		const u1x = dx1 / l1;
-		const u1y = dy1 / l1;
-		const u2x = dx2 / l2;
-		const u2y = dy2 / l2;
+		const u1 = vec(dir1.x / l1, dir1.y / l1);
+		const u2 = vec(dir2.x / l2, dir2.y / l2);
 
 		const targetRad = (this.targetAngle * Math.PI) / 180;
 		const rotAngle = this.sign * targetRad;
@@ -103,12 +96,10 @@ export class AngleConstraint extends BaseConstraint {
 		const sinA = Math.sin(rotAngle);
 
 		// Rotate u1 by rotAngle
-		const rx = u1x * cosA - u1y * sinA;
-		const ry = u1x * sinA + u1y * cosA;
+		const rotated = vec(u1.x * cosA - u1.y * sinA, u1.x * sinA + u1.y * cosA);
 
 		// Cross product between rotated u1 and u2
-		const cross = rx * u2y - ry * u2x;
-		return [cross * avgL * this.weight];
+		return [cross(rotated, u2) * avgL * this.weight];
 	}
 
 	override jacobian(
@@ -130,20 +121,20 @@ export class AngleConstraint extends BaseConstraint {
 
 		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
 
-		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
-		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+		const v1 = sub(p2, p1);
+		const v2 = sub(p4, p3);
 		const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
 		const l2Len = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
 
 		const s1Factor = this.s1 ?? geom.s1;
 		const s2Factor = this.s2 ?? geom.s2;
 
-		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
-		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
+		const u1 = scale(v1, s1Factor / l1Len);
+		const u2 = scale(v2, s2Factor / l2Len);
 
 		const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-		const sRay1 = ctx.viewport.worldToScreen({ x: geom.pInt.x + u1.x * 20, y: geom.pInt.y + u1.y * 20 });
-		const sRay2 = ctx.viewport.worldToScreen({ x: geom.pInt.x + u2.x * 20, y: geom.pInt.y + u2.y * 20 });
+		const sRay1 = ctx.viewport.worldToScreen(addScaled(geom.pInt, u1, 20));
+		const sRay2 = ctx.viewport.worldToScreen(addScaled(geom.pInt, u2, 20));
 
 		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
 		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
@@ -157,14 +148,11 @@ export class AngleConstraint extends BaseConstraint {
 		const rWorld = this.arcRadius ?? 40;
 		const rScreen = Math.max(28, rWorld * ctx.viewport.zoom);
 
-		const ax = sCenter.x + rScreen * Math.cos(a1);
-		const ay = sCenter.y + rScreen * Math.sin(a1);
-		const bx = sCenter.x + rScreen * Math.cos(a2);
-		const by = sCenter.y + rScreen * Math.sin(a2);
+		const a = vec(sCenter.x + rScreen * Math.cos(a1), sCenter.y + rScreen * Math.sin(a1));
+		const b = vec(sCenter.x + rScreen * Math.cos(a2), sCenter.y + rScreen * Math.sin(a2));
 
 		const midAngle = a1 + delta * 0.5;
-		const midX = sCenter.x + rScreen * Math.cos(midAngle);
-		const midY = sCenter.y + rScreen * Math.sin(midAngle);
+		const midPoint = vec(sCenter.x + rScreen * Math.cos(midAngle), sCenter.y + rScreen * Math.sin(midAngle));
 
 		const g = createSvgElement(
 			'g',
@@ -202,7 +190,7 @@ export class AngleConstraint extends BaseConstraint {
 		// Arc path with arrowheads
 		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 		createSvgPath(
-			`M ${ax.toFixed(1)} ${ay.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${bx.toFixed(1)} ${by.toFixed(1)}`,
+			`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
 			{
 				fill: 'none',
 				stroke: color,
@@ -219,7 +207,7 @@ export class AngleConstraint extends BaseConstraint {
 		const textLen = textVal.length * 8 + 14;
 
 		createSvgRect(
-			{ x: midX - textLen * 0.5, y: midY - 10 },
+			{ x: midPoint.x - textLen * 0.5, y: midPoint.y - 10 },
 			{ x: textLen, y: 20 },
 			{
 				rx: 4,
@@ -231,7 +219,7 @@ export class AngleConstraint extends BaseConstraint {
 		);
 
 		createSvgText(
-			{ x: midX, y: midY + 4 },
+			{ x: midPoint.x, y: midPoint.y + 4 },
 			textVal,
 			{
 				'text-anchor': 'middle',
@@ -254,20 +242,20 @@ export class AngleConstraint extends BaseConstraint {
 		if (!p1 || !p2 || !p3 || !p4) return null;
 
 		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
-		const v1 = { x: p2.x - p1.x, y: p2.y - p1.y };
-		const v2 = { x: p4.x - p3.x, y: p4.y - p3.y };
+		const v1 = sub(p2, p1);
+		const v2 = sub(p4, p3);
 		const l1Len = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
 		const l2Len = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
 
 		const s1Factor = this.s1 ?? geom.s1;
 		const s2Factor = this.s2 ?? geom.s2;
 
-		const u1 = { x: (s1Factor * v1.x) / l1Len, y: (s1Factor * v1.y) / l1Len };
-		const u2 = { x: (s2Factor * v2.x) / l2Len, y: (s2Factor * v2.y) / l2Len };
+		const u1 = scale(v1, s1Factor / l1Len);
+		const u2 = scale(v2, s2Factor / l2Len);
 
 		const sCenter = viewport.worldToScreen(geom.pInt);
-		const sRay1 = viewport.worldToScreen({ x: geom.pInt.x + u1.x * 20, y: geom.pInt.y + u1.y * 20 });
-		const sRay2 = viewport.worldToScreen({ x: geom.pInt.x + u2.x * 20, y: geom.pInt.y + u2.y * 20 });
+		const sRay1 = viewport.worldToScreen(addScaled(geom.pInt, u1, 20));
+		const sRay2 = viewport.worldToScreen(addScaled(geom.pInt, u2, 20));
 
 		const a1 = Math.atan2(sRay1.y - sCenter.y, sRay1.x - sCenter.x);
 		const a2 = Math.atan2(sRay2.y - sCenter.y, sRay2.x - sCenter.x);
@@ -281,11 +269,10 @@ export class AngleConstraint extends BaseConstraint {
 		const rScreen = Math.max(28, rWorld * viewport.zoom);
 
 		const midAngle = a1 + delta * 0.5;
-		const midX = sCenter.x + rScreen * Math.cos(midAngle);
-		const midY = sCenter.y + rScreen * Math.sin(midAngle);
+		const midPoint = vec(sCenter.x + rScreen * Math.cos(midAngle), sCenter.y + rScreen * Math.sin(midAngle));
 
 		// 1. Check distance to badge / text box
-		const dLabel = Math.hypot(screen.x - midX, screen.y - midY);
+		const dLabel = Math.hypot(screen.x - midPoint.x, screen.y - midPoint.y);
 		if (dLabel <= LABEL_DISTANCE_PX) return dLabel;
 
 		// 2. Check distance to angle arc

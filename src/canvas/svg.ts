@@ -1,5 +1,5 @@
 import { SVG_NS, type SvgAttrs, TOOLTIP_RECT_ATTRS, TOOLTIP_TEXT_ATTRS } from './styles';
-import { distancesFrom, type Vec2 } from '../math/vector';
+import { dot, sub, vec, distancesFrom, type Vec2 } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
 	return typeof v === 'number' ? (Number.isInteger(v) ? v.toString() : v.toFixed(1)) : String(v);
@@ -147,10 +147,9 @@ export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwis
 	}
 
 	const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
-	const mx = sc.x + sr * Math.cos(midAngle);
-	const my = sc.y + sr * Math.sin(midAngle);
+	const midpoint = vec(sc.x + sr * Math.cos(midAngle), sc.y + sr * Math.sin(midAngle));
 
-	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${midpoint.x.toFixed(2)} ${midpoint.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 }
 
 export function getEllipticalArcSvgPath(
@@ -167,15 +166,15 @@ export function getEllipticalArcSvgPath(
 	const theta = Math.atan2(smaj.y - sc.y, smaj.x - sc.x);
 	const thetaDeg = (theta * 180) / Math.PI;
 
-	const ux = Math.cos(theta);
-	const uy = Math.sin(theta);
-	const vx = -Math.sin(theta);
-	const vy = Math.cos(theta);
+	const u = vec(Math.cos(theta), Math.sin(theta));
+	const v = vec(-Math.sin(theta), Math.cos(theta));
 
-	const us = (ss.x - sc.x) * ux + (ss.y - sc.y) * uy;
-	const vs = (ss.x - sc.x) * vx + (ss.y - sc.y) * vy;
-	const ue = (se.x - sc.x) * ux + (se.y - sc.y) * uy;
-	const ve = (se.x - sc.x) * vx + (se.y - sc.y) * vy;
+	const startOffset = sub(ss, sc);
+	const us = dot(startOffset, u);
+	const vs = dot(startOffset, v);
+	const endOffset = sub(se, sc);
+	const ue = dot(endOffset, u);
+	const ve = dot(endOffset, v);
 
 	const ts = Math.atan2(vs / r.y, us / r.x);
 	const te = Math.atan2(ve / r.y, ue / r.x);
@@ -197,8 +196,7 @@ export function getEllipticalArcSvgPath(
 	const tmid = clockwise ? ts + sweepAngle * 0.5 : ts - sweepAngle * 0.5;
 	const umid = r.x * Math.cos(tmid);
 	const vmid = r.y * Math.sin(tmid);
-	const mx = sc.x + umid * ux + vmid * vx;
-	const my = sc.y + umid * uy + vmid * vy;
+	const midpoint = vec(sc.x + umid * u.x + vmid * v.x, sc.y + umid * u.y + vmid * v.y);
 
-	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${mx.toFixed(2)} ${my.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${midpoint.x.toFixed(2)} ${midpoint.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 }

@@ -1,5 +1,5 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { distanceToPoint } from '../../math/hitTest';
@@ -26,17 +26,14 @@ export class MidpointConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const mx = paramMap.get(`${this.midId}.x`) ?? 0;
-		const my = paramMap.get(`${this.midId}.y`) ?? 0;
-		const p1x = paramMap.get(`${this.p1Id}.x`) ?? 0;
-		const p1y = paramMap.get(`${this.p1Id}.y`) ?? 0;
-		const p2x = paramMap.get(`${this.p2Id}.x`) ?? 0;
-		const p2y = paramMap.get(`${this.p2Id}.y`) ?? 0;
+		const midpoint = readParamPoint(paramMap, this.midId);
+		const p1 = readParamPoint(paramMap, this.p1Id);
+		const p2 = readParamPoint(paramMap, this.p2Id);
 
 		const alpha = this.ratio;
 		return [
-			(mx - ((1 - alpha) * p1x + alpha * p2x)) * this.weight,
-			(my - ((1 - alpha) * p1y + alpha * p2y)) * this.weight,
+			(midpoint.x - ((1 - alpha) * p1.x + alpha * p2.x)) * this.weight,
+			(midpoint.y - ((1 - alpha) * p1.y + alpha * p2.y)) * this.weight,
 		];
 	}
 

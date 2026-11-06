@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import { AABB } from '../../../math/aabb';
 import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
-import { dist, type Vec2 } from '../../../math/vector';
+import { dot, sub, dist, type Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import {
@@ -58,8 +58,7 @@ export class FilletTool extends BaseTool {
 				if (c1 && c2) {
 					let cornerVertex: Vec2 | undefined;
 					if (activePf.vertexPointId) {
-						const pt = this.ctx.sketch.points.get(activePf.vertexPointId);
-						if (pt) cornerVertex = { x: pt.x, y: pt.y };
+						cornerVertex = this.ctx.sketch.points.get(activePf.vertexPointId);
 					}
 					maxR = findMaxFilletRadius(
 						c1,
@@ -90,8 +89,7 @@ export class FilletTool extends BaseTool {
 				if (c1 && c2) {
 					let cornerVertex: Vec2 | undefined;
 					if (invalidPf.vertexPointId) {
-						const pt = this.ctx.sketch.points.get(invalidPf.vertexPointId);
-						if (pt) cornerVertex = { x: pt.x, y: pt.y };
+						cornerVertex = this.ctx.sketch.points.get(invalidPf.vertexPointId);
 					}
 					maxR = findMaxFilletRadius(
 						c1,
@@ -252,7 +250,7 @@ export class FilletTool extends BaseTool {
 		if (this.filletGizmoDragState) {
 			const { startMouseWorld, startRadius, bisectorDir } = this.filletGizmoDragState;
 			const inwardDir = { x: -bisectorDir.x, y: -bisectorDir.y };
-			const delta = (world.x - startMouseWorld.x) * inwardDir.x + (world.y - startMouseWorld.y) * inwardDir.y;
+			const delta = dot(sub(world, startMouseWorld), inwardDir);
 			const newRadius = Math.max(0.5, Math.round((startRadius + delta) * 2) / 2);
 			if (Math.abs(newRadius - this.filletRadius) > 1e-4) {
 				const oldRadius = this.filletRadius;
