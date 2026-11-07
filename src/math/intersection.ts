@@ -6,6 +6,7 @@ import {
 	dot,
 	addScaled,
 	cross,
+	dist,
 	distancesFrom,
 	mid,
 	mix,
@@ -378,14 +379,18 @@ export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Ve
 	const A = dot(v, v);
 	if (A < 1e-12) return [];
 
-	const B = 2 * dot(w, v);
-	const C0 = dot(w, w) - c.radius * c.radius;
+	const closestT = -dot(w, v) / A;
+	const closest = addScaled(p1, v, closestT);
+	const distance = dist(closest, c.center);
+	// Test tangency in world units. A discriminant tolerance depends on segment
+	// length and can turn solver roundoff into a gap or two spurious crossings.
+	// Allow the solver's ~1e-6 residuals, using the same 1e-5 geometric tolerance
+	// as segment intersections and region vertex keys.
+	const isTangent = Math.abs(distance - c.radius) <= 1e-5;
+	if (!isTangent && distance > c.radius) return [];
 
-	const disc = B * B - 4 * A * C0;
-	if (disc < -1e-7) return [];
-
-	const sqrtD = Math.sqrt(Math.max(0, disc));
-	const tCandidates = [(-B - sqrtD) / (2 * A), (-B + sqrtD) / (2 * A)];
+	const offset = isTangent ? 0 : Math.sqrt(((c.radius - distance) * (c.radius + distance)) / A);
+	const tCandidates = isTangent ? [closestT] : [closestT - offset, closestT + offset];
 	const pts: Vec2[] = [];
 	const eps = 1e-5;
 

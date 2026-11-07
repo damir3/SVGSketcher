@@ -47,7 +47,9 @@ export class ParallelConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
-		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+		// Forward-difference error can make parallelism appear independent of
+		// redundant rectangle constraints, hiding a real degree of freedom.
+		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap, true);
 	}
 
 	override render(ctx: ConstraintRenderContext): void {

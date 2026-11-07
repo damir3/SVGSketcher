@@ -14,6 +14,54 @@ function addTriangle(sketch: SketchDocument) {
 }
 
 describe('sketch regions', () => {
+	for (const scene of [
+		{
+			file: 'sketch_1794027958502-region-fill-issue.svg',
+			apex: { x: 55.0000000470061, y: 72.72728358143615 },
+			left: { x: -49.99999823089005, y: 0.000010382264488887 },
+			bottom: { x: 55.00000005082707, y: 0.000010336797123716007 },
+			coincidentApex: { x: 55.00000004877023, y: 72.72728357363519 },
+			center: { x: 30.00000004052743, y: 25.000010289346033 },
+			radius: 25,
+			inside: { x: 50, y: 55 },
+			outside: { x: 60, y: 55 },
+		},
+		{
+			file: 'sketch_1794028291234.svg',
+			apex: { x: 87.61813474576562, y: 80.42830334126855 },
+			left: { x: -49.99999823089005, y: 0.000010382264488887 },
+			bottom: { x: 59.15142691652586, y: 0.000010382304403557553 },
+			coincidentApex: { x: 87.61813474576562, y: 80.42830334126855 },
+			center: { x: 38.620461640688625, y: 21.18715528269591 },
+			radius: 26.42366052077758,
+			inside: { x: 70, y: 55 },
+			outside: { x: 90, y: 55 },
+		},
+	]) {
+		it(`closes the region above the tangent circle in ${scene.file}`, () => {
+			const sketch = new SketchDocument();
+			const apex = sketch.addPoint(scene.apex);
+			const left = sketch.addPoint(scene.left);
+			const bottom = sketch.addPoint(scene.bottom);
+			const coincidentApex = sketch.addPoint(scene.coincidentApex);
+			const center = sketch.addPoint(scene.center);
+			sketch.addLine(apex.id, left.id);
+			sketch.addLine(coincidentApex.id, bottom.id);
+			sketch.addCircle(center.id, scene.radius);
+
+			const regions = findSketchRegions(sketch);
+			assert.equal(regions.length, 2);
+			const above = regions.find(region => pointInRegion(scene.inside, region));
+			assert.ok(above);
+			assert.ok(above.area > 500);
+			assert.equal((above.path.match(/ A /g) ?? []).length, 1);
+			assert.equal((above.path.match(/ L /g) ?? []).length, 2);
+			assert.equal(pointInRegion(center, above), false);
+			assert.equal(regions.filter(region => pointInRegion(center, region)).length, 1);
+			assert.ok(regions.every(region => !pointInRegion(scene.outside, region)));
+		});
+	}
+
 	it('represents a circle inside a triangle as a circle and a ring with a hole', () => {
 		const sketch = new SketchDocument();
 		addTriangle(sketch);
@@ -181,17 +229,8 @@ describe('sketch regions', () => {
 		sketch.addLine(rightBottom.id, rightTop.id);
 		sketch.addLine(topRight.id, topLeft.id);
 		sketch.addLine(leftTop.id, leftBottom.id);
-		const addArc = (
-			id: string,
-			centerId: string,
-			startPointId: string,
-			endPointId: string,
-			clockwise: boolean
-		) =>
-			sketch.arcs.set(
-				id,
-				new SketchArc({ id, centerId, startPointId, endPointId, radius: 10, clockwise })
-			);
+		const addArc = (id: string, centerId: string, startPointId: string, endPointId: string, clockwise: boolean) =>
+			sketch.arcs.set(id, new SketchArc({ id, centerId, startPointId, endPointId, radius: 10, clockwise }));
 		addArc('round-tl', topLeftCenter.id, topLeft.id, leftTop.id, false);
 		addArc('round-tr', topRightCenter.id, rightTop.id, topRight.id, false);
 		addArc('round-br', bottomRightCenter.id, bottomRight.id, rightBottom.id, false);

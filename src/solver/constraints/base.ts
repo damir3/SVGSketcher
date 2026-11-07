@@ -99,11 +99,12 @@ export function computeNumericJacobianForEquation(
 	paramIndices: Map<string, number>,
 	baseRow: number,
 	eqIndex: number,
-	paramMap: Map<string, number>
+	paramMap: Map<string, number>,
+	centralDifference = false
 ): JacobianEntry[] {
 	const res: JacobianEntry[] = [];
 	const eps = 1e-5;
-	const f0 = constraint.evaluate(paramMap)[eqIndex];
+	const f0 = centralDifference ? 0 : constraint.evaluate(paramMap)[eqIndex];
 
 	for (const [paramId, col] of paramIndices.entries()) {
 		const orig = paramMap.get(paramId);
@@ -121,9 +122,14 @@ export function computeNumericJacobianForEquation(
 
 		paramMap.set(paramId, orig + eps);
 		const fPlus = constraint.evaluate(paramMap)[eqIndex];
+		let fMinus = f0;
+		if (centralDifference) {
+			paramMap.set(paramId, orig - eps);
+			fMinus = constraint.evaluate(paramMap)[eqIndex];
+		}
 		paramMap.set(paramId, orig);
 
-		const deriv = (fPlus - f0) / eps;
+		const deriv = (fPlus - fMinus) / (centralDifference ? 2 * eps : eps);
 		if (Math.abs(deriv) > 1e-11) {
 			res.push({ row: baseRow + eqIndex, col, val: deriv });
 		}

@@ -133,7 +133,7 @@ export class NumericalSolver {
 
 		if (n === 0 || totalEquations === 0) {
 			return {
-				status: 'CONVERGED',
+				status: n === 0 ? 'CONVERGED' : 'UNDER_CONSTRAINED',
 				iterations: 0,
 				initialError: 0,
 				finalError: 0,
