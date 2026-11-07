@@ -577,12 +577,6 @@ export class CanvasInteraction {
 		this.highlightManager.refresh(this.activeToolInstance);
 
 		// Update popup positions on screen during zoom / pan
-		const polygonTool = this.tools.get('polygon') as PolygonTool | undefined;
-		if (polygonTool?.popup.isOpen() && polygonTool.centerWorldPos) {
-			const sCtr = this.viewport.worldToScreen(polygonTool.centerWorldPos);
-			polygonTool.popup.updatePosition(sCtr);
-		}
-
 		const filletTool = this.tools.get('fillet') as FilletTool | undefined;
 		if (filletTool?.popup.isOpen() && filletTool.pendingFillets.length > 0) {
 			const bbox = filletTool.getGizmoBoundingBox();
@@ -818,6 +812,7 @@ export class CanvasInteraction {
 				if (
 					(this.activeTool === 'fillet' ||
 						this.activeTool === 'chamfer' ||
+						this.activeTool === 'polygon' ||
 						this.activeTool === 'spline' ||
 						this.activeTool === 'text') &&
 					tool?.onKeyDown?.(e)

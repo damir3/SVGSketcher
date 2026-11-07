@@ -1,6 +1,7 @@
 import { ICONS } from './icons';
 import type { SketchDocument } from '../model/sketch';
 import type { CanvasInteraction, ToolType, ConstraintToolType } from '../canvas/interaction';
+import type { PolygonMode } from '../canvas/tools/primitives/polygon';
 import type { ArcMode } from '../canvas/tools/primitives/arc';
 import type { CircleMode } from '../canvas/tools/primitives/circle';
 import type { RectangleMode } from '../canvas/tools/primitives/rectangle';
@@ -51,9 +52,9 @@ export class Toolbar {
 					${ICONS.circle}
 					<span class="btn-tooltip">Circle (C)</span>
 				</button>
-				<button class="tool-btn" data-tool="polygon" title="Polygon (G)">
+				<button class="tool-btn" data-tool="polygon" title="Circumscribed Polygon (G)">
 					${ICONS.polygon}
-					<span class="btn-tooltip">Polygon (G)</span>
+					<span class="btn-tooltip">Circumscribed Polygon (G)</span>
 				</button>
 				<button class="tool-btn" data-tool="arc" title="Centerpoint Arc (A)">
 					${ICONS.arc_center}
@@ -195,6 +196,9 @@ export class Toolbar {
 			switch (tool) {
 				case 'arc':
 					this.setArcMode(mode as ArcMode);
+					break;
+				case 'polygon':
+					this.setPolygonMode(mode as PolygonMode);
 					break;
 				case 'circle':
 					this.setCircleMode(mode as CircleMode);
@@ -347,6 +351,23 @@ export class Toolbar {
 		arcBtn.innerHTML = `
 			${icon}
 			<span class="btn-tooltip">${tooltip}</span>
+		`;
+	}
+
+	setPolygonMode(mode: PolygonMode): void {
+		const button = this.container.querySelector<HTMLButtonElement>('[data-tool="polygon"]');
+		if (!button) return;
+
+		const modes: Record<PolygonMode, { icon: string; title: string }> = {
+			circumscribed: { icon: ICONS.polygon, title: 'Circumscribed Polygon (G)' },
+			inscribed: { icon: ICONS.polygon_inscribed, title: 'Inscribed Polygon (G)' },
+			edge: { icon: ICONS.polygon_edge, title: 'Edge Polygon (G)' },
+		};
+		const { icon, title } = modes[mode];
+		button.title = title;
+		button.innerHTML = `
+			${icon}
+			<span class="btn-tooltip">${title}</span>
 		`;
 	}
 

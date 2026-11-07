@@ -131,25 +131,26 @@ export function renderPolygonPreviewVisual(
 	sCtr: Vec2,
 	centerWorld: Vec2,
 	sides: number,
-	inradius: number,
+	radius: number,
 	angleRad: number,
 	isConstruction: boolean,
-	viewport: Viewport
+	viewport: Viewport,
+	{ radiusToVertex = false, showGuide = true } = {}
 ): void {
 	const N = Math.max(3, Math.round(sides));
-	const R = inradius / Math.cos(Math.PI / N);
-	const sInradius = inradius * viewport.zoom;
+	const R = radiusToVertex ? radius : radius / Math.cos(Math.PI / N);
+	const baseAngle = radiusToVertex ? angleRad : angleRad - Math.PI / N;
 
-	createSvgCircle(sCtr, sInradius, GUIDE_OUTLINE_ATTRS, parent);
+	const handle = showGuide
+		? viewport.worldToScreen(
+				vec(centerWorld.x + radius * Math.cos(angleRad), centerWorld.y + radius * Math.sin(angleRad))
+			)
+		: null;
+	if (handle) {
+		createSvgCircle(sCtr, radius * viewport.zoom, GUIDE_OUTLINE_ATTRS, parent);
+		createSvgLine(sCtr, handle, AUX_RAY_ATTRS, parent);
+	}
 
-	const midWorld: Vec2 = {
-		x: centerWorld.x + inradius * Math.cos(angleRad),
-		y: centerWorld.y + inradius * Math.sin(angleRad),
-	};
-	const midScreen = viewport.worldToScreen(midWorld);
-	createSvgLine(sCtr, midScreen, AUX_RAY_ATTRS, parent);
-
-	const baseAngle = angleRad - Math.PI / N;
 	const step = (2 * Math.PI) / N;
 	const pts: Vec2[] = [];
 	for (let i = 0; i < N; i++) {
@@ -171,7 +172,7 @@ export function renderPolygonPreviewVisual(
 		createSvgCircle(pt, 2.5, PREVIEW_POINT_ATTRS, parent);
 	}
 	createSvgCircle(sCtr, 3, PREVIEW_POINT_ATTRS, parent);
-	createSvgCircle(midScreen, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, parent);
+	if (handle) createSvgCircle(handle, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, parent);
 }
 
 export function renderEllipseMajorAxisPreviewVisual(

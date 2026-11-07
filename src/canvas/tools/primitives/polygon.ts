@@ -1,37 +1,86 @@
 import { BaseTool } from '../base';
-import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { angleFromTo, dist, vec, type Vec2 } from '../../../math/vector';
+import { dispatchToolModeChange } from '../modeChangeEvent';
+import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
+import { addScaled, angleFromTo, cross, dist, mid, sub, vec, type Vec2 } from '../../../math/vector';
 import { ToolPopup } from '../../../ui/tool-popup';
-import type { SketchPoint, SketchLine } from '../../../model/types';
-import type { PatternCopyData, PointToLineDistanceConstraint } from '../../../solver/constraints';
-import { createSvgCircle, createSvgLine, createSvgPath } from '../../svg';
-import {
-	GUIDE_OUTLINE_ATTRS,
-	AUX_RAY_ATTRS,
-	PREVIEW_POINT_ATTRS,
-	POLYGON_RADIUS_HANDLE_ATTRS,
-	getPreviewStrokeAttrs,
-} from '../../styles';
+import { VariationToolPanel } from '../../../ui/panels/tools/variationToolPanel';
+import { renderPolygonPreviewVisual } from '../../previewHelpers';
+import { createSvgLine } from '../../svg';
+import { getPreviewStrokeAttrs } from '../../styles';
+
+export type PolygonMode = 'circumscribed' | 'inscribed' | 'edge';
+
+const MIN_POINT_DISTANCE = 0.001;
 
 export class PolygonTool extends BaseTool {
 	readonly id = 'polygon' as const;
+	declare readonly sidebarPanel: VariationToolPanel<PolygonMode>;
+	readonly popup: ToolPopup<'sides' | 'radius' | 'size'>;
 
-	readonly popup: ToolPopup<'sides' | 'radius'>;
-	sides = 6;
-	radius = 0;
-	radiusLocked = false;
-	currentAngle = 0;
-
-	drawingStep: 0 | 1 = 0;
-	centerPtId: string | null = null;
-	centerWorldPos: Vec2 | null = null;
+	private _mode: PolygonMode = 'circumscribed';
+	private sides = 6;
+	private size = 0;
+	private sizeLocked = false;
+	private currentAngle = 0;
+	private startPointId: string | null = null;
+	private edgeEnd: ToolMouseEvent | null = null;
+	private edgeCursor: ToolMouseEvent | null = null;
+	private onStateChange?: () => void;
 
 	constructor() {
 		super();
-		this.popup = new ToolPopup<'sides' | 'radius'>({
+		this.sidebarPanel = new VariationToolPanel<PolygonMode>({
+			title: 'Polygon Tool',
+			description: 'Select polygon creation method:',
+			dataAttribute: 'data-polygon-mode',
+			modes: [
+				{
+					id: 'circumscribed',
+					label: 'Circumscribed',
+					title: 'Circumscribed Polygon (Alt+1)',
+					iconName: 'polygon',
+				},
+				{
+					id: 'inscribed',
+					label: 'Inscribed',
+					title: 'Inscribed Polygon (Alt+2)',
+					iconName: 'polygon_inscribed',
+				},
+				{
+					id: 'edge',
+					label: 'Edge',
+					title: 'Edge Polygon (Alt+3)',
+					iconName: 'polygon_edge',
+				},
+			],
+			getCurrentMode: () => this.mode,
+			onSelectMode: mode => this.setMode(mode),
+			onCancel: () => this.ctx?.setTool('select'),
+			getHint: () => this.getStepHint(),
+			bindStateChange: cb => {
+				this.onStateChange = cb;
+			},
+		});
+
+		this.popup = new ToolPopup<'sides' | 'radius' | 'size'>({
 			className: 'polygon-popup',
-			defaultOffset: { x: 150, y: 40 },
+			defaultOffset: { x: 50, y: 0 },
 			fields: [
+				{
+					id: 'radius',
+					label: 'Radius',
+					type: 'dimension',
+					unit: 'mm',
+					defaultValue: 0,
+				},
+				{
+					id: 'size',
+					label: 'Size',
+					type: 'dimension',
+					unit: 'mm',
+					defaultValue: 0,
+					visible: false,
+				},
 				{
 					id: 'sides',
 					label: 'Sides',
@@ -41,265 +90,312 @@ export class PolygonTool extends BaseTool {
 					max: 100,
 					step: 1,
 				},
-				{
-					id: 'radius',
-					label: 'Radius',
-					type: 'dimension',
-					unit: 'mm',
-					defaultValue: 0.0,
-				},
 			],
+			onKeyDown: e => this.sidebarPanel.handleKeyDown(e),
 		});
 		this.popup.onChange = id => {
 			this.sides = this.popup.getNumericValue('sides', 6);
-			if (id === 'radius') {
-				const r = this.popup.getNumericValue('radius', 50);
-				this.radius = r <= 0.01 ? 1 : r;
-				this.radiusLocked = true;
+			if (id === this.sizeField) {
+				this.size = Math.max(0, this.popup.getNumericValue(id));
+				this.sizeLocked = true;
 			}
-			if (this.drawingStep === 1 && this.centerWorldPos) {
-				this.ctx.requestRender();
-			}
+			this.ctx.requestRender();
 		};
-		this.popup.onCommit = () => {
-			if (this.drawingStep === 1 && this.centerPtId) {
-				const hasRadiusConstraint = this.radiusLocked || this.popup.isLocked('radius');
-				this.commitPolygon(this.centerPtId, this.sides, this.radius, this.currentAngle, hasRadiusConstraint);
-			}
-		};
+		this.popup.onCommit = () => this.confirm();
 		this.popup.onCancel = () => {
 			this.cancel();
 			this.ctx.setTool('select');
-			this.ctx.requestRender();
 		};
 	}
 
-	override activate(ctx: any): void {
-		super.activate(ctx);
-		this.popup.setSketch(this.ctx.sketch);
-		this.ctx.showToast('Polygon: Click center point');
+	get mode(): PolygonMode {
+		return this._mode;
 	}
 
-	override deactivate(): void {
-		this.popup.hide();
-		super.deactivate();
+	private get sizeField(): 'radius' | 'size' {
+		return this.mode === 'edge' ? 'size' : 'radius';
+	}
+
+	private get startPoint(): Vec2 | undefined {
+		return this.startPointId ? this.ctx.sketch.points.get(this.startPointId) : undefined;
+	}
+
+	setMode(mode: PolygonMode): void {
+		if (this._mode === mode) return;
+		this._mode = mode;
+		this.cancel();
+		dispatchToolModeChange('polygon', mode);
+		this.onStateChange?.();
+		this.ctx?.requestRender();
+	}
+
+	private getStepHint(): string {
+		if (this.mode === 'edge') {
+			if (!this.startPointId) return '1. Click to place the first edge endpoint';
+			if (!this.edgeEnd) return '2. Click to place the second edge endpoint';
+			return '3. Click on the side where the polygon should extend';
+		}
+		if (!this.startPointId) return '1. Click to place the center point';
+		return this.mode === 'inscribed' ? '2. Click to place a vertex' : '2. Click to set the distance to a side';
+	}
+
+	override activate(ctx: ToolContext): void {
+		super.activate(ctx);
+		this.popup.setSketch(ctx.sketch);
+		ctx.showToast(`Polygon: ${this.mode === 'edge' ? 'Click the first edge endpoint' : 'Click center point'}`);
+	}
+
+	override shouldSnap(): boolean {
+		return this.edgeEnd === null;
 	}
 
 	override onMouseDown(e: ToolMouseEvent): void {
 		const { sketch } = this.ctx;
-		const snap = e.snap;
-		const world = e.world;
-
-		if (this.drawingStep === 0) {
+		if (!this.startPointId) {
 			sketch.beginTransaction();
-			let cId: string;
-			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
-				cId = snap.id;
-				this.centerWorldPos = snap.worldPos;
-			} else {
-				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos);
-				cId = pt.id;
-				this.centerWorldPos = vec(pt.x, pt.y);
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.centerPtId = cId;
-			this.radiusLocked = false;
+			this.startPointId = this.placePoint(e);
+			this.size = 0;
+			this.sizeLocked = false;
 			this.currentAngle = 0;
-			this.drawingStep = 1;
-
-			this.popup.setLocked('radius', false);
+			this.popup.setFieldVisible('radius', this.mode !== 'edge');
+			this.popup.setFieldVisible('size', this.mode === 'edge');
 			this.popup.setValue('sides', this.sides);
-			this.popup.setValue('radius', 50);
-			this.popup.show(e.screen);
+			this.popup.setValue(this.sizeField, 0);
+			this.popup.show(e.client);
+			this.onStateChange?.();
 			this.ctx.requestRender();
-		} else {
-			const curPos = snap ? snap.worldPos : world;
-			const currentDist = dist(this.centerWorldPos!, curPos);
-			const radius = this.radiusLocked ? this.radius : Math.max(1, currentDist);
-			const angleRad = angleFromTo(this.centerWorldPos!, curPos);
-			this.commitPolygon(this.centerPtId!, this.sides, radius, angleRad, this.radiusLocked);
+			return;
 		}
-	}
 
-	override onMouseMove(e: ToolMouseEvent): void {
-		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const effectiveWorld = e.effectiveWorld;
-
-			if (!this.radiusLocked) {
-				this.radius = Math.max(1, dist(this.centerWorldPos, effectiveWorld));
-				this.popup.setValue('radius', this.radius);
-			}
-			this.currentAngle = angleFromTo(this.centerWorldPos, effectiveWorld);
-
-			if (this.popup.isOpen()) {
-				this.popup.updatePosition(e.screen);
-			}
-		}
-	}
-
-	override renderPreview(ctx: ToolRenderContext): void {
-		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const sCtr = ctx.viewport.worldToScreen(this.centerWorldPos);
-			const N = Math.max(3, Math.round(this.sides));
-			const R = this.radius / Math.cos(Math.PI / N);
-			const sInradius = this.radius * ctx.viewport.zoom;
-
-			// 1. Inscribed guide circle
-			createSvgCircle(sCtr, sInradius, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
-
-			// 2. Auxiliary ray from center to current point
-			const midWorld: Vec2 = {
-				x: this.centerWorldPos.x + this.radius * Math.cos(this.currentAngle),
-				y: this.centerWorldPos.y + this.radius * Math.sin(this.currentAngle),
-			};
-			const midScreen = ctx.viewport.worldToScreen(midWorld);
-			createSvgLine(sCtr, midScreen, AUX_RAY_ATTRS, ctx.targetGroup);
-
-			// 3. Polygon vertices in world coordinates, transformed to screen
-			const baseAngle = this.currentAngle - Math.PI / N;
-			const step = (2 * Math.PI) / N;
-			const pts: Vec2[] = [];
-			for (let i = 0; i < N; i++) {
-				const a = baseAngle + i * step;
-				const w = vec(this.centerWorldPos.x + R * Math.cos(a), this.centerWorldPos.y + R * Math.sin(a));
-				pts.push(ctx.viewport.worldToScreen(w));
-			}
-
-			// 4. Polygon outline path
-			if (pts.length >= 3) {
-				let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-				for (let i = 1; i < pts.length; i++) {
-					d += ` L ${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}`;
-				}
-				d += ' Z';
-				createSvgPath(d, getPreviewStrokeAttrs(ctx.isConstruction), ctx.targetGroup);
-			}
-
-			// 5. Draw vertex dots
-			for (const pt of pts) {
-				createSvgCircle(pt, 2.5, PREVIEW_POINT_ATTRS, ctx.targetGroup);
-			}
-
-			// 6. Center marker
-			createSvgCircle(sCtr, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
-
-			// 7. Midpoint marker on incircle
-			createSvgCircle(midScreen, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, ctx.targetGroup);
-		}
-	}
-
-	override onKeyDown(e: KeyboardEvent): boolean | void {
-		if (e.key === 'Tab') {
-			if (this.drawingStep === 1 && this.popup.isOpen()) {
-				e.preventDefault();
-				this.popup.cycleFocus(e.shiftKey);
-				return true;
-			}
-		} else if (e.key === 'Enter') {
-			if (this.drawingStep === 1 && this.centerPtId) {
-				e.preventDefault();
-				const hasRadiusConstraint = this.radiusLocked || this.popup.isLocked('radius');
-				this.commitPolygon(this.centerPtId, this.sides, this.radius, this.currentAngle, hasRadiusConstraint);
-				return true;
-			}
-		}
-	}
-
-	override cancel(): void {
-		if (this.drawingStep > 0) {
-			this.ctx.sketch.rollbackTransaction();
-			this.drawingStep = 0;
-			this.centerPtId = null;
-			this.centerWorldPos = null;
-			this.radiusLocked = false;
-			this.popup.hide();
-			this.ctx.renderer.clearPreviews();
-			this.ctx.requestRender();
-		}
-	}
-
-	private commitPolygon(
-		centerPtId: string,
-		sides: number,
-		inradius: number,
-		angleRad: number,
-		addDistanceConstraint = false
-	): void {
-		const N = Math.max(3, Math.round(sides));
-		const r = Math.max(0.1, inradius);
-		const centerPt = this.ctx.sketch.points.get(centerPtId);
-		if (!centerPt) {
+		const anchor = this.startPoint;
+		if (!anchor) {
 			this.cancel();
 			return;
 		}
 
-		const R = r / Math.cos(Math.PI / N);
-		const baseAngle = angleRad - Math.PI / N;
-		const step = (2 * Math.PI) / N;
-
-		const vertices: SketchPoint[] = [];
-		for (let k = 0; k < N; k++) {
-			const a = baseAngle + k * step;
-			const v = vec(centerPt.x + R * Math.cos(a), centerPt.y + R * Math.sin(a));
-			const pt = this.ctx.sketch.addPoint(v, false);
-			vertices.push(pt);
+		if (this.mode !== 'edge') {
+			this.commitCenteredPolygon(e);
+		} else if (!this.edgeEnd) {
+			const end = this.getEdgeEnd(anchor, e.effectiveWorld);
+			const length = dist(anchor, end);
+			if (length < MIN_POINT_DISTANCE) return;
+			this.edgeEnd = e;
+			this.edgeCursor = null;
+			if (!this.sizeLocked) this.updateSize(length);
+			this.popup.updatePosition(e.client);
+			this.onStateChange?.();
+			this.ctx.requestRender();
+		} else {
+			this.commitEdgePolygon(e.world);
 		}
+	}
 
-		const lines: SketchLine[] = [];
-		for (let k = 0; k < N; k++) {
-			const nextK = (k + 1) % N;
-			const line = this.ctx.sketch.addLine(vertices[k].id, vertices[nextK].id, this.ctx.isConstructionMode);
-			lines.push(line);
+	override onMouseMove(e: ToolMouseEvent): void {
+		const anchor = this.startPoint;
+		if (!anchor) return;
+		if (this.mode === 'edge') {
+			this.edgeCursor = e;
+		} else {
+			this.currentAngle = angleFromTo(anchor, e.effectiveWorld);
 		}
-
-		const copies: PatternCopyData[] = [];
-		for (let k = 1; k < N; k++) {
-			copies.push({
-				copyIndex: k,
-				pointPairs: [{ sourcePtId: vertices[0].id, patternPtId: vertices[k].id }],
-				createdEntityIds: [{ id: vertices[k].id, type: 'point' }],
-			});
+		if (!this.sizeLocked && !this.edgeEnd) {
+			this.updateSize(dist(anchor, e.effectiveWorld));
 		}
+		this.popup.updatePosition(e.client);
+	}
 
-		const constraint = this.ctx.sketch.addCircularPatternConstraint(
-			centerPtId,
-			[vertices[0].id],
-			'full',
-			360,
-			N,
-			false,
-			[],
-			copies,
-			undefined,
-			true // isReadOnly
-		);
+	private updateSize(size: number): void {
+		this.size = size;
+		this.popup.setValue(this.sizeField, size);
+	}
 
-		let distConstraint: PointToLineDistanceConstraint | null = null;
-		if (addDistanceConstraint && lines.length > 0) {
-			distConstraint = this.ctx.sketch.addPointToLineDistanceConstraint(centerPtId, lines[0].id, r);
-			const expr = this.popup.getExpression('radius');
-			if (distConstraint && expr) {
-				distConstraint.expression = expr;
+	override renderPreview(ctx: ToolRenderContext): void {
+		const anchor = this.startPoint;
+		if (!anchor) return;
+
+		const { targetGroup, viewport, isConstruction } = ctx;
+		if (this.mode === 'edge') {
+			const end = this.getEdgeEnd(anchor, this.edgeEnd?.effectiveWorld ?? ctx.snap?.worldPos ?? ctx.cursorWorld);
+			const side = this.edgeEnd ? this.getEdgeSide(anchor, end, ctx.cursorWorld) : 0;
+			const geometry = side ? this.getEdgeGeometry(anchor, end, side < 0) : null;
+			if (geometry) {
+				renderPolygonPreviewVisual(
+					targetGroup,
+					viewport.worldToScreen(geometry.center),
+					geometry.center,
+					this.sides,
+					geometry.radius,
+					geometry.angle,
+					isConstruction,
+					viewport,
+					{ radiusToVertex: true, showGuide: false }
+				);
+			} else {
+				createSvgLine(
+					viewport.worldToScreen(anchor),
+					viewport.worldToScreen(end),
+					getPreviewStrokeAttrs(isConstruction),
+					targetGroup
+				);
 			}
+			return;
 		}
 
-		this.ctx.sketch.commitTransaction();
-		this.ctx.sketch.solve();
+		if (this.size < MIN_POINT_DISTANCE) return;
+		renderPolygonPreviewVisual(
+			targetGroup,
+			viewport.worldToScreen(anchor),
+			anchor,
+			this.sides,
+			this.size,
+			this.currentAngle,
+			isConstruction,
+			viewport,
+			{ radiusToVertex: this.mode === 'inscribed' }
+		);
+	}
 
-		this.popup.hide();
-		this.drawingStep = 0;
-		this.centerPtId = null;
-		this.centerWorldPos = null;
-		this.ctx.renderer.clearPreviews();
-
-		if (distConstraint) {
-			this.ctx.sketch.selectEntity(distConstraint.id, 'constraint', false);
-		} else if (constraint) {
-			this.ctx.sketch.selectEntity(constraint.id, 'constraint', false);
+	override onKeyDown(e: KeyboardEvent): boolean | void {
+		if (!this.startPointId) return;
+		if (e.key === 'Tab' && this.popup.isOpen()) {
+			e.preventDefault();
+			this.popup.cycleFocus(e.shiftKey);
+			return true;
 		}
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			this.confirm();
+			return true;
+		}
+	}
 
-		this.ctx.showToast(`Polygon created (${N} vertices)`);
+	private confirm(): void {
+		const created = this.mode === 'edge' ? this.commitEdgePolygon() : this.commitCenteredPolygon();
+		if (created) this.ctx.setTool('select');
+	}
+
+	override cancel(): void {
+		if (!this.startPointId) return;
+		this.ctx.sketch.rollbackTransaction();
+		this.resetDrawing();
 		this.ctx.requestRender();
+	}
+
+	private resetDrawing(): void {
+		this.startPointId = null;
+		this.edgeEnd = null;
+		this.edgeCursor = null;
+		this.popup.hide();
+		this.ctx.renderer.clearPreviews();
+		this.onStateChange?.();
+	}
+
+	private placePoint(e: ToolMouseEvent): string {
+		const { sketch } = this.ctx;
+		const { snap } = e;
+		if (snap?.type === 'point' && snap.id && sketch.points.has(snap.id)) return snap.id;
+		const point = sketch.addPoint(e.effectiveWorld);
+		this.ctx.applySnapConstraintIfNeeded?.(point.id, snap);
+		return point.id;
+	}
+
+	private getEdgeEnd(start: Vec2, target: Vec2): Vec2 {
+		if (!this.sizeLocked) return target;
+		const angle = angleFromTo(start, target);
+		return addScaled(start, vec(Math.cos(angle), Math.sin(angle)), this.size);
+	}
+
+	private getEdgeSide(start: Vec2, end: Vec2, toward: Vec2): number {
+		const length = dist(start, end);
+		if (length < MIN_POINT_DISTANCE) return 0;
+		const signedDistance = cross(sub(end, start), sub(toward, start)) / length;
+		return Math.abs(signedDistance) < MIN_POINT_DISTANCE ? 0 : Math.sign(signedDistance);
+	}
+
+	private getEdgeGeometry(start: Vec2, end: Vec2, reversed: boolean) {
+		const edge = sub(end, start);
+		const length = dist(start, end);
+		const halfAngle = Math.PI / this.sides;
+		const normal = vec(-edge.y / length, edge.x / length);
+		const apothem = length / (2 * Math.tan(halfAngle));
+		const center = addScaled(mid(start, end), normal, reversed ? -apothem : apothem);
+		const angle = angleFromTo(center, reversed ? end : start);
+		return { center, radius: length / (2 * Math.sin(halfAngle)), angle };
+	}
+
+	private commitEdgePolygon(direction?: Vec2): boolean {
+		const startId = this.startPointId;
+		const start = this.startPoint;
+		if (!startId || !start) return false;
+
+		const endEvent = this.edgeEnd ?? this.edgeCursor;
+		const end = this.getEdgeEnd(start, endEvent?.effectiveWorld ?? start);
+		if (dist(start, end) < MIN_POINT_DISTANCE) return false;
+		const toward = direction ?? (this.edgeEnd ? this.edgeCursor?.world : undefined);
+		const side = toward ? this.getEdgeSide(start, end, toward) : 0;
+		if (direction && side === 0) return false;
+
+		const { sketch } = this.ctx;
+		const endId = endEvent && !this.sizeLocked ? this.placePoint(endEvent) : sketch.addPoint(end).id;
+		const endPoint = sketch.points.get(endId)!;
+		if (dist(start, endPoint) < MIN_POINT_DISTANCE) {
+			this.cancel();
+			return false;
+		}
+		const reversed = side < 0;
+		const geometry = this.getEdgeGeometry(start, endPoint, reversed);
+		const centerId = sketch.addPoint(geometry.center).id;
+		const vertexIds = reversed ? [endId, startId] : [startId, endId];
+		return this.commitPolygon(centerId, geometry.radius, geometry.angle, this.sizeLocked, vertexIds);
+	}
+
+	private commitCenteredPolygon(e?: ToolMouseEvent): boolean {
+		const centerId = this.startPointId;
+		const center = this.startPoint;
+		if (!centerId || !center) return false;
+
+		const radius = this.sizeLocked || !e ? this.size : dist(center, e.effectiveWorld);
+		if (radius < MIN_POINT_DISTANCE) return false;
+		const angle = e ? angleFromTo(center, e.effectiveWorld) : this.currentAngle;
+		if (e && this.mode === 'inscribed' && !this.sizeLocked) {
+			const vertexId = this.placePoint(e);
+			const vertex = this.ctx.sketch.points.get(vertexId)!;
+			return this.commitPolygon(centerId, dist(center, vertex), angleFromTo(center, vertex), false, [vertexId]);
+		}
+		return this.commitPolygon(centerId, radius, angle, this.sizeLocked);
+	}
+
+	private commitPolygon(
+		centerId: string,
+		radius: number,
+		angle: number,
+		lockSize: boolean,
+		vertexIds?: string[]
+	): boolean {
+		const { sketch } = this.ctx;
+		const lockRadius = lockSize && this.mode !== 'edge';
+		const expression = lockSize ? this.popup.getExpression(this.sizeField) : undefined;
+		const polygon = sketch.addPolygon(centerId, radius, this.sides, angle, this.ctx.isConstructionMode, lockRadius, {
+			radiusToVertex: this.mode !== 'circumscribed',
+			vertexIds,
+			radiusExpression: lockRadius ? expression : undefined,
+		});
+		if (!polygon) {
+			this.cancel();
+			return false;
+		}
+
+		let dimension = polygon.vertexDistanceConstraint ?? polygon.distanceConstraint;
+		if (lockSize && this.mode === 'edge') {
+			const [start, end] = polygon.vertices;
+			dimension = sketch.addDistanceConstraint(start.id, end.id, this.size) ?? undefined;
+			if (dimension && expression) dimension.expression = expression;
+		}
+		sketch.commitTransaction();
+		this.resetDrawing();
+		sketch.selectEntity((dimension ?? polygon.constraint).id, 'constraint', false);
+		this.ctx.showToast(`Polygon created (${polygon.vertices.length} vertices)`);
+		this.ctx.requestRender();
+		return true;
 	}
 }

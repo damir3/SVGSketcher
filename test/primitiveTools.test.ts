@@ -6,6 +6,7 @@ import { CircleTool } from '../src/canvas/tools/primitives/circle';
 import { RectangleTool } from '../src/canvas/tools/primitives/rectangle';
 import { SlotTool } from '../src/canvas/tools/primitives/slot';
 import { ArcTool } from '../src/canvas/tools/primitives/arc';
+import { PolygonTool } from '../src/canvas/tools/primitives/polygon';
 import { EllipseTool } from '../src/canvas/tools/primitives/ellipse';
 import { SplineTool } from '../src/canvas/tools/primitives/spline';
 import { CanvasInteraction } from '../src/canvas/interaction';
@@ -32,7 +33,7 @@ import {
 	PointOnCircleConstraint,
 } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
-import { vec, type Vec2 } from '../src/math/vector';
+import { dist, mid, vec, type Vec2 } from '../src/math/vector';
 
 function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstruction: { value: boolean } } {
 	const isConstruction = { value: false };
@@ -2159,5 +2160,219 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 		elArcTool.onMouseDown(evt4);
 		assert.equal(elArcTool.step, 0);
 		assert.equal(sketch.ellipticalArcs.size, 1);
+	});
+});
+
+describe('Polygon tool modes', () => {
+	it('uses the second click as a side midpoint by default and as a vertex in inscribed mode', () => {
+		for (const mode of ['circumscribed', 'inscribed'] as const) {
+			const sketch = new SketchDocument();
+			const { ctx } = createMockContext(sketch);
+			const tool = new PolygonTool();
+			assert.equal(tool.mode, 'circumscribed');
+			tool.setMode(mode);
+			tool.activate(ctx);
+			tool.onMouseDown(makeMouseEvent(0, 0));
+			tool.onMouseDown(makeMouseEvent(12, 9));
+
+			assert.equal(sketch.lines.size, 6);
+			const [edge] = sketch.lines.values();
+			const start = sketch.points.get(edge.p1Id)!;
+			const end = sketch.points.get(edge.p2Id)!;
+			const handle = mode === 'inscribed' ? start : mid(start, end);
+			assert.ok(dist(handle, vec(12, 9)) < 1e-6);
+		}
+	});
+
+	it('dimensions the inscribed radius from the center to a vertex', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new PolygonTool();
+		tool.setMode('inscribed');
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(0, 0));
+		tool.popup.setValue('radius', '20 / 2');
+		tool.popup.onChange?.('radius', 10);
+		tool.onMouseDown(makeMouseEvent(25, 0));
+
+		const radius = [...sketch.constraints.values()].find(c => c instanceof DistanceConstraint);
+		assert.equal(radius?.targetDistance, 10);
+		assert.equal(radius?.expression, '20 / 2');
+		assert.ok(sketch.selection.constraintIds.has(radius!.id));
+	});
+
+	it('uses the two snapped endpoints for one edge and places the remaining vertices on the chosen side', () => {
+		for (const side of [-1, 1]) {
+			const sketch = new SketchDocument();
+			const { ctx, isConstruction } = createMockContext(sketch);
+			isConstruction.value = true;
+			const tool = new PolygonTool();
+			tool.setMode('edge');
+			tool.activate(ctx);
+			const a = sketch.addPoint(vec(3, 2), true);
+			const b = sketch.addPoint(vec(13, 2), true);
+			const base = sketch.addLine(a.id, b.id, true);
+			for (const point of [a, b]) {
+				tool.onMouseDown(
+					makeMouseEvent(point.x, point.y, {
+						type: 'point',
+						id: point.id,
+						worldPos: point,
+						screenPos: point,
+					})
+				);
+			}
+			assert.equal(tool.popup.isRadiusVisible(), false);
+			assert.equal(tool.shouldSnap(), false);
+			tool.onMouseDown(makeMouseEvent(8, 2));
+			assert.equal(sketch.lines.size, 1);
+			tool.onMouseDown(makeMouseEvent(8, 2 + side * 10));
+
+			assert.equal(sketch.lines.size, 6);
+			assert.ok(sketch.lines.has(base.id));
+			for (const line of sketch.lines.values()) {
+				assert.equal(line.isConstruction, true);
+				const p1 = sketch.points.get(line.p1Id)!;
+				const p2 = sketch.points.get(line.p2Id)!;
+				assert.ok(Math.abs(dist(p1, p2) - 10) < 1e-6);
+				assert.ok((p1.y - 2) * side >= -1e-6);
+				assert.ok((p2.y - 2) * side >= -1e-6);
+			}
+			assert.equal(sketch.undo(), true);
+			assert.equal(sketch.lines.size, 1);
+			assert.equal(sketch.points.size, 2);
+		}
+	});
+
+	it('starts center radii at zero and finishes the current preview in Select on Enter', () => {
+		for (const mode of ['circumscribed', 'inscribed'] as const) {
+			const sketch = new SketchDocument();
+			const { ctx } = createMockContext(sketch);
+			const tool = new PolygonTool();
+			const switches: string[] = [];
+			ctx.setTool = id => switches.push(id);
+			tool.setMode(mode);
+			tool.activate(ctx);
+			tool.onMouseDown(makeMouseEvent(0, 0));
+			const enter = { key: 'Enter', code: 'Enter', preventDefault() {} } as KeyboardEvent;
+
+			assert.equal(tool.popup.getNumericValue('radius'), 0);
+			tool.onKeyDown(enter);
+			assert.equal(sketch.lines.size, 0);
+			assert.deepEqual(switches, []);
+
+			tool.onMouseMove(makeMouseEvent(0.5, 0));
+			assert.equal(tool.popup.getNumericValue('radius'), 0.5);
+			CanvasInteraction.prototype.handleKeyDown.call({ activeTool: 'polygon', activeToolInstance: tool }, enter);
+
+			assert.equal(sketch.lines.size, 6);
+			assert.deepEqual(switches, ['select']);
+			const [edge] = sketch.lines.values();
+			const start = sketch.points.get(edge.p1Id)!;
+			const end = sketch.points.get(edge.p2Id)!;
+			const handle = mode === 'inscribed' ? start : mid(start, end);
+			assert.ok(dist(handle, vec(0.5, 0)) < 1e-6);
+		}
+	});
+
+	it('uses the entered Edge size and the hovered side when Enter confirms from the popup', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new PolygonTool();
+		const switches: string[] = [];
+		ctx.setTool = id => switches.push(id);
+		tool.setMode('edge');
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(tool.popup.isFieldVisible('size'), true);
+		assert.equal(tool.popup.getNumericValue('size'), 0);
+
+		tool.onMouseMove(makeMouseEvent(14, 0));
+		assert.equal(tool.popup.getNumericValue('size'), 14);
+		tool.onMouseDown(makeMouseEvent(20, 0));
+		assert.equal(tool.popup.getNumericValue('size'), 20);
+		tool.popup.setValue('size', '18 / 2');
+		tool.popup.onChange?.('size', 9);
+		tool.onMouseMove(makeMouseEvent(2, -5));
+		assert.equal(tool.popup.getNumericValue('size'), 9);
+		tool.popup.onCommit?.();
+
+		assert.deepEqual(switches, ['select']);
+		assert.equal(sketch.lines.size, 6);
+		for (const line of sketch.lines.values()) {
+			const start = sketch.points.get(line.p1Id)!;
+			const end = sketch.points.get(line.p2Id)!;
+			assert.ok(Math.abs(dist(start, end) - 9) < 1e-6);
+			assert.ok(start.y <= 1e-6 && end.y <= 1e-6);
+		}
+		const length = [...sketch.constraints.values()].find(c => c instanceof DistanceConstraint);
+		assert.equal(length?.targetDistance, 9);
+		assert.equal(length?.expression, '18 / 2');
+		assert.equal(sketch.undo(), true);
+		assert.equal(sketch.points.size, 0);
+	});
+
+	it('keeps the popup at the cursor through redraws in every Polygon mode', () => {
+		for (const mode of ['circumscribed', 'inscribed', 'edge'] as const) {
+			const sketch = new SketchDocument();
+			const { ctx } = createMockContext(sketch);
+			const tool = new PolygonTool();
+			const positions: Vec2[] = [];
+			const show = tool.popup.show.bind(tool.popup);
+			tool.popup.show = position => {
+				show(position);
+				positions.push(position as Vec2);
+			};
+			tool.popup.updatePosition = position => positions.push(position as Vec2);
+			ctx.requestRender = () =>
+				CanvasInteraction.prototype.render.call({
+					activeTool: 'polygon',
+					viewport: ctx.viewport,
+					renderer: { render() {} },
+					highlightManager: { refresh() {} },
+					tools: new Map([['polygon', tool]]),
+					updateToolPreview() {},
+				});
+
+			const mouseEvent = (x: number, y: number) => ({
+				...makeMouseEvent(x, y),
+				client: vec(x + 100, y + 50),
+			});
+			tool.setMode(mode);
+			tool.activate(ctx);
+			tool.onMouseDown(mouseEvent(15, 10));
+			tool.onMouseMove(mouseEvent(35, 10));
+			ctx.requestRender();
+			const expected = [vec(115, 60), vec(135, 60)];
+
+			if (mode === 'edge') {
+				tool.onMouseDown(mouseEvent(40, 10));
+				tool.onMouseMove(mouseEvent(30, 25));
+				ctx.requestRender();
+				expected.push(vec(140, 60), vec(130, 75));
+			}
+
+			assert.deepEqual(positions, expected);
+		}
+	});
+
+	it('uses Alt+1–3 from the active panel and popup and rolls back pending geometry on switch', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new PolygonTool();
+		const shortcut = (digit: number) => ({ altKey: true, code: `Digit${digit}`, preventDefault() {} }) as KeyboardEvent;
+		tool.activate(ctx);
+		assert.equal(tool.sidebarPanel.handleKeyDown(shortcut(3)), true);
+		assert.equal(tool.mode, 'edge');
+		tool.onMouseDown(makeMouseEvent(0, 0));
+		tool.onMouseDown(makeMouseEvent(10, 0));
+		assert.equal(tool.popup.getNumericValue('size'), 10);
+		assert.equal(sketch.points.size, 1);
+		assert.equal(tool.popup.onKeyDown?.(shortcut(2)), true);
+		assert.equal(tool.mode, 'inscribed');
+		assert.equal(sketch.points.size, 0);
+		assert.equal(tool.popup.isOpen(), false);
+		assert.equal(tool.sidebarPanel.handleKeyDown(shortcut(1)), true);
+		assert.equal(tool.mode, 'circumscribed');
 	});
 });

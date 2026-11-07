@@ -1909,43 +1909,56 @@ export class SketchDocument {
 
 	addPolygon(
 		centerPointId: string,
-		inradius: number,
+		radius: number,
 		sides: number,
 		angleRad: number,
 		isConstruction = false,
-		addDistanceConstraint = false
+		addDistanceConstraint = false,
+		options: { radiusToVertex?: boolean; vertexIds?: readonly string[]; radiusExpression?: string } = {}
 	): {
 		centerPoint: SketchPoint;
 		vertices: SketchPoint[];
 		lines: SketchLine[];
 		constraint: CircularPatternConstraint;
 		distanceConstraint?: PointToLineDistanceConstraint;
+		vertexDistanceConstraint?: DistanceConstraint;
 	} | null {
 		const centerPt = this.points.get(centerPointId);
 		if (!centerPt) return null;
 
 		const N = Math.max(3, Math.round(sides));
-		if (inradius <= 1e-4) return null;
+		if (!Number.isFinite(radius) || radius <= 1e-4) return null;
+		const existingVertices = (options.vertexIds ?? []).map(id => this.points.get(id));
+		if (existingVertices.some(point => !point)) return null;
 
 		this.beginTransaction();
 
-		const R = inradius / Math.cos(Math.PI / N);
-		const baseAngle = angleRad - Math.PI / N;
+		const R = options.radiusToVertex ? radius : radius / Math.cos(Math.PI / N);
+		const baseAngle = options.radiusToVertex ? angleRad : angleRad - Math.PI / N;
 		const step = (2 * Math.PI) / N;
 
 		const vertices: SketchPoint[] = [];
 		for (let k = 0; k < N; k++) {
 			const a = baseAngle + k * step;
 			const v = vec(centerPt.x + R * Math.cos(a), centerPt.y + R * Math.sin(a));
-			const pt = this.addPoint(v, false);
+			const pt = existingVertices[k] ?? this.addPoint(v, false);
 			vertices.push(pt);
 		}
 
 		const lines: SketchLine[] = [];
 		for (let k = 0; k < N; k++) {
 			const nextK = (k + 1) % N;
-			const line = this.addLine(vertices[k].id, vertices[nextK].id, isConstruction);
-			lines.push(line);
+			const p1Id = vertices[k].id;
+			const p2Id = vertices[nextK].id;
+			const existingEdge =
+				k === 0 && existingVertices.length === 2
+					? [...this.lines.values()].find(
+							line =>
+								line.isConstruction === isConstruction &&
+								((line.p1Id === p1Id && line.p2Id === p2Id) || (line.p1Id === p2Id && line.p2Id === p1Id))
+						)
+					: undefined;
+			lines.push(existingEdge ?? this.addLine(p1Id, p2Id, isConstruction));
 		}
 
 		const copies: PatternCopyData[] = [];
@@ -1953,7 +1966,7 @@ export class SketchDocument {
 			copies.push({
 				copyIndex: k,
 				pointPairs: [{ sourcePtId: vertices[0].id, patternPtId: vertices[k].id }],
-				createdEntityIds: [{ id: vertices[k].id, type: 'point' }],
+				createdEntityIds: existingVertices[k] ? [] : [{ id: vertices[k].id, type: 'point' }],
 			});
 		}
 
@@ -1971,9 +1984,15 @@ export class SketchDocument {
 		);
 
 		let distanceConstraint: PointToLineDistanceConstraint | undefined;
-		if (addDistanceConstraint && lines.length > 0) {
-			const distC = this.addPointToLineDistanceConstraint(centerPointId, lines[0].id, inradius);
-			if (distC) distanceConstraint = distC;
+		let vertexDistanceConstraint: DistanceConstraint | undefined;
+		if (addDistanceConstraint) {
+			if (options.radiusToVertex) {
+				vertexDistanceConstraint = this.addDistanceConstraint(centerPointId, vertices[0].id, radius) ?? undefined;
+			} else {
+				distanceConstraint = this.addPointToLineDistanceConstraint(centerPointId, lines[0].id, radius) ?? undefined;
+			}
+			const radiusConstraint = vertexDistanceConstraint ?? distanceConstraint;
+			if (radiusConstraint && options.radiusExpression) radiusConstraint.expression = options.radiusExpression;
 		}
 
 		this.commitTransaction();
@@ -1987,6 +2006,7 @@ export class SketchDocument {
 			lines,
 			constraint,
 			distanceConstraint,
+			vertexDistanceConstraint,
 		};
 	}
 

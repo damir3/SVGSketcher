@@ -21,6 +21,8 @@ import slotOverall from '../assets/icons/slot-overall.svg?raw';
 import slotArc3Point from '../assets/icons/slot-arc-3point.svg?raw';
 import slotArcCenter from '../assets/icons/slot-arc-center.svg?raw';
 import polygon from '../assets/icons/polygon.svg?raw';
+import polygonInscribed from '../assets/icons/polygon-inscribed.svg?raw';
+import polygonEdge from '../assets/icons/polygon-edge.svg?raw';
 import regions from '../assets/icons/regions.svg?raw';
 import constraintBadges from '../assets/icons/constraint-badges.svg?raw';
 import dimensionsToggle from '../assets/icons/dimensions-toggle.svg?raw';
@@ -117,6 +119,8 @@ export const ICONS = {
 	lock: fixed,
 	unlock: unfixed,
 	polygon,
+	polygon_inscribed: polygonInscribed,
+	polygon_edge: polygonEdge,
 	regions,
 	constraintBadges,
 	dimensionsToggle,
