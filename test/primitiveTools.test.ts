@@ -106,7 +106,7 @@ function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstr
 
 function makeMouseEvent(worldX: number, worldY: number, snap: any = null): ToolMouseEvent {
 	return {
-		raw: {} as MouseEvent,
+		raw: { preventDefault() {} } as MouseEvent,
 		screen: vec(worldX, worldY),
 		client: vec(worldX, worldY),
 		world: vec(worldX, worldY),
@@ -229,14 +229,56 @@ describe('Primitive Tools Creation', () => {
 		lineTool.onMouseDown(makeMouseEvent(10, 20));
 		assert.equal(sketch.points.size, 1);
 		assert.equal(sketch.lines.size, 0);
+		assert.equal(lineTool.popup.isOpen(), true);
+		assert.equal(lineTool.popup.getNumericValue('length'), 0);
 
 		// Move mouse
 		lineTool.onMouseMove(makeMouseEvent(100, 20));
+		assert.equal(lineTool.popup.getNumericValue('length'), 90);
+		assert.equal(lineTool.popup.getNumericValue('angle'), 0);
 
 		// Second click - end point & line
 		lineTool.onMouseDown(makeMouseEvent(100, 20));
 		assert.equal(sketch.lines.size, 1);
 		assert.equal(sketch.points.size, 2);
+		assert.equal(lineTool.popup.getNumericValue('length'), 0);
+	});
+
+	it('LineTool confirms typed length and angle from the popup and resets the next segment', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new LineTool();
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(10, 20));
+		tool.onMouseMove(makeMouseEvent(13, 24));
+		assert.equal(tool.popup.getNumericValue('length'), 5);
+		assert.equal(tool.popup.getNumericValue('angle'), 53.1);
+
+		tool.popup.setValue('length', '60 / 2');
+		tool.popup.setLocked('length', true, true);
+		tool.popup.setValue('angle', '0 - 90');
+		tool.popup.setLocked('angle', true, true);
+		tool.popup.onKeyDown?.({ key: 'Enter', preventDefault() {}, stopPropagation() {} } as KeyboardEvent);
+
+		const [line] = sketch.lines.values();
+		const start = sketch.points.get(line.p1Id)!;
+		const end = sketch.points.get(line.p2Id)!;
+		assert.ok(dist(start, vec(10, 20)) < 1e-6);
+		assert.ok(dist(end, vec(10, -10)) < 1e-6);
+		assert.equal(sketch.getDistanceConstraint(line.p1Id, line.p2Id)?.expression, '60 / 2');
+		const angle = [...sketch.constraints.values()].find(c => c instanceof AngleConstraint);
+		assert.equal(angle?.targetAngle, 90);
+		assert.equal(angle?.sign, -1);
+		assert.equal(angle?.expression, '-(0 - 90)');
+		assert.equal(tool.popup.isLocked('length'), false);
+		assert.equal(tool.popup.isLocked('angle'), false);
+		assert.equal(tool.popup.isOpen(), true);
+
+		tool.cancel();
+		assert.equal(tool.popup.isOpen(), false);
+		assert.equal(sketch.lines.size, 1);
+		assert.equal(sketch.undo(), true);
+		assert.equal(sketch.lines.size, 0);
 	});
 
 	it('CircleTool creates circle and center point', () => {
@@ -811,6 +853,7 @@ describe('Primitive Tools Creation', () => {
 	});
 
 	it('renderPreview calls preview visual rendering on targetGroup', () => {
+		const lineTool = new LineTool();
 		const createdElements: any[] = [];
 		const origDoc = (globalThis as any).document;
 		(globalThis as any).document = {
@@ -823,7 +866,6 @@ describe('Primitive Tools Creation', () => {
 		try {
 			const sketch = new SketchDocument();
 			const { ctx } = createMockContext(sketch);
-			const lineTool = new LineTool();
 			lineTool.activate(ctx);
 			lineTool.onMouseDown(makeMouseEvent(10, 20));
 
@@ -838,7 +880,10 @@ describe('Primitive Tools Creation', () => {
 				isConstruction: false,
 			});
 
-			assert.ok(createdElements.length > 0);
+			assert.deepEqual(
+				createdElements.map(el => el.tag),
+				['line']
+			);
 		} finally {
 			(globalThis as any).document = origDoc;
 		}
@@ -2164,6 +2209,67 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 });
 
 describe('Polygon tool modes', () => {
+	it('focuses and selects the first measurement and preserves selection as the mouse updates it', () => {
+		for (const mode of ['circumscribed', 'inscribed', 'edge'] as const) {
+			const { ctx } = createMockContext(new SketchDocument());
+			const tool = new PolygonTool();
+			tool.setMode(mode);
+			tool.activate(ctx);
+
+			const field = mode === 'edge' ? 'size' : 'radius';
+			const input = tool.popup.getInputElement(field)!;
+			const mockDocument = { activeElement: null as HTMLInputElement | null };
+			Object.assign(input, {
+				tagName: 'INPUT',
+				closest: () => tool.popup.container,
+				focus: () => {
+					mockDocument.activeElement = input;
+				},
+				select: () => {
+					Object.assign(input, { selectionStart: 0, selectionEnd: input.value.length });
+				},
+			});
+			tool.popup.container = { classList: { remove() {} } } as unknown as HTMLElement;
+			tool.popup.setError = () => {};
+			const originalDocument = globalThis.document;
+			globalThis.document = mockDocument as unknown as Document;
+			try {
+				let defaultPrevented = false;
+				const event = makeMouseEvent(0, 0);
+				event.raw.preventDefault = () => {
+					defaultPrevented = true;
+				};
+				Object.assign(event.raw, { button: 0, clientX: 0, clientY: 0 });
+				CanvasInteraction.prototype['handleMouseDown'].call(
+					{
+						activeTool: 'polygon',
+						activeToolInstance: tool,
+						svg: { ownerDocument: mockDocument },
+						highlightManager: { clear() {} },
+						lastClickPos: event.screen,
+						cancelAnimation() {},
+						isSnapModifier: () => false,
+						getScreenPos: () => event.screen,
+						createToolMouseEvent: () => event,
+						updateToolPreview() {},
+					},
+					event.raw
+				);
+				assert.equal(defaultPrevented, true);
+				assert.equal(mockDocument.activeElement, input);
+				assert.equal(input.selectionStart, 0);
+				assert.equal(input.selectionEnd, 1);
+
+				tool.onMouseMove(makeMouseEvent(12, 0));
+				assert.equal(input.value, '12');
+				assert.equal(input.selectionStart, 0);
+				assert.equal(input.selectionEnd, 2);
+			} finally {
+				globalThis.document = originalDocument;
+			}
+		}
+	});
+
 	it('uses the second click as a side midpoint by default and as a vertex in inscribed mode', () => {
 		for (const mode of ['circumscribed', 'inscribed'] as const) {
 			const sketch = new SketchDocument();
@@ -2374,5 +2480,116 @@ describe('Polygon tool modes', () => {
 		assert.equal(tool.popup.isOpen(), false);
 		assert.equal(tool.sidebarPanel.handleKeyDown(shortcut(1)), true);
 		assert.equal(tool.mode, 'circumscribed');
+	});
+});
+
+describe('Arc and Ellipse measurement popups', () => {
+	const enter = { key: 'Enter', preventDefault() {}, stopPropagation() {} } as KeyboardEvent;
+
+	it('sets the center arc radius and sweep through the popup', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new ArcTool();
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(tool.popup.isOpen(), true);
+		assert.equal(tool.popup.isFieldVisible('angle'), false);
+		tool.onMouseMove(makeMouseEvent(30, 0));
+		assert.equal(tool.popup.getNumericValue('radius'), 30);
+		tool.popup.setValue('radius', '24 / 2');
+		tool.popup.setLocked('radius', true);
+		tool.popup.onKeyDown?.(enter);
+		assert.equal(tool.popup.isFieldVisible('angle'), true);
+		tool.onMouseMove(makeMouseEvent(0, 20));
+		assert.equal(tool.popup.getNumericValue('angle'), 90);
+		tool.popup.setValue('angle', 120);
+		tool.popup.setLocked('angle', true);
+		tool.popup.onKeyDown?.(enter);
+
+		const [arc] = sketch.arcs.values();
+		const center = sketch.points.get(arc.centerId)!;
+		const end = sketch.points.get(arc.endPointId)!;
+		assert.ok(Math.abs(arc.radius - 12) < 1e-6);
+		assert.ok(Math.abs(end.x - center.x + 6) < 1e-6);
+		assert.ok(Math.abs(end.y - center.y - 6 * Math.sqrt(3)) < 1e-6);
+		assert.equal([...sketch.constraints.values()].find(c => c instanceof RadiusConstraint)?.expression, '24 / 2');
+		assert.equal([...sketch.constraints.values()].find(c => c instanceof AngleConstraint)?.targetAngle, 120);
+		assert.equal(tool.popup.isOpen(), false);
+	});
+
+	it('updates the other measurement when locking the sweep of a three-point arc', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new ArcTool('three_point');
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(-10, 0));
+		assert.equal(tool.popup.isOpen(), false);
+		tool.onMouseDown(makeMouseEvent(10, 0));
+		assert.equal(tool.popup.isFieldVisible('angle'), true);
+		tool.onMouseMove(makeMouseEvent(0, 5));
+		assert.equal(tool.popup.getNumericValue('radius'), 12.5);
+		tool.popup.setLocked('radius', true);
+		tool.popup.setValue('angle', 180);
+		tool.popup.setLocked('angle', true, true);
+		assert.equal(tool.popup.isLocked('radius'), false);
+		assert.equal(tool.popup.getNumericValue('radius'), 10);
+		tool.popup.onKeyDown?.(enter);
+		const [arc] = sketch.arcs.values();
+		assert.ok(Math.abs(arc.radius - 10) < 1e-6);
+	});
+
+	it('creates a tangent arc with the entered radius and sweep', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const a = sketch.addPoint(vec(-20, 0));
+		const b = sketch.addPoint(vec(0, 0));
+		sketch.addLine(a.id, b.id);
+		const tool = new ArcTool('tangent');
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(0, 0, { type: 'point', id: b.id, worldPos: b, screenPos: b }));
+		tool.onMouseMove(makeMouseEvent(10, 10));
+		assert.equal(tool.popup.getNumericValue('angle'), 90);
+		tool.popup.setValue('radius', 15);
+		tool.popup.setLocked('radius', true);
+		tool.popup.setValue('angle', 270);
+		tool.popup.setLocked('angle', true);
+		tool.popup.onKeyDown?.(enter);
+		const [arc] = sketch.arcs.values();
+		const end = sketch.points.get(arc.endPointId)!;
+		assert.ok(Math.abs(arc.radius - 15) < 1e-6);
+		assert.ok(dist(end, vec(-15, 15)) < 1e-6);
+		assert.equal([...sketch.constraints.values()].find(c => c instanceof AngleConstraint)?.targetAngle, 270);
+	});
+
+	it('sets both ellipse radii through the popup in either mode', () => {
+		for (const mode of ['ellipse', 'elliptical_arc'] as const) {
+			const sketch = new SketchDocument();
+			const { ctx } = createMockContext(sketch);
+			const tool = new EllipseTool(mode);
+			tool.activate(ctx);
+			tool.onMouseDown(makeMouseEvent(0, 0));
+			tool.onMouseMove(makeMouseEvent(30, 0));
+			assert.equal(tool.popup.getNumericValue('major'), 30);
+			tool.popup.setValue('major', '40 / 2');
+			tool.popup.setLocked('major', true);
+			tool.popup.onKeyDown?.(enter);
+			tool.onMouseMove(makeMouseEvent(0, 15));
+			assert.equal(tool.popup.getNumericValue('minor'), 15);
+			tool.popup.setValue('minor', 8);
+			tool.popup.setLocked('minor', true);
+			tool.popup.onKeyDown?.(enter);
+
+			if (mode === 'elliptical_arc') {
+				tool.onMouseDown(makeMouseEvent(20, 0));
+				tool.onMouseDown(makeMouseEvent(0, 8));
+			}
+
+			const [entity] = (mode === 'ellipse' ? sketch.ellipses : sketch.ellipticalArcs).values();
+			const center = sketch.points.get(entity.centerId)!;
+			assert.ok(Math.abs(dist(center, sketch.points.get(entity.majorAxisPointId)!) - 20) < 1e-6);
+			assert.ok(Math.abs(dist(center, sketch.points.get(entity.minorAxisPointId)!) - 8) < 1e-6);
+			assert.equal([...sketch.constraints.values()].find(c => c instanceof DistanceConstraint)?.expression, '40 / 2');
+			assert.equal(tool.popup.isOpen(), false);
+		}
 	});
 });

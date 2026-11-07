@@ -129,6 +129,7 @@ export class SlotTool extends BaseTool {
 					visible: false,
 				},
 			],
+			onKeyDown: e => this.sidebarPanel.handleKeyDown(e),
 		});
 
 		this.popup.onChange = () => {
@@ -635,7 +636,6 @@ export class SlotTool extends BaseTool {
 
 			this.drawingStep = 1;
 			this.popup.show(e.screen);
-			this.popup.focus('distance');
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -690,7 +690,6 @@ export class SlotTool extends BaseTool {
 
 			this.drawingStep = 1;
 			this.popup.show(e.screen);
-			this.popup.focus('distance');
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -780,7 +779,6 @@ export class SlotTool extends BaseTool {
 
 			this.drawingStep = 1;
 			this.popup.show(e.screen);
-			this.popup.focus('distance');
 			this.updateToastHint();
 			this.onStateChange?.();
 			this.ctx.requestRender();

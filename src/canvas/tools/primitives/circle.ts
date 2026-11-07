@@ -31,6 +31,7 @@ export class CircleTool extends BaseTool {
 				lockable: true,
 			},
 		],
+		onKeyDown: e => this.sidebarPanel.handleKeyDown(e),
 	});
 
 	private drawingStep = 0;
@@ -115,6 +116,7 @@ export class CircleTool extends BaseTool {
 		super.activate(ctx);
 		this.popup.setSketch(ctx.sketch);
 		this.popup.onCommit = () => this.commitPopupValue();
+		this.popup.onCancel = () => this.ctx.setTool('select');
 		this.popup.onChange = () => this.ctx.requestRender();
 	}
 
@@ -245,7 +247,6 @@ export class CircleTool extends BaseTool {
 				this.popup.setFieldLabel('radius', 'Diameter');
 				this.popup.resetField('radius', 20);
 				this.popup.show(e.screen);
-				this.popup.focus('radius');
 				this.notify();
 			} else {
 				const locked = this.popup.isLocked('radius');
@@ -265,14 +266,12 @@ export class CircleTool extends BaseTool {
 				this.popup.setFieldLabel('radius', 'Diameter');
 				this.popup.resetField('radius', 20);
 				this.popup.show(e.screen);
-				this.popup.focus('radius');
 			}
 
 			if (this._mode === 'three_point' && this.drawingStep === 2) {
 				this.popup.setFieldLabel('radius', 'Diameter');
 				this.popup.resetField('radius', 20);
 				this.popup.show(e.screen);
-				this.popup.focus('radius');
 			}
 
 			if (this._mode === 'two_point' && this.points.length === 2) {
@@ -353,7 +352,6 @@ export class CircleTool extends BaseTool {
 			this.popup.setFieldLabel('radius', 'Radius');
 			this.popup.resetField('radius', 10);
 			this.popup.show(e.screen);
-			this.popup.focus('radius');
 		}
 
 		if (this._mode === 'three_tangent' && this.lineIds.length === 3) {

@@ -514,22 +514,6 @@ export const SNAP_OBJECT_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
-// Tooltip
-export const TOOLTIP_RECT_ATTRS: SvgAttrs = {
-	rx: 4,
-	fill: COLORS.tooltipBg,
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.thin,
-};
-
-export const TOOLTIP_TEXT_ATTRS: SvgAttrs = {
-	'text-anchor': 'middle',
-	fill: COLORS.white,
-	'font-size': 11,
-	'font-weight': 500,
-	'font-family': 'monospace',
-};
-
 // Spline SvgAttrs Presets
 export const SPLINE_HANDLE_ATTRS: SvgAttrs = {
 	class: 'entity-visible visible-spline-handle',

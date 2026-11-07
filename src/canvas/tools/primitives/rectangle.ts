@@ -65,6 +65,7 @@ export class RectangleTool extends BaseTool {
 					visible: this._mode === 'rounded',
 				},
 			],
+			onKeyDown: e => this.sidebarPanel.handleKeyDown(e),
 		});
 
 		const syncValuesFromPopup = () => {

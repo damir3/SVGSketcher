@@ -1,17 +1,9 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
-import { angleFromTo, angleFromToDeg, abs, distancesFrom, vec, type Vec2 } from '../math/vector';
+import { angleFromTo, angleFromToDeg, distancesFrom, vec, type Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
-import {
-	createSvgElement,
-	createSvgLine,
-	createSvgCircle,
-	createSvgRect,
-	createSvgEllipse,
-	createSvgPath,
-	renderTooltip,
-} from './svg';
+import { createSvgElement, createSvgLine, createSvgCircle, createSvgEllipse, createSvgPath } from './svg';
 import {
 	COLORS,
 	STROKE_WIDTH,
@@ -38,39 +30,6 @@ import {
 	type BezierSegment,
 } from '../math/spline';
 
-const TWO_PI = 2 * Math.PI;
-
-export function renderLinePreviewVisual(
-	parent: SVGElement,
-	s1: Vec2,
-	s2: Vec2,
-	len: number,
-	angleDeg: number,
-	isConstruction = false,
-	axisBadge?: 'H' | 'V'
-): void {
-	createSvgLine(s1, s2, getPreviewStrokeAttrs(isConstruction, false, true), parent);
-
-	const mid = { x: (s1.x + s2.x) * 0.5, y: (s1.y + s2.y) * 0.5 - 16 };
-	const badgeText = axisBadge ? ` [${axisBadge}]` : '';
-	const label = `${len.toFixed(1)} mm | ${angleDeg.toFixed(1)}°${badgeText}`;
-	renderTooltip(parent, mid, label);
-}
-
-export function renderCirclePreviewVisual(
-	parent: SVGElement,
-	center: Vec2,
-	current: Vec2,
-	radius: number,
-	isConstruction = false,
-	isGuide = false
-): void {
-	const rPx = Math.hypot(current.x - center.x, current.y - center.y);
-	createSvgCircle(center, rPx, getPreviewStrokeAttrs(isConstruction, isGuide), parent);
-	createSvgLine(center, current, AUX_RAY_ATTRS, parent);
-	renderTooltip(parent, { x: current.x + 12, y: current.y - 12 }, `R ${radius.toFixed(1)} mm`);
-}
-
 export function renderArcPreviewVisual(
 	parent: SVGElement,
 	sc: Vec2,
@@ -78,52 +37,12 @@ export function renderArcPreviewVisual(
 	se: Vec2,
 	sr: number,
 	clockwise: boolean,
-	radiusVal: number,
-	sweepDeg?: number,
 	isConstruction = false
 ): void {
-	const as = angleFromTo(sc, ss);
-	const ae = angleFromTo(sc, se);
-
-	let sweepAngle = 0;
-	if (clockwise) {
-		sweepAngle = (ae - as) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	} else {
-		sweepAngle = (as - ae) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	}
-
 	createSvgCircle(sc, sr, GUIDE_OUTLINE_ATTRS, parent);
-
-	const d = getArcSvgPath(sc, ss, se, sr, clockwise);
-	createSvgPath(d, getPreviewStrokeAttrs(isConstruction, false, true), parent);
-
+	createSvgPath(getArcSvgPath(sc, ss, se, sr, clockwise), getPreviewStrokeAttrs(isConstruction, false, true), parent);
 	createSvgLine(sc, ss, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc, se, AUX_RAY_ATTRS, parent);
-
-	const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
-	const midPoint = { x: sc.x + sr * Math.cos(midAngle), y: sc.y + sr * Math.sin(midAngle) };
-
-	const deg = sweepDeg ?? (sweepAngle * 180) / Math.PI;
-	renderTooltip(parent, midPoint, `R ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
-}
-
-export function renderRectanglePreviewVisual(
-	parent: SVGElement,
-	s1: Vec2,
-	s2: Vec2,
-	w: number,
-	h: number,
-	isConstruction = false
-): void {
-	const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
-	const size = abs(s2, s1);
-	const width = size.x;
-	const height = size.y;
-
-	createSvgRect(min, { x: width, y: height }, getPreviewStrokeAttrs(isConstruction), parent);
-	renderTooltip(parent, { x: s2.x + 12, y: s2.y - 12 }, `${w.toFixed(1)} × ${h.toFixed(1)} mm`);
 }
 
 export function renderPolygonPreviewVisual(
@@ -175,13 +94,7 @@ export function renderPolygonPreviewVisual(
 	if (handle) createSvgCircle(handle, 2.5, POLYGON_RADIUS_HANDLE_ATTRS, parent);
 }
 
-export function renderEllipseMajorAxisPreviewVisual(
-	parent: SVGElement,
-	sc: Vec2,
-	current: Vec2,
-	radiusVal: number,
-	_isConstruction = false
-): void {
+export function renderEllipseMajorAxisPreviewVisual(parent: SVGElement, sc: Vec2, current: Vec2): void {
 	createSvgLine(
 		sc,
 		current,
@@ -192,9 +105,6 @@ export function renderEllipseMajorAxisPreviewVisual(
 		},
 		parent
 	);
-
-	const deg = angleFromToDeg(sc, current);
-	renderTooltip(parent, { x: current.x + 12, y: current.y - 12 }, `Rx ${radiusVal.toFixed(1)} mm | ${deg.toFixed(1)}°`);
 }
 
 export function renderEllipsePreviewVisual(
@@ -202,8 +112,6 @@ export function renderEllipsePreviewVisual(
 	sc: Vec2,
 	smaj: Vec2,
 	smin: Vec2,
-	rxVal: number,
-	ryVal: number,
 	isConstruction = false,
 	isGuide = false
 ): void {
@@ -222,8 +130,6 @@ export function renderEllipsePreviewVisual(
 
 	createSvgLine(sc, smaj, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc, smin, AUX_RAY_ATTRS, parent);
-
-	renderTooltip(parent, { x: smin.x + 12, y: smin.y - 12 }, `Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm`);
 }
 
 export function renderEllipticalArcStartPreviewVisual(
@@ -231,10 +137,7 @@ export function renderEllipticalArcStartPreviewVisual(
 	sc: Vec2,
 	smaj: Vec2,
 	smin: Vec2,
-	ss: Vec2,
-	rxVal: number,
-	ryVal: number,
-	_isConstruction = false
+	ss: Vec2
 ): void {
 	const r = distancesFrom(sc, smaj, smin);
 	const theta = angleFromTo(sc, smaj);
@@ -261,11 +164,6 @@ export function renderEllipticalArcStartPreviewVisual(
 
 	createSvgLine(sc, projSs, AUX_RAY_ATTRS, parent);
 	createSvgCircle(projSs, 4, { fill: COLORS.primary }, parent);
-	renderTooltip(
-		parent,
-		{ x: projSs.x + 12, y: projSs.y - 12 },
-		`Start Angle | Rx ${rxVal.toFixed(1)} Ry ${ryVal.toFixed(1)}`
-	);
 }
 
 export function renderEllipticalArcPreviewVisual(
@@ -275,8 +173,6 @@ export function renderEllipticalArcPreviewVisual(
 	smin: Vec2,
 	ss: Vec2,
 	se: Vec2,
-	rxVal: number,
-	ryVal: number,
 	clockwise: boolean,
 	isConstruction = false
 ): void {
@@ -298,17 +194,7 @@ export function renderEllipticalArcPreviewVisual(
 
 	const { axisU: u, axisV: v } = ellipseAxes(theta);
 
-	const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
 	const te = ellipseParameterAtPoint(se, sc, r, u, v);
-
-	let sweepAngle = 0;
-	if (clockwise) {
-		sweepAngle = (te - ts) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	} else {
-		sweepAngle = (ts - te) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	}
 
 	const projSe = ellipsePointAtParameter(te, sc, r, u, v);
 
@@ -317,13 +203,6 @@ export function renderEllipticalArcPreviewVisual(
 
 	createSvgLine(sc, ss, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc, projSe, AUX_RAY_ATTRS, parent);
-
-	const sweepDeg = (sweepAngle * 180) / Math.PI;
-	renderTooltip(
-		parent,
-		{ x: projSe.x + 12, y: projSe.y - 12 },
-		`Rx ${rxVal.toFixed(1)} | Ry ${ryVal.toFixed(1)} mm | ${sweepDeg.toFixed(1)}°`
-	);
 }
 
 export function renderSplinePreviewVisual(

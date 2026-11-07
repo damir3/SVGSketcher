@@ -46,7 +46,7 @@ import {
 	createSvgEllipse,
 	createSvgPath,
 	createSvgText,
-	renderTooltip,
+	renderDimensionLabel,
 	getArcSvgPath,
 	getEllipticalArcSvgPath,
 } from './svg';
@@ -1510,7 +1510,7 @@ export class SVGRenderer {
 			parent,
 			isSelected = false,
 			constraintId,
-			isTooltip = false,
+			isPreview = false,
 			startPointHighlight,
 			targetPointSnapped = false,
 		} = opts;
@@ -1532,7 +1532,7 @@ export class SVGRenderer {
 
 		// 1. Extension lines
 		if (extensionLines && extensionLines.length > 0) {
-			const extAttrs = isTooltip
+			const extAttrs = isPreview
 				? PREVIEW_EXTENSION_LINE_ATTRS
 				: isSelected
 					? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
@@ -1582,37 +1582,7 @@ export class SVGRenderer {
 		}
 		createSvgLine(d1, d2, lineAttrs, g);
 
-		// 5. Label (tooltip or badge) at midpoint
-		const mid = { x: (d1.x + d2.x) * 0.5, y: (d1.y + d2.y) * 0.5 };
-		if (isTooltip) {
-			this.renderTooltip({ x: mid.x, y: mid.y - 12 }, label);
-		} else {
-			const textLen = label.length * 8 + 14;
-			createSvgRect(
-				{ x: mid.x - textLen * 0.5, y: mid.y - 10 },
-				{ x: textLen, y: 20 },
-				{
-					rx: 4,
-					fill: COLORS.white,
-					stroke: color,
-					'stroke-width': STROKE_WIDTH.thin,
-				},
-				g
-			);
-
-			createSvgText(
-				{ x: mid.x, y: mid.y + 4 },
-				label,
-				{
-					'text-anchor': 'middle',
-					fill: color,
-					'font-size': 12,
-					'font-weight': 600,
-					'font-family': 'monospace',
-				},
-				g
-			);
-		}
+		renderDimensionLabel(g, vec((d1.x + d2.x) * 0.5, (d1.y + d2.y) * 0.5), label, color);
 	}
 
 	private renderDashedExtensionLines(
@@ -2292,7 +2262,7 @@ export class SVGRenderer {
 			label: `${labelPrefix}${distVal.toFixed(1)} mm`,
 			extensionLines: geom.extensionLines,
 			parent: this.previewGroup,
-			isTooltip: true,
+			isPreview: true,
 			startPointHighlight: orientation === 'direct' ? s1 : undefined,
 			targetPointSnapped: isTargetSnapped,
 		});
@@ -2313,7 +2283,7 @@ export class SVGRenderer {
 			label: `${distVal.toFixed(1)} mm`,
 			extensionLines: geom.extensionLines,
 			parent: this.previewGroup,
-			isTooltip: true,
+			isPreview: true,
 			startPointHighlight: sp,
 		});
 	}
@@ -2366,7 +2336,7 @@ export class SVGRenderer {
 			this.previewGroup
 		);
 
-		this.renderTooltip(midpoint, `${angleDeg.toFixed(1)}°`);
+		renderDimensionLabel(this.previewGroup, midpoint, `${angleDeg.toFixed(1)}°`, COLORS.primary, 'angle');
 	}
 
 	renderSnapIndicator(
@@ -3357,9 +3327,5 @@ export class SVGRenderer {
 	clearPreviews(): void {
 		this.previewGroup.innerHTML = '';
 		this.overlayGroup.innerHTML = '';
-	}
-
-	renderTooltip(position: Vec2, textStr: string): void {
-		renderTooltip(this.previewGroup, position, textStr);
 	}
 }

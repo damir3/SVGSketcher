@@ -495,7 +495,7 @@ describe('Origin & Axis Constraints', () => {
 
 			// Step 2: Click to place end point
 			lineTool.onMouseDown({
-				raw: {} as MouseEvent,
+				raw: { preventDefault() {} } as MouseEvent,
 				screen: vec(80, 60),
 				client: vec(80, 60),
 				world: vec(80, 60),

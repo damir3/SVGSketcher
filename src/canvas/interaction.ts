@@ -813,6 +813,9 @@ export class CanvasInteraction {
 					(this.activeTool === 'fillet' ||
 						this.activeTool === 'chamfer' ||
 						this.activeTool === 'polygon' ||
+						this.activeTool === 'arc' ||
+						this.activeTool === 'ellipse' ||
+						this.activeTool === 'line' ||
 						this.activeTool === 'spline' ||
 						this.activeTool === 'text') &&
 					tool?.onKeyDown?.(e)
@@ -1728,10 +1731,15 @@ export class CanvasInteraction {
 
 		// Delegate to active tool if not select
 		if (this.activeTool !== 'select' && this.activeToolInstance?.onMouseDown) {
+			const focusDocument = this.svg.ownerDocument;
+			const previousFocus = focusDocument?.activeElement;
 			const toolEvent = this.createToolMouseEvent(e);
 			const handled = this.activeToolInstance.onMouseDown(toolEvent);
 			if (handled !== false) {
 				this.updateToolPreview();
+				// Keep the focus a tool popup took during this canvas click.
+				const focus = focusDocument?.activeElement;
+				if (focus !== previousFocus && focus?.closest?.('.tool-popup')) e.preventDefault();
 				return;
 			}
 		}

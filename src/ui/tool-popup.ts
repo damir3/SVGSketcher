@@ -251,6 +251,7 @@ export class ToolPopup<TFieldId extends string = string> {
 	}
 
 	public show(posOrBBox?: Vec2 | ScreenBoundingBox, ..._args: any[]): void {
+		const opening = !this._isOpen;
 		this._isOpen = true;
 		if (!this.container) return;
 		this.setError(false);
@@ -259,6 +260,7 @@ export class ToolPopup<TFieldId extends string = string> {
 		if (posOrBBox) {
 			this.updatePosition(posOrBBox);
 		}
+		if (opening) this.focus();
 	}
 
 	public hide(): void {
@@ -374,6 +376,13 @@ export class ToolPopup<TFieldId extends string = string> {
 				field.row.classList?.add?.('hidden');
 			}
 		}
+	}
+
+	public setFieldReadOnly(id: TFieldId, readOnly: boolean): void {
+		const field = this.fieldMap.get(id);
+		if (!field) return;
+		field.input.readOnly = readOnly;
+		if (field.lockBtn) field.lockBtn.disabled = readOnly;
 	}
 
 	public isFieldVisible(id: TFieldId): boolean {
@@ -524,6 +533,12 @@ export class ToolPopup<TFieldId extends string = string> {
 		if (field.config.type === 'checkbox') {
 			field.input.checked = Boolean(value);
 		} else {
+			const { input } = field;
+			const keepSelection =
+				typeof document !== 'undefined' &&
+				document.activeElement === input &&
+				input.selectionStart === 0 &&
+				input.selectionEnd === input.value.length;
 			if (value === null || value === undefined) {
 				field.input.value = '';
 			} else if (typeof value === 'number') {
@@ -537,6 +552,7 @@ export class ToolPopup<TFieldId extends string = string> {
 			} else {
 				field.input.value = String(value);
 			}
+			if (keepSelection) input.select();
 			if (field.config.type === 'dimension') {
 				this.updateFieldEvalPreview(field);
 			}
@@ -665,7 +681,7 @@ export class ToolPopup<TFieldId extends string = string> {
 		const visible: HTMLElement[] = [];
 		for (const id of this.fieldOrder) {
 			const field = this.fieldMap.get(id);
-			if (field?.isVisible && field.input) {
+			if (field?.isVisible && field.input && !field.input.readOnly) {
 				visible.push(field.input);
 			}
 		}

@@ -14,7 +14,7 @@ export interface LinearDimensionVisualOptions {
 	parent: SVGElement;
 	isSelected?: boolean;
 	constraintId?: string;
-	isTooltip?: boolean;
+	isPreview?: boolean;
 	startPointHighlight?: Vec2;
 	targetPointSnapped?: boolean;
 }

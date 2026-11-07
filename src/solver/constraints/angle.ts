@@ -3,7 +3,7 @@ import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } fro
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
-import { createSvgElement, createSvgPath, createSvgRect, createSvgText } from '../../canvas/svg';
+import { createSvgElement, createSvgPath, renderDimensionLabel } from '../../canvas/svg';
 import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
 import { angleFromTo, addScaled, cross, scale, sub, vec } from '../../math/vector';
 
@@ -201,35 +201,8 @@ export class AngleConstraint extends BaseConstraint {
 			g
 		);
 
-		// Text label badge with background
 		const prefix = this.expression ? 'fx: ' : '';
-		const textVal = `${prefix}${this.targetAngle.toFixed(1)}°`;
-		const textLen = textVal.length * 8 + 14;
-
-		createSvgRect(
-			{ x: midPoint.x - textLen * 0.5, y: midPoint.y - 10 },
-			{ x: textLen, y: 20 },
-			{
-				rx: 4,
-				fill: COLORS.white,
-				stroke: color,
-				'stroke-width': STROKE_WIDTH.dimension,
-			},
-			g
-		);
-
-		createSvgText(
-			{ x: midPoint.x, y: midPoint.y + 4 },
-			textVal,
-			{
-				'text-anchor': 'middle',
-				fill: color,
-				'font-size': 11,
-				'font-weight': 700,
-				'font-family': 'ui-monospace, monospace',
-			},
-			g
-		);
+		renderDimensionLabel(g, midPoint, `${prefix}${this.targetAngle.toFixed(1)}°`, color, 'angle');
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {

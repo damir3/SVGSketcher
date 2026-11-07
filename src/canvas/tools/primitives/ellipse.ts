@@ -1,7 +1,7 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../../../math/ellipse';
 import { BaseTool } from '../base';
-import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { angleFromTo, dot, dist, distancesFrom, vec, sub, type Vec2 } from '../../../math/vector';
+import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
+import { addScaled, angleFromTo, dot, dist, distancesFrom, vec, sub, type Vec2 } from '../../../math/vector';
 import {
 	renderEllipseMajorAxisPreviewVisual,
 	renderEllipsePreviewVisual,
@@ -9,6 +9,7 @@ import {
 	renderEllipticalArcPreviewVisual,
 } from '../../previewHelpers';
 import { VariationToolPanel } from '../../../ui/panels/tools';
+import { ToolPopup } from '../../../ui/tool-popup';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 
 const TWO_PI = 2 * Math.PI;
@@ -17,6 +18,15 @@ export type EllipseMode = 'ellipse' | 'elliptical_arc';
 
 export class EllipseTool extends BaseTool {
 	readonly id = 'ellipse' as const;
+	readonly popup = new ToolPopup<'major' | 'minor'>({
+		className: 'ellipse-popup',
+		fields: [
+			{ id: 'major', label: 'Major Radius', type: 'dimension', unit: 'mm', lockable: true, min: 0.1 },
+			{ id: 'minor', label: 'Minor Radius', type: 'dimension', unit: 'mm', lockable: true, min: 0.1 },
+		],
+		onKeyDown: e => this.sidebarPanel?.handleKeyDown?.(e) || this.onKeyDown(e),
+	});
+	private lastPointer: ToolMouseEvent | null = null;
 	private _mode: EllipseMode;
 
 	private drawingStep: 0 | 1 | 2 | 3 | 4 = 0;
@@ -65,6 +75,9 @@ export class EllipseTool extends BaseTool {
 				this.onStateChange = cb;
 			},
 		});
+		this.popup.onChange = () => this.ctx.requestRender();
+		this.popup.onLockChange = () => this.ctx.requestRender();
+		this.popup.onCancel = () => this.ctx.setTool('select');
 	}
 
 	getStepHint(): string {
@@ -100,6 +113,27 @@ export class EllipseTool extends BaseTool {
 		this.ctx?.requestRender();
 	}
 
+	override activate(ctx: ToolContext): void {
+		super.activate(ctx);
+		this.popup.setSketch(ctx.sketch);
+	}
+
+	override onKeyDown(e: KeyboardEvent): boolean | void {
+		if (!this.popup.isOpen() || !this.lastPointer) return;
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.onMouseDown(this.lastPointer);
+			return true;
+		}
+		if (e.key === 'Tab') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.popup.cycleFocus(e.shiftKey);
+			return true;
+		}
+	}
+
 	override deactivate(): void {
 		this.cancel();
 		super.deactivate();
@@ -110,6 +144,7 @@ export class EllipseTool extends BaseTool {
 	}
 
 	override onMouseDown(e: ToolMouseEvent): void {
+		this.lastPointer = e;
 		const { sketch } = this.ctx;
 		const snap = this.shouldSnap() ? e.snap : null;
 		const world = e.world;
@@ -129,74 +164,45 @@ export class EllipseTool extends BaseTool {
 			}
 			this.centerId = cId;
 			this.drawingStep = 1;
+			this.popup.resetField('major', 0);
+			this.popup.resetField('minor', 0);
+			this.popup.setFieldReadOnly('major', false);
+			this.popup.setFieldReadOnly('minor', true);
+			this.popup.show(e.client);
 			this.onStateChange?.();
 			this.ctx.requestRender();
 		} else if (this.drawingStep === 1) {
-			const centerWorld = this.centerWorldPos!;
-			const effectiveWorld = snap ? snap.worldPos : world;
-			if (dist(centerWorld, effectiveWorld) < 2) {
-				return;
-			}
-
-			let p1Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.centerId && sketch.points.has(snap.id)) {
-				p1Id = snap.id;
-				this.majWorldPos = snap.worldPos;
-			} else {
-				const pt = sketch.addPoint(effectiveWorld);
-				p1Id = pt.id;
-				this.majWorldPos = vec(pt.x, pt.y);
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.majPtId = p1Id;
+			const center = this.centerWorldPos!;
+			const position = this.getMajorPoint(center, world);
+			if (!this.popup.isLocked('major') && dist(center, position) < 2) return;
+			this.majPtId = sketch.addPoint(position).id;
+			this.majWorldPos = position;
 			this.drawingStep = 2;
+			this.popup.updateValueIfUnlocked('major', dist(center, position));
+			this.popup.setFieldReadOnly('major', true);
+			this.popup.setFieldReadOnly('minor', false);
+			this.popup.updatePosition(e.client);
+			this.popup.focus('minor');
 			this.onStateChange?.();
 			this.ctx.requestRender();
 		} else if (this.drawingStep === 2) {
-			const centerWorld = this.centerWorldPos!;
-			const majWorld = this.majWorldPos!;
-			const effectiveWorld = snap ? snap.worldPos : world;
-
-			const majLen = dist(centerWorld, majWorld);
-			if (majLen < 0.1) return;
-
-			const u = vec((majWorld.x - centerWorld.x) / majLen, (majWorld.y - centerWorld.y) / majLen);
-			const v = vec(-u.y, u.x);
-
-			const dir = sub(effectiveWorld, centerWorld);
-			const projection = dot(dir, v);
-			const ryVal = Math.max(1, Math.abs(projection));
-			const sign = projection < 0 ? -1 : 1;
-
-			const minorAxisPos = { x: centerWorld.x + sign * ryVal * v.x, y: centerWorld.y + sign * ryVal * v.y };
-
-			let p2Id: string;
-			if (
-				snap &&
-				snap.type === 'point' &&
-				snap.id &&
-				snap.id !== this.centerId &&
-				snap.id !== this.majPtId &&
-				sketch.points.has(snap.id)
-			) {
-				p2Id = snap.id;
-				this.minWorldPos = snap.worldPos;
-			} else {
-				const pt = sketch.addPoint(minorAxisPos);
-				p2Id = pt.id;
-				this.minWorldPos = vec(pt.x, pt.y);
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
+			const center = this.centerWorldPos!;
+			const position = this.getMinorPoint(center, this.majWorldPos!, world);
+			const point = sketch.addPoint(position);
+			this.minPtId = point.id;
+			this.minWorldPos = position;
+			this.popup.updateValueIfUnlocked('minor', dist(center, position));
 
 			if (this._mode === 'ellipse') {
-				sketch.addEllipse(this.centerId!, this.majPtId!, p2Id, this.ctx.isConstructionMode);
+				sketch.addEllipse(this.centerId!, this.majPtId!, point.id, this.ctx.isConstructionMode);
+				this.constrainRadii();
 				sketch.commitTransaction();
 				this.cancel();
 				this.ctx.requestRender();
 				this.ctx.showToast('Ellipse created');
 			} else {
-				this.minPtId = p2Id;
 				this.drawingStep = 3;
+				this.popup.setFieldReadOnly('minor', true);
 				this.onStateChange?.();
 				this.ctx.requestRender();
 			}
@@ -322,6 +328,7 @@ export class EllipseTool extends BaseTool {
 				clockwise,
 				this.ctx.isConstructionMode
 			);
+			this.constrainRadii();
 			sketch.commitTransaction();
 			this.cancel();
 			this.ctx.requestRender();
@@ -330,6 +337,16 @@ export class EllipseTool extends BaseTool {
 	}
 
 	override onMouseMove(e: ToolMouseEvent): void {
+		this.lastPointer = e;
+		if (this.centerWorldPos) {
+			if (this.drawingStep === 1) {
+				this.popup.updateValueIfUnlocked('major', dist(this.centerWorldPos, e.world));
+			} else if (this.drawingStep === 2 && this.majWorldPos) {
+				const minor = this.getMinorPoint(this.centerWorldPos, this.majWorldPos, e.world);
+				this.popup.updateValueIfUnlocked('minor', dist(this.centerWorldPos, minor));
+			}
+			this.popup.updatePosition(e.client);
+		}
 		const effectiveWorld = this.shouldSnap() && e.snap ? e.snap.worldPos : e.world;
 
 		if (this.drawingStep === 4 && this.centerWorldPos && this.majWorldPos && this.minWorldPos && this.startWorldPtPos) {
@@ -375,44 +392,27 @@ export class EllipseTool extends BaseTool {
 		const effectiveWorld = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 
 		if (this.drawingStep === 1 && this.centerWorldPos) {
-			const s1 = ctx.viewport.worldToScreen(this.centerWorldPos);
-			const s2 = ctx.viewport.worldToScreen(effectiveWorld);
-			const rx = dist(this.centerWorldPos, effectiveWorld);
-			renderEllipseMajorAxisPreviewVisual(ctx.targetGroup, s1, s2, rx, ctx.isConstruction);
+			const start = ctx.viewport.worldToScreen(this.centerWorldPos);
+			const end = ctx.viewport.worldToScreen(this.getMajorPoint(this.centerWorldPos, effectiveWorld));
+			renderEllipseMajorAxisPreviewVisual(ctx.targetGroup, start, end);
 		} else if (this.drawingStep === 2 && this.centerWorldPos && this.majWorldPos) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-
-			const majLen = dist(centerWorld, majWorld);
-			if (majLen >= 0.1) {
-				const u = vec((majWorld.x - centerWorld.x) / majLen, (majWorld.y - centerWorld.y) / majLen);
-				const v = vec(-u.y, u.x);
-
-				const dir = sub(effectiveWorld, centerWorld);
-				const projection = dot(dir, v);
-				const ryVal = Math.max(1, Math.abs(projection));
-				const sign = projection < 0 ? -1 : 1;
-
-				const sc = ctx.viewport.worldToScreen(centerWorld);
-				const smaj = ctx.viewport.worldToScreen(majWorld);
-				const sminWorld = vec(centerWorld.x + sign * ryVal * v.x, centerWorld.y + sign * ryVal * v.y);
-				const smin = ctx.viewport.worldToScreen(sminWorld);
-
-				renderEllipsePreviewVisual(ctx.targetGroup, sc, smaj, smin, majLen, ryVal, ctx.isConstruction);
-			}
+			const center = ctx.viewport.worldToScreen(this.centerWorldPos);
+			const major = ctx.viewport.worldToScreen(this.majWorldPos);
+			const minor = ctx.viewport.worldToScreen(
+				this.getMinorPoint(this.centerWorldPos, this.majWorldPos, effectiveWorld)
+			);
+			renderEllipsePreviewVisual(ctx.targetGroup, center, major, minor, ctx.isConstruction);
 		} else if (this.drawingStep === 3 && this.centerWorldPos && this.majWorldPos && this.minWorldPos) {
 			const centerWorld = this.centerWorldPos;
 			const majWorld = this.majWorldPos;
 			const minWorld = this.minWorldPos;
-			const rxVal = dist(centerWorld, majWorld);
-			const ryVal = dist(centerWorld, minWorld);
 
 			const sc = ctx.viewport.worldToScreen(centerWorld);
 			const smaj = ctx.viewport.worldToScreen(majWorld);
 			const smin = ctx.viewport.worldToScreen(minWorld);
 			const ss = ctx.viewport.worldToScreen(effectiveWorld);
 
-			renderEllipticalArcStartPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss, rxVal, ryVal, ctx.isConstruction);
+			renderEllipticalArcStartPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss);
 		} else if (
 			this.drawingStep === 4 &&
 			this.centerWorldPos &&
@@ -450,19 +450,36 @@ export class EllipseTool extends BaseTool {
 					clockwise = delta >= 0;
 				}
 
-				renderEllipticalArcPreviewVisual(
-					ctx.targetGroup,
-					sc,
-					smaj,
-					smin,
-					ss,
-					se,
-					rxVal,
-					ryVal,
-					clockwise,
-					ctx.isConstruction
-				);
+				renderEllipticalArcPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss, se, clockwise, ctx.isConstruction);
 			}
+		}
+	}
+
+	private getMajorPoint(center: Vec2, cursor: Vec2): Vec2 {
+		if (!this.popup.isLocked('major')) return cursor;
+		const { axisU } = ellipseAxes(angleFromTo(center, cursor));
+		return addScaled(center, axisU, this.popup.getNumericValue('major', 0.1));
+	}
+
+	private getMinorPoint(center: Vec2, major: Vec2, cursor: Vec2): Vec2 {
+		const { axisV } = ellipseAxes(angleFromTo(center, major));
+		const projection = dot(sub(cursor, center), axisV);
+		const radius = this.popup.isLocked('minor')
+			? this.popup.getNumericValue('minor', 0.1)
+			: Math.max(1, Math.abs(projection));
+		return addScaled(center, axisV, projection < 0 ? -radius : radius);
+	}
+
+	private constrainRadii(): void {
+		const { sketch } = this.ctx;
+		for (const [field, id] of [
+			['major', this.majPtId],
+			['minor', this.minPtId],
+		] as const) {
+			if (!id || !this.popup.isLocked(field)) continue;
+			const constraint = sketch.addDistanceConstraint(this.centerId!, id, this.popup.getNumericValue(field, 0.1));
+			const expression = this.popup.getExpression(field);
+			if (constraint && expression) constraint.expression = expression;
 		}
 	}
 
@@ -470,6 +487,8 @@ export class EllipseTool extends BaseTool {
 		if (this.drawingStep > 0) {
 			this.ctx?.sketch.rollbackTransaction();
 			this.drawingStep = 0;
+			this.popup.hide();
+			this.lastPointer = null;
 			this.centerId = null;
 			this.centerWorldPos = null;
 			this.majPtId = null;

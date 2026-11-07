@@ -1,5 +1,5 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
-import { SVG_NS, type SvgAttrs, TOOLTIP_RECT_ATTRS, TOOLTIP_TEXT_ATTRS } from './styles';
+import { COLORS, SVG_NS, STROKE_WIDTH, type SvgAttrs } from './styles';
 import { angleFromTo, vec, distancesFrom, type Vec2 } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
@@ -120,11 +120,33 @@ export function createSvgText(position: Vec2, text: string, attrs?: SvgAttrs, pa
 	);
 }
 
-export function renderTooltip(parent: SVGElement, position: Vec2, textStr: string): void {
-	const g = createSvgElement('g', undefined, parent);
-	const width = textStr.length * 7.5 + 14;
-	createSvgRect({ x: position.x - width * 0.5, y: position.y - 11 }, { x: width, y: 22 }, TOOLTIP_RECT_ATTRS, g);
-	createSvgText({ x: position.x, y: position.y + 4 }, textStr, TOOLTIP_TEXT_ATTRS, g);
+export function renderDimensionLabel(
+	parent: SVGElement,
+	center: Vec2,
+	label: string,
+	color: string,
+	kind: 'linear' | 'angle' = 'linear'
+): void {
+	const width = label.length * 8 + 14;
+	const isAngle = kind === 'angle';
+	createSvgRect(
+		{ x: center.x - width * 0.5, y: center.y - 10 },
+		{ x: width, y: 20 },
+		{ rx: 4, fill: COLORS.white, stroke: color, 'stroke-width': isAngle ? STROKE_WIDTH.dimension : STROKE_WIDTH.thin },
+		parent
+	);
+	createSvgText(
+		{ x: center.x, y: center.y + 4 },
+		label,
+		{
+			'text-anchor': 'middle',
+			fill: color,
+			'font-size': isAngle ? 11 : 12,
+			'font-weight': isAngle ? 700 : 600,
+			'font-family': isAngle ? 'ui-monospace, monospace' : 'monospace',
+		},
+		parent
+	);
 }
 
 const TWO_PI = 2 * Math.PI;
