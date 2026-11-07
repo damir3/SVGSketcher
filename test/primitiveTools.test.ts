@@ -10,6 +10,9 @@ import { EllipseTool } from '../src/canvas/tools/primitives/ellipse';
 import { SplineTool } from '../src/canvas/tools/primitives/spline';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { TrimTool } from '../src/canvas/tools/modify/trim';
+import { FilletTool } from '../src/canvas/tools/modify/fillet';
+import { ChamferTool } from '../src/canvas/tools/modify/chamfer';
+import { sketchPrimitiveToGeoCurve } from '../src/math/intersection';
 import { CircularPatternTool } from '../src/canvas/tools/modify/circularPattern';
 import { MirrorTool } from '../src/canvas/tools/modify/mirror';
 import { RectangularPatternTool } from '../src/canvas/tools/modify/rectangularPattern';
@@ -111,6 +114,108 @@ function makeMouseEvent(worldX: number, worldY: number, snap: any = null): ToolM
 		effectiveScreen: snap ? snap.screenPos : vec(worldX, worldY),
 	};
 }
+
+describe('Corner modification shortcuts', () => {
+	it('applies the previous chamfer when the next corner is clicked and refreshes the shared line', () => {
+		const sketch = new SketchDocument();
+		const left = sketch.addPoint(vec(0, 0));
+		const right = sketch.addPoint(vec(100, 0));
+		const shared = sketch.addLine(left.id, right.id);
+		sketch.addLine(left.id, sketch.addPoint(vec(0, 100)).id);
+		sketch.addLine(right.id, sketch.addPoint(vec(100, 100)).id);
+		const { ctx } = createMockContext(sketch);
+		const tool = new ChamferTool();
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(0, 0));
+		assert.equal(sketch.lines.size, 3);
+		tool.onMouseDown(makeMouseEvent(100, 0));
+		assert.equal(sketch.lines.size, 4);
+		assert.equal(tool.candidate?.vertexPointId, right.id);
+		assert.equal(tool.candidate?.line1.otherPointId, shared.p1Id);
+		assert.equal(tool.candidate?.len1, 90);
+	});
+
+	it('moves the fillet handle with the cursor along a line corner bisector', () => {
+		const sketch = new SketchDocument();
+		const corner = sketch.addPoint(vec(0, 0));
+		sketch.addLine(corner.id, sketch.addPoint(vec(100, 0)).id);
+		sketch.addLine(corner.id, sketch.addPoint(vec(0, 100)).id);
+		const { ctx } = createMockContext(sketch);
+		ctx.toGeoCurve = (type, id) => sketchPrimitiveToGeoCurve(sketch, type, id);
+		const tool = new FilletTool();
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(0, 0));
+
+		const fillet = tool.pendingFillets[0];
+		const start = fillet.result;
+		assert.ok(start);
+		ctx.renderer.filletGizmoHandle = {
+			screenX: start.midArc.x,
+			screenY: start.midArc.y,
+			worldMidArc: start.midArc,
+			worldBisectorDir: start.bisectorDir,
+			radius: start.radius,
+		};
+		const grab = makeMouseEvent(start.midArc.x, start.midArc.y);
+		grab.raw.preventDefault = () => {};
+		grab.raw.stopPropagation = () => {};
+		tool.onMouseDown(grab);
+
+		const target = vec(start.midArc.x + 3.25, start.midArc.y + 3.25);
+		tool.onMouseMove(makeMouseEvent(target.x, target.y));
+		assert.ok(fillet.result);
+		assert.ok(Math.hypot(fillet.result.midArc.x - target.x, fillet.result.midArc.y - target.y) < 1e-6);
+	});
+
+	for (const [Tool, code] of [
+		[FilletTool, 'Enter'],
+		[ChamferTool, 'NumpadEnter'],
+	] as const) {
+		it(`applies ${Tool.name} with ${code} outside the popup`, () => {
+			const sketch = new SketchDocument();
+			const corner = sketch.addPoint(vec(0, 0));
+			sketch.addLine(corner.id, sketch.addPoint(vec(100, 0)).id);
+			sketch.addLine(corner.id, sketch.addPoint(vec(0, 100)).id);
+			const { ctx } = createMockContext(sketch);
+			const toolChanges: string[] = [];
+			ctx.setTool = next => {
+				toolChanges.push(next);
+			};
+			ctx.toGeoCurve = (type, id) => sketchPrimitiveToGeoCurve(sketch, type, id);
+			const tool = new Tool();
+			tool.activate(ctx);
+			tool.onMouseDown(makeMouseEvent(0, 0));
+
+			const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+				activeTool: tool.id,
+				activeToolInstance: tool,
+				sketch,
+			});
+			let prevented = false;
+			interaction.handleKeyDown({
+				key: 'Enter',
+				code,
+				preventDefault: () => {
+					prevented = true;
+				},
+			} as KeyboardEvent);
+
+			assert.ok(prevented);
+			assert.deepEqual(toolChanges, ['select']);
+			assert.equal(sketch.arcs.size, tool.id === 'fillet' ? 1 : 0);
+			assert.equal(sketch.lines.size, tool.id === 'chamfer' ? 3 : 2);
+
+			interaction.setTool = next => {
+				tool.deactivate();
+				interaction.activeTool = next;
+			};
+			assert.ok(interaction.undoSketch());
+			assert.equal(interaction.activeTool, 'select');
+			assert.equal(sketch.arcs.size, 0);
+			assert.equal(sketch.lines.size, 2);
+		});
+	}
+});
 
 describe('Primitive Tools Creation', () => {
 	it('LineTool creates lines and does not throw stack overflow on isConstructionMode', () => {

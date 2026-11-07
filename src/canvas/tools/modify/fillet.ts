@@ -25,8 +25,7 @@ export class FilletTool extends BaseTool {
 	filletGizmoDragState: {
 		startMouseWorld: Vec2;
 		startRadius: number;
-		center: Vec2;
-		bisectorDir: Vec2;
+		radiusPerWorldUnit: Vec2;
 	} | null = null;
 
 	constructor() {
@@ -110,14 +109,16 @@ export class FilletTool extends BaseTool {
 					this.recalculatePendingFillets();
 					this.popup.setValue('radius', maxR);
 					this.popup.setError(false);
-					this.commit();
-					this.ctx.showToast(`Committed with maximum possible radius (${maxR.toFixed(1)} mm)`);
+					if (this.commit()) {
+						this.ctx.setTool('select');
+						this.ctx.showToast(`Committed with maximum possible radius (${maxR.toFixed(1)} mm)`);
+					}
 				} else {
 					this.ctx.showToast('Cannot commit: radius too large for corner');
 				}
 				return;
 			}
-			this.commit();
+			if (this.commit()) this.ctx.setTool('select');
 		};
 		this.popup.onCancel = () => {
 			this.cancel();
@@ -156,12 +157,19 @@ export class FilletTool extends BaseTool {
 		if (this.ctx.renderer.filletGizmoHandle) {
 			const gh = this.ctx.renderer.filletGizmoHandle;
 			if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
+				const active = this.pendingFillets.find(pf => pf.id === this.activeFilletId) ?? this.pendingFillets.at(-1);
+				const inward = { x: -gh.worldBisectorDir.x, y: -gh.worldBisectorDir.y };
+				const travelPerRadius =
+					active?.result && active.primitive1.type === 'line' && active.primitive2.type === 'line'
+						? dot(sub(gh.worldMidArc, active.result.cornerVertex), inward) / gh.radius
+						: 1;
+				const gain = travelPerRadius > 1e-6 ? 1 / travelPerRadius : 1;
 				this.filletGizmoDragState = {
 					startMouseWorld: world,
 					startRadius: gh.radius,
-					center: gh.worldCenter,
-					bisectorDir: gh.worldBisectorDir,
+					radiusPerWorldUnit: { x: inward.x * gain, y: inward.y * gain },
 				};
+				this.ctx.setCursor('grabbing');
 				e.raw.preventDefault();
 				e.raw.stopPropagation();
 				return;
@@ -248,10 +256,9 @@ export class FilletTool extends BaseTool {
 
 		// Gizmo drag handling
 		if (this.filletGizmoDragState) {
-			const { startMouseWorld, startRadius, bisectorDir } = this.filletGizmoDragState;
-			const inwardDir = { x: -bisectorDir.x, y: -bisectorDir.y };
-			const delta = dot(sub(world, startMouseWorld), inwardDir);
-			const newRadius = Math.max(0.5, Math.round((startRadius + delta) * 2) / 2);
+			const { startMouseWorld, startRadius, radiusPerWorldUnit } = this.filletGizmoDragState;
+			const delta = dot(sub(world, startMouseWorld), radiusPerWorldUnit);
+			const newRadius = Math.max(0.5, startRadius + delta);
 			if (Math.abs(newRadius - this.filletRadius) > 1e-4) {
 				const oldRadius = this.filletRadius;
 				this.filletRadius = newRadius;
@@ -277,9 +284,7 @@ export class FilletTool extends BaseTool {
 				y: this.ctx.renderer.filletGizmoHandle.screenY,
 			}) <= GIZMO_DISTANCE_PX;
 
-		if (this.filletGizmoDragState) {
-			this.ctx.setCursor('grabbing');
-		} else if (isOverGizmo) {
+		if (isOverGizmo) {
 			this.ctx.setCursor('grab');
 		} else if (this.pendingFillets.length === 0 || this.filletFirstPrimitive) {
 			this.ctx.setCursor('crosshair');
@@ -299,6 +304,7 @@ export class FilletTool extends BaseTool {
 	override onMouseUp(_e: ToolMouseEvent): void {
 		if (this.filletGizmoDragState) {
 			this.filletGizmoDragState = null;
+			this.ctx.setCursor('default');
 			this.ctx.requestRender();
 		}
 	}
@@ -310,15 +316,15 @@ export class FilletTool extends BaseTool {
 				this.popup.focus();
 				return true;
 			}
-		} else if (e.key === 'Enter') {
+		} else if (e.key === 'Enter' && this.pendingFillets.length > 0) {
 			e.preventDefault();
-			this.commit();
+			this.popup.onCommit?.();
 			return true;
 		}
 	}
 
-	override commit(): void {
-		if (this.pendingFillets.length === 0) return;
+	override commit(): boolean {
+		if (!this.pendingFillets.some(pf => pf.result)) return false;
 		this.ctx.sketch.beginTransaction();
 		let firstArcId: string | undefined;
 
@@ -337,6 +343,7 @@ export class FilletTool extends BaseTool {
 
 		this.ctx.showToast(`Created ${this.pendingFillets.length} fillet${this.pendingFillets.length > 1 ? 's' : ''}`);
 		this.cancel();
+		return true;
 	}
 
 	override cancel(): void {

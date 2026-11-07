@@ -225,18 +225,18 @@ function initApp(): void {
 	});
 
 	// Header Actions
-	btnUndo.addEventListener('click', () => {
+	function undo(): void {
 		if (interaction.isDrawingSpline()) {
 			if (interaction.undoSplinePoint()) {
 				showToast('Spline: Undo point');
 			}
 			return;
 		}
-		if (sketch.undo()) {
-			renderer.render(sketch, viewport);
+		if (interaction.undoSketch()) {
 			showToast('Undo');
 		}
-	});
+	}
+	btnUndo.addEventListener('click', undo);
 
 	btnRedo.addEventListener('click', () => {
 		if (interaction.isDrawingSpline()) {
@@ -384,6 +384,17 @@ function initApp(): void {
 	// Keyboard Shortcuts
 	window.addEventListener('keydown', e => {
 		const target = e.target as HTMLElement | null;
+		const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+		const isUndo = isCtrlOrCmd && !e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ');
+		if (
+			isUndo &&
+			((interaction.activeTool === 'fillet' && target?.closest?.('.fillet-popup')) ||
+				(interaction.activeTool === 'chamfer' && target?.closest?.('.chamfer-popup')))
+		) {
+			e.preventDefault();
+			undo();
+			return;
+		}
 		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
 		if (
 			(target &&
@@ -404,22 +415,11 @@ function initApp(): void {
 			return;
 		}
 
-		const isCtrlOrCmd = e.ctrlKey || e.metaKey;
-
 		if (isCtrlOrCmd) {
 			// Undo: Ctrl+Z / Cmd+Z (without Shift)
-			if ((e.key === 'z' || e.key === 'Z' || e.code === 'KeyZ') && !e.shiftKey) {
+			if (isUndo) {
 				e.preventDefault();
-				if (interaction.isDrawingSpline()) {
-					if (interaction.undoSplinePoint()) {
-						showToast('Spline: Undo point');
-					}
-					return;
-				}
-				if (sketch.undo()) {
-					renderer.render(sketch, viewport);
-					showToast('Undo');
-				}
+				undo();
 				return;
 			}
 

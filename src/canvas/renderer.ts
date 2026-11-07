@@ -2,6 +2,7 @@ import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
 import { findSketchRegions, pointInRegion } from '../math/regions';
+import { getFilletLineEndPointId, type FilletCandidate } from '../math/fillet';
 import {
 	computePatternCopyAngle,
 	computeRectangularPatternOffset,
@@ -149,19 +150,7 @@ export interface RenderOptions {
 		suppressedIndices: Set<number>;
 	};
 	filletState?: {
-		pendingFillets: Array<{
-			id: string;
-			result?: {
-				center: Vec2;
-				radius: number;
-				t1: Vec2;
-				t2: Vec2;
-				clockwise: boolean;
-				cornerVertex: Vec2;
-				midArc: Vec2;
-				bisectorDir: Vec2;
-			} | null;
-		}>;
+		pendingFillets: FilletCandidate[];
 		activeFilletId?: string | null;
 		selectedPrimitive1?: { type: 'line' | 'arc' | 'spline'; id: string } | null;
 		hoverPointId?: string | null;
@@ -236,7 +225,6 @@ export class SVGRenderer {
 		screenX: number;
 		screenY: number;
 		worldMidArc: Vec2;
-		worldCenter: Vec2;
 		worldBisectorDir: Vec2;
 		radius: number;
 	} | null = null;
@@ -394,7 +382,7 @@ export class SVGRenderer {
 		this.chamferGizmoHandles.length = 0;
 		this.chamferGroup.innerHTML = '';
 		if (options.chamferState) {
-			this.renderChamferPreviews(sketch, viewport, options.chamferState);
+			this.renderChamferPreviews(viewport, options.chamferState);
 		}
 		this.offsetGizmoHandles.length = 0;
 		this.offsetGroup.innerHTML = '';
@@ -722,6 +710,35 @@ export class SVGRenderer {
 			}
 		}
 
+		const lineCuts = new Map<string, Map<string, Vec2>>();
+		const addCut = (lineId: string, pointId: string, cut: Vec2) => {
+			let cuts = lineCuts.get(lineId);
+			if (!cuts) {
+				cuts = new Map();
+				lineCuts.set(lineId, cuts);
+			}
+			cuts.set(pointId, cut);
+		};
+		for (const fillet of options.filletState?.pendingFillets ?? []) {
+			const result = fillet.result;
+			if (!result) continue;
+			for (const [primitive, cut, param, hint] of [
+				[fillet.primitive1, result.t1, result.param1, fillet.endPointId1],
+				[fillet.primitive2, result.t2, result.param2, fillet.endPointId2],
+			] as const) {
+				if (primitive.type !== 'line') continue;
+				const line = sketch.lines.get(primitive.id);
+				if (!line) continue;
+				const endId = getFilletLineEndPointId(sketch, line, param, hint, result.cornerVertex);
+				addCut(line.id, endId, cut);
+			}
+		}
+		const chamfer = options.chamferState?.candidate;
+		if (chamfer?.result?.isValid) {
+			addCut(chamfer.line1.id, chamfer.line1.cornerPointId, chamfer.result.t1);
+			addCut(chamfer.line2.id, chamfer.line2.cornerPointId, chamfer.result.t2);
+		}
+
 		// 1. Render Lines
 		for (const line of sketch.lines.values()) {
 			if (options.hiddenEntityIds?.has(line.id)) continue;
@@ -782,7 +799,19 @@ export class SVGRenderer {
 			} else if (isDir2Line) {
 				createSvgLine(s1, s2, DIR2_LINE_ATTRS, lineG);
 			} else {
-				createSvgLine(s1, s2, getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true), lineG);
+				const cuts = lineCuts.get(line.id);
+				const start = cuts?.get(line.p1Id);
+				const end = cuts?.get(line.p2Id);
+				const isChamferPreview =
+					chamfer?.result?.isValid && (chamfer.line1.id === line.id || chamfer.line2.id === line.id);
+				createSvgLine(
+					start ? viewport.worldToScreen(start) : s1,
+					end ? viewport.worldToScreen(end) : s2,
+					isChamferPreview
+						? CHAMFER_HIGHLIGHT_ATTRS
+						: getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true),
+					lineG
+				);
 			}
 		}
 
@@ -2915,7 +2944,6 @@ export class SVGRenderer {
 					screenX: tip.x,
 					screenY: tip.y,
 					worldMidArc: res.midArc,
-					worldCenter: res.center,
 					worldBisectorDir: res.bisectorDir,
 					radius: res.radius,
 				};
@@ -2923,11 +2951,7 @@ export class SVGRenderer {
 		}
 	}
 
-	renderChamferPreviews(
-		sketch: SketchDocument,
-		viewport: Viewport,
-		state: NonNullable<RenderOptions['chamferState']>
-	): void {
+	renderChamferPreviews(viewport: Viewport, state: NonNullable<RenderOptions['chamferState']>): void {
 		// 1. Render candidate preview and gizmos
 		const cand = state.candidate;
 		if (!cand || !cand.result) return;
@@ -2946,18 +2970,6 @@ export class SVGRenderer {
 
 		// Chamfer line
 		createSvgLine(sT1, sT2, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
-
-		// Highlight remaining parts of the two lines to their other endpoints
-		const pOther1 = sketch.points.get(cand.line1.otherPointId);
-		const pOther2 = sketch.points.get(cand.line2.otherPointId);
-		if (pOther1) {
-			const sOther1 = viewport.worldToScreen(pOther1);
-			createSvgLine(sT1, sOther1, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
-		}
-		if (pOther2) {
-			const sOther2 = viewport.worldToScreen(pOther2);
-			createSvgLine(sT2, sOther2, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
-		}
 
 		// Cut points T1 and T2
 		createSvgCircle(sT1, 3, GIZMO_POINT_ATTRS, this.chamferGroup);

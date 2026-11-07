@@ -388,6 +388,19 @@ describe('Chamfer Commit and Document Integration', () => {
 		assert.equal(distValues[1], 24);
 	});
 
+	it('places both distances outside when the chamfer lines are selected in reverse order', () => {
+		const sketch = new SketchDocument();
+		const corner = sketch.addPoint(vec(0, 0));
+		const horizontal = sketch.addLine(corner.id, sketch.addPoint(vec(100, 0)).id);
+		const vertical = sketch.addLine(corner.id, sketch.addPoint(vec(0, 100)).id);
+		const candidate = findChamferCandidateForLines(sketch, vertical.id, horizontal.id);
+		assert.ok(candidate);
+		const result = commitChamferToSketch(sketch, candidate, 'equal_distance', 10, 10, 45, false);
+		assert.ok(result);
+		assert.equal(sketch.getDistanceConstraint(corner.id, result.p1Id)?.offset, -10);
+		assert.equal(sketch.getDistanceConstraint(corner.id, result.p2Id)?.offset, 10);
+	});
+
 	it('commits distance and angle chamfer: creates Distance and Angle constraints', () => {
 		const sketch = new SketchDocument();
 		const p0 = sketch.addPoint({ x: 0, y: 0 });

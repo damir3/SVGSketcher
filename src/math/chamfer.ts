@@ -1,6 +1,7 @@
 import type { Vec2 } from './vector';
-import { centroid, dist, dot, mid, normalize, vec } from './vector';
+import { centroid, cross, dist, dot, mid, normalize, vec } from './vector';
 import type { SketchDocument } from '../model/sketch';
+import { remapLineConstraints } from '../model/constraintLinks';
 import { CoincidentConstraint } from '../solver/constraints';
 
 export type ChamferMode = 'equal_distance' | 'two_distance' | 'distance_angle';
@@ -366,6 +367,7 @@ export function commitChamferToSketch(
 	// 3. Shorten line 1 by replacing corner point with pA
 	const l1 = sketch.lines.get(candidate.line1.id);
 	if (l1) {
+		remapLineConstraints(sketch, l1, candidate.line1.cornerPointId, pA.id);
 		if (l1.p1Id === candidate.line1.cornerPointId) {
 			l1.p1Id = pA.id;
 		} else {
@@ -376,6 +378,7 @@ export function commitChamferToSketch(
 	// 4. Shorten line 2 by replacing corner point with pB
 	const l2 = sketch.lines.get(candidate.line2.id);
 	if (l2) {
+		remapLineConstraints(sketch, l2, candidate.line2.cornerPointId, pB.id);
 		if (l2.p1Id === candidate.line2.cornerPointId) {
 			l2.p1Id = pB.id;
 		} else {
@@ -396,21 +399,24 @@ export function commitChamferToSketch(
 	}
 
 	// 6. Add Distance / Angle constraints
+	// Positive dimension offsets use the clockwise normal in world coordinates.
+	const offset1 = cross(candidate.dir1, candidate.dir2) > 0 ? 10 : -10;
+	const offset2 = -offset1;
 	if (mode === 'equal_distance') {
-		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
 		if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
-		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
 		if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
 	} else if (mode === 'two_distance') {
-		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
 		if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
-		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
 		if (c2 && expressions?.dist2) c2.expression = expressions.dist2;
 	} else if (mode === 'distance_angle') {
 		const cornerCentroid = centroid([candidate.vertexPos, res.t1, res.t2]);
 		if (!flip) {
 			// Distance along line 1
-			const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, 10);
+			const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
 			if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
 			// Angle between chamfer line and line 1
 			if (l1) {
@@ -419,7 +425,7 @@ export function commitChamferToSketch(
 			}
 		} else {
 			// Distance along line 2 (offset on other side of line)
-			const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, -10);
+			const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
 			if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
 			// Angle between chamfer line and line 2
 			if (l2) {

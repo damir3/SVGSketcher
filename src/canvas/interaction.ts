@@ -246,6 +246,16 @@ export class CanvasInteraction {
 		return tool instanceof SplineTool ? tool.undoPoint() : false;
 	}
 
+	undoSketch(): boolean {
+		if (!this.sketch.undo()) return false;
+		if (this.activeTool === 'fillet' || this.activeTool === 'chamfer') {
+			this.setTool('select');
+		} else {
+			this.render();
+		}
+		return true;
+	}
+
 	redoSplinePoint(): boolean {
 		const tool = this.activeToolInstance;
 		return tool instanceof SplineTool ? tool.redoPoint() : false;
@@ -795,6 +805,7 @@ export class CanvasInteraction {
 				return;
 			case 'Enter':
 			case 'NumpadEnter':
+				if ((this.activeTool === 'fillet' || this.activeTool === 'chamfer') && tool?.onKeyDown?.(e)) return;
 				if (this.activeToolInstance?.isBusy?.()) {
 					this.activeToolInstance.commit?.();
 				}

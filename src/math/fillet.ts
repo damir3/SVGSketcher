@@ -1,8 +1,15 @@
 import type { Vec2 } from './vector';
 import { angleFromTo, add, addScaled, cross, dist, dot, mix, normalize, sub } from './vector';
 import type { SketchDocument } from '../model/sketch';
-import type { SketchSpline } from '../model/types';
-import { CoincidentConstraint, MidpointConstraint } from '../solver/constraints';
+import type { SketchLine, SketchSpline } from '../model/types';
+import { remapLineConstraints } from '../model/constraintLinks';
+import {
+	CircularPatternConstraint,
+	CoincidentConstraint,
+	DistanceConstraint,
+	MidpointConstraint,
+	RectangularPatternConstraint,
+} from '../solver/constraints';
 import { getPointAtParam, type GeoCurve, type GeoSpline } from './intersection';
 import { extractSplineInterval, getSplineParamAtPoint } from './spline';
 
@@ -696,6 +703,17 @@ export function commitFilletToSketch(
 ): { arcId: string; centerId: string; p1Id: string; p2Id: string } | null {
 	const res = fillet.result;
 	if (!res) return null;
+	const referencePoints = new Set<string>();
+	for (const c of sketch.constraints.values()) {
+		if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
+			for (const id of [...c.entityIds, ...c.sourceObjectIds]) {
+				if (sketch.points.has(id)) referencePoints.add(id);
+			}
+		} else if (c instanceof DistanceConstraint) {
+			referencePoints.add(c.p1Id);
+			referencePoints.add(c.p2Id);
+		}
+	}
 
 	// 1. Create tangent points and arc center
 	const pT1 = sketch.addPoint(res.t1);
@@ -725,6 +743,20 @@ export function commitFilletToSketch(
 		res.cornerVertex
 	);
 
+	// Keep dimension and pattern references at the original intersection.
+	const retainedPoints = new Set(referencePoints);
+	for (const [primitive, pointId] of [
+		[fillet.primitive1, oldPt1],
+		[fillet.primitive2, oldPt2],
+	] as const) {
+		if (primitive.type !== 'line' || !pointId) continue;
+		const { pointIds } = getConnectedPrimitivesForPoint(sketch, pointId);
+		if ([...pointIds].some(id => referencePoints.has(id))) {
+			for (const id of pointIds) retainedPoints.add(id);
+			sketch.addPointOnLineConstraint(pointId, primitive.id);
+		}
+	}
+
 	// 5. If corner vertex or old endpoints exist and are now unreferenced, delete them
 	const candidatesToClean = new Set<string>();
 	if (oldPt1) candidatesToClean.add(oldPt1);
@@ -742,11 +774,11 @@ export function commitFilletToSketch(
 	}
 
 	for (const pid of candidatesToClean) {
-		if (sketch.points.has(pid)) {
+		if (sketch.points.has(pid) && !retainedPoints.has(pid)) {
 			const conn = getConnectedPrimitivesForPoint(sketch, pid);
 			if (conn.primitives.length === 0) {
 				for (const id of conn.pointIds) {
-					sketch.removeEntity(id);
+					if (!retainedPoints.has(id)) sketch.removeEntity(id);
 				}
 			} else if (!sketch.isPointUsed(pid)) {
 				sketch.removeEntity(pid);
@@ -815,6 +847,23 @@ function isPointAtOrCoincident(sketch: SketchDocument, targetPointId: string, ca
 	return false;
 }
 
+export function getFilletLineEndPointId(
+	sketch: SketchDocument,
+	line: SketchLine,
+	param: number,
+	hintEndPointId?: string,
+	cornerVertex?: Vec2
+): string {
+	if (hintEndPointId && isPointAtOrCoincident(sketch, hintEndPointId, line.p1Id)) return line.p1Id;
+	if (hintEndPointId && isPointAtOrCoincident(sketch, hintEndPointId, line.p2Id)) return line.p2Id;
+	if (cornerVertex) {
+		const p1 = sketch.points.get(line.p1Id);
+		const p2 = sketch.points.get(line.p2Id);
+		if (p1 && p2) return dist(p1, cornerVertex) < dist(p2, cornerVertex) ? line.p1Id : line.p2Id;
+	}
+	return param <= 0.5 ? line.p1Id : line.p2Id;
+}
+
 /**
  * Trims or extends a primitive so its endpoint connects to newCutPointId.
  */
@@ -830,24 +879,9 @@ function trimOrExtendPrimitive(
 		const line = sketch.lines.get(primitive.id);
 		if (!line) return undefined;
 
-		let replaceP1: boolean;
-		if (hintEndPointId && isPointAtOrCoincident(sketch, hintEndPointId, line.p1Id)) {
-			replaceP1 = true;
-		} else if (hintEndPointId && isPointAtOrCoincident(sketch, hintEndPointId, line.p2Id)) {
-			replaceP1 = false;
-		} else if (cornerVertex) {
-			const pt1 = sketch.points.get(line.p1Id);
-			const pt2 = sketch.points.get(line.p2Id);
-			if (pt1 && pt2) {
-				replaceP1 = dist(pt1, cornerVertex) < dist(pt2, cornerVertex);
-			} else {
-				replaceP1 = param <= 0.5;
-			}
-		} else {
-			replaceP1 = param <= 0.5;
-		}
-
-		const oldPtId = replaceP1 ? line.p1Id : line.p2Id;
+		const oldPtId = getFilletLineEndPointId(sketch, line, param, hintEndPointId, cornerVertex);
+		const replaceP1 = oldPtId === line.p1Id;
+		remapLineConstraints(sketch, line, oldPtId, newCutPointId);
 		if (replaceP1) {
 			line.p1Id = newCutPointId;
 		} else {

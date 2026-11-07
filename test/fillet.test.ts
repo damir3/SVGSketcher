@@ -14,6 +14,10 @@ import {
 	TangentCircleCircleConstraint,
 	RadiusConstraint,
 	EqualRadiusConstraint,
+	EqualLengthConstraint,
+	HorizontalConstraint,
+	VerticalConstraint,
+	PointOnLineConstraint,
 } from '../src/solver/constraints';
 
 describe('Fillet Connected Primitives Discovery', () => {
@@ -455,6 +459,9 @@ describe('Fillet Commit and Document Integration', () => {
 
 		const line1 = sketch.addLine(pCorner.id, p1.id);
 		const line2 = sketch.addLine(pCorner.id, p2.id);
+		const horizontal = sketch.addHorizontalConstraint(pCorner.id, p1.id);
+		const vertical = sketch.addVerticalConstraint(p2.id, pCorner.id);
+		const equal = sketch.addEqualLengthConstraint(line1.id, line2.id)!;
 
 		const conn = getConnectedPrimitivesForPoint(sketch, pCorner.id);
 		assert.equal(conn.valid, true);
@@ -497,6 +504,17 @@ describe('Fillet Commit and Document Integration', () => {
 		const updatedL2 = sketch.lines.get(line2.id)!;
 		assert.equal(updatedL2.p1Id, commitRes.p2Id);
 
+		const updatedHorizontal = sketch.constraints.get(horizontal.id);
+		const updatedVertical = sketch.constraints.get(vertical.id);
+		const updatedEqual = sketch.constraints.get(equal.id);
+		assert.ok(updatedHorizontal instanceof HorizontalConstraint);
+		assert.ok(updatedVertical instanceof VerticalConstraint);
+		assert.ok(updatedEqual instanceof EqualLengthConstraint);
+		assert.equal(updatedHorizontal.p1Id, updatedL1.p1Id);
+		assert.equal(updatedVertical.p2Id, updatedL2.p1Id);
+		assert.equal(updatedEqual.line1P1, updatedL1.p1Id);
+		assert.equal(updatedEqual.line2P1, updatedL2.p1Id);
+
 		// Old corner vertex must have been removed
 		assert.equal(sketch.points.has(pCorner.id), false, 'Obsolete corner point must be removed');
 
@@ -508,6 +526,50 @@ describe('Fillet Commit and Document Integration', () => {
 		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);
 		assert.equal(radConstraints.length, 1, 'RadiusConstraint must be added on first fillet');
 		assert.equal(radConstraints[0].targetRadius, 25);
+	});
+
+	it('preserves the original circular pattern point on both shortened lines', () => {
+		const sketch = new SketchDocument();
+		const corner = sketch.addPoint({ x: 20, y: 20 });
+		const center = sketch.addPoint({ x: 0, y: 0 });
+		const copy = sketch.addPoint({ x: -20, y: -20 });
+		const line1 = sketch.addLine(corner.id, sketch.addPoint({ x: 120, y: 20 }).id);
+		const line2 = sketch.addLine(corner.id, sketch.addPoint({ x: 20, y: 120 }).id);
+		const pattern = sketch.addCircularPatternConstraint(center.id, [corner.id], 'full', 360, 2, false, [], [
+			{
+				copyIndex: 1,
+				pointPairs: [{ sourcePtId: corner.id, patternPtId: copy.id }],
+				createdEntityIds: [{ type: 'point', id: copy.id }],
+			},
+		]);
+		assert.ok(pattern);
+
+		const result = calculateFilletGeometry(line1.toGeoCurve(sketch)!, line2.toGeoCurve(sketch)!, 10, {
+			cornerVertex: corner,
+			endPointId1: corner.id,
+			endPointId2: corner.id,
+		});
+		assert.ok(result);
+		const fillet = commitFilletToSketch(sketch, {
+			id: 'pattern-corner',
+			vertexPointId: corner.id,
+			primitive1: { type: 'line', id: line1.id },
+			primitive2: { type: 'line', id: line2.id },
+			endPointId1: corner.id,
+			endPointId2: corner.id,
+			result,
+		}, true);
+		assert.ok(fillet);
+		assert.ok(sketch.points.has(corner.id));
+		assert.equal(sketch.constraints.get(pattern.id), pattern);
+		assert.equal(pattern.copies[0].pointPairs[0].sourcePtId, corner.id);
+
+		const links = [...sketch.constraints.values()].filter(
+			c => c instanceof PointOnLineConstraint && c.pointId === corner.id
+		);
+		assert.deepEqual(links.map(c => c.lineP1Id), [fillet.p1Id, fillet.p2Id]);
+		assert.deepEqual(links.map(c => c.lineP2Id), [line1.p2Id, line2.p2Id]);
+		assert.ok(sketch.solve().finalError < 1e-8);
 	});
 
 	it('commits multiple fillets: first gets RadiusConstraint, subsequent get EqualRadiusConstraint', () => {
@@ -522,6 +584,8 @@ describe('Fillet Commit and Document Integration', () => {
 		const lRight = sketch.addLine(p1.id, p2.id);
 		const lTop = sketch.addLine(p2.id, p3.id);
 		const lLeft = sketch.addLine(p3.id, p0.id);
+		const width = sketch.addDistanceConstraint(p0.id, p1.id, 100);
+		assert.ok(width);
 
 		const radius = 15;
 
@@ -569,6 +633,24 @@ describe('Fillet Commit and Document Integration', () => {
 		assert.ok(commit0);
 		assert.ok(commit1);
 		assert.equal(sketch.arcs.size, 2);
+		assert.equal(sketch.constraints.get(width.id), width);
+		assert.equal(width.p1Id, p0.id);
+		assert.equal(width.p2Id, p1.id);
+		assert.equal(width.targetDistance, 100);
+		assert.ok(sketch.points.has(p0.id));
+		assert.ok(sketch.points.has(p1.id));
+		const bottomStart = sketch.points.get(lBottom.p1Id)!;
+		const bottomEnd = sketch.points.get(lBottom.p2Id)!;
+		assert.ok(Math.abs(Math.hypot(bottomEnd.x - bottomStart.x, bottomEnd.y - bottomStart.y) - 70) < 1e-6);
+
+		const tangents = [...sketch.constraints.values()].filter(c => c instanceof TangentLineCircleConstraint);
+		assert.equal(tangents.length, 4);
+		for (const arcId of [commit0.arcId, commit1.arcId]) {
+			const tangent = tangents.find(c => c.circleId === arcId && c.lineId === lBottom.id);
+			assert.ok(tangent, 'Both fillets must remain tangent to the shared line');
+			assert.equal(tangent.lineP1Id, lBottom.p1Id);
+			assert.equal(tangent.lineP2Id, lBottom.p2Id);
+		}
 
 		// First arc has RadiusConstraint
 		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);

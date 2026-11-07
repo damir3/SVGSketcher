@@ -117,7 +117,7 @@ export class ChamferTool extends BaseTool {
 		};
 
 		this.popup.onCommit = () => {
-			this.commit();
+			if (this.commit()) this.ctx.setTool('select');
 		};
 
 		this.popup.onCancel = () => {
@@ -251,10 +251,10 @@ export class ChamferTool extends BaseTool {
 		}
 	}
 
-	commit(): void {
+	commit(): boolean {
 		if (!this.candidate || !this.candidate.result || !this.candidate.result.isValid) {
 			this.ctx?.showToast('Cannot commit chamfer with invalid parameters');
-			return;
+			return false;
 		}
 
 		const res = commitChamferToSketch(
@@ -279,6 +279,7 @@ export class ChamferTool extends BaseTool {
 		this.popup.hide();
 		this.ctx.setCursor(this.defaultCursor);
 		this.ctx.requestRender();
+		return Boolean(res);
 	}
 
 	override getRenderOptions(): Record<string, unknown> {
@@ -316,9 +317,15 @@ export class ChamferTool extends BaseTool {
 		if (!this.firstLine) {
 			const nearPt = this.ctx.findPointNear(screen);
 			if (nearPt) {
-				const cand = findChamferCandidateForPoint(this.ctx.sketch, nearPt.id);
+				let cand = findChamferCandidateForPoint(this.ctx.sketch, nearPt.id);
 				if (cand) {
-					this.selectCandidate(cand);
+					if (this.candidate) {
+						if (cand.vertexPointId === this.candidate.vertexPointId) return;
+						this.commit();
+						if (this.candidate) return;
+						cand = findChamferCandidateForPoint(this.ctx.sketch, nearPt.id);
+					}
+					if (cand) this.selectCandidate(cand);
 					return;
 				}
 			}
@@ -518,9 +525,9 @@ export class ChamferTool extends BaseTool {
 				this.popup.focus();
 				return true;
 			}
-		} else if (e.key === 'Enter') {
+		} else if (e.key === 'Enter' && this.candidate) {
 			e.preventDefault();
-			this.commit();
+			this.popup.onCommit?.();
 			return true;
 		}
 	}

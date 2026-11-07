@@ -5,10 +5,12 @@ import {
 	RadiusConstraint,
 	AngleConstraint,
 	FixedConstraint,
+	OffsetConstraint,
 	OriginDistanceConstraint,
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
 } from '../solver/constraints';
+import { deserializeConstraint, serializeConstraint } from '../solver/constraints/serialization';
 
 export function hasRadiusConstraint(sketch: SketchDocument, circleId: string): boolean {
 	for (const c of sketch.constraints.values()) {
@@ -65,6 +67,91 @@ export function isPointFixed(sketch: SketchDocument, pointId: string): boolean {
 
 export function matchesEndpoints(pA: string, pB: string, end1: string, end2: string): boolean {
 	return (pA === end1 && pB === end2) || (pA === end2 && pB === end1);
+}
+
+export function remapLineConstraints(
+	sketch: SketchDocument,
+	line: SketchLine,
+	oldPointId: string,
+	newPointId: string
+): void {
+	for (const constraint of sketch.constraints.values()) {
+		if (constraint.type === 'circular_pattern' || !constraint.entityIds.includes(oldPointId)) continue;
+		const data = serializeConstraint(constraint);
+		let changed = false;
+		const remapPair = <T>(record: T, first: keyof T, second: keyof T) => {
+			const a = record[first];
+			const b = record[second];
+			if (typeof a !== 'string' || typeof b !== 'string' || !matchesEndpoints(a, b, line.p1Id, line.p2Id)) {
+				return;
+			}
+			Object.assign(record, { [a === oldPointId ? first : second]: newPointId });
+			changed = true;
+		};
+
+		switch (data.type) {
+			case 'horizontal':
+			case 'vertical':
+			case 'midpoint':
+				remapPair(data, 'p1Id', 'p2Id');
+				break;
+			case 'angle':
+				if (data.line1Id === line.id) remapPair(data, 'l1P1', 'l1P2');
+				if (data.line2Id === line.id) remapPair(data, 'l2P1', 'l2P2');
+				break;
+			case 'parallel':
+			case 'perpendicular':
+			case 'collinear':
+				remapPair(data, 'l1P1', 'l1P2');
+				remapPair(data, 'l2P1', 'l2P2');
+				break;
+			case 'equal_length':
+				remapPair(data, 'line1P1', 'line1P2');
+				remapPair(data, 'line2P1', 'line2P2');
+				break;
+			case 'symmetry':
+			case 'tangent_line_circle':
+			case 'point_to_line_distance':
+			case 'line_to_axis_distance':
+				if (data.lineId && data.lineId !== line.id) break;
+				remapPair(data, 'lineP1Id', 'lineP2Id');
+				break;
+			case 'point_on_line':
+				remapPair(data, 'lineP1Id', 'lineP2Id');
+				break;
+			case 'offset': {
+				const pairs = data.pairs as OffsetConstraint['pairs'];
+				for (const pair of pairs) {
+					if (pair.kind !== 'line') continue;
+					if (pair.origLineId === line.id) remapPair(pair, 'origP1Id', 'origP2Id');
+					if (pair.offLineId === line.id) remapPair(pair, 'offP1Id', 'offP2Id');
+				}
+				if (changed) {
+					data.entityIds = new OffsetConstraint(data.id, pairs, data.targetDistance).entityIds;
+				}
+				break;
+			}
+			case 'rectangular_pattern':
+				if (data.line1Id === line.id) remapPair(data, 'line1P1Id', 'line1P2Id');
+				if (data.line2Id === line.id) remapPair(data, 'line2P1Id', 'line2P2Id');
+				break;
+		}
+
+		if (!changed) continue;
+		if (data.type !== 'offset') {
+			// A point can also play a second role, for example as the endpoint of another line.
+			const { entityIds, ...fields } = data;
+			const stillUsesOldPoint =
+				Object.values(fields).includes(oldPointId) ||
+				(data.type === 'rectangular_pattern' &&
+					data.copies.some(copy =>
+						copy.pointPairs.some(pair => pair.sourcePtId === oldPointId || pair.patternPtId === oldPointId)
+					));
+			data.entityIds = [...new Set([...entityIds.filter(id => id !== oldPointId || stillUsesOldPoint), newPointId])];
+		}
+		const updated = deserializeConstraint(data);
+		if (updated) sketch.constraints.set(updated.id, updated);
+	}
 }
 
 export function getLineBetween(sketch: SketchDocument, p1Id: string, p2Id: string): SketchLine | undefined {
