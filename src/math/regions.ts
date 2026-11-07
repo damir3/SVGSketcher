@@ -1,6 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from './vector';
-import { angleFromTo, angleFromToDeg, vec, cross, distancesFrom } from './vector';
+import { angleFromTo, angleFromToDeg, vec, cross, dist, distancesFrom } from './vector';
 import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurves } from './intersection';
 import { extractSplineInterval, type BezierSegment } from './spline';
@@ -233,12 +233,26 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 		edges = new Map<string, Set<string>>(),
 		edgeSources = new Map<string, BoundaryEdge>();
 	const edgeKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+	const nodeKey = (point: Vec2): string => {
+		const x = Math.round(point.x * KEY_SCALE);
+		const y = Math.round(point.y * KEY_SCALE);
+		const ownKey = `${x},${y}`;
+		if (nodes.has(ownKey)) return ownKey;
+		// Coincident endpoints can straddle a rounding boundary after solving.
+		for (let dx = -1; dx <= 1; dx++) {
+			for (let dy = -1; dy <= 1; dy++) {
+				const neighborKey = `${x + dx},${y + dy}`;
+				const neighbor = nodes.get(neighborKey);
+				if (neighbor && dist(point, neighbor) <= 1 / KEY_SCALE) return neighborKey;
+			}
+		}
+		nodes.set(ownKey, point);
+		return ownKey;
+	};
 	const addEdge = (segment: (typeof segments)[number]) => {
-		const ka = key(segment.a),
-			kb = key(segment.b);
+		const ka = nodeKey(segment.a),
+			kb = nodeKey(segment.b);
 		if (ka === kb) return;
-		nodes.set(ka, segment.a);
-		nodes.set(kb, segment.b);
 		(edges.get(ka) ?? (edges.set(ka, new Set()), edges.get(ka)!)).add(kb);
 		(edges.get(kb) ?? (edges.set(kb, new Set()), edges.get(kb)!)).add(ka);
 		edgeSources.set(edgeKey(ka, kb), {

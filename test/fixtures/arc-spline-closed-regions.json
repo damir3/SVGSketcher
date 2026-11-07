@@ -1,0 +1,429 @@
+{
+  "points": [
+    {
+      "type": "point",
+      "id": "Point-1",
+      "x": 1.191721849908609e-11,
+      "y": -0.32032498663571984,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-2",
+      "x": -42.62439352350582,
+      "y": -13.810967634520619,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-3",
+      "x": 17.959262892513927,
+      "y": -41.26298307557996,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-4",
+      "x": -87.49002876126735,
+      "y": -28.010964446852363,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-5",
+      "x": -101.3190684913219,
+      "y": -72.99232499066747,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-6",
+      "x": -101.31906849638564,
+      "y": -72.99232500713913,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-7",
+      "x": -119.22056096065262,
+      "y": 18.375338576581914,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-8",
+      "x": -6.858487000267512,
+      "y": 68.89856521883273,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-9",
+      "x": 17.959262911694704,
+      "y": -41.26298311930734,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-10",
+      "x": -66.11033593411659,
+      "y": -83.81450810136471,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-11",
+      "x": -136.52780106878078,
+      "y": -62.17014194585669,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-12",
+      "x": -141.6260211833265,
+      "y": -15.280294774017815,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-13",
+      "x": -96.81510073797875,
+      "y": 52.03097192718164,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-14",
+      "x": -51.07052693897014,
+      "y": 88.11955403676168,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-15",
+      "x": 37.35355293843512,
+      "y": 49.677576400903774,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-16",
+      "x": -45.09991730896327,
+      "y": -68.91145324767669,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-17",
+      "x": 81.01844317070301,
+      "y": -13.614513078395118,
+      "fixed": false
+    }
+  ],
+  "lines": [
+    {
+      "type": "line",
+      "id": "Line-1",
+      "p1Id": "Point-10",
+      "p2Id": "Point-11",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": false
+    },
+    {
+      "type": "line",
+      "id": "Line-2",
+      "p1Id": "Point-12",
+      "p2Id": "Point-13",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-3",
+      "p1Id": "Point-14",
+      "p2Id": "Point-15",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-4",
+      "p1Id": "Point-16",
+      "p2Id": "Point-17",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": false
+    }
+  ],
+  "circles": [],
+  "arcs": [
+    {
+      "type": "arc",
+      "id": "Arc-1",
+      "centerId": "Point-1",
+      "startPointId": "Point-2",
+      "endPointId": "Point-3",
+      "radius": 44.70834779049353,
+      "clockwise": true,
+      "isConstruction": false
+    },
+    {
+      "type": "arc",
+      "id": "Arc-2",
+      "centerId": "Point-4",
+      "startPointId": "Point-2",
+      "endPointId": "Point-5",
+      "radius": 47.05916631855693,
+      "clockwise": true,
+      "isConstruction": false
+    }
+  ],
+  "ellipses": [],
+  "ellipticalArcs": [],
+  "splines": [
+    {
+      "type": "spline",
+      "id": "Spline-1",
+      "splineType": "fit",
+      "pointIds": [
+        "Point-6",
+        "Point-7",
+        "Point-8",
+        "Point-9"
+      ],
+      "tangentLineIds": [
+        "Line-1",
+        "Line-2",
+        "Line-3",
+        "Line-4"
+      ],
+      "isClosed": false,
+      "isConstruction": false
+    }
+  ],
+  "texts": [],
+  "constraints": [
+    {
+      "id": "c_arcept-1",
+      "type": "arc_endpoints",
+      "name": "Arc Endpoints",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Arc-1",
+        "Point-1",
+        "Point-2",
+        "Point-3"
+      ],
+      "arcId": "Arc-1",
+      "centerId": "Point-1",
+      "startPointId": "Point-2",
+      "endPointId": "Point-3"
+    },
+    {
+      "id": "c_arcept-2",
+      "type": "arc_endpoints",
+      "name": "Arc Endpoints",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Arc-2",
+        "Point-4",
+        "Point-2",
+        "Point-5"
+      ],
+      "arcId": "Arc-2",
+      "centerId": "Point-4",
+      "startPointId": "Point-2",
+      "endPointId": "Point-5"
+    },
+    {
+      "id": "c_tang-1",
+      "type": "tangent_circle_circle",
+      "name": "Tangent",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-4",
+        "Arc-2",
+        "Point-1",
+        "Arc-1",
+        "Point-2"
+      ],
+      "circle1CenterId": "Point-4",
+      "circle1Id": "Arc-2",
+      "circle2CenterId": "Point-1",
+      "circle2Id": "Arc-1",
+      "isInternal": false,
+      "outerCircleId": null,
+      "sharedPointId": "Point-2"
+    },
+    {
+      "id": "c_midpoint-1",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-6",
+        "Point-10",
+        "Point-11"
+      ],
+      "midId": "Point-6",
+      "p1Id": "Point-10",
+      "p2Id": "Point-11",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-2",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-7",
+        "Point-12",
+        "Point-13"
+      ],
+      "midId": "Point-7",
+      "p1Id": "Point-12",
+      "p2Id": "Point-13",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-3",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-8",
+        "Point-14",
+        "Point-15"
+      ],
+      "midId": "Point-8",
+      "p1Id": "Point-14",
+      "p2Id": "Point-15",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-4",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-9",
+        "Point-16",
+        "Point-17"
+      ],
+      "midId": "Point-9",
+      "p1Id": "Point-16",
+      "p2Id": "Point-17",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_coinc-1",
+      "type": "coincident",
+      "name": "Coincident",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-5",
+        "Point-6"
+      ],
+      "p1Id": "Point-5",
+      "p2Id": "Point-6"
+    },
+    {
+      "id": "c_coinc-2",
+      "type": "coincident",
+      "name": "Coincident",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-3",
+        "Point-9"
+      ],
+      "p1Id": "Point-3",
+      "p2Id": "Point-9"
+    },
+    {
+      "id": "c_tang-2",
+      "type": "tangent_line_circle",
+      "name": "Tangent",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-10",
+        "Point-11",
+        "Point-4",
+        "Arc-2",
+        "Line-1"
+      ],
+      "lineP1Id": "Point-10",
+      "lineP2Id": "Point-11",
+      "circleCenterId": "Point-4",
+      "circleId": "Arc-2",
+      "initialSide": 1,
+      "lineId": "Line-1"
+    },
+    {
+      "id": "c_tang-3",
+      "type": "tangent_line_circle",
+      "name": "Tangent",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-16",
+        "Point-17",
+        "Point-1",
+        "Arc-1",
+        "Line-4"
+      ],
+      "lineP1Id": "Point-16",
+      "lineP2Id": "Point-17",
+      "circleCenterId": "Point-1",
+      "circleId": "Arc-1",
+      "initialSide": -1,
+      "lineId": "Line-4"
+    },
+    {
+      "id": "c_pt_axis_on-1",
+      "type": "origin_distance",
+      "name": "Point on Y-Axis",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "value": 0,
+      "entityIds": [
+        "Point-1"
+      ],
+      "pointId": "Point-1",
+      "targetDistance": 0,
+      "orientation": "horizontal",
+      "side": 1,
+      "isCoincident": false
+    }
+  ],
+  "parameters": [],
+  "idCounter": 37
+}

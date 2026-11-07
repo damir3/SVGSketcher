@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { SketchDocument } from '../src/model/sketch';
 import { findSketchRegions, pointInRegion } from '../src/math/regions';
 import { SketchArc } from '../src/model/primitives/arc';
@@ -14,6 +15,21 @@ function addTriangle(sketch: SketchDocument) {
 }
 
 describe('sketch regions', () => {
+	it('closes an arc and spline boundary across a vertex rounding boundary', () => {
+		// Snapshot from sketch_1794043428570.svg.
+		const fixture = new URL('./fixtures/arc-spline-closed-regions.json', import.meta.url);
+		const sketch = new SketchDocument();
+		sketch.restoreSnapshot(JSON.parse(readFileSync(fixture, 'utf8')));
+
+		const regions = findSketchRegions(sketch);
+		assert.equal(regions.length, 2);
+		const largeRegion = regions.find(region => pointInRegion({ x: -80, y: 10 }, region));
+		assert.ok(largeRegion);
+		assert.equal(largeRegion.holes.length, 0);
+		assert.equal((largeRegion.path.match(/ A /g) ?? []).length, 2);
+		assert.match(largeRegion.path, / C /);
+	});
+
 	for (const scene of [
 		{
 			file: 'sketch_1794027958502-region-fill-issue.svg',
