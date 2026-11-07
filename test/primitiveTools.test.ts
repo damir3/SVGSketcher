@@ -710,6 +710,10 @@ describe('Primitive Tools Creation', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 		const splineTool = new SplineTool('fit');
+		const selectedTools: string[] = [];
+		ctx.setTool = tool => {
+			selectedTools.push(tool);
+		};
 		splineTool.activate(ctx);
 		const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
 			activeTool: splineTool.id,
@@ -747,16 +751,62 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(splineTool.mode, 'control');
 		assert.deepEqual(modeEvents, ['control']);
 
-		splineTool.onMouseDown(makeMouseEvent(0, 100));
-		splineTool.onMouseDown(makeMouseEvent(30, 130));
-		splineTool.onMouseDown(makeMouseEvent(70, 130));
-		pressEnter('NumpadEnter');
-		assert.equal(splineTool.pointCount, 3);
-		assert.equal(sketch.splines.size, 1);
-		splineTool.onMouseDown(makeMouseEvent(100, 100));
-		assert.equal(splineTool.pointCount, 4);
-		pressEnter('NumpadEnter');
-		assert.equal(sketch.splines.size, 2);
+		for (const count of [2, 3, 4]) {
+			for (let i = 0; i < count; i++) {
+				splineTool.onMouseDown(makeMouseEvent(30 * i, 100 * count));
+			}
+			pressEnter('NumpadEnter');
+			assert.equal(splineTool.pointCount, 0);
+			assert.equal(Array.from(sketch.splines.values()).at(-1)?.pointIds.length, count);
+		}
+		assert.equal(sketch.splines.size, 4);
+		assert.deepEqual(selectedTools, ['select', 'select', 'select', 'select']);
+	});
+
+	it('undo and redo spline creation include new points and preserve reused points', () => {
+		for (const mode of ['fit', 'control'] as const) {
+			const sketch = new SketchDocument();
+			const existing = sketch.addPoint(vec(10, 10));
+			const before = sketch.takeSnapshot();
+			const { ctx } = createMockContext(sketch);
+			const tool = new SplineTool(mode);
+			tool.activate(ctx);
+			const first = makeMouseEvent(10, 10);
+			first.snap = { type: 'point', id: existing.id, worldPos: vec(10, 10), screenPos: vec(10, 10) };
+			tool.onMouseDown(first);
+			assert.ok(tool.undoPoint());
+			assert.ok(sketch.points.has(existing.id));
+			assert.ok(tool.redoPoint());
+			tool.onMouseDown(makeMouseEvent(50, 50));
+			assert.ok(tool.undoPoint());
+			assert.ok(tool.redoPoint());
+			tool.commit();
+			const completed = sketch.takeSnapshot();
+			assert.equal(sketch.splines.size, 1);
+			assert.ok(sketch.undo());
+			assert.deepEqual(sketch.takeSnapshot(), before);
+			assert.ok(sketch.redo());
+			assert.deepEqual(sketch.takeSnapshot(), completed);
+		}
+	});
+
+	it('cancelling spline creation rolls back its points and retains point redo while drawing', () => {
+		const sketch = new SketchDocument();
+		const existing = sketch.addPoint(vec(10, 10));
+		const before = sketch.takeSnapshot();
+		const { ctx } = createMockContext(sketch);
+		const tool = new SplineTool();
+		tool.activate(ctx);
+		tool.onMouseDown(makeMouseEvent(50, 50));
+		assert.ok(tool.isBusy());
+		assert.ok(tool.undoPoint());
+		assert.ok(tool.isBusy());
+		assert.ok(tool.redoPoint());
+		tool.cancel();
+		assert.equal(tool.isBusy(), false);
+		assert.deepEqual(sketch.takeSnapshot(), before);
+		assert.ok(sketch.undo());
+		assert.equal(sketch.points.has(existing.id), false);
 	});
 
 	it('renderPreview calls preview visual rendering on targetGroup', () => {

@@ -210,8 +210,13 @@ function initApp(): void {
 	});
 
 	function updateUndoRedoButtons(): void {
-		btnUndo.disabled = !sketch.canUndo();
-		btnRedo.disabled = !sketch.canRedo();
+		if (interaction.isDrawingSpline()) {
+			btnUndo.disabled = !interaction.canUndoSplinePoint();
+			btnRedo.disabled = !interaction.canRedoSplinePoint();
+		} else {
+			btnUndo.disabled = !sketch.canUndo();
+			btnRedo.disabled = !sketch.canRedo();
+		}
 	}
 
 	// Benchmark solver execution on each solve

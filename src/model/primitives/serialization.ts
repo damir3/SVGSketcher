@@ -22,6 +22,7 @@ export interface LineSnapshot {
 	isConstruction?: boolean;
 	isSplineHandle?: boolean;
 	parentSplineId?: string;
+	isAutomaticSplineHandle?: boolean;
 }
 export interface CircleSnapshot {
 	type: 'circle';

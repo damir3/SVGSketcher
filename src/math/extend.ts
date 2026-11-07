@@ -847,6 +847,7 @@ export function executeExtend(
 					hLine.isConstruction = true;
 					hLine.isSplineHandle = true;
 					hLine.parentSplineId = spline.id;
+					hLine.isAutomaticSplineHandle = true;
 					spline.tangentLineIds.push(hLine.id);
 					sketch.addConstraint(new MidpointConstraint(sketch.nextId('c_mid'), pFit.id, h1.id, h2.id, 1.0, 0.5));
 				}

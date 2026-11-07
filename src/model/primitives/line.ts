@@ -13,6 +13,7 @@ export class SketchLine implements ISketchPrimitive {
 	isConstruction?: boolean;
 	isSplineHandle?: boolean;
 	parentSplineId?: string;
+	isAutomaticSplineHandle?: boolean;
 
 	constructor(
 		dataOrId:
@@ -24,6 +25,7 @@ export class SketchLine implements ISketchPrimitive {
 					isConstruction?: boolean;
 					isSplineHandle?: boolean;
 					parentSplineId?: string;
+					isAutomaticSplineHandle?: boolean;
 			  },
 		p1Id = '',
 		p2Id = '',
@@ -36,6 +38,7 @@ export class SketchLine implements ISketchPrimitive {
 			this.isConstruction = dataOrId.isConstruction;
 			this.isSplineHandle = dataOrId.isSplineHandle;
 			this.parentSplineId = dataOrId.parentSplineId;
+			this.isAutomaticSplineHandle = dataOrId.isAutomaticSplineHandle;
 		} else {
 			this.id = dataOrId;
 			this.p1Id = p1Id;

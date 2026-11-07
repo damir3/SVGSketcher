@@ -241,6 +241,16 @@ export class CanvasInteraction {
 		return tool instanceof SplineTool && tool.isBusy();
 	}
 
+	canUndoSplinePoint(): boolean {
+		const tool = this.activeToolInstance;
+		return tool instanceof SplineTool && tool.pointCount > 0;
+	}
+
+	canRedoSplinePoint(): boolean {
+		const tool = this.activeToolInstance;
+		return tool instanceof SplineTool && tool.hasUndonePoints;
+	}
+
 	undoSplinePoint(): boolean {
 		const tool = this.activeToolInstance;
 		return tool instanceof SplineTool ? tool.undoPoint() : false;
@@ -896,6 +906,31 @@ export class CanvasInteraction {
 		let closestPointDist = pointSnapDistPx;
 		let foundPoint: { id: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
 
+		// A dragged spline point can move its own handles, so they cannot be snap targets.
+		const excludedSplineIds = new Set<string>();
+		const excludedHandleLineIds = new Set<string>();
+		const excludedHandlePointIds = new Set<string>();
+		if (excludePointId) {
+			for (const spline of this.sketch.splines.values()) {
+				const handles = (spline.tangentLineIds ?? []).map(id => this.sketch.lines.get(id));
+				if (
+					!spline.pointIds.includes(excludePointId) &&
+					!handles.some(line => line?.p1Id === excludePointId || line?.p2Id === excludePointId)
+				) {
+					continue;
+				}
+				excludedSplineIds.add(spline.id);
+				for (const line of handles) {
+					if (!line) continue;
+					excludedHandleLineIds.add(line.id);
+					if (spline.splineType === 'fit') {
+						excludedHandlePointIds.add(line.p1Id);
+						excludedHandlePointIds.add(line.p2Id);
+					}
+				}
+			}
+		}
+
 		const selectedSplineIds = new Set<string>(this.sketch.selection.splineIds);
 		for (const spline of this.sketch.splines.values()) {
 			if (spline.pointIds.some(pid => this.sketch.selection.pointIds.has(pid))) {
@@ -917,7 +952,7 @@ export class CanvasInteraction {
 		}
 
 		for (const pt of this.sketch.points.values()) {
-			if (excludePointId && pt.id === excludePointId) continue;
+			if (pt.id === excludePointId || excludedHandlePointIds.has(pt.id)) continue;
 			// If point belongs to a spline handle or control polygon, only snap if spline is selected or constraint tool active
 			let isHiddenSplinePoint = false;
 			for (const spline of this.sketch.splines.values()) {
@@ -980,6 +1015,7 @@ export class CanvasInteraction {
 		} | null = null;
 
 		for (const line of this.sketch.lines.values()) {
+			if (excludedHandleLineIds.has(line.id)) continue;
 			if (excludePointId && (line.p1Id === excludePointId || line.p2Id === excludePointId)) {
 				continue;
 			}
@@ -1199,20 +1235,7 @@ export class CanvasInteraction {
 		}
 
 		for (const spline of this.sketch.splines.values()) {
-			if (excludePointId && spline.pointIds.includes(excludePointId)) {
-				continue;
-			}
-			if (excludePointId && spline.tangentLineIds) {
-				let isHandlePt = false;
-				for (const lid of spline.tangentLineIds) {
-					const l = this.sketch.lines.get(lid);
-					if (l && (l.p1Id === excludePointId || l.p2Id === excludePointId)) {
-						isHandlePt = true;
-						break;
-					}
-				}
-				if (isHandlePt) continue;
-			}
+			if (excludedSplineIds.has(spline.id)) continue;
 
 			const screenSegments = this.getSplineScreenSegments(spline);
 			if (!screenSegments) continue;
@@ -2384,10 +2407,10 @@ export class CanvasInteraction {
 		if (this.isDraggingPoint && this.draggedPointId && this.dragPointStartWorld) {
 			this.hasDragged = true;
 			const snap = this.findSnap(screen, this.draggedPointId);
-			const targetWorld = snap ? snap.worldPos : world;
+			const targetWorld = this.sketch.getPointDragTarget(this.draggedPointId, snap?.worldPos ?? world);
 			this.sketch.dragPoint(this.draggedPointId, targetWorld.x, targetWorld.y);
 			this.render();
-			if (snap) {
+			if (snap && targetWorld.x === snap.worldPos.x && targetWorld.y === snap.worldPos.y) {
 				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, true);
 			} else {
 				this.renderer.clearPreviews();
@@ -2665,7 +2688,16 @@ export class CanvasInteraction {
 				if (draggedPtId) {
 					const screen = e ? this.getScreenPos(e) : this.lastMouseScreen;
 					const snap = this.findSnap(screen, draggedPtId);
-					if (snap && snap.id && (snap.type !== 'point' || snap.id !== draggedPtId)) {
+					const target = snap && this.sketch.getPointDragTarget(draggedPtId, snap.worldPos);
+					if (
+						snap &&
+						target &&
+						(this.sketch.isSplineHandlePoint(draggedPtId) ||
+							target.x !== snap.worldPos.x ||
+							target.y !== snap.worldPos.y)
+					) {
+						this.sketch.dragPoint(draggedPtId, target.x, target.y);
+					} else if (snap && snap.id && (snap.type !== 'point' || snap.id !== draggedPtId)) {
 						const pt = this.sketch.getPoint(draggedPtId);
 						if (pt) {
 							pt.x = snap.worldPos.x;

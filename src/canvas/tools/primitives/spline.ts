@@ -15,6 +15,8 @@ export class SplineTool extends BaseTool {
 	private points: Array<{ id: string; x: number; y: number }> = [];
 	private undonePoints: Array<{ id?: string; x: number; y: number }> = [];
 	private checkmarkPos?: Vec2;
+	private transactionStarted = false;
+	private createdPointIds = new Set<string>();
 
 	onModeChange?: (mode: SplineMode) => void;
 	onStateChange?: () => void;
@@ -62,9 +64,8 @@ export class SplineTool extends BaseTool {
 			if (count === 2) return 'Click to add points, or click ✓ / press Enter to finish';
 			return `Points: ${count}. Click first point to close, or click ✓ / Enter to finish`;
 		} else {
-			if (count === 0) return 'Click to place first control point (min 4 points)';
-			if (count < 4)
-				return `Points: ${count}/4. Click to place ${4 - count} more control point${4 - count > 1 ? 's' : ''}`;
+			if (count === 0) return 'Click to place first control point';
+			if (count === 1) return 'Click to place next control point (min 2 points)';
 			return `Points: ${count}. Click to add more, or click ✓ / Enter to finish`;
 		}
 	}
@@ -73,8 +74,16 @@ export class SplineTool extends BaseTool {
 		return this._mode;
 	}
 
+	override isBusy(): boolean {
+		return this.transactionStarted;
+	}
+
 	get pointCount(): number {
 		return this.points.length;
+	}
+
+	get hasUndonePoints(): boolean {
+		return this.undonePoints.length > 0;
 	}
 
 	setMode(newMode: SplineMode): void {
@@ -125,6 +134,11 @@ export class SplineTool extends BaseTool {
 			}
 		}
 
+		if (!this.transactionStarted) {
+			sketch.beginTransaction();
+			this.transactionStarted = true;
+		}
+
 		let pId: string;
 		let pPos: Vec2;
 		if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
@@ -134,11 +148,13 @@ export class SplineTool extends BaseTool {
 			pPos = snap ? snap.worldPos : world;
 			const pt = sketch.addPoint(pPos);
 			pId = pt.id;
+			this.createdPointIds.add(pt.id);
 			this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 		}
 
 		this.points.push({ id: pId, x: pPos.x, y: pPos.y });
 		this.undonePoints = [];
+		this.ctx.sketch.notify();
 		this.onStateChange?.();
 		this.ctx.requestRender();
 	}
@@ -178,7 +194,10 @@ export class SplineTool extends BaseTool {
 		if (e.key !== 'Enter' || this.points.length === 0) return;
 
 		e.preventDefault();
-		if (this.points.length >= 2) this.commit();
+		if (this.points.length >= 2) {
+			this.commit();
+			this.ctx.setTool('select');
+		}
 		return true;
 	}
 
@@ -186,12 +205,17 @@ export class SplineTool extends BaseTool {
 		if (this.points.length === 0) return false;
 		const last = this.points.pop()!;
 		this.undonePoints.push(last);
-		if (!this.ctx.sketch.isPointUsed(last.id)) {
+		if (
+			this.createdPointIds.has(last.id) &&
+			!this.points.some(point => point.id === last.id) &&
+			!this.ctx.sketch.isPointUsed(last.id)
+		) {
 			this.ctx.sketch.removeEntity(last.id);
 		}
 		if (this.points.length === 0) {
 			this.ctx.renderer.clearPreviews();
 		}
+		this.ctx.sketch.notify();
 		this.onStateChange?.();
 		this.ctx.requestRender();
 		return true;
@@ -204,8 +228,10 @@ export class SplineTool extends BaseTool {
 		if (!ptId || !this.ctx.sketch.points.has(ptId)) {
 			const pt = this.ctx.sketch.addPoint(next);
 			ptId = pt.id;
+			this.createdPointIds.add(pt.id);
 		}
 		this.points.push({ id: ptId, x: next.x, y: next.y });
+		this.ctx.sketch.notify();
 		this.onStateChange?.();
 		this.ctx.requestRender();
 		return true;
@@ -217,11 +243,11 @@ export class SplineTool extends BaseTool {
 
 	override cancel(): void {
 		const hadPoints = this.points.length > 0;
-		for (const p of this.points) {
-			if (!this.ctx?.sketch.isPointUsed(p.id)) {
-				this.ctx?.sketch.removeEntity(p.id);
-			}
+		if (this.transactionStarted) {
+			this.transactionStarted = false;
+			this.ctx.sketch.rollbackTransaction();
 		}
+		this.createdPointIds.clear();
 		this.points = [];
 		this.undonePoints = [];
 		this.checkmarkPos = undefined;
@@ -237,19 +263,18 @@ export class SplineTool extends BaseTool {
 			this.cancel();
 			return;
 		}
-		if (this._mode === 'control' && this.points.length < 4) {
-			this.ctx.showToast('Control spline requires at least 4 points');
-			return;
-		}
 		const pointIds = this.points.map(p => p.id);
 		if (this._mode === 'fit') {
 			this.ctx.sketch.addFitSpline(pointIds, undefined, this.ctx.isConstructionMode, undefined, isClosed);
 		} else {
 			this.ctx.sketch.addControlSpline(pointIds, this.ctx.isConstructionMode, undefined, false);
 		}
+		this.transactionStarted = false;
+		this.createdPointIds.clear();
 		this.points = [];
 		this.undonePoints = [];
 		this.checkmarkPos = undefined;
+		this.ctx.sketch.commitTransaction();
 		this.ctx.renderer.clearPreviews();
 		this.onStateChange?.();
 		this.ctx.requestRender();

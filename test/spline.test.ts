@@ -268,6 +268,63 @@ describe('SketchDocument Spline Integration', () => {
 		assert.ok(sketch.isPointUsed(handleLine0.p2Id));
 	});
 
+	it('recomputes automatic tangents while retaining manually edited tangents across snapshots', () => {
+		const sketch = new SketchDocument();
+		const points = [
+			{ x: 0, y: 0 },
+			{ x: 50, y: 40 },
+			{ x: 100, y: 0 },
+			{ x: 150, y: 25 },
+		].map(point => sketch.addPoint(point));
+		const spline = sketch.addFitSpline(points.map(point => point.id));
+		const ids = spline.tangentLineIds!;
+		const manual = sketch.lines.get(ids[0])!;
+		const endpoint = sketch.points.get(manual.p2Id)!;
+		sketch.dragPoint(endpoint.id, 20, 10);
+		assert.deepEqual({ x: points[0].x, y: points[0].y }, { x: 0, y: 0 });
+		assert.deepEqual({ x: endpoint.x, y: endpoint.y }, { x: 20, y: 10 });
+
+		sketch.restoreSnapshot(sketch.takeSnapshot());
+		sketch.dragPoint(points[1].id, 45, 60);
+		const current = points.map(point => sketch.points.get(point.id)!);
+		assert.deepEqual({ x: current[1].x, y: current[1].y }, { x: 45, y: 60 });
+		const expected = computeNaturalFitHandles(current);
+		for (const [index, id] of ids.entries()) {
+			const line = sketch.lines.get(id)!;
+			const h1 = sketch.points.get(line.p1Id)!;
+			const h2 = sketch.points.get(line.p2Id)!;
+			const handle = index === 0 ? { h1: { x: -20, y: -10 }, h2: { x: 20, y: 10 } } : expected[index];
+			assert.deepEqual({ x: h1.x, y: h1.y }, handle.h1);
+			assert.deepEqual({ x: h2.x, y: h2.y }, handle.h2);
+		}
+	});
+
+	it('keeps other fit points stationary when dragging either axis-constrained endpoint', () => {
+		for (const endpoint of [0, 3]) {
+			const sketch = new SketchDocument();
+			const coords = [
+				{ x: -25, y: 0 },
+				{ x: -25, y: 50 },
+				{ x: 25, y: 50 },
+				{ x: 25, y: 0 },
+			];
+			const points = coords.map(point => sketch.addPoint(point));
+			sketch.addPointOnAxisConstraint(points[0].id, 'x');
+			sketch.addPointOnAxisConstraint(points[3].id, 'x');
+			const spline = sketch.addFitSpline(points.map(point => point.id));
+			const targetX = coords[endpoint].x + 10;
+			for (const targetY of [25, -25]) {
+				sketch.dragPoint(points[endpoint].id, targetX, targetY);
+				sketch.solve();
+				assert.deepEqual(
+					points.map(({ x, y }) => ({ x, y })),
+					coords.map((point, i) => (i === endpoint ? { x: targetX, y: 0 } : point))
+				);
+				assert.deepEqual(spline.toGeoCurve(sketch)?.bezierSegments, fitPointsToBezier(points));
+			}
+		}
+	});
+
 	it('addControlSpline creates control point spline with control polygon lines', () => {
 		const sketch = new SketchDocument();
 		const p1 = sketch.addPoint({ x: 0, y: 0 });
@@ -379,7 +436,7 @@ describe('SketchDocument Spline Integration', () => {
 		assert.equal(sketch.lines.size, 0, 'All handles deleted');
 	});
 
-	it('deleting a control point keeps control spline intact if >= 4 points remain', () => {
+	it('reduces the degree when deleting control points until fewer than two remain', () => {
 		const sketch = new SketchDocument();
 		const p0 = sketch.addPoint({ x: 0, y: 0 });
 		const p1 = sketch.addPoint({ x: 20, y: 50 });
@@ -397,9 +454,18 @@ describe('SketchDocument Spline Integration', () => {
 		assert.equal(spline.pointIds.length, 4);
 		assert.deepEqual(spline.pointIds, [p0.id, p1.id, p3.id, p4.id]);
 
-		// Now delete another control point: only 3 remain, so cubic spline cannot survive
 		sketch.removeEntity(p0.id);
-		assert.equal(sketch.splines.size, 0, 'Control spline deleted when < 4 points remain');
+		assert.equal(spline.pointIds.length, 3);
+		const quadraticMid = evaluateBezier(spline.toGeoCurve(sketch)!.bezierSegments[0], 0.5);
+		assert.deepEqual(quadraticMid, { x: 70, y: 37.5 });
+
+		sketch.removeEntity(p3.id);
+		assert.equal(spline.pointIds.length, 2);
+		const lineMid = evaluateBezier(spline.toGeoCurve(sketch)!.bezierSegments[0], 0.5);
+		assert.deepEqual(lineMid, { x: 60, y: 25 });
+
+		sketch.removeEntity(p1.id);
+		assert.equal(sketch.splines.size, 0);
 	});
 
 	it('cannot delete tangent handle lines or tangent handle points directly', () => {
@@ -421,13 +487,33 @@ describe('SketchDocument Spline Integration', () => {
 		// Attempt to delete handle point directly
 		sketch.removeEntity(handlePtId);
 		assert.ok(sketch.points.has(handlePtId), 'Tangent handle point must NOT be deleted directly');
+	});
 
-		// Attempt to delete via deleteSelected
-		sketch.selection.lineIds.add(handleLineId);
-		sketch.selection.pointIds.add(handlePtId);
-		sketch.deleteSelected();
-		assert.ok(sketch.lines.has(handleLineId), 'deleteSelected must ignore tangent handle lines');
-		assert.ok(sketch.points.has(handlePtId), 'deleteSelected must ignore tangent handle points');
+	it('Delete resets a fit tangent selected by its line or either endpoint', () => {
+		for (const target of ['line', 'p1', 'p2']) {
+			const sketch = new SketchDocument();
+			const p1 = sketch.addPoint({ x: 0, y: 0 });
+			const p2 = sketch.addPoint({ x: 30, y: 15 });
+			const spline = sketch.addFitSpline([p1.id, p2.id]);
+			const line = sketch.lines.get(spline.tangentLineIds![0])!;
+			sketch.dragPoint(line.p2Id, 20, 5);
+			sketch.dragPoint(p2.id, 45, 30);
+
+			const selectedId = target === 'line' ? line.id : target === 'p1' ? line.p1Id : line.p2Id;
+			sketch.selectEntity(selectedId, target === 'line' ? 'line' : 'point');
+			sketch.deleteSelected();
+
+			const expected = computeNaturalFitHandles([p1, p2])[0];
+			const h1 = sketch.points.get(line.p1Id)!;
+			const h2 = sketch.points.get(line.p2Id)!;
+			assert.equal(line.isAutomaticSplineHandle, true);
+			assert.deepEqual({ x: h1.x, y: h1.y }, expected.h1);
+			assert.deepEqual({ x: h2.x, y: h2.y }, expected.h2);
+			assert.ok(sketch.undo());
+			const restored = sketch.points.get(line.p2Id)!;
+			assert.deepEqual({ x: restored.x, y: restored.y }, { x: 20, y: 5 });
+			assert.equal(sketch.lines.get(line.id)?.isAutomaticSplineHandle, false);
+		}
 	});
 
 	it('undo and redo properly restore splines and their handles', () => {

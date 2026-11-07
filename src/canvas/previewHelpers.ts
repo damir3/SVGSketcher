@@ -356,6 +356,8 @@ export function renderSplinePreviewVisual(
 		createSvgCircle(p, 3, SPLINE_PREVIEW_VERTEX_ATTRS, parent);
 	}
 
+	if (points.length < 2) return {};
+
 	const checkmarkPos = { x: lastPt.x + 20, y: lastPt.y - 12 };
 	const checkG = createSvgElement(
 		'g',

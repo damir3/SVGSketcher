@@ -4,6 +4,7 @@ import { SketchDocument } from '../src/model/sketch';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
 import { vec } from '../src/math/vector';
+import { computeNaturalFitHandles } from '../src/math/spline';
 
 function setupMockDocument() {
 	const origDoc = (globalThis as any).document;
@@ -177,6 +178,47 @@ describe('Grid Snapping & Drag Precision', () => {
 
 			assert.equal(pt.x, 25, 'Point X should snap exactly to grid 25');
 			assert.equal(pt.y, 20, 'Point Y should snap exactly to grid 20');
+
+			const points = [vec(15, 40), vec(30, 40), vec(45, 55)].map(point => sketch.addPoint(point));
+			const spline = sketch.addFitSpline(points.map(point => point.id));
+			sketch.selectEntity(points[1].id, 'point');
+			const nearGrid = viewport.worldToScreen(vec(20, 40));
+			// The previous fit point's forward handle sits on this grid intersection.
+			assert.equal(interaction.findSnap(nearGrid, points[1].id)?.type, 'grid');
+
+			(interaction as any).isDraggingPoint = true;
+			(interaction as any).draggedPointId = points[1].id;
+			(interaction as any).dragPointStartWorld = vec(30, 40);
+			(interaction as any).hasDragged = true;
+			(interaction as any).handleMouseUp({ clientX: nearGrid.x + 1, clientY: nearGrid.y, button: 0 });
+			assert.deepEqual(vec(points[1].x, points[1].y), vec(20, 40));
+			assert.equal(sketch.constraints.size, 3);
+
+			const checkHandles = () => {
+				const expected = computeNaturalFitHandles(points);
+				for (const [i, id] of spline.tangentLineIds!.entries()) {
+					const line = sketch.lines.get(id)!;
+					const h1 = sketch.points.get(line.p1Id)!;
+					const h2 = sketch.points.get(line.p2Id)!;
+					assert.deepEqual(vec(h1.x, h1.y), expected[i].h1);
+					assert.deepEqual(vec(h2.x, h2.y), expected[i].h2);
+				}
+			};
+			checkHandles();
+			sketch.dragPoint(points[0].id, 10, 45);
+			checkHandles();
+
+			const tangent = sketch.lines.get(spline.tangentLineIds![1])!;
+			const handle = sketch.points.get(tangent.p2Id)!;
+			const handleTarget = viewport.worldToScreen(vec(25, 50));
+			(interaction as any).isDraggingPoint = true;
+			(interaction as any).draggedPointId = handle.id;
+			(interaction as any).dragPointStartWorld = vec(handle.x, handle.y);
+			(interaction as any).hasDragged = true;
+			(interaction as any).handleMouseUp({ clientX: handleTarget.x + 1, clientY: handleTarget.y, button: 0 });
+			assert.deepEqual(vec(handle.x, handle.y), vec(25, 50));
+			assert.deepEqual(vec(points[1].x, points[1].y), vec(20, 40));
+			assert.equal(sketch.constraints.size, 3);
 		} finally {
 			cleanupDoc();
 		}

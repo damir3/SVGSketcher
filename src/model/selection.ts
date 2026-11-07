@@ -281,6 +281,8 @@ export function deleteSelected(sketch: SketchDocument): void {
 	for (const id of selectedTexts) sketch.removeEntity(id);
 	for (const id of filteredPoints) sketch.removeEntity(id);
 
+	sketch.resetFitSplineTangents(selectedLines, selectedPoints);
+
 	// Final sweep for any candidate points that became unused across the batch
 	for (const ptId of candidatePointIds) {
 		if (sketch.points.has(ptId) && !sketch.isPointUsed(ptId)) {

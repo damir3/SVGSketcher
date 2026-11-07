@@ -93,12 +93,14 @@ import {
 } from './types';
 import type { GeoCurve } from '../math/intersection';
 import {
+	add,
 	angleFromTo,
 	addScaled,
 	cross,
 	dist,
 	dot,
 	mid,
+	mix,
 	reflectPoint,
 	scale,
 	sub,
@@ -107,6 +109,7 @@ import {
 } from '../math/vector';
 import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
+import { AutomaticSplineHandlesConstraint } from '../solver/constraints/automaticSplineHandles';
 import { calculateOffsetGeometry } from '../math/offset';
 import { serializePrimitive } from './primitives/serialization';
 import { HistoryManager, type SketchSnapshot } from './history';
@@ -367,6 +370,8 @@ export class SketchDocument {
 				this.constraints.set(c.id, c);
 			}
 		}
+
+		this.restoreAutomaticSplineHandles();
 
 		this.counters.clear();
 		const allIds = [
@@ -632,10 +637,11 @@ export class SketchDocument {
 						isConstruction: true,
 						isSplineHandle: true,
 						parentSplineId: sid,
+						isAutomaticSplineHandle: !explicitHandles,
 					});
 					this.lines.set(lineId, hLine);
-					const d1 = Math.hypot(pFit.x - h.h1.x, pFit.y - h.h1.y);
-					const d2 = Math.hypot(h.h2.x - pFit.x, h.h2.y - pFit.y);
+					const d1 = dist(pFit, h.h1);
+					const d2 = dist(pFit, h.h2);
 					const ratio = d1 + d2 > 1e-6 ? d1 / (d1 + d2) : 0.5;
 					const midC = new MidpointConstraint(this.nextId('c_midpoint'), pFit.id, p1Id, p2Id, 1.0, ratio);
 					this.constraints.set(midC.id, midC);
@@ -663,6 +669,7 @@ export class SketchDocument {
 				const line = this.lines.get(lid);
 				if (line) {
 					line.parentSplineId = sid;
+					line.isAutomaticSplineHandle ??= false;
 					line.isSplineHandle = true;
 				}
 			}
@@ -2370,6 +2377,44 @@ export class SketchDocument {
 		return false;
 	}
 
+	resetFitSplineTangents(selectedLines: string[], selectedPoints: string[]): void {
+		for (const spline of this.splines.values()) {
+			if (spline.splineType !== 'fit' || !spline.tangentLineIds) continue;
+			for (const id of new Set(spline.tangentLineIds)) {
+				const line = this.lines.get(id);
+				if (
+					!line ||
+					line.isAutomaticSplineHandle ||
+					(!selectedLines.includes(id) && !selectedPoints.includes(line.p1Id) && !selectedPoints.includes(line.p2Id))
+				) {
+					continue;
+				}
+
+				const midpoint = [...this.constraints.values()].find(
+					c => c instanceof MidpointConstraint && c.p1Id === line.p1Id && c.p2Id === line.p2Id
+				);
+				if (!(midpoint instanceof MidpointConstraint)) continue;
+
+				const constrained = [...this.constraints.values()].some(
+					c =>
+						c !== midpoint &&
+						!(c instanceof PointOnSplineConstraint) &&
+						c.entityIds.some(entityId => entityId === id || entityId === line.p1Id || entityId === line.p2Id)
+				);
+				if (constrained || this.points.get(line.p1Id)?.fixed || this.points.get(line.p2Id)?.fixed) continue;
+
+				// Explicit handles can have unequal lengths. The automatic handles are symmetric.
+				if (midpoint.ratio !== 0.5) {
+					this.constraints.set(
+						midpoint.id,
+						new MidpointConstraint(midpoint.id, midpoint.midId, midpoint.p1Id, midpoint.p2Id, midpoint.weight)
+					);
+				}
+				line.isAutomaticSplineHandle = true;
+			}
+		}
+	}
+
 	isSplineInternalConstraint(c: IConstraint): boolean {
 		if (c instanceof MidpointConstraint || c.type === 'midpoint') {
 			const anyC = c as any;
@@ -2605,7 +2650,7 @@ export class SketchDocument {
 				if (spline.pointIds.includes(id)) {
 					if (spline.splineType === 'control') {
 						const remaining = spline.pointIds.filter(pid => pid !== id);
-						if (remaining.length >= 4) {
+						if (remaining.length >= 2) {
 							spline.pointIds = remaining;
 							delete spline.knots;
 							if (spline.tangentLineIds) {
@@ -2905,9 +2950,105 @@ export class SketchDocument {
 		return locked;
 	}
 
+	private restoreAutomaticSplineHandles(): void {
+		for (const spline of this.splines.values()) {
+			if (spline.splineType !== 'fit' || !spline.tangentLineIds) continue;
+			const points = spline.pointIds.map(id => this.points.get(id));
+			if (points.some(point => !point)) continue;
+			const natural = computeNaturalFitHandles(points as SketchPoint[]);
+			for (const [index, lineId] of spline.tangentLineIds.entries()) {
+				const line = this.lines.get(lineId);
+				const handle = natural[index];
+				if (!line || line.isAutomaticSplineHandle !== undefined || !handle) continue;
+				const p1 = this.points.get(line.p1Id);
+				const p2 = this.points.get(line.p2Id);
+				// Older snapshots only stored the handle geometry.
+				line.isAutomaticSplineHandle = !!p1 && !!p2 && dist(p1, handle.h1) < 1e-5 && dist(p2, handle.h2) < 1e-5;
+			}
+		}
+	}
+
+	private prepareSplineConstraints(
+		extraConstraints: IConstraint[],
+		lockedParams: Set<string>,
+		editedHandles: SketchLine[]
+	): IConstraint[] {
+		const constraints = [...this.constraints.values(), ...extraConstraints];
+		if (this.splines.size === 0) return constraints;
+		const splineConstraints: IConstraint[] = [];
+		const replaced = new Set<IConstraint>();
+		const midpoints = new Map<string, MidpointConstraint>();
+		const editedPoints = new Set<string>();
+		const constrained = new Set<string>();
+		for (const c of constraints) {
+			if (c instanceof MidpointConstraint) {
+				midpoints.set(c.p1Id, c);
+			} else if (!(c instanceof PointOnSplineConstraint)) {
+				if (extraConstraints.includes(c) && (c instanceof DragPointConstraint || c instanceof FixedConstraint)) {
+					editedPoints.add(c.pointId);
+				} else {
+					for (const id of c.entityIds) constrained.add(id);
+				}
+			}
+		}
+
+		for (const spline of this.splines.values()) {
+			if (spline.splineType !== 'fit' || !spline.tangentLineIds || spline.pointIds.length < 2) continue;
+			const points = spline.pointIds.map(id => this.points.get(id));
+			if (points.some(point => !point)) continue;
+			const natural = computeNaturalFitHandles(points as SketchPoint[]);
+			const automatic: { index: number; midpoint: MidpointConstraint }[] = [];
+			for (const [index, lineId] of spline.tangentLineIds.entries()) {
+				// Closed splines reuse the first tangent at the closing point.
+				if (index === spline.pointIds.length - 1 && index > 0 && lineId === spline.tangentLineIds[0]) continue;
+				const line = this.lines.get(lineId);
+				const fit = points[index];
+				if (!line || !fit) continue;
+				const midpoint = midpoints.get(line.p1Id);
+				const p1 = this.points.get(line.p1Id);
+				const p2 = this.points.get(line.p2Id);
+				if (!midpoint || midpoint.midId !== fit.id || midpoint.p2Id !== line.p2Id || !p1 || !p2) continue;
+
+				const editP1 = editedPoints.has(p1.id);
+				const editP2 = editedPoints.has(p2.id);
+				if (editP1 || editP2) {
+					editedHandles.push(line);
+					lockedParams.add(`${fit.id}.x`);
+					lockedParams.add(`${fit.id}.y`);
+				}
+
+				if (constrained.has(lineId) || constrained.has(p1.id) || constrained.has(p2.id) || p1.fixed || p2.fixed) {
+					continue;
+				}
+
+				const ratio = midpoint.ratio;
+				const dir: Vec2 = sub(fit, mix(p1, p2, ratio));
+				if (editP1 && !editP2 && ratio > 1e-6) {
+					Object.assign(p2, addScaled(p2, dir, 1 / ratio));
+				} else if (editP2 && !editP1 && 1 - ratio > 1e-6) {
+					Object.assign(p1, addScaled(p1, dir, 1 / (1 - ratio)));
+				} else if (!editP1 && !editP2 && line.isAutomaticSplineHandle) {
+					Object.assign(p1, natural[index].h1);
+					Object.assign(p2, natural[index].h2);
+					automatic.push({ index, midpoint });
+					replaced.add(midpoint);
+				} else if (editedPoints.has(fit.id)) {
+					Object.assign(p1, add(p1, dir));
+					Object.assign(p2, add(p2, dir));
+				}
+			}
+			if (automatic.length > 0) {
+				splineConstraints.push(new AutomaticSplineHandlesConstraint(spline.id, spline.pointIds, automatic));
+			}
+		}
+		return [...constraints.filter(c => !replaced.has(c)), ...splineConstraints];
+	}
+
 	solve(extraConstraints: IConstraint[] = []): SolverResult {
-		const activeConstraints = [...this.constraints.values(), ...extraConstraints];
 		const drivenRadii = this.collectDrivenRadii();
+		const editedHandles: SketchLine[] = [];
+		const activeConstraints = this.prepareSplineConstraints(extraConstraints, drivenRadii, editedHandles);
+		for (const line of editedHandles) line.isAutomaticSplineHandle = false;
 
 		// Interactive drags keep the regular behaviour (radius may follow the drag)
 		if (extraConstraints.length > 0) {
@@ -2953,23 +3094,40 @@ export class SketchDocument {
 		return res;
 	}
 
+	getPointDragTarget(pointId: string, target: Vec2): Vec2 {
+		return {
+			x: this.getPointToAxisConstraint(pointId, 'y')?.targetDistance === 0 ? 0 : target.x,
+			y: this.getPointToAxisConstraint(pointId, 'x')?.targetDistance === 0 ? 0 : target.y,
+		};
+	}
+
 	dragPoint(pointId: string, targetX: number, targetY: number): SolverResult {
 		const pt = this.points.get(pointId);
 		if (!pt || this.isPointFixed(pointId)) {
 			return this.solve();
 		}
 
-		pt.x = targetX;
-		pt.y = targetY;
+		// Apply axis locks before automatic spline tangents are seeded for the solve.
+		const target = this.getPointDragTarget(pointId, { x: targetX, y: targetY });
+		pt.x = target.x;
+		pt.y = target.y;
 
-		// Soft spring constraint pulls point to mouse position while strictly preserving hard constraints
-		const dragConstraint = new DragPointConstraint(pointId, targetX, targetY, 0.005);
+		// Soft spring constraint pulls point to mouse position while preserving hard constraints.
+		const dragConstraint = new DragPointConstraint(pointId, target.x, target.y, 0.005);
 		return this.solve([dragConstraint]);
 	}
 
 	dragLine(lineId: string, p1TargetX: number, p1TargetY: number, p2TargetX: number, p2TargetY: number): SolverResult {
 		const line = this.lines.get(lineId);
 		if (!line) return this.solve();
+
+		const spline = line.parentSplineId ? this.splines.get(line.parentSplineId) : undefined;
+		if (spline?.splineType === 'fit') {
+			// Drag one end of the tangent so the other end can pivot around the fit point.
+			return this.isPointFixed(line.p2Id)
+				? this.dragPoint(line.p1Id, p1TargetX, p1TargetY)
+				: this.dragPoint(line.p2Id, p2TargetX, p2TargetY);
+		}
 
 		const p1 = this.points.get(line.p1Id);
 		const p2 = this.points.get(line.p2Id);
@@ -3442,8 +3600,9 @@ export class SketchDocument {
 
 	tryHardSolve(tempHardConstraints: IConstraint[], extraValidator?: () => boolean): boolean {
 		const initialValues = this.paramManager.getCurrentValues();
-		const activeConstraints = [...this.constraints.values(), ...tempHardConstraints];
 		const drivenRadii = this.collectDrivenRadii();
+		const editedHandles: SketchLine[] = [];
+		const activeConstraints = this.prepareSplineConstraints(tempHardConstraints, drivenRadii, editedHandles);
 		for (const c of tempHardConstraints) {
 			if (c instanceof RadiusConstraint) {
 				const entity = this.circles.get(c.circleId) ?? this.arcs.get(c.circleId);
@@ -3486,6 +3645,9 @@ export class SketchDocument {
 			}
 		}
 
+		if (solvedOk) {
+			for (const line of editedHandles) line.isAutomaticSplineHandle = false;
+		}
 		return solvedOk;
 	}
 
