@@ -155,6 +155,13 @@ function curvePointAt(
 	item: { curve: ReturnType<typeof getAllGeoCurves>[number]; periodic: boolean },
 	param: number
 ): Vec2 {
+	// Keep bounded-curve endpoints attached to their sketch vertices. Arc endpoints
+	// can be a little off the ideal radius after solving/import, while adjacent
+	// curves still use the exact same endpoint coordinates.
+	if (!item.periodic && (item.curve.type === 'arc' || item.curve.type === 'elliptical_arc')) {
+		if (param <= 0) return item.curve.start;
+		if (param >= 1) return item.curve.end;
+	}
 	if (item.curve.type === 'spline' && item.periodic && (param < 0 || param > 1)) {
 		param = ((param % 1) + 1) % 1;
 	}
@@ -197,7 +204,7 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 					intervals.push([a.t, a.p, i + 1 < unique.length ? b.t : b.t + period, b.p]);
 				}
 		} else {
-			const cuts = [{ t: 0, p: getPointAtParam(curve, 0) }, ...unique, { t: 1, p: getPointAtParam(curve, 1) }];
+			const cuts = [{ t: 0, p: curvePointAt(item, 0) }, ...unique, { t: 1, p: curvePointAt(item, 1) }];
 			for (let i = 0; i < cuts.length - 1; i++) intervals.push([cuts[i].t, cuts[i].p, cuts[i + 1].t, cuts[i + 1].p]);
 		}
 		for (const [t0, p0, t1, p1] of intervals) {

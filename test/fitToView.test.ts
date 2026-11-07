@@ -262,10 +262,10 @@ describe('Fit to View & Selection Bounding Box', () => {
 			assert.equal(vp.panY, targetAll.panY);
 			assert.equal(vp.zoom, targetAll.zoom);
 
-			// 3. Zoom with empty sketch (should center origin and zoom 1.0)
+			// 3. An empty sketch restores the default view.
 			sketch.clear();
 			interaction.fitToView(false);
-			assert.equal(vp.zoom, 1.0);
+			assert.equal(vp.zoom, 4);
 			assert.equal(vp.panX, 400);
 			assert.equal(vp.panY, 300);
 		} finally {

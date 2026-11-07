@@ -288,12 +288,14 @@ export class OffsetConstraint extends BaseConstraint {
 		return res;
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: 'Offset Distance',
-		dimension: {
-			label: 'Distance',
-			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
-		},
-	});
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: 'Offset Distance',
+			dimension: {
+				label: 'Distance',
+				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+			},
+		});
+	}
 }

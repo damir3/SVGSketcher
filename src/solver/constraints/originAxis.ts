@@ -224,43 +224,45 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: () => {
-			if (this.isCoincident) {
-				return 'Coincident with Origin (0,0)';
-			}
-			if (this.targetDistance === 0) {
-				const axisName = this.orientation === 'vertical' ? 'X-Axis' : 'Y-Axis';
-				return `Point on ${axisName}`;
-			}
-			return this.orientation === 'horizontal'
-				? 'Distance to Y-Axis'
-				: this.orientation === 'vertical'
-					? 'Distance to X-Axis'
-					: 'Distance to (0,0)';
-		},
-		rows: [
-			{
-				label: 'Position:',
-				getValue: () => '(0.00, 0.00)',
-				isVisible: () => this.isCoincident,
-			},
-			{
-				label: 'Axis:',
-				getValue: () => {
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: () => {
+				if (this.isCoincident) {
+					return 'Coincident with Origin (0,0)';
+				}
+				if (this.targetDistance === 0) {
 					const axisName = this.orientation === 'vertical' ? 'X-Axis' : 'Y-Axis';
-					return `${axisName} (${this.orientation === 'vertical' ? 'Y = 0' : 'X = 0'})`;
-				},
-				isVisible: () => !this.isCoincident && this.targetDistance === 0,
+					return `Point on ${axisName}`;
+				}
+				return this.orientation === 'horizontal'
+					? 'Distance to Y-Axis'
+					: this.orientation === 'vertical'
+						? 'Distance to X-Axis'
+						: 'Distance to (0,0)';
 			},
-		],
-		dimension: {
-			label: 'Distance',
-			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
-			isVisible: () => !this.isCoincident && this.targetDistance > 0,
-		},
-	});
+			rows: [
+				{
+					label: 'Position:',
+					getValue: () => '(0.00, 0.00)',
+					isVisible: () => this.isCoincident,
+				},
+				{
+					label: 'Axis:',
+					getValue: () => {
+						const axisName = this.orientation === 'vertical' ? 'X-Axis' : 'Y-Axis';
+						return `${axisName} (${this.orientation === 'vertical' ? 'Y = 0' : 'X = 0'})`;
+					},
+					isVisible: () => !this.isCoincident && this.targetDistance === 0,
+				},
+			],
+			dimension: {
+				label: 'Distance',
+				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+				isVisible: () => !this.isCoincident && this.targetDistance > 0,
+			},
+		});
+	}
 }
 
 /**
@@ -412,26 +414,28 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: () => {
-			const axisName = this.axis === 'x' ? 'X-Axis' : 'Y-Axis';
-			return this.isCollinear ? `Line Collinear with ${axisName}` : `Distance to ${axisName}`;
-		},
-		rows: [
-			{
-				label: 'Axis:',
-				getValue: () => {
-					const axisName = this.axis === 'x' ? 'X-Axis' : 'Y-Axis';
-					return `${axisName} (${this.axis === 'x' ? 'Y = 0' : 'X = 0'})`;
-				},
-				isVisible: () => this.isCollinear,
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: () => {
+				const axisName = this.axis === 'x' ? 'X-Axis' : 'Y-Axis';
+				return this.isCollinear ? `Line Collinear with ${axisName}` : `Distance to ${axisName}`;
 			},
-		],
-		dimension: {
-			label: 'Distance',
-			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
-			isVisible: () => !this.isCollinear,
-		},
-	});
+			rows: [
+				{
+					label: 'Axis:',
+					getValue: () => {
+						const axisName = this.axis === 'x' ? 'X-Axis' : 'Y-Axis';
+						return `${axisName} (${this.axis === 'x' ? 'Y = 0' : 'X = 0'})`;
+					},
+					isVisible: () => this.isCollinear,
+				},
+			],
+			dimension: {
+				label: 'Distance',
+				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+				isVisible: () => !this.isCollinear,
+			},
+		});
+	}
 }

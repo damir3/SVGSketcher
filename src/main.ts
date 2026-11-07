@@ -1,4 +1,5 @@
 import './style.css';
+import { DEFAULT_ZOOM } from './constants';
 import { SketchDocument } from './model/sketch';
 import { Viewport } from './canvas/viewport';
 import { SVGRenderer } from './canvas/renderer';
@@ -7,12 +8,6 @@ import { Toolbar, showToast } from './ui/toolbar';
 import { Sidebar } from './ui/sidebar';
 import { DimensionModal } from './ui/modal';
 import { ParametersPopup } from './ui/parameters-popup';
-import {
-	loadTrianglePreset,
-	loadBracketPreset,
-	loadFourBarLinkagePreset,
-	loadCircleTangentPreset,
-} from './model/presets';
 import { ICONS } from './ui/icons';
 import { setToolIconProvider } from './ui/panels/tools/iconProvider';
 import { preloadFonts, setOnFontLoaded } from './canvas/fonts';
@@ -38,17 +33,6 @@ function initApp(): void {
 					</svg>
 				</div>
 				<div class="brand-title">SVG Sketcher</div>
-				<div class="brand-badge">Parametric 2D</div>
-			</div>
-
-			<div class="header-center">
-				<select class="preset-select" id="preset-selector" title="Load CAD Example">
-					<option value="triangle">Demo: Constrained Triangle</option>
-					<option value="bracket">Demo: Parametric L-Bracket</option>
-					<option value="linkage">Demo: Four-Bar Linkage</option>
-					<option value="tangent">Demo: Circle & Tangent Line</option>
-					<option value="blank">— Blank Sketch —</option>
-				</select>
 			</div>
 
 			<div class="header-actions">
@@ -94,6 +78,9 @@ function initApp(): void {
 				<button class="btn-header primary" id="btn-export" title="Export as SVG">
 					${ICONS.export} Export SVG
 				</button>
+				<a class="btn-header btn-icon" href="https://github.com/damir3/SVGSketcher" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
+					${ICONS.github}
+				</a>
 			</div>
 		</header>
 
@@ -116,7 +103,7 @@ function initApp(): void {
 			<div class="footer-coords">
 				<span>X: <strong id="coord-x">0.0</strong> mm</span>
 				<span>Y: <strong id="coord-y">0.0</strong> mm</span>
-				<span>Zoom: <strong id="zoom-level">100%</strong></span>
+				<span>Zoom: <strong id="zoom-level">${Math.round(DEFAULT_ZOOM * 100)}%</strong></span>
 			</div>
 			<div class="footer-status">
 				<span>Solver: <strong id="solver-time">0.0 ms</strong></span>
@@ -128,7 +115,6 @@ function initApp(): void {
 	const svg = document.getElementById('cad-svg') as unknown as SVGSVGElement;
 	const toolbarContainer = document.getElementById('toolbar') as HTMLElement;
 	const sidebarContainer = document.getElementById('sidebar') as HTMLElement;
-	const presetSelector = document.getElementById('preset-selector') as HTMLSelectElement;
 	const btnUndo = document.getElementById('btn-undo') as HTMLButtonElement;
 	const btnRedo = document.getElementById('btn-redo') as HTMLButtonElement;
 	const btnSnapHeader = document.getElementById('btn-snap-header') as HTMLButtonElement;
@@ -150,7 +136,8 @@ function initApp(): void {
 
 	// Initialization of Architecture
 	const sketch = new SketchDocument();
-	const viewport = new Viewport(svg.clientWidth || 800, svg.clientHeight || 600);
+	const canvasRect = svg.getBoundingClientRect();
+	const viewport = new Viewport(canvasRect.width || 800, canvasRect.height || 600);
 	const renderer = new SVGRenderer(svg);
 	const interaction = new CanvasInteraction(svg, sketch, viewport, renderer);
 	const toolbar = new Toolbar(toolbarContainer, sketch, interaction);
@@ -197,12 +184,13 @@ function initApp(): void {
 	// Resize handling
 	function handleResize(): void {
 		const rect = svg.getBoundingClientRect();
-		viewport.resize(rect.width, rect.height);
-		renderer.render(sketch, viewport);
+		if (!viewport.resize(rect.width, rect.height)) return;
+		interaction.cancelAnimation();
+		interaction.render();
+		interaction.onViewportChange?.();
 	}
 
-	window.addEventListener('resize', handleResize);
-	setTimeout(handleResize, 50);
+	new ResizeObserver(handleResize).observe(svg);
 
 	setOnFontLoaded(() => {
 		renderer.render(sketch, viewport);
@@ -234,19 +222,6 @@ function initApp(): void {
 		solverTime.textContent = `${dt.toFixed(2)} ms`;
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 		updateUndoRedoButtons();
-	});
-
-	// Preset Selector
-	presetSelector.addEventListener('change', () => {
-		const val = presetSelector.value;
-		if (val === 'triangle') loadTrianglePreset(sketch);
-		else if (val === 'bracket') loadBracketPreset(sketch);
-		else if (val === 'linkage') loadFourBarLinkagePreset(sketch);
-		else if (val === 'tangent') loadCircleTangentPreset(sketch);
-		else if (val === 'blank') sketch.clear();
-
-		renderer.render(sketch, viewport);
-		showToast(`Loaded ${presetSelector.options[presetSelector.selectedIndex].text}`);
 	});
 
 	// Header Actions
@@ -359,7 +334,6 @@ function initApp(): void {
 				} else {
 					fitToView(false);
 				}
-				presetSelector.value = 'blank';
 				showToast(`Opened: ${file.name}`);
 			} else {
 				alert(`Failed to load SVG: ${result.error || 'Unknown error'}`);
@@ -480,9 +454,6 @@ function initApp(): void {
 		}
 	});
 
-	// Load Initial Constrained Triangle Demo
-	loadTrianglePreset(sketch);
-	sketch.clearHistory();
 	updateUndoRedoButtons();
 	renderer.render(sketch, viewport);
 }

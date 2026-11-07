@@ -1,21 +1,48 @@
+import { DEFAULT_ZOOM } from '../constants';
 import { mid, vec, type Vec2 } from '../math/vector';
 import type { AABB } from '../math/aabb';
 
 export class Viewport {
-	width = 800;
-	height = 600;
+	width: number;
+	height: number;
 	panX = 0; // World origin X on screen
 	panY = 0; // World origin Y on screen
-	zoom = 4.0; // Screen pixels per world unit
+	zoom = DEFAULT_ZOOM; // Screen pixels per world unit
+
+	private resizeFrame?: { width: number; height: number; panX: number; panY: number; zoom: number };
 
 	constructor(width = 800, height = 600) {
-		this.resize(width, height);
+		this.width = width;
+		this.height = height;
 		this.centerOrigin();
 	}
 
-	resize(width: number, height: number): void {
+	resize(width: number, height: number): boolean {
+		if (width <= 0 || height <= 0 || (width === this.width && height === this.height)) return false;
+
+		const center = this.screenToWorld(vec(this.width / 2, this.height / 2));
+		let frame = this.resizeFrame;
+		// Keep the same world bounds across resize events until the camera moves.
+		if (!frame || frame.panX !== this.panX || frame.panY !== this.panY || frame.zoom !== this.zoom) {
+			frame = {
+				width: this.width / this.zoom,
+				height: this.height / this.zoom,
+				panX: this.panX,
+				panY: this.panY,
+				zoom: this.zoom,
+			};
+			this.resizeFrame = frame;
+		}
+
 		this.width = width;
 		this.height = height;
+		this.zoom = Math.min(width / frame.width, height / frame.height);
+		this.panX = width / 2 - center.x * this.zoom;
+		this.panY = height / 2 + center.y * this.zoom;
+		frame.panX = this.panX;
+		frame.panY = this.panY;
+		frame.zoom = this.zoom;
+		return true;
 	}
 
 	centerOrigin(): void {

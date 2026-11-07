@@ -210,29 +210,31 @@ export class RadiusConstraint extends BaseConstraint {
 		return Math.min(labelDistance, distanceToSegment(screen, start, isInside ? edge : anchor));
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: () => (this.displayMode === 'diameter' ? 'Diameter' : 'Radius'),
-		segmentedControls: [
-			{
-				label: 'Mode',
-				options: [
-					{ id: 'radius', label: 'Radius' },
-					{ id: 'diameter', label: 'Diameter' },
-				],
-				getCurrent: () => this.displayMode ?? 'radius',
-				onSelect: (mode, context) => {
-					context.sketch.pushHistory();
-					const val = mode === 'diameter' ? this.targetRadius * 2 : this.targetRadius;
-					context.sketch.updateDimensionalConstraint(this.id, val, mode as any);
-					context.requestRender?.();
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: () => (this.displayMode === 'diameter' ? 'Diameter' : 'Radius'),
+			segmentedControls: [
+				{
+					label: 'Mode',
+					options: [
+						{ id: 'radius', label: 'Radius' },
+						{ id: 'diameter', label: 'Diameter' },
+					],
+					getCurrent: () => this.displayMode ?? 'radius',
+					onSelect: (mode, context) => {
+						context.sketch.pushHistory();
+						const val = mode === 'diameter' ? this.targetRadius * 2 : this.targetRadius;
+						context.sketch.updateDimensionalConstraint(this.id, val, mode as any);
+						context.requestRender?.();
+					},
 				},
+			],
+			dimension: {
+				label: () => (this.displayMode === 'diameter' ? 'Diameter' : 'Radius'),
+				getValue: () =>
+					`${this.displayMode === 'diameter' ? Number((this.targetRadius * 2).toFixed(2)) : Number(this.targetRadius.toFixed(2))} mm`,
 			},
-		],
-		dimension: {
-			label: () => (this.displayMode === 'diameter' ? 'Diameter' : 'Radius'),
-			getValue: () =>
-				`${this.displayMode === 'diameter' ? Number((this.targetRadius * 2).toFixed(2)) : Number(this.targetRadius.toFixed(2))} mm`,
-		},
-	});
+		});
+	}
 }

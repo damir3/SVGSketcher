@@ -296,93 +296,95 @@ export class CircularPatternConstraint extends BaseConstraint {
 		ctx.renderBadge(this.id, { x: sCtr.x + 14, y: sCtr.y - 14 }, 'circular_pattern', COLORS.primary);
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: () => (this.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern'),
-		iconName: () => (this.isReadOnly ? 'polygon' : 'circular_pattern'),
-		deleteButton: {
-			isVisible: () => this.isReadOnly,
-			label: 'Delete Constraint',
-			onDelete: context => {
-				context.sketch.removeConstraint(this.id);
-				context.requestRender?.();
-			},
-		},
-		segmentedControls: [
-			{
-				label: 'Distribution',
-				isVisible: () => !this.isReadOnly,
-				options: [
-					{ id: 'full', label: 'Full' },
-					{ id: 'partial', label: 'Partial' },
-					{ id: 'symmetric', label: 'Symmetric' },
-				],
-				getCurrent: () => this.distribution,
-				onSelect: (dist, context) => {
-					context.sketch.updateCircularPattern(this.id, {
-						distribution: dist as 'full' | 'partial' | 'symmetric',
-					});
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: () => (this.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern'),
+			iconName: () => (this.isReadOnly ? 'polygon' : 'circular_pattern'),
+			deleteButton: {
+				isVisible: () => this.isReadOnly,
+				label: 'Delete Constraint',
+				onDelete: context => {
+					context.sketch.removeConstraint(this.id);
 					context.requestRender?.();
 				},
 			},
-		],
-		fields: [
-			{
-				id: `insp-cpat-angle-${this.id}`,
-				label: 'Total Angle',
-				unit: '°',
-				type: 'text',
-				min: -360,
-				max: 360,
-				step: 5,
-				isVisible: () => !this.isReadOnly && this.distribution !== 'full',
-				getValue: () => this.totalAngleExpression ?? Number(this.totalAngle.toFixed(2)),
-				onChange: (val, context) => {
-					const text = String(val).trim();
-					const parsed = parseNumericOrExpression(text, this.totalAngle, context.sketch.getParameterValuesMap());
-					const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
-					if (!isNaN(parsed) && isFinite(parsed) && Math.abs(parsed) > 1e-3) {
+			segmentedControls: [
+				{
+					label: 'Distribution',
+					isVisible: () => !this.isReadOnly,
+					options: [
+						{ id: 'full', label: 'Full' },
+						{ id: 'partial', label: 'Partial' },
+						{ id: 'symmetric', label: 'Symmetric' },
+					],
+					getCurrent: () => this.distribution,
+					onSelect: (dist, context) => {
 						context.sketch.updateCircularPattern(this.id, {
-							totalAngle: parsed,
-							totalAngleExpression: expr,
+							distribution: dist as 'full' | 'partial' | 'symmetric',
 						});
 						context.requestRender?.();
-					}
+					},
 				},
-			},
-			{
-				id: `insp-cpat-quantity-${this.id}`,
-				label: 'Quantity',
-				type: 'number',
-				min: 2,
-				max: 100,
-				step: 1,
-				isVisible: () => !this.isReadOnly,
-				getValue: () => this.quantity,
-				onInput: (val, context) => {
-					if (!isNaN(val) && val >= 2) {
-						context.sketch.updateCircularPattern(this.id, { quantity: val });
+			],
+			fields: [
+				{
+					id: `insp-cpat-angle-${this.id}`,
+					label: 'Total Angle',
+					unit: '°',
+					type: 'text',
+					min: -360,
+					max: 360,
+					step: 5,
+					isVisible: () => !this.isReadOnly && this.distribution !== 'full',
+					getValue: () => this.totalAngleExpression ?? Number(this.totalAngle.toFixed(2)),
+					onChange: (val, context) => {
+						const text = String(val).trim();
+						const parsed = parseNumericOrExpression(text, this.totalAngle, context.sketch.getParameterValuesMap());
+						const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
+						if (!isNaN(parsed) && isFinite(parsed) && Math.abs(parsed) > 1e-3) {
+							context.sketch.updateCircularPattern(this.id, {
+								totalAngle: parsed,
+								totalAngleExpression: expr,
+							});
+							context.requestRender?.();
+						}
+					},
+				},
+				{
+					id: `insp-cpat-quantity-${this.id}`,
+					label: 'Quantity',
+					type: 'number',
+					min: 2,
+					max: 100,
+					step: 1,
+					isVisible: () => !this.isReadOnly,
+					getValue: () => this.quantity,
+					onInput: (val, context) => {
+						if (!isNaN(val) && val >= 2) {
+							context.sketch.updateCircularPattern(this.id, { quantity: val });
+							context.requestRender?.();
+						}
+					},
+				},
+			],
+			checkboxes: [
+				{
+					id: `insp-cpat-suppression-${this.id}`,
+					label: 'Suppression',
+					isVisible: () => !this.isReadOnly,
+					isChecked: () => this.suppression,
+					hint: () => {
+						const totalCopies = Math.max(1, this.quantity - 1);
+						const activeCopies = totalCopies - this.suppressedIndices.length;
+						return `${activeCopies} of ${totalCopies} enabled`;
+					},
+					onChange: (checked, context) => {
+						context.sketch.updateCircularPattern(this.id, { suppression: checked });
 						context.requestRender?.();
-					}
+					},
 				},
-			},
-		],
-		checkboxes: [
-			{
-				id: `insp-cpat-suppression-${this.id}`,
-				label: 'Suppression',
-				isVisible: () => !this.isReadOnly,
-				isChecked: () => this.suppression,
-				hint: () => {
-					const totalCopies = Math.max(1, this.quantity - 1);
-					const activeCopies = totalCopies - this.suppressedIndices.length;
-					return `${activeCopies} of ${totalCopies} enabled`;
-				},
-				onChange: (checked, context) => {
-					context.sketch.updateCircularPattern(this.id, { suppression: checked });
-					context.requestRender?.();
-				},
-			},
-		],
-	});
+			],
+		});
+	}
 }

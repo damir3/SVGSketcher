@@ -296,12 +296,14 @@ export class AngleConstraint extends BaseConstraint {
 		return null;
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: 'Angle',
-		dimension: {
-			label: 'Angle',
-			getValue: () => `${Number(this.targetAngle.toFixed(2))}°`,
-		},
-	});
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: 'Angle',
+			dimension: {
+				label: 'Angle',
+				getValue: () => `${Number(this.targetAngle.toFixed(2))}°`,
+			},
+		});
+	}
 }

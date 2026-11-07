@@ -1,6 +1,7 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSnapshot } from '../model/history';
+import { DEFAULT_ZOOM } from '../constants';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
 import {
@@ -678,7 +679,7 @@ export class CanvasInteraction {
 			target = {
 				panX: this.viewport.width / 2,
 				panY: this.viewport.height / 2,
-				zoom: 1.0,
+				zoom: DEFAULT_ZOOM,
 			};
 		}
 

@@ -160,4 +160,47 @@ describe('sketch regions', () => {
 
 		assert.equal(findSketchRegions(sketch).length, 2);
 	});
+
+	it('closes rounded contours when imported arc endpoints are slightly off their radius', () => {
+		const sketch = new SketchDocument();
+		const point = (x: number, y: number) => sketch.addPoint({ x, y });
+		const bottomLeft = point(10.000329374076054, 2.3199333184040677e-10);
+		const bottomRight = point(89.99133437857454, 4.846103017568557e-8);
+		const rightBottom = point(99.99999846215046, 9.993022795502009);
+		const rightTop = point(99.99999847253227, 65.00425680998654);
+		const topRight = point(90.0014644988888, 74.99999940445858);
+		const topLeft = point(10.00642344659919, 74.9999994422763);
+		const leftTop = point(-1.432332305514949e-8, 65.02166892897797);
+		const leftBottom = point(-4.9638171605798694e-9, 10.002218733327375);
+		const topLeftCenter = point(9.999988317649173, 65.00000049562668);
+		const topRightCenter = point(89.99999892534929, 64.99999945861987);
+		const bottomRightCenter = point(89.99999967389357, 9.99999817529173);
+		const bottomLeftCenter = point(9.999999871994534, 9.999999997559033);
+
+		sketch.addLine(bottomLeft.id, bottomRight.id);
+		sketch.addLine(rightBottom.id, rightTop.id);
+		sketch.addLine(topRight.id, topLeft.id);
+		sketch.addLine(leftTop.id, leftBottom.id);
+		const addArc = (
+			id: string,
+			centerId: string,
+			startPointId: string,
+			endPointId: string,
+			clockwise: boolean
+		) =>
+			sketch.arcs.set(
+				id,
+				new SketchArc({ id, centerId, startPointId, endPointId, radius: 10, clockwise })
+			);
+		addArc('round-tl', topLeftCenter.id, topLeft.id, leftTop.id, false);
+		addArc('round-tr', topRightCenter.id, rightTop.id, topRight.id, false);
+		addArc('round-br', bottomRightCenter.id, bottomRight.id, rightBottom.id, false);
+		addArc('round-bl', bottomLeftCenter.id, bottomLeft.id, leftBottom.id, true);
+
+		const regions = findSketchRegions(sketch);
+		assert.equal(regions.length, 1);
+		assert.ok(regions[0].area > 7000);
+		assert.equal((regions[0].path.match(/ A /g) ?? []).length, 4);
+		assert.equal(pointInRegion({ x: 50, y: 35 }, regions[0]), true);
+	});
 });

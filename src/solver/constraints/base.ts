@@ -59,20 +59,22 @@ export class BaseConstraint implements IConstraint {
 		return null;
 	}
 
-	readonly sidebarPanel: ConstraintPanel = new ConstraintPanel(this);
+	get sidebarPanel(): ConstraintPanel {
+		const panel = this.createSidebarPanel();
+		Object.defineProperty(this, 'sidebarPanel', { value: panel });
+		return panel;
+	}
+
+	protected createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel(this);
+	}
 
 	static restoreFromSnapshot<T extends BaseConstraint>(
 		constraintClass: { prototype: T },
 		data: Record<string, unknown>
 	): T {
-		const constraint = Object.assign(Object.create(constraintClass.prototype), data) as T;
-		Object.defineProperty(constraint, 'sidebarPanel', {
-			value: new ConstraintPanel(constraint),
-			writable: true,
-			configurable: true,
-			enumerable: true,
-		});
-		return constraint;
+		const { sidebarPanel: _sidebarPanel, ...fields } = data;
+		return Object.assign(Object.create(constraintClass.prototype), fields) as T;
 	}
 
 	protected addJacobianEntry(

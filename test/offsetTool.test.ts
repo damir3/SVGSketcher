@@ -3,6 +3,32 @@ import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { OffsetTool } from '../src/canvas/tools/modify/offset';
 
+function addConstrainedTriangle(sketch: SketchDocument): void {
+	sketch.beginTransaction();
+	sketch.clear();
+
+	// Create points
+	const pA = sketch.addPoint({ x: -50, y: 0 });
+	const pB = sketch.addPoint({ x: 50, y: 0 });
+	const pC = sketch.addPoint({ x: 0, y: 80 });
+
+	// Fix origin / vertex A
+	sketch.addFixedConstraint(pA.id);
+
+	// Create lines
+	sketch.addLine(pA.id, pB.id);
+	const lLeft = sketch.addLine(pA.id, pC.id);
+	const lRight = sketch.addLine(pB.id, pC.id);
+
+	// Constraints
+	sketch.addHorizontalConstraint(pA.id, pB.id);
+	sketch.addDistanceConstraint(pA.id, pB.id, 100);
+	sketch.addEqualLengthConstraint(lLeft.id, lRight.id);
+
+	sketch.solve();
+	sketch.commitTransaction();
+}
+
 function setupMockDocument() {
 	const origDoc = (globalThis as any).document;
 	const origWin = (globalThis as any).window;
@@ -438,12 +464,11 @@ describe('OffsetTool UI and Workflow', () => {
 		}
 	});
 
-	it('correctly commits offset for constrained triangle demo without deformation', async () => {
+	it('correctly commits offset for constrained triangle without deformation', () => {
 		const cleanup = setupMockDocument();
 		try {
-			const { loadTrianglePreset } = await import('../src/model/presets');
 			const sketch = new SketchDocument();
-			loadTrianglePreset(sketch);
+			addConstrainedTriangle(sketch);
 
 			const firstLine = Array.from(sketch.lines.values())[0];
 			const tool = new OffsetTool();
@@ -573,12 +598,11 @@ describe('OffsetTool UI and Workflow', () => {
 		}
 	});
 
-	it('ensures modifying offset distance changes ONLY offset geometry and does not move the original geometry', async () => {
+	it('ensures modifying offset distance changes ONLY offset geometry and does not move the original geometry', () => {
 		const cleanup = setupMockDocument();
 		try {
-			const { loadTrianglePreset } = await import('../src/model/presets');
 			const sketch = new SketchDocument();
-			loadTrianglePreset(sketch);
+			addConstrainedTriangle(sketch);
 
 			// Remove fixed constraint so original triangle is not artificially locked in world space
 			for (const c of Array.from(sketch.constraints.values())) {

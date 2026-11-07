@@ -139,17 +139,19 @@ export class DistanceConstraint extends BaseConstraint {
 		return distanceToLinearDimension(screen, geom.d1, geom.d2);
 	}
 
-	override readonly sidebarPanel: ConstraintPanel = new ConstraintPanel({
-		constraint: this,
-		title: () =>
-			this.orientation === 'horizontal'
-				? 'Horizontal Distance'
-				: this.orientation === 'vertical'
-					? 'Vertical Distance'
-					: 'Distance',
-		dimension: {
-			label: 'Distance',
-			getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
-		},
-	});
+	protected override createSidebarPanel(): ConstraintPanel {
+		return new ConstraintPanel({
+			constraint: this,
+			title: () =>
+				this.orientation === 'horizontal'
+					? 'Horizontal Distance'
+					: this.orientation === 'vertical'
+						? 'Vertical Distance'
+						: 'Distance',
+			dimension: {
+				label: 'Distance',
+				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+			},
+		});
+	}
 }

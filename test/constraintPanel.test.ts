@@ -6,6 +6,7 @@ import { RadiusConstraint } from '../src/solver/constraints/radius';
 import { CircularPatternConstraint } from '../src/solver/constraints/circularPattern';
 import { RectangularPatternConstraint } from '../src/solver/constraints/rectangularPattern';
 import { ParallelConstraint } from '../src/solver/constraints/parallel';
+import { deserializeConstraint, serializeConstraint } from '../src/solver/constraints/serialization';
 import { ConstraintPanel } from '../src/ui/panels/constraints/constraintPanel';
 
 describe('ConstraintPanel Integration', () => {
@@ -49,6 +50,10 @@ describe('ConstraintPanel Integration', () => {
 		assert.ok(html.includes('50 mm'), 'Should render formatted distance');
 		assert.ok(html.includes('fx: len / 2'), 'Should render expression badge');
 		assert.ok(html.includes('btn-insp-edit-dim'), 'Should render edit dimension button');
+
+		const restored = deserializeConstraint(serializeConstraint(c));
+		assert.ok(restored instanceof DistanceConstraint);
+		assert.equal(restored.sidebarPanel.render(mockCtx), html);
 	});
 
 	it('RadiusConstraint renders segmented control for mode and dimension', () => {
