@@ -1,3 +1,4 @@
+import type { ToolContext } from '../types';
 import { centroid, type Vec2 } from '../../../math/vector';
 import type { SketchDocument } from '../../../model/sketch';
 
@@ -44,7 +45,26 @@ export function calculateObjectsCentroid(sketch: SketchDocument, objectIds: Iter
 			if (cp) points.push(cp);
 			continue;
 		}
+		for (const id of new Set(sketch.splines.get(objId)?.pointIds)) {
+			const point = sketch.points.get(id);
+			if (point) points.push(point);
+		}
 	}
 	if (points.length === 0) return null;
 	return centroid(points);
+}
+
+export function findTransformObjectId(ctx: ToolContext, screen: Vec2): string | null {
+	const point = ctx.findPointNear(screen);
+	if (point && !ctx.sketch.isSplineHandlePoint(point.id)) return point.id;
+	const line = ctx.findLineNear(screen);
+	if (line && !line.isSplineHandle) return line.id;
+	return (
+		ctx.findCircleNear(screen)?.id ??
+		ctx.findArcNear(screen)?.id ??
+		ctx.findEllipseNear?.(screen)?.id ??
+		ctx.findEllipticalArcNear?.(screen)?.id ??
+		ctx.findSplineNear?.(screen)?.id ??
+		null
+	);
 }

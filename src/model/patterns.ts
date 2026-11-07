@@ -32,11 +32,11 @@ export function generateCircularPatternCopy(
 	const pointMap = new Map<string, string>();
 	const pointPairs: PatternPointPair[] = [];
 	const radiusPairs: PatternRadiusPair[] = [];
-	const createdEntityIds: Array<{
-		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
-	}> = [];
+	const createdEntityIds: PatternCopyData['createdEntityIds'] = [];
 
+	const splinePointIds = new Set(
+		sourceObjectIds.filter(id => sketch.splines.has(id)).flatMap(id => sketch.getPrimitivePointIds(id))
+	);
 	const getOrRotatePoint = (origPtId: string): string => {
 		if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
 		if (origPtId === centerPtId) {
@@ -47,7 +47,7 @@ export function generateCircularPatternCopy(
 		if (!pt) return origPtId;
 
 		const distToCenter = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
-		if (distToCenter < 1e-3) {
+		if (distToCenter < 1e-3 && !splinePointIds.has(origPtId)) {
 			pointMap.set(origPtId, centerPtId);
 			return centerPtId;
 		}
@@ -123,6 +123,8 @@ export function generateCircularPatternCopy(
 			continue;
 		}
 
+		if (copyPatternSpline(sketch, objId, getOrRotatePoint, createdEntityIds)) continue;
+
 		const pt = sketch.points.get(objId);
 		if (pt) {
 			getOrRotatePoint(pt.id);
@@ -138,13 +140,30 @@ export function generateCircularPatternCopy(
 	};
 }
 
-export function deletePatternCopy(sketch: SketchDocument, copy: PatternCopyData): void {
+function copyPatternSpline(
+	sketch: SketchDocument,
+	id: string,
+	mapPoint: (id: string) => string,
+	createdEntityIds: PatternCopyData['createdEntityIds']
+): boolean {
+	const source = sketch.splines.get(id);
+	if (!source) return false;
+	const spline = sketch.copySpline(source, mapPoint);
+	createdEntityIds.push({ id: spline.id, type: 'spline' });
+	for (const id of new Set(spline.tangentLineIds)) {
+		if (id) createdEntityIds.push({ id, type: 'line' });
+	}
+	return true;
+}
+
+export function deletePatternCopy(sketch: SketchDocument, copy: PatternCopyData): boolean {
 	for (const item of copy.createdEntityIds) {
 		if (item.type === 'line') sketch.lines.delete(item.id);
 		else if (item.type === 'circle') sketch.circles.delete(item.id);
 		else if (item.type === 'arc') sketch.arcs.delete(item.id);
 		else if (item.type === 'ellipse') sketch.ellipses.delete(item.id);
 		else if (item.type === 'elliptical_arc') sketch.ellipticalArcs.delete(item.id);
+		else if (item.type === 'spline') sketch.splines.delete(item.id);
 		else if (item.type === 'point') sketch.points.delete(item.id);
 
 		sketch.selection.pointIds.delete(item.id);
@@ -153,7 +172,21 @@ export function deletePatternCopy(sketch: SketchDocument, copy: PatternCopyData)
 		sketch.selection.arcIds.delete(item.id);
 		sketch.selection.ellipseIds.delete(item.id);
 		sketch.selection.ellipticalArcIds.delete(item.id);
+		sketch.selection.splineIds.delete(item.id);
 	}
+	const hasSpline = copy.createdEntityIds.some(item => item.type === 'spline');
+	if (hasSpline) {
+		const removedIds = new Set(copy.createdEntityIds.map(item => item.id));
+		for (const c of sketch.constraints.values()) {
+			if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) continue;
+			if (c.entityIds.some(id => removedIds.has(id))) {
+				sketch.constraints.delete(c.id);
+				sketch.selection.constraintIds.delete(c.id);
+			}
+		}
+		sketch.cleanOrphanTexts();
+	}
+	return hasSpline;
 }
 
 export function addCircularPatternConstraint(
@@ -207,6 +240,7 @@ export function updateCircularPattern(
 	if (!c || !(c instanceof CircularPatternConstraint) || c.isReadOnly) return false;
 
 	sketch.beginTransaction();
+	let removedSplineCopy = false;
 
 	if (updates.totalAngleExpression !== undefined) {
 		c.totalAngleExpression = updates.totalAngleExpression;
@@ -234,7 +268,7 @@ export function updateCircularPattern(
 	for (let i = c.copies.length - 1; i >= 0; i--) {
 		const copy = c.copies[i];
 		if (copy.copyIndex >= newQty) {
-			deletePatternCopy(sketch, copy);
+			removedSplineCopy = deletePatternCopy(sketch, copy) || removedSplineCopy;
 			c.copies.splice(i, 1);
 		}
 	}
@@ -246,7 +280,7 @@ export function updateCircularPattern(
 
 		if (shouldBeSuppressed) {
 			if (existingIndex >= 0) {
-				deletePatternCopy(sketch, c.copies[existingIndex]);
+				removedSplineCopy = deletePatternCopy(sketch, c.copies[existingIndex]) || removedSplineCopy;
 				c.copies.splice(existingIndex, 1);
 			}
 		} else {
@@ -299,6 +333,7 @@ export function updateCircularPattern(
 	}
 	(c as any).entityIds = Array.from(pointIdSet);
 
+	if (removedSplineCopy) sketch.cleanOrphanConstraints();
 	sketch.rebuildParamManager();
 	sketch.solve();
 	sketch.commitTransaction();
@@ -321,10 +356,7 @@ export function generateRectangularPatternCopy(
 	const pointMap = new Map<string, string>();
 	const pointPairs: PatternPointPair[] = [];
 	const radiusPairs: PatternRadiusPair[] = [];
-	const createdEntityIds: Array<{
-		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
-	}> = [];
+	const createdEntityIds: PatternCopyData['createdEntityIds'] = [];
 
 	const getOrTranslatePoint = (origPtId: string): string => {
 		if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
@@ -400,6 +432,8 @@ export function generateRectangularPatternCopy(
 			createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
 			continue;
 		}
+
+		if (copyPatternSpline(sketch, objId, getOrTranslatePoint, createdEntityIds)) continue;
 
 		const pt = sketch.points.get(objId);
 		if (pt) {
@@ -488,6 +522,7 @@ export function updateRectangularPattern(
 	if (!c || !(c instanceof RectangularPatternConstraint)) return false;
 
 	sketch.beginTransaction();
+	let removedSplineCopy = false;
 
 	if (updates.distance1Expression !== undefined) {
 		c.distance1Expression = updates.distance1Expression;
@@ -554,7 +589,7 @@ export function updateRectangularPattern(
 	for (let idx = c.copies.length - 1; idx >= 0; idx--) {
 		const copy = c.copies[idx];
 		if (!neededKeys.has(copy.copyIndex)) {
-			deletePatternCopy(sketch, copy);
+			removedSplineCopy = deletePatternCopy(sketch, copy) || removedSplineCopy;
 			c.copies.splice(idx, 1);
 		}
 	}
@@ -614,6 +649,7 @@ export function updateRectangularPattern(
 	}
 	(c as any).entityIds = Array.from(entityIdSet);
 
+	if (removedSplineCopy) sketch.cleanOrphanConstraints();
 	sketch.rebuildParamManager();
 	sketch.solve();
 	sketch.commitTransaction();

@@ -8,7 +8,7 @@ import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 } from '../../../solver/constraints/rectangularPattern';
-import { calculateObjectsCentroid } from './utils';
+import { calculateObjectsCentroid, findTransformObjectId } from './utils';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 
@@ -414,14 +414,7 @@ export class RectangularPatternTool extends BaseTool {
 		super.activate(ctx);
 		this.popup.setSketch(this.ctx.sketch);
 
-		const sel = ctx.sketch.selection;
-		const initialObjects = new Set<string>();
-		for (const id of sel.lineIds) initialObjects.add(id);
-		for (const id of sel.circleIds) initialObjects.add(id);
-		for (const id of sel.arcIds) initialObjects.add(id);
-		for (const id of sel.ellipseIds) initialObjects.add(id);
-		for (const id of sel.ellipticalArcIds) initialObjects.add(id);
-		for (const id of sel.pointIds) initialObjects.add(id);
+		const initialObjects = new Set(ctx.sketch.getSelectedPrimitives().map(primitive => primitive.id));
 
 		this.state = {
 			phase: initialObjects.size > 0 ? 'direction1' : 'objects',
@@ -660,46 +653,12 @@ export class RectangularPatternTool extends BaseTool {
 
 		if (this.state.phase === 'direction1' || this.state.phase === 'direction2') {
 			const hitLine = this.ctx.findLineNear(e.screen);
-			if (hitLine) {
+			if (hitLine && !hitLine.isSplineHandle) {
 				hitId = hitLine.id;
 				hitType = 'line';
 			}
 		} else {
-			const nearPoint = this.ctx.findPointNear(e.screen);
-			if (nearPoint) {
-				hitId = nearPoint.id;
-				hitType = 'point';
-			} else {
-				const hitLine = this.ctx.findLineNear(e.screen);
-				if (hitLine) {
-					hitId = hitLine.id;
-					hitType = 'line';
-				} else {
-					const hitCircle = this.ctx.findCircleNear(e.screen);
-					if (hitCircle) {
-						hitId = hitCircle.id;
-						hitType = 'circle';
-					} else {
-						const hitArc = this.ctx.findArcNear(e.screen);
-						if (hitArc) {
-							hitId = hitArc.id;
-							hitType = 'arc';
-						} else {
-							const hitEllipse = this.ctx.findEllipseNear?.(e.screen);
-							if (hitEllipse) {
-								hitId = hitEllipse.id;
-								hitType = 'ellipse';
-							} else {
-								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen);
-								if (hitEllipticalArc) {
-									hitId = hitEllipticalArc.id;
-									hitType = 'elliptical_arc';
-								}
-							}
-						}
-					}
-				}
-			}
+			hitId = findTransformObjectId(this.ctx, e.screen);
 		}
 
 		if (hitId) {

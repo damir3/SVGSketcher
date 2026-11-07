@@ -1,3 +1,4 @@
+import { calculateObjectsCentroid } from './tools/modify/utils';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
@@ -1050,6 +1051,9 @@ export class SVGRenderer {
 				options.filletState.selectedPrimitive1.id === spline.id;
 			const isSelected =
 				sketch.selection.splineIds.has(spline.id) ||
+				options.mirrorHighlight?.selectedObjectIds.has(spline.id) ||
+				options.patternHighlight?.selectedObjectIds.has(spline.id) ||
+				options.rectangularPatternHighlight?.selectedObjectIds.has(spline.id) ||
 				spline.pointIds.some(pid => sketch.selection.pointIds.has(pid)) ||
 				(spline.tangentLineIds &&
 					spline.tangentLineIds.some(lid => {
@@ -2176,6 +2180,22 @@ export class SVGRenderer {
 				continue;
 			}
 
+			const spline = sketch.splines.get(objId)?.toGeoCurve(sketch);
+			if (spline) {
+				const points = spline.points.map(point => transformPoint(point.x, point.y));
+				copyWorldPoints.push(...(spline.isClosed ? points.slice(0, -1) : points));
+				if (!skipRender && targetGroup) {
+					const d = getSplineSvgPath(
+						spline.bezierSegments,
+						point => viewport.worldToScreen(transformPoint(point.x, point.y)),
+						spline.isClosed
+					);
+					createSvgPath(d, getAttrs(!!spline.isConstruction), targetGroup);
+					for (const point of points) drawTransformedVertex(viewport.worldToScreen(point));
+				}
+				continue;
+			}
+
 			// Standalone Point
 			const pt = sketch.points.get(objId);
 			if (pt) {
@@ -2566,6 +2586,16 @@ export class SVGRenderer {
 				continue;
 			}
 
+			if (sketch.splines.has(objId)) {
+				this.renderTransformedObjects(sketch, viewport, [objId], (x, y) => reflectPoint(vec(x, y), pA, normal), {
+					targetGroup: this.mirrorGroup,
+					baseColor,
+					opacity: 0.5,
+					drawVertices: true,
+				});
+				continue;
+			}
+
 			// Standalone Point
 			const pt = sketch.points.get(objId);
 			if (pt) {
@@ -2728,49 +2758,8 @@ export class SVGRenderer {
 		this.patternGroup.innerHTML = '';
 		if (highlight.selectedObjectIds.size === 0) return;
 
-		const points: Vec2[] = [];
-		for (const objId of highlight.selectedObjectIds) {
-			const pt = sketch.points.get(objId);
-			if (pt) {
-				points.push(pt);
-				continue;
-			}
-			const l = sketch.lines.get(objId);
-			if (l) {
-				const p1 = sketch.points.get(l.p1Id);
-				const p2 = sketch.points.get(l.p2Id);
-				if (p1) points.push(p1);
-				if (p2) points.push(p2);
-				continue;
-			}
-			const c = sketch.circles.get(objId);
-			if (c) {
-				const cp = sketch.points.get(c.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-			const a = sketch.arcs.get(objId);
-			if (a) {
-				const cp = sketch.points.get(a.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-			const el = sketch.ellipses.get(objId);
-			if (el) {
-				const cp = sketch.points.get(el.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-			const ea = sketch.ellipticalArcs.get(objId);
-			if (ea) {
-				const cp = sketch.points.get(ea.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-		}
-
-		if (points.length === 0) return;
-		const centroidWorld = centroid(points);
+		const centroidWorld = calculateObjectsCentroid(sketch, highlight.selectedObjectIds);
+		if (!centroidWorld) return;
 
 		const paramMap = new Map<string, number>();
 		for (const [pid, pt] of sketch.points.entries()) {

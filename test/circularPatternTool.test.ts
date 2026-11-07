@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { CircularPatternTool } from '../src/canvas/tools/modify/circularPattern';
 import { CircularPatternConstraint, RectangularPatternConstraint } from '../src/solver/constraints';
+import { MirrorTool } from '../src/canvas/tools/modify/mirror';
 import { RectangularPatternTool } from '../src/canvas/tools/modify/rectangularPattern';
 
 const origDoc = (globalThis as any).document;
@@ -357,6 +358,113 @@ describe('RectangularPatternTool & Panel Integration', () => {
 		sketch.updateParameter('gap', 'gap', '30');
 		assert.equal(rpat.distance1, 60);
 	});
+
+	for (const mode of ['mirror', 'circular', 'rectangular'] as const) {
+		it(`selects and transforms a spline with the ${mode} tool`, () => {
+			const sketch = new SketchDocument();
+			const center = sketch.addPoint({ x: 0, y: 0 }, true);
+			const end = sketch.addPoint({ x: 0, y: 50 }, true);
+			const axis = sketch.addLine(center.id, end.id);
+			const pointIds = [
+				{ x: 10, y: 5 },
+				{ x: 16, y: 12 },
+				{ x: 25, y: 8 },
+				{ x: 28, y: 15 },
+			].map(point => sketch.addPoint(point).id);
+			const source =
+				mode === 'rectangular'
+					? sketch.addControlSpline(pointIds, true, undefined, false, [0, 0, 0, 0, 1, 1, 1, 1])
+					: sketch.addFitSpline(pointIds, undefined, false, undefined, true);
+			const counts = [sketch.points.size, sketch.lines.size, sketch.constraints.size];
+			const tool =
+				mode === 'mirror'
+					? new MirrorTool()
+					: mode === 'circular'
+						? new CircularPatternTool()
+						: new RectangularPatternTool();
+			tool.activate({
+				sketch,
+				viewport: { worldToScreen: point => point, screenToWorld: point => point },
+				renderer: { patternCheckboxPositions: new Map(), rectangularGizmoHandles: new Map() },
+				findPointNear: screen => (screen.x === 0 && screen.y === 0 ? center : null),
+				findLineNear: screen => (screen.x === 0 && screen.y === 25 ? axis : null),
+				findCircleNear: () => null,
+				findArcNear: () => null,
+				findSplineNear: screen => (screen.x === 15 ? source : null),
+				requestRender: () => {},
+				setCursor: () => {},
+				showToast: () => {},
+				setTool: () => {},
+			} as Parameters<typeof tool.activate>[0]);
+			const click = (x: number, y: number) => {
+				const screen = { x, y };
+				tool.onMouseDown({
+					screen,
+					client: screen,
+					world: screen,
+					effectiveWorld: screen,
+					effectiveScreen: screen,
+					snap: null,
+					raw: {} as MouseEvent,
+				});
+			};
+			click(15, 10);
+			assert.ok(tool.state?.selectedObjectIds.has(source.id));
+			if (tool instanceof MirrorTool) {
+				tool.setPhase('mirror_line');
+				click(0, 25);
+			} else if (tool instanceof CircularPatternTool) {
+				tool.setPhase('center_point');
+				click(0, 0);
+				tool.state!.quantity = 2;
+			} else {
+				tool.setPhase('direction1');
+				click(0, 25);
+				tool.state!.quantity1 = 2;
+				tool.state!.distance1 = 40;
+			}
+			tool.commit();
+			const copy = [...sketch.splines.values()].find(spline => spline.id !== source.id);
+			assert.ok(copy);
+			assert.equal(copy.isClosed, source.isClosed);
+			assert.equal(copy.isConstruction, source.isConstruction);
+			assert.deepEqual(copy.knots, source.knots);
+			const verifyGeometry = () => {
+				const original = source.toGeoCurve(sketch)!.bezierSegments.flat();
+				const transformed = copy.toGeoCurve(sketch)!.bezierSegments.flat();
+				assert.equal(transformed.length, original.length);
+				for (const [index, { x, y }] of original.entries()) {
+					const expectedX = mode === 'rectangular' ? x : -x;
+					const expectedY = mode === 'rectangular' ? y + 40 : mode === 'circular' ? -y : y;
+					assert.ok(Math.hypot(transformed[index].x - expectedX, transformed[index].y - expectedY) < 1e-3);
+				}
+			};
+			verifyGeometry();
+			sketch.dragPoint(pointIds[1], 18, 15);
+			verifyGeometry();
+			if (source.splineType === 'fit') {
+				const handle = sketch.lines.get(source.tangentLineIds![1])!;
+				const end = sketch.points.get(handle.p2Id)!;
+				sketch.dragPoint(end.id, end.x + 3, end.y + 2);
+				verifyGeometry();
+			}
+			const constraint = [...sketch.constraints.values()].find(
+				c => c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint
+			);
+			if (constraint instanceof CircularPatternConstraint) {
+				assert.ok(sketch.updateCircularPattern(constraint.id, { suppression: true, suppressedIndices: [1] }));
+			} else if (constraint instanceof RectangularPatternConstraint) {
+				assert.ok(sketch.updateRectangularPattern(constraint.id, { quantity1: 1 }));
+			}
+			if (constraint) {
+				assert.equal(sketch.splines.size, 1);
+				assert.deepEqual(
+					[sketch.points.size, sketch.lines.size, sketch.constraints.size],
+					[counts[0], counts[1], counts[2] + 1]
+				);
+			}
+		});
+	}
 
 	after(() => {
 		(globalThis as any).document = origDoc;

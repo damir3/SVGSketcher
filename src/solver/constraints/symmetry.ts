@@ -15,6 +15,7 @@ export class SymmetryConstraint extends BaseConstraint {
 	readonly lineP1Id: string;
 	readonly lineP2Id: string;
 	readonly lineId?: string;
+	readonly isMirrorCopy?: boolean;
 
 	constructor(
 		id: string,
@@ -23,7 +24,8 @@ export class SymmetryConstraint extends BaseConstraint {
 		lineP1Id: string,
 		lineP2Id: string,
 		weight = 1.0,
-		lineId?: string
+		lineId?: string,
+		isMirrorCopy?: boolean
 	) {
 		const axisId =
 			lineId === 'axis_x' || lineId === 'axis_y'
@@ -43,6 +45,7 @@ export class SymmetryConstraint extends BaseConstraint {
 		this.lineP1Id = axisId ? 'origin' : lineP1Id;
 		this.lineP2Id = axisId ? axisId : lineP2Id;
 		this.lineId = axisId ?? lineId;
+		if (isMirrorCopy) this.isMirrorCopy = true;
 	}
 
 	override getEquationsCount(): number {

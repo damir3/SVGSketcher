@@ -22,7 +22,7 @@ export interface PatternCopyData {
 	radiusPairs?: PatternRadiusPair[];
 	createdEntityIds: Array<{
 		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}>;
 }
 

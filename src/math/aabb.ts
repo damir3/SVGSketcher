@@ -1,5 +1,6 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import type { GeoCurve } from './intersection';
+import { evaluateBezier } from './spline';
 import { angleFromTo, dot, vec, distancesFrom, sub, type Vec2 } from './vector';
 
 const TWO_PI = 2 * Math.PI;
@@ -41,9 +42,34 @@ export function pointIntersectsAABB(p: Vec2, min: Vec2, max: Vec2): boolean {
 	return p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y;
 }
 
-export function curveContainedInAABB(curve: Exclude<GeoCurve, { type: 'spline' }>, min: Vec2, max: Vec2): boolean {
+export function curveContainedInAABB(curve: GeoCurve, min: Vec2, max: Vec2): boolean {
 	const contains = (point: Vec2) => pointIntersectsAABB(point, min, max);
 	if (curve.type === 'segment') return contains(curve.p1) && contains(curve.p2);
+
+	if (curve.type === 'spline') {
+		return curve.bezierSegments.every(segment => {
+			const [p0, p1, p2, p3] = segment;
+			if (!contains(p0) || !contains(p3)) return false;
+			for (const axis of ['x', 'y'] as const) {
+				const d0 = p1[axis] - p0[axis];
+				const d1 = p2[axis] - p1[axis];
+				const d2 = p3[axis] - p2[axis];
+				const a = d0 - 2 * d1 + d2;
+				const b = 2 * (d1 - d0);
+				const discriminant = b * b - 4 * a * d0;
+				const roots =
+					a === 0
+						? b === 0
+							? []
+							: [-d0 / b]
+						: discriminant >= 0
+							? [(-b - Math.sqrt(discriminant)) / (2 * a), (-b + Math.sqrt(discriminant)) / (2 * a)]
+							: [];
+				if (roots.some(t => t > 0 && t < 1 && !contains(evaluateBezier(segment, t)))) return false;
+			}
+			return true;
+		});
+	}
 
 	const { center } = curve;
 	const radii =

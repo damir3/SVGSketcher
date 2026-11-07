@@ -650,6 +650,7 @@ export function getEntitiesForConstraint(
 					else if (item.type === 'arc' && sketch.arcs.has(item.id)) add(item.id, 'arc');
 					else if (item.type === 'ellipse' && sketch.ellipses.has(item.id)) add(item.id, 'ellipse');
 					else if (item.type === 'elliptical_arc' && sketch.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
+					else if (item.type === 'spline' && sketch.splines.has(item.id)) add(item.id, 'spline');
 					else if (item.type === 'point' && sketch.points.has(item.id)) add(item.id, 'point');
 				}
 			}
@@ -677,6 +678,7 @@ export function getEntitiesForConstraint(
 					else if (item.type === 'arc' && sketch.arcs.has(item.id)) add(item.id, 'arc');
 					else if (item.type === 'ellipse' && sketch.ellipses.has(item.id)) add(item.id, 'ellipse');
 					else if (item.type === 'elliptical_arc' && sketch.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
+					else if (item.type === 'spline' && sketch.splines.has(item.id)) add(item.id, 'spline');
 					else if (item.type === 'point' && sketch.points.has(item.id)) add(item.id, 'point');
 				}
 			}

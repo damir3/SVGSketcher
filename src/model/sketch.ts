@@ -738,6 +738,48 @@ export class SketchDocument {
 		return this.splines.get(id);
 	}
 
+	copySpline(source: SketchSpline, mapPoint: (id: string) => string): SketchSpline {
+		const pointIds = source.pointIds.map(mapPoint);
+		if (source.splineType === 'control') {
+			return this.addControlSpline(pointIds, source.isConstruction, undefined, false, source.knots);
+		}
+
+		const constraints = [...this.constraints.values()];
+		const lines = new Map<string, string>();
+		const tangentLineIds = pointIds.map((pointId, index) => {
+			const line = this.lines.get(source.tangentLineIds?.[index] ?? '');
+			if (!line || !this.points.get(line.p1Id) || !this.points.get(line.p2Id)) return '';
+			const existing = lines.get(line.id);
+			if (existing) return existing;
+
+			const p1Id = mapPoint(line.p1Id);
+			const p2Id = mapPoint(line.p2Id);
+			const copy = this.addLine(p1Id, p2Id, line.isConstruction);
+			copy.isAutomaticSplineHandle = line.isAutomaticSplineHandle;
+			lines.set(line.id, copy.id);
+			const midpoint = constraints.find(
+				(c): c is MidpointConstraint =>
+					c instanceof MidpointConstraint &&
+					c.midId === source.pointIds[index] &&
+					c.p1Id === line.p1Id &&
+					c.p2Id === line.p2Id
+			);
+			if (midpoint) {
+				const c = new MidpointConstraint(
+					this.nextId('c_midpoint'),
+					pointId,
+					p1Id,
+					p2Id,
+					midpoint.weight,
+					midpoint.ratio
+				);
+				this.constraints.set(c.id, c);
+			}
+			return copy.id;
+		});
+		return this.addFitSpline(pointIds, tangentLineIds, source.isConstruction, undefined, source.isClosed);
+	}
+
 	// --- Constraint methods ---
 	addConstraint(constraint: IConstraint): void {
 		this.pushHistory();
@@ -1721,7 +1763,7 @@ export class SketchDocument {
 		return c;
 	}
 
-	addSymmetryConstraint(p1Id: string, p2Id: string, lineId: string): SymmetryConstraint | null {
+	addSymmetryConstraint(p1Id: string, p2Id: string, lineId: string, isMirrorCopy?: boolean): SymmetryConstraint | null {
 		if (p1Id === p2Id) return null;
 		if (!this.points.get(p1Id) || !this.points.get(p2Id)) return null;
 
@@ -1755,7 +1797,8 @@ export class SketchDocument {
 			line ? line.p1Id : '',
 			line ? line.p2Id : '',
 			1.0,
-			isOriginAxis ? 'origin' : line!.id
+			isOriginAxis ? 'origin' : line!.id,
+			isMirrorCopy
 		);
 		this.addConstraint(c);
 		return c;
@@ -2497,15 +2540,19 @@ export class SketchDocument {
 						this.arcs.has(id) ||
 						this.ellipses.has(id) ||
 						this.ellipticalArcs.has(id) ||
+						this.splines.has(id) ||
 						this.points.has(id)
 				);
-				if (!hasAnySource) {
+				const hasMissingSpline = constraint.copies.some(copy =>
+					copy.createdEntityIds.some(item => item.type === 'spline' && !this.splines.has(item.id))
+				);
+				if (!hasAnySource || hasMissingSpline) {
 					this.constraints.delete(cid);
 					this.selection.constraintIds.delete(cid);
 					continue;
 				}
 				const hasMissingPoint = constraint.copies.some(copy =>
-					copy.pointPairs.some(pair => !this.points.has(pair.sourcePtId) || !this.points.has(pair.patternPtId))
+					copy.pointPairs.some(pair => !this.points.get(pair.sourcePtId) || !this.points.get(pair.patternPtId))
 				);
 				if (hasMissingPoint) {
 					this.constraints.delete(cid);
@@ -2532,9 +2579,18 @@ export class SketchDocument {
 						this.arcs.has(id) ||
 						this.ellipses.has(id) ||
 						this.ellipticalArcs.has(id) ||
+						this.splines.has(id) ||
 						this.points.has(id)
 				);
-				if (!hasAnySource) {
+				const hasBrokenSplineCopy = constraint.copies.some(copy => {
+					const splines = copy.createdEntityIds.filter(item => item.type === 'spline');
+					return (
+						splines.length > 0 &&
+						(splines.some(item => !this.splines.has(item.id)) ||
+							copy.pointPairs.some(pair => !this.points.get(pair.sourcePtId) || !this.points.get(pair.patternPtId)))
+					);
+				});
+				if (!hasAnySource || hasBrokenSplineCopy) {
 					this.constraints.delete(cid);
 					this.selection.constraintIds.delete(cid);
 					continue;
@@ -3007,7 +3063,23 @@ export class SketchDocument {
 				if (extraConstraints.includes(c) && (c instanceof DragPointConstraint || c instanceof FixedConstraint)) {
 					editedPoints.add(c.pointId);
 				} else {
-					for (const id of c.entityIds) constrained.add(id);
+					// Copy constraints drive the destination, so automatic source handles can still follow their fit points.
+					if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
+						for (const copy of c.copies) {
+							for (const pair of copy.pointPairs) constrained.add(pair.patternPtId);
+						}
+						if (c instanceof CircularPatternConstraint) {
+							constrained.add(c.centerPtId);
+						} else {
+							for (const id of [c.line1P1Id, c.line1P2Id, c.line2P1Id, c.line2P2Id]) {
+								if (id) constrained.add(id);
+							}
+						}
+					} else {
+						for (const id of c.entityIds) {
+							if (!(c instanceof SymmetryConstraint && c.isMirrorCopy && id === c.p1Id)) constrained.add(id);
+						}
+					}
 				}
 			}
 		}

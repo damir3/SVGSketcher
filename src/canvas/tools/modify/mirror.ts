@@ -1,3 +1,4 @@
+import { findTransformObjectId } from './utils';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -163,46 +164,12 @@ export class MirrorTool extends BaseTool {
 
 		if (this.state.phase === 'mirror_line') {
 			const hitLine = this.ctx.findLineNear(e.screen);
-			if (hitLine) {
+			if (hitLine && !hitLine.isSplineHandle) {
 				hitId = hitLine.id;
 				hitType = 'line';
 			}
 		} else {
-			const nearPoint = this.ctx.findPointNear(e.screen);
-			if (nearPoint) {
-				hitId = nearPoint.id;
-				hitType = 'point';
-			} else {
-				const hitLine = this.ctx.findLineNear(e.screen);
-				if (hitLine) {
-					hitId = hitLine.id;
-					hitType = 'line';
-				} else {
-					const hitCircle = this.ctx.findCircleNear(e.screen);
-					if (hitCircle) {
-						hitId = hitCircle.id;
-						hitType = 'circle';
-					} else {
-						const hitArc = this.ctx.findArcNear(e.screen);
-						if (hitArc) {
-							hitId = hitArc.id;
-							hitType = 'arc';
-						} else {
-							const hitEllipse = this.ctx.findEllipseNear?.(e.screen);
-							if (hitEllipse) {
-								hitId = hitEllipse.id;
-								hitType = 'ellipse';
-							} else {
-								const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(e.screen);
-								if (hitEllipticalArc) {
-									hitId = hitEllipticalArc.id;
-									hitType = 'elliptical_arc';
-								}
-							}
-						}
-					}
-				}
-			}
+			hitId = findTransformObjectId(this.ctx, e.screen);
 		}
 
 		if (hitId) {
@@ -287,7 +254,11 @@ export class MirrorTool extends BaseTool {
 			if (!pt) return origPtId;
 
 			// If point is strictly on the mirror line, reuse it
-			if (origPtId === mirrorLine.p1Id || origPtId === mirrorLine.p2Id || isPointOnMirrorLine(pt)) {
+			if (
+				origPtId === mirrorLine.p1Id ||
+				origPtId === mirrorLine.p2Id ||
+				(isPointOnMirrorLine(pt) && !this.ctx.sketch.isSplineHandlePoint(origPtId))
+			) {
 				pointMap.set(origPtId, origPtId);
 				if (origPtId !== mirrorLine.p1Id && origPtId !== mirrorLine.p2Id) {
 					this.ctx.sketch.addPointOnLineConstraint(origPtId, mirrorLine.id);
@@ -301,14 +272,14 @@ export class MirrorTool extends BaseTool {
 			pointMap.set(origPtId, newPt.id);
 
 			// Automatically add SymmetryConstraint
-			this.ctx.sketch.addSymmetryConstraint(origPtId, newPt.id, mirrorLine.id);
+			this.ctx.sketch.addSymmetryConstraint(origPtId, newPt.id, mirrorLine.id, true);
 			return newPt.id;
 		};
 
 		let createdCount = 0;
 		const newCreatedItems: Array<{
 			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 		}> = [];
 
 		// Mirror each primitive in selectedObjectIds
@@ -393,7 +364,15 @@ export class MirrorTool extends BaseTool {
 				continue;
 			}
 
-			// 6. Standalone Point
+			const spline = this.ctx.sketch.splines.get(objId);
+			if (spline) {
+				const copy = this.ctx.sketch.copySpline(spline, getOrReflectPoint);
+				newCreatedItems.push({ id: copy.id, type: 'spline' });
+				createdCount++;
+				continue;
+			}
+
+			// Standalone Point
 			const pt = this.ctx.sketch.points.get(objId);
 			if (pt) {
 				const nPtId = getOrReflectPoint(pt.id);

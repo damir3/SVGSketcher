@@ -3770,7 +3770,7 @@ export class CanvasInteraction {
 		const crossing = s2.x < s1.x;
 		const matches = (entity: {
 			intersectsAABB(min: Vec2, max: Vec2, sketch: SketchDocument): boolean;
-			toGeoCurve(sketch: SketchDocument): Exclude<GeoCurve, { type: 'spline' }> | null;
+			toGeoCurve(sketch: SketchDocument): GeoCurve | null;
 		}): boolean => {
 			if (crossing) return entity.intersectsAABB(min, max, this.sketch);
 			const curve = entity.toGeoCurve(this.sketch);
@@ -3779,11 +3779,17 @@ export class CanvasInteraction {
 
 		const itemsToSelect: Array<{
 			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'constraint';
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
 		}> = [];
+
+		const isTransform =
+			this.activeTool === 'mirror' ||
+			this.activeTool === 'circular_pattern' ||
+			this.activeTool === 'rectangular_pattern';
 
 		// 1. Points
 		for (const pt of this.sketch.points.values()) {
+			if (isTransform && this.sketch.isSplineHandlePoint(pt.id)) continue;
 			if (pt.intersectsAABB(min, max, this.sketch)) {
 				itemsToSelect.push({ id: pt.id, type: 'point' });
 			}
@@ -3791,6 +3797,7 @@ export class CanvasInteraction {
 
 		// 2. Lines
 		for (const line of this.sketch.lines.values()) {
+			if (isTransform && line.isSplineHandle) continue;
 			if (matches(line)) {
 				itemsToSelect.push({ id: line.id, type: 'line' });
 			}
@@ -3822,6 +3829,10 @@ export class CanvasInteraction {
 			if (matches(elArc)) {
 				itemsToSelect.push({ id: elArc.id, type: 'elliptical_arc' });
 			}
+		}
+
+		for (const spline of this.sketch.splines.values()) {
+			if (matches(spline)) itemsToSelect.push({ id: spline.id, type: 'spline' });
 		}
 
 		if (this.activeTool === 'mirror') {

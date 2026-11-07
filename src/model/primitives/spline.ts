@@ -1,9 +1,9 @@
 import type { Vec2 } from '../../math/vector';
 import { bsplineToBezier, fitPointsToBezier, type BezierSegment } from '../../math/spline';
 import { distanceToSpline } from '../../math/hitTest';
-import type { GeoSpline } from '../../math/intersection';
+import { intersectSplineCurve, type GeoSpline } from '../../math/intersection';
+import { pointIntersectsAABB } from '../../math/aabb';
 import type { ISketchPrimitive } from './base';
-import type { SketchPoint } from './point';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchSpline implements ISketchPrimitive {
@@ -105,11 +105,24 @@ export class SketchSpline implements ISketchPrimitive {
 	}
 
 	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
-		const pts = this.pointIds.map(id => sketch.points.get(id)).filter((p: any): p is SketchPoint => !!p);
-		for (const pt of pts) {
-			if (pt.x >= min.x && pt.x <= max.x && pt.y >= min.y && pt.y <= max.y) return true;
-		}
-		return false;
+		const curve = this.toGeoCurve(sketch);
+		if (!curve) return false;
+		if (
+			curve.bezierSegments.some(
+				([start, , , end]) => pointIntersectsAABB(start, min, max) || pointIntersectsAABB(end, min, max)
+			)
+		)
+			return true;
+		const corners = [min, { x: max.x, y: min.y }, max, { x: min.x, y: max.y }];
+		return corners.some(
+			(p1, index) =>
+				intersectSplineCurve(curve, {
+					type: 'segment',
+					id: '',
+					p1,
+					p2: corners[(index + 1) % corners.length],
+				}).length > 0
+		);
 	}
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({

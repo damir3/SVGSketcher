@@ -1,6 +1,7 @@
+import { calculateObjectsCentroid } from '../../canvas/tools/modify/utils';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
-import type { PatternPointPair, PatternRadiusPair } from './circularPattern';
+import type { PatternCopyData, PatternPointPair, PatternRadiusPair } from './circularPattern';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
@@ -13,10 +14,7 @@ export interface RectangularPatternCopyData {
 	j: number;
 	pointPairs: PatternPointPair[];
 	radiusPairs?: PatternRadiusPair[];
-	createdEntityIds: Array<{
-		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc';
-	}>;
+	createdEntityIds: PatternCopyData['createdEntityIds'];
 }
 
 export function computeAxisOffset(index: number, distance: number, direction: 'one_direction' | 'symmetric'): number {
@@ -350,49 +348,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const points: Vec2[] = [];
-		for (const objId of this.sourceObjectIds) {
-			const pt = ctx.sketch.points.get(objId);
-			if (pt) {
-				points.push(pt);
-				continue;
-			}
-			const l = ctx.sketch.lines.get(objId);
-			if (l) {
-				const p1 = ctx.sketch.points.get(l.p1Id);
-				const p2 = ctx.sketch.points.get(l.p2Id);
-				if (p1) points.push(p1);
-				if (p2) points.push(p2);
-				continue;
-			}
-			const c = ctx.sketch.circles.get(objId);
-			if (c) {
-				const cp = ctx.sketch.points.get(c.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-			const a = ctx.sketch.arcs.get(objId);
-			if (a) {
-				const cp = ctx.sketch.points.get(a.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-			const el = ctx.sketch.ellipses.get(objId);
-			if (el) {
-				const cp = ctx.sketch.points.get(el.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-			const ea = ctx.sketch.ellipticalArcs.get(objId);
-			if (ea) {
-				const cp = ctx.sketch.points.get(ea.centerId);
-				if (cp) points.push(cp);
-				continue;
-			}
-		}
-
-		if (points.length === 0) return;
-		const centroidWorld = centroid(points);
+		const centroidWorld = calculateObjectsCentroid(ctx.sketch, this.sourceObjectIds);
+		if (!centroidWorld) return;
 		const sCtr = ctx.viewport.worldToScreen(centroidWorld);
 
 		const paramMap = new Map<string, number>();
