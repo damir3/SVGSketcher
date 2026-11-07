@@ -148,6 +148,11 @@ function intersectionCut(curve: ReturnType<typeof getAllGeoCurves>[number], poin
 		const tolerance = curve.type === 'arc' ? Math.max(1e-3, curve.radius * 2e-4) : 2e-3;
 		if (Math.hypot(point.x - curve.start.x, point.y - curve.start.y) < tolerance) return { t: 0, p: curve.start };
 		if (Math.hypot(point.x - curve.end.x, point.y - curve.end.y) < tolerance) return { t: 1, p: curve.end };
+	} else if (curve.type === 'spline' && !curve.isClosed) {
+		const start = curve.bezierSegments[0]?.[0];
+		const end = curve.bezierSegments.at(-1)?.[3];
+		if (start && dist(point, start) <= 1 / KEY_SCALE) return { t: 0, p: start };
+		if (end && dist(point, end) <= 1 / KEY_SCALE) return { t: 1, p: end };
 	}
 	return { t: getParamAtPoint(curve, point), p: point };
 }

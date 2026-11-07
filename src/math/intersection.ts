@@ -614,6 +614,7 @@ export function intersectEllipseEllipse(
 
 function findBezierImplicitRoots(b: BezierSegment, f: (p: Vec2) => number): Vec2[] {
 	const N = 16;
+	const nearRootTolerance = 1e-4;
 	const vals: number[] = new Array(N + 1);
 	for (let i = 0; i <= N; i++) {
 		vals[i] = f(evaluateBezier(b, i / N));
@@ -646,12 +647,19 @@ function findBezierImplicitRoots(b: BezierSegment, f: (p: Vec2) => number): Vec2
 			}
 			roots.push((low + high) * 0.5);
 		} else if (
-			Math.abs(vA) < 1e-4 &&
+			Math.abs(vA) < nearRootTolerance &&
 			(i === 0 || Math.abs(vA) <= Math.abs(vals[i - 1])) &&
 			Math.abs(vA) <= Math.abs(vB)
 		) {
 			roots.push(tA);
 		}
+	}
+	// The loop tests near roots at the left sample of each interval.
+	// Include the final sample too if the last interval did not bracket a root.
+	const last = vals[N];
+	const previous = vals[N - 1];
+	if (last * previous > 0 && Math.abs(last) < nearRootTolerance && Math.abs(last) <= Math.abs(previous)) {
+		roots.push(1);
 	}
 	return roots.map(t => evaluateBezier(b, t));
 }

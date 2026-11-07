@@ -15,6 +15,22 @@ function addTriangle(sketch: SketchDocument) {
 }
 
 describe('sketch regions', () => {
+	it('closes a region when the final spline endpoint is just outside its circle', () => {
+		// Snapshot from sketch_1794050130573.svg.
+		const fixture = new URL('./fixtures/spline-circle-closed-regions.json', import.meta.url);
+		const sketch = new SketchDocument();
+		sketch.restoreSnapshot(JSON.parse(readFileSync(fixture, 'utf8')));
+
+		const regions = findSketchRegions(sketch);
+		assert.equal(regions.length, 2);
+		const outer = regions.find(region => pointInRegion({ x: -80, y: 0 }, region));
+		assert.ok(outer);
+		assert.equal(pointInRegion({ x: 0, y: 0 }, outer), false);
+		assert.ok(regions.some(region => pointInRegion({ x: 0, y: 0 }, region)));
+		assert.equal((outer.path.match(/ A /g) ?? []).length, 1);
+		assert.equal((outer.path.match(/ C /g) ?? []).length, 3);
+	});
+
 	it('closes an arc and spline boundary across a vertex rounding boundary', () => {
 		// Snapshot from sketch_1794043428570.svg.
 		const fixture = new URL('./fixtures/arc-spline-closed-regions.json', import.meta.url);

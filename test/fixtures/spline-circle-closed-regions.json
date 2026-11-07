@@ -1,0 +1,307 @@
+{
+  "points": [
+    {
+      "type": "point",
+      "id": "Point-72",
+      "x": 1.209455609089096e-07,
+      "y": 7.227692371771382e-08,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-73",
+      "x": -13.671622936922256,
+      "y": -6.171444075783794,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-74",
+      "x": -85.32465585885048,
+      "y": -19.36678556724298,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-75",
+      "x": -126.93344676561769,
+      "y": 14.443325770723073,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-76",
+      "x": -14.315474668624752,
+      "y": 4.479640856435977,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-77",
+      "x": 10.212721370387149,
+      "y": -1.7729969119640643,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-78",
+      "x": -37.55596724423166,
+      "y": -10.569891239603523,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-79",
+      "x": -63.58718583392401,
+      "y": -23.323219663580296,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-80",
+      "x": -107.06212588377694,
+      "y": -15.410351470905665,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-81",
+      "x": -178.59436152394935,
+      "y": 16.41201297663931,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-82",
+      "x": -75.27253200741626,
+      "y": 12.474638563725458,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-83",
+      "x": -51.854798700955726,
+      "y": 7.800869161198342,
+      "fixed": false
+    },
+    {
+      "type": "point",
+      "id": "Point-84",
+      "x": 23.223849363706222,
+      "y": 1.158412551673612,
+      "fixed": false
+    }
+  ],
+  "lines": [
+    {
+      "type": "line",
+      "id": "Line-35",
+      "p1Id": "Point-77",
+      "p2Id": "Point-78",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-36",
+      "p1Id": "Point-79",
+      "p2Id": "Point-80",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-37",
+      "p1Id": "Point-81",
+      "p2Id": "Point-82",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": false
+    },
+    {
+      "type": "line",
+      "id": "Line-38",
+      "p1Id": "Point-83",
+      "p2Id": "Point-84",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    }
+  ],
+  "circles": [
+    {
+      "type": "circle",
+      "id": "Circle-2",
+      "centerId": "Point-72",
+      "radius": 15,
+      "isConstruction": false
+    }
+  ],
+  "arcs": [],
+  "ellipses": [],
+  "ellipticalArcs": [],
+  "splines": [
+    {
+      "type": "spline",
+      "id": "Spline-1",
+      "splineType": "fit",
+      "pointIds": [
+        "Point-73",
+        "Point-74",
+        "Point-75",
+        "Point-76"
+      ],
+      "tangentLineIds": [
+        "Line-35",
+        "Line-36",
+        "Line-37",
+        "Line-38"
+      ],
+      "isClosed": false,
+      "isConstruction": false
+    }
+  ],
+  "texts": [],
+  "constraints": [
+    {
+      "id": "c_rad-4",
+      "type": "radius",
+      "name": "Diameter (30)",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": true,
+      "value": 15,
+      "entityIds": [
+        "Circle-2"
+      ],
+      "circleId": "Circle-2",
+      "targetRadius": 15,
+      "displayMode": "diameter"
+    },
+    {
+      "id": "c_origin_coinc-1",
+      "type": "origin_distance",
+      "name": "Coincident with (0,0)",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "value": 0,
+      "entityIds": [
+        "Point-72"
+      ],
+      "pointId": "Point-72",
+      "targetDistance": 0,
+      "orientation": "aligned",
+      "side": 1,
+      "isCoincident": true
+    },
+    {
+      "id": "c_ptcirc-3",
+      "type": "point_on_circle",
+      "name": "Point on Circle",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-73",
+        "Point-72",
+        "Circle-2"
+      ],
+      "pointId": "Point-73",
+      "circleCenterId": "Point-72",
+      "circleId": "Circle-2"
+    },
+    {
+      "id": "c_ptcirc-4",
+      "type": "point_on_circle",
+      "name": "Point on Circle",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-76",
+        "Point-72",
+        "Circle-2"
+      ],
+      "pointId": "Point-76",
+      "circleCenterId": "Point-72",
+      "circleId": "Circle-2"
+    },
+    {
+      "id": "c_midpoint-14",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-73",
+        "Point-77",
+        "Point-78"
+      ],
+      "midId": "Point-73",
+      "p1Id": "Point-77",
+      "p2Id": "Point-78",
+      "ratio": 0.49999999999999994
+    },
+    {
+      "id": "c_midpoint-15",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-74",
+        "Point-79",
+        "Point-80"
+      ],
+      "midId": "Point-74",
+      "p1Id": "Point-79",
+      "p2Id": "Point-80",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-16",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-75",
+        "Point-81",
+        "Point-82"
+      ],
+      "midId": "Point-75",
+      "p1Id": "Point-81",
+      "p2Id": "Point-82",
+      "ratio": 0.49999999999999994
+    },
+    {
+      "id": "c_midpoint-17",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-76",
+        "Point-83",
+        "Point-84"
+      ],
+      "midId": "Point-76",
+      "p1Id": "Point-83",
+      "p2Id": "Point-84",
+      "ratio": 0.5000000000000001
+    }
+  ],
+  "parameters": [],
+  "idCounter": 345
+}
