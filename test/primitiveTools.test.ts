@@ -951,6 +951,36 @@ describe('Primitive Tools Creation', () => {
 		assert.ok(tangConstraint, 'TangentCircleCircleConstraint must be applied between the two arcs');
 	});
 
+	it('Tangent uses the Point on Line equation for a shared arc endpoint', () => {
+		const sketch = new SketchDocument();
+		const center1 = sketch.addPoint({ x: 0, y: 0 });
+		const center2 = sketch.addPoint({ x: 6, y: 0 });
+		const shared = sketch.addPoint({ x: 10, y: 0 });
+		const end1 = sketch.addPoint({ x: 0, y: 10 });
+		const end2 = sketch.addPoint({ x: 6, y: 4 });
+		const arc1 = sketch.addArc(center1.id, end1.id, shared.id, 10);
+		const arc2 = sketch.addArc(center2.id, shared.id, end2.id, 4);
+
+		const constraint = sketch.addTangentConstraint(arc1.id, arc2.id);
+		assert.ok(constraint instanceof TangentCircleCircleConstraint);
+		assert.equal(constraint.sharedPointId, shared.id);
+		assert.equal(constraint.getEquationsCount(), 1);
+		assert.equal(shared.x, 10);
+
+		const pointOnLine = new PointOnLineConstraint('test', shared.id, center1.id, center2.id);
+		const params = new Map([
+			[`${center1.id}.x`, 0],
+			[`${center1.id}.y`, 0],
+			[`${center2.id}.x`, 6],
+			[`${center2.id}.y`, 0],
+			[`${shared.id}.x`, 10],
+			[`${shared.id}.y`, 2],
+			[`${arc1.id}.r`, 15],
+			[`${arc2.id}.r`, 4],
+		]);
+		assert.deepEqual(constraint.evaluate(params), pointOnLine.evaluate(params));
+	});
+
 	it('ArcTool creates tangent arc with sweep angle > 180 degrees without flipping sides', () => {
 		const sketch = new SketchDocument();
 		// Horizontal line from (0, 0) to (50, 0)

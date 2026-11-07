@@ -1,6 +1,7 @@
-import { addScaled, cross, sub, vec } from '../../math/vector';
+import { addScaled, sub, vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
+import { signedDistanceToLine } from './pointOnLine';
 import type { ConstraintRenderContext } from './renderContext';
 
 /**
@@ -39,17 +40,17 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		this.sharedPointId = sharedPointId;
 	}
 
-	override getEquationsCount(): number {
-		return this.sharedPointId ? 2 : 1;
-	}
-
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const c1 = readParamPoint(paramMap, this.circle1CenterId);
-		const r1 = paramMap.get(`${this.circle1Id}.r`) ?? 10;
-
 		const c2 = readParamPoint(paramMap, this.circle2CenterId);
-		const r2 = paramMap.get(`${this.circle2Id}.r`) ?? 10;
 
+		if (this.sharedPointId) {
+			const p = readParamPoint(paramMap, this.sharedPointId);
+			return [signedDistanceToLine(p, c1, c2) * this.weight];
+		}
+
+		const r1 = paramMap.get(`${this.circle1Id}.r`) ?? 10;
+		const r2 = paramMap.get(`${this.circle2Id}.r`) ?? 10;
 		const dir = sub(c2, c1);
 		const dist = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
 
@@ -62,14 +63,7 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 			targetDist = r2 - r1;
 		}
 
-		const eq0 = (dist - targetDist) * this.weight;
-		if (!this.sharedPointId) {
-			return [eq0];
-		}
-
-		const p = readParamPoint(paramMap, this.sharedPointId);
-		const signedDistance = cross(sub(p, c1), dir) / dist;
-		return [eq0, signedDistance * this.weight];
+		return [(dist - targetDist) * this.weight];
 	}
 
 	override jacobian(
@@ -77,13 +71,7 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
-		if (!this.sharedPointId) {
-			return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
-		}
-		return [
-			...computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap),
-			...computeNumericJacobianForEquation(this, paramIndices, baseRow + 1, 1, paramMap),
-		];
+		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
@@ -114,6 +102,13 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		if (distScreen > 1e-4) {
 			ux = dir.x / distScreen;
 			uy = dir.y / distScreen;
+		}
+
+		const sharedPoint = this.sharedPointId ? ctx.sketch.points.get(this.sharedPointId) : undefined;
+		if (sharedPoint) {
+			const badge = addScaled(ctx.viewport.worldToScreen(sharedPoint), vec(-uy, ux), 14);
+			ctx.renderBadge(this.id, badge, 'tangent');
+			return;
 		}
 
 		let tanPt1X: number;

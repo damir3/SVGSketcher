@@ -1,8 +1,14 @@
-import { cross, sub } from '../../math/vector';
+import { cross, sub, type Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
+
+export function signedDistanceToLine(point: Vec2, start: Vec2, end: Vec2): number {
+	const dir = sub(end, start);
+	const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+	return cross(sub(point, start), dir) / lineLen;
+}
 
 /**
  * Constrains a point to lie on the infinite line passing through lineP1 and lineP2
@@ -28,11 +34,7 @@ export class PointOnLineConstraint extends BaseConstraint {
 		const p1 = readParamPoint(paramMap, this.lineP1Id);
 		const p2 = readParamPoint(paramMap, this.lineP2Id);
 
-		const dir = sub(p2, p1);
-		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
-
-		// Perpendicular distance from point to line
-		return [(cross(sub(p, p1), dir) / lineLen) * this.weight];
+		return [signedDistanceToLine(p, p1, p2) * this.weight];
 	}
 
 	override jacobian(
