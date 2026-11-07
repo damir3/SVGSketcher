@@ -1,6 +1,7 @@
 import * as opentype from 'opentype.js';
-import { angleFromTo, vec, dist, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
-import type { GeoCurve, GeoSegment, GeoCircle, GeoArc, GeoSpline } from './intersection';
+import { angleFromTo, vec, dist, distancesFrom, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
+import type { GeoCurve, GeoSegment, GeoEllipse, GeoEllipticalArc, GeoSpline } from './intersection';
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import { evaluateBezier, evaluateBezierDerivative } from './spline';
 
 export interface TextLayoutOptions {
@@ -25,8 +26,70 @@ export interface CurveSample {
 }
 
 export interface PathEvaluator {
+	// Length used for alignment and fitting. A closed continuation may extend beyond it.
 	readonly length: number;
 	getSampleAtDistance(s: number): CurveSample;
+}
+
+function createEllipsePathEvaluator(curve: GeoEllipse | GeoEllipticalArc): PathEvaluator {
+	const { center, majorAxisPoint, minorAxisPoint } = curve;
+	const radii = distancesFrom(center, majorAxisPoint, minorAxisPoint);
+	const { axisU, axisV } = ellipseAxes(angleFromTo(center, majorAxisPoint));
+	const fullTurn = 2 * Math.PI;
+	const direction = curve.type === 'ellipse' || curve.clockwise ? -1 : 1;
+	let start = Math.PI;
+	let sweep = fullTurn;
+	if (radii.x === 0 || radii.y === 0) {
+		sweep = 0;
+	} else if (curve.type === 'elliptical_arc') {
+		start = ellipseParameterAtPoint(curve.start, center, radii, axisU, axisV);
+		const end = ellipseParameterAtPoint(curve.end, center, radii, axisU, axisV);
+		sweep = (direction * (end - start)) % fullTurn;
+		if (sweep < 0) sweep += fullTurn;
+	}
+
+	// Sample the full revolution, including the exact arc endpoint for alignment and fitting.
+	const steps = 256;
+	const angles = Array.from({ length: steps + 1 }, (_, i) => (i * fullTurn) / steps);
+	const endIndex = angles.findIndex(angle => angle >= sweep);
+	if (angles[endIndex] !== sweep) angles.splice(endIndex, 0, sweep);
+
+	const lengths = [0];
+	let previous = ellipsePointAtParameter(start, center, radii, axisU, axisV);
+	for (let i = 1; i < angles.length; i++) {
+		const point = ellipsePointAtParameter(start + direction * angles[i], center, radii, axisU, axisV);
+		lengths.push(lengths[i - 1] + dist(previous, point));
+		previous = point;
+	}
+
+	const length = lengths[endIndex];
+	const perimeter = lengths[lengths.length - 1];
+	return {
+		length,
+		getSampleAtDistance(s: number) {
+			const remainder = perimeter > 0 ? s % perimeter : 0;
+			const distance = remainder < 0 ? remainder + perimeter : remainder;
+			let low = 0;
+			let high = lengths.length - 1;
+			while (high - low > 1) {
+				const middle = (low + high) >> 1;
+				if (lengths[middle] <= distance) low = middle;
+				else high = middle;
+			}
+			const span = lengths[high] - lengths[low];
+			const fraction = span > 0 ? (distance - lengths[low]) / span : 0;
+			const angle = angles[low] + fraction * (angles[high] - angles[low]);
+			const theta = start + direction * angle;
+			const du = -radii.x * Math.sin(theta);
+			const dv = radii.y * Math.cos(theta);
+			const forward = normalize(vec(du * axisU.x + dv * axisV.x, du * axisU.y + dv * axisV.y));
+			return {
+				point: ellipsePointAtParameter(theta, center, radii, axisU, axisV),
+				tangent: vec(direction * forward.x, direction * forward.y),
+				normal: vec(forward.y, -forward.x),
+			};
+		},
+	};
 }
 
 export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
@@ -49,52 +112,37 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 				},
 			};
 		}
-		case 'circle': {
-			const c = curve as GeoCircle;
-			const totalLen = 2 * Math.PI * c.radius;
-			return {
-				length: totalLen,
-				getSampleAtDistance(s: number) {
-					const theta = s / c.radius;
-					const cos = Math.cos(theta);
-					const sin = Math.sin(theta);
-					return {
-						point: vec(c.center.x + c.radius * cos, c.center.y + c.radius * sin),
-						tangent: vec(-sin, cos),
-						normal: vec(cos, sin),
-					};
-				},
-			};
-		}
+		case 'circle':
 		case 'arc': {
-			const arc = curve as GeoArc;
-			const thetaS = angleFromTo(arc.center, arc.start);
-			const thetaE = angleFromTo(arc.center, arc.end);
-			let sweep = 0;
-			const dir = arc.clockwise ? -1 : 1;
-			if (arc.clockwise) {
-				sweep = (thetaS - thetaE) % (2 * Math.PI);
-				if (sweep <= 0) sweep += 2 * Math.PI;
-			} else {
-				sweep = (thetaE - thetaS) % (2 * Math.PI);
-				if (sweep <= 0) sweep += 2 * Math.PI;
+			const { center, radius } = curve;
+			const fullTurn = 2 * Math.PI;
+			const direction = curve.type === 'circle' || curve.clockwise ? -1 : 1;
+			const start = curve.type === 'circle' ? Math.PI : angleFromTo(center, curve.start);
+			let sweep = fullTurn;
+			if (curve.type === 'arc') {
+				const end = angleFromTo(center, curve.end);
+				sweep = (direction * (end - start)) % fullTurn;
+				if (sweep <= 0) sweep += fullTurn;
 			}
-			const totalLen = arc.radius * sweep;
+			const circumference = fullTurn * radius;
 			return {
-				length: totalLen,
+				length: radius * sweep,
 				getSampleAtDistance(s: number) {
-					const u = totalLen > 1e-9 ? Math.max(0, Math.min(1, s / totalLen)) : 0;
-					const theta = thetaS + dir * u * sweep;
+					const offset = radius > 0 ? (s % circumference) / radius : 0;
+					const theta = start + direction * offset;
 					const cos = Math.cos(theta);
 					const sin = Math.sin(theta);
 					return {
-						point: vec(arc.center.x + arc.radius * cos, arc.center.y + arc.radius * sin),
-						tangent: vec(dir * -sin, dir * cos),
+						point: vec(center.x + radius * cos, center.y + radius * sin),
+						tangent: vec(-direction * sin, direction * cos),
 						normal: vec(cos, sin),
 					};
 				},
 			};
 		}
+		case 'ellipse':
+		case 'elliptical_arc':
+			return createEllipsePathEvaluator(curve);
 		case 'spline': {
 			const spline = curve as GeoSpline;
 			const segments = spline.bezierSegments || [];
@@ -109,20 +157,20 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 
 			// Subdivide segments to approximate arc-lengths
 			const stepsPerSeg = 20;
-			const subSamples: Array<{ t: number; segIdx: number; p: Vec2; cumLen: number }> = [];
+			const subSamples: Array<{ t: number; segIdx: number; cumLen: number }> = [];
 			let cumLen = 0;
 
 			for (let i = 0; i < segments.length; i++) {
 				const seg = segments[i];
 				let prevP = evaluateBezier(seg, 0);
 				if (i === 0) {
-					subSamples.push({ t: 0, segIdx: 0, p: prevP, cumLen: 0 });
+					subSamples.push({ t: 0, segIdx: 0, cumLen: 0 });
 				}
 				for (let step = 1; step <= stepsPerSeg; step++) {
 					const t = step / stepsPerSeg;
 					const p = evaluateBezier(seg, t);
 					cumLen += dist(prevP, p);
-					subSamples.push({ t, segIdx: i, p, cumLen });
+					subSamples.push({ t, segIdx: i, cumLen });
 					prevP = p;
 				}
 			}
@@ -149,9 +197,10 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 					const s1 = subSamples[high];
 					const segSpan = s1.cumLen - s0.cumLen;
 					const frac = segSpan > 1e-9 ? (clampedS - s0.cumLen) / segSpan : 0;
-					const segIdx = s0.segIdx;
-					const t = s0.t + frac * (s1.t - s0.t);
-					const seg = segments[segIdx];
+					// The endpoint of one segment is also t = 0 on the next segment.
+					const startT = s0.segIdx === s1.segIdx ? s0.t : 0;
+					const t = startT + frac * (s1.t - startT);
+					const seg = segments[s1.segIdx];
 					const pt = evaluateBezier(seg, t);
 					const d = evaluateBezierDerivative(seg, t);
 					const tan = normalizeOrNull(d, 1e-9) ?? vec(1, 0);
@@ -324,8 +373,13 @@ export function generateTextSvgPathData(
 			}
 		}
 
-		// Placement: above curve or below curve
-		const baseNormalOffset = options.placement === 'below' ? -effectiveHeight : 0.5;
+		const below = options.placement === 'below';
+		let normalOffset = below ? -effectiveHeight : 0.5;
+		if (options.flipVertical) {
+			// Use the flat cap line above the path and the baseline below it.
+			normalOffset = below ? 0 : font.charToGlyph('H').getBoundingBox().y2 * scale;
+		}
+		const normalDirection = options.flipVertical ? 1 : -1;
 
 		let curDist = startDist;
 		for (let i = 0; i < glyphs.length; i++) {
@@ -351,12 +405,8 @@ export function generateTextSvgPathData(
 
 			for (const cmd of gPath.commands) {
 				const transformCurve = (x: number, y: number): Vec2 => {
-					let dx = x - w / 2;
-					let localY = -y;
-					if (options.flipVertical) {
-						localY = effectiveHeight - localY;
-					}
-					let dy = localY + baseNormalOffset;
+					const dx = x - w / 2;
+					const dy = normalOffset + normalDirection * y;
 
 					const cad = vec(sample.point.x + dx * tan.x + dy * norm.x, sample.point.y + dx * tan.y + dy * norm.y);
 

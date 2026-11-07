@@ -175,13 +175,11 @@ export class SplineTool extends BaseTool {
 	}
 
 	override onKeyDown(e: KeyboardEvent): boolean | void {
-		if (e.key === 'Enter') {
-			if (this.points.length > 0) {
-				e.preventDefault();
-				this.finishSpline(false);
-				return true;
-			}
-		}
+		if (e.key !== 'Enter' || this.points.length === 0) return;
+
+		e.preventDefault();
+		if (this.points.length >= 2) this.commit();
+		return true;
 	}
 
 	override undoPoint(): boolean {

@@ -1,10 +1,18 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { angleFromTo, dist, vec, sub, type Vec2 } from '../../../math/vector';
+import { angleFromTo, angleFromToDeg, dist, distancesFrom, vec, sub, type Vec2 } from '../../../math/vector';
 import type { IToolPanel } from '../../../ui/panels/tools/types';
-import type { SketchText } from '../../../model/primitives/text';
+import type { SketchText, TextPathTargetType } from '../../../model/primitives/text';
 import { COLORS } from '../../styles';
-import { createSvgElement, createSvgLine, createSvgRect, createSvgText } from '../../svg';
+import {
+	createSvgElement,
+	createSvgEllipse,
+	createSvgLine,
+	createSvgPath,
+	createSvgRect,
+	createSvgText,
+	getEllipticalArcSvgPath,
+} from '../../svg';
 import {
 	renderTextCardHtml,
 	bindTextCardEvents,
@@ -39,7 +47,7 @@ export class TextTool extends BaseTool {
 	private isDragDown = false;
 
 	// Hover candidate for mode === 'text_on_path'
-	private hoverCandidate: { id: string; type: 'line' | 'circle' | 'arc' | 'spline' } | null = null;
+	private hoverCandidate: { id: string; type: TextPathTargetType } | null = null;
 
 	// Rotation gizmo dragging
 	private isRotating = false;
@@ -129,6 +137,15 @@ export class TextTool extends BaseTool {
 		this.dragStartWorld = null;
 		this.dragInitialPoints.clear();
 		this.activeTextId = null;
+	}
+
+	override onKeyDown(e: KeyboardEvent): boolean | void {
+		if (e.key !== 'Enter') return;
+
+		e.preventDefault();
+		if (this.isRotating || this.isDraggingCenter) this.ctx.sketch.commitTransaction();
+		this.ctx.setTool('select');
+		return true;
 	}
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {
@@ -455,7 +472,7 @@ export class TextTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
-	private commitTextOnPath(primId: string, primType: 'line' | 'circle' | 'arc' | 'spline'): void {
+	private commitTextOnPath(primId: string, primType: TextPathTargetType): void {
 		const sketch = this.ctx.sketch;
 		const existingText = this.activeTextId ? sketch.texts.get(this.activeTextId) : null;
 
@@ -533,7 +550,7 @@ export class TextTool extends BaseTool {
 		return null;
 	}
 
-	private findCurveNear(screen: Vec2): { id: string; type: 'line' | 'circle' | 'arc' | 'spline' } | null {
+	private findCurveNear(screen: Vec2): { id: string; type: TextPathTargetType } | null {
 		const line = this.ctx.findLineNear(screen, 12);
 		if (line) return { id: line.id, type: 'line' };
 
@@ -545,6 +562,12 @@ export class TextTool extends BaseTool {
 
 		const spline = this.ctx.findSplineNear(screen, 12);
 		if (spline) return { id: spline.id, type: 'spline' };
+
+		const ellipse = this.ctx.findEllipseNear?.(screen, 12);
+		if (ellipse) return { id: ellipse.id, type: 'ellipse' };
+
+		const ellipticalArc = this.ctx.findEllipticalArcNear?.(screen, 12);
+		if (ellipticalArc) return { id: ellipticalArc.id, type: 'elliptical_arc' };
 
 		return null;
 	}
@@ -636,11 +659,27 @@ export class TextTool extends BaseTool {
 		} else if (this.mode === 'text_on_path' && this.hoverCandidate) {
 			// Highlight candidate curve
 			const geo = this.ctx.sketch.toGeoCurve(this.hoverCandidate.id, this.hoverCandidate.type);
-			if (geo) {
-				if (geo.type === 'segment') {
-					const s1 = ctx.viewport.worldToScreen(geo.p1);
-					const s2 = ctx.viewport.worldToScreen(geo.p2);
-					createSvgLine(s1, s2, { stroke: COLORS.primary, 'stroke-width': 3 }, ctx.targetGroup);
+			const attrs = { stroke: COLORS.primary, 'stroke-width': 3, fill: 'none', 'pointer-events': 'none' };
+			const toScreen = (point: Vec2) => ctx.viewport.worldToScreen(point);
+			if (geo?.type === 'segment') {
+				createSvgLine(toScreen(geo.p1), toScreen(geo.p2), attrs, ctx.targetGroup);
+			} else if (geo?.type === 'ellipse' || geo?.type === 'elliptical_arc') {
+				const center = toScreen(geo.center);
+				const major = toScreen(geo.majorAxisPoint);
+				const minor = toScreen(geo.minorAxisPoint);
+				if (geo.type === 'ellipse') {
+					const transform = `rotate(${angleFromToDeg(center, major)} ${center.x} ${center.y})`;
+					createSvgEllipse(center, distancesFrom(center, major, minor), { ...attrs, transform }, ctx.targetGroup);
+				} else {
+					const d = getEllipticalArcSvgPath(
+						center,
+						major,
+						minor,
+						toScreen(geo.start),
+						toScreen(geo.end),
+						geo.clockwise
+					);
+					createSvgPath(d, attrs, ctx.targetGroup);
 				}
 			}
 		}

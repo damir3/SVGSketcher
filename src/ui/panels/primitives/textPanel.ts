@@ -195,7 +195,7 @@ export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: b
 			${
 				data.mode === 'text'
 					? 'Click & drag on canvas to draw rectangle frame'
-					: 'Click a primitive (line, circle, arc, spline) to place text'
+					: 'Click a primitive (line, circle, arc, ellipse, elliptical arc, spline) to place text'
 			}
 		</div>
 		`

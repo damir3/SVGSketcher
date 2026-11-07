@@ -706,20 +706,37 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(sketch.ellipticalArcs.size, 1);
 	});
 
-	it('SplineTool creates fit and control splines and supports setMode', () => {
+	it('SplineTool finishes fit and control splines with Enter when enough points are placed', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
 		const splineTool = new SplineTool('fit');
 		splineTool.activate(ctx);
+		const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+			activeTool: splineTool.id,
+			activeToolInstance: splineTool,
+			sketch,
+		});
+		const pressEnter = (code: 'Enter' | 'NumpadEnter') => {
+			let prevented = false;
+			interaction.handleKeyDown({
+				key: 'Enter',
+				code,
+				preventDefault: () => {
+					prevented = true;
+				},
+			} as KeyboardEvent);
+			assert.ok(prevented);
+		};
 
 		assert.equal(splineTool.id, 'spline');
 		assert.equal(splineTool.mode, 'fit');
 
 		splineTool.onMouseDown(makeMouseEvent(0, 0));
+		pressEnter('Enter');
+		assert.equal(splineTool.pointCount, 1);
+		assert.equal(sketch.splines.size, 0);
 		splineTool.onMouseDown(makeMouseEvent(50, 50));
-		splineTool.onMouseDown(makeMouseEvent(100, 0));
-		assert.equal(splineTool.pointCount, 3);
-		splineTool.finishSpline(false);
+		pressEnter('Enter');
 		assert.equal(splineTool.pointCount, 0);
 		assert.equal(sketch.splines.size, 1);
 
@@ -733,9 +750,12 @@ describe('Primitive Tools Creation', () => {
 		splineTool.onMouseDown(makeMouseEvent(0, 100));
 		splineTool.onMouseDown(makeMouseEvent(30, 130));
 		splineTool.onMouseDown(makeMouseEvent(70, 130));
+		pressEnter('NumpadEnter');
+		assert.equal(splineTool.pointCount, 3);
+		assert.equal(sketch.splines.size, 1);
 		splineTool.onMouseDown(makeMouseEvent(100, 100));
 		assert.equal(splineTool.pointCount, 4);
-		splineTool.finishSpline(false);
+		pressEnter('NumpadEnter');
 		assert.equal(sketch.splines.size, 2);
 	});
 

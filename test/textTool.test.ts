@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { TextTool } from '../src/canvas/tools/primitives/text';
+import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
 import { exportSketchToSVG } from '../src/model/io/svgIO';
 import { SVG_EXPORT_STYLE } from '../src/canvas/styles';
@@ -309,7 +310,10 @@ describe('Text Model & Entity Lifecycle', () => {
 });
 
 describe('Text Layout & Path Mathematics', () => {
-	it('createPathEvaluator accurately samples segment, circle, and arc', () => {
+	it('samples a segment and wraps circles and arcs by distance', () => {
+		const near = (actual: { x: number; y: number }, expected: { x: number; y: number }) => {
+			assert.ok(Math.hypot(actual.x - expected.x, actual.y - expected.y) < 1e-6);
+		};
 		const seg: GeoSegment = {
 			type: 'segment',
 			p1: vec(0, 0),
@@ -330,6 +334,9 @@ describe('Text Layout & Path Mathematics', () => {
 		};
 		const evalCirc = createPathEvaluator(circle);
 		assert.ok(Math.abs(evalCirc.length - 2 * Math.PI * 10) < 1e-4);
+		near(evalCirc.getSampleAtDistance(0).point, vec(-10, 0));
+		near(evalCirc.getSampleAtDistance(0).tangent, vec(0, 1));
+		near(evalCirc.getSampleAtDistance(evalCirc.length / 4).point, vec(0, 10));
 
 		const arc: GeoArc = {
 			type: 'arc',
@@ -345,6 +352,65 @@ describe('Text Layout & Path Mathematics', () => {
 		};
 		const evalArc = createPathEvaluator(arc);
 		assert.ok(Math.abs(evalArc.length - Math.PI * 20) < 1e-4);
+		near(evalArc.getSampleAtDistance(evalArc.length).point, arc.end);
+		near(evalArc.getSampleAtDistance(1.5 * evalArc.length).point, vec(0, -20));
+		near(evalArc.getSampleAtDistance(2 * evalArc.length).point, arc.start);
+
+		const clockwiseArc = createPathEvaluator({ ...arc, clockwise: true });
+		near(clockwiseArc.getSampleAtDistance(1.5 * clockwiseArc.length).point, vec(0, 20));
+	});
+
+	it('wraps a rotated ellipse and both directions of an elliptical arc by distance', () => {
+		const sketch = new SketchDocument();
+		const center = sketch.addPoint(vec(2, 3));
+		const major = sketch.addPoint(vec(2, 23));
+		const minor = sketch.addPoint(vec(-3, 3));
+		const ellipse = sketch.addEllipse(center.id, major.id, minor.id).toGeoCurve(sketch);
+		assert.ok(ellipse);
+		const full = createPathEvaluator(ellipse);
+		const near = (actual: { x: number; y: number }, expected: { x: number; y: number }) => {
+			assert.ok(Math.hypot(actual.x - expected.x, actual.y - expected.y) < 1e-6);
+		};
+		near(full.getSampleAtDistance(full.length / 4).point, minor);
+		near(full.getSampleAtDistance(0).point, vec(2, -17));
+		near(full.getSampleAtDistance(0).tangent, vec(-1, 0));
+		near(full.getSampleAtDistance(full.length).point, vec(2, -17));
+
+		const checkArc = (clockwise: boolean, length: number, tangentX: number) => {
+			const arc = sketch
+				.addEllipticalArc(center.id, major.id, minor.id, major.id, minor.id, clockwise)
+				.toGeoCurve(sketch);
+			assert.ok(arc);
+			const path = createPathEvaluator(arc);
+			assert.ok(Math.abs(path.length - length) < 1e-6);
+			near(path.getSampleAtDistance(0).point, major);
+			near(path.getSampleAtDistance(path.length).point, minor);
+			near(
+				path.getSampleAtDistance(path.length + full.length / 4).point,
+				clockwise ? major : vec(2, -17)
+			);
+			near(path.getSampleAtDistance(full.length + path.length).point, minor);
+			near(path.getSampleAtDistance(path.length - full.length).point, minor);
+			near(path.getSampleAtDistance(0).tangent, vec(tangentX, 0));
+			near(path.getSampleAtDistance(0).normal, vec(0, 1));
+		};
+		checkArc(false, full.length / 4, -1);
+		checkArc(true, (3 * full.length) / 4, 1);
+	});
+
+	it('samples the next Bézier segment immediately after a spline join', () => {
+		const spline: GeoSpline = {
+			type: 'spline',
+			id: 'spline',
+			bezierSegments: [
+				[vec(0, 0), vec(10 / 3, 0), vec(20 / 3, 0), vec(10, 0)],
+				[vec(10, 0), vec(10, 10 / 3), vec(10, 20 / 3), vec(10, 10)],
+			],
+		};
+		const path = createPathEvaluator(spline);
+		const { point, tangent } = path.getSampleAtDistance(10.25);
+		assert.ok(Math.hypot(point.x - 10, point.y - 0.25) < 1e-6);
+		assert.deepEqual(tangent, vec(0, 1));
 	});
 
 	it('generates SVG path data for Text mode in oriented rectangle', () => {
@@ -503,6 +569,33 @@ describe('SVG Export with Text Elements', () => {
 });
 
 describe('TextTool Interactive Operations & Sidebar Panel', () => {
+	it('switches to Select on Enter outside the text input', () => {
+		const sketch = new SketchDocument();
+		const tool = new TextTool();
+		const toolChanges: string[] = [];
+		tool.activate({ sketch, setCursor: () => {}, setTool: (next: string) => toolChanges.push(next) } as any);
+		const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+			activeTool: tool.id,
+			activeToolInstance: tool,
+			sketch,
+		});
+		for (const code of ['Enter', 'NumpadEnter']) {
+			let prevented = false;
+			const event = {
+				key: 'Enter',
+				code,
+				preventDefault: () => {
+					prevented = true;
+				},
+			};
+			interaction.handleKeyDown({ ...event, target: makeEl('textarea') } as KeyboardEvent);
+			assert.equal(prevented, false);
+			interaction.handleKeyDown(event as KeyboardEvent);
+			assert.equal(prevented, true);
+		}
+		assert.deepEqual(toolChanges, ['select', 'select']);
+	});
+
 	it('commits rectangle mode with 4 construction lines and parallel/perpendicular constraints (no redundant equal constraints)', () => {
 		const sketch = new SketchDocument();
 		const tool = new TextTool();
@@ -716,6 +809,58 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		assert.equal(sketch.texts.size, 1, 'Only one text must exist; second path click updates target');
 		assert.equal(text.targetPrimitiveId, line2.id);
 	});
+
+	for (const type of ['ellipse', 'elliptical_arc'] as const) {
+		it(`binds text to a hovered ${type} and exports its glyphs`, () => {
+			const sketch = new SketchDocument();
+			const center = sketch.addPoint(vec(0, 0));
+			const major = sketch.addPoint(vec(30, 0));
+			const minor = sketch.addPoint(vec(0, 10));
+			const ellipse = type === 'ellipse' ? sketch.addEllipse(center.id, major.id, minor.id) : null;
+			const arc =
+				type === 'elliptical_arc'
+					? sketch.addEllipticalArc(center.id, major.id, minor.id, major.id, minor.id)
+					: null;
+			const target = ellipse ?? arc;
+			assert.ok(target);
+
+			const tool = new TextTool();
+			const viewport = new Viewport(800, 600);
+			tool.activate({
+				sketch,
+				viewport,
+				renderer: {},
+				svg: makeEl(),
+				setCursor: () => {},
+				requestRender: () => {},
+				findLineNear: () => null,
+				findCircleNear: () => null,
+				findArcNear: () => null,
+				findSplineNear: () => null,
+				findEllipseNear: () => ellipse,
+				findEllipticalArcNear: () => arc,
+			} as any);
+			tool.mode = 'text_on_path';
+			const screen = viewport.worldToScreen(major);
+			const event = {
+				raw: {} as MouseEvent,
+				screen,
+				client: screen,
+				world: major,
+				snap: null,
+				effectiveWorld: major,
+				effectiveScreen: screen,
+			};
+			tool.onMouseMove(event);
+			tool.onMouseDown(event);
+
+			assert.equal(sketch.texts.size, 1);
+			const [text] = sketch.texts.values();
+			assert.equal(text.targetPrimitiveId, target.id);
+			assert.equal(text.targetPrimitiveType, type);
+			assert.ok(exportSketchToSVG(sketch).includes(`fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}"`));
+		});
+	}
 
 	it('sidebar panel renders all required controls and parameters conditionally per mode', () => {
 		const tool = new TextTool();
@@ -1895,6 +2040,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			yLineFlipV.every(y => y >= -0.1),
 			'Flip V must remain above the line (Y >= 0)'
 		);
+		assert.ok(yLineFlipV.includes(0), 'The reflected cap line must touch the path');
 		// Below places text below the line (all Y <= 0.1)
 		assert.ok(
 			yLineBelow.every(y => y <= 0.1),

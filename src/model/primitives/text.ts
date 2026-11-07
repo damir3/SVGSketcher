@@ -4,6 +4,8 @@ import type { SketchDocument } from '../sketch';
 import type { IInspectable, ISidebarPanel } from '../../ui/panels/inspector/types';
 import { TextInspectorPanel } from '../../ui/panels/primitives/textPanel';
 
+export type TextPathTargetType = 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
+
 export interface TextSnapshot {
 	type: 'text';
 	id: string;
@@ -23,7 +25,7 @@ export interface TextSnapshot {
 	rectanglePointIds?: [string, string, string, string];
 	rectangleLineIds?: [string, string, string, string];
 	targetPrimitiveId?: string;
-	targetPrimitiveType?: 'line' | 'circle' | 'arc' | 'spline';
+	targetPrimitiveType?: TextPathTargetType;
 }
 
 export class SketchText implements IInspectable {
@@ -46,7 +48,7 @@ export class SketchText implements IInspectable {
 	rectanglePointIds?: [string, string, string, string];
 	rectangleLineIds?: [string, string, string, string];
 	targetPrimitiveId?: string;
-	targetPrimitiveType?: 'line' | 'circle' | 'arc' | 'spline';
+	targetPrimitiveType?: TextPathTargetType;
 
 	readonly sidebarPanel: ISidebarPanel;
 

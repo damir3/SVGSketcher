@@ -805,7 +805,15 @@ export class CanvasInteraction {
 				return;
 			case 'Enter':
 			case 'NumpadEnter':
-				if ((this.activeTool === 'fillet' || this.activeTool === 'chamfer') && tool?.onKeyDown?.(e)) return;
+				if (
+					(this.activeTool === 'fillet' ||
+						this.activeTool === 'chamfer' ||
+						this.activeTool === 'spline' ||
+						this.activeTool === 'text') &&
+					tool?.onKeyDown?.(e)
+				) {
+					return;
+				}
 				if (this.activeToolInstance?.isBusy?.()) {
 					this.activeToolInstance.commit?.();
 				}
