@@ -76,6 +76,7 @@ export type ToolType =
 	| 'fillet'
 	| 'chamfer'
 	| 'offset'
+	| 'transform'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 

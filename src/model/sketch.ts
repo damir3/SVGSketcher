@@ -3838,9 +3838,9 @@ export class SketchDocument {
 			id: string;
 			type: SelectableEntityType;
 		}>,
-		multiSelect = false
+		mode: boolean | 'toggle' = false
 	): void {
-		selectEntities(this, items, multiSelect);
+		selectEntities(this, items, mode);
 	}
 
 	selectEntity(id: string, type: SelectableEntityType, multiSelect = false): void {

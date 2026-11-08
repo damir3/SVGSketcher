@@ -84,6 +84,10 @@ export class Toolbar {
 					${ICONS.rectangular_pattern}
 					<span class="btn-tooltip">Rectangular Pattern</span>
 				</button>
+				<button class="tool-btn" data-tool="transform" id="tool-transform" title="Transform / Copy">
+					${ICONS.transform}
+					<span class="btn-tooltip">Transform / Copy</span>
+				</button>
 				<button class="tool-btn" data-tool="mirror" id="tool-mirror" title="Mirror Objects (M)">
 					${ICONS.mirror}
 					<span class="btn-tooltip">Mirror (M)</span>

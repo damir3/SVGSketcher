@@ -222,7 +222,8 @@ function initApp(): void {
 	// Benchmark solver execution on each solve
 	sketch.onChange(() => {
 		const t0 = performance.now();
-		renderer.render(sketch, viewport);
+		if (interaction.activeTool === 'transform') interaction.render();
+		else renderer.render(sketch, viewport);
 		const dt = performance.now() - t0;
 		solverTime.textContent = `${dt.toFixed(2)} ms`;
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;

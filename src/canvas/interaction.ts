@@ -60,6 +60,7 @@ import { showToast } from '../ui/toast';
 import type { GeoCurve } from '../math/intersection';
 import { bsplineToBezier, fitPointsToBezier, getSplineParamAtPoint, type BezierSegment } from '../math/spline';
 import { calculateObjectsCentroid } from './tools/modify/utils';
+import { TransformTool } from './tools/modify/transform';
 import { HighlightManager } from './highlightManager';
 
 import {
@@ -292,6 +293,7 @@ export class CanvasInteraction {
 		this.tools.set('fillet', new FilletTool());
 		this.tools.set('chamfer', new ChamferTool());
 		this.tools.set('offset', new OffsetTool());
+		this.tools.set('transform', new TransformTool());
 		this.tools.set('mirror', new MirrorTool());
 		this.tools.set('circular_pattern', new CircularPatternTool());
 		this.tools.set('rectangular_pattern', new RectangularPatternTool());
@@ -1824,7 +1826,6 @@ export class CanvasInteraction {
 			}
 		}
 
-		// --- TOOL: SELECT ---
 		if (this.activeTool === 'select') {
 			// Check if clicking on a circular or rectangular pattern suppression checkbox on canvas
 			for (const entry of this.renderer.patternCheckboxPositions.values()) {
@@ -1864,7 +1865,9 @@ export class CanvasInteraction {
 					}
 				}
 			}
+		}
 
+		if (this.activeTool === 'select' || this.activeTool === 'transform') {
 			const target = e.target as SVGElement;
 			const targetG = target.closest('[data-id]') as SVGElement | null;
 			let id = targetG?.getAttribute('data-id');
@@ -1890,7 +1893,7 @@ export class CanvasInteraction {
 					id = snap.id;
 					type = 'point';
 				} else {
-					const hitConstraint = this.findConstraintNear(screen);
+					const hitConstraint = this.activeTool === 'select' ? this.findConstraintNear(screen) : null;
 					if (
 						hitConstraint &&
 						!this.sketch.isSplineInternalConstraint(hitConstraint) &&
@@ -1956,7 +1959,7 @@ export class CanvasInteraction {
 
 			// A visible primitive can be the raw SVG target even when the pointer is
 			// within the wider tolerance of a nearby dimension line.
-			if (type && type !== 'constraint' && type !== 'point') {
+			if (this.activeTool === 'select' && type && type !== 'constraint' && type !== 'point') {
 				const hitConstraint = this.findConstraintNear(screen);
 				if (
 					hitConstraint &&
@@ -1969,8 +1972,9 @@ export class CanvasInteraction {
 				}
 			}
 
+			if (this.activeTool === 'transform' && type === 'constraint') return;
 			if (id && type) {
-				const isToggle = e.metaKey || e.ctrlKey;
+				const isToggle = this.activeTool === 'transform' || e.metaKey || e.ctrlKey;
 				if (isToggle) {
 					this.sketch.toggleEntitySelection(id, type);
 					this.render();
@@ -2135,7 +2139,7 @@ export class CanvasInteraction {
 				this.boxSelectStartScreen = screen;
 				this.boxSelectCurrentScreen = screen;
 				this.boxSelectShift = e.shiftKey;
-				if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
+				if (this.activeTool === 'select' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
 					this.sketch.clearSelection();
 					this.render();
 				}
@@ -2594,6 +2598,12 @@ export class CanvasInteraction {
 			return;
 		}
 
+		if (this.activeToolInstance instanceof TransformTool && this.activeToolInstance.isBusy()) {
+			this.activeToolInstance.onMouseMove(this.createToolMouseEvent(e));
+			this.updateToolPreview();
+			return;
+		}
+
 		// If mouse is outside the canvas SVG (e.g. over modals, dialogs, header, toolbar, sidebar),
 		// clear hover highlights and tool previews, and do not process hover under overlays.
 		const isOverCanvas = e.target === this.svg || (e.target instanceof Node && this.svg.contains(e.target));
@@ -2601,7 +2611,7 @@ export class CanvasInteraction {
 			this.regionHoverPoint = null;
 			this.renderer.updateRegionHover(null);
 			this.highlightManager.clear();
-			this.renderer.clearPreviews();
+			if (this.activeTool !== 'transform') this.renderer.clearPreviews();
 			return;
 		}
 
@@ -3850,6 +3860,6 @@ export class CanvasInteraction {
 			return;
 		}
 
-		this.sketch.selectEntities(itemsToSelect, shiftKey);
+		this.sketch.selectEntities(itemsToSelect, this.activeTool === 'transform' ? 'toggle' : shiftKey);
 	}
 }

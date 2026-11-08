@@ -139,7 +139,7 @@ export class Sidebar {
 	}
 
 	private renderInspector(): string {
-		if (this.interaction?.activeTool === 'text') {
+		if (this.interaction?.activeTool === 'text' || this.interaction?.activeTool === 'transform') {
 			return '';
 		}
 		const entity = this.getSelectedInspectableEntity();
@@ -626,10 +626,15 @@ export class Sidebar {
 					| 'text'
 					| 'constraint';
 
-				this.sketch.selectEntity(id, type, false);
+				if (this.interaction?.activeTool === 'transform') {
+					if (type !== 'constraint') this.sketch.toggleEntitySelection(id, type);
+				} else {
+					this.sketch.selectEntity(id, type, false);
+				}
 			});
 
 			item.addEventListener('dblclick', () => {
+				if (this.interaction?.activeTool === 'transform') return;
 				const id = item.getAttribute('data-id')!;
 				const type = item.getAttribute('data-type')!;
 				if (type === 'text') {
@@ -676,7 +681,7 @@ export class Sidebar {
 		this.interaction?.activeToolInstance?.sidebarPanel?.bindEvents(this.container);
 
 		// Inspector entity events
-		if (this.interaction?.activeTool !== 'text') {
+		if (this.interaction?.activeTool !== 'text' && this.interaction?.activeTool !== 'transform') {
 			const entity = this.getSelectedInspectableEntity();
 			const ctx = this.createInspectorContext();
 			entity?.sidebarPanel?.bindEvents(this.container, ctx);

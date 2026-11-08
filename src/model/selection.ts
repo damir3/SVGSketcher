@@ -39,7 +39,7 @@ export function isEntitySelected(sketch: SketchDocument, id: string, type: Selec
 	}
 }
 
-export function deselectEntity(sketch: SketchDocument, id: string, type: SelectableEntityType): void {
+export function deselectEntity(sketch: SketchDocument, id: string, type: SelectableEntityType, notify = true): void {
 	switch (type) {
 		case 'point':
 			sketch.selection.pointIds.delete(id);
@@ -70,7 +70,7 @@ export function deselectEntity(sketch: SketchDocument, id: string, type: Selecta
 			break;
 	}
 
-	sketch.notify();
+	if (notify) sketch.notify();
 }
 
 export function toggleEntitySelection(sketch: SketchDocument, id: string, type: SelectableEntityType): void {
@@ -87,9 +87,9 @@ export function selectEntities(
 		id: string;
 		type: SelectableEntityType;
 	}>,
-	multiSelect = false
+	mode: boolean | 'toggle' = false
 ): void {
-	if (!multiSelect) {
+	if (mode === false) {
 		sketch.selection.pointIds.clear();
 		sketch.selection.lineIds.clear();
 		sketch.selection.circleIds.clear();
@@ -102,7 +102,9 @@ export function selectEntities(
 	}
 
 	for (const item of items) {
-		if (item.type === 'point') {
+		if (mode === 'toggle' && isEntitySelected(sketch, item.id, item.type)) {
+			deselectEntity(sketch, item.id, item.type, false);
+		} else if (item.type === 'point') {
 			sketch.selection.pointIds.add(item.id);
 		} else if (item.type === 'line') {
 			sketch.selection.lineIds.add(item.id);

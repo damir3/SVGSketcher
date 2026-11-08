@@ -1,3 +1,4 @@
+import { createTransform, type TransformValues } from '../model/transform';
 import { calculateObjectsCentroid } from './tools/modify/utils';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchSpline } from '../model/types';
@@ -117,6 +118,7 @@ const TWO_PI = 2 * Math.PI;
 
 export interface RenderOptions {
 	activeTextId?: string | null;
+	hideTextGizmos?: boolean;
 	hiddenEntityIds?: Set<string>;
 	regionHoverPoint?: Vec2 | null;
 	showGrid?: boolean;
@@ -1198,11 +1200,16 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderTexts(sketch: SketchDocument, viewport: Viewport, options: RenderOptions): void {
+	private renderTexts(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		options: RenderOptions,
+		preview?: { ids: ReadonlySet<string>; target: SVGGElement; color: string }
+	): void {
 		for (const text of sketch.texts.values()) {
-			if (options.hiddenEntityIds?.has(text.id)) continue;
+			if (options.hiddenEntityIds?.has(text.id) || (preview && !preview.ids.has(text.id))) continue;
 			const isSelected = sketch.selection.textIds.has(text.id) || options.activeTextId === text.id;
-			const color = isSelected ? COLORS.primary : COLORS.unconstrained;
+			const color = preview?.color ?? (isSelected ? COLORS.primary : COLORS.unconstrained);
 			const hScreen = Math.max(1, text.height * viewport.zoom);
 			const fontFam = text.fontFamily || 'Arial, sans-serif';
 
@@ -1230,7 +1237,7 @@ export class SVGRenderer {
 						'data-text-id': text.id,
 						cursor: 'pointer',
 					},
-					this.textGroup
+					preview?.target ?? this.textGroup
 				);
 
 				// Transparent hit-rect covering the entire box for easy clicking & double-clicking
@@ -1328,7 +1335,7 @@ export class SVGRenderer {
 				}
 
 				// Rotation Gizmo Handle (at top center of rectangle)
-				if (isSelected || options.activeTextId === text.id) {
+				if (isSelected && !options.hideTextGizmos && !preview) {
 					const stemLen = TEXT_ROTATION_HANDLE_DISTANCE_PX;
 					const topEdgeY = -hBoxScreen / 2;
 					const handleY = topEdgeY - stemLen;
@@ -1433,7 +1440,7 @@ export class SVGRenderer {
 							'data-text-id': text.id,
 							cursor: 'pointer',
 						},
-						this.textGroup
+						preview?.target ?? this.textGroup
 					);
 
 					createSvgElement(
@@ -1975,6 +1982,36 @@ export class SVGRenderer {
 		}
 	}
 
+	renderTransformPreview(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		ids: ReadonlySet<string>,
+		center: Vec2,
+		values: TransformValues,
+		targetGroup: SVGGElement,
+		color: string
+	): void {
+		const transform = createTransform(center, values);
+		this.renderTransformedObjects(sketch, viewport, ids, (x, y) => transform.point(vec(x, y)), {
+			targetGroup,
+			baseColor: color,
+			transformScale: values.scale,
+			drawVertices: true,
+		});
+
+		if (sketch.selection.textIds.size === 0) return;
+		const from = viewport.worldToScreen(center);
+		const to = viewport.worldToScreen(transform.point(center));
+		const textPreview = createSvgElement(
+			'g',
+			{
+				transform: `translate(${to.x}, ${to.y}) rotate(${-values.angle % 360}) scale(${values.scale}) translate(${-from.x}, ${-from.y})`,
+			},
+			targetGroup
+		);
+		this.renderTexts(sketch, viewport, {}, { ids, target: textPreview, color });
+	}
+
 	private renderTransformedObjects(
 		sketch: SketchDocument,
 		viewport: Viewport,
@@ -1991,6 +2028,7 @@ export class SVGRenderer {
 			drawVertices?: boolean;
 			strokeWidth?: number;
 			skipRender?: boolean;
+			transformScale?: number;
 		}
 	): Array<{ x: number; y: number }> {
 		let transformPoint: (x: number, y: number) => { x: number; y: number };
@@ -2019,6 +2057,7 @@ export class SVGRenderer {
 		const opacity = options.opacity ?? 1.0;
 		const baseColor = options.baseColor ?? COLORS.unconstrained;
 		const strokeWidth = options.strokeWidth ?? STROKE_WIDTH.normal;
+		const transformScale = options.transformScale ?? 1;
 
 		const drawTransformedVertex = (screenPt: { x: number; y: number }) => {
 			if (!options.drawVertices || skipRender || !targetGroup) return;
@@ -2026,7 +2065,7 @@ export class SVGRenderer {
 				screenPt,
 				3,
 				{
-					fill: baseColor === COLORS.constrained ? COLORS.constrained : COLORS.primary,
+					fill: options.transformScale !== undefined || baseColor === COLORS.constrained ? baseColor : COLORS.primary,
 					stroke: COLORS.white,
 					'stroke-width': STROKE_WIDTH.normal,
 					opacity,
@@ -2036,7 +2075,10 @@ export class SVGRenderer {
 			);
 		};
 
-		const getAttrs = (isConstruction: boolean) => getCopyStrokeAttrs(isConstruction, baseColor, opacity, strokeWidth);
+		const getAttrs = (isConstruction: boolean) => {
+			const attrs = getCopyStrokeAttrs(isConstruction, baseColor, opacity, strokeWidth);
+			return options.transformScale === undefined ? attrs : { ...attrs, stroke: baseColor };
+		};
 
 		for (const objId of objectIds) {
 			// Line
@@ -2071,7 +2113,7 @@ export class SVGRenderer {
 
 					if (!skipRender && targetGroup) {
 						const sc = viewport.worldToScreen(rc);
-						const sr = c.radius * viewport.zoom;
+						const sr = c.radius * viewport.zoom * transformScale;
 						createSvgCircle(sc, sr, getAttrs(!!c.isConstruction), targetGroup);
 
 						drawTransformedVertex(sc);
@@ -2096,7 +2138,7 @@ export class SVGRenderer {
 						const sc = viewport.worldToScreen(rc);
 						const ss = viewport.worldToScreen(rs);
 						const se = viewport.worldToScreen(re);
-						const sr = a.radius * viewport.zoom;
+						const sr = a.radius * viewport.zoom * transformScale;
 
 						const d = getArcSvgPath(sc, ss, se, sr, a.clockwise);
 						createSvgPath(d, getAttrs(!!a.isConstruction), targetGroup);

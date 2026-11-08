@@ -31,7 +31,7 @@ export type ModifyParamItem =
 			unit?: string;
 			min?: number;
 			max?: number;
-			step?: number;
+			step?: number | 'any';
 			isVisible?: () => boolean;
 			getValue: () => number | string;
 			onInput?: (val: number) => void;
@@ -58,6 +58,7 @@ export interface ModifyToolPanelOptions {
 	bindParams?: (container: HTMLElement) => void;
 	canApply: () => boolean;
 	applyLabel: string;
+	applyOnEnter?: boolean;
 	onApply: () => void;
 	onCancel: () => void;
 	getHint: () => string;
@@ -185,7 +186,7 @@ export class ModifyToolPanel implements IToolPanel {
 				${paramsHtml}
 
 				<div class="mirror-actions">
-					<button class="btn-mirror-ok btn-modify-ok" ${canApply ? '' : 'disabled'} title="${this.options.applyLabel} (Enter)">
+					<button class="btn-mirror-ok btn-modify-ok" ${canApply ? '' : 'disabled'} title="${this.options.applyLabel}${this.options.applyOnEnter === false ? '' : ' (Enter)'}">
 						${this.options.applyLabel}
 					</button>
 					<button class="btn-mirror-cancel btn-modify-cancel" title="Cancel (Esc)">
@@ -288,7 +289,7 @@ export class ModifyToolPanel implements IToolPanel {
 			this.options.onCancel();
 			return true;
 		}
-		if (e.key === 'Enter' && this.options.canApply()) {
+		if (e.key === 'Enter' && this.options.applyOnEnter !== false && this.options.canApply()) {
 			this.options.onApply();
 			return true;
 		}

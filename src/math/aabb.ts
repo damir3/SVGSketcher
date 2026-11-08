@@ -43,13 +43,19 @@ export function pointIntersectsAABB(p: Vec2, min: Vec2, max: Vec2): boolean {
 }
 
 export function curveContainedInAABB(curve: GeoCurve, min: Vec2, max: Vec2): boolean {
-	const contains = (point: Vec2) => pointIntersectsAABB(point, min, max);
-	if (curve.type === 'segment') return contains(curve.p1) && contains(curve.p2);
+	const bounds = getCurveBoundingBox(curve);
+	return !bounds || (pointIntersectsAABB(bounds.min, min, max) && pointIntersectsAABB(bounds.max, min, max));
+}
+
+export function getCurveBoundingBox(curve: GeoCurve): AABB | null {
+	if (curve.type === 'segment') return new AABB(curve.p1).addPoint(curve.p2);
 
 	if (curve.type === 'spline') {
-		return curve.bezierSegments.every(segment => {
+		if (curve.bezierSegments.length === 0) return null;
+		const bounds = new AABB();
+		for (const segment of curve.bezierSegments) {
 			const [p0, p1, p2, p3] = segment;
-			if (!contains(p0) || !contains(p3)) return false;
+			bounds.addPoint(p0).addPoint(p3);
 			for (const axis of ['x', 'y'] as const) {
 				const d0 = p1[axis] - p0[axis];
 				const d1 = p2[axis] - p1[axis];
@@ -65,10 +71,12 @@ export function curveContainedInAABB(curve: GeoCurve, min: Vec2, max: Vec2): boo
 						: discriminant >= 0
 							? [(-b - Math.sqrt(discriminant)) / (2 * a), (-b + Math.sqrt(discriminant)) / (2 * a)]
 							: [];
-				if (roots.some(t => t > 0 && t < 1 && !contains(evaluateBezier(segment, t)))) return false;
+				for (const t of roots) {
+					if (t > 0 && t < 1) bounds.addPoint(evaluateBezier(segment, t));
+				}
 			}
-			return true;
-		});
+		}
+		return bounds;
 	}
 
 	const { center } = curve;
@@ -81,10 +89,10 @@ export function curveContainedInAABB(curve: GeoCurve, min: Vec2, max: Vec2): boo
 	const x = Math.hypot(radii.x * axisU.x, radii.y * axisV.x);
 	const y = Math.hypot(radii.x * axisU.y, radii.y * axisV.y);
 	if (curve.type === 'circle' || curve.type === 'ellipse') {
-		return contains(vec(center.x - x, center.y - y)) && contains(vec(center.x + x, center.y + y));
+		return new AABB(vec(center.x - x, center.y - y)).addPoint(vec(center.x + x, center.y + y));
 	}
 
-	if (!contains(curve.start) || !contains(curve.end)) return false;
+	const bounds = new AABB(curve.start).addPoint(curve.end);
 	const parameterAt = (point: Vec2) =>
 		curve.type === 'arc' ? angleFromTo(center, point) : ellipseParameterAtPoint(point, center, radii, axisU, axisV);
 	const start = parameterAt(curve.start);
@@ -100,12 +108,11 @@ export function curveContainedInAABB(curve: GeoCurve, min: Vec2, max: Vec2): boo
 	// Only endpoints and the extrema on the swept portion can reach the box edges.
 	const tx = Math.atan2(radii.y * axisV.x, radii.x * axisU.x);
 	const ty = Math.atan2(radii.y * axisV.y, radii.x * axisU.y);
-	return (
-		(distanceFromStart(tx) > sweep || center.x + x <= max.x) &&
-		(distanceFromStart(tx + Math.PI) > sweep || center.x - x >= min.x) &&
-		(distanceFromStart(ty) > sweep || center.y + y <= max.y) &&
-		(distanceFromStart(ty + Math.PI) > sweep || center.y - y >= min.y)
-	);
+	if (distanceFromStart(tx) <= sweep) bounds.max.x = Math.max(bounds.max.x, center.x + x);
+	if (distanceFromStart(tx + Math.PI) <= sweep) bounds.min.x = Math.min(bounds.min.x, center.x - x);
+	if (distanceFromStart(ty) <= sweep) bounds.max.y = Math.max(bounds.max.y, center.y + y);
+	if (distanceFromStart(ty + Math.PI) <= sweep) bounds.min.y = Math.min(bounds.min.y, center.y - y);
+	return bounds;
 }
 
 /**
