@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { analyzeNullspace, Matrix } from '../src/math/matrix';
 import { SketchDocument } from '../src/model/sketch';
 
 function restoreTangentCircleScene(): SketchDocument {
@@ -42,4 +43,36 @@ describe('degrees of freedom with dependent constraints', () => {
 		assert.equal(result.status, 'CONVERGED');
 		assert.equal(result.degreesOfFreedom, 0);
 	});
+});
+
+it('distinguishes fixed coordinates from pivots that move with free coordinates', () => {
+	// The first two rows fix x but allow y and z to move together.
+	// The last row fixes w, whose pivot comes after the free column z.
+	const matrix = new Matrix(3, 4, [1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1]);
+	assert.deepEqual(analyzeNullspace(matrix), { rank: 3, fixedColumns: [0, 3] });
+});
+
+it('reports fixed parameters in a mixed sketch, excluding temporary drag targets', () => {
+	const sketch = new SketchDocument();
+	const anchor = sketch.addPoint({ x: 20, y: 20 }, true);
+	const center = sketch.addPoint({ x: 20, y: 20 });
+	const free = sketch.addPoint({ x: 50, y: 50 });
+	sketch.addCoincidentConstraint(anchor.id, center.id);
+	const circle = sketch.addCircle(center.id, 10);
+
+	const initial = sketch.solve();
+	assert.equal(initial.status, 'UNDER_CONSTRAINED');
+	assert.ok(initial.constrainedParams.has(`${center.id}.x`));
+	assert.ok(initial.constrainedParams.has(`${center.id}.y`));
+	assert.ok(!initial.constrainedParams.has(`${circle.id}.r`));
+
+	const radius = sketch.addRadiusConstraint(circle.id, 10)!;
+	const dragged = sketch.dragPoint(free.id, 60, 60);
+	assert.equal(dragged.degreesOfFreedom, 2);
+	assert.ok(dragged.constrainedParams.has(`${circle.id}.r`));
+	assert.ok(!dragged.constrainedParams.has(`${free.id}.x`));
+	assert.ok(!dragged.constrainedParams.has(`${free.id}.y`));
+
+	sketch.removeConstraint(radius.id);
+	assert.ok(!sketch.lastSolverResult?.constrainedParams.has(`${circle.id}.r`));
 });

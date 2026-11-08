@@ -96,6 +96,8 @@ export interface SolverResult {
 	initialError: number;
 	finalError: number;
 	degreesOfFreedom: number;
+	/** Parameters with no motion under the hard constraints, including locked parameters. */
+	constrainedParams: ReadonlySet<string>;
 	freeParametersCount: number;
 	equationsCount: number;
 }

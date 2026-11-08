@@ -159,15 +159,13 @@ export function solveLinearSystem(A: Matrix, b: Float64Array): Float64Array | nu
 	return x;
 }
 
-/**
- * Computes numerical rank of a matrix (useful for Degrees of Freedom calculation).
- */
-export function computeRank(matrix: Matrix, tolerance = 1e-7): number {
+/** Finds the rank and the coordinates that are zero in every nullspace direction. */
+export function analyzeNullspace(matrix: Matrix, tolerance = 1e-7): { rank: number; fixedColumns: number[] } {
 	const m = matrix.rows;
 	const n = matrix.cols;
 	const a = new Float64Array(matrix.data);
 
-	let rank = 0;
+	const pivotColumns: number[] = [];
 	let row = 0;
 
 	for (let col = 0; col < n && row < m; col++) {
@@ -204,9 +202,29 @@ export function computeRank(matrix: Matrix, tolerance = 1e-7): number {
 			}
 		}
 
+		pivotColumns.push(col);
 		row++;
-		rank++;
 	}
 
-	return rank;
+	const rank = pivotColumns.length;
+	if (rank === n) return { rank, fixedColumns: pivotColumns };
+
+	const pivots = new Set(pivotColumns);
+	const freeColumns = Array.from({ length: n }, (_, col) => col).filter(col => !pivots.has(col));
+	const movablePivots = new Set<number>();
+	// Substitute each free coordinate back through the pivot rows. A pivot
+	// can still move if its value depends on any of the free coordinates.
+	for (const free of freeColumns) {
+		for (let r = rank - 1; r >= 0; r--) {
+			const col = pivotColumns[r];
+			if (col > free) continue;
+			const coefficient = a[r * n + free] / a[r * n + col];
+			if (Math.abs(coefficient) > tolerance) movablePivots.add(col);
+			if (coefficient === 0) continue;
+			for (let i = 0; i < r; i++) {
+				a[i * n + free] -= a[i * n + col] * coefficient;
+			}
+		}
+	}
+	return { rank, fixedColumns: pivotColumns.filter(col => !movablePivots.has(col)) };
 }

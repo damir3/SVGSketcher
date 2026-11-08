@@ -730,11 +730,11 @@ export class SVGRenderer {
 		this.geometryGroup.innerHTML = '';
 		this.pointGroup.innerHTML = '';
 
-		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
-		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-
-		// Light Theme: Unconstrained is bold slate, fully constrained is green, conflict is red
-		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+		const { constrainedParams, status } = sketch.lastSolverResult ?? {};
+		const hasConflict = status === 'OVER_CONSTRAINED';
+		const isPointConstrained = (id: string) => !!constrainedParams?.has(`${id}.x`) && constrainedParams.has(`${id}.y`);
+		const getBaseColor = (isConstrained: boolean) =>
+			hasConflict ? COLORS.conflict : isConstrained ? COLORS.constrained : COLORS.unconstrained;
 
 		// Determine which splines have any part active (spline curve, fit points, or tangent handles/endpoints)
 		const activeSplineIds = new Set<string>(sketch.selection.splineIds);
@@ -856,7 +856,12 @@ export class SVGRenderer {
 					end ? viewport.worldToScreen(end) : s2,
 					isChamferPreview
 						? CHAMFER_HIGHLIGHT_ATTRS
-						: getPrimitiveStrokeAttrs(isSelected, !!line.isConstruction, baseColor, true),
+						: getPrimitiveStrokeAttrs(
+								isSelected,
+								!!line.isConstruction,
+								getBaseColor(isPointConstrained(line.p1Id) && isPointConstrained(line.p2Id)),
+								true
+							),
 					lineG
 				);
 			}
@@ -894,7 +899,11 @@ export class SVGRenderer {
 				sr,
 				{
 					fill: 'none',
-					...getPrimitiveStrokeAttrs(isSelected, !!circle.isConstruction, baseColor),
+					...getPrimitiveStrokeAttrs(
+						isSelected,
+						!!circle.isConstruction,
+						getBaseColor(isPointConstrained(circle.centerId) && !!constrainedParams?.has(`${circle.id}.r`))
+					),
 				},
 				circleG
 			);
@@ -941,7 +950,15 @@ export class SVGRenderer {
 				d,
 				{
 					fill: 'none',
-					...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
+					...getPrimitiveStrokeAttrs(
+						isSelected,
+						!!arc.isConstruction,
+						getBaseColor(
+							[arc.centerId, arc.startPointId, arc.endPointId].every(isPointConstrained) &&
+								!!constrainedParams?.has(`${arc.id}.r`)
+						),
+						true
+					),
 				},
 				arcG
 			);
@@ -1002,7 +1019,13 @@ export class SVGRenderer {
 				{
 					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
 					fill: 'none',
-					...getPrimitiveStrokeAttrs(isSelected, !!ellipse.isConstruction, baseColor),
+					...getPrimitiveStrokeAttrs(
+						isSelected,
+						!!ellipse.isConstruction,
+						getBaseColor(
+							[ellipse.centerId, ellipse.majorAxisPointId, ellipse.minorAxisPointId].every(isPointConstrained)
+						)
+					),
 				},
 				ellipseG
 			);
@@ -1055,7 +1078,16 @@ export class SVGRenderer {
 				d,
 				{
 					fill: 'none',
-					...getPrimitiveStrokeAttrs(isSelected, !!arc.isConstruction, baseColor, true),
+					...getPrimitiveStrokeAttrs(
+						isSelected,
+						!!arc.isConstruction,
+						getBaseColor(
+							[arc.centerId, arc.majorAxisPointId, arc.minorAxisPointId, arc.startPointId, arc.endPointId].every(
+								isPointConstrained
+							)
+						),
+						true
+					),
 				},
 				arcG
 			);
@@ -1114,6 +1146,14 @@ export class SVGRenderer {
 				isFilletSelected;
 
 			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p), !!spline.isClosed);
+			const isConstrained =
+				pts.every(point => isPointConstrained(point.id)) &&
+				(spline.splineType !== 'fit' ||
+					!spline.tangentLineIds ||
+					spline.tangentLineIds.every(id => {
+						const line = sketch.lines.get(id);
+						return !line || (isPointConstrained(line.p1Id) && isPointConstrained(line.p2Id));
+					}));
 
 			const splineG = createSvgElement(
 				'g',
@@ -1133,7 +1173,7 @@ export class SVGRenderer {
 				d,
 				{
 					fill: spline.isClosed ? SPLINE_STYLES.closedFill : 'none',
-					...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, baseColor, true),
+					...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, getBaseColor(isConstrained), true),
 				},
 				splineG
 			);
@@ -1216,7 +1256,7 @@ export class SVGRenderer {
 				strokeColor = SPLINE_STYLES.handleDot.stroke;
 			} else if (pt.fixed) {
 				fillColor = COLORS.fixed; // Fixed points highlighted amber
-			} else if (isFullyConstrained) {
+			} else if (!hasConflict && isPointConstrained(pt.id)) {
 				fillColor = COLORS.constrained; // Fully defined
 			}
 

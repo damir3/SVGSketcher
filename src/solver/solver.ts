@@ -1,4 +1,4 @@
-import { Matrix, solveLinearSystem, computeRank } from '../math/matrix';
+import { Matrix, solveLinearSystem, analyzeNullspace } from '../math/matrix';
 import type { IConstraint, ParamRef, SolveCallOptions, SolverOptions, SolverResult, SolverStatus } from './types';
 
 export class ParamManager {
@@ -122,8 +122,11 @@ export class NumericalSolver {
 			stiffness[i] = callOptions.paramStiffness?.get(freeParams[i].id) ?? 1;
 			lowerBounds[i] = freeParams[i].min ?? -Infinity;
 		}
-		const dofOf = (map: Map<string, number>): number =>
-			callOptions.skipDoF ? 0 : this.computeDoF(paramMgr, constraints, map);
+		const hardConstraints = constraints.filter(c => !c.isSoft);
+		const constraintState = (map?: Map<string, number>) =>
+			callOptions.skipDoF
+				? { degreesOfFreedom: 0, constrainedParams: new Set<string>() }
+				: this.computeConstraintState(paramMgr, hardConstraints, map ?? paramMgr.getCurrentValues());
 
 		// Calculate total equations
 		let totalEquations = 0;
@@ -137,7 +140,8 @@ export class NumericalSolver {
 				iterations: 0,
 				initialError: 0,
 				finalError: 0,
-				degreesOfFreedom: Math.max(0, n),
+				...constraintState(),
+				degreesOfFreedom: n,
 				freeParametersCount: n,
 				equationsCount: totalEquations,
 			};
@@ -150,13 +154,13 @@ export class NumericalSolver {
 		const initialError = currentError;
 
 		if (currentError < this.options.tolerance * this.options.tolerance) {
-			const dof = dofOf(paramMap);
+			const state = constraintState(paramMap);
 			return {
-				status: dof === 0 ? 'CONVERGED' : 'UNDER_CONSTRAINED',
+				status: state.degreesOfFreedom === 0 ? 'CONVERGED' : 'UNDER_CONSTRAINED',
 				iterations: 0,
 				initialError,
 				finalError: currentError,
-				degreesOfFreedom: dof,
+				...state,
 				freeParametersCount: n,
 				equationsCount: totalEquations,
 			};
@@ -252,14 +256,13 @@ export class NumericalSolver {
 			}
 		}
 
-		const hardConstraints = constraints.filter(c => !c.isSoft);
 		const hardError = this.evaluateError(hardConstraints, paramMap);
-		const degreesOfFreedom = dofOf(paramMap);
+		const state = constraintState(paramMap);
 		let status: SolverStatus;
 
 		if (hardError > 1e-2) {
 			status = 'OVER_CONSTRAINED';
-		} else if (degreesOfFreedom > 0) {
+		} else if (state.degreesOfFreedom > 0) {
 			status = 'UNDER_CONSTRAINED';
 		} else {
 			status = 'CONVERGED';
@@ -270,7 +273,7 @@ export class NumericalSolver {
 			iterations: iteration,
 			initialError,
 			finalError: currentError,
-			degreesOfFreedom,
+			...state,
 			freeParametersCount: n,
 			equationsCount: totalEquations,
 		};
@@ -287,17 +290,24 @@ export class NumericalSolver {
 		return sumSq * 0.5;
 	}
 
-	private computeDoF(paramMgr: ParamManager, constraints: IConstraint[], paramMap: Map<string, number>): number {
-		const hardConstraints = constraints.filter(c => !c.isSoft);
+	private computeConstraintState(
+		paramMgr: ParamManager,
+		hardConstraints: IConstraint[],
+		paramMap: Map<string, number>
+	): Pick<SolverResult, 'degreesOfFreedom' | 'constrainedParams'> {
 		let totalEquations = 0;
 		for (const c of hardConstraints) {
 			totalEquations += c.getEquationsCount();
 		}
 
 		const n = paramMgr.getFreeCount();
-		if (totalEquations === 0) return n;
-
 		const paramIndices = paramMgr.getIndices();
+		const constrainedParams = new Set<string>();
+		for (const id of paramMap.keys()) {
+			if (!paramIndices.has(id)) constrainedParams.add(id);
+		}
+		if (n === 0 || totalEquations === 0) return { degreesOfFreedom: n, constrainedParams };
+
 		const J = Matrix.zeros(totalEquations, n);
 
 		let eqOffset = 0;
@@ -309,7 +319,9 @@ export class NumericalSolver {
 			eqOffset += c.getEquationsCount();
 		}
 
-		const rank = computeRank(J);
-		return Math.max(0, n - rank);
+		const { rank, fixedColumns } = analyzeNullspace(J);
+		const freeParams = paramMgr.getFreeParams();
+		for (const col of fixedColumns) constrainedParams.add(freeParams[col].id);
+		return { degreesOfFreedom: n - rank, constrainedParams };
 	}
 }
