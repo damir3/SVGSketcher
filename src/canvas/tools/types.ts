@@ -77,6 +77,7 @@ export type ToolType =
 	| 'chamfer'
 	| 'offset'
 	| 'transform'
+	| 'image'
 	| DrawingPrimitiveToolType
 	| ConstraintToolType;
 

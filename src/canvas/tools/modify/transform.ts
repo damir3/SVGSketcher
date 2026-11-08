@@ -1,19 +1,12 @@
-import { add, angleFromTo, dist, dot, scale, sub, vec, type Vec2 } from '../../../math/vector';
+import { add, angleFromTo, dot, scale, sub, vec, type Vec2 } from '../../../math/vector';
 import { applyTransform, createTransform, getTransformSelection, type TransformValues } from '../../../model/transform';
 import { ModifyToolPanel, type ModifyParamItem } from '../../../ui/panels/tools/modifyToolPanel';
-import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from '../../distances';
-import { createSvgCircle, createSvgElement, createSvgLine } from '../../svg';
+import { createSvgElement } from '../../svg';
+import { getTransformGizmo, hitTransformGizmo, renderTransformGizmo } from '../../transformGizmo';
 import type { Viewport } from '../../viewport';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
-import {
-	TRANSFORM_FRAME_ATTRS,
-	TRANSFORM_GEOMETRY_ATTRS,
-	TRANSFORM_HANDLE_ATTRS,
-	TRANSFORM_HANDLE_RADIUS,
-	TRANSFORM_PREVIEW_COLOR,
-	TRANSFORM_ROTATION_STEM_ATTRS,
-} from '../../styles';
+import { TRANSFORM_GEOMETRY_ATTRS, TRANSFORM_PREVIEW_COLOR } from '../../styles';
 
 const DEFAULT_VALUES: TransformValues = { x: 0, y: 0, angle: 0, scale: 1 };
 const FIELDS = [
@@ -22,19 +15,6 @@ const FIELDS = [
 	{ key: 'angle', label: 'Angle', unit: '°' },
 	{ key: 'scale', label: 'Scale', unit: '×' },
 ] as const;
-const HANDLE_HIT_RADIUS = 9;
-const RESIZE_CURSORS = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'] as const;
-
-type TransformHandle =
-	| { type: 'move'; cursor: 'move' }
-	| { type: 'rotate'; cursor: 'grab' }
-	| { type: 'scale'; direction: Vec2; cursor: (typeof RESIZE_CURSORS)[number] };
-
-function resizeCursor(direction: Vec2) {
-	const octant = Math.round(Math.atan2(direction.y, direction.x) / (Math.PI / 4));
-	return RESIZE_CURSORS[(octant + RESIZE_CURSORS.length) % RESIZE_CURSORS.length];
-}
-
 type Drag =
 	| { type: 'move'; start: Vec2; offset: Vec2 }
 	| { type: 'rotate'; center: Vec2; lastAngle: number }
@@ -119,7 +99,7 @@ export class TransformTool extends BaseTool {
 		const selection = getTransformSelection(this.ctx.sketch);
 		if (!selection) return false;
 		const gizmo = this.getGizmo(selection, this.ctx.viewport);
-		const handle = this.getHandle(e.screen, gizmo);
+		const handle = hitTransformGizmo(e.screen, gizmo);
 		if (!handle) return false;
 		if (handle.type === 'move') {
 			this.drag = { type: 'move', start: e.world, offset: vec(this.values.x, this.values.y) };
@@ -188,33 +168,13 @@ export class TransformTool extends BaseTool {
 			TRANSFORM_PREVIEW_COLOR
 		);
 
-		const { center, corners, top, rotation } = this.getGizmo(selection, ctx.viewport);
-		createSvgElement(
-			'polygon',
-			{
-				...TRANSFORM_FRAME_ATTRS,
-				points: corners.map(({ point }) => `${point.x},${point.y}`).join(' '),
-			},
-			ctx.targetGroup
-		);
-		createSvgLine(top, rotation, TRANSFORM_ROTATION_STEM_ATTRS, ctx.targetGroup);
-
-		for (const point of [...corners.map(corner => corner.point), center, rotation]) {
-			createSvgCircle(point, TRANSFORM_HANDLE_RADIUS, TRANSFORM_HANDLE_ATTRS, ctx.targetGroup);
-		}
+		renderTransformGizmo(this.getGizmo(selection, ctx.viewport), ctx.targetGroup);
 	}
 
 	private updateHandleCursor(screen: Vec2): void {
 		const selection = getTransformSelection(this.ctx.sketch);
-		const handle = selection && this.getHandle(screen, this.getGizmo(selection, this.ctx.viewport));
+		const handle = selection && hitTransformGizmo(screen, this.getGizmo(selection, this.ctx.viewport));
 		this.ctx.setCursor(handle?.cursor ?? this.defaultCursor);
-	}
-
-	private getHandle(screen: Vec2, gizmo: ReturnType<TransformTool['getGizmo']>): TransformHandle | null {
-		if (dist(screen, gizmo.center) <= HANDLE_HIT_RADIUS) return { type: 'move', cursor: 'move' };
-		if (dist(screen, gizmo.rotation) <= HANDLE_HIT_RADIUS) return { type: 'rotate', cursor: 'grab' };
-		const corner = gizmo.corners.find(corner => dist(screen, corner.point) <= HANDLE_HIT_RADIUS);
-		return corner ? { type: 'scale', direction: sub(corner.point, gizmo.center), cursor: corner.cursor } : null;
 	}
 
 	private getGizmo(selection: NonNullable<ReturnType<typeof getTransformSelection>>, viewport: Viewport) {
@@ -222,21 +182,7 @@ export class TransformTool extends BaseTool {
 		const transform = createTransform(center, this.values);
 		const screenCenter = viewport.worldToScreen(transform.point(center));
 		const half = scale(sub(bounds.max, bounds.min), (this.values.scale * viewport.zoom) / 2);
-		const x = Math.max(12, half.x + 7);
-		const y = Math.max(12, half.y + 7);
-		const toScreen = (x: number, y: number) => {
-			const rotated = transform.rotate(vec(x, y));
-			return add(screenCenter, vec(rotated.x, -rotated.y));
-		};
-		return {
-			center: screenCenter,
-			corners: [vec(-1, 1), vec(1, 1), vec(1, -1), vec(-1, -1)].map(corner => ({
-				point: toScreen(corner.x * x, corner.y * y),
-				cursor: resizeCursor(sub(toScreen(corner.x, corner.y), screenCenter)),
-			})),
-			top: toScreen(0, y),
-			rotation: toScreen(0, y + TEXT_ROTATION_HANDLE_DISTANCE_PX),
-		};
+		return getTransformGizmo(screenCenter, half, this.values.angle);
 	}
 
 	private displayValue(key: keyof TransformValues): number {

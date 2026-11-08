@@ -1,3 +1,4 @@
+import type { SketchImage } from './image';
 import type { ConstraintSnapshot } from '../solver/constraints/serialization';
 import type { SketchParameter } from '../math/expression';
 import type {
@@ -20,6 +21,7 @@ export interface SketchSnapshot {
 	ellipticalArcs: EllipticalArcSnapshot[];
 	splines?: SplineSnapshot[];
 	texts?: TextSnapshot[];
+	images?: SketchImage[];
 	constraints: ConstraintSnapshot[];
 	parameters?: SketchParameter[];
 	idCounter: number;
@@ -36,12 +38,14 @@ type SnapshotCollection =
 	| 'ellipticalArcs'
 	| 'splines'
 	| 'texts'
+	| 'images'
 	| 'constraints';
 type HistoryPatch = {
 	collections: Partial<Record<SnapshotCollection, Record<string, EntityChange>>>;
 	parameters?: Record<string, { before: SketchParameter | null; after: SketchParameter | null }>;
 	idCounter?: { before: number; after: number };
 	changedKeys: string[];
+	coalesce?: boolean;
 };
 
 function equalValue(a: unknown, b: unknown): boolean {
@@ -58,6 +62,7 @@ function makePatch(before: SketchSnapshot, after: SketchSnapshot): HistoryPatch 
 		'ellipticalArcs',
 		'splines',
 		'texts',
+		'images',
 		'constraints',
 	];
 	const changes: HistoryPatch['collections'] = {};
@@ -111,6 +116,7 @@ function applyPatch(snapshot: SketchSnapshot, patch: HistoryPatch, direction: 'b
 	};
 	if (snapshot.splines || patch.collections.splines) result.splines = [...(snapshot.splines ?? [])];
 	if (snapshot.texts || patch.collections.texts) result.texts = [...(snapshot.texts ?? [])];
+	if (snapshot.images || patch.collections.images) result.images = [...(snapshot.images ?? [])];
 	if (snapshot.parameters || patch.parameters) result.parameters = [...(snapshot.parameters ?? [])];
 	for (const [name, delta] of Object.entries(patch.collections) as [
 		SnapshotCollection,
@@ -154,11 +160,13 @@ export class HistoryManager {
 	private undoStack: HistoryPatch[] = [];
 	private redoStack: HistoryPatch[] = [];
 	private pending: SketchSnapshot | null = null;
+	private coalescePending = true;
 	private maxHistory = 60;
 
-	pushState(snapshot: SketchSnapshot): void {
+	pushState(snapshot: SketchSnapshot, coalesce = true): void {
 		if (this.pending) this.finalize(snapshot);
 		this.pending = snapshot;
+		this.coalescePending = coalesce;
 	}
 
 	private finalize(after: SketchSnapshot): void {
@@ -166,10 +174,12 @@ export class HistoryManager {
 		const patch = makePatch(this.pending, after);
 		this.pending = null;
 		if (!patch) return;
+		patch.coalesce = this.coalescePending;
 		this.redoStack = [];
 		const previous = this.undoStack[this.undoStack.length - 1];
 		if (
-			previous &&
+			patch.coalesce &&
+			previous?.coalesce &&
 			previous.changedKeys.length === patch.changedKeys.length &&
 			previous.changedKeys.every(key => patch.changedKeys.includes(key))
 		) {

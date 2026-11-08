@@ -1,3 +1,4 @@
+import type { SketchImage } from './image';
 import { ParamManager, NumericalSolver } from '../solver/solver';
 import type { IConstraint, SolverResult } from '../solver/types';
 import {
@@ -153,6 +154,7 @@ export class SketchDocument {
 	ellipticalArcs = new Map<string, SketchEllipticalArc>();
 	splines = new Map<string, SketchSpline>();
 	texts = new Map<string, SketchText>();
+	images = new Map<string, SketchImage>();
 	constraints = new Map<string, IConstraint>();
 	parameters = new Map<string, SketchParameter>();
 
@@ -206,6 +208,7 @@ export class SketchDocument {
 			this.ellipticalArcs.has(id) ||
 			this.splines.has(id) ||
 			this.texts.has(id) ||
+			this.images.has(id) ||
 			this.constraints.has(id);
 
 		let next = (this.counters.get(prefix) ?? 0) + 1;
@@ -254,9 +257,9 @@ export class SketchDocument {
 		}
 	}
 
-	pushHistory(): void {
+	pushHistory(coalesce = true): void {
 		if (this.batchDepth > 0) return;
-		this.history.pushState(this.takeSnapshot());
+		this.history.pushState(this.takeSnapshot(), coalesce);
 	}
 
 	pushSnapshot(snapshot: SketchSnapshot): void {
@@ -316,6 +319,7 @@ export class SketchDocument {
 			ellipticalArcs: [...this.ellipticalArcs.values()].map(arc => serializePrimitive(arc)),
 			splines: [...this.splines.values()].map(spline => serializePrimitive(spline)),
 			texts: [...this.texts.values()].map(text => text.serialize()),
+			images: [...this.images.values()].map(image => ({ ...image })),
 			constraints: Array.from(this.constraints.values()).map(c => serializeConstraint(c)),
 			parameters: Array.from(this.parameters.values()).map(p => ({ ...p })),
 			idCounter: this.idCounter,
@@ -363,6 +367,8 @@ export class SketchDocument {
 			this.texts.set(t.id, new SketchText(t));
 		}
 
+		this.images = new Map((snapshot.images ?? []).map(image => [image.id, { ...image }]));
+
 		this.constraints.clear();
 		for (const sc of snapshot.constraints) {
 			const c = deserializeConstraint(sc);
@@ -381,6 +387,7 @@ export class SketchDocument {
 			...snapshot.arcs.map(a => a.id),
 			...(snapshot.ellipses ?? []).map(e => e.id),
 			...(snapshot.ellipticalArcs ?? []).map(a => a.id),
+			...(snapshot.images ?? []).map(image => image.id),
 			...snapshot.constraints.map(c => c.id),
 		];
 		for (const id of allIds) {
@@ -3847,6 +3854,29 @@ export class SketchDocument {
 		selectEntity(this, id, type, multiSelect);
 	}
 
+	addImage(data: Omit<SketchImage, 'id'>): SketchImage {
+		this.pushHistory(false);
+		const image = { ...data, id: this.nextId('Image') };
+		this.images.set(image.id, image);
+		this.notify();
+		return image;
+	}
+
+	updateImage(id: string, changes: Partial<Omit<SketchImage, 'id'>>): void {
+		const image = this.images.get(id);
+		if (!image || Object.entries(changes).every(([key, value]) => image[key as keyof SketchImage] === value)) return;
+		this.pushHistory(false);
+		this.images.set(id, { ...image, ...changes });
+		this.notify();
+	}
+
+	removeImage(id: string): void {
+		if (!this.images.has(id)) return;
+		this.pushHistory(false);
+		this.images.delete(id);
+		this.notify();
+	}
+
 	clear(): void {
 		this.pushHistory();
 		this.points.clear();
@@ -3857,6 +3887,7 @@ export class SketchDocument {
 		this.ellipticalArcs.clear();
 		this.splines.clear();
 		this.texts.clear();
+		this.images.clear();
 		this.constraints.clear();
 		this.parameters.clear();
 		this.selection.pointIds.clear();

@@ -1,3 +1,4 @@
+import { getImageBounds } from './image';
 import type { SketchDocument } from './sketch';
 import { sub, vec, distancesFrom } from '../math/vector';
 import { AABB } from '../math/aabb';
@@ -302,10 +303,14 @@ export function deleteSelected(sketch: SketchDocument): void {
 }
 
 export function getBoundingBox(sketch: SketchDocument): AABB | null {
-	if (sketch.points.size === 0) return null;
+	if (sketch.points.size === 0 && sketch.images.size === 0) return null;
 	const bounds = new AABB();
 
 	for (const p of sketch.points.values()) bounds.addPoint(p);
+	for (const image of sketch.images.values()) {
+		const imageBounds = getImageBounds(image);
+		bounds.addPoint(imageBounds.min).addPoint(imageBounds.max);
+	}
 
 	for (const c of sketch.circles.values()) {
 		const center = sketch.points.get(c.centerId);

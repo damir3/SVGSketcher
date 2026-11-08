@@ -1,3 +1,4 @@
+import type { SketchImage } from '../model/image';
 import { createTransform, type TransformValues } from '../model/transform';
 import { calculateObjectsCentroid } from './tools/modify/utils';
 import type { SketchDocument } from '../model/sketch';
@@ -119,6 +120,7 @@ const TWO_PI = 2 * Math.PI;
 export interface RenderOptions {
 	activeTextId?: string | null;
 	hideTextGizmos?: boolean;
+	imagePreview?: SketchImage | null;
 	hiddenEntityIds?: Set<string>;
 	regionHoverPoint?: Vec2 | null;
 	showGrid?: boolean;
@@ -197,6 +199,7 @@ export class SVGRenderer {
 	private svg: SVGSVGElement;
 	private defsEl: SVGDefsElement;
 	private gridGroup: SVGGElement;
+	private imageGroup: SVGGElement;
 	private originAxisGroup: SVGGElement;
 	private geometryGroup: SVGGElement;
 	private regionGroup: SVGGElement;
@@ -259,6 +262,7 @@ export class SVGRenderer {
 		this.gridGroup = this.createGroup('grid-layer');
 		this.gridGroup.style.pointerEvents = 'none';
 
+		this.imageGroup = this.createGroup('image-layer');
 		this.originAxisGroup = this.createGroup('origin-axis-layer');
 		this.regionGroup = this.createGroup('region-layer');
 		this.regionGroup.style.pointerEvents = 'none';
@@ -289,6 +293,7 @@ export class SVGRenderer {
 		this.overlayGroup.style.pointerEvents = 'none';
 
 		this.svg.appendChild(this.gridGroup);
+		this.svg.appendChild(this.imageGroup);
 		this.svg.appendChild(this.originAxisGroup);
 		this.svg.appendChild(this.regionGroup);
 		this.svg.appendChild(this.geometryGroup);
@@ -341,6 +346,7 @@ export class SVGRenderer {
 		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
 		this.renderGrid(sketch, viewport, options.showGrid ?? true, options);
+		this.renderImages(sketch, viewport, options.imagePreview);
 		this.renderRegions(sketch, viewport, options.regionHoverPoint ?? null);
 		this.renderGeometry(sketch, viewport, options);
 		this.textRotationGizmo = null;
@@ -464,8 +470,51 @@ export class SVGRenderer {
 		}
 	}
 
+	renderImages(sketch: SketchDocument, viewport: Viewport, preview?: SketchImage | null): void {
+		this.imageGroup.innerHTML = '';
+		for (const stored of sketch.images.values()) {
+			const image = preview?.id === stored.id ? preview : stored;
+			const center = viewport.worldToScreen(image);
+			const width = image.width * viewport.zoom;
+			const height = image.height * viewport.zoom;
+			const attrs = {
+				x: center.x - width / 2,
+				y: center.y - height / 2,
+				width,
+				height,
+				transform: `rotate(${-image.angle % 360} ${center.x} ${center.y})`,
+				'data-image-id': image.id,
+				'pointer-events': 'all',
+			};
+			if (image.objectUrl) {
+				createSvgElement(
+					'image',
+					{
+						...attrs,
+						href: image.objectUrl,
+						opacity: image.opacity,
+						preserveAspectRatio: 'none',
+					},
+					this.imageGroup
+				);
+			} else {
+				createSvgElement(
+					'rect',
+					{
+						...attrs,
+						fill: 'none',
+						stroke: COLORS.construction,
+						'stroke-dasharray': DASH_ARRAY.guideCircle,
+					},
+					this.imageGroup
+				);
+			}
+		}
+	}
+
 	private renderGrid(sketch: SketchDocument, viewport: Viewport, showGrid: boolean, options: RenderOptions = {}): void {
 		this.gridGroup.innerHTML = '';
+		this.originAxisGroup.innerHTML = '';
 
 		const origin = viewport.worldToScreen(ORIGIN);
 
@@ -488,7 +537,7 @@ export class SVGRenderer {
 			const axisY = Math.max(8, Math.min(viewport.height - 40, origin.y));
 			const axisX = Math.max(8, Math.min(viewport.width - 30, origin.x));
 
-			const labelsG = createSvgElement('g', { class: 'grid-labels' });
+			const labelsG = createSvgElement('g', { class: 'grid-labels', 'pointer-events': 'none' }, this.originAxisGroup);
 
 			const labelStyle: SvgAttrs = {
 				'dominant-baseline': 'central',
@@ -574,14 +623,9 @@ export class SVGRenderer {
 					this.gridGroup
 				);
 			}
-
-			// Coordinate labels
-			this.gridGroup.appendChild(labelsG);
 		}
 
 		// Origin Axes & Marker
-		this.originAxisGroup.innerHTML = '';
-
 		const isXSelected = sketch.selection.lineIds.has('axis_x');
 		const isYSelected = sketch.selection.lineIds.has('axis_y');
 		const isOriginSelected = sketch.selection.pointIds.has('origin');

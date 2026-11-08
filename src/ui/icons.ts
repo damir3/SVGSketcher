@@ -42,6 +42,7 @@ import offsetTwoSides from '../assets/icons/offset-two-sides.svg?raw';
 import offsetSymmetric from '../assets/icons/offset-symmetric.svg?raw';
 import extend from '../assets/icons/extend.svg?raw';
 import breakIcon from '../assets/icons/break.svg?raw';
+import image from '../assets/icons/image.svg?raw';
 import transform from '../assets/icons/transform.svg?raw';
 import mirror from '../assets/icons/mirror.svg?raw';
 import circularPattern from '../assets/icons/circular-pattern.svg?raw';
@@ -168,6 +169,7 @@ export const ICONS = {
 	break: breakIcon,
 	mirror,
 	transform,
+	image,
 	circular_pattern: circularPattern,
 	rectangular_pattern: rectangularPattern,
 

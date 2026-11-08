@@ -71,6 +71,10 @@ function initApp(): void {
 					${ICONS.clear}
 				</button>
 				<div class="header-divider"></div>
+				<button class="btn-header btn-icon" id="btn-add-image" title="Add Image" aria-label="Add Image">
+					${ICONS.image}
+				</button>
+				<input type="file" id="file-input-image" accept="image/*" hidden />
 				<button class="btn-header" id="btn-import" title="Open SVG (with CAD metadata)">
 					${ICONS.open} Open SVG
 				</button>
@@ -126,6 +130,7 @@ function initApp(): void {
 	const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
 	const btnImport = document.getElementById('btn-import') as HTMLButtonElement;
 	const fileInputSvg = document.getElementById('file-input-svg') as HTMLInputElement;
+	const fileInputImage = document.getElementById('file-input-image') as HTMLInputElement;
 	const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
 	const canvasContainer = document.querySelector('.cad-canvas-container') as HTMLElement;
 
@@ -222,7 +227,7 @@ function initApp(): void {
 	// Benchmark solver execution on each solve
 	sketch.onChange(() => {
 		const t0 = performance.now();
-		if (interaction.activeTool === 'transform') interaction.render();
+		if (interaction.activeTool === 'transform' || interaction.activeTool === 'image') interaction.render();
 		else renderer.render(sketch, viewport);
 		const dt = performance.now() - t0;
 		solverTime.textContent = `${dt.toFixed(2)} ms`;
@@ -292,12 +297,76 @@ function initApp(): void {
 		interaction.toggleConstructionMode();
 	});
 
+	let imageRequest = 0;
 	btnClear.addEventListener('click', () => {
 		if (confirm('Clear sketch canvas?')) {
+			imageRequest++;
+			if (interaction.activeTool === 'image') interaction.setTool('select');
 			sketch.clear();
 			renderer.render(sketch, viewport);
 			showToast('Sketch cleared');
 		}
+	});
+
+	let replaceImageId: string | null = null;
+	function pickImage(id: string | null): void {
+		imageRequest++;
+		replaceImageId = id;
+		fileInputImage.value = '';
+		fileInputImage.click();
+	}
+
+	document.getElementById('btn-add-image')?.addEventListener('click', () => pickImage(null));
+	interaction.onReplaceImage = id => pickImage(id);
+	fileInputImage.addEventListener('change', () => {
+		const file = fileInputImage.files?.[0];
+		if (!file) return;
+		const request = imageRequest;
+		const replacement = replaceImageId ? sketch.images.get(replaceImageId) : undefined;
+		if (replaceImageId && !replacement) return;
+		if (/[\\/]/.test(file.name) || file.name === '.' || file.name === '..') {
+			showToast('Choose an image with a valid local file name.');
+			return;
+		}
+		const objectUrl = URL.createObjectURL(file);
+		const decoded = new Image();
+		decoded.onload = () => {
+			if (request !== imageRequest || (replacement && sketch.images.get(replacement.id) !== replacement)) {
+				URL.revokeObjectURL(objectUrl);
+				return;
+			}
+			const { naturalWidth, naturalHeight } = decoded;
+			if (!naturalWidth || !naturalHeight) {
+				URL.revokeObjectURL(objectUrl);
+				showToast('The selected image has no dimensions.');
+				return;
+			}
+			const source = { fileName: file.name, objectUrl, naturalWidth, naturalHeight };
+			if (replacement) {
+				const relinking = !replacement.objectUrl && file.name === replacement.fileName;
+				sketch.updateImage(replacement.id, {
+					...source,
+					height: relinking ? replacement.height : (replacement.width * naturalHeight) / naturalWidth,
+				});
+				interaction.selectImage(replacement.id);
+			} else {
+				const center = viewport.screenToWorld({ x: viewport.width / 2, y: viewport.height / 2 });
+				const image = sketch.addImage({
+					...center,
+					...source,
+					width: naturalWidth / viewport.zoom,
+					height: naturalHeight / viewport.zoom,
+					angle: 0,
+					opacity: 1,
+				});
+				interaction.selectImage(image.id);
+			}
+		};
+		decoded.onerror = () => {
+			URL.revokeObjectURL(objectUrl);
+			if (request === imageRequest) showToast('Could not open the selected image.');
+		};
+		decoded.src = objectUrl;
 	});
 
 	btnExport.addEventListener('click', () => {
@@ -331,6 +400,8 @@ function initApp(): void {
 
 			const result = sketch.importSVG(content);
 			if (result.success) {
+				imageRequest++;
+				if (interaction.activeTool === 'image') interaction.setTool('select');
 				if (result.viewport) {
 					viewport.panX = result.viewport.panX;
 					viewport.panY = result.viewport.panY;
@@ -340,7 +411,11 @@ function initApp(): void {
 				} else {
 					fitToView(false);
 				}
-				showToast(`Opened: ${file.name}`);
+				showToast(
+					sketch.images.size
+						? `Opened: ${file.name}. Use Replace Image to relink local images.`
+						: `Opened: ${file.name}`
+				);
 			} else {
 				alert(`Failed to load SVG: ${result.error || 'Unknown error'}`);
 			}

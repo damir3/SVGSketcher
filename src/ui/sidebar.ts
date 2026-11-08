@@ -1,3 +1,4 @@
+import type { SketchImage } from '../model/image';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline, SketchText } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
@@ -85,6 +86,7 @@ export class Sidebar {
 		const ellipticalArcs = [...this.sketch.ellipticalArcs.values()];
 		const splines = [...this.sketch.splines.values()];
 		const texts = [...this.sketch.texts.values()];
+		const images = [...this.sketch.images.values()];
 		const totalPrimitives =
 			points.length +
 			lines.length +
@@ -125,9 +127,19 @@ export class Sidebar {
 						${ellipses.map(e => this.renderEllipseItem(e)).join('')}
 						${ellipticalArcs.map(ea => this.renderEllipticalArcItem(ea)).join('')}
 						${points.map(p => this.renderPointItem(p)).join('')}
-						${totalPrimitives === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
+						${totalPrimitives === 0 && images.length === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
 					</div>
 				</div>
+				${
+					images.length
+						? `
+					<div class="tree-group">
+						<div class="tree-header"><span class="tree-title">Images (${images.length})</span></div>
+						<div class="tree-list">${images.map(image => this.renderImageItem(image)).join('')}</div>
+					</div>
+				`
+						: ''
+				}
 			</div>
 		`;
 
@@ -139,7 +151,11 @@ export class Sidebar {
 	}
 
 	private renderInspector(): string {
-		if (this.interaction?.activeTool === 'text' || this.interaction?.activeTool === 'transform') {
+		if (
+			this.interaction?.activeTool === 'text' ||
+			this.interaction?.activeTool === 'transform' ||
+			this.interaction?.activeTool === 'image'
+		) {
 			return '';
 		}
 		const entity = this.getSelectedInspectableEntity();
@@ -389,6 +405,19 @@ export class Sidebar {
 		`;
 	}
 
+	private renderImageItem(image: SketchImage): string {
+		return `
+			<div class="tree-item ${this.interaction?.selectedImageId === image.id ? 'selected' : ''}" data-image-row>
+				<div class="tree-item-info">
+					<span class="tree-icon">${ICONS.image}</span>
+					<span class="tree-name" data-image-name></span>
+					${image.objectUrl ? '' : '<span class="tree-meta">Missing file</span>'}
+				</div>
+				<button type="button" class="tree-delete-btn" data-image-delete title="Delete Image">${ICONS.delete}</button>
+			</div>
+		`;
+	}
+
 	private renderTextItem(text: SketchText, showDelete = true): string {
 		const isSelected = this.sketch.selection.textIds.has(text.id);
 		const label = text.text ? `"${text.text.slice(0, 15)}"` : text.id;
@@ -610,7 +639,7 @@ export class Sidebar {
 
 	private bindEvents(): void {
 		// Tree item selection
-		this.container.querySelectorAll<HTMLElement>('.tree-item').forEach(item => {
+		this.container.querySelectorAll<HTMLElement>('.tree-item[data-type]').forEach(item => {
 			item.addEventListener('click', e => {
 				if ((e.target as HTMLElement).closest('.tree-delete-btn, .constraint-entity-chip')) return;
 
@@ -626,6 +655,7 @@ export class Sidebar {
 					| 'text'
 					| 'constraint';
 
+				if (this.interaction?.activeTool === 'image') this.interaction.setTool('select');
 				if (this.interaction?.activeTool === 'transform') {
 					if (type !== 'constraint') this.sketch.toggleEntitySelection(id, type);
 				} else {
@@ -649,6 +679,19 @@ export class Sidebar {
 			});
 		});
 
+		const images = [...this.sketch.images.values()];
+		this.container.querySelectorAll<HTMLElement>('[data-image-row]').forEach((row, index) => {
+			const image = images[index];
+			const name = row.querySelector('[data-image-name]');
+			if (name) name.textContent = image.fileName;
+			row.addEventListener('click', () => this.interaction?.selectImage(image.id));
+			row.querySelector('[data-image-delete]')?.addEventListener('click', event => {
+				event.stopPropagation();
+				if (this.interaction?.selectedImageId === image.id) this.interaction.setTool('select');
+				this.sketch.removeImage(image.id);
+			});
+		});
+
 		// Quick-switch primitive chips inside constraint items
 		this.container.querySelectorAll<HTMLButtonElement>('.constraint-entity-chip').forEach(chip => {
 			chip.addEventListener('click', e => {
@@ -669,7 +712,7 @@ export class Sidebar {
 		});
 
 		// Delete buttons
-		this.container.querySelectorAll<HTMLButtonElement>('.tree-delete-btn').forEach(btn => {
+		this.container.querySelectorAll<HTMLButtonElement>('.tree-delete-btn[data-delete-id]').forEach(btn => {
 			btn.addEventListener('click', e => {
 				e.stopPropagation();
 				const id = btn.getAttribute('data-delete-id')!;
@@ -681,7 +724,11 @@ export class Sidebar {
 		this.interaction?.activeToolInstance?.sidebarPanel?.bindEvents(this.container);
 
 		// Inspector entity events
-		if (this.interaction?.activeTool !== 'text' && this.interaction?.activeTool !== 'transform') {
+		if (
+			this.interaction?.activeTool !== 'text' &&
+			this.interaction?.activeTool !== 'transform' &&
+			this.interaction?.activeTool !== 'image'
+		) {
 			const entity = this.getSelectedInspectableEntity();
 			const ctx = this.createInspectorContext();
 			entity?.sidebarPanel?.bindEvents(this.container, ctx);

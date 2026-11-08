@@ -1,3 +1,4 @@
+import { isValidImage } from '../image';
 import { ellipseAxes, ellipseParameterAtPoint } from '../../math/ellipse';
 import type { SketchDocument } from '../sketch';
 import type { SketchSnapshot } from '../history';
@@ -660,6 +661,33 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 	}
 }
 
+function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
+	const images = Array.isArray(snapshot.images) ? snapshot.images.filter(isValidImage) : [];
+	return {
+		...snapshot,
+		images: images.map(({ id, fileName, x, y, width, height, angle, opacity, naturalWidth, naturalHeight }) => {
+			const hasPixelSize =
+				naturalWidth &&
+				naturalHeight &&
+				Number.isSafeInteger(naturalWidth) &&
+				Number.isSafeInteger(naturalHeight) &&
+				naturalWidth > 0 &&
+				naturalHeight > 0;
+			return {
+				id,
+				fileName,
+				x,
+				y,
+				width,
+				height,
+				angle,
+				opacity,
+				...(hasPixelSize ? { naturalWidth, naturalHeight } : {}),
+			};
+		}),
+	};
+}
+
 export function exportSketchToSVG(
 	sketch: SketchDocument,
 	viewportState?: { panX: number; panY: number; zoom: number }
@@ -670,7 +698,7 @@ export function exportSketchToSVG(
 		generator: 'SVG Sketcher',
 		createdAt: new Date().toISOString(),
 		viewport: viewportState,
-		snapshot: sketch.takeSnapshot(),
+		snapshot: withoutImageObjectUrls(sketch.takeSnapshot()),
 	};
 
 	const jsonString = JSON.stringify(metadataPayload, null, 2).replace(/]]>/g, ']]]]><![CDATA[>');
@@ -678,6 +706,14 @@ export function exportSketchToSVG(
 	// Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
 	const elements: string[] = [];
 	const usedPoints = new Set<string>();
+
+	for (const image of metadataPayload.snapshot.images ?? []) {
+		const { x, y, width, height, angle, opacity } = image;
+		const href = `./${encodeURIComponent(image.fileName)}`;
+		elements.push(
+			`<image href="${href}" x="${x - width / 2}" y="${-y - height / 2}" width="${width}" height="${height}" opacity="${opacity}" preserveAspectRatio="none" transform="rotate(${-angle % 360} ${x} ${-y})" />`
+		);
+	}
 
 	// Text rectangle construction lines and points should not be exported as visual lines/points
 	const textRectLineIds = new Set<string>();
@@ -994,7 +1030,7 @@ export function importSketchFromSVG(
 				return { success: false, error: 'Unsupported sketch metadata format' };
 			}
 
-			sketch.restoreSnapshot(data.snapshot);
+			sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
 			sketch.clearHistory();
 
 			return {
@@ -1015,7 +1051,7 @@ export function importSketchFromSVG(
 			}
 			const data = JSON.parse(text) as SketchFileMetadata;
 			if (data.format === 'svg-sketcher' && data.snapshot) {
-				sketch.restoreSnapshot(data.snapshot);
+				sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
 				sketch.clearHistory();
 				return { success: true, viewport: data.viewport };
 			}

@@ -60,6 +60,7 @@ import { showToast } from '../ui/toast';
 import type { GeoCurve } from '../math/intersection';
 import { bsplineToBezier, fitPointsToBezier, getSplineParamAtPoint, type BezierSegment } from '../math/spline';
 import { calculateObjectsCentroid } from './tools/modify/utils';
+import { ImageTool } from './tools/modify/image';
 import { TransformTool } from './tools/modify/transform';
 import { HighlightManager } from './highlightManager';
 
@@ -173,6 +174,7 @@ export class CanvasInteraction {
 	private boxSelectStartScreen: Vec2 | null = null;
 	private boxSelectCurrentScreen: Vec2 | null = null;
 	private boxSelectShift = false;
+	private boxSelectImageId: string | null = null;
 	private pendingExclusiveSelection: {
 		id: string;
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'text' | 'constraint';
@@ -216,6 +218,7 @@ export class CanvasInteraction {
 		screenPos: Vec2
 	) => void;
 	onToolChange?: (tool: ToolType) => void;
+	onReplaceImage?: (id: string) => void;
 	onConstructionChange?: (isConstruction: boolean) => void;
 	isSnappingEnabled = true;
 	onSnappingChange?: (active: boolean) => void;
@@ -259,7 +262,11 @@ export class CanvasInteraction {
 
 	undoSketch(): boolean {
 		if (!this.sketch.undo()) return false;
-		if (this.activeTool === 'fillet' || this.activeTool === 'chamfer') {
+		if (
+			this.activeTool === 'fillet' ||
+			this.activeTool === 'chamfer' ||
+			(this.selectedImageId && !this.sketch.images.has(this.selectedImageId))
+		) {
 			this.setTool('select');
 		} else {
 			this.render();
@@ -294,6 +301,7 @@ export class CanvasInteraction {
 		this.tools.set('chamfer', new ChamferTool());
 		this.tools.set('offset', new OffsetTool());
 		this.tools.set('transform', new TransformTool());
+		this.tools.set('image', new ImageTool(id => this.onReplaceImage?.(id)));
 		this.tools.set('mirror', new MirrorTool());
 		this.tools.set('circular_pattern', new CircularPatternTool());
 		this.tools.set('rectangular_pattern', new RectangularPatternTool());
@@ -416,6 +424,18 @@ export class CanvasInteraction {
 			this.updateConstructionState();
 		});
 		this.setTool(this.activeTool);
+	}
+
+	get selectedImageId(): string | null {
+		return this.activeToolInstance instanceof ImageTool ? this.activeToolInstance.imageId : null;
+	}
+
+	selectImage(id: string): void {
+		const tool = this.tools.get('image');
+		if (!(tool instanceof ImageTool) || !this.sketch.images.has(id)) return;
+		this.sketch.clearSelection();
+		tool.imageId = id;
+		this.setTool('image');
 	}
 
 	setTool(tool: ToolType): void {
@@ -559,6 +579,7 @@ export class CanvasInteraction {
 		this.boxSelectStartScreen = null;
 		this.boxSelectCurrentScreen = null;
 		this.boxSelectShift = false;
+		this.boxSelectImageId = null;
 		this.pendingExclusiveSelection = null;
 
 		this.isDraggingSpline = false;
@@ -830,6 +851,11 @@ export class CanvasInteraction {
 				return;
 			case 'Delete':
 			case 'Backspace':
+				if (this.selectedImageId) {
+					this.sketch.removeImage(this.selectedImageId);
+					this.setTool('select');
+					return;
+				}
 				this.sketch.deleteSelected();
 				this.render();
 				return;
@@ -1699,12 +1725,17 @@ export class CanvasInteraction {
 
 		if (e.button !== 0) return; // Only primary button for drawing/selection
 
+		const imageId =
+			this.activeTool === 'select' || this.activeTool === 'image'
+				? (e.target as SVGElement | null)?.closest('[data-image-id]')?.getAttribute('data-image-id')
+				: null;
+
 		// Robust double-click detection (works even when DOM nodes are re-rendered)
 		const now = performance.now();
 		const timeDelta = now - this.lastClickTime;
 		const distanceDelta = dist(screen, this.lastClickPos);
 
-		if (this.activeTool === 'select' && timeDelta >= 50 && timeDelta <= 400 && distanceDelta < 30) {
+		if (this.activeTool === 'select' && !imageId && timeDelta >= 50 && timeDelta <= 400 && distanceDelta < 30) {
 			this.lastClickTime = 0;
 			const targetEl = e.target as SVGElement | null;
 			const clickedText = this.findTextNear(screen, targetEl);
@@ -1744,6 +1775,14 @@ export class CanvasInteraction {
 				if (focus !== previousFocus && focus?.closest?.('.tool-popup')) e.preventDefault();
 				return;
 			}
+		}
+
+		if (this.activeTool === 'select' || this.activeTool === 'image') {
+			if (imageId && this.sketch.images.has(imageId)) {
+				this.beginBoxSelection(screen, e.shiftKey, imageId);
+				return;
+			}
+			if (this.activeTool === 'image') this.setTool('select');
 		}
 
 		const world = this.viewport.screenToWorld(screen);
@@ -2135,10 +2174,7 @@ export class CanvasInteraction {
 				this.render();
 			} else {
 				// Clicked background -> start rectangular box selection
-				this.isBoxSelecting = true;
-				this.boxSelectStartScreen = screen;
-				this.boxSelectCurrentScreen = screen;
-				this.boxSelectShift = e.shiftKey;
+				this.beginBoxSelection(screen, e.shiftKey);
 				if (this.activeTool === 'select' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
 					this.sketch.clearSelection();
 					this.render();
@@ -2146,6 +2182,14 @@ export class CanvasInteraction {
 			}
 			return;
 		}
+	}
+
+	private beginBoxSelection(screen: Vec2, shiftKey: boolean, imageId: string | null = null): void {
+		this.isBoxSelecting = true;
+		this.boxSelectStartScreen = screen;
+		this.boxSelectCurrentScreen = screen;
+		this.boxSelectShift = shiftKey;
+		this.boxSelectImageId = imageId;
 	}
 
 	private handleMouseMove(e: MouseEvent): void {
@@ -2598,7 +2642,10 @@ export class CanvasInteraction {
 			return;
 		}
 
-		if (this.activeToolInstance instanceof TransformTool && this.activeToolInstance.isBusy()) {
+		if (
+			(this.activeToolInstance instanceof TransformTool || this.activeToolInstance instanceof ImageTool) &&
+			this.activeToolInstance.isBusy()
+		) {
 			this.activeToolInstance.onMouseMove(this.createToolMouseEvent(e));
 			this.updateToolPreview();
 			return;
@@ -2611,7 +2658,7 @@ export class CanvasInteraction {
 			this.regionHoverPoint = null;
 			this.renderer.updateRegionHover(null);
 			this.highlightManager.clear();
-			if (this.activeTool !== 'transform') this.renderer.clearPreviews();
+			if (this.activeTool !== 'transform' && this.activeTool !== 'image') this.renderer.clearPreviews();
 			return;
 		}
 
@@ -2880,15 +2927,20 @@ export class CanvasInteraction {
 			const startScreen = this.boxSelectStartScreen;
 			const endScreen = e ? this.getScreenPos(e) : (this.boxSelectCurrentScreen ?? startScreen);
 			const isShift = this.boxSelectShift || (e ? e.shiftKey : false);
+			const imageId = this.boxSelectImageId;
 
 			this.isBoxSelecting = false;
 			this.boxSelectStartScreen = null;
 			this.boxSelectCurrentScreen = null;
 			this.boxSelectShift = false;
+			this.boxSelectImageId = null;
 			this.renderer.clearPreviews();
 
 			if (startScreen && endScreen && dist(startScreen, endScreen) > 4) {
+				if (this.activeTool === 'image') this.setTool('select');
 				this.finishBoxSelection(startScreen, endScreen, isShift);
+			} else if (imageId && imageId !== this.selectedImageId) {
+				this.selectImage(imageId);
 			}
 			this.render();
 		}
