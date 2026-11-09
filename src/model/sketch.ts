@@ -124,7 +124,7 @@ import {
 	type SketchParameter,
 	type ParameterGraphResult,
 } from '../math/expression';
-import { exportSketchToSVG, importSketchFromSVG, type SketchFileMetadata } from './io/svgIO';
+import { exportSketchToSVG, importSketchFromSVG, type SketchFileMetadata, type SvgExportLayers } from './io/svgIO';
 
 export type { SketchFileMetadata };
 
@@ -4049,8 +4049,8 @@ export class SketchDocument {
 		}
 	}
 
-	exportSVG(viewportState?: { panX: number; panY: number; zoom: number }): string {
-		return exportSketchToSVG(this, viewportState);
+	exportSVG(viewportState?: { panX: number; panY: number; zoom: number }, scale = 1, layers?: SvgExportLayers): string {
+		return exportSketchToSVG(this, viewportState, scale, layers);
 	}
 
 	importSVG(svgString: string): {

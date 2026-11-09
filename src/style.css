@@ -1850,6 +1850,84 @@ body {
 	border-color: #fecaca;
 }
 
+/* --- SVG EXPORT DIALOG --- */
+.svg-export-dialog {
+	width: 360px;
+	max-width: calc(100vw - 32px);
+	max-height: calc(100dvh - 32px);
+	margin: auto;
+	border: 1px solid var(--border-color);
+	border-radius: 12px;
+	background: var(--bg-surface);
+	color: var(--text-primary);
+	box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.22);
+}
+
+.svg-export-dialog::backdrop {
+	background: rgba(15, 23, 42, 0.45);
+}
+
+.svg-export-dialog form {
+	display: grid;
+	gap: 16px;
+	padding: 18px;
+	font-size: 13px;
+}
+
+.svg-export-dialog h2 {
+	font-size: 16px;
+}
+
+.svg-export-units {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.svg-export-units select {
+	padding: 6px 8px;
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+	background: var(--bg-surface);
+	color: inherit;
+	font: inherit;
+}
+
+.svg-export-dialog fieldset {
+	display: grid;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--border-color);
+	border-radius: 6px;
+}
+
+.svg-export-dialog legend {
+	padding-inline: 4px;
+	font-weight: 600;
+}
+
+.svg-export-dialog fieldset label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.svg-export-dialog input {
+	accent-color: var(--cad-blue);
+}
+
+.svg-export-dialog p {
+	color: var(--text-secondary);
+	font-size: 12px;
+}
+
+.svg-export-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
 /* --- PARAMETERS MODAL POPUP --- */
 .param-modal-backdrop {
 	position: fixed;

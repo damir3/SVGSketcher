@@ -15,6 +15,17 @@ import { preloadFonts, setOnFontLoaded } from './canvas/fonts';
 setToolIconProvider(name => ICONS[name] ?? '');
 preloadFonts();
 
+const PIXELS_PER_INCH = 96;
+const PIXELS_PER_MILLIMETER = PIXELS_PER_INCH / 25.4;
+const SVG_EXPORT_UNITS = [
+	{ id: 'px', label: 'Pixels (px)', scale: 1 },
+	{ id: 'mm', label: 'Millimeters (mm)', scale: PIXELS_PER_MILLIMETER },
+	{ id: 'cm', label: 'Centimeters (cm)', scale: 10 * PIXELS_PER_MILLIMETER },
+	{ id: 'm', label: 'Meters (m)', scale: 1000 * PIXELS_PER_MILLIMETER },
+	{ id: 'in', label: 'Inches (in)', scale: PIXELS_PER_INCH },
+	{ id: 'ft', label: 'Feet (ft)', scale: 12 * PIXELS_PER_INCH },
+];
+
 function initApp(): void {
 	const app = document.getElementById('app');
 	if (!app) return;
@@ -79,7 +90,7 @@ function initApp(): void {
 					${ICONS.open} Open SVG
 				</button>
 				<input type="file" id="file-input-svg" accept=".svg,image/svg+xml" style="display: none;" />
-				<button class="btn-header primary" id="btn-export" title="Export as SVG">
+				<button class="btn-header primary" id="btn-export" title="Export as SVG" aria-haspopup="dialog">
 					${ICONS.export} Export SVG
 				</button>
 				<a class="btn-header btn-icon" href="https://github.com/damir3/SVGSketcher" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
@@ -114,6 +125,32 @@ function initApp(): void {
 				<span>Region Solver: <strong id="region-solver-time" title="Time for the last region calculation">0.0 ms</strong></span>
 			</div>
 		</footer>
+
+		<dialog class="svg-export-dialog" id="svg-export-dialog" aria-labelledby="svg-export-title">
+			<form method="dialog">
+				<h2 id="svg-export-title">Export SVG</h2>
+				<label class="svg-export-units">
+					Units
+					<select name="units" autofocus>
+						${SVG_EXPORT_UNITS.map(
+							({ id, label }) => `<option value="${id}"${id === 'mm' ? ' selected' : ''}>${label}</option>`
+						).join('')}
+					</select>
+				</label>
+				<fieldset>
+					<legend>Include in SVG</legend>
+					<label><input type="checkbox" name="layers" value="solid" checked /> Solid geometry</label>
+					<label><input type="checkbox" name="layers" value="construction" checked /> Construction geometry</label>
+					<label><input type="checkbox" name="layers" value="regions" checked /> Region fills</label>
+					<label><input type="checkbox" name="layers" value="images" checked /> Reference images</label>
+				</fieldset>
+				<p>The editable Sketcher data is saved with the SVG.</p>
+				<div class="svg-export-actions">
+					<button type="button" class="btn-header" id="btn-cancel-svg-export">Cancel</button>
+					<button type="submit" class="btn-header primary">Export SVG</button>
+				</div>
+			</form>
+		</dialog>
 	`;
 
 	// Elements
@@ -371,11 +408,23 @@ function initApp(): void {
 		decoded.src = objectUrl;
 	});
 
-	btnExport.addEventListener('click', () => {
-		const svgData = sketch.exportSVG({
-			panX: viewport.panX,
-			panY: viewport.panY,
-			zoom: viewport.zoom,
+	const exportDialog = document.getElementById('svg-export-dialog') as HTMLDialogElement;
+	const exportForm = exportDialog.querySelector('form')!;
+	btnExport.addEventListener('click', () => exportDialog.showModal());
+	exportDialog.querySelector('#btn-cancel-svg-export')?.addEventListener('click', () => exportDialog.close());
+	exportDialog.addEventListener('keydown', e => e.stopPropagation());
+
+	exportForm.addEventListener('submit', e => {
+		e.preventDefault();
+		const settings = new FormData(exportForm);
+		const unit = settings.get('units');
+		const scale = SVG_EXPORT_UNITS.find(({ id }) => id === unit)?.scale ?? PIXELS_PER_MILLIMETER;
+		const layers = settings.getAll('layers');
+		const svgData = sketch.exportSVG({ panX: viewport.panX, panY: viewport.panY, zoom: viewport.zoom }, scale, {
+			regions: layers.includes('regions'),
+			solid: layers.includes('solid'),
+			construction: layers.includes('construction'),
+			images: layers.includes('images'),
 		});
 		const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
@@ -386,6 +435,7 @@ function initApp(): void {
 		link.click();
 		document.body.removeChild(link);
 		URL.revokeObjectURL(url);
+		exportDialog.close();
 		showToast('SVG exported successfully');
 	});
 

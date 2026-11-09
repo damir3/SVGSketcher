@@ -688,10 +688,18 @@ function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
 	};
 }
 
+export type SvgExportLayers = Partial<Record<'regions' | 'solid' | 'construction' | 'images', boolean>>;
+
 export function exportSketchToSVG(
 	sketch: SketchDocument,
-	viewportState?: { panX: number; panY: number; zoom: number }
+	viewportState?: { panX: number; panY: number; zoom: number },
+	scale = 1,
+	layers: SvgExportLayers = {}
 ): string {
+	if (!Number.isFinite(scale) || scale <= 0) {
+		throw new RangeError('SVG export scale must be finite and positive');
+	}
+
 	const metadataPayload: SketchFileMetadata = {
 		format: 'svg-sketcher',
 		version: 1,
@@ -704,14 +712,20 @@ export function exportSketchToSVG(
 	const jsonString = JSON.stringify(metadataPayload, null, 2).replace(/]]>/g, ']]]]><![CDATA[>');
 
 	// Generate clean SVG markup for CAD export (CAD Y-up converted to standard SVG Y-down)
-	const elements: string[] = [];
+	const images: string[] = [];
+	const regions: string[] = [];
+	const solid: string[] = [];
+	const construction: string[] = [];
 	const usedPoints = new Set<string>();
+	const scaleTransform = `scale(${scale})`;
 
-	for (const image of metadataPayload.snapshot.images ?? []) {
+	for (const image of layers.images === false ? [] : (metadataPayload.snapshot.images ?? [])) {
 		const { x, y, width, height, angle, opacity } = image;
 		const href = `./${encodeURIComponent(image.fileName)}`;
-		elements.push(
-			`<image href="${href}" x="${x - width / 2}" y="${-y - height / 2}" width="${width}" height="${height}" opacity="${opacity}" preserveAspectRatio="none" transform="rotate(${-angle % 360} ${x} ${-y})" />`
+		const rotation = `rotate(${-angle % 360} ${x} ${-y})`;
+		const transform = scale === 1 ? rotation : `${scaleTransform} ${rotation}`;
+		images.push(
+			`<image href="${href}" x="${x - width / 2}" y="${-y - height / 2}" width="${width}" height="${height}" opacity="${opacity}" preserveAspectRatio="none" transform="${transform}" />`
 		);
 	}
 
@@ -731,8 +745,8 @@ export function exportSketchToSVG(
 		}
 	}
 
-	for (const region of findSketchRegions(sketch)) {
-		elements.push(
+	for (const region of layers.regions === false ? [] : findSketchRegions(sketch)) {
+		regions.push(
 			`<path d="${region.path}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" fill-rule="evenodd" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`
 		);
 	}
@@ -747,7 +761,8 @@ export function exportSketchToSVG(
 			const dash = line.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			elements.push(
+			const group = line.isConstruction ? construction : solid;
+			group.push(
 				`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" />`
 			);
 		}
@@ -760,7 +775,8 @@ export function exportSketchToSVG(
 			const dash = circ.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			elements.push(
+			const group = circ.isConstruction ? construction : solid;
+			group.push(
 				`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
@@ -798,7 +814,8 @@ export function exportSketchToSVG(
 			const dash = arc.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			elements.push(
+			const group = arc.isConstruction ? construction : solid;
+			group.push(
 				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
@@ -820,7 +837,8 @@ export function exportSketchToSVG(
 			const dash = el.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			elements.push(
+			const group = el.isConstruction ? construction : solid;
+			group.push(
 				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
@@ -869,7 +887,8 @@ export function exportSketchToSVG(
 			const dash = elarc.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			elements.push(
+			const group = elarc.isConstruction ? construction : solid;
+			group.push(
 				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
@@ -915,7 +934,8 @@ export function exportSketchToSVG(
 			const dash = spline.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			elements.push(
+			const group = spline.isConstruction ? construction : solid;
+			group.push(
 				`<path d="${d}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
@@ -958,7 +978,7 @@ export function exportSketchToSVG(
 		);
 
 		if (d) {
-			elements.push(
+			solid.push(
 				`<path d="${d}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`
 			);
 		}
@@ -968,24 +988,35 @@ export function exportSketchToSVG(
 	for (const pt of sketch.points.values()) {
 		if (!usedPoints.has(pt.id) && !textRectPointIds.has(pt.id)) {
 			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
-			elements.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`);
+			solid.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`);
 		}
 	}
 
 	const bbox = sketch.getBoundingBox();
-	let viewBox = '-100 -100 200 200';
+	let bounds = [-100, -100, 200, 200];
 
 	if (bbox) {
 		const w = bbox.max.x - bbox.min.x;
 		const h = bbox.max.y - bbox.min.y;
 		const padding = Math.max(10, Math.max(w, h) * 0.05);
-		const viewBoxMin = { x: bbox.min.x - padding, y: -bbox.max.y - padding };
-		const vbWidth = Math.max(w + padding * 2, 20);
-		const vbHeight = Math.max(h + padding * 2, 20);
-		viewBox = `${viewBoxMin.x.toFixed(2)} ${viewBoxMin.y.toFixed(2)} ${vbWidth.toFixed(2)} ${vbHeight.toFixed(2)}`;
+		bounds = [
+			bbox.min.x - padding,
+			-bbox.max.y - padding,
+			Math.max(w + padding * 2, 20),
+			Math.max(h + padding * 2, 20),
+		];
 	}
 
-	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  <metadata id="sketcher-metadata">\n    <![CDATA[\n${jsonString}\n    ]]>\n  </metadata>\n  ${elements.join('\n  ')}\n</svg>`;
+	const viewBox = bounds.map(value => (value * scale).toFixed(2)).join(' ');
+	const geometry = { regions, solid, construction };
+	const groups = (['regions', 'solid', 'construction'] as const)
+		.filter(id => layers[id] !== false)
+		.map(id => {
+			const content = geometry[id].map(element => `    ${element}\n`).join('');
+			return `<g id="${id}" transform="${scaleTransform}">\n${content}  </g>`;
+		});
+
+	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  <metadata id="sketcher-metadata">\n    <![CDATA[\n${jsonString}\n    ]]>\n  </metadata>\n  ${[...images, ...groups].join('\n  ')}\n</svg>`;
 }
 
 export function importSketchFromSVG(
