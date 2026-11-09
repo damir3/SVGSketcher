@@ -29,6 +29,7 @@ export interface ImageTraceSettings {
 	minSegment: number;
 	/** Direction changes sharper than this angle split a path into separate pieces. */
 	cornerAngle: number;
+	useLines: boolean;
 	useArcs: boolean;
 	useCircles: boolean;
 	constraints: {
@@ -59,6 +60,7 @@ export const DEFAULT_TRACE_SETTINGS: ImageTraceSettings = {
 	autoMinSegment: true,
 	minSegment: 12,
 	cornerAngle: 40,
+	useLines: true,
 	useArcs: true,
 	useCircles: true,
 	constraints: {
@@ -96,6 +98,7 @@ export interface FitOptions {
 	minSegment: number;
 	cornerAngle: number;
 	smoothing: number;
+	useLines: boolean;
 	useArcs: boolean;
 	useCircles: boolean;
 	minRadius: number;

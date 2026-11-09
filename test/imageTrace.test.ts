@@ -96,6 +96,77 @@ describe('image tracing', () => {
 		const result = traceImage(image, settings({ outlineAlgorithm: 'pixel-edges' }));
 		assert.equal(result.stats.lines, 4);
 	});
+
+	it('converts circles to a single closed spline when circles are disabled', () => {
+		const disk = makeImage(120, 120, (x, y) => Math.hypot(x - 60, y - 60) < 40);
+		const outlineResult = traceImage(disk, settings({ useCircles: false }));
+		assert.deepEqual(outlineResult.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		assert.equal(outlineResult.closedSplines.length, 1);
+		assert.equal(outlineResult.closedSplines[0].points.length, 4);
+		assert.equal(outlineResult.paths.length, 0);
+
+		const ring = makeImage(120, 120, (x, y) => Math.abs(Math.hypot(x - 60, y - 60) - 40) < 3);
+		const centerResult = traceImage(ring, settings({ mode: 'centerline', useCircles: false }));
+		assert.deepEqual(centerResult.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		assert.equal(centerResult.closedSplines.length, 1);
+		assert.equal(centerResult.closedSplines[0].points.length, 4);
+		assert.equal(centerResult.paths.length, 0);
+	});
+
+	it('converts closed line loops into a single closed spline when lines are disabled', () => {
+		const rect = makeImage(160, 120, (x, y) => x > 20 && x < 140 && y > 30 && y < 90);
+		const result = traceImage(rect, settings({ useLines: false }));
+		assert.deepEqual(result.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		assert.equal(result.closedSplines.length, 1);
+		assert.equal(result.closedSplines[0].points.length, 4);
+		assert.equal(result.paths.length, 0);
+
+		const sketch = new SketchDocument();
+		const img = sketch.addImage({
+			id: 'Image-rect',
+			fileName: 'rect.png',
+			x: 0,
+			y: 0,
+			width: 160,
+			height: 120,
+			angle: 0,
+			opacity: 1,
+		});
+		buildTraceGeometry(sketch, result, img, settings({ useLines: false }));
+		assert.equal(sketch.splines.size, 1);
+		assert.equal([...sketch.lines.values()].filter(l => !l.isSplineHandle).length, 0);
+		const spline = [...sketch.splines.values()][0];
+		assert.equal(spline.isClosed, true);
+	});
+
+	it('converts open lines to splines when lines are disabled', () => {
+		const image = makeImage(160, 60, (x, y) => x > 20 && x < 140 && Math.abs(y - 30) < 3);
+		const result = traceImage(image, settings({ mode: 'centerline', useLines: false }));
+		assert.deepEqual(result.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		assert.equal(result.closedSplines.length, 0);
+		assert.equal(result.paths.length, 1);
+	});
+
+	it('converts disabled lines or arcs on a rounded rectangle into splines and merges into one closed spline when both are disabled', () => {
+		const r = 20;
+		const inside = (x: number, y: number) => {
+			const cx = Math.min(Math.max(x, 20 + r), 180 - r);
+			const cy = Math.min(Math.max(y, 20 + r), 120 - r);
+			return Math.hypot(x - cx, y - cy) < r;
+		};
+		const img = makeImage(200, 140, inside);
+
+		const noArcs = traceImage(img, settings({ useArcs: false }));
+		assert.deepEqual(noArcs.stats, { lines: 4, arcs: 0, circles: 0, splines: 4 });
+
+		const noLines = traceImage(img, settings({ useLines: false }));
+		assert.deepEqual(noLines.stats, { lines: 0, arcs: 4, circles: 0, splines: 4 });
+
+		const neither = traceImage(img, settings({ useLines: false, useArcs: false }));
+		assert.deepEqual(neither.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		assert.equal(neither.closedSplines.length, 1);
+		assert.equal(neither.paths.length, 0);
+	});
 });
 
 describe('image trace geometry', () => {

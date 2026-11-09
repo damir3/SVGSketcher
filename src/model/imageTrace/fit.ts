@@ -292,7 +292,7 @@ interface ArcCandidate {
 }
 
 function tryArc(points: Vec2[], from: number, to: number, options: FitOptions): ArcCandidate | null {
-	if (!options.useArcs || to - from < 4) return null;
+	if (to - from < 4) return null;
 	const circle = fitCircle(points, from, to);
 	if (!circle) return null;
 	if (circle.radius < options.minRadius || circle.radius > options.maxRadius) return null;
@@ -319,20 +319,31 @@ export function fitSplineRun(
 	points: Vec2[],
 	from: number,
 	to: number,
-	tolerance: number
+	tolerance: number,
+	closed = false,
+	seedIndices?: number[]
 ): { points: Vec2[]; handles: Array<{ h1: Vec2; h2: Vec2 }> } {
+	const isClosedLoop = closed && from === 0 && to === points.length - 1 && to >= 3;
 	const tangentAt = (index: number): Vec2 => {
-		const a = points[Math.max(from, index - 2)];
-		const b = points[Math.min(to, index + 2)];
+		const a = isClosedLoop ? points[(((index - 2) % to) + to) % to] : points[Math.max(from, index - 2)];
+		const b = isClosedLoop ? points[(index + 2) % to] : points[Math.min(to, index + 2)];
 		const l = len(a, b);
 		return l < 1e-9 ? { x: 1, y: 0 } : { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
 	};
 	const build = (indices: number[]) => {
 		const fit = indices.map(i => points[i]);
+		const last = indices.length - 1;
 		const handles = indices.map((index, k) => {
 			const t = tangentAt(index);
-			const previous = k > 0 ? len(points[indices[k - 1]], points[index]) / 3 : 0;
-			const next = k < indices.length - 1 ? len(points[index], points[indices[k + 1]]) / 3 : 0;
+			let previous: number;
+			let next: number;
+			if (isClosedLoop && (k === 0 || k === last)) {
+				previous = len(points[indices[last - 1]], points[0]) / 3;
+				next = len(points[0], points[indices[1]]) / 3;
+			} else {
+				previous = k > 0 ? len(points[indices[k - 1]], points[index]) / 3 : 0;
+				next = k < last ? len(points[index], points[indices[k + 1]]) / 3 : 0;
+			}
 			const p = points[index];
 			const backward = previous || next;
 			const forward = next || previous;
@@ -354,8 +365,33 @@ export function fitSplineRun(
 	const lengths = cumulativeLengths(points);
 
 	const indices = [from, to];
-	if (to - from >= 6) indices.splice(1, 0, Math.round((from + to) / 2));
-	for (let iteration = 0; iteration < 64; iteration++) {
+	if (seedIndices?.length) {
+		for (const seed of seedIndices) {
+			if (seed > from && seed < to && !indices.includes(seed)) {
+				indices.push(seed);
+			}
+		}
+		indices.sort((a, b) => a - b);
+	}
+	if (isClosedLoop) {
+		while (indices.length < 5 && to - from >= 4) {
+			let bestGap = 0;
+			let bestAt = -1;
+			for (let k = 0; k < indices.length - 1; k++) {
+				const gap = indices[k + 1] - indices[k];
+				if (gap > bestGap) {
+					bestGap = gap;
+					bestAt = k + 1;
+				}
+			}
+			if (bestGap < 2 || bestAt < 0) break;
+			indices.splice(bestAt, 0, Math.round((indices[bestAt - 1] + indices[bestAt]) / 2));
+		}
+	} else if (indices.length === 2 && to - from >= 6) {
+		indices.splice(1, 0, Math.round((from + to) / 2));
+	}
+	const maxIterations = Math.min(256, Math.max(64, Math.round((to - from) / 3)));
+	for (let iteration = 0; iteration < maxIterations; iteration++) {
 		const { handles } = build(indices);
 		let worst = -1;
 		let worstError = tolerance;
@@ -542,7 +578,7 @@ function fitRun(points: Vec2[], from: number, to: number, options: FitOptions, l
 			const dev = lineAlive ? lineDeviation(points, start, end) : Infinity;
 			if (lineAlive && dev > tol) lineAlive = false;
 			let circle: CircleFit | null = null;
-			if (options.useArcs && end - start >= 4) {
+			if (end - start >= 4) {
 				const rough = sums.circle();
 				if (rough && circleDeviation(points, start, end, rough, tol * 1.5) <= tol * 1.5) {
 					circle = rough;
@@ -664,8 +700,8 @@ export function fitPolyline(input: PolylineFitInput, options: FitOptions): Fitte
 	const breaks = closed
 		? [...corners, points.length - 1]
 		: [0, ...corners.filter(c => c > 0 && c < points.length - 1), points.length - 1];
-	const pieces: FittedPiece[] = [];
-	const cornerFlags: boolean[] = [];
+	let pieces: FittedPiece[] = [];
+	let cornerFlags: boolean[] = [];
 	for (let k = 0; k < breaks.length - 1; k++) {
 		const from = breaks[k];
 		const to = breaks[k + 1];
@@ -676,7 +712,320 @@ export function fitPolyline(input: PolylineFitInput, options: FitOptions): Fitte
 			cornerFlags.push(index === 0 && (k > 0 || (closed && hadCorners)));
 		});
 	}
-	return { points, pieces, corners: cornerFlags, closed };
+	if (!pieces.length) return null;
+
+	for (const piece of pieces) {
+		if (piece.kind !== 'arc') continue;
+		for (const idx of [piece.start, piece.end]) {
+			const p = points[idx];
+			const angle = Math.atan2(p.y - piece.center.y, p.x - piece.center.x);
+			points[idx] = {
+				x: piece.center.x + piece.radius * Math.cos(angle),
+				y: piece.center.y + piece.radius * Math.sin(angle),
+			};
+		}
+	}
+	if (closed && points.length > 1) {
+		points[points.length - 1] = { ...points[0] };
+	}
+
+	const isInflectionLineBetweenConvertedArcs = (index: number): boolean => {
+		if (options.useArcs || pieces[index].kind !== 'line') return false;
+		const prev = index > 0 ? pieces[index - 1] : closed ? pieces[pieces.length - 1] : undefined;
+		const next = index + 1 < pieces.length ? pieces[index + 1] : closed ? pieces[0] : undefined;
+		if (
+			!prev ||
+			!next ||
+			(prev.kind !== 'arc' && prev.kind !== 'spline') ||
+			(next.kind !== 'arc' && next.kind !== 'spline')
+		) {
+			return false;
+		}
+		const lineLen = lengths[pieces[index].end] - lengths[pieces[index].start];
+		const prevLen = lengths[prev.end] - lengths[prev.start];
+		const nextLen = lengths[next.end] - lengths[next.start];
+		return lineLen < Math.max(options.minSegment * 2.5, Math.min(prevLen, nextLen));
+	};
+
+	let splineFlags = pieces.map(
+		(piece, index) =>
+			piece.kind === 'spline' ||
+			(piece.kind === 'line' && !options.useLines) ||
+			(piece.kind === 'arc' && !options.useArcs) ||
+			isInflectionLineBetweenConvertedArcs(index)
+	);
+
+	if (splineFlags.every(Boolean)) {
+		const fit = piecesToSpline(points, pieces, closed);
+		return {
+			points,
+			pieces: [{ kind: 'spline', start: 0, end: points.length - 1, points: fit.points, handles: fit.handles }],
+			corners: [false],
+			closed,
+		};
+	}
+
+	if (closed && pieces.length > 1 && splineFlags[0] && splineFlags[pieces.length - 1]) {
+		const firstNonSpline = splineFlags.findIndex(flag => !flag);
+		if (firstNonSpline > 0) {
+			const n = points.length - 1;
+			const shift = pieces[firstNonSpline].start;
+			const loop = points.slice(0, n);
+			points = [...loop.slice(shift), ...loop.slice(0, shift), { ...loop[shift] }];
+			pieces = [...pieces.slice(firstNonSpline), ...pieces.slice(0, firstNonSpline)].map(p => {
+				const start = (p.start - shift + n) % n;
+				const endRaw = (p.end - shift + n) % n;
+				const end = endRaw === 0 ? n : endRaw;
+				return { ...p, start, end };
+			});
+			cornerFlags = [...cornerFlags.slice(firstNonSpline), ...cornerFlags.slice(0, firstNonSpline)];
+			splineFlags = [...splineFlags.slice(firstNonSpline), ...splineFlags.slice(0, firstNonSpline)];
+		}
+	}
+
+	const finalPieces: FittedPiece[] = [];
+	const finalCorners: boolean[] = [];
+	for (let i = 0; i < pieces.length; ) {
+		if (!splineFlags[i]) {
+			finalPieces.push(pieces[i]);
+			finalCorners.push(cornerFlags[i]);
+			i++;
+			continue;
+		}
+		let j = i;
+		while (j + 1 < pieces.length && splineFlags[j + 1]) j++;
+		const start = pieces[i].start;
+		const end = pieces[j].end;
+		if (i === j && pieces[i].kind === 'spline') {
+			finalPieces.push(pieces[i]);
+		} else {
+			const fit = piecesToSpline(points, pieces.slice(i, j + 1), false);
+			finalPieces.push({ kind: 'spline', start, end, points: fit.points, handles: fit.handles });
+		}
+		finalCorners.push(cornerFlags[i]);
+		i = j + 1;
+	}
+	return { points, pieces: finalPieces, corners: finalCorners, closed };
+}
+
+interface SplineKnot {
+	point: Vec2;
+	inVec: Vec2 | null;
+	outVec: Vec2 | null;
+}
+
+function pieceToKnots(points: Vec2[], piece: FittedPiece): SplineKnot[] {
+	if (piece.kind === 'line') {
+		const a = points[piece.start];
+		const b = points[piece.end];
+		return [
+			{ point: { x: a.x, y: a.y }, inVec: null, outVec: null },
+			{ point: { x: b.x, y: b.y }, inVec: null, outVec: null },
+		];
+	}
+	if (piece.kind === 'arc') {
+		const a = points[piece.start];
+		const b = points[piece.end];
+		const mid = points[Math.round((piece.start + piece.end) / 2)];
+		const { center, radius } = piece;
+		const ccw = (from: number, to: number) => (((to - from) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+		const thetaA = Math.atan2(a.y - center.y, a.x - center.x);
+		const thetaMid = Math.atan2(mid.y - center.y, mid.x - center.x);
+		const thetaB = Math.atan2(b.y - center.y, b.x - center.x);
+		const ccwTotal = ccw(thetaA, thetaB);
+		const ccwMid = ccw(thetaA, thetaMid);
+		const sweep = ccwMid <= ccwTotal ? ccwTotal : ccwTotal - 2 * Math.PI;
+		const segCount = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2)));
+		const alpha = sweep / segCount;
+		const dir = sweep >= 0 ? 1 : -1;
+		const rA = Math.hypot(a.x - center.x, a.y - center.y) || radius;
+		const rB = Math.hypot(b.x - center.x, b.y - center.y) || radius;
+		const kFactor = (4 / 3) * Math.tan(Math.abs(alpha) / 4);
+		const knots: SplineKnot[] = [];
+		for (let i = 0; i <= segCount; i++) {
+			const theta = thetaA + i * alpha;
+			const r = i === 0 ? rA : i === segCount ? rB : radius;
+			const pt =
+				i === 0
+					? { x: a.x, y: a.y }
+					: i === segCount
+						? { x: b.x, y: b.y }
+						: { x: center.x + radius * Math.cos(theta), y: center.y + radius * Math.sin(theta) };
+			const tx = -dir * Math.sin(theta);
+			const ty = dir * Math.cos(theta);
+			const hLen = kFactor * r;
+			knots.push({
+				point: pt,
+				inVec: i > 0 ? { x: -tx * hLen, y: -ty * hLen } : null,
+				outVec: i < segCount ? { x: tx * hLen, y: ty * hLen } : null,
+			});
+		}
+		return knots;
+	}
+	return piece.points.map((pt, i) => {
+		const h = piece.handles[i];
+		return {
+			point: { x: pt.x, y: pt.y },
+			inVec: i > 0 ? { x: h.h1.x - pt.x, y: h.h1.y - pt.y } : null,
+			outVec: i < piece.points.length - 1 ? { x: h.h2.x - pt.x, y: h.h2.y - pt.y } : null,
+		};
+	});
+}
+
+/**
+ * Converts one or more fitted pieces (`line`, `arc`, `spline`) directly into an exact cubic Bezier spline without
+ * re-fitting raw contour pixels.
+ */
+export function piecesToSpline(
+	points: Vec2[],
+	pieces: FittedPiece[],
+	closed: boolean
+): { points: Vec2[]; handles: Array<{ h1: Vec2; h2: Vec2 }> } {
+	if (!closed && pieces.length === 1 && pieces[0].kind === 'line') {
+		const a = points[pieces[0].start];
+		const b = points[pieces[0].end];
+		const dx = (b.x - a.x) / 3;
+		const dy = (b.y - a.y) / 3;
+		return {
+			points: [
+				{ x: a.x, y: a.y },
+				{ x: b.x, y: b.y },
+			],
+			handles: [
+				{ h1: { x: a.x - dx, y: a.y - dy }, h2: { x: a.x + dx, y: a.y + dy } },
+				{ h1: { x: b.x - dx, y: b.y - dy }, h2: { x: b.x + dx, y: b.y + dy } },
+			],
+		};
+	}
+
+	const knots: SplineKnot[] = [];
+	for (const piece of pieces) {
+		const sub = pieceToKnots(points, piece);
+		if (!sub.length) continue;
+		if (knots.length > 0) {
+			knots[knots.length - 1].outVec = sub[0].outVec;
+			for (let i = 1; i < sub.length; i++) knots.push(sub[i]);
+		} else {
+			for (const k of sub) knots.push(k);
+		}
+	}
+	if (closed && knots.length >= 2) {
+		knots[0].inVec = knots[knots.length - 1].inVec;
+		knots.pop();
+	}
+
+	const resolveKnot = (
+		knot: SplineKnot,
+		isFirst: boolean,
+		isLast: boolean
+	): Array<{ point: Vec2; h1: Vec2; h2: Vec2 }> => {
+		const p = knot.point;
+		const { inVec, outVec } = knot;
+		if (!inVec && !outVec) {
+			return [{ point: { ...p }, h1: { ...p }, h2: { ...p } }];
+		}
+		if (inVec && !outVec) {
+			if (!closed && isLast) {
+				return [
+					{
+						point: { ...p },
+						h1: { x: p.x + inVec.x, y: p.y + inVec.y },
+						h2: { x: p.x - inVec.x, y: p.y - inVec.y },
+					},
+				];
+			}
+			return [{ point: { ...p }, h1: { x: p.x + inVec.x, y: p.y + inVec.y }, h2: { ...p } }];
+		}
+		if (!inVec && outVec) {
+			if (!closed && isFirst) {
+				return [
+					{
+						point: { ...p },
+						h1: { x: p.x - outVec.x, y: p.y - outVec.y },
+						h2: { x: p.x + outVec.x, y: p.y + outVec.y },
+					},
+				];
+			}
+			return [{ point: { ...p }, h1: { ...p }, h2: { x: p.x + outVec.x, y: p.y + outVec.y } }];
+		}
+		const d1 = Math.hypot(inVec!.x, inVec!.y);
+		const d2 = Math.hypot(outVec!.x, outVec!.y);
+		if (d1 < 1e-9 && d2 < 1e-9) return [{ point: { ...p }, h1: { ...p }, h2: { ...p } }];
+		if (d1 < 1e-9) return [{ point: { ...p }, h1: { ...p }, h2: { x: p.x + outVec!.x, y: p.y + outVec!.y } }];
+		if (d2 < 1e-9) return [{ point: { ...p }, h1: { x: p.x + inVec!.x, y: p.y + inVec!.y }, h2: { ...p } }];
+		const u1x = -inVec!.x / d1;
+		const u1y = -inVec!.y / d1;
+		const u2x = outVec!.x / d2;
+		const u2y = outVec!.y / d2;
+		if (u1x * u2x + u1y * u2y >= Math.cos((20 * Math.PI) / 180)) {
+			const tx = u1x + u2x;
+			const ty = u1y + u2y;
+			const tl = Math.hypot(tx, ty) || 1;
+			const ux = tx / tl;
+			const uy = ty / tl;
+			return [
+				{
+					point: { ...p },
+					h1: { x: p.x - ux * d1, y: p.y - uy * d1 },
+					h2: { x: p.x + ux * d2, y: p.y + uy * d2 },
+				},
+			];
+		}
+		return [
+			{ point: { ...p }, h1: { x: p.x + inVec!.x, y: p.y + inVec!.y }, h2: { ...p } },
+			{ point: { ...p }, h1: { ...p }, h2: { x: p.x + outVec!.x, y: p.y + outVec!.y } },
+		];
+	};
+
+	const outPoints: Vec2[] = [];
+	const outHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
+	let seamTrailing: { point: Vec2; h1: Vec2; h2: Vec2 } | null = null;
+	for (let i = 0; i < knots.length; i++) {
+		const resolved = resolveKnot(knots[i], i === 0, i === knots.length - 1);
+		if (closed && i === 0 && resolved.length === 2) {
+			outPoints.push(resolved[1].point);
+			outHandles.push({ h1: resolved[1].h1, h2: resolved[1].h2 });
+			seamTrailing = resolved[0];
+		} else {
+			for (const item of resolved) {
+				outPoints.push(item.point);
+				outHandles.push({ h1: item.h1, h2: item.h2 });
+			}
+		}
+	}
+	if (seamTrailing) {
+		outPoints.push(seamTrailing.point);
+		outHandles.push({ h1: seamTrailing.h1, h2: seamTrailing.h2 });
+	}
+	if (closed && outPoints.length > 0) {
+		outPoints.push({ ...outPoints[0] });
+		outHandles.push({ h1: { ...outHandles[0].h1 }, h2: { ...outHandles[0].h2 } });
+	}
+	return { points: outPoints, handles: outHandles };
+}
+
+/** Converts an analytical circle into an exact 4-point closed cubic Bezier spline. */
+export function circleToClosedSpline(circle: CircleFit): {
+	points: Vec2[];
+	handles: Array<{ h1: Vec2; h2: Vec2 }>;
+} {
+	const { x: cx, y: cy } = circle.center;
+	const r = circle.radius;
+	const k = (4 / 3) * Math.tan(Math.PI / 8) * r;
+	return {
+		points: [
+			{ x: cx + r, y: cy },
+			{ x: cx, y: cy + r },
+			{ x: cx - r, y: cy },
+			{ x: cx, y: cy - r },
+		],
+		handles: [
+			{ h1: { x: cx + r, y: cy - k }, h2: { x: cx + r, y: cy + k } },
+			{ h1: { x: cx + k, y: cy + r }, h2: { x: cx - k, y: cy + r } },
+			{ h1: { x: cx - r, y: cy + k }, h2: { x: cx - r, y: cy - k } },
+			{ h1: { x: cx - k, y: cy - r }, h2: { x: cx + k, y: cy - r } },
+		],
+	};
 }
 
 /** For corner-free closed loops, start where the curvature changes most, which is usually a primitive boundary. */
@@ -695,9 +1044,9 @@ function bestClosedStart(points: Vec2[], options: FitOptions): number {
 	return best;
 }
 
-/** Checks whether a closed polyline is a full circle within tolerance. */
-export function fitClosedCircle(points: Vec2[], options: FitOptions): CircleFit | null {
-	if (!options.useCircles || points.length < 8) return null;
+/** Checks whether a closed polyline is a full circle within tolerance, regardless of `options.useCircles`. */
+export function detectClosedCircle(points: Vec2[], options: FitOptions): CircleFit | null {
+	if (points.length < 8) return null;
 	const circle = fitCircle(points);
 	if (!circle || circle.radius < options.minRadius || circle.radius > options.maxRadius) return null;
 	for (const p of points) {
@@ -707,4 +1056,10 @@ export function fitClosedCircle(points: Vec2[], options: FitOptions): CircleFit 
 	const sweep = arcSweep(closedPoints, 0, closedPoints.length - 1, circle.center);
 	if (sweep === null || Math.abs(Math.abs(sweep) - 2 * Math.PI) > 0.3) return null;
 	return circle;
+}
+
+/** Checks whether a closed polyline is a full circle within tolerance when circles are enabled. */
+export function fitClosedCircle(points: Vec2[], options: FitOptions): CircleFit | null {
+	if (!options.useCircles) return null;
+	return detectClosedCircle(points, options);
 }

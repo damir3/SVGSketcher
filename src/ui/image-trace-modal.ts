@@ -229,6 +229,10 @@ export class ImageTraceModal {
 						<div class="trace-row">
 							<span class="trace-label">Primitives</span>
 							<div class="trace-checks-inline">
+								<label class="trace-inline-check" title="Fit straight line segments">
+									<input type="checkbox" id="trace-use-lines" />
+									<span>Lines</span>
+								</label>
 								<label class="trace-inline-check" title="Fit circular arcs to curved segments">
 									<input type="checkbox" id="trace-use-arcs" />
 									<span>Arcs</span>
@@ -343,6 +347,7 @@ export class ImageTraceModal {
 
 		this.setSliderAndNumber('#trace-smoothing-range', '#trace-smoothing', s.smoothing);
 		this.setSliderAndNumber('#trace-corner-angle-range', '#trace-corner-angle', s.cornerAngle);
+		this.setCheckbox('#trace-use-lines', s.useLines);
 		this.setCheckbox('#trace-use-arcs', s.useArcs);
 		this.setCheckbox('#trace-use-circles', s.useCircles);
 
@@ -474,6 +479,11 @@ export class ImageTraceModal {
 
 		this.bindLinkedSlider('#trace-corner-angle-range', '#trace-corner-angle', 10, 120, val => {
 			this.settings.cornerAngle = Math.round(val);
+			this.scheduleTrace();
+		});
+
+		c.querySelector<HTMLInputElement>('#trace-use-lines')?.addEventListener('change', e => {
+			this.settings.useLines = (e.target as HTMLInputElement).checked;
 			this.scheduleTrace();
 		});
 

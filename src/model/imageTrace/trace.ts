@@ -1,6 +1,13 @@
 import type { Vec2 } from '../../math/vector';
 import { marchingSquares, pixelEdgeContours } from './contours';
-import { fitClosedCircle, fitPolyline, polylineLength, type FittedPiece, type FittedPolyline } from './fit';
+import {
+	circleToClosedSpline,
+	detectClosedCircle,
+	fitPolyline,
+	polylineLength,
+	type FittedPiece,
+	type FittedPolyline,
+} from './fit';
 import { binarize, despeckle, gaussianBlur, otsuThreshold } from './raster';
 import { extractSkeletonGraph, pruneSkeletonGraph, thin } from './skeleton';
 import {
@@ -33,6 +40,7 @@ export function getFitOptions(settings: ImageTraceSettings, input: Omit<TraceInp
 		minSegment: getEffectiveMinSegment(settings, input.width, input.height),
 		cornerAngle: settings.cornerAngle,
 		smoothing: settings.smoothing,
+		useLines: settings.useLines,
 		useArcs: settings.useArcs,
 		useCircles: settings.useCircles,
 		minRadius: Math.max(settings.tolerance * 2, MIN_WORLD_RADIUS / Math.max(1e-9, input.pixelSize)),
@@ -122,9 +130,13 @@ class TraceBuilder {
 
 	addClosed(points: Vec2[]): void {
 		if (points.length < 3 || polylineLength([...points, points[0]]) < this.options.minSegment) return;
-		const circle = fitClosedCircle(points, this.options);
+		const circle = detectClosedCircle(points, this.options);
 		if (circle) {
-			this.circles.push(circle);
+			if (this.options.useCircles) {
+				this.circles.push(circle);
+			} else {
+				this.closedSplines.push(circleToClosedSpline(circle));
+			}
 			return;
 		}
 		const fitted = fitPolyline({ points, closed: true }, this.options);
