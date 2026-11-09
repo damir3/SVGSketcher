@@ -29,6 +29,7 @@ import {
 	extractSplineInterval,
 	type BezierSegment,
 } from '../math/spline';
+import { createTraceTransform, type TracePlacement, type TraceResult } from '../model/imageTrace';
 
 export function renderArcPreviewVisual(
 	parent: SVGElement,
@@ -449,6 +450,67 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 				},
 				parent
 			);
+		}
+	}
+}
+
+export function renderTracePreviewVisual(
+	parent: SVGElement,
+	viewport: Viewport,
+	result: TraceResult,
+	placement: TracePlacement,
+	isConstruction: boolean
+): void {
+	const { toWorld, scale } = createTraceTransform(result, placement);
+	const strokeAttrs = getPreviewStrokeAttrs(isConstruction, false, true);
+	const splineAttrs = getSplinePreviewStrokeAttrs(isConstruction);
+	const group = createSvgElement('g', { class: 'image-trace-preview', 'pointer-events': 'none' }, parent);
+
+	const worldVertices = result.vertices.map(toWorld);
+	const screenVertices = worldVertices.map(p => viewport.worldToScreen(p));
+
+	for (const path of result.paths) {
+		for (const segment of path.segments) {
+			if (segment.kind === 'line') {
+				createSvgLine(screenVertices[segment.a], screenVertices[segment.b], strokeAttrs, group);
+			} else if (segment.kind === 'arc') {
+				const start = worldVertices[segment.a];
+				const mid = toWorld(segment.mid);
+				const end = worldVertices[segment.b];
+				const turn = (mid.x - start.x) * (end.y - mid.y) - (mid.y - start.y) * (end.x - mid.x);
+				const sc = viewport.worldToScreen(toWorld(segment.center));
+				const sr = segment.radius * scale * viewport.zoom;
+				const d = getArcSvgPath(sc, screenVertices[segment.a], screenVertices[segment.b], sr, turn < 0);
+				createSvgPath(d, strokeAttrs, group);
+			} else {
+				const fitPoints = [worldVertices[segment.a], ...segment.points.map(toWorld), worldVertices[segment.b]];
+				const handles = segment.handles.map(h => ({ h1: toWorld(h.h1), h2: toWorld(h.h2) }));
+				const beziers = fitPointsToBezier(fitPoints, handles);
+				const d = getSplineSvgPath(beziers, p => viewport.worldToScreen(p), false);
+				createSvgPath(d, splineAttrs, group);
+			}
+		}
+	}
+
+	for (const circle of result.circles) {
+		const sc = viewport.worldToScreen(toWorld(circle.center));
+		const sr = circle.radius * scale * viewport.zoom;
+		createSvgCircle(sc, sr, strokeAttrs, group);
+		createSvgCircle(sc, 2.5, PREVIEW_POINT_ATTRS, group);
+	}
+
+	for (const spline of result.closedSplines) {
+		if (spline.points.length < 2) continue;
+		const worldPoints = spline.points.map(toWorld);
+		const worldHandles = spline.handles.map(h => ({ h1: toWorld(h.h1), h2: toWorld(h.h2) }));
+		const beziers = fitPointsToBezier([...worldPoints, worldPoints[0]], [...worldHandles, worldHandles[0]]);
+		const d = getSplineSvgPath(beziers, p => viewport.worldToScreen(p), true);
+		createSvgPath(d, splineAttrs, group);
+	}
+
+	if (screenVertices.length <= 500) {
+		for (const pt of screenVertices) {
+			createSvgCircle(pt, 2.5, PREVIEW_POINT_ATTRS, group);
 		}
 	}
 }

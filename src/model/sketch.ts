@@ -179,6 +179,7 @@ export class SketchDocument {
 	private history = new HistoryManager();
 	private batchDepth = 0;
 	private batchSnapshot: SketchSnapshot | null = null;
+	private solveDeferred = 0;
 
 	// Listeners for UI reactivity
 	private changeListeners: Array<() => void> = [];
@@ -3143,7 +3144,35 @@ export class SketchDocument {
 		return [...constraints.filter(c => !replaced.has(c)), ...splineConstraints];
 	}
 
+	/**
+	 * Runs `fn` without solving after each individual edit, then solves once.
+	 * Use for bulk creation of many primitives and constraints.
+	 */
+	withDeferredSolve<T>(fn: () => T): T {
+		this.solveDeferred++;
+		try {
+			return fn();
+		} finally {
+			this.solveDeferred--;
+			if (this.solveDeferred === 0) this.solve();
+		}
+	}
+
 	solve(extraConstraints: IConstraint[] = []): SolverResult {
+		if (this.solveDeferred > 0) {
+			return (
+				this.lastSolverResult ?? {
+					status: 'UNDER_CONSTRAINED',
+					iterations: 0,
+					initialError: 0,
+					finalError: 0,
+					degreesOfFreedom: 0,
+					constrainedParams: new Set<string>(),
+					freeParametersCount: 0,
+					equationsCount: 0,
+				}
+			);
+		}
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = this.prepareSplineConstraints(extraConstraints, drivenRadii, editedHandles);

@@ -1,6 +1,9 @@
 import { angleFromTo, dot, sub, vec, type Vec2 } from '../../../math/vector';
 import type { SketchImage } from '../../../model/image';
+import type { ImageTraceSettings, TraceResult } from '../../../model/imageTrace';
+import { ImageTraceModal } from '../../../ui/image-trace-modal';
 import { getToolIcon } from '../../../ui/panels/tools/iconProvider';
+import { renderTracePreviewVisual } from '../../previewHelpers';
 import { getTransformGizmo, hitTransformGizmo, renderTransformGizmo } from '../../transformGizmo';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
@@ -29,6 +32,8 @@ export class ImageTool extends BaseTool {
 	private draft: SketchImage | null = null;
 	private container?: HTMLElement;
 	private readonly replaceImage: (id: string) => void;
+	private traceModal?: ImageTraceModal;
+	private tracePreview: { imageId: string; result: TraceResult | null; settings: ImageTraceSettings } | null = null;
 
 	constructor(replaceImage: (id: string) => void) {
 		super();
@@ -53,17 +58,28 @@ export class ImageTool extends BaseTool {
 
 	override deactivate(): void {
 		this.container?.querySelector<HTMLInputElement>('.image-tool-card input:focus')?.blur();
+		this.traceModal?.close();
+		this.tracePreview = null;
 		this.drag = null;
 		this.draft = null;
 		this.container = undefined;
 	}
 
 	override cancel(): void {
+		if (this.traceModal?.openState) {
+			this.traceModal.close();
+			return;
+		}
 		this.ctx.setTool('select');
 	}
 
 	override getRenderOptions(): Record<string, unknown> {
-		return { imagePreview: this.draft };
+		if (this.draft) return { imagePreview: this.draft };
+		const image = this.image;
+		if (image && this.tracePreview?.imageId === image.id) {
+			return { imagePreview: { ...image, opacity: Math.min(image.opacity, 0.35) } };
+		}
+		return { imagePreview: null };
 	}
 
 	private getGizmo(image: SketchImage) {
@@ -78,7 +94,35 @@ export class ImageTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		const image = this.draft ?? this.image;
-		if (image) renderTransformGizmo(this.getGizmo(image), ctx.targetGroup);
+		if (!image) return;
+		renderTransformGizmo(this.getGizmo(image), ctx.targetGroup);
+		if (this.tracePreview?.imageId === image.id && this.tracePreview.result) {
+			renderTracePreviewVisual(
+				ctx.targetGroup,
+				ctx.viewport,
+				this.tracePreview.result,
+				image,
+				this.tracePreview.settings.construction
+			);
+		}
+	}
+
+	openConvertModal(): void {
+		const image = this.image;
+		if (!image || !image.objectUrl) return;
+		if (!this.traceModal) {
+			this.traceModal = new ImageTraceModal(this.ctx.sketch, {
+				onPreviewChange: preview => {
+					this.tracePreview = preview;
+					this.ctx.requestRender();
+				},
+				onConverted: () => {
+					this.tracePreview = null;
+					this.ctx.setTool('select');
+				},
+			});
+		}
+		this.traceModal.open(image.id);
 	}
 
 	override onMouseDown(e: ToolMouseEvent): boolean {
@@ -204,7 +248,10 @@ export class ImageTool extends BaseTool {
 					`
 					).join('')}
 				</div>
-				<div class="mirror-actions"><button type="button" class="btn-mirror-ok image-replace">Replace Image</button></div>
+				<div class="mirror-actions">
+					<button type="button" class="btn-mirror-ok image-convert" ${image.objectUrl ? '' : 'disabled'}>Convert to Primitives</button>
+					<button type="button" class="btn-mirror-cancel image-replace">Replace Image</button>
+				</div>
 				${image.objectUrl ? '' : '<div class="mirror-hint">Choose the local image file to restore the reference.</div>'}
 			</div>
 		`;
@@ -213,6 +260,7 @@ export class ImageTool extends BaseTool {
 	private bindPanel(container: HTMLElement): void {
 		this.container = container;
 		container.querySelector('.image-close')?.addEventListener('click', () => this.cancel());
+		container.querySelector('.image-convert')?.addEventListener('click', () => this.openConvertModal());
 		container.querySelector('.image-replace')?.addEventListener('click', () => {
 			if (this.imageId) this.replaceImage(this.imageId);
 		});

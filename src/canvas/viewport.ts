@@ -92,7 +92,7 @@ export class Viewport {
 
 	zoomAt(screen: Vec2, factor: number): void {
 		const worldBefore = this.screenToWorld(screen);
-		const newZoom = Math.min(Math.max(this.zoom * factor, 0.05), 50.0);
+		const newZoom = Math.min(Math.max(this.zoom * factor, 0.05), 200.0);
 		this.zoom = newZoom;
 		const screenAfter = this.worldToScreen(worldBefore);
 		this.panX += screen.x - screenAfter.x;

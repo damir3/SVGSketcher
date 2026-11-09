@@ -1,0 +1,201 @@
+import type { Vec2 } from '../../math/vector';
+import { marchingSquares, pixelEdgeContours } from './contours';
+import { fitClosedCircle, fitPolyline, polylineLength, type FittedPiece, type FittedPolyline } from './fit';
+import { binarize, despeckle, gaussianBlur, otsuThreshold } from './raster';
+import { extractSkeletonGraph, pruneSkeletonGraph, thin } from './skeleton';
+import {
+	countTraceStats,
+	getEffectiveMinSegment,
+	type FitOptions,
+	type ImageTraceSettings,
+	type TracedPath,
+	type TracedSegment,
+	type TraceResult,
+} from './types';
+
+export interface TraceInput {
+	/** Grayscale values 0..255, row-major. Transparent pixels should already be composited onto white. */
+	gray: Float32Array;
+	width: number;
+	height: number;
+	/** Ratio of the world size of a pixel in y to its size in x. Fitting happens in x-pixel units. */
+	yScale: number;
+	/** World size (mm) of one pixel in x. Used to reject arcs below the sketch's minimum radius. */
+	pixelSize: number;
+}
+
+/** Sketch radii are clamped to at least 1 mm. */
+const MIN_WORLD_RADIUS = 1.05;
+
+export function getFitOptions(settings: ImageTraceSettings, input: Omit<TraceInput, 'gray'>): FitOptions {
+	return {
+		tolerance: Math.max(0.1, settings.tolerance),
+		minSegment: getEffectiveMinSegment(settings, input.width, input.height),
+		cornerAngle: settings.cornerAngle,
+		smoothing: settings.smoothing,
+		useArcs: settings.useArcs,
+		useCircles: settings.useCircles,
+		minRadius: Math.max(settings.tolerance * 2, MIN_WORLD_RADIUS / Math.max(1e-9, input.pixelSize)),
+		maxRadius: Math.hypot(input.width, input.height * input.yScale) * 3,
+	};
+}
+
+export function prepareMask(input: TraceInput, settings: ImageTraceSettings): { mask: Uint8Array; threshold: number } {
+	const blurred = gaussianBlur(input.gray, input.width, input.height, settings.blur);
+	const threshold = settings.autoThreshold ? otsuThreshold(blurred) : settings.threshold;
+	const binary = binarize(blurred, threshold, settings.invert);
+	const mask = despeckle(binary, input.width, input.height, Math.round(settings.despeckle));
+	return { mask, threshold };
+}
+
+export function traceImage(input: TraceInput, settings: ImageTraceSettings): TraceResult {
+	const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+	const { width, height, yScale } = input;
+	const options = getFitOptions(settings, input);
+	const { mask, threshold } = prepareMask(input, settings);
+	const scaleY = (points: Vec2[]) => points.map(p => ({ x: p.x, y: p.y * yScale }));
+
+	const builder = new TraceBuilder(options);
+	if (settings.mode === 'outline') {
+		let contours: Vec2[][];
+		if (settings.outlineAlgorithm === 'pixel-edges') {
+			contours = pixelEdgeContours(mask, width, height);
+		} else {
+			const field = new Float32Array(mask.length);
+			for (let i = 0; i < mask.length; i++) field[i] = mask[i];
+			contours = marchingSquares(gaussianBlur(field, width, height, 0.8), width, height, 0.5);
+		}
+		for (const contour of contours) builder.addClosed(scaleY(contour));
+	} else {
+		const skeleton = thin(mask, width, height, settings.centerlineAlgorithm);
+		const graph = pruneSkeletonGraph(
+			extractSkeletonGraph(skeleton, width, height),
+			Math.max(options.minSegment * 0.75, options.tolerance * 3)
+		);
+		const nodeVertices = new Map<number, number>();
+		const nodeVertex = (node: number) => {
+			let vertex = nodeVertices.get(node);
+			if (vertex === undefined) {
+				const p = graph.nodes[node];
+				vertex = builder.addVertex({ x: p.x, y: p.y * yScale });
+				nodeVertices.set(node, vertex);
+			}
+			return vertex;
+		};
+		for (const edge of graph.edges) {
+			const points = scaleY(edge.points);
+			if (polylineLength(points) < options.tolerance * 2) continue;
+			builder.addOpen(points, nodeVertex(edge.a), nodeVertex(edge.b));
+		}
+		for (const loop of graph.loops) builder.addClosed(scaleY(loop));
+	}
+
+	const elapsedMs = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime;
+	const result = {
+		width,
+		height,
+		yScale,
+		threshold,
+		vertices: builder.vertices,
+		paths: builder.paths,
+		circles: builder.circles,
+		closedSplines: builder.closedSplines,
+	};
+	return { ...result, stats: countTraceStats(result), elapsedMs };
+}
+
+class TraceBuilder {
+	readonly vertices: Vec2[] = [];
+	readonly paths: TracedPath[] = [];
+	readonly circles: TraceResult['circles'] = [];
+	readonly closedSplines: TraceResult['closedSplines'] = [];
+	private readonly options: FitOptions;
+
+	constructor(options: FitOptions) {
+		this.options = options;
+	}
+
+	addVertex(p: Vec2): number {
+		this.vertices.push({ x: p.x, y: p.y });
+		return this.vertices.length - 1;
+	}
+
+	addClosed(points: Vec2[]): void {
+		if (points.length < 3 || polylineLength([...points, points[0]]) < this.options.minSegment) return;
+		const circle = fitClosedCircle(points, this.options);
+		if (circle) {
+			this.circles.push(circle);
+			return;
+		}
+		const fitted = fitPolyline({ points, closed: true }, this.options);
+		if (!fitted || !fitted.pieces.length) return;
+		if (fitted.pieces.length === 1 && fitted.pieces[0].kind === 'spline') {
+			const piece = fitted.pieces[0];
+			// A single closed spline: drop the repeated end point.
+			this.closedSplines.push({ points: piece.points.slice(0, -1), handles: piece.handles.slice(0, -1) });
+			return;
+		}
+		const vertices = fitted.pieces.map(piece => this.addVertex(fitted.points[piece.start]));
+		this.pushPath(fitted, vertices, vertices[0]);
+	}
+
+	addOpen(points: Vec2[], startVertex: number, endVertex: number): void {
+		const fitted = fitPolyline({ points, closed: false, pinEnds: true }, this.options);
+		if (!fitted || !fitted.pieces.length) return;
+		const vertices = fitted.pieces.map((piece, index) =>
+			index === 0 ? startVertex : this.addVertex(fitted.points[piece.start])
+		);
+		this.pushPath(fitted, vertices, endVertex);
+	}
+
+	private pushPath(fitted: FittedPolyline, startVertices: number[], lastVertex: number): void {
+		const segments: TracedSegment[] = fitted.pieces.map((piece, index) => {
+			const a = startVertices[index];
+			const b = index + 1 < startVertices.length ? startVertices[index + 1] : lastVertex;
+			return toSegment(fitted.points, piece, a, b);
+		});
+		const tangent = fitted.pieces.map((piece, index) => {
+			if (fitted.corners[index]) return false;
+			const previousIndex = index > 0 ? index - 1 : fitted.closed ? fitted.pieces.length - 1 : -1;
+			if (previousIndex < 0 || previousIndex === index) return false;
+			const previous = fitted.pieces[previousIndex];
+			if (previous.kind === 'spline' || piece.kind === 'spline') return false;
+			if (previous.kind === 'line' && piece.kind === 'line') return false;
+			const incoming = endDirection(fitted.points, previous, 'end');
+			const outgoing = endDirection(fitted.points, piece, 'start');
+			const cos = incoming.x * outgoing.x + incoming.y * outgoing.y;
+			return cos > Math.cos((Math.min(12, this.options.cornerAngle / 2) * Math.PI) / 180);
+		});
+		this.paths.push({ segments, closed: fitted.closed, tangent });
+	}
+}
+
+function toSegment(points: Vec2[], piece: FittedPiece, a: number, b: number): TracedSegment {
+	if (piece.kind === 'line') return { kind: 'line', a, b };
+	if (piece.kind === 'arc') {
+		const mid = points[Math.round((piece.start + piece.end) / 2)];
+		return { kind: 'arc', a, b, center: piece.center, radius: piece.radius, mid: { ...mid } };
+	}
+	return { kind: 'spline', a, b, points: piece.points.slice(1, -1), handles: piece.handles };
+}
+
+/** Unit direction of travel at the start or end of a fitted piece. */
+function endDirection(points: Vec2[], piece: FittedPiece, at: 'start' | 'end'): Vec2 {
+	const p = points[at === 'start' ? piece.start : piece.end];
+	const near = points[at === 'start' ? Math.min(piece.end, piece.start + 2) : Math.max(piece.start, piece.end - 2)];
+	const travel = at === 'start' ? { x: near.x - p.x, y: near.y - p.y } : { x: p.x - near.x, y: p.y - near.y };
+	let direction: Vec2;
+	if (piece.kind === 'line') {
+		const a = points[piece.start];
+		const b = points[piece.end];
+		direction = { x: b.x - a.x, y: b.y - a.y };
+	} else if (piece.kind === 'arc') {
+		const radial = { x: p.x - piece.center.x, y: p.y - piece.center.y };
+		direction = { x: -radial.y, y: radial.x };
+		if (direction.x * travel.x + direction.y * travel.y < 0) direction = { x: -direction.x, y: -direction.y };
+	} else {
+		direction = travel;
+	}
+	const l = Math.hypot(direction.x, direction.y) || 1;
+	return { x: direction.x / l, y: direction.y / l };
+}

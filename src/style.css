@@ -2133,3 +2133,230 @@ body {
 	fill: #e0f2fe;
 	stroke-width: 2.5;
 }
+
+/* --- IMAGE TRACE MODAL --- */
+.trace-modal-layer {
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	z-index: 1500;
+}
+
+.trace-modal-layer.hidden {
+	display: none;
+}
+
+.trace-modal-dialog {
+	position: fixed;
+	top: calc(var(--header-height) + 14px);
+	right: calc(var(--sidebar-width) + 14px);
+	width: 390px;
+	max-width: calc(100vw - 24px);
+	max-height: calc(100vh - var(--header-height) - var(--footer-height) - 28px);
+	background-color: #ffffff;
+	border: 1px solid var(--border-color);
+	border-radius: 12px;
+	box-shadow:
+		0 12px 28px -6px rgba(15, 23, 42, 0.22),
+		0 6px 12px -4px rgba(15, 23, 42, 0.1);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	pointer-events: auto;
+	animation: paramModalFadeIn 0.15s ease-out;
+}
+
+.trace-modal-header {
+	padding: 11px 14px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	border-bottom: 1px solid var(--border-color);
+	background-color: var(--bg-surface-elevated, #f8fafc);
+	cursor: move;
+}
+
+.trace-modal-subtitle {
+	font-size: 11px;
+	color: var(--text-muted);
+	max-width: 250px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.trace-modal-body {
+	padding: 12px 14px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	flex: 1;
+}
+
+.trace-section {
+	background-color: var(--bg-surface-elevated, #f8fafc);
+	border: 1px solid var(--border-color);
+	border-radius: 8px;
+	padding: 9px 11px;
+	display: flex;
+	flex-direction: column;
+	gap: 7px;
+}
+
+.trace-section-title {
+	font-size: 10.5px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--text-secondary);
+}
+
+.trace-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.trace-mode-selector {
+	display: inline-flex;
+	padding: 2px;
+	gap: 2px;
+}
+
+.trace-mode-button {
+	min-height: 24px;
+	padding: 3px 10px;
+	font-size: 11px;
+}
+
+.trace-row.hidden {
+	display: none;
+}
+
+.trace-label {
+	font-size: 11.5px;
+	font-weight: 500;
+	color: var(--text-primary);
+}
+
+.trace-label-with-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.trace-inline-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 11px;
+	font-weight: 500;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.trace-check-row {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11.5px;
+	color: var(--text-primary);
+	cursor: pointer;
+}
+
+.trace-checks-inline {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.trace-constraints-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 5px 8px;
+}
+
+.trace-select {
+	padding: 4px 8px;
+	border: 1px solid #cbd5e1;
+	border-radius: 5px;
+	background-color: #ffffff;
+	color: var(--text-primary);
+	font-size: 11.5px;
+	max-width: 210px;
+}
+
+.trace-slider-group {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.trace-slider-group input[type="range"] {
+	width: 110px;
+	accent-color: var(--cad-blue);
+	cursor: pointer;
+}
+
+.trace-num-input {
+	width: 54px;
+	padding: 3px 6px;
+	border: 1px solid #cbd5e1;
+	border-radius: 5px;
+	font-size: 11.5px;
+	font-family: monospace;
+	text-align: right;
+	background-color: #ffffff;
+	color: var(--text-primary);
+}
+
+.trace-unit {
+	font-size: 11px;
+	color: var(--text-muted);
+	min-width: 18px;
+}
+
+.trace-warning-banner {
+	margin: 0 14px 8px;
+	padding: 7px 10px;
+	border-radius: 6px;
+	background-color: #fffbeb;
+	border: 1px solid #fde68a;
+	color: #92400e;
+	font-size: 11px;
+	line-height: 1.35;
+}
+
+.trace-warning-banner.hidden {
+	display: none;
+}
+
+.trace-modal-footer {
+	padding: 10px 14px;
+	border-top: 1px solid var(--border-color);
+	background-color: var(--bg-surface-elevated, #f8fafc);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.trace-stats-summary {
+	font-size: 11.5px;
+	font-weight: 500;
+	color: var(--text-secondary);
+}
+
+.trace-footer-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 6px;
+}
+
+.btn-param-action.primary:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	box-shadow: none;
+}

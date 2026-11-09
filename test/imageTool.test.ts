@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { CanvasInteraction } from '../src/canvas/interaction';
+import { ImageTool } from '../src/canvas/tools/modify/image';
 import { Viewport } from '../src/canvas/viewport';
 import { SketchDocument } from '../src/model/sketch';
 
@@ -101,4 +102,37 @@ it('keeps the local source available through image edits, deletion and undo', ()
 	assert.ok(sketch.redo());
 	assert.ok(sketch.redo());
 	assert.equal(sketch.images.size, 0);
+});
+
+it('enables Convert to Primitives only when the image has a local file reference', () => {
+	const sketch = new SketchDocument();
+	const missing = sketch.addImage({
+		fileName: 'missing.png',
+		x: 0,
+		y: 0,
+		width: 100,
+		height: 80,
+		angle: 0,
+		opacity: 1,
+	});
+	const linked = sketch.addImage({
+		fileName: 'linked.png',
+		objectUrl: 'blob:linked',
+		x: 0,
+		y: 0,
+		width: 100,
+		height: 80,
+		angle: 0,
+		opacity: 1,
+	});
+	const tool = new ImageTool(() => {});
+	tool.activate({ sketch, setCursor() {} } as any);
+
+	tool.imageId = missing.id;
+	const missingHtml = tool.sidebarPanel!.render();
+	assert.match(missingHtml, /image-convert[^>]*disabled/);
+
+	tool.imageId = linked.id;
+	const linkedHtml = tool.sidebarPanel!.render();
+	assert.match(linkedHtml, /class="btn-mirror-ok image-convert"\s*>/);
 });
