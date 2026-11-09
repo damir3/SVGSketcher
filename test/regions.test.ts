@@ -2,7 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { SketchDocument } from '../src/model/sketch';
-import { findSketchRegions, pointInRegion } from '../src/math/regions';
+import { findCurveRegions, findSketchRegions, pointInRegion } from '../src/math/regions';
+import type { GeoArc } from '../src/math/intersection';
 import { SketchArc } from '../src/model/primitives/arc';
 
 function addTriangle(sketch: SketchDocument) {
@@ -15,6 +16,36 @@ function addTriangle(sketch: SketchDocument) {
 }
 
 describe('sketch regions', () => {
+	it('finds a face whose tessellated boundary is too deep for recursive traversal', () => {
+		const count = 180;
+		const center = { x: 0, y: 0 };
+		const radius = 100;
+		const points = Array.from({ length: count }, (_, i) => {
+			const angle = (i * 2 * Math.PI) / count;
+			return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+		});
+		const curves: GeoArc[] = points.map((start, i) => {
+			const next = (i + 1) % count;
+			return {
+				type: 'arc',
+				id: `arc-${i}`,
+				center,
+				centerId: 'center',
+				startPointId: `point-${i}`,
+				endPointId: `point-${next}`,
+				start,
+				end: points[next],
+				radius,
+				clockwise: false,
+			};
+		});
+
+		const regions = findCurveRegions(curves);
+		assert.equal(regions.length, 1);
+		assert.ok(regions[0].points.length >= 8000);
+		assert.ok(pointInRegion(center, regions[0]));
+	});
+
 	it('closes a region when the final spline endpoint is just outside its circle', () => {
 		// Snapshot from sketch_1794050130573.svg.
 		const fixture = new URL('./fixtures/spline-circle-closed-regions.json', import.meta.url);

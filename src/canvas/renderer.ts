@@ -4,7 +4,8 @@ import { calculateObjectsCentroid } from './tools/modify/utils';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
-import { findSketchRegions, pointInRegion } from '../math/regions';
+import { getAllGeoCurves } from '../math/intersection';
+import { findCurveRegions, pointInRegion, type SketchRegion } from '../math/regions';
 import { getFilletLineEndPointId, type FilletCandidate } from '../math/fillet';
 import {
 	computePatternCopyAngle,
@@ -206,8 +207,11 @@ export class SVGRenderer {
 	private regionHoverGroup: SVGGElement;
 	private constraintBadgesVisible = true;
 	private dimensionsVisible = true;
-	private cachedRegions: ReturnType<typeof findSketchRegions> = [];
+	private cachedRegions: SketchRegion[] = [];
+	private regionGeometryKey: string | null = null;
 	private cachedViewport: Viewport | null = null;
+	deferRegionSolve = false;
+	onRegionSolve?: (elapsedMs: number) => void;
 	private constraintGroup: SVGGElement;
 	private pointGroup: SVGGElement;
 	private mirrorGroup: SVGGElement;
@@ -401,7 +405,16 @@ export class SVGRenderer {
 	}
 
 	private renderRegions(sketch: SketchDocument, viewport: Viewport, hoverPoint: Vec2 | null): void {
-		this.cachedRegions = findSketchRegions(sketch);
+		if (!this.deferRegionSolve) {
+			const start = performance.now();
+			const curves = getAllGeoCurves(sketch).filter(curve => !curve.isConstruction);
+			const geometryKey = JSON.stringify(curves);
+			if (geometryKey !== this.regionGeometryKey) {
+				this.cachedRegions = findCurveRegions(curves);
+				this.regionGeometryKey = geometryKey;
+				this.onRegionSolve?.(performance.now() - start);
+			}
+		}
 		this.cachedViewport = viewport;
 		this.drawRegions(hoverPoint);
 	}

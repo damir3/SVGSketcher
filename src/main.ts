@@ -110,7 +110,8 @@ function initApp(): void {
 				<span>Zoom: <strong id="zoom-level">${Math.round(DEFAULT_ZOOM * 100)}%</strong></span>
 			</div>
 			<div class="footer-status">
-				<span>Solver: <strong id="solver-time">0.0 ms</strong></span>
+				<span>Constraint Solver: <strong id="solver-time">0.0 ms</strong></span>
+				<span>Region Solver: <strong id="region-solver-time" title="Time for the last region calculation">0.0 ms</strong></span>
 			</div>
 		</footer>
 	`;
@@ -138,12 +139,16 @@ function initApp(): void {
 	const coordY = document.getElementById('coord-y') as HTMLElement;
 	const zoomLevel = document.getElementById('zoom-level') as HTMLElement;
 	const solverTime = document.getElementById('solver-time') as HTMLElement;
+	const regionSolverTime = document.getElementById('region-solver-time') as HTMLElement;
 
 	// Initialization of Architecture
 	const sketch = new SketchDocument();
 	const canvasRect = svg.getBoundingClientRect();
 	const viewport = new Viewport(canvasRect.width || 800, canvasRect.height || 600);
 	const renderer = new SVGRenderer(svg);
+	renderer.onRegionSolve = elapsedMs => {
+		regionSolverTime.textContent = `${elapsedMs.toFixed(2)} ms`;
+	};
 	const interaction = new CanvasInteraction(svg, sketch, viewport, renderer);
 	const toolbar = new Toolbar(toolbarContainer, sketch, interaction);
 	const sidebar = new Sidebar(sidebarContainer, sketch, interaction);
@@ -201,7 +206,7 @@ function initApp(): void {
 		renderer.render(sketch, viewport);
 	});
 
-	// Track cursor coordinates and solver benchmark
+	// Track cursor coordinates
 	svg.addEventListener('mousemove', e => {
 		const rect = svg.getBoundingClientRect();
 		const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -224,13 +229,10 @@ function initApp(): void {
 		}
 	}
 
-	// Benchmark solver execution on each solve
 	sketch.onChange(() => {
-		const t0 = performance.now();
+		solverTime.textContent = `${sketch.lastSolveTimeMs.toFixed(2)} ms`;
 		if (interaction.activeTool === 'transform' || interaction.activeTool === 'image') interaction.render();
 		else renderer.render(sketch, viewport);
-		const dt = performance.now() - t0;
-		solverTime.textContent = `${dt.toFixed(2)} ms`;
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 		updateUndoRedoButtons();
 	});

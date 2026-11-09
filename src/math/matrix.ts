@@ -96,11 +96,24 @@ export function solveLinearSystem(A: Matrix, b: Float64Array): Float64Array | nu
 		throw new Error('solveLinearSystem expects square matrix and matching vector');
 	}
 
-	// Work on local copies
-	const a = new Float64Array(A.data);
-	const x = new Float64Array(b);
-	const piv = new Int32Array(n);
-	for (let i = 0; i < n; i++) piv[i] = i;
+	// Process sparse rows and their corresponding columns first to limit fill-in.
+	const order = Array.from({ length: n }, (_, i) => i);
+	const nonzeroCounts = new Int32Array(n);
+	for (let row = 0; row < n; row++) {
+		for (let col = 0; col < n; col++) {
+			if (A.data[row * n + col] !== 0) nonzeroCounts[row]++;
+		}
+	}
+	order.sort((a, b) => nonzeroCounts[a] - nonzeroCounts[b]);
+	const a = new Float64Array(n * n);
+	const x = new Float64Array(n);
+	for (let row = 0; row < n; row++) {
+		const originalRow = order[row];
+		x[row] = b[originalRow];
+		for (let col = 0; col < n; col++) {
+			a[row * n + col] = A.data[originalRow * n + order[col]];
+		}
+	}
 
 	// LU decomposition with partial pivoting
 	for (let i = 0; i < n; i++) {
@@ -119,17 +132,13 @@ export function solveLinearSystem(A: Matrix, b: Float64Array): Float64Array | nu
 			return null; // Singular matrix
 		}
 
-		// Swap rows in A and permutation
+		// Swap rows in A and the right-hand side.
 		if (maxRow !== i) {
 			for (let c = 0; c < n; c++) {
 				const tmp = a[i * n + c];
 				a[i * n + c] = a[maxRow * n + c];
 				a[maxRow * n + c] = tmp;
 			}
-			const tmpP = piv[i];
-			piv[i] = piv[maxRow];
-			piv[maxRow] = tmpP;
-
 			const tmpB = x[i];
 			x[i] = x[maxRow];
 			x[maxRow] = tmpB;
@@ -139,6 +148,7 @@ export function solveLinearSystem(A: Matrix, b: Float64Array): Float64Array | nu
 		const pivot = a[i * n + i];
 		for (let j = i + 1; j < n; j++) {
 			const factor = a[j * n + i] / pivot;
+			if (factor === 0) continue;
 			a[j * n + i] = factor;
 			for (let c = i + 1; c < n; c++) {
 				a[j * n + c] -= factor * a[i * n + c];
@@ -156,7 +166,9 @@ export function solveLinearSystem(A: Matrix, b: Float64Array): Float64Array | nu
 		x[i] = sum / a[i * n + i];
 	}
 
-	return x;
+	const solution = new Float64Array(n);
+	for (let i = 0; i < n; i++) solution[order[i]] = x[i];
+	return solution;
 }
 
 /** Finds the rank and the coordinates that are zero in every nullspace direction. */
@@ -197,6 +209,7 @@ export function analyzeNullspace(matrix: Matrix, tolerance = 1e-7): { rank: numb
 		const pivot = a[row * n + col];
 		for (let r = row + 1; r < m; r++) {
 			const factor = a[r * n + col] / pivot;
+			if (factor === 0) continue;
 			for (let c = col; c < n; c++) {
 				a[r * n + c] -= factor * a[row * n + c];
 			}

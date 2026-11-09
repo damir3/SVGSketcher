@@ -38,7 +38,7 @@ export interface ParamRef {
 	get(): number;
 	set(val: number): void;
 	isFixed?: boolean;
-	/** Optional lower bound enforced inside the solver iterations (e.g. radius >= 1) */
+	/** Optional lower bound enforced inside the solver iterations. */
 	min?: number;
 }
 

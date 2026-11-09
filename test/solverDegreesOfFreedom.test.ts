@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { analyzeNullspace, Matrix } from '../src/math/matrix';
+import { analyzeNullspace, Matrix, solveLinearSystem } from '../src/math/matrix';
 import { SketchDocument } from '../src/model/sketch';
 
 function restoreTangentCircleScene(): SketchDocument {
@@ -52,6 +52,12 @@ it('distinguishes fixed coordinates from pivots that move with free coordinates'
 	assert.deepEqual(analyzeNullspace(matrix), { rank: 3, fixedColumns: [0, 3] });
 });
 
+it('returns the linear solution in the original variable order after reordering and pivoting', () => {
+	const matrix = new Matrix(3, 3, [1, 2, 3, 0, 0, 4, 0, 5, 0]);
+	const rhs = new Float64Array([14, 12, 10]);
+	assert.deepEqual(solveLinearSystem(matrix, rhs), new Float64Array([1, 2, 3]));
+});
+
 it('reports fixed parameters in a mixed sketch, excluding temporary drag targets', () => {
 	const sketch = new SketchDocument();
 	const anchor = sketch.addPoint({ x: 20, y: 20 }, true);
@@ -75,4 +81,28 @@ it('reports fixed parameters in a mixed sketch, excluding temporary drag targets
 
 	sketch.removeConstraint(radius.id);
 	assert.ok(!sketch.lastSolverResult?.constrainedParams.has(`${circle.id}.r`));
+});
+
+it('restores a missing arc endpoint constraint in a saved sketch', () => {
+	const sketch = new SketchDocument();
+	const center = sketch.addPoint({ x: 0, y: 0 }, true);
+	const start = sketch.addPoint({ x: 100, y: 0 });
+	const end = sketch.addPoint({ x: 0, y: 100 });
+	const arc = sketch.addArc(center.id, start.id, end.id, 100);
+	const radius = sketch.addRadiusConstraint(arc.id, 100)!;
+	const snapshot = sketch.takeSnapshot();
+	snapshot.constraints = snapshot.constraints.filter(c => c.type !== 'arc_endpoints');
+	const dimension = snapshot.constraints.find(c => c.id === radius.id);
+	assert.ok(dimension?.type === 'radius');
+	dimension.targetRadius = 113;
+	dimension.value = 113;
+
+	sketch.restoreSnapshot(snapshot);
+
+	assert.equal(sketch.arcs.get(arc.id)?.radius, 113);
+	assert.equal(sketch.lastSolverResult?.degreesOfFreedom, 2);
+	for (const id of [start.id, end.id]) {
+		const point = sketch.points.get(id)!;
+		assert.ok(Math.abs(Math.hypot(point.x, point.y) - 113) < 1e-6);
+	}
 });

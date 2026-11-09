@@ -224,6 +224,61 @@ describe('Grid Snapping & Drag Precision', () => {
 		}
 	});
 
+	it('defers region solving until the dragged point has snapped on mouseup', () => {
+		const cleanupDoc = setupMockDocument();
+		try {
+			const sketch = new SketchDocument();
+			const viewport = new Viewport(800, 600);
+			viewport.zoom = 4;
+			const point = sketch.addPoint(vec(12, 16));
+			const svg = {
+				style: {},
+				classList: { add() {}, remove() {}, toggle() {} },
+				getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+				addEventListener() {},
+			} as unknown as SVGSVGElement;
+			const regionInputs: number[] = [];
+			const renderer = {
+				deferRegionSolve: false,
+				rectangularGizmoHandles: new Map(),
+				patternCheckboxPositions: new Map(),
+				clearPreviews() {},
+				renderSnapIndicator() {},
+				render() {
+					if (!this.deferRegionSolve) regionInputs.push(point.x);
+				},
+			};
+			const interaction = new CanvasInteraction(svg, sketch, viewport, renderer as any);
+			sketch.onChange(() => renderer.render());
+			const eventAt = (x: number, y: number) => {
+				const screen = viewport.worldToScreen(vec(x, y));
+				return {
+					button: 0,
+					clientX: screen.x,
+					clientY: screen.y,
+					target: {
+						closest: (selector: string) =>
+							selector === '[data-id]'
+								? { getAttribute: (name: string) => (name === 'data-id' ? point.id : 'point') }
+								: null,
+					},
+				} as unknown as MouseEvent;
+			};
+
+			interaction['handleMouseDown'](eventAt(12, 16));
+			regionInputs.length = 0;
+			interaction['handleMouseMove'](eventAt(16, 17));
+			interaction['handleMouseMove'](eventAt(20, 19));
+			assert.equal(point.x, 20);
+			assert.deepEqual(regionInputs, []);
+
+			interaction['handleMouseUp'](eventAt(25.5, 20));
+			assert.deepEqual(regionInputs, [25]);
+		} finally {
+			cleanupDoc();
+		}
+	});
+
 	it('snaps along X to grid on X-axis and along Y to grid on Y-axis', () => {
 		const cleanupDoc = setupMockDocument();
 		try {

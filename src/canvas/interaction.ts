@@ -587,7 +587,20 @@ export class CanvasInteraction {
 		this.dragSplineStartWorld = null;
 		this.splinePointsStart.clear();
 
+		this.renderer.deferRegionSolve = false;
 		this.renderer.clearPreviews();
+	}
+
+	private get isDraggingPrimitive(): boolean {
+		return (
+			this.isDraggingPoint ||
+			this.isDraggingLine ||
+			this.isDraggingCircle ||
+			this.isDraggingArc ||
+			this.isDraggingEllipse ||
+			this.isDraggingEllipticalArc ||
+			this.isDraggingSpline
+		);
 	}
 
 	render(): void {
@@ -762,6 +775,7 @@ export class CanvasInteraction {
 		window.addEventListener('blur', () => {
 			this.isSnapModifierPressed = false;
 			this.isSpacePressed = false;
+			if (this.isDraggingPrimitive) this.handleMouseUp();
 			this.highlightManager.clear();
 		});
 	}
@@ -2170,6 +2184,7 @@ export class CanvasInteraction {
 					}
 				}
 
+				this.renderer.deferRegionSolve = this.isDraggingPrimitive;
 				this.svg.classList.add('is-dragging');
 				this.render();
 			} else {
@@ -2493,8 +2508,7 @@ export class CanvasInteraction {
 			const hasRadConst = this.sketch.hasRadiusConstraint(this.draggedCircleId);
 
 			if ((e.shiftKey || e.altKey || (isFixed && !hasRadConst)) && center) {
-				const newRadius = Math.max(1, dist(center, world));
-				this.sketch.dragCircleRadius(this.draggedCircleId, newRadius);
+				this.sketch.dragCircleRadius(this.draggedCircleId, dist(center, world));
 				this.render();
 			} else {
 				const dir = sub(world, this.dragCircleStartWorld);
@@ -2705,6 +2719,7 @@ export class CanvasInteraction {
 	}
 
 	private handleMouseUp(e?: MouseEvent): void {
+		const primitiveMoved = this.isDraggingPrimitive && this.hasDragged;
 		if (e) {
 			this.isSnapModifierPressed = this.isSnapModifier(e);
 			if (this.activeTool !== 'select' && this.activeToolInstance?.onMouseUp) {
@@ -2781,7 +2796,6 @@ export class CanvasInteraction {
 				}
 				// Final solve without soft drag constraint to ensure exact convergence
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2799,7 +2813,6 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2816,7 +2829,6 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2835,7 +2847,6 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2854,7 +2865,6 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2875,7 +2885,6 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2892,7 +2901,6 @@ export class CanvasInteraction {
 			this.renderer.clearPreviews();
 			if (this.hasDragged) {
 				this.sketch.solve();
-				this.render();
 				if (this.preDragSnapshot) {
 					this.sketch.pushSnapshot(this.preDragSnapshot);
 				}
@@ -2950,6 +2958,8 @@ export class CanvasInteraction {
 			this.render();
 		}
 		this.pendingExclusiveSelection = null;
+		this.renderer.deferRegionSolve = false;
+		if (primitiveMoved) this.render();
 		this.highlightManager.update(this.activeToolInstance, this.lastMouseScreen);
 	}
 

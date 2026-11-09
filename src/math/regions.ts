@@ -176,7 +176,10 @@ function curvePointAt(
 /** Finds bounded faces in the planar arrangement of sketch curves. Curves are flattened
  * into short chords; the resulting region boundaries are therefore SVG-ready polylines. */
 export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
-	const curves = getAllGeoCurves(sketch).filter(c => !c.isConstruction);
+	return findCurveRegions(getAllGeoCurves(sketch).filter(c => !c.isConstruction));
+}
+
+export function findCurveRegions(curves: RegionCurve[]): SketchRegion[] {
 	const segments: Array<{ a: Vec2; b: Vec2; curve: RegionCurve; t0: number; t1: number }> = [];
 	const params = curves.map(curve => {
 		const periodic = curve.type === 'circle' || curve.type === 'ellipse' || (curve.type === 'spline' && curve.isClosed);
@@ -275,19 +278,31 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 	const discovery = new Map<string, number>(),
 		low = new Map<string, number>();
 	let time = 0;
-	const findBridges = (node: string, parent: string | null) => {
+	const visit = (node: string) => {
 		discovery.set(node, ++time);
 		low.set(node, time);
-		for (const next of edges.get(node) ?? []) {
-			if (next === parent) continue;
-			if (!discovery.has(next)) {
-				findBridges(next, node);
-				low.set(node, Math.min(low.get(node)!, low.get(next)!));
-				if (low.get(next)! > discovery.get(node)!) bridges.add(edgeKey(node, next));
-			} else low.set(node, Math.min(low.get(node)!, discovery.get(next)!));
-		}
+		return { node, neighbors: edges.get(node)!.values() };
 	};
-	for (const node of edges.keys()) if (!discovery.has(node)) findBridges(node, null);
+	for (const root of edges.keys()) {
+		if (discovery.has(root)) continue;
+		const stack = [visit(root)];
+		while (stack.length > 0) {
+			const { node, neighbors } = stack[stack.length - 1];
+			const parent = stack[stack.length - 2]?.node;
+			const step = neighbors.next();
+			if (step.done) {
+				stack.pop();
+				if (parent !== undefined) {
+					low.set(parent, Math.min(low.get(parent)!, low.get(node)!));
+					if (low.get(node)! > discovery.get(parent)!) bridges.add(edgeKey(parent, node));
+				}
+			} else if (step.value !== parent) {
+				const seen = discovery.get(step.value);
+				if (seen === undefined) stack.push(visit(step.value));
+				else low.set(node, Math.min(low.get(node)!, seen));
+			}
+		}
+	}
 	for (const [node, adjacent] of edges)
 		for (const next of adjacent) if (bridges.has(edgeKey(node, next))) adjacent.delete(next);
 	const visited = new Set<string>(),
@@ -335,17 +350,21 @@ export function findSketchRegions(sketch: SketchDocument): SketchRegion[] {
 	// Disconnected nested contours are separate graph components. Build a parent tree
 	// so each bounded face gets direct child contours as holes while each child remains
 	// a region of its own.
-	const parents = loops.map((loop, i) => {
+	const parents = loops.map(loop => {
 		let parent = -1;
 		for (let j = 0; j < loops.length; j++) {
-			if (i === j || loops[j].area <= loop.area) continue;
+			if (loops[j].area <= loop.area || (parent >= 0 && loops[j].area >= loops[parent].area)) continue;
+			if (!pointInPolygon(loop.points[0], loops[j].points)) continue;
 			// Faces created by intersecting curves share their exact intersection
 			// vertices. They are adjacent, not nested, even if a boundary vertex
 			// happens to pass the point-in-polygon test.
-			const sharesBoundary = loop.points.some(p => loops[j].points.some(q => Math.hypot(p.x - q.x, p.y - q.y) < 1e-4));
-			if (sharesBoundary) continue;
-			if (pointInPolygon(loop.points[0], loops[j].points) && (parent < 0 || loops[j].area < loops[parent].area))
-				parent = j;
+			const sharesBoundary = loop.points.some(p =>
+				loops[j].points.some(q => {
+					const dx = p.x - q.x;
+					return Math.abs(dx) < 1e-4 && Math.hypot(dx, p.y - q.y) < 1e-4;
+				})
+			);
+			if (!sharesBoundary) parent = j;
 		}
 		return parent;
 	});

@@ -10,6 +10,7 @@ import {
 } from '../src/math/fillet';
 import { sketchPrimitiveToGeoCurve } from '../src/math/intersection';
 import {
+	ArcEndpointsConstraint,
 	TangentLineCircleConstraint,
 	TangentCircleCircleConstraint,
 	RadiusConstraint,
@@ -526,6 +527,47 @@ describe('Fillet Commit and Document Integration', () => {
 		const radConstraints = [...sketch.constraints.values()].filter(c => c instanceof RadiusConstraint);
 		assert.equal(radConstraints.length, 1, 'RadiusConstraint must be added on first fillet');
 		assert.equal(radConstraints[0].targetRadius, 25);
+	});
+
+	it('keeps the shortened arc endpoints on its circle when the radius changes', () => {
+		const sketch = new SketchDocument();
+		const center = sketch.addPoint({ x: 0, y: 0 }, true);
+		const corner = sketch.addPoint({ x: 50, y: 0 });
+		const end = sketch.addPoint({ x: 0, y: 50 });
+		const arc = sketch.addArc(center.id, corner.id, end.id, 50);
+		const line = sketch.addLine(corner.id, sketch.addPoint({ x: 100, y: 0 }).id);
+		const result = calculateFilletGeometry(line.toGeoCurve(sketch)!, arc.toGeoCurve(sketch)!, 8, {
+			cornerVertex: corner,
+			endPointId1: corner.id,
+			endPointId2: corner.id,
+		});
+		assert.ok(result);
+		assert.ok(
+			commitFilletToSketch(
+				sketch,
+				{
+					id: 'line-arc-fillet',
+					vertexPointId: corner.id,
+					primitive1: { type: 'line', id: line.id },
+					primitive2: { type: 'arc', id: arc.id },
+					endPointId1: corner.id,
+					endPointId2: corner.id,
+					result,
+				},
+				true
+			)
+		);
+
+		assert.ok(!sketch.points.has(corner.id));
+		const endpoints = [...sketch.constraints.values()].find(
+			(c): c is ArcEndpointsConstraint => c instanceof ArcEndpointsConstraint && c.arcId === arc.id
+		);
+		assert.equal(endpoints?.startPointId, arc.startPointId);
+		const radius = sketch.addRadiusConstraint(arc.id, 50)!;
+		assert.ok(sketch.updateDimensionalConstraint(radius.id, 55));
+		const start = sketch.points.get(arc.startPointId)!;
+		assert.ok(Math.abs(Math.hypot(start.x - center.x, start.y - center.y) - 55) < 1e-6);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
 	});
 
 	it('preserves the original circular pattern point on both shortened lines', () => {

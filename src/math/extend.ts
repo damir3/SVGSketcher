@@ -715,11 +715,7 @@ export function executeExtend(
 		if (otherEntities.length > 0 || movingPt.fixed) {
 			const newPt = sketch.addPoint(toPoint);
 			newEndPtId = newPt.id;
-			if (edge === 'end') {
-				arc.endPointId = newEndPtId;
-			} else {
-				arc.startPointId = newEndPtId;
-			}
+			sketch.replaceArcEndpoint(arc, edge, newEndPtId);
 		} else {
 			const toRemove: string[] = [];
 			for (const c of sketch.constraints.values()) {

@@ -128,6 +128,8 @@ import { exportSketchToSVG, importSketchFromSVG, type SketchFileMetadata } from 
 
 export type { SketchFileMetadata };
 
+const MIN_SOLVER_RADIUS = 0.01;
+
 const BUILT_IN_POINTS = new Map<string, SketchPoint>([
 	['origin', Object.freeze(new SketchPoint({ id: 'origin', x: 0, y: 0, fixed: true }))],
 	['axis_x', Object.freeze(new SketchPoint({ id: 'axis_x', x: 1, y: 0, fixed: true }))],
@@ -174,6 +176,7 @@ export class SketchDocument {
 	paramManager = new ParamManager();
 	private solver = new NumericalSolver();
 	lastSolverResult: SolverResult | null = null;
+	lastSolveTimeMs = 0;
 
 	// History & Transactions
 	private history = new HistoryManager();
@@ -404,6 +407,13 @@ export class SketchDocument {
 		}
 
 		this.idCounter = snapshot.idCounter;
+		const arcEndpoints = new Map<string, ArcEndpointsConstraint>();
+		for (const c of this.constraints.values()) {
+			if (c instanceof ArcEndpointsConstraint) arcEndpoints.set(c.arcId, c);
+		}
+		for (const arc of this.arcs.values()) {
+			this.syncArcEndpoints(arc, arcEndpoints.get(arc.id));
+		}
 		this.clearSelection();
 
 		this.parameters.clear();
@@ -523,10 +533,38 @@ export class SketchDocument {
 		});
 		this.arcs.set(id, arc);
 		this.rebuildParamManager();
-		const c = new ArcEndpointsConstraint(this.nextId('c_arcept'), id, centerId, startPointId, endPointId);
-		this.constraints.set(c.id, c);
+		this.syncArcEndpoints(arc);
 		this.solve();
 		return arc;
+	}
+
+	replaceArcEndpoint(arc: SketchArc, edge: 'start' | 'end', pointId: string): void {
+		if (edge === 'start') arc.startPointId = pointId;
+		else arc.endPointId = pointId;
+
+		const endpoints = [...this.constraints.values()].find(
+			(c): c is ArcEndpointsConstraint => c instanceof ArcEndpointsConstraint && c.arcId === arc.id
+		);
+		this.syncArcEndpoints(arc, endpoints);
+	}
+
+	private syncArcEndpoints(arc: SketchArc, existing?: ArcEndpointsConstraint): void {
+		if (
+			existing?.centerId === arc.centerId &&
+			existing.startPointId === arc.startPointId &&
+			existing.endPointId === arc.endPointId
+		) {
+			return;
+		}
+		const c = new ArcEndpointsConstraint(
+			existing?.id ?? this.nextId('c_arcept'),
+			arc.id,
+			arc.centerId,
+			arc.startPointId,
+			arc.endPointId,
+			existing?.weight
+		);
+		this.constraints.set(c.id, c);
 	}
 
 	// --- Ellipse methods ---
@@ -1631,7 +1669,7 @@ export class SketchDocument {
 			return existing;
 		}
 
-		const r = targetRadius ?? Math.max(0.01, Number(entity.radius.toFixed(2)));
+		const r = targetRadius ?? Math.max(MIN_SOLVER_RADIUS, Number(entity.radius.toFixed(2)));
 		const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r, 1.0, placement?.leaderAngle, defaultMode);
 		c.leaderOffset = placement?.leaderOffset;
 		this.addConstraint(c);
@@ -2998,10 +3036,10 @@ export class SketchDocument {
 				id: `${circle.id}.r`,
 				get: () => circle.radius,
 				set: val => {
-					circle.radius = Math.max(1, val);
+					circle.radius = Math.max(MIN_SOLVER_RADIUS, val);
 				},
 				isFixed: false,
-				min: 1,
+				min: MIN_SOLVER_RADIUS,
 			});
 		}
 
@@ -3010,10 +3048,10 @@ export class SketchDocument {
 				id: `${arc.id}.r`,
 				get: () => arc.radius,
 				set: val => {
-					arc.radius = Math.max(1, val);
+					arc.radius = Math.max(MIN_SOLVER_RADIUS, val);
 				},
 				isFixed: false,
-				min: 1,
+				min: MIN_SOLVER_RADIUS,
 			});
 		}
 	}
@@ -3028,10 +3066,33 @@ export class SketchDocument {
 			if (!(c instanceof RadiusConstraint)) continue;
 			const entity = this.circles.get(c.circleId) ?? this.arcs.get(c.circleId);
 			if (!entity) continue;
-			entity.radius = Math.max(1, c.targetRadius);
+			entity.radius = Math.max(MIN_SOLVER_RADIUS, c.targetRadius);
 			locked.add(`${c.circleId}.r`);
 		}
 		return locked;
+	}
+
+	private lockedRadiusError(constraints: IConstraint[], values: Map<string, number>, limit: number): number {
+		let sumSq = 0;
+		for (const c of constraints) {
+			if (c instanceof EqualRadiusConstraint) {
+				const [residual] = c.evaluate(values);
+				sumSq += residual * residual;
+			} else if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
+				const suppressed = new Set(c.suppressedIndices);
+				for (const copy of c.copies) {
+					if (c.suppression && suppressed.has(copy.copyIndex)) continue;
+					for (const pair of copy.radiusPairs ?? []) {
+						const source = values.get(`${pair.sourceCircleId}.r`) ?? 0;
+						const destination = values.get(`${pair.patternCircleId}.r`) ?? 0;
+						const residual = (destination - source) * c.weight;
+						sumSq += residual * residual;
+					}
+				}
+			}
+			if (sumSq * 0.5 >= limit) break;
+		}
+		return sumSq * 0.5;
 	}
 
 	private restoreAutomaticSplineHandles(): void {
@@ -3173,6 +3234,7 @@ export class SketchDocument {
 				}
 			);
 		}
+		const start = performance.now();
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = this.prepareSplineConstraints(extraConstraints, drivenRadii, editedHandles);
@@ -3184,6 +3246,7 @@ export class SketchDocument {
 				lockedParams: drivenRadii,
 			});
 			this.lastSolverResult = res;
+			this.lastSolveTimeMs = performance.now() - start;
 			this.notify();
 			return res;
 		}
@@ -3194,17 +3257,20 @@ export class SketchDocument {
 		for (const id of this.circles.keys()) allRadii.add(`${id}.r`);
 		for (const id of this.arcs.keys()) allRadii.add(`${id}.r`);
 
-		let stage1Ok = false;
 		if (allRadii.size > drivenRadii.size) {
 			const initialValues = this.paramManager.getCurrentValues();
-			const stage1 = this.solver.solve(this.paramManager, activeConstraints, {
-				lockedParams: allRadii,
-				skipDoF: true,
-			});
-			stage1Ok = stage1.status !== 'OVER_CONSTRAINED' && stage1.finalError < 1e-8;
-			if (!stage1Ok) {
-				// Discard the least-squares compromise and start over from the original state
-				this.paramManager.restoreValues(initialValues);
+			const maxError = 1e-8;
+			// Radius-only residuals cannot improve while all radii are locked.
+			if (this.lockedRadiusError(activeConstraints, initialValues, maxError) < maxError) {
+				const stage1 = this.solver.solve(this.paramManager, activeConstraints, {
+					lockedParams: allRadii,
+					skipDoF: true,
+				});
+				const stage1Ok = stage1.status !== 'OVER_CONSTRAINED' && stage1.finalError < maxError;
+				if (!stage1Ok) {
+					// Discard the least-squares compromise and start over from the original state.
+					this.paramManager.restoreValues(initialValues);
+				}
 			}
 		}
 
@@ -3218,6 +3284,7 @@ export class SketchDocument {
 			paramStiffness: stiffness,
 		});
 		this.lastSolverResult = res;
+		this.lastSolveTimeMs = performance.now() - start;
 		this.notify();
 		return res;
 	}
@@ -3291,7 +3358,7 @@ export class SketchDocument {
 		const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
 		if (!entity) return this.solve();
 
-		entity.radius = Math.max(1, targetRadius);
+		entity.radius = Math.max(MIN_SOLVER_RADIUS, targetRadius);
 		return this.solve();
 	}
 
@@ -3735,7 +3802,7 @@ export class SketchDocument {
 			if (c instanceof RadiusConstraint) {
 				const entity = this.circles.get(c.circleId) ?? this.arcs.get(c.circleId);
 				if (entity) {
-					entity.radius = Math.max(0.01, c.targetRadius);
+					entity.radius = Math.max(MIN_SOLVER_RADIUS, c.targetRadius);
 					drivenRadii.add(`${c.circleId}.r`);
 				}
 			}

@@ -911,12 +911,7 @@ function trimOrExtendPrimitive(
 		}
 
 		const oldPtId = replaceStart ? arc.startPointId : arc.endPointId;
-		if (replaceStart) {
-			arc.startPointId = newCutPointId;
-		} else {
-			arc.endPointId = newCutPointId;
-		}
-		sketch.rebuildParamManager();
+		sketch.replaceArcEndpoint(arc, replaceStart ? 'start' : 'end', newCutPointId);
 		return oldPtId;
 	} else if (primitive.type === 'spline') {
 		const spline = sketch.splines.get(primitive.id);
