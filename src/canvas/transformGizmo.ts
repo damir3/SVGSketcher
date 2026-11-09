@@ -2,6 +2,7 @@ import { add, dist, sub, vec, type Vec2 } from '../math/vector';
 import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
 import { createSvgCircle, createSvgElement, createSvgLine } from './svg';
 import {
+	COLORS,
 	TRANSFORM_FRAME_ATTRS,
 	TRANSFORM_HANDLE_ATTRS,
 	TRANSFORM_HANDLE_RADIUS,
@@ -21,7 +22,12 @@ function resizeCursor(direction: Vec2) {
 	return RESIZE_CURSORS[(octant + RESIZE_CURSORS.length) % RESIZE_CURSORS.length];
 }
 
-export function getTransformGizmo(screenCenter: Vec2, half: Vec2, angle: number, { exactBounds = false } = {}) {
+export function getTransformGizmo(
+	screenCenter: Vec2,
+	half: Vec2,
+	angle: number,
+	{ exactBounds = false, pivot = screenCenter } = {}
+) {
 	const radians = ((angle % 360) * Math.PI) / 180;
 	const cos = Math.cos(radians);
 	const sin = Math.sin(radians);
@@ -31,14 +37,16 @@ export function getTransformGizmo(screenCenter: Vec2, half: Vec2, angle: number,
 		const rotated = vec(x * cos - y * sin, x * sin + y * cos);
 		return add(screenCenter, vec(rotated.x, -rotated.y));
 	};
+	const upperRotation = toScreen(0, y + TEXT_ROTATION_HANDLE_DISTANCE_PX);
+	const rotationBelow = dist(upperRotation, pivot) < 2 * HANDLE_HIT_RADIUS;
 	return {
-		center: screenCenter,
+		center: pivot,
 		corners: [vec(-1, 1), vec(1, 1), vec(1, -1), vec(-1, -1)].map(corner => ({
 			point: toScreen(corner.x * x, corner.y * y),
 			cursor: resizeCursor(sub(toScreen(corner.x, corner.y), screenCenter)),
 		})),
-		top: toScreen(0, y),
-		rotation: toScreen(0, y + TEXT_ROTATION_HANDLE_DISTANCE_PX),
+		rotationBase: toScreen(0, rotationBelow ? -y : y),
+		rotation: rotationBelow ? toScreen(0, -y - TEXT_ROTATION_HANDLE_DISTANCE_PX) : upperRotation,
 	};
 }
 
@@ -55,19 +63,24 @@ export function hitTransformGizmo(screen: Vec2, gizmo: ReturnType<typeof getTran
 	return nearestDistance <= HANDLE_HIT_RADIUS ? handle : null;
 }
 
-export function renderTransformGizmo(gizmo: ReturnType<typeof getTransformGizmo>, target: SVGGElement): void {
-	const { center, corners, top, rotation } = gizmo;
+export function renderTransformGizmo(
+	gizmo: ReturnType<typeof getTransformGizmo>,
+	target: SVGGElement,
+	stroke: string = COLORS.primary
+): void {
+	const { center, corners, rotationBase, rotation } = gizmo;
 	createSvgElement(
 		'polygon',
 		{
 			...TRANSFORM_FRAME_ATTRS,
+			stroke,
 			points: corners.map(({ point }) => `${point.x},${point.y}`).join(' '),
 		},
 		target
 	);
-	createSvgLine(top, rotation, TRANSFORM_ROTATION_STEM_ATTRS, target);
+	createSvgLine(rotationBase, rotation, { ...TRANSFORM_ROTATION_STEM_ATTRS, stroke }, target);
 
 	for (const point of [...corners.map(corner => corner.point), center, rotation]) {
-		createSvgCircle(point, TRANSFORM_HANDLE_RADIUS, TRANSFORM_HANDLE_ATTRS, target);
+		createSvgCircle(point, TRANSFORM_HANDLE_RADIUS, { ...TRANSFORM_HANDLE_ATTRS, stroke }, target);
 	}
 }

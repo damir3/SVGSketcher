@@ -1933,7 +1933,6 @@ body {
 	position: fixed;
 	inset: 0;
 	background-color: rgba(15, 23, 42, 0.45);
-	backdrop-filter: blur(2px);
 	z-index: 2000;
 	display: flex;
 	align-items: center;
@@ -1978,6 +1977,13 @@ body {
 	justify-content: space-between;
 	border-bottom: 1px solid var(--border-color);
 	background-color: var(--bg-surface-elevated, #f8fafc);
+	cursor: grab;
+	touch-action: none;
+	user-select: none;
+}
+
+.param-modal-header.dragging {
+	cursor: grabbing;
 }
 
 .param-modal-title-wrap {

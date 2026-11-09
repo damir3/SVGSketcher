@@ -235,13 +235,12 @@ export const SYMMETRY_CHORD_ATTRS: SvgAttrs = {
 export const TRANSFORM_PREVIEW_COLOR = COLORS.splinePreview;
 export const TRANSFORM_GEOMETRY_ATTRS = { opacity: 0.7, 'pointer-events': 'none' };
 
-const TRANSFORM_OUTLINE_ATTRS = { fill: 'none', stroke: TRANSFORM_PREVIEW_COLOR, 'stroke-width': 1.5 };
+const TRANSFORM_OUTLINE_ATTRS = { fill: 'none', 'stroke-width': 1.5 };
 
 export const TRANSFORM_FRAME_ATTRS = { ...TRANSFORM_OUTLINE_ATTRS, 'stroke-dasharray': '4,4' };
 export const TRANSFORM_ROTATION_STEM_ATTRS = { ...TRANSFORM_OUTLINE_ATTRS, 'stroke-dasharray': '3 3' };
 export const TRANSFORM_HANDLE_ATTRS = {
 	fill: COLORS.white,
-	stroke: TRANSFORM_PREVIEW_COLOR,
 	'stroke-width': 2,
 	'pointer-events': 'all',
 };

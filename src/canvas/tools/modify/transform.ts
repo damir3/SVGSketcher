@@ -6,7 +6,7 @@ import { getTransformGizmo, hitTransformGizmo, renderTransformGizmo } from '../.
 import type { Viewport } from '../../viewport';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
-import { TRANSFORM_GEOMETRY_ATTRS, TRANSFORM_PREVIEW_COLOR } from '../../styles';
+import { COLORS, TRANSFORM_GEOMETRY_ATTRS, TRANSFORM_PREVIEW_COLOR } from '../../styles';
 
 const DEFAULT_VALUES: TransformValues = { x: 0, y: 0, angle: 0, scale: 1 };
 const FIELDS = [
@@ -168,7 +168,10 @@ export class TransformTool extends BaseTool {
 			TRANSFORM_PREVIEW_COLOR
 		);
 
-		renderTransformGizmo(this.getGizmo(selection, ctx.viewport), ctx.targetGroup);
+		const gizmoColor = selection.selected.every(id => ctx.sketch.texts.has(id))
+			? COLORS.primary
+			: TRANSFORM_PREVIEW_COLOR;
+		renderTransformGizmo(this.getGizmo(selection, ctx.viewport), ctx.targetGroup, gizmoColor);
 	}
 
 	private updateHandleCursor(screen: Vec2): void {

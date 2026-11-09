@@ -665,7 +665,8 @@ function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
 	const images = Array.isArray(snapshot.images) ? snapshot.images.filter(isValidImage) : [];
 	return {
 		...snapshot,
-		images: images.map(({ id, fileName, x, y, width, height, angle, opacity, naturalWidth, naturalHeight }) => {
+		images: images.map(image => {
+			const { id, fileName, x, y, width, height, angle, opacity, naturalWidth, naturalHeight, pivotX, pivotY } = image;
 			const hasPixelSize =
 				naturalWidth &&
 				naturalHeight &&
@@ -683,6 +684,8 @@ function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
 				angle,
 				opacity,
 				...(hasPixelSize ? { naturalWidth, naturalHeight } : {}),
+				...(Number.isFinite(pivotX) ? { pivotX } : {}),
+				...(Number.isFinite(pivotY) ? { pivotY } : {}),
 			};
 		}),
 	};

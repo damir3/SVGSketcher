@@ -378,6 +378,7 @@ export class ParametersPopup {
 		// Stop canvas mousemove and interaction when moving over the modal backdrop or dialog
 		this.container.addEventListener('mousemove', e => e.stopPropagation());
 		this.container.addEventListener('pointermove', e => e.stopPropagation());
+		this.setupDragging();
 
 		// Header close button
 		this.container.querySelector('#btn-close-param-modal')?.addEventListener('click', e => {
@@ -405,6 +406,45 @@ export class ParametersPopup {
 				this.hide();
 			}
 		});
+	}
+
+	private setupDragging(): void {
+		const dialog = this.container.querySelector<HTMLElement>('.param-modal-dialog');
+		const header = dialog?.querySelector<HTMLElement>('.param-modal-header');
+		if (!dialog || !header) return;
+
+		let x = 0;
+		let y = 0;
+		let drag: { pointerId: number; offsetX: number; offsetY: number } | null = null;
+		const moveTo = (nextX: number, nextY: number) => {
+			const maxX = Math.max(0, (this.container.clientWidth - dialog.offsetWidth) / 2);
+			const maxY = Math.max(0, (this.container.clientHeight - dialog.offsetHeight) / 2);
+			x = Math.max(-maxX, Math.min(maxX, nextX));
+			y = Math.max(-maxY, Math.min(maxY, nextY));
+			dialog.style.translate = `${x}px ${y}px`;
+		};
+
+		header.addEventListener('pointerdown', e => {
+			if (drag || e.button !== 0 || (e.target instanceof Element && e.target.closest('button'))) return;
+			drag = { pointerId: e.pointerId, offsetX: e.clientX - x, offsetY: e.clientY - y };
+			header.setPointerCapture(e.pointerId);
+			header.classList.add('dragging');
+		});
+		header.addEventListener('pointermove', e => {
+			if (!this.isOpen || drag?.pointerId !== e.pointerId) return;
+			moveTo(e.clientX - drag.offsetX, e.clientY - drag.offsetY);
+		});
+		header.addEventListener('lostpointercapture', e => {
+			if (drag?.pointerId !== e.pointerId) return;
+			drag = null;
+			header.classList.remove('dragging');
+		});
+
+		const observer = new ResizeObserver(() => {
+			if (this.isOpen) moveTo(x, y);
+		});
+		observer.observe(this.container);
+		observer.observe(dialog);
 	}
 
 	private addNewParameter(): void {

@@ -1,5 +1,5 @@
-import { angleFromTo, dot, sub, vec, type Vec2 } from '../../../math/vector';
-import type { SketchImage } from '../../../model/image';
+import { add, angleFromTo, dot, sub, vec, type Vec2 } from '../../../math/vector';
+import { getImagePivotOffset, type SketchImage } from '../../../model/image';
 import type { ImageTraceSettings, TraceResult } from '../../../model/imageTrace';
 import { ImageTraceModal } from '../../../ui/image-trace-modal';
 import { getToolIcon } from '../../../ui/panels/tools/iconProvider';
@@ -9,8 +9,10 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 
 const FIELDS = [
-	{ key: 'x', label: 'Position X', unit: 'mm' },
-	{ key: 'y', label: 'Position Y', unit: 'mm' },
+	{ key: 'x', label: 'Position X', unit: 'mm', title: 'Pivot X coordinate in the sketch' },
+	{ key: 'y', label: 'Position Y', unit: 'mm', title: 'Pivot Y coordinate in the sketch' },
+	{ key: 'pivotX', label: 'Pivot Offset X', unit: 'px', title: 'Offset from the image center, positive to the right' },
+	{ key: 'pivotY', label: 'Pivot Offset Y', unit: 'px', title: 'Offset from the image center, positive downward' },
 	{ key: 'scale', label: 'Scale', unit: '×' },
 	{ key: 'aspect', label: 'Aspect', unit: '' },
 	{ key: 'angle', label: 'Angle', unit: '°' },
@@ -21,8 +23,14 @@ const MIN_SIZE = 1e-6;
 
 type Drag =
 	| { type: 'move'; start: Vec2 }
-	| { type: 'rotate'; lastAngle: number }
+	| { type: 'rotate'; pivot: Vec2; lastAngle: number }
 	| { type: 'scale'; start: Vec2; direction: Vec2 };
+
+function transformAboutPivot(image: SketchImage, changes: Partial<Pick<SketchImage, 'width' | 'height' | 'angle'>>) {
+	const offsetBefore = getImagePivotOffset(image);
+	const offsetAfter = getImagePivotOffset({ ...image, ...changes });
+	return { ...changes, ...add(image, sub(offsetBefore, offsetAfter)) };
+}
 
 export class ImageTool extends BaseTool {
 	readonly id = 'image' as const;
@@ -88,7 +96,7 @@ export class ImageTool extends BaseTool {
 			viewport.worldToScreen(image),
 			vec((image.width * viewport.zoom) / 2, (image.height * viewport.zoom) / 2),
 			image.angle,
-			{ exactBounds: true }
+			{ exactBounds: true, pivot: viewport.worldToScreen(add(image, getImagePivotOffset(image))) }
 		);
 	}
 
@@ -131,8 +139,10 @@ export class ImageTool extends BaseTool {
 		const handle = hitTransformGizmo(e.screen, this.getGizmo(image));
 		if (!handle) return false;
 		if (handle.type === 'move') this.drag = { type: 'move', start: e.world };
-		else if (handle.type === 'rotate') this.drag = { type: 'rotate', lastAngle: angleFromTo(image, e.world) };
-		else this.drag = { type: 'scale', start: e.screen, direction: handle.direction };
+		else if (handle.type === 'rotate') {
+			const pivot = add(image, getImagePivotOffset(image));
+			this.drag = { type: 'rotate', pivot, lastAngle: angleFromTo(pivot, e.world) };
+		} else this.drag = { type: 'scale', start: e.screen, direction: handle.direction };
 		this.draft = { ...image };
 		this.ctx.setCursor(handle.type === 'rotate' ? 'grabbing' : handle.cursor);
 		return true;
@@ -153,15 +163,15 @@ export class ImageTool extends BaseTool {
 			draft.x = image.x + offset.x;
 			draft.y = image.y + offset.y;
 		} else if (drag.type === 'rotate') {
-			const angle = angleFromTo(image, e.world);
+			const angle = angleFromTo(drag.pivot, e.world);
 			const delta = angle - drag.lastAngle;
-			draft.angle += (Math.atan2(Math.sin(delta), Math.cos(delta)) * 180) / Math.PI;
+			const nextAngle = draft.angle + (Math.atan2(Math.sin(delta), Math.cos(delta)) * 180) / Math.PI;
+			Object.assign(draft, transformAboutPivot(image, { angle: nextAngle }));
 			drag.lastAngle = angle;
 		} else {
 			const delta = dot(sub(e.screen, drag.start), drag.direction) / dot(drag.direction, drag.direction);
 			const scale = Math.max(MIN_SIZE / Math.min(image.width, image.height), 1 + delta);
-			draft.width = image.width * scale;
-			draft.height = image.height * scale;
+			Object.assign(draft, transformAboutPivot(image, { width: image.width * scale, height: image.height * scale }));
 		}
 		this.updateFields(draft);
 		this.ctx.renderer.renderImages(this.ctx.sketch, this.ctx.viewport, draft);
@@ -179,6 +189,10 @@ export class ImageTool extends BaseTool {
 	private formatField(key: ImageField, image: SketchImage): string {
 		let value: number;
 		switch (key) {
+			case 'x':
+			case 'y':
+				value = image[key] + getImagePivotOffset(image)[key];
+				break;
 			case 'scale':
 				if (!image.naturalWidth) return '';
 				value = image.width / image.naturalWidth;
@@ -190,24 +204,30 @@ export class ImageTool extends BaseTool {
 				value = image.opacity * 100;
 				break;
 			default:
-				value = image[key];
+				value = image[key] ?? 0;
 		}
 		return String(Number(value.toPrecision(10)));
 	}
 
 	private commitField(image: SketchImage, key: ImageField, value: number): void {
 		if (!Number.isFinite(value)) return;
-		if (key === 'scale') {
+		if (key === 'x' || key === 'y') {
+			this.ctx.sketch.updateImage(image.id, { [key]: value - getImagePivotOffset(image)[key] });
+		} else if (key === 'scale') {
 			if (value <= 0 || !image.naturalWidth) return;
 			const width = value * image.naturalWidth;
 			const height = image.height * (width / image.width);
 			if (Number.isFinite(width) && Number.isFinite(height) && Math.min(width, height) >= MIN_SIZE) {
-				this.ctx.sketch.updateImage(image.id, { width, height });
+				this.ctx.sketch.updateImage(image.id, transformAboutPivot(image, { width, height }));
 			}
 		} else if (key === 'aspect') {
 			if (value <= 0) return;
 			const height = image.width / value;
-			if (Number.isFinite(height) && height >= MIN_SIZE) this.ctx.sketch.updateImage(image.id, { height });
+			if (Number.isFinite(height) && height >= MIN_SIZE) {
+				this.ctx.sketch.updateImage(image.id, transformAboutPivot(image, { height }));
+			}
+		} else if (key === 'angle') {
+			this.ctx.sketch.updateImage(image.id, transformAboutPivot(image, { angle: value }));
 		} else {
 			this.ctx.sketch.updateImage(image.id, {
 				[key]: key === 'opacity' ? Math.max(0, Math.min(100, value)) / 100 : value,
@@ -236,21 +256,25 @@ export class ImageTool extends BaseTool {
 						<span class="pattern-param-label">Source Size</span>
 						<span class="pattern-param-label">${image.naturalWidth && image.naturalHeight ? `${image.naturalWidth} × ${image.naturalHeight} px` : '—'}</span>
 					</div>
-					${FIELDS.map(
-						({ key, label, unit }) => `
+					${FIELDS.map(field => {
+						const { key, label, unit } = field;
+						const disabled =
+							((key === 'scale' || key === 'pivotX') && !image.naturalWidth) ||
+							(key === 'pivotY' && !image.naturalHeight);
+						return `
 						<div class="pattern-param-row">
-							<label class="pattern-param-label" for="image-${key}">${label}</label>
+							<label class="pattern-param-label" for="image-${key}" ${'title' in field ? `title="${field.title}"` : ''}>${label}</label>
 							<div class="pattern-input-suffix-wrapper">
-									<input class="pattern-num-input" id="image-${key}" type="number" step="any" ${key === 'opacity' ? 'min="0" max="100"' : ''} ${key === 'scale' && !image.naturalWidth ? 'disabled' : ''} value="${this.formatField(key, image)}">
+								<input class="pattern-num-input" id="image-${key}" type="number" step="any" ${key === 'opacity' ? 'min="0" max="100"' : ''} ${disabled ? 'disabled' : ''} value="${this.formatField(key, image)}">
 								<span class="pattern-input-suffix">${unit}</span>
 							</div>
 						</div>
-					`
-					).join('')}
+					`;
+					}).join('')}
 				</div>
 				<div class="mirror-actions">
-					<button type="button" class="btn-mirror-ok image-convert" ${image.objectUrl ? '' : 'disabled'}>Convert to Primitives</button>
 					<button type="button" class="btn-mirror-cancel image-replace">Replace Image</button>
+					<button type="button" class="btn-mirror-cancel image-convert" ${image.objectUrl ? '' : 'disabled'}>Convert to Primitives</button>
 				</div>
 				${image.objectUrl ? '' : '<div class="mirror-hint">Choose the local image file to restore the reference.</div>'}
 			</div>
