@@ -377,7 +377,14 @@ export function getConstraintsForEntity(
 				res.push(c);
 				continue;
 			}
-			if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
+			if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
+				if (
+					c.sourceObjectIds.includes(id) ||
+					c.copies.some(copy => copy.createdEntityIds.some(entity => entity.type === 'line' && entity.id === id))
+				) {
+					res.push(c);
+				}
+			} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
 				if (matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
 					res.push(c);
 				}
@@ -533,9 +540,12 @@ export function getConstraintsForEntity(
 	return res;
 }
 
+export type PatternLinks = 'all' | 'sources';
+
 export function getEntitiesForConstraint(
 	sketch: SketchDocument,
-	c: IConstraint
+	c: IConstraint,
+	patternLinks: PatternLinks = 'all'
 ): Array<{
 	id: string;
 	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
@@ -630,7 +640,8 @@ export function getEntitiesForConstraint(
 		}
 	} else if (c.type === 'circular_pattern') {
 		const cpat = c as CircularPatternConstraint;
-		if (sketch.points.get(cpat.centerPtId)) add(cpat.centerPtId, 'point');
+		const links = cpat.isReadOnly ? 'all' : patternLinks;
+		if (links !== 'sources' && sketch.points.get(cpat.centerPtId)) add(cpat.centerPtId, 'point');
 		if (cpat.sourceObjectIds) {
 			for (const id of cpat.sourceObjectIds) {
 				if (sketch.lines.has(id)) add(id, 'line');
@@ -642,6 +653,8 @@ export function getEntitiesForConstraint(
 				else if (sketch.points.has(id)) add(id, 'point');
 			}
 		}
+		// The fallback below would add copies back to the inspector list.
+		if (links !== 'all') return res;
 		if (cpat.copies) {
 			for (const copy of cpat.copies) {
 				for (const item of copy.createdEntityIds) {
@@ -657,8 +670,10 @@ export function getEntitiesForConstraint(
 		}
 	} else if (c.type === 'rectangular_pattern') {
 		const rpat = c as RectangularPatternConstraint;
-		if (rpat.line1Id && sketch.lines.has(rpat.line1Id)) add(rpat.line1Id, 'line');
-		if (rpat.line2Id && sketch.lines.has(rpat.line2Id)) add(rpat.line2Id, 'line');
+		if (patternLinks === 'all') {
+			if (rpat.line1Id && sketch.lines.has(rpat.line1Id)) add(rpat.line1Id, 'line');
+			if (rpat.line2Id && sketch.lines.has(rpat.line2Id)) add(rpat.line2Id, 'line');
+		}
 		if (rpat.sourceObjectIds) {
 			for (const id of rpat.sourceObjectIds) {
 				if (sketch.lines.has(id)) add(id, 'line');
@@ -670,6 +685,7 @@ export function getEntitiesForConstraint(
 				else if (sketch.points.has(id)) add(id, 'point');
 			}
 		}
+		if (patternLinks === 'sources') return res;
 		if (rpat.copies) {
 			for (const copy of rpat.copies) {
 				for (const item of copy.createdEntityIds) {

@@ -78,6 +78,7 @@ import {
 	isPointUsed,
 	getConstraintsForEntity,
 	getEntitiesForConstraint,
+	type PatternLinks,
 } from './constraintLinks';
 import {
 	SketchPoint,
@@ -3917,11 +3918,14 @@ export class SketchDocument {
 		return getConstraintsForEntity(this, type, id);
 	}
 
-	getEntitiesForConstraint(c: IConstraint): Array<{
+	getEntitiesForConstraint(
+		c: IConstraint,
+		patternLinks?: PatternLinks
+	): Array<{
 		id: string;
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}> {
-		return getEntitiesForConstraint(this, c);
+		return getEntitiesForConstraint(this, c, patternLinks);
 	}
 
 	isEntitySelected(id: string, type: SelectableEntityType): boolean {

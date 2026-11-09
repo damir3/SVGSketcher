@@ -10,6 +10,7 @@ import {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 	CircularPatternConstraint,
+	RectangularPatternConstraint,
 	OriginDistanceConstraint,
 	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
@@ -498,6 +499,10 @@ export class Sidebar {
 					: `${c.quantity}x ${c.totalAngle.toFixed(1)}°`;
 			valBadge = `<span class="val-badge">${label}</span>`;
 			name = c.isReadOnly ? 'Polygon Pattern' : 'Circular Pattern';
+		} else if (c instanceof RectangularPatternConstraint) {
+			const columns = Math.abs(c.distance1) > 1e-6 ? c.quantity1 : 1;
+			const rows = Math.abs(c.distance2) > 1e-6 ? c.quantity2 : 1;
+			valBadge = `<span class="val-badge">${columns}x${rows}</span>`;
 		} else if (c instanceof OriginDistanceConstraint) {
 			if (c.isCoincident) {
 				name = 'Coincident with (0,0)';
@@ -523,7 +528,8 @@ export class Sidebar {
 			}
 		}
 
-		const allEntities = this.sketch.getEntitiesForConstraint(c);
+		const hideLinkedEntities = (c.type === 'circular_pattern' && !c.isReadOnly) || c.type === 'rectangular_pattern';
+		const allEntities = hideLinkedEntities ? [] : this.sketch.getEntitiesForConstraint(c);
 		const targetEntities = (
 			currentEntityIds.length === 1 ? allEntities.filter(e => e.id !== currentEntityIds[0]) : allEntities
 		).filter(e => e.id !== 'origin' && e.id !== 'axis_x' && e.id !== 'axis_y');

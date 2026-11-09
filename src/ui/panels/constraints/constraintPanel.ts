@@ -241,7 +241,7 @@ export class ConstraintPanel implements ISidebarPanel {
 			)
 			.join('');
 
-		const relatedPrimitives = context.sketch.getEntitiesForConstraint(c);
+		const relatedPrimitives = context.sketch.getEntitiesForConstraint(c, 'sources');
 		const primitivesHtml = context.renderPrimitivesSublist(relatedPrimitives);
 
 		return `
