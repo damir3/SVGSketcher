@@ -50,13 +50,13 @@ export class Viewport {
 		this.panY = this.height / 2;
 	}
 
-	getTargetFit(bounds: AABB, padding = 80): { panX: number; panY: number; zoom: number } {
+	getTargetFit(bounds: AABB, padding = 80, minZoom = 0.05): { panX: number; panY: number; zoom: number } {
 		const { min, max } = bounds;
 		const boxWidth = max.x - min.x;
 		const boxHeight = max.y - min.y;
 
-		const availWidth = Math.max(this.width - padding * 2, 50);
-		const availHeight = Math.max(this.height - padding * 2, 50);
+		const availWidth = Math.min(this.width, Math.max(this.width - padding * 2, 50));
+		const availHeight = Math.min(this.height, Math.max(this.height - padding * 2, 50));
 
 		const effectiveWidth = Math.max(boxWidth, 20);
 		const effectiveHeight = Math.max(boxHeight, 20);
@@ -65,7 +65,7 @@ export class Viewport {
 		const zoomY = availHeight / effectiveHeight;
 		const fitZoom = Math.min(zoomX, zoomY);
 
-		const zoom = Math.min(Math.max(fitZoom, 0.05), 50.0);
+		const zoom = Math.min(Math.max(fitZoom, minZoom), 50.0);
 
 		const center = new Vec2().midpoint(min, max);
 		const panX = this.width / 2 - center.x * zoom;
@@ -92,7 +92,8 @@ export class Viewport {
 
 	zoomAt(screen: XY, factor: number): void {
 		const worldBefore = this.screenToWorld(screen);
-		const newZoom = Math.min(Math.max(this.zoom * factor, 0.05), 200.0);
+		const minZoom = Math.min(this.zoom, 0.05);
+		const newZoom = Math.min(Math.max(this.zoom * factor, minZoom), 200.0);
 		this.zoom = newZoom;
 		const screenAfter = this.worldToScreen(worldBefore);
 		this.panX += screen.x - screenAfter.x;

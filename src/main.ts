@@ -2,6 +2,7 @@ import { Vec2 } from './math/vector';
 import './style.css';
 import { DEFAULT_ZOOM } from './constants';
 import { SketchDocument } from './model/sketch';
+import { getImageBounds } from './model/image';
 import { Viewport } from './canvas/viewport';
 import { SVGRenderer } from './canvas/renderer';
 import { CanvasInteraction } from './canvas/interaction';
@@ -390,6 +391,7 @@ function initApp(): void {
 				});
 				interaction.selectImage(replacement.id);
 			} else {
+				interaction.cancelAnimation();
 				const center = viewport.screenToWorld(new Vec2(viewport.width / 2, viewport.height / 2));
 				const image = sketch.addImage({
 					...center,
@@ -400,6 +402,10 @@ function initApp(): void {
 					opacity: 1,
 				});
 				interaction.selectImage(image.id);
+				if (naturalWidth > viewport.width || naturalHeight > viewport.height) {
+					const target = viewport.getTargetFit(getImageBounds(image), undefined, 0);
+					interaction.animateViewportTo(target.panX, target.panY, target.zoom);
+				}
 			}
 		};
 		decoded.onerror = () => {
