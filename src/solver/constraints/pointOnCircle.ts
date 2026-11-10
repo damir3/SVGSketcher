@@ -1,4 +1,4 @@
-import { sub, vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -28,8 +28,8 @@ export class PointOnCircleConstraint extends BaseConstraint {
 		const center = readParamPoint(paramMap, this.circleCenterId);
 		const r = paramMap.get(`${this.circleId}.r`) ?? 10;
 
-		const dir = sub(p, center);
-		const cur = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(p, center);
+		const cur = dir.length();
 
 		return [(cur - r) * this.weight];
 	}
@@ -43,10 +43,10 @@ export class PointOnCircleConstraint extends BaseConstraint {
 		const p = readParamPoint(paramMap, this.pointId);
 		const center = readParamPoint(paramMap, this.circleCenterId);
 
-		const dir = sub(p, center);
-		const cur = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const dir = new Vec2().subVectors(p, center);
+		const cur = Math.max(dir.length(), 1e-7);
 
-		const dP = vec((dir.x / cur) * this.weight, (dir.y / cur) * this.weight);
+		const dP = dir.clone().multiplyScalar((this.weight * 1) / cur);
 
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, dP.x);
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow, dP.y);
@@ -61,6 +61,6 @@ export class PointOnCircleConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x, y: s.y + 14 }, '⚲', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s.x, s.y + 14), '⚲', COLORS.primary);
 	}
 }

@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { angleFromTo, angleFromToDeg, dist, distancesFrom, vec, sub, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import type { IToolPanel } from '../../../ui/panels/tools/types';
 import type { SketchText, TextPathTargetType } from '../../../model/primitives/text';
 import { COLORS } from '../../styles';
@@ -151,7 +151,7 @@ export class TextTool extends BaseTool {
 	override onMouseDown(e: ToolMouseEvent): boolean | void {
 		// 1. Check if clicked rotation gizmo handle
 		const gizmo = this.ctx.renderer.textRotationGizmo;
-		if (gizmo && dist(e.screen, gizmo.handleScreen) <= 15) {
+		if (gizmo && e.screen.distanceTo(gizmo.handleScreen) <= 15) {
 			this.isRotating = true;
 			this.rotationTextId = gizmo.textId;
 			this.rotationCenter = gizmo.centerWorld;
@@ -161,7 +161,7 @@ export class TextTool extends BaseTool {
 
 		// 2. Check if clicked center drag handle
 		const dragGizmo = this.ctx.renderer.textDragGizmo;
-		if (dragGizmo && dist(e.screen, dragGizmo.centerScreen) <= 15) {
+		if (dragGizmo && e.screen.distanceTo(dragGizmo.centerScreen) <= 15) {
 			this.isDraggingCenter = true;
 			this.dragTextId = dragGizmo.textId;
 			this.dragStartWorld = e.world;
@@ -170,7 +170,7 @@ export class TextTool extends BaseTool {
 			if (text?.rectanglePointIds) {
 				for (const pid of text.rectanglePointIds) {
 					const pt = this.ctx.sketch.points.get(pid);
-					if (pt) this.dragInitialPoints.set(pid, vec(pt.x, pt.y));
+					if (pt) this.dragInitialPoints.set(pid, pt.clone());
 				}
 			}
 			this.ctx.sketch.beginTransaction();
@@ -215,9 +215,9 @@ export class TextTool extends BaseTool {
 		// Update cursor if hovering over gizmo handles
 		const rotGizmo = this.ctx.renderer.textRotationGizmo;
 		const dragGizmo = this.ctx.renderer.textDragGizmo;
-		if (rotGizmo && dist(e.screen, rotGizmo.handleScreen) <= 15) {
+		if (rotGizmo && e.screen.distanceTo(rotGizmo.handleScreen) <= 15) {
 			this.ctx.setCursor('grab');
-		} else if (dragGizmo && dist(e.screen, dragGizmo.centerScreen) <= 15) {
+		} else if (dragGizmo && e.screen.distanceTo(dragGizmo.centerScreen) <= 15) {
 			this.ctx.setCursor('move');
 		} else {
 			this.ctx.setCursor(this.defaultCursor);
@@ -254,7 +254,7 @@ export class TextTool extends BaseTool {
 
 		if (this.mode === 'text' && this.isDragDown && this.drawingStep === 1 && this.startWorld) {
 			this.isDragDown = false;
-			const d = dist(this.startWorld, e.world);
+			const d = this.startWorld.distanceTo(e.world);
 			if (d >= 2) {
 				this.commitRectangle(e.world);
 			}
@@ -263,7 +263,7 @@ export class TextTool extends BaseTool {
 
 	private handleCenterDragMove(currentWorld: Vec2): void {
 		if (!this.dragStartWorld || this.dragInitialPoints.size === 0) return;
-		const dir = sub(currentWorld, this.dragStartWorld);
+		const dir = new Vec2().subVectors(currentWorld, this.dragStartWorld);
 
 		for (const [pid, initPos] of this.dragInitialPoints) {
 			const pt = this.ctx.sketch.points.get(pid);
@@ -288,19 +288,12 @@ export class TextTool extends BaseTool {
 
 		const c = this.rotationCenter;
 		// Target angle of mouse relative to center
-		const mouseAngle = angleFromTo(c, mouseWorld);
+		const mouseAngle = c.angleToPoint(mouseWorld);
 		// In unrotated rectangle, top center handle is at angle +PI/2
 		const targetAngle = mouseAngle - Math.PI / 2;
 
-		const currentAngle = angleFromTo(p0, p1);
+		const currentAngle = p0.angleToPoint(p1);
 		const deltaAngle = targetAngle - currentAngle;
-
-		const rotatePoint = (p: Vec2, center: Vec2, rad: number): Vec2 => {
-			const cos = Math.cos(rad);
-			const sin = Math.sin(rad);
-			const dir = sub(p, center);
-			return vec(center.x + dir.x * cos - dir.y * sin, center.y + dir.x * sin + dir.y * cos);
-		};
 
 		const pt0 = this.ctx.sketch.points.get(text.rectanglePointIds[0]);
 		const pt1 = this.ctx.sketch.points.get(text.rectanglePointIds[1]);
@@ -308,10 +301,10 @@ export class TextTool extends BaseTool {
 		const pt3 = this.ctx.sketch.points.get(text.rectanglePointIds[3]);
 
 		if (pt0 && pt1 && pt2 && pt3) {
-			const np0 = rotatePoint(p0, c, deltaAngle);
-			const np1 = rotatePoint(p1, c, deltaAngle);
-			const np2 = rotatePoint(p2, c, deltaAngle);
-			const np3 = rotatePoint(p3, c, deltaAngle);
+			const np0 = p0.clone().rotateAround(c, deltaAngle);
+			const np1 = p1.clone().rotateAround(c, deltaAngle);
+			const np2 = p2.clone().rotateAround(c, deltaAngle);
+			const np3 = p3.clone().rotateAround(c, deltaAngle);
 
 			pt0.x = np0.x;
 			pt0.y = np0.y;
@@ -331,8 +324,8 @@ export class TextTool extends BaseTool {
 		if (!this.startWorld) return;
 		const sketch = this.ctx.sketch;
 
-		const min = { x: Math.min(this.startWorld.x, secondPos.x), y: Math.min(this.startWorld.y, secondPos.y) };
-		const max = { x: Math.max(this.startWorld.x, secondPos.x), y: Math.max(this.startWorld.y, secondPos.y) };
+		const min = new Vec2(Math.min(this.startWorld.x, secondPos.x), Math.min(this.startWorld.y, secondPos.y));
+		const max = new Vec2(Math.max(this.startWorld.x, secondPos.x), Math.max(this.startWorld.y, secondPos.y));
 
 		if (max.x - min.x < 2 || max.y - min.y < 2) {
 			max.x = min.x + 50;
@@ -381,9 +374,9 @@ export class TextTool extends BaseTool {
 					}
 				}
 
-				const p0 = sketch.addPoint({ x: min.x, y: max.y }, false);
+				const p0 = sketch.addPoint(new Vec2(min.x, max.y), false);
 				const p1 = sketch.addPoint(max, false);
-				const p2 = sketch.addPoint({ x: max.x, y: min.y }, false);
+				const p2 = sketch.addPoint(new Vec2(max.x, min.y), false);
 				const p3 = sketch.addPoint(min, false);
 
 				const l0 = sketch.addLine(p0.id, p1.id, true);
@@ -426,9 +419,9 @@ export class TextTool extends BaseTool {
 		}
 
 		// Add 4 construction points: p0(TL), p1(TR), p2(BR), p3(BL) in CAD Y-up
-		const p0 = sketch.addPoint({ x: min.x, y: max.y }, false);
+		const p0 = sketch.addPoint(new Vec2(min.x, max.y), false);
 		const p1 = sketch.addPoint(max, false);
-		const p2 = sketch.addPoint({ x: max.x, y: min.y }, false);
+		const p2 = sketch.addPoint(new Vec2(max.x, min.y), false);
 		const p3 = sketch.addPoint(min, false);
 
 		// Add 4 construction lines
@@ -577,14 +570,14 @@ export class TextTool extends BaseTool {
 			const s1 = ctx.viewport.worldToScreen(this.startWorld);
 			const s2 = ctx.viewport.worldToScreen(this.currentWorld);
 
-			const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
-			const max = { x: Math.max(s1.x, s2.x), y: Math.max(s1.y, s2.y) };
+			const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
+			const max = new Vec2(Math.max(s1.x, s2.x), Math.max(s1.y, s2.y));
 			const w = Math.max(1, max.x - min.x);
 			const h = Math.max(1, max.y - min.y);
 
 			createSvgRect(
 				min,
-				{ x: w, y: h },
+				new Vec2(w, h),
 				{
 					stroke: COLORS.primary,
 					'stroke-width': 1.5,
@@ -601,7 +594,7 @@ export class TextTool extends BaseTool {
 			const lineHeightPx = hScreen * 1.25;
 			const totalBlockHeightPx = (numLines - 1) * lineHeightPx;
 
-			const center = vec(min.x + w / 2, min.y + h / 2);
+			const center = new Vec2(min.x + w / 2, min.y + h / 2);
 
 			let posX = center.x;
 			let textAnchor = 'middle';
@@ -641,7 +634,7 @@ export class TextTool extends BaseTool {
 			for (let i = 0; i < lines.length; i++) {
 				const lineY = startY + i * lineHeightPx;
 				createSvgText(
-					{ x: posX, y: lineY },
+					new Vec2(posX, lineY),
 					lines[i] || ' ',
 					{
 						fill: COLORS.primary,
@@ -668,8 +661,8 @@ export class TextTool extends BaseTool {
 				const major = toScreen(geo.majorAxisPoint);
 				const minor = toScreen(geo.minorAxisPoint);
 				if (geo.type === 'ellipse') {
-					const transform = `rotate(${angleFromToDeg(center, major)} ${center.x} ${center.y})`;
-					createSvgEllipse(center, distancesFrom(center, major, minor), { ...attrs, transform }, ctx.targetGroup);
+					const transform = `rotate(${center.angleToPointDeg(major)} ${center.x} ${center.y})`;
+					createSvgEllipse(center, center.distancesTo(major, minor), { ...attrs, transform }, ctx.targetGroup);
 				} else {
 					const d = getEllipticalArcSvgPath(
 						center,

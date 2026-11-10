@@ -1,4 +1,4 @@
-import { sub } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -30,12 +30,7 @@ import {
 describe('Spline Mathematics', () => {
 	it('bsplineToBezier converts cubic B-spline to Bezier segments', () => {
 		// 4 control points produce exactly 1 cubic Bezier segment
-		const p4 = [
-			{ x: 0, y: 0 },
-			{ x: 10, y: 20 },
-			{ x: 30, y: 20 },
-			{ x: 40, y: 0 },
-		];
+		const p4 = [new Vec2(0, 0), new Vec2(10, 20), new Vec2(30, 20), new Vec2(40, 0)];
 		const segs4 = bsplineToBezier(p4);
 		assert.equal(segs4.length, 1);
 		assert.ok(Math.abs(segs4[0][0].x - 0) < 1e-4);
@@ -44,13 +39,7 @@ describe('Spline Mathematics', () => {
 		assert.ok(Math.abs(segs4[0][3].y - 0) < 1e-4);
 
 		// 5 control points produce 2 cubic Bezier segments with C0 continuity
-		const p5 = [
-			{ x: 0, y: 0 },
-			{ x: 10, y: 30 },
-			{ x: 25, y: -20 },
-			{ x: 40, y: 30 },
-			{ x: 50, y: 0 },
-		];
+		const p5 = [new Vec2(0, 0), new Vec2(10, 30), new Vec2(25, -20), new Vec2(40, 30), new Vec2(50, 0)];
 		const segs5 = bsplineToBezier(p5);
 		assert.equal(segs5.length, 2);
 		// Segment 0 end should match Segment 1 start
@@ -62,11 +51,7 @@ describe('Spline Mathematics', () => {
 	});
 
 	it('computeNaturalFitHandles calculates tangent handles with midpoint at fit point', () => {
-		const pts = [
-			{ x: 0, y: 0 },
-			{ x: 50, y: 50 },
-			{ x: 100, y: 0 },
-		];
+		const pts = [new Vec2(0, 0), new Vec2(50, 50), new Vec2(100, 0)];
 		const handles = computeNaturalFitHandles(pts);
 		assert.equal(handles.length, 3);
 
@@ -82,11 +67,11 @@ describe('Spline Mathematics', () => {
 	it('computeNaturalFitHandles handles closed loop splines', () => {
 		// 4 points in a circle-like arrangement, closed (first === last)
 		const pts = [
-			{ x: 0, y: 50 },
-			{ x: 50, y: 100 },
-			{ x: 100, y: 50 },
-			{ x: 50, y: 0 },
-			{ x: 0, y: 50 }, // closed loop endpoint
+			new Vec2(0, 50),
+			new Vec2(50, 100),
+			new Vec2(100, 50),
+			new Vec2(50, 0),
+			new Vec2(0, 50), // closed loop endpoint
 		];
 		const handles = computeNaturalFitHandles(pts);
 		assert.equal(handles.length, 5);
@@ -106,11 +91,11 @@ describe('Spline Mathematics', () => {
 		const cx = 50,
 			cy = 50;
 		const pts = [
-			{ x: cx + R, y: cy },
-			{ x: cx, y: cy + R },
-			{ x: cx - R, y: cy },
-			{ x: cx, y: cy - R },
-			{ x: cx + R, y: cy },
+			new Vec2(cx + R, cy),
+			new Vec2(cx, cy + R),
+			new Vec2(cx - R, cy),
+			new Vec2(cx, cy - R),
+			new Vec2(cx + R, cy),
 		];
 		const segs = fitPointsToBezier(pts);
 		assert.equal(segs.length, 4);
@@ -124,12 +109,7 @@ describe('Spline Mathematics', () => {
 	});
 
 	it('fitPointsToBezier produces valid cubic segments passing through fit points', () => {
-		const pts = [
-			{ x: 0, y: 0 },
-			{ x: 30, y: 40 },
-			{ x: 70, y: 20 },
-			{ x: 100, y: 50 },
-		];
+		const pts = [new Vec2(0, 0), new Vec2(30, 40), new Vec2(70, 20), new Vec2(100, 50)];
 		const segs = fitPointsToBezier(pts);
 		assert.equal(segs.length, 3);
 
@@ -142,12 +122,7 @@ describe('Spline Mathematics', () => {
 	});
 
 	it('evaluateBezier and splitBezier evaluate and subdivide curves accurately', () => {
-		const seg: BezierSegment = [
-			{ x: 0, y: 0 },
-			{ x: 0, y: 50 },
-			{ x: 100, y: 50 },
-			{ x: 100, y: 0 },
-		];
+		const seg: BezierSegment = [new Vec2(0, 0), new Vec2(0, 50), new Vec2(100, 50), new Vec2(100, 0)];
 
 		const start = evaluateBezier(seg, 0);
 		const end = evaluateBezier(seg, 1);
@@ -169,18 +144,8 @@ describe('Spline Mathematics', () => {
 
 	it('getSplinePointAtParam and getSplineParamAtPoint round-trip', () => {
 		const segs: BezierSegment[] = [
-			[
-				{ x: 0, y: 0 },
-				{ x: 10, y: 20 },
-				{ x: 30, y: 20 },
-				{ x: 40, y: 0 },
-			],
-			[
-				{ x: 40, y: 0 },
-				{ x: 50, y: -20 },
-				{ x: 70, y: -20 },
-				{ x: 80, y: 0 },
-			],
+			[new Vec2(0, 0), new Vec2(10, 20), new Vec2(30, 20), new Vec2(40, 0)],
+			[new Vec2(40, 0), new Vec2(50, -20), new Vec2(70, -20), new Vec2(80, 0)],
 		];
 
 		const targetParam = 0.65;
@@ -190,14 +155,7 @@ describe('Spline Mathematics', () => {
 	});
 
 	it('extractSplineInterval extracts subsegment correctly', () => {
-		const segs: BezierSegment[] = [
-			[
-				{ x: 0, y: 0 },
-				{ x: 10, y: 30 },
-				{ x: 30, y: 30 },
-				{ x: 40, y: 0 },
-			],
-		];
+		const segs: BezierSegment[] = [[new Vec2(0, 0), new Vec2(10, 30), new Vec2(30, 30), new Vec2(40, 0)]];
 
 		const sub = extractSplineInterval(segs, 0.25, 0.75);
 		assert.ok(sub.length >= 1);
@@ -211,14 +169,7 @@ describe('Spline Mathematics', () => {
 	});
 
 	it('getSplineSvgPath creates valid path data and closes with Z when isClosed is true', () => {
-		const segs: BezierSegment[] = [
-			[
-				{ x: 0, y: 0 },
-				{ x: 10, y: 10 },
-				{ x: 20, y: 10 },
-				{ x: 30, y: 0 },
-			],
-		];
+		const segs: BezierSegment[] = [[new Vec2(0, 0), new Vec2(10, 10), new Vec2(20, 10), new Vec2(30, 0)]];
 		const openPath = getSplineSvgPath(segs, p => p, false);
 		assert.ok(openPath.startsWith('M 0.00 0.00 C 10.00 10.00'));
 		assert.ok(!openPath.endsWith('Z'));
@@ -294,8 +245,8 @@ describe('SketchDocument Spline Integration', () => {
 			const h1 = sketch.points.get(line.p1Id)!;
 			const h2 = sketch.points.get(line.p2Id)!;
 			const handle = index === 0 ? { h1: { x: -20, y: -10 }, h2: { x: 20, y: 10 } } : expected[index];
-			assert.deepEqual({ x: h1.x, y: h1.y }, handle.h1);
-			assert.deepEqual({ x: h2.x, y: h2.y }, handle.h2);
+			assert.deepEqual({ x: h1.x, y: h1.y }, { ...handle.h1 });
+			assert.deepEqual({ x: h2.x, y: h2.y }, { ...handle.h2 });
 		}
 	});
 
@@ -457,12 +408,12 @@ describe('SketchDocument Spline Integration', () => {
 		sketch.removeEntity(p0.id);
 		assert.equal(spline.pointIds.length, 3);
 		const quadraticMid = evaluateBezier(spline.toGeoCurve(sketch)!.bezierSegments[0], 0.5);
-		assert.deepEqual(quadraticMid, { x: 70, y: 37.5 });
+		assert.deepEqual(quadraticMid, new Vec2(70, 37.5));
 
 		sketch.removeEntity(p3.id);
 		assert.equal(spline.pointIds.length, 2);
 		const lineMid = evaluateBezier(spline.toGeoCurve(sketch)!.bezierSegments[0], 0.5);
-		assert.deepEqual(lineMid, { x: 60, y: 25 });
+		assert.deepEqual(lineMid, new Vec2(60, 25));
 
 		sketch.removeEntity(p1.id);
 		assert.equal(sketch.splines.size, 0);
@@ -507,8 +458,8 @@ describe('SketchDocument Spline Integration', () => {
 			const h1 = sketch.points.get(line.p1Id)!;
 			const h2 = sketch.points.get(line.p2Id)!;
 			assert.equal(line.isAutomaticSplineHandle, true);
-			assert.deepEqual({ x: h1.x, y: h1.y }, expected.h1);
-			assert.deepEqual({ x: h2.x, y: h2.y }, expected.h2);
+			assert.deepEqual({ x: h1.x, y: h1.y }, { ...expected.h1 });
+			assert.deepEqual({ x: h2.x, y: h2.y }, { ...expected.h2 });
 			assert.ok(sketch.undo());
 			const restored = sketch.points.get(line.p2Id)!;
 			assert.deepEqual({ x: restored.x, y: restored.y }, { x: 20, y: 5 });
@@ -600,25 +551,13 @@ describe('SketchDocument Spline Integration', () => {
 
 describe('Spline Intersections, Trim, and Break', () => {
 	it('intersectSplineCurve finds intersections between spline and line', () => {
-		const segs: BezierSegment[] = [
-			[
-				{ x: 0, y: 0 },
-				{ x: 25, y: 50 },
-				{ x: 75, y: 50 },
-				{ x: 100, y: 0 },
-			],
-		];
+		const segs: BezierSegment[] = [[new Vec2(0, 0), new Vec2(25, 50), new Vec2(75, 50), new Vec2(100, 0)]];
 		const geoSpline: GeoSpline = {
 			type: 'spline',
 			id: 'sp1',
 			splineType: 'fit',
 			pointIds: ['p0', 'p1', 'p2', 'p3'],
-			points: [
-				{ x: 0, y: 0 },
-				{ x: 25, y: 50 },
-				{ x: 75, y: 50 },
-				{ x: 100, y: 0 },
-			],
+			points: [new Vec2(0, 0), new Vec2(25, 50), new Vec2(75, 50), new Vec2(100, 0)],
 			bezierSegments: segs,
 		};
 
@@ -626,8 +565,8 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const line: GeoSegment = {
 			type: 'segment',
 			id: 'l1',
-			p1: { x: -10, y: 25 },
-			p2: { x: 110, y: 25 },
+			p1: new Vec2(-10, 25),
+			p2: new Vec2(110, 25),
 		};
 
 		const pts = intersectSplineCurve(geoSpline, line);
@@ -654,7 +593,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const spCurve = allCurves.find(c => c.id === spline.id) as GeoSpline;
 		assert.ok(spCurve);
 
-		const candidate = getTrimCandidate(spCurve, allCurves, { x: 25, y: 30 });
+		const candidate = getTrimCandidate(spCurve, allCurves, new Vec2(25, 30));
 		assert.ok(candidate);
 
 		executeBreak(sketch, candidate);
@@ -679,7 +618,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const spCurve = allCurves.find(c => c.id === spline.id) as GeoSpline;
 		assert.ok(spCurve);
 
-		const candidate = getTrimCandidate(spCurve, allCurves, { x: 80, y: 20 });
+		const candidate = getTrimCandidate(spCurve, allCurves, new Vec2(80, 20));
 		assert.ok(candidate, 'Trim candidate found for right branch');
 		assert.equal(candidate.curve.id, spline.id);
 
@@ -709,7 +648,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		assert.ok(spCurve);
 
 		// Click top half near (50, 90)
-		const candidate = getTrimCandidate(spCurve, allCurves, { x: 50, y: 90 });
+		const candidate = getTrimCandidate(spCurve, allCurves, new Vec2(50, 90));
 		assert.ok(candidate);
 		assert.equal(candidate.isWholeEntity, false);
 
@@ -740,7 +679,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const sCurve = curves.find(c => c.id === spline.id) as GeoSpline;
 
 		// Click top half near (50, 95)
-		const candidate = getTrimCandidate(sCurve, curves, { x: 50, y: 95 });
+		const candidate = getTrimCandidate(sCurve, curves, new Vec2(50, 95));
 		assert.ok(candidate);
 
 		// Execute trim
@@ -791,7 +730,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		assert.ok(sCurve);
 
 		// Click near the start (0, 10) to trim the start portion [0, u]
-		const candidate = getTrimCandidate(sCurve, curves, { x: 0, y: 10 });
+		const candidate = getTrimCandidate(sCurve, curves, new Vec2(0, 10));
 		assert.ok(candidate);
 		assert.ok(candidate.interval[0] <= 1e-4, 'Trim interval should start at 0');
 
@@ -808,7 +747,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		let maxDiff = 0;
 		for (let s = 0; s < expectedSub.length; s++) {
 			for (let k = 0; k < 4; k++) {
-				const dir = sub(trimmedCurve.bezierSegments[s][k], expectedSub[s][k]);
+				const dir = new Vec2().subVectors(trimmedCurve.bezierSegments[s][k], expectedSub[s][k]);
 				maxDiff = Math.max(maxDiff, Math.abs(dir.x), Math.abs(dir.y));
 			}
 		}
@@ -832,7 +771,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const sCurve = curves.find(c => c.id === spline.id) as GeoSpline;
 		assert.ok(sCurve);
 
-		const candidate = getTrimCandidate(sCurve, curves, { x: 0, y: 10 });
+		const candidate = getTrimCandidate(sCurve, curves, new Vec2(0, 10));
 		assert.ok(candidate);
 
 		executeBreak(sketch, candidate);
@@ -847,40 +786,24 @@ describe('Spline Intersections, Trim, and Break', () => {
 
 	it('intersectSplineCurve finds intersections between two crossing splines', () => {
 		// Spline 1: Horizontal S-curve from (-50, 0) to (50, 0)
-		const b1: BezierSegment = [
-			{ x: -50, y: 0 },
-			{ x: -20, y: 40 },
-			{ x: 20, y: -40 },
-			{ x: 50, y: 0 },
-		];
+		const b1: BezierSegment = [new Vec2(-50, 0), new Vec2(-20, 40), new Vec2(20, -40), new Vec2(50, 0)];
 		const sp1: GeoSpline = {
 			type: 'spline',
 			id: 'sp1',
 			splineType: 'fit',
 			pointIds: ['p0', 'p1', 'p2', 'p3'],
-			points: [
-				{ x: -50, y: 0 },
-				{ x: 50, y: 0 },
-			],
+			points: [new Vec2(-50, 0), new Vec2(50, 0)],
 			bezierSegments: [b1],
 		};
 
 		// Spline 2: Vertical curve from (0, -50) to (0, 50) crossing at (0, 0)
-		const b2: BezierSegment = [
-			{ x: 0, y: -50 },
-			{ x: 0, y: -20 },
-			{ x: 0, y: 20 },
-			{ x: 0, y: 50 },
-		];
+		const b2: BezierSegment = [new Vec2(0, -50), new Vec2(0, -20), new Vec2(0, 20), new Vec2(0, 50)];
 		const sp2: GeoSpline = {
 			type: 'spline',
 			id: 'sp2',
 			splineType: 'fit',
 			pointIds: ['q0', 'q1', 'q2', 'q3'],
-			points: [
-				{ x: 0, y: -50 },
-				{ x: 0, y: 50 },
-			],
+			points: [new Vec2(0, -50), new Vec2(0, 50)],
 			bezierSegments: [b2],
 		};
 
@@ -909,7 +832,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		assert.ok(targetCurve);
 
 		// Click at (-25, 0) to trim off left branch of horizontal spline
-		const candidate = getTrimCandidate(targetCurve, curves, { x: -25, y: 0 });
+		const candidate = getTrimCandidate(targetCurve, curves, new Vec2(-25, 0));
 		assert.ok(candidate, 'Trim candidate found for left branch of spline');
 		assert.equal(candidate.curve.id, spHorizontal.id);
 
@@ -923,11 +846,11 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const e1: GeoEllipse = {
 			type: 'ellipse',
 			id: 'el1',
-			center: { x: 100, y: 100 },
+			center: new Vec2(100, 100),
 			centerId: 'c1',
-			majorAxisPoint: { x: 150, y: 100 },
+			majorAxisPoint: new Vec2(150, 100),
 			majorAxisPointId: 'maj1',
-			minorAxisPoint: { x: 100, y: 130 },
+			minorAxisPoint: new Vec2(100, 130),
 			minorAxisPointId: 'min1',
 		};
 
@@ -935,11 +858,11 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const e2: GeoEllipse = {
 			type: 'ellipse',
 			id: 'el2',
-			center: { x: 140, y: 100 },
+			center: new Vec2(140, 100),
 			centerId: 'c2',
-			majorAxisPoint: { x: 190, y: 100 },
+			majorAxisPoint: new Vec2(190, 100),
 			majorAxisPointId: 'maj2',
-			minorAxisPoint: { x: 140, y: 130 },
+			minorAxisPoint: new Vec2(140, 130),
 			minorAxisPointId: 'min2',
 		};
 
@@ -973,7 +896,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		assert.ok(targetCurve);
 
 		// Click inside the overlapping region: (130, 100)
-		const candidate = getTrimCandidate(targetCurve, curves, { x: 130, y: 100 });
+		const candidate = getTrimCandidate(targetCurve, curves, new Vec2(130, 100));
 		assert.ok(candidate, 'Trim candidate found for overlapping segment of ellipse');
 
 		executeTrim(sketch, candidate);

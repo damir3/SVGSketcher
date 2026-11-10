@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
@@ -72,7 +73,7 @@ it('scales arc geometry and copies its endpoint constraint while dropping an inc
 	sketch.selectEntity(arc.id, 'arc');
 
 	const selection = getTransformSelection(sketch)!;
-	assert.deepEqual(selection.center, { x: 35, y: 25 });
+	assert.deepEqual(selection.center, new Vec2(35, 25));
 	assert.equal(applyTransform(sketch, selection, { x: 0, y: 0, angle: 0, scale: 2 }, true), 1);
 	const id = [...sketch.selection.arcIds][0];
 	const copy = sketch.arcs.get(id)!;

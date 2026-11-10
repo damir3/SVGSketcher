@@ -1,7 +1,7 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import type { GeoCurve } from './intersection';
 import { evaluateBezier } from './spline';
-import { angleFromTo, dot, vec, distancesFrom, sub, type Vec2 } from './vector';
+import { Vec2, type XY } from './vector';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -9,12 +9,12 @@ export class AABB {
 	min: Vec2;
 	max: Vec2;
 
-	constructor(point?: Vec2) {
-		this.min = point ? { ...point } : { x: Infinity, y: Infinity };
-		this.max = point ? { ...point } : { x: -Infinity, y: -Infinity };
+	constructor(point?: XY) {
+		this.min = point ? Vec2.from(point) : new Vec2(Infinity, Infinity);
+		this.max = point ? Vec2.from(point) : new Vec2(-Infinity, -Infinity);
 	}
 
-	addPoint(point: Vec2): this {
+	addPoint(point: XY): this {
 		this.min.x = Math.min(this.min.x, point.x);
 		this.min.y = Math.min(this.min.y, point.y);
 		this.max.x = Math.max(this.max.x, point.x);
@@ -22,7 +22,7 @@ export class AABB {
 		return this;
 	}
 
-	static fromPoints(points: Iterable<Vec2>): AABB | null {
+	static fromPoints(points: Iterable<XY>): AABB | null {
 		const iterator = points[Symbol.iterator]();
 		const first = iterator.next();
 		if (first.done) return null;
@@ -82,19 +82,20 @@ export function getCurveBoundingBox(curve: GeoCurve): AABB | null {
 	const { center } = curve;
 	const radii =
 		curve.type === 'circle' || curve.type === 'arc'
-			? vec(curve.radius, curve.radius)
-			: distancesFrom(center, curve.majorAxisPoint, curve.minorAxisPoint);
-	const angle = 'majorAxisPoint' in curve ? angleFromTo(center, curve.majorAxisPoint) : 0;
+			? new Vec2(curve.radius, curve.radius)
+			: center.distancesTo(curve.majorAxisPoint, curve.minorAxisPoint);
+	const angle = 'majorAxisPoint' in curve ? center.angleToPoint(curve.majorAxisPoint) : 0;
 	const { axisU, axisV } = ellipseAxes(angle);
 	const x = Math.hypot(radii.x * axisU.x, radii.y * axisV.x);
 	const y = Math.hypot(radii.x * axisU.y, radii.y * axisV.y);
 	if (curve.type === 'circle' || curve.type === 'ellipse') {
-		return new AABB(vec(center.x - x, center.y - y)).addPoint(vec(center.x + x, center.y + y));
+		const halfSize = new Vec2(x, y);
+		return new AABB(center.clone().sub(halfSize)).addPoint(center.clone().add(halfSize));
 	}
 
 	const bounds = new AABB(curve.start).addPoint(curve.end);
-	const parameterAt = (point: Vec2) =>
-		curve.type === 'arc' ? angleFromTo(center, point) : ellipseParameterAtPoint(point, center, radii, axisU, axisV);
+	const parameterAt = (point: XY) =>
+		curve.type === 'arc' ? center.angleToPoint(point) : ellipseParameterAtPoint(point, center, radii, axisU, axisV);
 	const start = parameterAt(curve.start);
 	const end = parameterAt(curve.end);
 	// Clockwise in screen coordinates means decreasing parameter in world coordinates.
@@ -126,7 +127,7 @@ export function segmentIntersectsAABB(p1: Vec2, p2: Vec2, min: Vec2, max: Vec2):
 	if (Math.max(p1.x, p2.x) < min.x || Math.min(p1.x, p2.x) > max.x) return false;
 	if (Math.max(p1.y, p2.y) < min.y || Math.min(p1.y, p2.y) > max.y) return false;
 
-	const dir = sub(p2, p1);
+	const dir = new Vec2().subVectors(p2, p1);
 	let t0 = 0.0;
 	let t1 = 1.0;
 
@@ -156,16 +157,16 @@ export function segmentIntersectsAABB(p1: Vec2, p2: Vec2, min: Vec2, max: Vec2):
 export function circleIntersectsAABB(c: Vec2, r: number, min: Vec2, max: Vec2): boolean {
 	if (c.x >= min.x && c.x <= max.x && c.y >= min.y && c.y <= max.y) return true;
 
-	const closest = vec(Math.max(min.x, Math.min(c.x, max.x)), Math.max(min.y, Math.min(c.y, max.y)));
-	const distSq = (c.x - closest.x) ** 2 + (c.y - closest.y) ** 2;
+	const closest = new Vec2(Math.max(min.x, Math.min(c.x, max.x)), Math.max(min.y, Math.min(c.y, max.y)));
+	const distSq = c.distanceToSquared(closest);
 
 	if (distSq > r * r) return false;
 
-	const maxD = vec(
+	const maxD = new Vec2(
 		Math.max(Math.abs(c.x - min.x), Math.abs(c.x - max.x)),
 		Math.max(Math.abs(c.y - min.y), Math.abs(c.y - max.y))
 	);
-	const furthestDistSq = dot(maxD, maxD);
+	const furthestDistSq = maxD.lengthSq();
 
 	if (furthestDistSq < r * r) return false;
 
@@ -188,8 +189,8 @@ export function arcIntersectsAABB(
 	if (end.x >= min.x && end.x <= max.x && end.y >= min.y && end.y <= max.y) return true;
 	if (center.x >= min.x && center.x <= max.x && center.y >= min.y && center.y <= max.y) return true;
 
-	const as = angleFromTo(center, start);
-	const ae = angleFromTo(center, end);
+	const as = center.angleToPoint(start);
+	const ae = center.angleToPoint(end);
 
 	let sweepAngle = 0;
 	if (clockwise) {
@@ -207,10 +208,10 @@ export function arcIntersectsAABB(
 	for (let i = 1; i <= steps; i++) {
 		const frac = i / steps;
 		const angle = clockwise ? as + frac * sweepAngle : as - frac * sweepAngle;
-		const curr = vec(center.x + radius * Math.cos(angle), center.y + radius * Math.sin(angle));
+		const curr = Vec2.fromPolar(radius, angle).add(center);
 
 		if (curr.x >= min.x && curr.x <= max.x && curr.y >= min.y && curr.y <= max.y) return true;
-		if (segmentIntersectsAABB({ x: prevX, y: prevY }, curr, min, max)) return true;
+		if (segmentIntersectsAABB(new Vec2(prevX, prevY), curr, min, max)) return true;
 
 		prevX = curr.x;
 		prevY = curr.y;
@@ -227,10 +228,10 @@ export function ellipseIntersectsAABB(center: Vec2, majorPt: Vec2, minorPt: Vec2
 	if (majorPt.x >= min.x && majorPt.x <= max.x && majorPt.y >= min.y && majorPt.y <= max.y) return true;
 	if (minorPt.x >= min.x && minorPt.x <= max.x && minorPt.y >= min.y && minorPt.y <= max.y) return true;
 
-	const r = distancesFrom(center, majorPt, minorPt);
+	const r = center.distancesTo(majorPt, minorPt);
 	if (r.x < 0.01 || r.y < 0.01) return false;
 
-	const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(center, majorPt));
+	const { axisU: u, axisV: v } = ellipseAxes(center.angleToPoint(majorPt));
 
 	const steps = 36;
 	let prevX = center.x + r.x * u.x;
@@ -241,7 +242,7 @@ export function ellipseIntersectsAABB(center: Vec2, majorPt: Vec2, minorPt: Vec2
 		const curr = ellipsePointAtParameter(t, center, r, u, v);
 
 		if (curr.x >= min.x && curr.x <= max.x && curr.y >= min.y && curr.y <= max.y) return true;
-		if (segmentIntersectsAABB({ x: prevX, y: prevY }, curr, min, max)) return true;
+		if (segmentIntersectsAABB(new Vec2(prevX, prevY), curr, min, max)) return true;
 
 		prevX = curr.x;
 		prevY = curr.y;
@@ -267,10 +268,10 @@ export function ellipticalArcIntersectsAABB(
 	if (startPt.x >= min.x && startPt.x <= max.x && startPt.y >= min.y && startPt.y <= max.y) return true;
 	if (endPt.x >= min.x && endPt.x <= max.x && endPt.y >= min.y && endPt.y <= max.y) return true;
 
-	const r = distancesFrom(center, majorPt, minorPt);
+	const r = center.distancesTo(majorPt, minorPt);
 	if (r.x < 0.01 || r.y < 0.01) return false;
 
-	const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(center, majorPt));
+	const { axisU: u, axisV: v } = ellipseAxes(center.angleToPoint(majorPt));
 
 	const ts = ellipseParameterAtPoint(startPt, center, r, u, v);
 	const te = ellipseParameterAtPoint(endPt, center, r, u, v);
@@ -294,7 +295,7 @@ export function ellipticalArcIntersectsAABB(
 		const curr = ellipsePointAtParameter(t, center, r, u, v);
 
 		if (curr.x >= min.x && curr.x <= max.x && curr.y >= min.y && curr.y <= max.y) return true;
-		if (segmentIntersectsAABB({ x: prevX, y: prevY }, curr, min, max)) return true;
+		if (segmentIntersectsAABB(new Vec2(prevX, prevY), curr, min, max)) return true;
 
 		prevX = curr.x;
 		prevY = curr.y;

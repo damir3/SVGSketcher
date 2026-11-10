@@ -4,7 +4,7 @@ import { SketchDocument } from '../src/model/sketch';
 import { DeleteTool } from '../src/canvas/tools/modify/delete';
 import { HighlightManager } from '../src/canvas/highlightManager';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
-import { vec, type Vec2 } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../src/canvas/distances';
 
 function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {}): any {
@@ -74,8 +74,8 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 		zoom: 1,
 		panX: 0,
 		panY: 0,
-		worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-		screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+		worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+		screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 	};
 
 	const svgObj = {
@@ -233,11 +233,11 @@ describe('Delete Tool', () => {
 		const tool = new DeleteTool();
 		tool.activate(ctx);
 
-		const target = ctx.highlightManager!.update(tool, vec(50, 0));
+		const target = ctx.highlightManager!.update(tool, new Vec2(50, 0));
 		assert.ok(target);
 		assert.equal(target.id, line.id);
 
-		tool.onMouseDown(createToolMouseEvent(vec(50, 0)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(50, 0)));
 		assert.equal(sketch.lines.has(line.id), false);
 		assert.ok(toasts.includes('Deleted'));
 	});
@@ -253,11 +253,11 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Cursor at (2, 1) - within 14px of p1 at (0, 0)
-		const target = ctx.highlightManager!.update(tool, vec(2, 1));
+		const target = ctx.highlightManager!.update(tool, new Vec2(2, 1));
 		assert.ok(target);
 		assert.equal(target.id, p1.id);
 
-		tool.onMouseDown(createToolMouseEvent(vec(2, 1)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(2, 1)));
 		assert.equal(sketch.points.has(p1.id), false);
 	});
 
@@ -271,11 +271,11 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Perimeter is at x = 70, y = 50
-		const target = ctx.highlightManager!.update(tool, vec(70, 50));
+		const target = ctx.highlightManager!.update(tool, new Vec2(70, 50));
 		assert.ok(target);
 		assert.equal(target.id, circle.id);
 
-		tool.onMouseDown(createToolMouseEvent(vec(70, 50)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(70, 50)));
 		assert.equal(sketch.circles.has(circle.id), false);
 	});
 
@@ -291,7 +291,7 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		const midAngle = Math.PI / 4;
-		const midPos = vec(20 * Math.cos(midAngle), 20 * Math.sin(midAngle));
+		const midPos = new Vec2(20 * Math.cos(midAngle), 20 * Math.sin(midAngle));
 		const target = ctx.highlightManager!.update(tool, midPos);
 		assert.ok(target);
 		assert.equal(target.id, arc.id);
@@ -312,11 +312,11 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Distance constraint dimension line is offset (by default offsetScreen = 32px, ny = 1)
-		const target = ctx.highlightManager!.update(tool, vec(50, 32));
+		const target = ctx.highlightManager!.update(tool, new Vec2(50, 32));
 		assert.ok(target);
 		assert.equal(target.id, distConstraint!.id);
 
-		tool.onMouseDown(createToolMouseEvent(vec(50, 32)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(50, 32)));
 		assert.equal(sketch.constraints.has(distConstraint!.id), false);
 	});
 
@@ -355,11 +355,11 @@ describe('Delete Tool', () => {
 		tool.activate(ctx);
 
 		// Hover near badge rect (45, -15)
-		const target = ctx.highlightManager!.update(tool, vec(45, -15));
+		const target = ctx.highlightManager!.update(tool, new Vec2(45, -15));
 		assert.ok(target);
 		assert.equal(target.id, hConstraint.id);
 
-		tool.onMouseDown(createToolMouseEvent(vec(45, -15)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(45, -15)));
 		assert.equal(sketch.constraints.has(hConstraint.id), false);
 	});
 
@@ -383,7 +383,7 @@ describe('Delete Tool', () => {
 		assert.ok(handleLine);
 
 		const hp1 = sketch.points.get(handleLine.p1Id)!;
-		const midHandle = vec(hp1.x + 1, hp1.y + 1);
+		const midHandle = new Vec2(hp1.x + 1, hp1.y + 1);
 		const target = ctx.highlightManager!.update(tool, midHandle);
 		if (target) {
 			assert.notEqual(target.id, handleLine.id);
@@ -412,7 +412,7 @@ describe('Delete Tool', () => {
 		assert.equal(tool.getHighlightClass({ type: 'line', id: line.id }), 'delete-hover');
 		assert.equal(tool.canHighlight({ type: 'line', id: line.id }), true);
 
-		ctx.highlightManager!.update(tool, vec(50, 0));
+		ctx.highlightManager!.update(tool, new Vec2(50, 0));
 		assert.ok(lineEl.classList.contains('delete-hover'));
 
 		tool.cancel();
@@ -429,7 +429,7 @@ describe('Delete Tool', () => {
 		const tool = new DeleteTool();
 		tool.activate(ctx);
 
-		tool.onMouseDown(createToolMouseEvent(vec(50, 0)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(50, 0)));
 		assert.equal(sketch.lines.has(line.id), false);
 
 		sketch.undo();

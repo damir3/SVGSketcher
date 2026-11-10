@@ -2,7 +2,7 @@ import { GIZMO_DISTANCE_PX } from '../../distances';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
-import { sub, cross, dist, dot, normalize, vec, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import { VariationToolPanel } from '../../../ui/panels/tools';
@@ -47,7 +47,7 @@ export class ChamferTool extends BaseTool {
 		super();
 		this.popup = new ToolPopup<'dist1' | 'dist2' | 'angle' | 'flip'>({
 			className: 'chamfer-popup',
-			defaultOffset: { x: 200, y: 40 },
+			defaultOffset: new Vec2(200, 40),
 			fields: [
 				{
 					id: 'dist1',
@@ -300,7 +300,7 @@ export class ChamferTool extends BaseTool {
 		// 1. Check for Chamfer Gizmo handle click / drag
 		if (this.ctx.renderer.chamferGizmoHandles && this.ctx.renderer.chamferGizmoHandles.length > 0) {
 			for (const gh of this.ctx.renderer.chamferGizmoHandles) {
-				if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
+				if (screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX) {
 					this.gizmoDragState = {
 						handle: gh,
 						startMouseWorld: world,
@@ -373,8 +373,8 @@ export class ChamferTool extends BaseTool {
 
 		if (this.ctx.renderer?.chamferGizmoHandles) {
 			for (const h of this.ctx.renderer.chamferGizmoHandles) {
-				pts.push({ x: h.screenX - 16, y: h.screenY - 16 });
-				pts.push({ x: h.screenX + 16, y: h.screenY + 16 });
+				pts.push(new Vec2(h.screenX - 16, h.screenY - 16));
+				pts.push(new Vec2(h.screenX + 16, h.screenY + 16));
 			}
 		}
 
@@ -422,20 +422,17 @@ export class ChamferTool extends BaseTool {
 			if (handle.type === 'dist1' || handle.type === 'dist2') {
 				if (this.mode === 'equal_distance') {
 					// Drag along angle bisector
-					const bisector = normalize({
-						x: this.candidate.dir1.x + this.candidate.dir2.x,
-						y: this.candidate.dir1.y + this.candidate.dir2.y,
-					});
+					const bisector = new Vec2().addVectors(this.candidate.dir1, this.candidate.dir2).normalizeOrUnitX();
 					const halfAngle = this.candidate.cornerAngleRad / 2;
 					const cosHalf = Math.max(0.05, Math.cos(halfAngle));
-					const delta = dot(sub(world, startMouseWorld), bisector);
+					const delta = new Vec2().subVectors(world, startMouseWorld).dot(bisector);
 					const deltaD = delta / cosHalf;
 					const newDist = Math.max(0.5, Math.round((startValue + deltaD) * 2) / 2);
 					this.dist1 = newDist;
 					this.dist2 = newDist;
 				} else if (this.mode === 'two_distance') {
 					const dir = handle.dir || (handle.type === 'dist1' ? this.candidate.dir1 : this.candidate.dir2);
-					const delta = dot(sub(world, startMouseWorld), dir);
+					const delta = new Vec2().subVectors(world, startMouseWorld).dot(dir);
 					const newDist = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
 					if (handle.type === 'dist1') {
 						if (!this.flip) {
@@ -452,7 +449,7 @@ export class ChamferTool extends BaseTool {
 					}
 				} else if (this.mode === 'distance_angle') {
 					const dir = handle.dir || (!this.flip ? this.candidate.dir1 : this.candidate.dir2);
-					const delta = dot(sub(world, startMouseWorld), dir);
+					const delta = new Vec2().subVectors(world, startMouseWorld).dot(dir);
 					const newDist = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
 					this.dist1 = newDist;
 				}
@@ -465,19 +462,17 @@ export class ChamferTool extends BaseTool {
 			} else if (handle.type === 'angle') {
 				// Angle drag around vertex A (or B if flipped)
 				const refVertex = !this.flip ? this.candidate.result.t1 : this.candidate.result.t2;
-				const refDir = !this.flip
-					? vec(-this.candidate.dir1.x, -this.candidate.dir1.y)
-					: vec(-this.candidate.dir2.x, -this.candidate.dir2.y);
+				const refDir = !this.flip ? this.candidate.dir1.clone().negate() : this.candidate.dir2.clone().negate();
 
 				// Determine which side of refDir points into the corner interior
-				const cross12 = cross(this.candidate.dir1, this.candidate.dir2);
+				const cross12 = this.candidate.dir1.cross(this.candidate.dir2);
 				const interiorSign = !this.flip ? (cross12 >= 0 ? -1 : 1) : cross12 >= 0 ? 1 : -1;
 
-				const toMouse = vec(world.x - refVertex.x, world.y - refVertex.y);
-				const toMouseLen = Math.hypot(toMouse.x, toMouse.y);
+				const toMouse = new Vec2().subVectors(world, refVertex);
+				const toMouseLen = toMouse.length();
 				if (toMouseLen > 1e-4) {
-					const crossMouse = cross(refDir, toMouse);
-					const dotMouse = dot(refDir, toMouse);
+					const crossMouse = refDir.cross(toMouse);
+					const dotMouse = refDir.dot(toMouse);
 					const signedCross = crossMouse * interiorSign;
 					const signedAngleRad = Math.atan2(signedCross, dotMouse);
 					const signedAngleDeg = (signedAngleRad * 180) / Math.PI;
@@ -499,7 +494,7 @@ export class ChamferTool extends BaseTool {
 
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
 		const isOverGizmo = this.ctx.renderer.chamferGizmoHandles?.some(
-			gh => dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX
+			gh => screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX
 		);
 		if (this.gizmoDragState) {
 			this.ctx.setCursor('grabbing');

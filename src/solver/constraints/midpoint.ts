@@ -1,3 +1,4 @@
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -66,13 +67,13 @@ export class MidpointConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.midId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x, y: s.y - 14 }, 'M', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s.x, s.y - 14), 'M', COLORS.primary);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
 		const pt = sketch.points.get(this.midId);
 		if (!pt) return null;
 		const s = viewport.worldToScreen(pt);
-		return distanceToPoint(screen, { x: s.x, y: s.y - 14 });
+		return distanceToPoint(screen, new Vec2(s.x, s.y - 14));
 	}
 }

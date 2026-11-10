@@ -1,4 +1,4 @@
-import { dot, scale, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 
@@ -49,27 +49,27 @@ export class EllipticalArcEndpointsConstraint extends BaseConstraint {
 		const s = readParamPoint(paramMap, this.startPointId);
 		const end = readParamPoint(paramMap, this.endPointId);
 
-		const u = sub(p1, center);
-		const v = sub(p2, center);
+		const u = new Vec2().subVectors(p1, center);
+		const v = new Vec2().subVectors(p2, center);
 
-		const rx = Math.max(Math.hypot(u.x, u.y), 1e-7);
-		const ry = Math.max(Math.hypot(v.x, v.y), 1e-7);
+		const rx = Math.max(u.length(), 1e-7);
+		const ry = Math.max(v.length(), 1e-7);
 		const avgR = (rx + ry) * 0.5;
 
 		// Unit axis vectors
-		const uHat = scale(u, 1 / rx);
-		const vHat = scale(v, 1 / ry);
+		const uHat = u.clone().multiplyScalar(1 / rx);
+		const vHat = v.clone().multiplyScalar(1 / ry);
 
 		// Start point local coords
-		const ds = sub(s, center);
-		const uS = dot(ds, uHat);
-		const vS = dot(ds, vHat);
+		const ds = new Vec2().subVectors(s, center);
+		const uS = ds.dot(uHat);
+		const vS = ds.dot(vHat);
 		const resS = ((uS * uS) / (rx * rx) + (vS * vS) / (ry * ry) - 1.0) * avgR * this.weight;
 
 		// End point local coords
-		const de = sub(end, center);
-		const uE = dot(de, uHat);
-		const vE = dot(de, vHat);
+		const de = new Vec2().subVectors(end, center);
+		const uE = de.dot(uHat);
+		const vE = de.dot(vHat);
 		const resE = ((uE * uE) / (rx * rx) + (vE * vE) / (ry * ry) - 1.0) * avgR * this.weight;
 
 		return [resS, resE];

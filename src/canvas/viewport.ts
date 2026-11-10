@@ -1,5 +1,5 @@
 import { DEFAULT_ZOOM } from '../constants';
-import { mid, vec, type Vec2 } from '../math/vector';
+import { Vec2, type XY } from '../math/vector';
 import type { AABB } from '../math/aabb';
 
 export class Viewport {
@@ -20,7 +20,7 @@ export class Viewport {
 	resize(width: number, height: number): boolean {
 		if (width <= 0 || height <= 0 || (width === this.width && height === this.height)) return false;
 
-		const center = this.screenToWorld(vec(this.width / 2, this.height / 2));
+		const center = this.screenToWorld(new Vec2(this.width / 2, this.height / 2));
 		let frame = this.resizeFrame;
 		// Keep the same world bounds across resize events until the camera moves.
 		if (!frame || frame.panX !== this.panX || frame.panY !== this.panY || frame.zoom !== this.zoom) {
@@ -67,7 +67,7 @@ export class Viewport {
 
 		const zoom = Math.min(Math.max(fitZoom, 0.05), 50.0);
 
-		const center = mid(min, max);
+		const center = new Vec2().midpoint(min, max);
 		const panX = this.width / 2 - center.x * zoom;
 		const panY = this.height / 2 + center.y * zoom;
 
@@ -81,16 +81,16 @@ export class Viewport {
 		this.panY = target.panY;
 	}
 
-	screenToWorld(screen: Vec2): Vec2 {
+	screenToWorld(screen: XY): Vec2 {
 		// CAD standard: Y points UP in world coordinates
-		return vec((screen.x - this.panX) / this.zoom, -(screen.y - this.panY) / this.zoom);
+		return new Vec2((screen.x - this.panX) / this.zoom, -(screen.y - this.panY) / this.zoom);
 	}
 
-	worldToScreen(world: Vec2): Vec2 {
-		return vec(this.panX + world.x * this.zoom, this.panY - world.y * this.zoom);
+	worldToScreen(world: XY): Vec2 {
+		return new Vec2(this.panX + world.x * this.zoom, this.panY - world.y * this.zoom);
 	}
 
-	zoomAt(screen: Vec2, factor: number): void {
+	zoomAt(screen: XY, factor: number): void {
 		const worldBefore = this.screenToWorld(screen);
 		const newZoom = Math.min(Math.max(this.zoom * factor, 0.05), 200.0);
 		this.zoom = newZoom;

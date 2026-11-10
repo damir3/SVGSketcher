@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -63,8 +64,8 @@ describe('CircularPatternTool & Panel Integration', () => {
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+				screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -97,9 +98,9 @@ describe('CircularPatternTool & Panel Integration', () => {
 
 		// Click line to select object
 		tool.onMouseDown({
-			screen: { x: 15, y: 15 },
-			client: { x: 15, y: 15 },
-			world: { x: 15, y: 15 },
+			screen: new Vec2(15, 15),
+			client: new Vec2(15, 15),
+			world: new Vec2(15, 15),
 			event: {} as any,
 		});
 		assert.ok(tool.state?.selectedObjectIds.has(line.id), 'Line should be selected');
@@ -110,9 +111,9 @@ describe('CircularPatternTool & Panel Integration', () => {
 
 		// Click center point
 		tool.onMouseDown({
-			screen: { x: 0, y: 0 },
-			client: { x: 0, y: 0 },
-			world: { x: 0, y: 0 },
+			screen: new Vec2(0, 0),
+			client: new Vec2(0, 0),
+			world: new Vec2(0, 0),
 			event: {} as any,
 		});
 		assert.equal(tool.state?.centerPointId, center.id);
@@ -144,8 +145,8 @@ describe('CircularPatternTool & Panel Integration', () => {
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+				screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -172,18 +173,18 @@ describe('CircularPatternTool & Panel Integration', () => {
 
 		// Select line
 		tool.onMouseDown({
-			screen: { x: 15, y: 0 },
-			client: { x: 15, y: 0 },
-			world: { x: 15, y: 0 },
+			screen: new Vec2(15, 0),
+			client: new Vec2(15, 0),
+			world: new Vec2(15, 0),
 			event: {} as any,
 		});
 
 		// Switch to center_point phase and click origin
 		tool.setPhase('center_point');
 		tool.onMouseDown({
-			screen: { x: 0, y: 0 },
-			client: { x: 0, y: 0 },
-			world: { x: 0, y: 0 },
+			screen: new Vec2(0, 0),
+			client: new Vec2(0, 0),
+			world: new Vec2(0, 0),
 			event: {} as any,
 		});
 		assert.equal(tool.state?.centerPointId, 'origin');
@@ -213,8 +214,8 @@ describe('CircularPatternTool & Panel Integration', () => {
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+				screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -239,16 +240,16 @@ describe('CircularPatternTool & Panel Integration', () => {
 
 		tool.activate(mockCtx);
 		tool.onMouseDown({
-			screen: { x: 15, y: 0 },
-			client: { x: 15, y: 0 },
-			world: { x: 15, y: 0 },
+			screen: new Vec2(15, 0),
+			client: new Vec2(15, 0),
+			world: new Vec2(15, 0),
 			event: {} as any,
 		});
 		tool.setPhase('center_point');
 		tool.onMouseDown({
-			screen: { x: 0, y: 0 },
-			client: { x: 0, y: 0 },
-			world: { x: 0, y: 0 },
+			screen: new Vec2(0, 0),
+			client: new Vec2(0, 0),
+			world: new Vec2(0, 0),
 			event: {} as any,
 		});
 
@@ -290,8 +291,8 @@ describe('RectangularPatternTool & Panel Integration', () => {
 		const mockCtx: any = {
 			sketch,
 			viewport: {
-				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-				screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+				worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+				screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 			},
 			renderer: {
 				patternCheckboxPositions: new Map(),
@@ -320,9 +321,9 @@ describe('RectangularPatternTool & Panel Integration', () => {
 
 		// Select line
 		tool.onMouseDown({
-			screen: { x: 5, y: 0 },
-			client: { x: 5, y: 0 },
-			world: { x: 5, y: 0 },
+			screen: new Vec2(5, 0),
+			client: new Vec2(5, 0),
+			world: new Vec2(5, 0),
 			event: {} as any,
 		});
 		assert.ok(tool.state?.selectedObjectIds.has(line.id));
@@ -397,7 +398,7 @@ describe('RectangularPatternTool & Panel Integration', () => {
 				setTool: () => {},
 			} as Parameters<typeof tool.activate>[0]);
 			const click = (x: number, y: number) => {
-				const screen = { x, y };
+				const screen = new Vec2(x, y);
 				tool.onMouseDown({
 					screen,
 					client: screen,

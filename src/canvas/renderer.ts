@@ -13,23 +13,7 @@ import {
 	computeRectangularPatternDirections,
 	type ConstraintRenderContext,
 } from '../solver/constraints';
-import {
-	angleFromTo,
-	angleFromToDeg,
-	directionAngle,
-	dot,
-	addScaled,
-	ORIGIN,
-	centroid,
-	distancesFrom,
-	vec,
-	dist,
-	normalize,
-	reflectPoint,
-	scale,
-	sub,
-	type Vec2,
-} from '../math/vector';
+import { ORIGIN, Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
 import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../math/spline';
 import { getFontSync, loadFontAsync } from './fonts';
@@ -533,11 +517,11 @@ export class SVGRenderer {
 
 		if (showGrid) {
 			const { step, subStep } = viewport.getGridStep();
-			const minWorld = viewport.screenToWorld({ x: 0, y: viewport.height });
-			const maxWorld = viewport.screenToWorld({ x: viewport.width, y: 0 });
+			const minWorld = viewport.screenToWorld(new Vec2(0, viewport.height));
+			const maxWorld = viewport.screenToWorld(new Vec2(viewport.width, 0));
 
-			const start = vec(Math.floor(minWorld.x / subStep) * subStep, Math.floor(minWorld.y / subStep) * subStep);
-			const end = vec(Math.ceil(maxWorld.x / subStep) * subStep, Math.ceil(maxWorld.y / subStep) * subStep);
+			const start = new Vec2(Math.floor(minWorld.x / subStep) * subStep, Math.floor(minWorld.y / subStep) * subStep);
+			const end = new Vec2(Math.ceil(maxWorld.x / subStep) * subStep, Math.ceil(maxWorld.y / subStep) * subStep);
 
 			const subStepPx = subStep * viewport.zoom;
 			const showSubGrid = subStepPx >= 6;
@@ -564,14 +548,14 @@ export class SVGRenderer {
 			};
 
 			for (let x = start.x; x <= end.x; x += subStep) {
-				const s = viewport.worldToScreen({ x: x, y: 0 });
+				const s = viewport.worldToScreen(new Vec2(x, 0));
 				const isMajor = Math.abs(Math.round(x / subStep) % 5) === 0;
 				if (isMajor) {
 					dMajor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
 
 					const cleanVal = parseFloat((Math.round(x / step) * step).toFixed(6));
 					if (Math.abs(cleanVal) > 1e-4) {
-						const anchor = vec(s.x, axisY + 4);
+						const anchor = new Vec2(s.x, axisY + 4);
 						createSvgText(
 							anchor,
 							cleanVal.toString(),
@@ -589,7 +573,7 @@ export class SVGRenderer {
 			}
 
 			for (let y = start.y; y <= end.y; y += subStep) {
-				const s = viewport.worldToScreen({ x: 0, y: y });
+				const s = viewport.worldToScreen(new Vec2(0, y));
 				const isMajor = Math.abs(Math.round(y / subStep) % 5) === 0;
 				if (isMajor) {
 					dMajor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
@@ -597,7 +581,7 @@ export class SVGRenderer {
 					const cleanVal = parseFloat((Math.round(y / step) * step).toFixed(6));
 					if (Math.abs(cleanVal) > 1e-4) {
 						createSvgText(
-							{ x: axisX + 8, y: s.y },
+							new Vec2(axisX + 8, s.y),
 							cleanVal.toString(),
 							{
 								'text-anchor': 'start',
@@ -654,10 +638,10 @@ export class SVGRenderer {
 			this.originAxisGroup
 		);
 
-		createSvgLine({ x: 0, y: origin.y }, { x: viewport.width, y: origin.y }, HIT_AREA_STROKE_ATTRS, axisXG);
+		createSvgLine(new Vec2(0, origin.y), new Vec2(viewport.width, origin.y), HIT_AREA_STROKE_ATTRS, axisXG);
 		createSvgLine(
-			{ x: 0, y: origin.y },
-			{ x: viewport.width, y: origin.y },
+			new Vec2(0, origin.y),
+			new Vec2(viewport.width, origin.y),
 			{
 				stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
 				'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
@@ -676,10 +660,10 @@ export class SVGRenderer {
 			this.originAxisGroup
 		);
 
-		createSvgLine({ x: origin.x, y: 0 }, { x: origin.x, y: viewport.height }, HIT_AREA_STROKE_ATTRS, axisYG);
+		createSvgLine(new Vec2(origin.x, 0), new Vec2(origin.x, viewport.height), HIT_AREA_STROKE_ATTRS, axisYG);
 		createSvgLine(
-			{ x: origin.x, y: 0 },
-			{ x: origin.x, y: viewport.height },
+			new Vec2(origin.x, 0),
+			new Vec2(origin.x, viewport.height),
 			{
 				stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
 				'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
@@ -994,10 +978,10 @@ export class SVGRenderer {
 			const smaj = viewport.worldToScreen(majorPt);
 			const smin = viewport.worldToScreen(minorPt);
 
-			const r = distancesFrom(sc, smaj, smin);
+			const r = sc.distancesTo(smaj, smin);
 			if (r.x < 0.1 || r.y < 0.1) continue;
 
-			const thetaDeg = angleFromToDeg(sc, smaj);
+			const thetaDeg = sc.angleToPointDeg(smaj);
 			const isSelected =
 				sketch.selection.ellipseIds.has(ellipse.id) ||
 				!!options.mirrorHighlight?.selectedObjectIds.has(ellipse.id) ||
@@ -1315,14 +1299,14 @@ export class SVGRenderer {
 				if (!corners) continue;
 
 				const [p0, p1, p2, p3] = corners;
-				const cWorld = vec((p0.x + p2.x) / 2, (p0.y + p2.y) / 2);
+				const cWorld = new Vec2().midpoint(p0, p2);
 				const sCenter = viewport.worldToScreen(cWorld);
-				const widthWorld = dist(p0, p1);
-				const heightWorld = dist(p0, p3);
+				const widthWorld = p0.distanceTo(p1);
+				const heightWorld = p0.distanceTo(p3);
 				const wScreen = widthWorld * viewport.zoom;
 				const hBoxScreen = heightWorld * viewport.zoom;
 
-				const angleCad = angleFromTo(p0, p1);
+				const angleCad = p0.angleToPoint(p1);
 				const angleScreenDeg = (-angleCad * 180) / Math.PI;
 
 				const textG = createSvgElement(
@@ -1467,9 +1451,7 @@ export class SVGRenderer {
 					);
 
 					const rad = (angleScreenDeg * Math.PI) / 180;
-					const cosA = Math.cos(rad);
-					const sinA = Math.sin(rad);
-					const handleScreen = vec(sCenter.x + (0 * cosA - handleY * sinA), sCenter.y + (0 * sinA + handleY * cosA));
+					const handleScreen = new Vec2(0, handleY).rotateAround(ORIGIN, rad).add(sCenter);
 
 					this.textRotationGizmo = {
 						textId: text.id,
@@ -1679,7 +1661,7 @@ export class SVGRenderer {
 		}
 
 		// 4. Dimension line with arrowheads
-		const screenDist = Math.hypot(d2.x - d1.x, d2.y - d1.y);
+		const screenDist = d1.distanceTo(d2);
 		const lineAttrs: SvgAttrs = {
 			stroke: color,
 			'stroke-width': STROKE_WIDTH.dimension,
@@ -1690,7 +1672,7 @@ export class SVGRenderer {
 		}
 		createSvgLine(d1, d2, lineAttrs, g);
 
-		renderDimensionLabel(g, vec((d1.x + d2.x) * 0.5, (d1.y + d2.y) * 0.5), label, color);
+		renderDimensionLabel(g, new Vec2().midpoint(d1, d2), label, color);
 	}
 
 	private renderDashedExtensionLines(
@@ -1702,10 +1684,10 @@ export class SVGRenderer {
 		pB: Vec2,
 		color: string
 	): void {
-		const v = vec(Math.cos(angleRad), Math.sin(angleRad));
+		const v = Vec2.fromPolar(1, angleRad);
 
-		const k1 = dot(sub(pA, sCenter), v);
-		const k2 = dot(sub(pB, sCenter), v);
+		const k1 = new Vec2().subVectors(pA, sCenter).dot(v);
+		const k2 = new Vec2().subVectors(pB, sCenter).dot(v);
 		const kMin = Math.min(k1, k2);
 		const kMax = Math.max(k1, k2);
 
@@ -1728,8 +1710,8 @@ export class SVGRenderer {
 
 		for (const [startK, endK] of intervals) {
 			if (endK - startK < 1) continue;
-			const p1 = addScaled(sCenter, v, startK);
-			const p2 = addScaled(sCenter, v, endK);
+			const p1 = sCenter.clone().addScaledVector(v, startK);
+			const p2 = sCenter.clone().addScaledVector(v, endK);
 
 			createSvgLine(
 				p1,
@@ -1760,9 +1742,9 @@ export class SVGRenderer {
 		const sCenter = viewport.worldToScreen(center);
 		const ss = viewport.worldToScreen(start);
 		const se = viewport.worldToScreen(end);
-		const as = angleFromTo(sCenter, ss);
-		const ae = angleFromTo(sCenter, se);
-		const aPt = angleFromTo(sCenter, point);
+		const as = sCenter.angleToPoint(ss);
+		const ae = sCenter.angleToPoint(se);
+		const aPt = sCenter.angleToPoint(point);
 		const clockwise = !!arc.clockwise;
 
 		let totalSweep = 0;
@@ -1805,15 +1787,13 @@ export class SVGRenderer {
 		const s1 = viewport.worldToScreen(p1);
 		const s2 = viewport.worldToScreen(p2);
 
-		const dir = sub(s2, s1);
-		const len = Math.max(Math.hypot(dir.x, dir.y), 1);
-		const u = scale(dir, 1 / len);
+		const dir = new Vec2().subVectors(s2, s1);
+		const len = Math.max(dir.length(), 1);
+		const u = dir.clone().multiplyScalar(1 / len);
 
-		let nx = -u.y;
-		let ny = u.x;
-		if (ny > 0 || (Math.abs(ny) < 1e-4 && nx < 0)) {
-			nx = -nx;
-			ny = -ny;
+		const normal = u.clone().perpendicular();
+		if (normal.y > 0 || (Math.abs(normal.y) < 1e-4 && normal.x < 0)) {
+			normal.negate();
 		}
 
 		let badgeIndex = 0;
@@ -1828,10 +1808,7 @@ export class SVGRenderer {
 				? 0
 				: (badgeIndex % 2 === 1 ? Math.floor((badgeIndex + 1) / 2) : -Math.floor(badgeIndex / 2)) * 22;
 
-		const midpoint = vec(
-			(s1.x + s2.x) * 0.5 + nx * 14 + u.x * offsetAlong,
-			(s1.y + s2.y) * 0.5 + ny * 14 + u.y * offsetAlong
-		);
+		const midpoint = new Vec2().midpoint(s1, s2).addScaledVector(normal, 14).addScaledVector(u, offsetAlong);
 
 		this.renderConstraintBadge(constraintId, midpoint, label, isSelected);
 	}
@@ -1862,8 +1839,8 @@ export class SVGRenderer {
 			if (start && end) {
 				const ss = viewport.worldToScreen(start);
 				const se = viewport.worldToScreen(end);
-				const as = angleFromTo(sc, ss);
-				const ae = angleFromTo(sc, se);
+				const as = sc.angleToPoint(ss);
+				const ae = sc.angleToPoint(se);
 				const clockwise = !!arc.clockwise;
 
 				let sweepAngle = 0;
@@ -1883,7 +1860,7 @@ export class SVGRenderer {
 			}
 		}
 
-		this.renderConstraintBadge(constraintId, { x: bx, y: by }, label, isSelected);
+		this.renderConstraintBadge(constraintId, new Vec2(bx, by), label, isSelected);
 	}
 
 	private isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
@@ -1913,20 +1890,20 @@ export class SVGRenderer {
 	): void {
 		const sCtr = viewport.worldToScreen(centroidWorld);
 
-		const p1Screen = viewport.worldToScreen({ x: centroidWorld.x + u1.x, y: centroidWorld.y + u1.y });
-		const v1 = sub(p1Screen, sCtr);
-		const v1Len = Math.max(dist(p1Screen, sCtr), 1e-6);
-		const u1Screen = scale(v1, 1.0 / v1Len);
+		const p1Screen = viewport.worldToScreen(new Vec2().addVectors(centroidWorld, u1));
+		const v1 = new Vec2().subVectors(p1Screen, sCtr);
+		const v1Len = Math.max(p1Screen.distanceTo(sCtr), 1e-6);
+		const u1Screen = v1.clone().multiplyScalar(1.0 / v1Len);
 
-		const p2Screen = viewport.worldToScreen({ x: centroidWorld.x + u2.x, y: centroidWorld.y + u2.y });
-		const v2 = sub(p2Screen, sCtr);
-		const v2Len = Math.max(dist(p2Screen, sCtr), 1e-6);
-		const u2Screen = scale(v2, 1.0 / v2Len);
+		const p2Screen = viewport.worldToScreen(new Vec2().addVectors(centroidWorld, u2));
+		const v2 = new Vec2().subVectors(p2Screen, sCtr);
+		const v2Len = Math.max(p2Screen.distanceTo(sCtr), 1e-6);
+		const u2Screen = v2.clone().multiplyScalar(1.0 / v2Len);
 
-		const h1World = addScaled(centroidWorld, u1, distance1);
+		const h1World = Vec2.from(centroidWorld).addScaledVector(u1, distance1);
 		const h1Screen = viewport.worldToScreen(h1World);
 
-		const h2World = addScaled(centroidWorld, u2, distance2);
+		const h2World = Vec2.from(centroidWorld).addScaledVector(u2, distance2);
 		const h2Screen = viewport.worldToScreen(h2World);
 
 		const gizmoG = createSvgElement(
@@ -1946,18 +1923,18 @@ export class SVGRenderer {
 			distVal: number
 		) => {
 			const isNegative = distVal < -1e-3;
-			const arrowDir = vec(isNegative ? -dirScreen.x : dirScreen.x, isNegative ? -dirScreen.y : dirScreen.y);
-			const perp = vec(-arrowDir.y, arrowDir.x);
+			const arrowDir = Vec2.from(dirScreen).multiplyScalar(isNegative ? -1 : 1);
+			const perp = arrowDir.clone().perpendicular();
 
 			const arrowLen = 18;
 			const arrowHalfWidth = 7.5;
 			const offsetDist = 48; // Offset equals initial line length at distance=0 (48px)
 
-			const tip = addScaled(to, arrowDir, offsetDist);
-			const baseCenter = addScaled(tip, arrowDir, -arrowLen);
+			const tip = Vec2.from(to).addScaledVector(arrowDir, offsetDist);
+			const baseCenter = tip.clone().addScaledVector(arrowDir, -arrowLen);
 
-			const base1 = addScaled(baseCenter, perp, arrowHalfWidth);
-			const base2 = addScaled(baseCenter, perp, -arrowHalfWidth);
+			const base1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
+			const base2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
 
 			// Register handle centered on the arrowhead for dragging
 			const key = options.constraintId ? `gizmo-${axisNum}-${options.constraintId}` : `gizmo-${axisNum}`;
@@ -2009,20 +1986,20 @@ export class SVGRenderer {
 			if (isHorizontal) {
 				// Horizontal arrow -> place label below the arrow
 				const midX = tip.x - arrowLen * 0.5 * arrowDir.x;
-				const max = { x: from.x, y: Math.max(from.y, tip.y, base1.y, base2.y) };
+				const max = new Vec2(from.x, Math.max(from.y, tip.y, base1.y, base2.y));
 				pillX = midX;
 				pillY = max.y + 16;
 			} else {
 				// Vertical arrow -> place label to the right of the arrow
 				const midY = tip.y - arrowLen * 0.5 * arrowDir.y;
-				const max = { x: Math.max(from.x, tip.x, base1.x, base2.x), y: from.y };
+				const max = new Vec2(Math.max(from.x, tip.x, base1.x, base2.x), from.y);
 				pillX = max.x + 10 + pillWidth * 0.5;
 				pillY = midY;
 			}
 
 			createSvgRect(
-				{ x: pillX - pillWidth * 0.5, y: pillY - 10 },
-				{ x: pillWidth, y: 20 },
+				new Vec2(pillX - pillWidth * 0.5, pillY - 10),
+				new Vec2(pillWidth, 20),
 				{
 					...RECT_PATTERN_PILL_ATTRS,
 					stroke: color,
@@ -2030,7 +2007,7 @@ export class SVGRenderer {
 				gizmoG
 			);
 
-			createSvgText({ x: pillX, y: pillY + 3.5 }, labelText, RECT_PATTERN_PILL_TEXT_ATTRS, gizmoG);
+			createSvgText(new Vec2(pillX, pillY + 3.5), labelText, RECT_PATTERN_PILL_TEXT_ATTRS, gizmoG);
 		};
 
 		renderArrow(sCtr, h1Screen, u1Screen, COLORS.patternAxis1, 1, distance1);
@@ -2055,11 +2032,11 @@ export class SVGRenderer {
 		);
 
 		// Outer halo / shadow
-		createSvgRect({ x: centroid.x - 11, y: centroid.y - 11 }, { x: 22, y: 22 }, CHECKBOX_HALO_ATTRS, cbG);
+		createSvgRect(Vec2.from(centroid).subScalar(11), new Vec2(22, 22), CHECKBOX_HALO_ATTRS, cbG);
 
 		if (!isSuppressed) {
 			// Active checkbox (blue filled with white checkmark)
-			createSvgRect({ x: centroid.x - 9, y: centroid.y - 9 }, { x: 18, y: 18 }, CHECKBOX_ACTIVE_ATTRS, cbG);
+			createSvgRect(Vec2.from(centroid).subScalar(9), new Vec2(18, 18), CHECKBOX_ACTIVE_ATTRS, cbG);
 
 			createSvgPath(
 				`M ${centroid.x - 4.5} ${centroid.y} L ${centroid.x - 1.5} ${centroid.y + 3.5} L ${centroid.x + 5} ${centroid.y - 3.5}`,
@@ -2068,11 +2045,11 @@ export class SVGRenderer {
 			);
 		} else {
 			// Suppressed checkbox (grey outline with red dash)
-			createSvgRect({ x: centroid.x - 9, y: centroid.y - 9 }, { x: 18, y: 18 }, CHECKBOX_SUPPRESSED_ATTRS, cbG);
+			createSvgRect(Vec2.from(centroid).subScalar(9), new Vec2(18, 18), CHECKBOX_SUPPRESSED_ATTRS, cbG);
 
 			createSvgLine(
-				{ x: centroid.x - 4, y: centroid.y },
-				{ x: centroid.x + 4, y: centroid.y },
+				new Vec2(centroid.x - 4, centroid.y),
+				new Vec2(centroid.x + 4, centroid.y),
 				CHECKBOX_SUPPRESSED_DASH_ATTRS,
 				cbG
 			);
@@ -2089,7 +2066,7 @@ export class SVGRenderer {
 		color: string
 	): void {
 		const transform = createTransform(center, values);
-		this.renderTransformedObjects(sketch, viewport, ids, (x, y) => transform.point(vec(x, y)), {
+		this.renderTransformedObjects(sketch, viewport, ids, (x, y) => transform.point(new Vec2(x, y)), {
 			targetGroup,
 			baseColor: color,
 			transformScale: values.scale,
@@ -2115,7 +2092,7 @@ export class SVGRenderer {
 		objectIds: Iterable<string>,
 		transform:
 			| { center: { x: number; y: number }; angleDeg: number }
-			| { dx: number; dy: number }
+			| Vec2
 			| ((x: number, y: number) => { x: number; y: number }),
 		options: {
 			targetGroup?: SVGGElement;
@@ -2133,19 +2110,10 @@ export class SVGRenderer {
 			transformPoint = transform;
 		} else if ('angleDeg' in transform) {
 			const rad = (transform.angleDeg * Math.PI) / 180;
-			const cosA = Math.cos(rad);
-			const sinA = Math.sin(rad);
-			const c = transform.center;
-			transformPoint = (x: number, y: number) => {
-				const dir = vec(x - c.x, y - c.y);
-				return {
-					x: c.x + dir.x * cosA - dir.y * sinA,
-					y: c.y + dir.x * sinA + dir.y * cosA,
-				};
-			};
+			const center = transform.center;
+			transformPoint = (x, y) => new Vec2(x, y).rotateAround(center, rad);
 		} else {
-			const dir = vec(transform.dx, transform.dy);
-			transformPoint = (x: number, y: number) => ({ x: x + dir.x, y: y + dir.y });
+			transformPoint = (x, y) => new Vec2(x, y).add(transform);
 		}
 
 		const copyWorldPoints: Array<{ x: number; y: number }> = [];
@@ -2264,8 +2232,8 @@ export class SVGRenderer {
 						const src = viewport.worldToScreen(rc);
 						const srmaj = viewport.worldToScreen(rmaj);
 						const srmin = viewport.worldToScreen(rmin);
-						const r = distancesFrom(src, srmaj, srmin);
-						const thetaDeg = angleFromToDeg(src, srmaj);
+						const r = src.distancesTo(srmaj, srmin);
+						const thetaDeg = src.angleToPointDeg(srmaj);
 
 						createSvgEllipse(
 							src,
@@ -2373,8 +2341,8 @@ export class SVGRenderer {
 		const width = icon ? 18 : Math.max(18, label.length * 8 + 8);
 
 		createSvgRect(
-			{ x: position.x - width * 0.5, y: position.y - 9 },
-			{ x: width, y: 18 },
+			new Vec2(position.x - width * 0.5, position.y - 9),
+			new Vec2(width, 18),
 			{
 				rx: 3,
 				fill: isSelected ? COLORS.selectedBg : COLORS.white,
@@ -2388,7 +2356,7 @@ export class SVGRenderer {
 			g.appendChild(icon);
 		} else {
 			createSvgText(
-				{ x: position.x, y: position.y + 4 },
+				new Vec2(position.x, position.y + 4),
 				label,
 				{
 					'text-anchor': 'middle',
@@ -2460,15 +2428,15 @@ export class SVGRenderer {
 	): void {
 		this.previewGroup.innerHTML = '';
 
-		const a1 = angleFromTo(sCenter, sRay1);
-		const a2 = angleFromTo(sCenter, sRay2);
+		const a1 = sCenter.angleToPoint(sRay1);
+		const a2 = sCenter.angleToPoint(sRay2);
 
 		let delta = a2 - a1;
 		while (delta > Math.PI) delta -= TWO_PI;
 		while (delta < -Math.PI) delta += TWO_PI;
 
 		const sweepFlag = delta > 0 ? 1 : 0;
-		const rScreen = Math.max(28, Math.hypot(cursor.x - sCenter.x, cursor.y - sCenter.y));
+		const rScreen = Math.max(28, sCenter.distanceTo(cursor));
 
 		if (sp1 && sp2) {
 			this.renderDashedExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, COLORS.primary);
@@ -2477,11 +2445,11 @@ export class SVGRenderer {
 			this.renderDashedExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, COLORS.primary);
 		}
 
-		const a = vec(sCenter.x + rScreen * Math.cos(a1), sCenter.y + rScreen * Math.sin(a1));
-		const b = vec(sCenter.x + rScreen * Math.cos(a2), sCenter.y + rScreen * Math.sin(a2));
+		const a = Vec2.fromPolar(rScreen, a1).add(sCenter);
+		const b = Vec2.fromPolar(rScreen, a2).add(sCenter);
 
 		const midAngle = a1 + delta * 0.5;
-		const midpoint = vec(sCenter.x + rScreen * Math.cos(midAngle), sCenter.y + rScreen * Math.sin(midAngle));
+		const midpoint = Vec2.fromPolar(rScreen, midAngle).add(sCenter);
 
 		createSvgPath(
 			`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
@@ -2522,8 +2490,8 @@ export class SVGRenderer {
 			// Indigo square at grid intersection
 			const size = 5;
 			createSvgRect(
-				{ x: s.x - size, y: s.y - size },
-				{ x: size * 2, y: size * 2 },
+				s.clone().subScalar(size),
+				new Vec2(size * 2, size * 2),
 				{
 					...SNAP_GRID_ATTRS,
 					rx: 1,
@@ -2543,12 +2511,12 @@ export class SVGRenderer {
 
 	renderSelectionBox(s1: Vec2, s2: Vec2): void {
 		this.overlayGroup.innerHTML = '';
-		const min = { x: Math.min(s1.x, s2.x), y: Math.min(s1.y, s2.y) };
+		const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
 		const width = Math.abs(s2.x - s1.x);
 		const height = Math.abs(s2.y - s1.y);
 
 		const attrs = s2.x < s1.x ? CROSSING_SELECTION_BOX_ATTRS : SELECTION_BOX_ATTRS;
-		createSvgRect(min, { x: width, y: height }, attrs, this.overlayGroup);
+		createSvgRect(min, new Vec2(width, height), attrs, this.overlayGroup);
 	}
 
 	renderMirrorPreview(
@@ -2569,11 +2537,11 @@ export class SVGRenderer {
 		const sA = viewport.worldToScreen(pA);
 		const sB = viewport.worldToScreen(pB);
 
-		const dir = sub(pB, pA);
-		const lineLen = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(pB, pA);
+		const lineLen = dir.length();
 		if (lineLen < 1e-6) return;
 
-		const normal = vec(-dir.y / lineLen, dir.x / lineLen);
+		const normal = dir.clone().perpendicular().divideScalar(lineLen);
 
 		// Highlight mirror line: bright gold/amber centerline
 		createSvgLine(sA, sB, MIRROR_PREVIEW_LINE_ATTRS, this.mirrorGroup);
@@ -2610,8 +2578,8 @@ export class SVGRenderer {
 				const pt1 = sketch.points.get(l.p1Id);
 				const pt2 = sketch.points.get(l.p2Id);
 				if (pt1 && pt2) {
-					const r1 = reflectPoint(pt1, pA, normal);
-					const r2 = reflectPoint(pt2, pA, normal);
+					const r1 = pt1.clone().reflectAcrossLine(pA, normal);
+					const r2 = pt2.clone().reflectAcrossLine(pA, normal);
 					const sr1 = viewport.worldToScreen(r1);
 					const sr2 = viewport.worldToScreen(r2);
 
@@ -2628,7 +2596,7 @@ export class SVGRenderer {
 			if (c) {
 				const center = sketch.points.get(c.centerId);
 				if (center) {
-					const rc = reflectPoint(center, pA, normal);
+					const rc = center.clone().reflectAcrossLine(pA, normal);
 					const src = viewport.worldToScreen(rc);
 					const sr = c.radius * viewport.zoom;
 
@@ -2646,9 +2614,9 @@ export class SVGRenderer {
 				const start = sketch.points.get(arc.startPointId);
 				const end = sketch.points.get(arc.endPointId);
 				if (center && start && end) {
-					const rc = reflectPoint(center, pA, normal);
-					const rs = reflectPoint(start, pA, normal);
-					const re = reflectPoint(end, pA, normal);
+					const rc = center.clone().reflectAcrossLine(pA, normal);
+					const rs = start.clone().reflectAcrossLine(pA, normal);
+					const re = end.clone().reflectAcrossLine(pA, normal);
 					const src = viewport.worldToScreen(rc);
 					const srs = viewport.worldToScreen(rs);
 					const sre = viewport.worldToScreen(re);
@@ -2671,14 +2639,14 @@ export class SVGRenderer {
 				const major = sketch.points.get(el.majorAxisPointId);
 				const minor = sketch.points.get(el.minorAxisPointId);
 				if (center && major && minor) {
-					const rc = reflectPoint(center, pA, normal);
-					const rmaj = reflectPoint(major, pA, normal);
-					const rmin = reflectPoint(minor, pA, normal);
+					const rc = center.clone().reflectAcrossLine(pA, normal);
+					const rmaj = major.clone().reflectAcrossLine(pA, normal);
+					const rmin = minor.clone().reflectAcrossLine(pA, normal);
 					const src = viewport.worldToScreen(rc);
 					const srmaj = viewport.worldToScreen(rmaj);
 					const srmin = viewport.worldToScreen(rmin);
-					const r = distancesFrom(src, srmaj, srmin);
-					const thetaDeg = angleFromToDeg(src, srmaj);
+					const r = src.distancesTo(srmaj, srmin);
+					const thetaDeg = src.angleToPointDeg(srmaj);
 
 					createSvgEllipse(
 						src,
@@ -2704,11 +2672,11 @@ export class SVGRenderer {
 				const start = sketch.points.get(elArc.startPointId);
 				const end = sketch.points.get(elArc.endPointId);
 				if (center && major && minor && start && end) {
-					const rc = reflectPoint(center, pA, normal);
-					const rmaj = reflectPoint(major, pA, normal);
-					const rmin = reflectPoint(minor, pA, normal);
-					const rs = reflectPoint(start, pA, normal);
-					const re = reflectPoint(end, pA, normal);
+					const rc = center.clone().reflectAcrossLine(pA, normal);
+					const rmaj = major.clone().reflectAcrossLine(pA, normal);
+					const rmin = minor.clone().reflectAcrossLine(pA, normal);
+					const rs = start.clone().reflectAcrossLine(pA, normal);
+					const re = end.clone().reflectAcrossLine(pA, normal);
 					const src = viewport.worldToScreen(rc);
 					const srmaj = viewport.worldToScreen(rmaj);
 					const srmin = viewport.worldToScreen(rmin);
@@ -2726,19 +2694,25 @@ export class SVGRenderer {
 			}
 
 			if (sketch.splines.has(objId)) {
-				this.renderTransformedObjects(sketch, viewport, [objId], (x, y) => reflectPoint(vec(x, y), pA, normal), {
-					targetGroup: this.mirrorGroup,
-					baseColor,
-					opacity: 0.5,
-					drawVertices: true,
-				});
+				this.renderTransformedObjects(
+					sketch,
+					viewport,
+					[objId],
+					(x, y) => new Vec2(x, y).reflectAcrossLine(pA, normal),
+					{
+						targetGroup: this.mirrorGroup,
+						baseColor,
+						opacity: 0.5,
+						drawVertices: true,
+					}
+				);
 				continue;
 			}
 
 			// Standalone Point
 			const pt = sketch.points.get(objId);
 			if (pt) {
-				const rp = reflectPoint(pt, pA, normal);
+				const rp = pt.clone().reflectAcrossLine(pA, normal);
 				const srp = viewport.worldToScreen(rp);
 				drawReflectedVertex(srp, `${Math.round(rp.x * 100)},${Math.round(rp.y * 100)}`);
 				continue;
@@ -2770,15 +2744,15 @@ export class SVGRenderer {
 		createSvgCircle(sCtr, 12, PATTERN_CENTER_RING_ATTRS, this.patternGroup);
 
 		createSvgLine(
-			{ x: sCtr.x - 16, y: sCtr.y },
-			{ x: sCtr.x + 16, y: sCtr.y },
+			new Vec2(sCtr.x - 16, sCtr.y),
+			new Vec2(sCtr.x + 16, sCtr.y),
 			PATTERN_CENTER_CROSSHAIR_ATTRS,
 			this.patternGroup
 		);
 
 		createSvgLine(
-			{ x: sCtr.x, y: sCtr.y - 16 },
-			{ x: sCtr.x, y: sCtr.y + 16 },
+			new Vec2(sCtr.x, sCtr.y - 16),
+			new Vec2(sCtr.x, sCtr.y + 16),
 			PATTERN_CENTER_CROSSHAIR_ATTRS,
 			this.patternGroup
 		);
@@ -2820,20 +2794,14 @@ export class SVGRenderer {
 			// Compute centroid of this copy to place suppression checkbox
 			const worldCentroid =
 				copyWorldPoints.length > 0
-					? centroid(copyWorldPoints)
-					: {
-							x: centerPt.x + 40 * Math.cos((aDeg * Math.PI) / 180),
-							y: centerPt.y + 40 * Math.sin((aDeg * Math.PI) / 180),
-						};
-			let copyCentroid = { x: 0, y: 0 };
+					? Vec2.centroid(copyWorldPoints)
+					: Vec2.fromPolar(40, (aDeg * Math.PI) / 180).add(centerPt);
+			let copyCentroid = new Vec2(0, 0);
 			if (copyWorldPoints.length > 0) {
 				copyCentroid = viewport.worldToScreen(worldCentroid);
 			} else {
 				const rad = (aDeg * Math.PI) / 180;
-				copyCentroid = {
-					x: sCtr.x + 40 * Math.cos(rad),
-					y: sCtr.y + 40 * Math.sin(rad),
-				};
+				copyCentroid = Vec2.fromPolar(40, rad).add(sCtr);
 			}
 
 			// Register checkbox screen position for hit-testing
@@ -2848,16 +2816,19 @@ export class SVGRenderer {
 				this.renderPatternSuppressionCheckbox(copyCentroid, k, isSuppressed);
 			}
 			if (angleHandleEnabled && k === lastVisibleCopyIndex) {
-				const dir = sub(copyCentroid, sCtr);
-				const len = Math.hypot(dir.x, dir.y) || 1;
+				const dir = new Vec2().subVectors(copyCentroid, sCtr);
+				const len = dir.length() || 1;
 				// The arrow points back along the angle arc, toward the pattern center.
 				const direction = angle < 0 ? -1 : 1;
-				const dirVector = vec((direction * dir.y) / len, (direction * -dir.x) / len);
-				const tip = addScaled(copyCentroid, dirVector, 30);
+				const dirVector = dir
+					.clone()
+					.perpendicular()
+					.multiplyScalar(-direction / len);
+				const tip = Vec2.from(copyCentroid).addScaledVector(dirVector, 30);
 				const arrowLen = 16,
 					arrowHalfWidth = 6.5;
-				const base = addScaled(tip, dirVector, -arrowLen);
-				const perp = vec(-dirVector.y, dirVector.x);
+				const base = tip.clone().addScaledVector(dirVector, -arrowLen);
+				const perp = dirVector.clone().perpendicular();
 				const arrowPath = `M ${tip.x} ${tip.y} L ${base.x + arrowHalfWidth * perp.x} ${base.y + arrowHalfWidth * perp.y} L ${base.x - arrowHalfWidth * perp.x} ${base.y - arrowHalfWidth * perp.y} Z`;
 				createSvgLine(
 					copyCentroid,
@@ -2947,9 +2918,9 @@ export class SVGRenderer {
 
 				let copyCentroid: { x: number; y: number };
 				if (copyWorldPoints.length > 0) {
-					copyCentroid = viewport.worldToScreen(centroid(copyWorldPoints));
+					copyCentroid = viewport.worldToScreen(Vec2.centroid(copyWorldPoints));
 				} else {
-					copyCentroid = viewport.worldToScreen({ x: centroidWorld.x + offset.dx, y: centroidWorld.y + offset.dy });
+					copyCentroid = viewport.worldToScreen(centroidWorld.clone().add(offset));
 				}
 
 				this.patternCheckboxPositions.set(`tool-${copyIndex}`, {
@@ -3006,34 +2977,31 @@ export class SVGRenderer {
 				createSvgCircle(sCenter, 4, GIZMO_POINT_ATTRS, this.filletGroup);
 
 				// Radial dashed line extending outward from center through midArc
-				const uDir = {
-					x: (sMid.x - sCenter.x) / (Math.hypot(sMid.x - sCenter.x, sMid.y - sCenter.y) || 1),
-					y: (sMid.y - sCenter.y) / (Math.hypot(sMid.x - sCenter.x, sMid.y - sCenter.y) || 1),
-				};
+				const uDir = new Vec2().subVectors(sMid, sCenter).divideScalar(sCenter.distanceTo(sMid) || 1);
 				const lineLen = sRadius + 45;
-				const lineEnd = addScaled(sCenter, uDir, lineLen);
+				const lineEnd = sCenter.clone().addScaledVector(uDir, lineLen);
 
 				createSvgLine(sCenter, lineEnd, FILLET_GIZMO_RADIAL_ATTRS, this.filletGroup);
 
 				// Small square at tip
 				const sqSize = 6;
 				createSvgRect(
-					{ x: lineEnd.x - sqSize * 0.5, y: lineEnd.y - sqSize * 0.5 },
-					{ x: sqSize, y: sqSize },
+					new Vec2(lineEnd.x - sqSize * 0.5, lineEnd.y - sqSize * 0.5),
+					new Vec2(sqSize, sqSize),
 					FILLET_GIZMO_SQUARE_ATTRS,
 					this.filletGroup
 				);
 
 				// Inward arrow gizmo at sMid pointing towards sCenter
-				const arrowDir = vec(-uDir.x, -uDir.y);
-				const perp = vec(-arrowDir.y, arrowDir.x);
+				const arrowDir = uDir.clone().negate();
+				const perp = arrowDir.clone().perpendicular();
 
 				const arrowLen = 18;
 				const arrowHalfWidth = 7.5;
 				const tip = sMid;
-				const baseCenter = addScaled(tip, arrowDir, -arrowLen);
-				const b1 = addScaled(baseCenter, perp, arrowHalfWidth);
-				const b2 = addScaled(baseCenter, perp, -arrowHalfWidth);
+				const baseCenter = tip.clone().addScaledVector(arrowDir, -arrowLen);
+				const b1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
+				const b2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
 
 				const arrowPath = `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`;
 				createSvgPath(arrowPath, FILLET_GIZMO_ARROW_ATTRS, this.filletGroup);
@@ -3077,53 +3045,37 @@ export class SVGRenderer {
 		const drawArrow = (tip: Vec2, dir: Vec2) => {
 			const arrowLen = 16;
 			const arrowHalfWidth = 6.5;
-			const perp = vec(-dir.y, dir.x);
-			const baseCenter = addScaled(tip, dir, -arrowLen);
-			const b1 = addScaled(baseCenter, perp, arrowHalfWidth);
-			const b2 = addScaled(baseCenter, perp, -arrowHalfWidth);
+			const perp = dir.clone().perpendicular();
+			const baseCenter = tip.clone().addScaledVector(dir, -arrowLen);
+			const b1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
+			const b2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
 			const arrowPath = `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`;
 			createSvgPath(arrowPath, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
 		};
 
 		// Unit screen directions for line 1 and line 2 (pointing away from V)
-		const sDir1 = {
-			x: cand.dir1.x * viewport.zoom,
-			y: -cand.dir1.y * viewport.zoom,
-		};
-		const lenSDir1 = Math.hypot(sDir1.x, sDir1.y) || 1;
-		const uSDir1 = scale(sDir1, 1.0 / lenSDir1);
-
-		const sDir2 = {
-			x: cand.dir2.x * viewport.zoom,
-			y: -cand.dir2.y * viewport.zoom,
-		};
-		const lenSDir2 = Math.hypot(sDir2.x, sDir2.y) || 1;
-		const uSDir2 = scale(sDir2, 1.0 / lenSDir2);
+		const screenScale = new Vec2(viewport.zoom, -viewport.zoom);
+		const uSDir1 = cand.dir1.clone().multiply(screenScale).normalize();
+		const uSDir2 = cand.dir2.clone().multiply(screenScale).normalize();
 
 		if (state.mode === 'equal_distance') {
 			// Mode 1: 1 arrow gizmo along the angle bisector, shifted back so tip points at chamfer midpoint
-			const sMid = {
-				x: (sT1.x + sT2.x) / 2,
-				y: (sT1.y + sT2.y) / 2,
-			};
-			const vBis = sub(sMid, sV);
-			const lenBis = Math.hypot(vBis.x, vBis.y) || 1;
-			const uSBis = scale(vBis, 1.0 / lenBis);
+			const sMid = new Vec2().midpoint(sT1, sT2);
+			const vBis = new Vec2().subVectors(sMid, sV);
+			const lenBis = vBis.length() || 1;
+			const uSBis = vBis.clone().multiplyScalar(1.0 / lenBis);
 
 			// Arrow tip points towards sMid
-			const tip = addScaled(sMid, uSBis, -2);
+			const tip = Vec2.from(sMid).addScaledVector(uSBis, -2);
 			drawArrow(tip, uSBis);
 
 			// Dashed guide line from vertex V to the base of the arrow along bisector
-			const baseCenter = addScaled(tip, uSBis, -16);
-			if (Math.hypot(baseCenter.x - sV.x, baseCenter.y - sV.y) > 4) {
+			const baseCenter = tip.clone().addScaledVector(uSBis, -16);
+			if (sV.distanceTo(baseCenter) > 4) {
 				createSvgLine(sV, baseCenter, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 			}
 
-			const bisectorWorld = normalize({
-				x: cand.dir1.x + cand.dir2.x,
-				y: cand.dir1.y + cand.dir2.y,
-			});
+			const bisectorWorld = new Vec2().addVectors(cand.dir1, cand.dir2).normalizeOrUnitX();
 
 			this.chamferGizmoHandles.push({
 				type: 'dist1',
@@ -3135,7 +3087,7 @@ export class SVGRenderer {
 			});
 		} else if (state.mode === 'two_distance') {
 			// Mode 2: 2 arrow gizmos shifted back so their tips point directly at T1 and T2
-			const tip1 = addScaled(sT1, uSDir1, -3.5);
+			const tip1 = sT1.clone().addScaledVector(uSDir1, -3.5);
 			drawArrow(tip1, uSDir1);
 			this.chamferGizmoHandles.push({
 				type: 'dist1',
@@ -3146,7 +3098,7 @@ export class SVGRenderer {
 				currentValue: res.dist1,
 			});
 
-			const tip2 = addScaled(sT2, uSDir2, -3.5);
+			const tip2 = sT2.clone().addScaledVector(uSDir2, -3.5);
 			drawArrow(tip2, uSDir2);
 			this.chamferGizmoHandles.push({
 				type: 'dist2',
@@ -3160,7 +3112,7 @@ export class SVGRenderer {
 			// Mode 3: 1 distance arrow on reference line + 1 angle circle at 100px from reference vertex
 			if (!state.flip) {
 				// Reference line is line 1 (vertex A = T1)
-				const tip1 = addScaled(sT1, uSDir1, -3.5);
+				const tip1 = sT1.clone().addScaledVector(uSDir1, -3.5);
 				drawArrow(tip1, uSDir1);
 				this.chamferGizmoHandles.push({
 					type: 'dist1',
@@ -3172,28 +3124,28 @@ export class SVGRenderer {
 				});
 
 				// Direction along chamfer line from T1 to T2
-				const vChamfer = sub(sT2, sT1);
-				const lenChamfer = Math.hypot(vChamfer.x, vChamfer.y) || 1;
-				const uSChamfer = scale(vChamfer, 1.0 / lenChamfer);
+				const vChamfer = new Vec2().subVectors(sT2, sT1);
+				const lenChamfer = vChamfer.length() || 1;
+				const uSChamfer = vChamfer.clone().multiplyScalar(1.0 / lenChamfer);
 
 				// Circle handle at exactly 100px from point A (T1)
-				const circle = addScaled(sT1, uSChamfer, 100);
+				const circle = sT1.clone().addScaledVector(uSChamfer, 100);
 
 				// Guide line along the angle ray to the circle handle
 				createSvgLine(sT1, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
 				// Visual arc showing the angle at T1 between ray towards V and ray towards T2 at 100px
-				const vV = sub(sV, sT1);
-				const lenV = Math.hypot(vV.x, vV.y);
+				const vV = new Vec2().subVectors(sV, sT1);
+				const lenV = vV.length();
 				if (lenV > 1e-4) {
-					const angV = directionAngle(vV);
-					const angChamfer = directionAngle(uSChamfer);
+					const angV = vV.signedAngle();
+					const angChamfer = uSChamfer.signedAngle();
 					let diff = angChamfer - angV;
 					while (diff > Math.PI) diff -= 2 * Math.PI;
 					while (diff < -Math.PI) diff += 2 * Math.PI;
 
 					const arcR = 100;
-					const start = vec(sT1.x + arcR * Math.cos(angV), sT1.y + arcR * Math.sin(angV));
+					const start = Vec2.fromPolar(arcR, angV).add(sT1);
 					const end = circle;
 
 					// Guide line along reference arm towards V out to 100px
@@ -3217,7 +3169,7 @@ export class SVGRenderer {
 				});
 			} else {
 				// Reference line is line 2 (flipped: reference vertex is B = T2)
-				const tip2 = addScaled(sT2, uSDir2, -3.5);
+				const tip2 = sT2.clone().addScaledVector(uSDir2, -3.5);
 				drawArrow(tip2, uSDir2);
 				this.chamferGizmoHandles.push({
 					type: 'dist2',
@@ -3229,28 +3181,28 @@ export class SVGRenderer {
 				});
 
 				// Direction along chamfer line from T2 to T1
-				const vChamfer = sub(sT1, sT2);
-				const lenChamfer = Math.hypot(vChamfer.x, vChamfer.y) || 1;
-				const uSChamfer = scale(vChamfer, 1.0 / lenChamfer);
+				const vChamfer = new Vec2().subVectors(sT1, sT2);
+				const lenChamfer = vChamfer.length() || 1;
+				const uSChamfer = vChamfer.clone().multiplyScalar(1.0 / lenChamfer);
 
 				// Circle handle at exactly 100px from point B (T2)
-				const circle = addScaled(sT2, uSChamfer, 100);
+				const circle = sT2.clone().addScaledVector(uSChamfer, 100);
 
 				// Guide line along the angle ray to the circle handle
 				createSvgLine(sT2, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
 				// Visual arc showing the angle at T2 between ray towards V and ray towards T1 at 100px
-				const vV = sub(sV, sT2);
-				const lenV = Math.hypot(vV.x, vV.y);
+				const vV = new Vec2().subVectors(sV, sT2);
+				const lenV = vV.length();
 				if (lenV > 1e-4) {
-					const angV = directionAngle(vV);
-					const angChamfer = directionAngle(uSChamfer);
+					const angV = vV.signedAngle();
+					const angChamfer = uSChamfer.signedAngle();
 					let diff = angChamfer - angV;
 					while (diff > Math.PI) diff -= 2 * Math.PI;
 					while (diff < -Math.PI) diff += 2 * Math.PI;
 
 					const arcR = 100;
-					const start = vec(sT2.x + arcR * Math.cos(angV), sT2.y + arcR * Math.sin(angV));
+					const start = Vec2.fromPolar(arcR, angV).add(sT2);
 					const end = circle;
 
 					// Guide line along reference arm towards V out to 100px
@@ -3328,8 +3280,8 @@ export class SVGRenderer {
 					const min = sketch.points.get(el.minorAxisPointId);
 					if (center && maj && min) {
 						const sc = viewport.worldToScreen(center);
-						const r = scale(distancesFrom(center, maj, min), viewport.zoom);
-						const thetaDeg = angleFromToDeg(center, maj);
+						const r = center.distancesTo(maj, min).clone().multiplyScalar(viewport.zoom);
+						const thetaDeg = center.angleToPointDeg(maj);
 						createSvgEllipse(
 							sc,
 							r,
@@ -3399,10 +3351,10 @@ export class SVGRenderer {
 		const drawArrow = (tip: Vec2, dir: Vec2) => {
 			const arrowLen = 16;
 			const arrowHalfWidth = 6.5;
-			const perp = vec(-dir.y, dir.x);
-			const baseCenter = addScaled(tip, dir, -arrowLen);
-			const b1 = addScaled(baseCenter, perp, arrowHalfWidth);
-			const b2 = addScaled(baseCenter, perp, -arrowHalfWidth);
+			const perp = dir.clone().perpendicular();
+			const baseCenter = tip.clone().addScaledVector(dir, -arrowLen);
+			const b1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
+			const b2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
 			const arrowPath = `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`;
 			createSvgPath(arrowPath, OFFSET_GIZMO_ARROW_ATTRS, this.offsetGroup);
 		};
@@ -3413,13 +3365,13 @@ export class SVGRenderer {
 		const sAnchor = viewport.worldToScreen(anchor);
 
 		const renderGizmoArrowForSide = (type: 'dist1' | 'dist2', offsetVal: number, sign: number) => {
-			const targetWorld = addScaled(anchor, norm, sign * offsetVal);
+			const targetWorld = anchor.clone().addScaledVector(norm, sign * offsetVal);
 			const sTarget = viewport.worldToScreen(targetWorld);
 
 			// Screen direction from anchor to target
-			const vDir = sub(sTarget, sAnchor);
-			const lenDir = Math.hypot(vDir.x, vDir.y) || 1;
-			const uDir = scale(vDir, 1.0 / lenDir);
+			const vDir = new Vec2().subVectors(sTarget, sAnchor);
+			const lenDir = vDir.length() || 1;
+			const uDir = vDir.clone().multiplyScalar(1.0 / lenDir);
 
 			// Dashed guide line from anchor to target
 			createSvgLine(sAnchor, sTarget, GIZMO_GUIDE_ATTRS, this.offsetGroup);
@@ -3433,7 +3385,7 @@ export class SVGRenderer {
 				screenX: tip.x - uDir.x * 8,
 				screenY: tip.y - uDir.y * 8,
 				worldPos: targetWorld,
-				normal: { x: sign * norm.x, y: sign * norm.y },
+				normal: norm.clone().multiplyScalar(sign),
 				currentValue: offsetVal,
 			});
 		};

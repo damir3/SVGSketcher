@@ -1,4 +1,4 @@
-import { mid, ORIGIN } from '../../math/vector';
+import { Vec2, ORIGIN } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -86,7 +86,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		// Aligned: hypot(px, py) = targetDistance
-		const curDist = Math.hypot(p.x, p.y);
+		const curDist = p.length();
 		return [(curDist - this.targetDistance) * this.weight];
 	}
 
@@ -114,7 +114,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 
 		// Aligned: d(hypot)/dx = x / hypot, d(hypot)/dy = y / hypot
 		const p = readParamPoint(paramMap, this.pointId);
-		const curDist = Math.max(Math.hypot(p.x, p.y), 1e-7);
+		const curDist = Math.max(p.length(), 1e-7);
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.x`, baseRow, (p.x / curDist) * this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.pointId}.y`, baseRow, (p.y / curDist) * this.weight);
 		return res;
@@ -128,17 +128,17 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
 
 		if (this.isCoincident) {
-			ctx.renderBadge(this.id, { x: sOrigin.x - 12, y: sOrigin.y - 12 }, '●', COLORS.primary);
+			ctx.renderBadge(this.id, sOrigin.clone().subScalar(12), '●', COLORS.primary);
 			return;
 		}
 
 		if (this.targetDistance === 0) {
-			ctx.renderBadge(this.id, { x: sp.x, y: sp.y + 14 }, '⚲', COLORS.primary);
+			ctx.renderBadge(this.id, new Vec2(sp.x, sp.y + 14), '⚲', COLORS.primary);
 			return;
 		}
 
 		if (this.orientation === 'vertical') {
-			const sAxisX = ctx.viewport.worldToScreen({ x: 100, y: 0 });
+			const sAxisX = ctx.viewport.worldToScreen(new Vec2(100, 0));
 			const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisX, offsetScreen);
 			if (!geom) return;
@@ -155,7 +155,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		if (this.orientation === 'horizontal') {
-			const sAxisY = ctx.viewport.worldToScreen({ x: 0, y: 100 });
+			const sAxisY = ctx.viewport.worldToScreen(new Vec2(0, 100));
 			const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisY, offsetScreen);
 			if (!geom) return;
@@ -195,15 +195,15 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		const sOrigin = viewport.worldToScreen(ORIGIN);
 
 		if (this.isCoincident) {
-			return distanceToPoint(screen, { x: sOrigin.x - 12, y: sOrigin.y - 12 });
+			return distanceToPoint(screen, sOrigin.clone().subScalar(12));
 		}
 
 		if (this.targetDistance === 0) {
-			return distanceToPoint(screen, { x: sp.x, y: sp.y + 14 });
+			return distanceToPoint(screen, new Vec2(sp.x, sp.y + 14));
 		}
 
 		if (this.orientation === 'vertical') {
-			const sAxisX = viewport.worldToScreen({ x: 100, y: 0 });
+			const sAxisX = viewport.worldToScreen(new Vec2(100, 0));
 			const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisX, offsetScreen);
 			if (!geom) return null;
@@ -211,7 +211,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		}
 
 		if (this.orientation === 'horizontal') {
-			const sAxisY = viewport.worldToScreen({ x: 0, y: 100 });
+			const sAxisY = viewport.worldToScreen(new Vec2(0, 100));
 			const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisY, offsetScreen);
 			if (!geom) return null;
@@ -365,14 +365,14 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
 
 		if (this.isCollinear) {
-			ctx.renderBadge(this.id, mid(s1, s2), 'collinear', COLORS.primary);
+			ctx.renderBadge(this.id, new Vec2().midpoint(s1, s2), 'collinear', COLORS.primary);
 			return;
 		}
 
-		const midPt = mid(p1, p2);
+		const midPt = new Vec2().midpoint(p1, p2);
 		const sp = ctx.viewport.worldToScreen(midPt);
 		const sAxis2 =
-			this.axis === 'x' ? ctx.viewport.worldToScreen({ x: 100, y: 0 }) : ctx.viewport.worldToScreen({ x: 0, y: 100 });
+			this.axis === 'x' ? ctx.viewport.worldToScreen(new Vec2(100, 0)) : ctx.viewport.worldToScreen(new Vec2(0, 100));
 
 		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);
@@ -399,13 +399,13 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const sOrigin = viewport.worldToScreen(ORIGIN);
 
 		if (this.isCollinear) {
-			return distanceToPoint(screen, mid(s1, s2));
+			return distanceToPoint(screen, new Vec2().midpoint(s1, s2));
 		}
 
-		const midPt = mid(p1, p2);
+		const midPt = new Vec2().midpoint(p1, p2);
 		const sp = viewport.worldToScreen(midPt);
 		const sAxis2 =
-			this.axis === 'x' ? viewport.worldToScreen({ x: 100, y: 0 }) : viewport.worldToScreen({ x: 0, y: 100 });
+			this.axis === 'x' ? viewport.worldToScreen(new Vec2(100, 0)) : viewport.worldToScreen(new Vec2(0, 100));
 
 		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);

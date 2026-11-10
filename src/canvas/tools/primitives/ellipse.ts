@@ -1,7 +1,7 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../../../math/ellipse';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
-import { addScaled, angleFromTo, dot, dist, distancesFrom, vec, sub, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import {
 	renderEllipseMajorAxisPreviewVisual,
 	renderEllipsePreviewVisual,
@@ -159,7 +159,7 @@ export class EllipseTool extends BaseTool {
 				const ptPos = snap ? snap.worldPos : world;
 				const pt = sketch.addPoint(ptPos);
 				cId = pt.id;
-				this.centerWorldPos = vec(pt.x, pt.y);
+				this.centerWorldPos = pt.clone();
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 			this.centerId = cId;
@@ -174,11 +174,11 @@ export class EllipseTool extends BaseTool {
 		} else if (this.drawingStep === 1) {
 			const center = this.centerWorldPos!;
 			const position = this.getMajorPoint(center, world);
-			if (!this.popup.isLocked('major') && dist(center, position) < 2) return;
+			if (!this.popup.isLocked('major') && center.distanceTo(position) < 2) return;
 			this.majPtId = sketch.addPoint(position).id;
 			this.majWorldPos = position;
 			this.drawingStep = 2;
-			this.popup.updateValueIfUnlocked('major', dist(center, position));
+			this.popup.updateValueIfUnlocked('major', center.distanceTo(position));
 			this.popup.setFieldReadOnly('major', true);
 			this.popup.setFieldReadOnly('minor', false);
 			this.popup.updatePosition(e.client);
@@ -191,7 +191,7 @@ export class EllipseTool extends BaseTool {
 			const point = sketch.addPoint(position);
 			this.minPtId = point.id;
 			this.minWorldPos = position;
-			this.popup.updateValueIfUnlocked('minor', dist(center, position));
+			this.popup.updateValueIfUnlocked('minor', center.distanceTo(position));
 
 			if (this._mode === 'ellipse') {
 				sketch.addEllipse(this.centerId!, this.majPtId!, point.id, this.ctx.isConstructionMode);
@@ -212,14 +212,14 @@ export class EllipseTool extends BaseTool {
 			const minWorld = this.minWorldPos!;
 			const effectiveWorld = snap ? snap.worldPos : world;
 
-			const rxVal = dist(centerWorld, majWorld);
-			const ryVal = dist(centerWorld, minWorld);
+			const rxVal = centerWorld.distanceTo(majWorld);
+			const ryVal = centerWorld.distanceTo(minWorld);
 			if (rxVal < 0.1 || ryVal < 0.1) return;
 
-			const axisU = vec((majWorld.x - centerWorld.x) / rxVal, (majWorld.y - centerWorld.y) / rxVal);
-			const axisV = vec((minWorld.x - centerWorld.x) / ryVal, (minWorld.y - centerWorld.y) / ryVal);
+			const axisU = new Vec2().subVectors(majWorld, centerWorld).divideScalar(rxVal);
+			const axisV = new Vec2().subVectors(minWorld, centerWorld).divideScalar(ryVal);
 
-			const radii = vec(rxVal, ryVal);
+			const radii = new Vec2(rxVal, ryVal);
 			const t = ellipseParameterAtPoint(effectiveWorld, centerWorld, radii, axisU, axisV);
 			const proj = ellipsePointAtParameter(t, centerWorld, radii, axisU, axisV);
 
@@ -238,7 +238,7 @@ export class EllipseTool extends BaseTool {
 			} else {
 				const pt = sketch.addPoint(proj);
 				startPtId = pt.id;
-				this.startWorldPtPos = vec(pt.x, pt.y);
+				this.startWorldPtPos = pt.clone();
 				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
 			}
 			this.startPtId = startPtId;
@@ -246,9 +246,9 @@ export class EllipseTool extends BaseTool {
 			const sMaj = this.ctx.viewport.worldToScreen(majWorld);
 			const sMin = this.ctx.viewport.worldToScreen(minWorld);
 			const sStart = this.ctx.viewport.worldToScreen(this.startWorldPtPos);
-			const r = distancesFrom(sCenter, sMaj, sMin);
-			const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
-			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(angleFromTo(sCenter, sMaj));
+			const r = sCenter.distancesTo(sMaj, sMin);
+			const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
+			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(sCenter.angleToPoint(sMaj));
 			this.ellipticalArcPrevAngle = ellipseParameterAtPoint(sStart, sCenter, paramRadii, screenAxisU, screenAxisV);
 			this.ellipticalArcTotalAngle = 0;
 			this.drawingStep = 4;
@@ -261,14 +261,14 @@ export class EllipseTool extends BaseTool {
 			const startWorld = this.startWorldPtPos!;
 			const effectiveWorld = snap ? snap.worldPos : world;
 
-			const rxVal = dist(centerWorld, majWorld);
-			const ryVal = dist(centerWorld, minWorld);
+			const rxVal = centerWorld.distanceTo(majWorld);
+			const ryVal = centerWorld.distanceTo(minWorld);
 			if (rxVal < 0.1 || ryVal < 0.1) return;
 
-			const axisU = vec((majWorld.x - centerWorld.x) / rxVal, (majWorld.y - centerWorld.y) / rxVal);
-			const axisV = vec((minWorld.x - centerWorld.x) / ryVal, (minWorld.y - centerWorld.y) / ryVal);
+			const axisU = new Vec2().subVectors(majWorld, centerWorld).divideScalar(rxVal);
+			const axisV = new Vec2().subVectors(minWorld, centerWorld).divideScalar(ryVal);
 
-			const radii = vec(rxVal, ryVal);
+			const radii = new Vec2(rxVal, ryVal);
 			const te = ellipseParameterAtPoint(effectiveWorld, centerWorld, radii, axisU, axisV);
 			const proj = ellipsePointAtParameter(te, centerWorld, radii, axisU, axisV);
 
@@ -279,10 +279,10 @@ export class EllipseTool extends BaseTool {
 			const sStart = this.ctx.viewport.worldToScreen(startWorld);
 			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld);
 
-			const r = distancesFrom(sCenter, sMaj, sMin);
-			const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
+			const r = sCenter.distancesTo(sMaj, sMin);
+			const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
 
-			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(angleFromTo(sCenter, sMaj));
+			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(sCenter.angleToPoint(sMaj));
 
 			const ts_sc = ellipseParameterAtPoint(sStart, sCenter, paramRadii, screenAxisU, screenAxisV);
 			const te_sc = ellipseParameterAtPoint(sCur, sCenter, paramRadii, screenAxisU, screenAxisV);
@@ -340,10 +340,10 @@ export class EllipseTool extends BaseTool {
 		this.lastPointer = e;
 		if (this.centerWorldPos) {
 			if (this.drawingStep === 1) {
-				this.popup.updateValueIfUnlocked('major', dist(this.centerWorldPos, e.world));
+				this.popup.updateValueIfUnlocked('major', this.centerWorldPos.distanceTo(e.world));
 			} else if (this.drawingStep === 2 && this.majWorldPos) {
 				const minor = this.getMinorPoint(this.centerWorldPos, this.majWorldPos, e.world);
-				this.popup.updateValueIfUnlocked('minor', dist(this.centerWorldPos, minor));
+				this.popup.updateValueIfUnlocked('minor', this.centerWorldPos.distanceTo(minor));
 			}
 			this.popup.updatePosition(e.client);
 		}
@@ -355,8 +355,8 @@ export class EllipseTool extends BaseTool {
 			const minWorld = this.minWorldPos;
 			const startWorld = this.startWorldPtPos;
 
-			const rxVal = dist(centerWorld, majWorld);
-			const ryVal = dist(centerWorld, minWorld);
+			const rxVal = centerWorld.distanceTo(majWorld);
+			const ryVal = centerWorld.distanceTo(minWorld);
 			if (rxVal >= 0.1 && ryVal >= 0.1) {
 				const sc = this.ctx.viewport.worldToScreen(centerWorld);
 				const smaj = this.ctx.viewport.worldToScreen(majWorld);
@@ -364,10 +364,10 @@ export class EllipseTool extends BaseTool {
 				const ss = this.ctx.viewport.worldToScreen(startWorld);
 				const se = this.ctx.viewport.worldToScreen(effectiveWorld);
 
-				const r = distancesFrom(sc, smaj, smin);
-				const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
+				const r = sc.distancesTo(smaj, smin);
+				const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
 
-				const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+				const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
 
 				const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
 				const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
@@ -425,8 +425,8 @@ export class EllipseTool extends BaseTool {
 			const minWorld = this.minWorldPos;
 			const startWorld = this.startWorldPtPos;
 
-			const rxVal = dist(centerWorld, majWorld);
-			const ryVal = dist(centerWorld, minWorld);
+			const rxVal = centerWorld.distanceTo(majWorld);
+			const ryVal = centerWorld.distanceTo(minWorld);
 			if (rxVal >= 0.1 && ryVal >= 0.1) {
 				const sc = ctx.viewport.worldToScreen(centerWorld);
 				const smaj = ctx.viewport.worldToScreen(majWorld);
@@ -434,10 +434,10 @@ export class EllipseTool extends BaseTool {
 				const ss = ctx.viewport.worldToScreen(startWorld);
 				const se = ctx.viewport.worldToScreen(effectiveWorld);
 
-				const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+				const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
 
-				const r = distancesFrom(sc, smaj, smin);
-				const paramRadii = vec(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
+				const r = sc.distancesTo(smaj, smin);
+				const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
 
 				const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
 				const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
@@ -457,17 +457,17 @@ export class EllipseTool extends BaseTool {
 
 	private getMajorPoint(center: Vec2, cursor: Vec2): Vec2 {
 		if (!this.popup.isLocked('major')) return cursor;
-		const { axisU } = ellipseAxes(angleFromTo(center, cursor));
-		return addScaled(center, axisU, this.popup.getNumericValue('major', 0.1));
+		const { axisU } = ellipseAxes(center.angleToPoint(cursor));
+		return center.clone().addScaledVector(axisU, this.popup.getNumericValue('major', 0.1));
 	}
 
 	private getMinorPoint(center: Vec2, major: Vec2, cursor: Vec2): Vec2 {
-		const { axisV } = ellipseAxes(angleFromTo(center, major));
-		const projection = dot(sub(cursor, center), axisV);
+		const { axisV } = ellipseAxes(center.angleToPoint(major));
+		const projection = new Vec2().subVectors(cursor, center).dot(axisV);
 		const radius = this.popup.isLocked('minor')
 			? this.popup.getNumericValue('minor', 0.1)
 			: Math.max(1, Math.abs(projection));
-		return addScaled(center, axisV, projection < 0 ? -radius : radius);
+		return center.clone().addScaledVector(axisV, projection < 0 ? -radius : radius);
 	}
 
 	private constrainRadii(): void {

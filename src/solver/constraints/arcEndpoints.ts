@@ -1,4 +1,3 @@
-import { vec } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 
@@ -29,8 +28,8 @@ export class ArcEndpointsConstraint extends BaseConstraint {
 		const end = readParamPoint(paramMap, this.endPointId);
 		const r = paramMap.get(`${this.arcId}.r`) ?? 10;
 
-		const ds = Math.hypot(s.x - center.x, s.y - center.y);
-		const de = Math.hypot(end.x - center.x, end.y - center.y);
+		const ds = center.distanceTo(s);
+		const de = center.distanceTo(end);
 
 		return [(ds - r) * this.weight, (de - r) * this.weight];
 	}
@@ -45,11 +44,11 @@ export class ArcEndpointsConstraint extends BaseConstraint {
 		const s = readParamPoint(paramMap, this.startPointId);
 		const end = readParamPoint(paramMap, this.endPointId);
 
-		const ds = Math.max(Math.hypot(s.x - center.x, s.y - center.y), 1e-7);
-		const de = Math.max(Math.hypot(end.x - center.x, end.y - center.y), 1e-7);
+		const ds = Math.max(center.distanceTo(s), 1e-7);
+		const de = Math.max(center.distanceTo(end), 1e-7);
 
 		// Row 0: dist(C, S) - r = 0
-		const startDerivative = vec(((s.x - center.x) / ds) * this.weight, ((s.y - center.y) / ds) * this.weight);
+		const startDerivative = s.sub(center).divideScalar(ds).multiplyScalar(this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.startPointId}.x`, baseRow, startDerivative.x);
 		this.addJacobianEntry(res, paramIndices, `${this.startPointId}.y`, baseRow, startDerivative.y);
 		this.addJacobianEntry(res, paramIndices, `${this.centerId}.x`, baseRow, -startDerivative.x);
@@ -57,7 +56,7 @@ export class ArcEndpointsConstraint extends BaseConstraint {
 		this.addJacobianEntry(res, paramIndices, `${this.arcId}.r`, baseRow, -1.0 * this.weight);
 
 		// Row 1: dist(C, E) - r = 0
-		const endDerivative = vec(((end.x - center.x) / de) * this.weight, ((end.y - center.y) / de) * this.weight);
+		const endDerivative = end.sub(center).divideScalar(de).multiplyScalar(this.weight);
 		this.addJacobianEntry(res, paramIndices, `${this.endPointId}.x`, baseRow + 1, endDerivative.x);
 		this.addJacobianEntry(res, paramIndices, `${this.endPointId}.y`, baseRow + 1, endDerivative.y);
 		this.addJacobianEntry(res, paramIndices, `${this.centerId}.x`, baseRow + 1, -endDerivative.x);

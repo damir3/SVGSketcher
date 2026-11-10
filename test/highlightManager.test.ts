@@ -5,7 +5,7 @@ import { HighlightManager } from '../src/canvas/highlightManager';
 import { BaseTool } from '../src/canvas/tools/base';
 import type { ToolContext } from '../src/canvas/tools/types';
 import type { HoverTarget } from '../src/canvas/tools/hoverTarget';
-import { vec, sub, type Vec2 } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { DimensionTool } from '../src/canvas/tools/constraints/dimension';
 import { MirrorTool } from '../src/canvas/tools/modify/mirror';
@@ -74,8 +74,8 @@ function createMockContext(
 		zoom: 1,
 		panX: 0,
 		panY: 0,
-		screenToWorld: (p: { x: number; y: number }) => vec(p.x, p.y),
-		worldToScreen: (p: { x: number; y: number }) => vec(p.x, p.y),
+		screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+		worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 	} as any;
 
 	const ctx: any = {
@@ -94,7 +94,7 @@ function createMockContext(
 		showToast: () => {},
 		findPointNear: (screen: Vec2, radius = 14) => {
 			for (const pt of sketch.points.values()) {
-				const dir = sub(pt, screen);
+				const dir = new Vec2().subVectors(pt, screen);
 				if (Math.hypot(dir.x, dir.y) <= radius) return pt;
 			}
 			return null;
@@ -160,7 +160,7 @@ describe('HighlightManager centralized highlighting', () => {
 		const tool = new TestCustomTool();
 		tool.enabled = false;
 
-		const target = manager.update(tool, vec(50, 0));
+		const target = manager.update(tool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 		assert.strictEqual(manager.getHoveredId(), null);
 		assert.strictEqual(lineG.classList.contains('custom-hover'), false);
@@ -181,7 +181,7 @@ describe('HighlightManager centralized highlighting', () => {
 		const tool = new TestCustomTool();
 		tool.rejectedId = line.id;
 
-		const target = manager.update(tool, vec(50, 0));
+		const target = manager.update(tool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 		assert.strictEqual(manager.getHoveredId(), null);
 		assert.strictEqual(lineG.classList.contains('custom-hover'), false);
@@ -203,7 +203,7 @@ describe('HighlightManager centralized highlighting', () => {
 		tool.customClass = 'danger-hover';
 		tool.customColor = '#ef4444';
 
-		const target = manager.update(tool, vec(50, 0));
+		const target = manager.update(tool, new Vec2(50, 0));
 		assert.ok(target);
 		assert.strictEqual(target.id, line.id);
 		assert.strictEqual(lineG.classList.contains('danger-hover'), true);
@@ -229,7 +229,7 @@ describe('HighlightManager centralized highlighting', () => {
 		const manager = new HighlightManager(svgRoot, () => ctx);
 		const tool = new TestCustomTool();
 
-		manager.update(tool, vec(50, 0));
+		manager.update(tool, new Vec2(50, 0));
 		assert.strictEqual(lineG1.classList.contains('custom-hover'), true);
 
 		// Simulate SVG re-render (children wiped and replaced with new DOM elements)
@@ -258,7 +258,7 @@ describe('HighlightManager centralized highlighting', () => {
 		const manager = new HighlightManager(svgRoot, () => ctx);
 		const tool = new TestCustomTool();
 
-		manager.update(tool, vec(50, 0));
+		manager.update(tool, new Vec2(50, 0));
 		assert.strictEqual(manager.getHoveredId(), line.id);
 
 		// Delete entity from sketch
@@ -280,16 +280,16 @@ describe('HighlightManager centralized highlighting', () => {
 		const permissiveTool = new TestCustomTool();
 		const selectTool = new SelectTool();
 
-		assert.equal(manager.update(permissiveTool, vec(0, 0))?.id, 'origin');
+		assert.equal(manager.update(permissiveTool, new Vec2(0, 0))?.id, 'origin');
 		manager.refresh(selectTool);
 		assert.equal(origin.classList.contains('custom-hover'), false);
 		assert.equal(manager.getHoveredId(), null);
 
-		assert.equal(manager.update(permissiveTool, vec(50, 0))?.id, 'axis_x');
+		assert.equal(manager.update(permissiveTool, new Vec2(50, 0))?.id, 'axis_x');
 		manager.refresh(selectTool);
 		assert.equal(axisX.classList.contains('custom-hover'), false);
 		assert.equal(manager.getHoveredId(), null);
-		assert.equal(manager.update(selectTool, vec(50, 0)), null);
+		assert.equal(manager.update(selectTool, new Vec2(50, 0)), null);
 	});
 });
 
@@ -317,30 +317,30 @@ describe('Constraint and Transform tools hovering', () => {
 		const fixedTool = new ConstraintTool('fixed');
 		fixedTool.activate(ctx);
 		// Over point -> highlight
-		let target = manager.update(fixedTool, vec(0, 0));
+		let target = manager.update(fixedTool, new Vec2(0, 0));
 		assert.strictEqual(target?.id, p1.id);
 		// Over line -> rejected
-		target = manager.update(fixedTool, vec(50, 0));
+		target = manager.update(fixedTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 
 		// Parallel constraint: only lines
 		const parallelTool = new ConstraintTool('parallel');
 		parallelTool.activate(ctx);
 		// Over point -> rejected
-		target = manager.update(parallelTool, vec(0, 0));
+		target = manager.update(parallelTool, new Vec2(0, 0));
 		assert.strictEqual(target, null);
 		// Over line -> highlight
-		target = manager.update(parallelTool, vec(50, 0));
+		target = manager.update(parallelTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line.id);
 
 		// Concentric constraint: circles/arcs
 		const concentricTool = new ConstraintTool('concentric');
 		concentricTool.activate(ctx);
 		// Over line -> rejected
-		target = manager.update(concentricTool, vec(50, 0));
+		target = manager.update(concentricTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 		// Over circle perimeter -> highlight (circle center is 200, 200, radius 30 -> (230, 200))
-		target = manager.update(concentricTool, vec(230, 200));
+		target = manager.update(concentricTool, new Vec2(230, 200));
 		assert.strictEqual(target?.id, circle.id);
 	});
 
@@ -365,21 +365,21 @@ describe('Constraint and Transform tools hovering', () => {
 		dimTool.activate(ctx);
 
 		// Step 0: can highlight line1
-		let target = manager.update(dimTool, vec(50, 0));
+		let target = manager.update(dimTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line1.id);
 
 		// Switch to step 1 with line1 selected
 		dimTool.state = { step: 1, line1Id: line1.id, line2Id: null, point1Id: null, point2Id: null };
 		// Hovering line1 again -> rejected (already selected as first entity)
-		target = manager.update(dimTool, vec(50, 0));
+		target = manager.update(dimTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 		// Hovering line2 -> allowed
-		target = manager.update(dimTool, vec(50, 50));
+		target = manager.update(dimTool, new Vec2(50, 50));
 		assert.strictEqual(target?.id, line2.id);
 
 		// Step 2: dimension placement phase -> highlighting disabled
 		dimTool.state = { step: 2, line1Id: line1.id, line2Id: line2.id, point1Id: null, point2Id: null };
-		target = manager.update(dimTool, vec(50, 50));
+		target = manager.update(dimTool, new Vec2(50, 50));
 		assert.strictEqual(target, null);
 	});
 
@@ -402,16 +402,16 @@ describe('Constraint and Transform tools hovering', () => {
 
 		// Phase: 'objects' -> both points and lines are highlightable
 		mirrorTool.setPhase('objects');
-		let target = manager.update(mirrorTool, vec(0, 0));
+		let target = manager.update(mirrorTool, new Vec2(0, 0));
 		assert.strictEqual(target?.id, p1.id);
-		target = manager.update(mirrorTool, vec(50, 0));
+		target = manager.update(mirrorTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line.id);
 
 		// Phase: 'mirror_line' -> points rejected, only lines highlightable
 		mirrorTool.setPhase('mirror_line');
-		target = manager.update(mirrorTool, vec(0, 0));
+		target = manager.update(mirrorTool, new Vec2(0, 0));
 		assert.strictEqual(target, null);
-		target = manager.update(mirrorTool, vec(50, 0));
+		target = manager.update(mirrorTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line.id);
 	});
 
@@ -434,16 +434,16 @@ describe('Constraint and Transform tools hovering', () => {
 
 		// Phase: 'objects' -> point and line highlightable
 		circTool.setPhase('objects');
-		let target = manager.update(circTool, vec(0, 0));
+		let target = manager.update(circTool, new Vec2(0, 0));
 		assert.strictEqual(target?.id, p1.id);
-		target = manager.update(circTool, vec(50, 0));
+		target = manager.update(circTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line.id);
 
 		// Phase: 'center_point' -> only point highlightable
 		circTool.setPhase('center_point');
-		target = manager.update(circTool, vec(50, 0));
+		target = manager.update(circTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
-		target = manager.update(circTool, vec(0, 0));
+		target = manager.update(circTool, new Vec2(0, 0));
 		assert.strictEqual(target?.id, p1.id);
 
 		// Suppression checkbox hover: disables highlighting
@@ -454,7 +454,7 @@ describe('Constraint and Transform tools hovering', () => {
 			y: 0,
 			copyIndex: 1,
 		});
-		target = manager.update(circTool, vec(0, 0));
+		target = manager.update(circTool, new Vec2(0, 0));
 		assert.strictEqual(target, null);
 	});
 
@@ -477,16 +477,16 @@ describe('Constraint and Transform tools hovering', () => {
 
 		// Phase: 'objects' -> point and line highlightable
 		rectTool.setPhase('objects');
-		let target = manager.update(rectTool, vec(0, 0));
+		let target = manager.update(rectTool, new Vec2(0, 0));
 		assert.strictEqual(target?.id, p1.id);
-		target = manager.update(rectTool, vec(50, 0));
+		target = manager.update(rectTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line.id);
 
 		// Phase: 'direction1' -> only line highlightable
 		rectTool.setPhase('direction1');
-		target = manager.update(rectTool, vec(0, 0));
+		target = manager.update(rectTool, new Vec2(0, 0));
 		assert.strictEqual(target, null);
-		target = manager.update(rectTool, vec(50, 0));
+		target = manager.update(rectTool, new Vec2(50, 0));
 		assert.strictEqual(target?.id, line.id);
 
 		// Over gizmo handle -> disables highlighting
@@ -496,19 +496,19 @@ describe('Constraint and Transform tools hovering', () => {
 			x: 50,
 			y: 0,
 		});
-		target = manager.update(rectTool, vec(50, 0));
+		target = manager.update(rectTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 
 		// Dragging gizmo -> disables highlighting
 		(ctx.renderer as any).rectangularGizmoHandles.clear();
 		(rectTool as any).gizmoDragState = {
 			axis: 1,
-			startMouseWorld: vec(0, 0),
-			centroidWorld: vec(0, 0),
-			u: vec(1, 0),
+			startMouseWorld: new Vec2(0, 0),
+			centroidWorld: new Vec2(0, 0),
+			u: new Vec2(1, 0),
 			startDistance: 10,
 		};
-		target = manager.update(rectTool, vec(50, 0));
+		target = manager.update(rectTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 	});
 });

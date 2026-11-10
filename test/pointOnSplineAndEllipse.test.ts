@@ -9,7 +9,7 @@ import { LineTool } from '../src/canvas/tools/primitives/line';
 import { PointOnEllipseConstraint } from '../src/solver/constraints/pointOnEllipse';
 import { PointOnSplineConstraint } from '../src/solver/constraints/pointOnSpline';
 import { OriginDistanceConstraint } from '../src/solver/constraints/originAxis';
-import { vec } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { getSplineParamAtPoint } from '../src/math/spline';
 
 function setupMockDocument() {
@@ -456,9 +456,9 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			// Query along ellipse perimeter away from definition points: at theta = 45 deg
 			// x = 100 + 80*cos(pi/4) ~ 156.57, y = 100 + 40*sin(pi/4) ~ 128.28
-			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
+			const pEl = new Vec2(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
 			const s = vp.worldToScreen(pEl);
-			const snap = interaction.findSnap(vec(s.x + 2, s.y - 2));
+			const snap = interaction.findSnap(new Vec2(s.x + 2, s.y - 2));
 			assert.ok(snap, 'Snap found');
 			assert.equal(snap.type, 'ellipse');
 			assert.equal(snap.id, ellipse.id);
@@ -504,7 +504,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const minPt = sketch.addPoint({ x: 100, y: 140 });
 			const ellipse = sketch.addEllipse(cPt.id, majPt.id, minPt.id);
 
-			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
+			const pEl = new Vec2(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
 			const s = vp.worldToScreen(pEl);
 			const snap = interaction.findSnap(s);
 			assert.ok(snap && snap.type === 'ellipse');
@@ -589,16 +589,16 @@ describe('Snapping with Ellipse and Spline', () => {
 			const sStart = vp.worldToScreen({ x: 50, y: 50 });
 			tool.onMouseDown({
 				screen: sStart,
-				world: vec(50, 50),
+				world: new Vec2(50, 50),
 				client: sStart,
 				raw: {} as any,
 				snap: null,
-				effectiveWorld: vec(50, 50),
+				effectiveWorld: new Vec2(50, 50),
 				effectiveScreen: sStart,
 			});
 
 			// Step 2: Snap to ellipse at perimeter
-			const pEl = vec(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
+			const pEl = new Vec2(100 + 80 * Math.cos(Math.PI / 4), 100 + 40 * Math.sin(Math.PI / 4));
 			const sEllipse = vp.worldToScreen(pEl);
 			const snapEllipse = interaction.findSnap(sEllipse);
 			assert.ok(snapEllipse && snapEllipse.type === 'ellipse');
@@ -637,15 +637,15 @@ describe('Snapping with Ellipse and Spline', () => {
 			const arc = sketch.addEllipticalArc(cPt.id, majPt.id, minPt.id, startPt.id, endPt.id);
 
 			// Point inside angular span: theta = pi/4
-			const pIn = vec(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
+			const pIn = new Vec2(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
 			const sIn = vp.worldToScreen(pIn);
-			const snapIn = interaction.findSnap(vec(sIn.x + 2, sIn.y - 2));
+			const snapIn = interaction.findSnap(new Vec2(sIn.x + 2, sIn.y - 2));
 			assert.ok(snapIn, 'Snap should be found within angular span');
 			assert.equal(snapIn.type, 'ellipse');
 			assert.equal(snapIn.id, arc.id);
 
 			// Point outside angular span: theta = pi (x=40, y=100)
-			const pOut = vec(40, 100);
+			const pOut = new Vec2(40, 100);
 			const sOut = vp.worldToScreen(pOut);
 			const snapOut = interaction.findSnap(sOut);
 			// Should NOT snap to arc.id
@@ -671,7 +671,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const endPt = sketch.addPoint({ x: 100, y: 130 });
 			const arc = sketch.addEllipticalArc(cPt.id, majPt.id, minPt.id, startPt.id, endPt.id);
 
-			const pIn = vec(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
+			const pIn = new Vec2(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
 			const s = vp.worldToScreen(pIn);
 			const snap = interaction.findSnap(s);
 			assert.ok(snap && snap.id === arc.id);
@@ -714,7 +714,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			const freePt = sketch.addPoint({ x: 200, y: 200 });
 
-			const pIn = vec(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
+			const pIn = new Vec2(100 + 60 * Math.cos(Math.PI / 4), 100 + 30 * Math.sin(Math.PI / 4));
 			const sIn = vp.worldToScreen(pIn);
 
 			(interaction as any).isDraggingPoint = true;
@@ -743,7 +743,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			// Test X-axis at x=150, y=0 (screen y = sOrigin.y)
 			const sX = vp.worldToScreen({ x: 150, y: 0 });
-			const snapX = interaction.findSnap(vec(sX.x, sX.y + 3));
+			const snapX = interaction.findSnap(new Vec2(sX.x, sX.y + 3));
 			assert.ok(snapX, 'Snap found on X axis');
 			assert.equal(snapX.type, 'line');
 			assert.equal(snapX.id, 'axis_x');
@@ -751,7 +751,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			// Test Y-axis at x=0, y=150 (screen x = sOrigin.x)
 			const sY = vp.worldToScreen({ x: 0, y: 150 });
-			const snapY = interaction.findSnap(vec(sY.x + 3, sY.y));
+			const snapY = interaction.findSnap(new Vec2(sY.x + 3, sY.y));
 			assert.ok(snapY, 'Snap found on Y axis');
 			assert.equal(snapY.type, 'line');
 			assert.equal(snapY.id, 'axis_y');
@@ -830,7 +830,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const interaction = createMockInteraction(sketch, vp);
 
 			const sOrigin = vp.worldToScreen({ x: 0, y: 0 });
-			const snap = interaction.findSnap(vec(sOrigin.x + 3, sOrigin.y - 3));
+			const snap = interaction.findSnap(new Vec2(sOrigin.x + 3, sOrigin.y - 3));
 			assert.ok(snap, 'Snap found at origin');
 			assert.equal(snap.type, 'point');
 			assert.equal(snap.id, 'origin');
@@ -920,11 +920,11 @@ describe('Snapping with Ellipse and Spline', () => {
 			const sStart = vp.worldToScreen({ x: 50, y: 50 });
 			tool.onMouseDown({
 				screen: sStart,
-				world: vec(50, 50),
+				world: new Vec2(50, 50),
 				client: sStart,
 				raw: {} as any,
 				snap: null,
-				effectiveWorld: vec(50, 50),
+				effectiveWorld: new Vec2(50, 50),
 				effectiveScreen: sStart,
 			});
 
@@ -951,11 +951,11 @@ describe('Snapping with Ellipse and Spline', () => {
 			// Line ending on X-axis
 			tool.onMouseDown({
 				screen: sStart,
-				world: vec(50, 50),
+				world: new Vec2(50, 50),
 				client: sStart,
 				raw: {} as any,
 				snap: null,
-				effectiveWorld: vec(50, 50),
+				effectiveWorld: new Vec2(50, 50),
 				effectiveScreen: sStart,
 			});
 

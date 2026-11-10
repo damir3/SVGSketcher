@@ -1,4 +1,4 @@
-import { add, angleFromTo, dot, sub, vec, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { getImagePivotOffset, type SketchImage } from '../../../model/image';
 import type { ImageTraceSettings, TraceResult } from '../../../model/imageTrace';
 import { ImageTraceModal } from '../../../ui/image-trace-modal';
@@ -29,7 +29,7 @@ type Drag =
 function transformAboutPivot(image: SketchImage, changes: Partial<Pick<SketchImage, 'width' | 'height' | 'angle'>>) {
 	const offsetBefore = getImagePivotOffset(image);
 	const offsetAfter = getImagePivotOffset({ ...image, ...changes });
-	return { ...changes, ...add(image, sub(offsetBefore, offsetAfter)) };
+	return { ...changes, ...new Vec2().addVectors(image, new Vec2().subVectors(offsetBefore, offsetAfter)) };
 }
 
 export class ImageTool extends BaseTool {
@@ -94,9 +94,9 @@ export class ImageTool extends BaseTool {
 		const { viewport } = this.ctx;
 		return getTransformGizmo(
 			viewport.worldToScreen(image),
-			vec((image.width * viewport.zoom) / 2, (image.height * viewport.zoom) / 2),
+			new Vec2((image.width * viewport.zoom) / 2, (image.height * viewport.zoom) / 2),
 			image.angle,
-			{ exactBounds: true, pivot: viewport.worldToScreen(add(image, getImagePivotOffset(image))) }
+			{ exactBounds: true, pivot: viewport.worldToScreen(new Vec2().addVectors(image, getImagePivotOffset(image))) }
 		);
 	}
 
@@ -140,8 +140,8 @@ export class ImageTool extends BaseTool {
 		if (!handle) return false;
 		if (handle.type === 'move') this.drag = { type: 'move', start: e.world };
 		else if (handle.type === 'rotate') {
-			const pivot = add(image, getImagePivotOffset(image));
-			this.drag = { type: 'rotate', pivot, lastAngle: angleFromTo(pivot, e.world) };
+			const pivot = new Vec2().addVectors(image, getImagePivotOffset(image));
+			this.drag = { type: 'rotate', pivot, lastAngle: pivot.angleToPoint(e.world) };
 		} else this.drag = { type: 'scale', start: e.screen, direction: handle.direction };
 		this.draft = { ...image };
 		this.ctx.setCursor(handle.type === 'rotate' ? 'grabbing' : handle.cursor);
@@ -159,17 +159,17 @@ export class ImageTool extends BaseTool {
 		}
 
 		if (drag.type === 'move') {
-			const offset = sub(e.world, drag.start);
+			const offset = new Vec2().subVectors(e.world, drag.start);
 			draft.x = image.x + offset.x;
 			draft.y = image.y + offset.y;
 		} else if (drag.type === 'rotate') {
-			const angle = angleFromTo(drag.pivot, e.world);
+			const angle = drag.pivot.angleToPoint(e.world);
 			const delta = angle - drag.lastAngle;
 			const nextAngle = draft.angle + (Math.atan2(Math.sin(delta), Math.cos(delta)) * 180) / Math.PI;
 			Object.assign(draft, transformAboutPivot(image, { angle: nextAngle }));
 			drag.lastAngle = angle;
 		} else {
-			const delta = dot(sub(e.screen, drag.start), drag.direction) / dot(drag.direction, drag.direction);
+			const delta = new Vec2().subVectors(e.screen, drag.start).dot(drag.direction) / drag.direction.lengthSq();
 			const scale = Math.max(MIN_SIZE / Math.min(image.width, image.height), 1 + delta);
 			Object.assign(draft, transformAboutPivot(image, { width: image.width * scale, height: image.height * scale }));
 		}

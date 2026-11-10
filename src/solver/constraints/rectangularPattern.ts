@@ -6,7 +6,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
-import { sub, vec, centroid, scale, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 
 export interface RectangularPatternCopyData {
 	copyIndex: number;
@@ -39,39 +39,36 @@ export function computeRectangularPatternOffset(
 	direction2: 'one_direction' | 'symmetric',
 	u1: { x: number; y: number },
 	u2: { x: number; y: number }
-): { dx: number; dy: number } {
+): Vec2 {
 	const o1 = computeAxisOffset(i, distance1, direction1);
 	const o2 = computeAxisOffset(j, distance2, direction2);
-	return {
-		dx: o1 * u1.x + o2 * u2.x,
-		dy: o1 * u1.y + o2 * u2.y,
-	};
+	return Vec2.from(u1).multiplyScalar(o1).addScaledVector(u2, o2);
 }
 
 export function computeRectangularPatternDirections(
 	paramMap: Map<string, number>,
 	line1?: { p1Id: string; p2Id: string } | null,
 	line2?: { p1Id: string; p2Id: string } | null
-): { u1: { x: number; y: number }; u2: { x: number; y: number } } {
-	let u1 = { x: 1, y: 0 };
+): { u1: Vec2; u2: Vec2 } {
+	let u1 = new Vec2(1, 0);
 	if (line1) {
 		const p1a = readParamPoint(paramMap, line1.p1Id);
 		const p1b = readParamPoint(paramMap, line1.p2Id);
-		const dir1 = sub(p1b, p1a);
-		const len1 = Math.hypot(dir1.x, dir1.y);
+		const dir1 = new Vec2().subVectors(p1b, p1a);
+		const len1 = dir1.length();
 		if (len1 > 1e-6) {
-			u1 = scale(dir1, 1.0 / len1);
+			u1 = dir1.clone().multiplyScalar(1.0 / len1);
 		}
 	}
 
-	let u2 = { x: -u1.y, y: u1.x };
+	let u2 = u1.clone().perpendicular();
 	if (line2) {
 		const p2a = readParamPoint(paramMap, line2.p1Id);
 		const p2b = readParamPoint(paramMap, line2.p2Id);
-		const dir2 = sub(p2b, p2a);
-		const len2 = Math.hypot(dir2.x, dir2.y);
+		const dir2 = new Vec2().subVectors(p2b, p2a);
+		const len2 = dir2.length();
 		if (len2 > 1e-6) {
-			u2 = scale(dir2, 1.0 / len2);
+			u2 = dir2.clone().multiplyScalar(1.0 / len2);
 		}
 	}
 
@@ -204,7 +201,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				const s = readParamPoint(paramMap, pair.sourcePtId);
 				const p = readParamPoint(paramMap, pair.patternPtId);
 
-				const target = vec(s.x + offset.dx, s.y + offset.dy);
+				const target = s.add(offset);
 
 				errors.push((p.x - target.x) * this.weight);
 				errors.push((p.y - target.y) * this.weight);
@@ -242,8 +239,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		if (line1) {
 			const p1a = readParamPoint(paramMap, line1.p1Id);
 			const p1b = readParamPoint(paramMap, line1.p2Id);
-			const dir1 = sub(p1b, p1a);
-			const L1 = Math.hypot(dir1.x, dir1.y);
+			const dir1 = new Vec2().subVectors(p1b, p1a);
+			const L1 = dir1.length();
 			if (L1 > 1e-6) {
 				hasL1 = true;
 				const invL = 1 / L1;
@@ -262,8 +259,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		if (line2) {
 			const p2a = readParamPoint(paramMap, line2.p1Id);
 			const p2b = readParamPoint(paramMap, line2.p2Id);
-			const dir2 = sub(p2b, p2a);
-			const L2 = Math.hypot(dir2.x, dir2.y);
+			const dir2 = new Vec2().subVectors(p2b, p2a);
+			const L2 = dir2.length();
 			if (L2 > 1e-6) {
 				hasL2 = true;
 				const invL = 1 / L2;
@@ -298,11 +295,11 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				if (colSy !== undefined) entries.push({ row: rowY, col: colSy, val: -this.weight });
 
 				if (hasL1 && line1) {
-					const dDeltaX_d1b = vec(
+					const dDeltaX_d1b = new Vec2(
 						o1 * du1_dx1b + (!hasL2 ? o2 * -du1_dx1b_y : 0),
 						o1 * du1_dy1b + (!hasL2 ? o2 * -du1_dy1b_y : 0)
 					);
-					const dDeltaY_d1b = vec(
+					const dDeltaY_d1b = new Vec2(
 						o1 * du1_dx1b_y + (!hasL2 ? o2 * du1_dx1b : 0),
 						o1 * du1_dy1b_y + (!hasL2 ? o2 * du1_dy1b : 0)
 					);
@@ -319,8 +316,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				}
 
 				if (hasL2 && line2) {
-					const dDeltaX_d2b = vec(o2 * du2_dx2b, o2 * du2_dy2b);
-					const dDeltaY_d2b = vec(o2 * du2_dx2b_y, o2 * du2_dy2b_y);
+					const dDeltaX_d2b = new Vec2(o2 * du2_dx2b, o2 * du2_dy2b);
+					const dDeltaY_d2b = new Vec2(o2 * du2_dx2b_y, o2 * du2_dy2b_y);
 
 					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowX, -dDeltaX_d2b.x * this.weight);
 					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowX, -dDeltaX_d2b.y * this.weight);
@@ -410,8 +407,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 							}
 							copyCentroid =
 								copyPts.length > 0
-									? ctx.viewport.worldToScreen(centroid(copyPts))
-									: ctx.viewport.worldToScreen({ x: centroidWorld.x + offset.dx, y: centroidWorld.y + offset.dy });
+									? ctx.viewport.worldToScreen(Vec2.centroid(copyPts))
+									: ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset));
 						} else if (ctx.renderTransformedObjects) {
 							const copyWorldPoints = ctx.renderTransformedObjects(this.sourceObjectIds, offset, {
 								targetGroup: ctx.targetGroup,
@@ -421,18 +418,12 @@ export class RectangularPatternConstraint extends BaseConstraint {
 								skipRender: !isSuppressed,
 							});
 							if (copyWorldPoints.length > 0) {
-								copyCentroid = ctx.viewport.worldToScreen(centroid(copyWorldPoints));
+								copyCentroid = ctx.viewport.worldToScreen(Vec2.centroid(copyWorldPoints));
 							} else {
-								copyCentroid = ctx.viewport.worldToScreen({
-									x: centroidWorld.x + offset.dx,
-									y: centroidWorld.y + offset.dy,
-								});
+								copyCentroid = ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset));
 							}
 						} else {
-							copyCentroid = ctx.viewport.worldToScreen({
-								x: centroidWorld.x + offset.dx,
-								y: centroidWorld.y + offset.dy,
-							});
+							copyCentroid = ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset));
 						}
 
 						if (ctx.patternCheckboxPositions) {
@@ -452,7 +443,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			}
 		}
 
-		ctx.renderBadge(this.id, { x: sCtr.x + 14, y: sCtr.y - 14 }, 'rectangular_pattern', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(sCtr.x + 14, sCtr.y - 14), 'rectangular_pattern', COLORS.primary);
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

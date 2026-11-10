@@ -1,19 +1,6 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
-import type { Vec2 } from './vector';
+import { Vec2, projectPointOntoSegment } from './vector';
 import { AABB } from './aabb';
-import {
-	angleFromTo,
-	dot,
-	addScaled,
-	cross,
-	dist,
-	distancesFrom,
-	mid,
-	mix,
-	projectPointOntoSegment,
-	sub,
-	vec,
-} from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
 import {
@@ -180,45 +167,39 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		return getSplinePointAtParam(curve.bezierSegments, param);
 	} else if (curve.type === 'segment') {
 		const t = Math.max(0, Math.min(1, param));
-		return mix(curve.p1, curve.p2, t);
+		return curve.p1.clone().lerp(curve.p2, t);
 	} else if (curve.type === 'circle') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const sq = {
-			x: sc.x + curve.radius * Math.cos(param),
-			y: sc.y + curve.radius * Math.sin(param),
-		};
-		return { x: sq.x, y: -sq.y };
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const sq = Vec2.fromPolar(curve.radius, param).add(sc);
+		return new Vec2(sq.x, -sq.y);
 	} else if (curve.type === 'arc') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const ss = { x: curve.start.x, y: -curve.start.y };
-		const se = { x: curve.end.x, y: -curve.end.y };
-		const as = angleFromTo(sc, ss);
-		const ae = angleFromTo(sc, se);
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const ss = new Vec2(curve.start.x, -curve.start.y);
+		const se = new Vec2(curve.end.x, -curve.end.y);
+		const as = Vec2.from(sc).angleToPoint(ss);
+		const ae = Vec2.from(sc).angleToPoint(se);
 		let sweep = curve.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		const u = Math.max(0, Math.min(1, param));
 		const ang = curve.clockwise ? as + u * sweep : as - u * sweep;
-		const sq = {
-			x: sc.x + curve.radius * Math.cos(ang),
-			y: sc.y + curve.radius * Math.sin(ang),
-		};
-		return { x: sq.x, y: -sq.y };
+		const sq = Vec2.fromPolar(curve.radius, ang).add(sc);
+		return new Vec2(sq.x, -sq.y);
 	} else if (curve.type === 'ellipse') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
-		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
-		const r = distancesFrom(sc, smaj, smin);
-		const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(sc, smaj));
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const smaj = new Vec2(curve.majorAxisPoint.x, -curve.majorAxisPoint.y);
+		const smin = new Vec2(curve.minorAxisPoint.x, -curve.minorAxisPoint.y);
+		const r = Vec2.from(sc).distancesTo(smaj, smin);
+		const { axisU: u, axisV: v } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
 		const sq = ellipsePointAtParameter(param, sc, r, u, v);
-		return { x: sq.x, y: -sq.y };
+		return new Vec2(sq.x, -sq.y);
 	} else if (curve.type === 'elliptical_arc') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
-		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
-		const ss = { x: curve.start.x, y: -curve.start.y };
-		const se = { x: curve.end.x, y: -curve.end.y };
-		const r = distancesFrom(sc, smaj, smin);
-		const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const smaj = new Vec2(curve.majorAxisPoint.x, -curve.majorAxisPoint.y);
+		const smin = new Vec2(curve.minorAxisPoint.x, -curve.minorAxisPoint.y);
+		const ss = new Vec2(curve.start.x, -curve.start.y);
+		const se = new Vec2(curve.end.x, -curve.end.y);
+		const r = Vec2.from(sc).distancesTo(smaj, smin);
+		const { axisU, axisV } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
 		const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
 		const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
 		let sweep = curve.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
@@ -226,9 +207,9 @@ export function getPointAtParam(curve: GeoCurve, param: number): Vec2 {
 		const u = Math.max(0, Math.min(1, param));
 		const t = curve.clockwise ? ts + u * sweep : ts - u * sweep;
 		const sq = ellipsePointAtParameter(t, sc, r, axisU, axisV);
-		return { x: sq.x, y: -sq.y };
+		return new Vec2(sq.x, -sq.y);
 	}
-	return { x: 0, y: 0 };
+	return new Vec2(0, 0);
 }
 
 /**
@@ -238,25 +219,25 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 	if (curve.type === 'spline') {
 		return getSplineParamAtPoint(curve.bezierSegments, pt).param;
 	} else if (curve.type === 'segment') {
-		const dir = sub(curve.p2, curve.p1);
-		const l2 = dot(dir, dir);
+		const dir = new Vec2().subVectors(curve.p2, curve.p1);
+		const l2 = dir.lengthSq();
 		if (l2 < 1e-12) return 0;
-		const t = dot(sub(pt, curve.p1), dir) / l2;
+		const t = new Vec2().subVectors(pt, curve.p1).dot(dir) / l2;
 		return Math.max(0, Math.min(1, t));
 	} else if (curve.type === 'circle') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const sp = { x: pt.x, y: -pt.y };
-		let ang = angleFromTo(sc, sp);
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const sp = new Vec2(pt.x, -pt.y);
+		let ang = Vec2.from(sc).angleToPoint(sp);
 		if (ang < 0) ang += TWO_PI;
 		return ang;
 	} else if (curve.type === 'arc') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const ss = { x: curve.start.x, y: -curve.start.y };
-		const se = { x: curve.end.x, y: -curve.end.y };
-		const sp = { x: pt.x, y: -pt.y };
-		const as = angleFromTo(sc, ss);
-		const ae = angleFromTo(sc, se);
-		const ap = angleFromTo(sc, sp);
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const ss = new Vec2(curve.start.x, -curve.start.y);
+		const se = new Vec2(curve.end.x, -curve.end.y);
+		const sp = new Vec2(pt.x, -pt.y);
+		const as = Vec2.from(sc).angleToPoint(ss);
+		const ae = Vec2.from(sc).angleToPoint(se);
+		const ap = Vec2.from(sc).angleToPoint(sp);
 		let sweep = curve.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 		if (sweep < 0) sweep += TWO_PI;
 		let delta = curve.clockwise ? (ap - as) % TWO_PI : (as - ap) % TWO_PI;
@@ -264,26 +245,26 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 		if (sweep < 1e-6) return 0;
 		return Math.max(0, Math.min(1, delta / sweep));
 	} else if (curve.type === 'ellipse') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
-		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
-		const sp = { x: pt.x, y: -pt.y };
-		const r = distancesFrom(sc, smaj, smin);
-		const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
-		const paramRadii = vec(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const smaj = new Vec2(curve.majorAxisPoint.x, -curve.majorAxisPoint.y);
+		const smin = new Vec2(curve.minorAxisPoint.x, -curve.minorAxisPoint.y);
+		const sp = new Vec2(pt.x, -pt.y);
+		const r = Vec2.from(sc).distancesTo(smaj, smin);
+		const { axisU, axisV } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
+		const paramRadii = new Vec2(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
 		let t = ellipseParameterAtPoint(sp, sc, paramRadii, axisU, axisV);
 		if (t < 0) t += TWO_PI;
 		return t;
 	} else if (curve.type === 'elliptical_arc') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
-		const smaj = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
-		const smin = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
-		const ss = { x: curve.start.x, y: -curve.start.y };
-		const se = { x: curve.end.x, y: -curve.end.y };
-		const sp = { x: pt.x, y: -pt.y };
-		const r = distancesFrom(sc, smaj, smin);
-		const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
-		const paramRadii = vec(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
+		const sc = new Vec2(curve.center.x, -curve.center.y);
+		const smaj = new Vec2(curve.majorAxisPoint.x, -curve.majorAxisPoint.y);
+		const smin = new Vec2(curve.minorAxisPoint.x, -curve.minorAxisPoint.y);
+		const ss = new Vec2(curve.start.x, -curve.start.y);
+		const se = new Vec2(curve.end.x, -curve.end.y);
+		const sp = new Vec2(pt.x, -pt.y);
+		const r = Vec2.from(sc).distancesTo(smaj, smin);
+		const { axisU, axisV } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
+		const paramRadii = new Vec2(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
 		const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
 		const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
 		const tp = ellipseParameterAtPoint(sp, sc, paramRadii, axisU, axisV);
@@ -301,13 +282,13 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
  * Checks if point pt (in world coords) lies on an arc within tolerance.
  */
 function isPointOnArc(pt: Vec2, arc: GeoArc, tol = 1e-3): boolean {
-	const sc = { x: arc.center.x, y: -arc.center.y };
-	const ss = { x: arc.start.x, y: -arc.start.y };
-	const se = { x: arc.end.x, y: -arc.end.y };
-	const sp = { x: pt.x, y: -pt.y };
-	const as = angleFromTo(sc, ss);
-	const ae = angleFromTo(sc, se);
-	const ap = angleFromTo(sc, sp);
+	const sc = new Vec2(arc.center.x, -arc.center.y);
+	const ss = new Vec2(arc.start.x, -arc.start.y);
+	const se = new Vec2(arc.end.x, -arc.end.y);
+	const sp = new Vec2(pt.x, -pt.y);
+	const as = Vec2.from(sc).angleToPoint(ss);
+	const ae = Vec2.from(sc).angleToPoint(se);
+	const ap = Vec2.from(sc).angleToPoint(sp);
 	let sweep = arc.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 	if (sweep < 0) sweep += TWO_PI;
 	let delta = arc.clockwise ? (ap - as) % TWO_PI : (as - ap) % TWO_PI;
@@ -320,15 +301,15 @@ function isPointOnArc(pt: Vec2, arc: GeoArc, tol = 1e-3): boolean {
  * Checks if point pt (in world coords) lies on an elliptical arc within tolerance.
  */
 function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): boolean {
-	const sc = { x: arc.center.x, y: -arc.center.y };
-	const smaj = { x: arc.majorAxisPoint.x, y: -arc.majorAxisPoint.y };
-	const smin = { x: arc.minorAxisPoint.x, y: -arc.minorAxisPoint.y };
-	const ss = { x: arc.start.x, y: -arc.start.y };
-	const se = { x: arc.end.x, y: -arc.end.y };
-	const sp = { x: pt.x, y: -pt.y };
-	const r = distancesFrom(sc, smaj, smin);
+	const sc = new Vec2(arc.center.x, -arc.center.y);
+	const smaj = new Vec2(arc.majorAxisPoint.x, -arc.majorAxisPoint.y);
+	const smin = new Vec2(arc.minorAxisPoint.x, -arc.minorAxisPoint.y);
+	const ss = new Vec2(arc.start.x, -arc.start.y);
+	const se = new Vec2(arc.end.x, -arc.end.y);
+	const sp = new Vec2(pt.x, -pt.y);
+	const r = Vec2.from(sc).distancesTo(smaj, smin);
 	if (r.x < 1e-6 || r.y < 1e-6) return false;
-	const { axisU, axisV } = ellipseAxes(angleFromTo(sc, smaj));
+	const { axisU, axisV } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
 	const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
 	const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
 	const tp = ellipseParameterAtPoint(sp, sc, r, axisU, axisV);
@@ -343,7 +324,7 @@ function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): bo
 function deduplicatePoints(pts: Vec2[], eps = 1e-4): Vec2[] {
 	const res: Vec2[] = [];
 	for (const p of pts) {
-		const exists = res.some(existing => Math.hypot(existing.x - p.x, existing.y - p.y) < eps);
+		const exists = res.some(existing => p.distanceTo(existing) < eps);
 		if (!exists) res.push(p);
 	}
 	return res;
@@ -352,20 +333,20 @@ function deduplicatePoints(pts: Vec2[], eps = 1e-4): Vec2[] {
 // --- INTERSECTION ROUTINES ---
 
 export function intersectSegmentSegment(s1: GeoSegment, s2: GeoSegment): Vec2[] {
-	const dir1 = sub(s1.p2, s1.p1);
-	const dir2 = sub(s2.p2, s2.p1);
+	const dir1 = new Vec2().subVectors(s1.p2, s1.p1);
+	const dir2 = new Vec2().subVectors(s2.p2, s2.p1);
 
-	const det = cross(dir1, dir2);
+	const det = dir1.cross(dir2);
 	if (Math.abs(det) < 1e-10) return [];
 
-	const delta = sub(s2.p1, s1.p1);
-	const t = cross(delta, dir2) / det;
-	const u = cross(delta, dir1) / det;
+	const delta = new Vec2().subVectors(s2.p1, s1.p1);
+	const t = delta.cross(dir2) / det;
+	const u = delta.cross(dir1) / det;
 
 	const eps = 1e-5;
 	if (t >= -eps && t <= 1 + eps && u >= -eps && u <= 1 + eps) {
 		const clampedT = Math.max(0, Math.min(1, t));
-		return [addScaled(s1.p1, dir1, clampedT)];
+		return [s1.p1.clone().addScaledVector(dir1, clampedT)];
 	}
 	return [];
 }
@@ -373,15 +354,15 @@ export function intersectSegmentSegment(s1: GeoSegment, s2: GeoSegment): Vec2[] 
 export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Vec2[] {
 	const p1 = s.p1;
 	const p2 = s.p2;
-	const v = sub(p2, p1);
-	const w = sub(p1, c.center);
+	const v = new Vec2().subVectors(p2, p1);
+	const w = new Vec2().subVectors(p1, c.center);
 
-	const A = dot(v, v);
+	const A = v.lengthSq();
 	if (A < 1e-12) return [];
 
-	const closestT = -dot(w, v) / A;
-	const closest = addScaled(p1, v, closestT);
-	const distance = dist(closest, c.center);
+	const closestT = -w.dot(v) / A;
+	const closest = p1.clone().addScaledVector(v, closestT);
+	const distance = closest.distanceTo(c.center);
 	// Test tangency in world units. A discriminant tolerance depends on segment
 	// length and can turn solver roundoff into a gap or two spurious crossings.
 	// Allow the solver's ~1e-6 residuals, using the same 1e-5 geometric tolerance
@@ -397,7 +378,7 @@ export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Ve
 	for (const t of tCandidates) {
 		if (t >= -eps && t <= 1 + eps) {
 			const clampedT = Math.max(0, Math.min(1, t));
-			const pt = addScaled(p1, v, clampedT);
+			const pt = p1.clone().addScaledVector(v, clampedT);
 			if (c.type === 'circle' || isPointOnArc(pt, c)) {
 				pts.push(pt);
 			}
@@ -407,25 +388,25 @@ export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Ve
 }
 
 export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipticalArc): Vec2[] {
-	const sc = { x: e.center.x, y: -e.center.y };
-	const smaj = { x: e.majorAxisPoint.x, y: -e.majorAxisPoint.y };
-	const smin = { x: e.minorAxisPoint.x, y: -e.minorAxisPoint.y };
-	const s1 = { x: s.p1.x, y: -s.p1.y };
-	const s2 = { x: s.p2.x, y: -s.p2.y };
+	const sc = new Vec2(e.center.x, -e.center.y);
+	const smaj = new Vec2(e.majorAxisPoint.x, -e.majorAxisPoint.y);
+	const smin = new Vec2(e.minorAxisPoint.x, -e.minorAxisPoint.y);
+	const s1 = new Vec2(s.p1.x, -s.p1.y);
+	const s2 = new Vec2(s.p2.x, -s.p2.y);
 
-	const r = distancesFrom(sc, smaj, smin);
+	const r = Vec2.from(sc).distancesTo(smaj, smin);
 	if (r.x < 1e-6 || r.y < 1e-6) return [];
 
-	const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(sc, smaj));
+	const { axisU: u, axisV: v } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
 
 	// Transform line segment endpoints to ellipse-local coordinates
-	const d1 = sub(s1, sc);
-	const d2 = sub(s2, sc);
+	const d1 = new Vec2().subVectors(s1, sc);
+	const d2 = new Vec2().subVectors(s2, sc);
 
-	const u1 = dot(d1, u);
-	const v1 = dot(d1, v);
-	const u2 = dot(d2, u);
-	const v2 = dot(d2, v);
+	const u1 = d1.dot(u);
+	const v1 = d1.dot(v);
+	const u2 = d2.dot(u);
+	const v2 = d2.dot(v);
 
 	const du = u2 - u1;
 	const dv = v2 - v1;
@@ -447,7 +428,7 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 	for (const t of tCandidates) {
 		if (t >= -eps && t <= 1 + eps) {
 			const clampedT = Math.max(0, Math.min(1, t));
-			const worldPt = mix(s.p1, s.p2, clampedT);
+			const worldPt = s.p1.clone().lerp(s.p2, clampedT);
 			if (e.type === 'ellipse' || isPointOnEllipticalArc(worldPt, e)) {
 				pts.push(worldPt);
 			}
@@ -457,8 +438,8 @@ export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipt
 }
 
 export function intersectCircleCircle(c1: GeoCircle | GeoArc, c2: GeoCircle | GeoArc): Vec2[] {
-	const dir = sub(c2.center, c1.center);
-	const d = Math.hypot(dir.x, dir.y);
+	const dir = new Vec2().subVectors(c2.center, c1.center);
+	const d = dir.length();
 
 	if (d < 1e-9) return []; // concentric or identical
 	if (d > c1.radius + c2.radius + 1e-5 || d < Math.abs(c1.radius - c2.radius) - 1e-5) return [];
@@ -467,15 +448,15 @@ export function intersectCircleCircle(c1: GeoCircle | GeoArc, c2: GeoCircle | Ge
 	const h2 = c1.radius * c1.radius - a * a;
 	const h = Math.sqrt(Math.max(0, h2));
 
-	const p0 = addScaled(c1.center, dir, a / d);
+	const p0 = c1.center.clone().addScaledVector(dir, a / d);
 
 	const candidates: Vec2[] = [];
 	if (h < 1e-7) {
 		candidates.push(p0);
 	} else {
-		const normal = vec(-dir.y / d, dir.x / d);
-		candidates.push({ x: p0.x + h * normal.x, y: p0.y + h * normal.y });
-		candidates.push({ x: p0.x - h * normal.x, y: p0.y - h * normal.y });
+		const normal = dir.clone().perpendicular().divideScalar(d);
+		candidates.push(p0.clone().addScaledVector(normal, h));
+		candidates.push(p0.clone().addScaledVector(normal, -h));
 	}
 
 	const pts: Vec2[] = [];
@@ -495,7 +476,7 @@ export function intersectEllipseEllipse(
 	e2: GeoCircle | GeoArc | GeoEllipse | GeoEllipticalArc
 ): Vec2[] {
 	// Parametrize e1 in SVG space
-	const sc1 = { x: e1.center.x, y: -e1.center.y };
+	const sc1 = new Vec2(e1.center.x, -e1.center.y);
 	let rx1 = 0,
 		ry1 = 0,
 		theta1 = 0;
@@ -504,19 +485,19 @@ export function intersectEllipseEllipse(
 		ry1 = e1.radius;
 		theta1 = 0;
 	} else {
-		const maj = { x: e1.majorAxisPoint.x, y: -e1.majorAxisPoint.y };
-		const min = { x: e1.minorAxisPoint.x, y: -e1.minorAxisPoint.y };
-		const r1 = distancesFrom(sc1, maj, min);
+		const maj = new Vec2(e1.majorAxisPoint.x, -e1.majorAxisPoint.y);
+		const min = new Vec2(e1.minorAxisPoint.x, -e1.minorAxisPoint.y);
+		const r1 = Vec2.from(sc1).distancesTo(maj, min);
 		rx1 = r1.x;
 		ry1 = r1.y;
-		theta1 = angleFromTo(sc1, maj);
+		theta1 = Vec2.from(sc1).angleToPoint(maj);
 	}
 	if (rx1 < 1e-6 || ry1 < 1e-6) return [];
 
 	const { axisU: u1, axisV: v1 } = ellipseAxes(theta1);
 
 	// Parametrize e2 implicit equation in SVG space
-	const sc2 = { x: e2.center.x, y: -e2.center.y };
+	const sc2 = new Vec2(e2.center.x, -e2.center.y);
 	let rx2 = 0,
 		ry2 = 0,
 		theta2 = 0;
@@ -525,25 +506,25 @@ export function intersectEllipseEllipse(
 		ry2 = e2.radius;
 		theta2 = 0;
 	} else {
-		const maj = { x: e2.majorAxisPoint.x, y: -e2.majorAxisPoint.y };
-		const min = { x: e2.minorAxisPoint.x, y: -e2.minorAxisPoint.y };
-		const r2 = distancesFrom(sc2, maj, min);
+		const maj = new Vec2(e2.majorAxisPoint.x, -e2.majorAxisPoint.y);
+		const min = new Vec2(e2.minorAxisPoint.x, -e2.minorAxisPoint.y);
+		const r2 = Vec2.from(sc2).distancesTo(maj, min);
 		rx2 = r2.x;
 		ry2 = r2.y;
-		theta2 = angleFromTo(sc2, maj);
+		theta2 = Vec2.from(sc2).angleToPoint(maj);
 	}
 	if (rx2 < 1e-6 || ry2 < 1e-6) return [];
 
 	const { axisU: u2, axisV: v2 } = ellipseAxes(theta2);
 
-	const radii1 = vec(rx1, ry1);
+	const radii1 = new Vec2(rx1, ry1);
 	const pointOnE1 = (t: number): Vec2 => ellipsePointAtParameter(t, sc1, radii1, u1, v1);
 
 	// Implicit value F2 of a point on e2: F2 = 0 on perimeter
 	const implicitE2 = (p: Vec2): number => {
-		const dir = sub(p, sc2);
-		const u = dot(dir, u2);
-		const v = dot(dir, v2);
+		const dir = new Vec2().subVectors(p, sc2);
+		const u = dir.dot(u2);
+		const v = dir.dot(v2);
 		return (u * u) / (rx2 * rx2) + (v * v) / (ry2 * ry2) - 1.0;
 	};
 
@@ -595,7 +576,7 @@ export function intersectEllipseEllipse(
 	const pts: Vec2[] = [];
 	for (const t of roots) {
 		const svgP = pointOnE1(t);
-		const worldP: Vec2 = { x: svgP.x, y: -svgP.y };
+		const worldP: Vec2 = new Vec2(svgP.x, -svgP.y);
 
 		let ok1 = true;
 		if (e1.type === 'arc') ok1 = isPointOnArc(worldP, e1);
@@ -712,16 +693,16 @@ export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec
 			for (let iter = 0; iter < 4; iter++) {
 				const p1 = evaluateBezier(b1, t);
 				const p2 = evaluateBezier(b2, u);
-				const f = sub(p1, p2);
-				if (Math.hypot(f.x, f.y) < 1e-11) break;
+				const f = new Vec2().subVectors(p1, p2);
+				if (f.length() < 1e-11) break;
 
 				const d1 = evaluateBezierDerivative(b1, t);
 				const d2 = evaluateBezierDerivative(b2, u);
-				const det = cross(d2, d1);
+				const det = d2.cross(d1);
 				if (Math.abs(det) < 1e-12) break;
 
-				const dt = cross(d2, f) / det;
-				const du = cross(d1, f) / det;
+				const dt = d2.cross(f) / det;
+				const du = d1.cross(f) / det;
 
 				t = Math.max(0, Math.min(1, t - dt));
 				u = Math.max(0, Math.min(1, u - du));
@@ -729,8 +710,8 @@ export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec
 
 			const p1 = evaluateBezier(b1, t);
 			const p2 = evaluateBezier(b2, u);
-			if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 1e-3) {
-				pts.push(mid(p1, p2));
+			if (p2.distanceTo(p1) < 1e-3) {
+				pts.push(new Vec2().midpoint(p1, p2));
 			}
 			continue;
 		}
@@ -794,7 +775,7 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 				}
 			}
 		} else if (other.type === 'circle' || other.type === 'arc') {
-			const f = (p: Vec2) => Math.hypot(p.x - other.center.x, p.y - other.center.y) - other.radius;
+			const f = (p: Vec2) => other.center.distanceTo(p) - other.radius;
 			const rPts = findBezierImplicitRoots(b, f);
 			for (const rPt of rPts) {
 				if (other.type === 'circle' || isPointOnArc(rPt, other)) {
@@ -802,18 +783,18 @@ export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[]
 				}
 			}
 		} else if (other.type === 'ellipse' || other.type === 'elliptical_arc') {
-			const sc = { x: other.center.x, y: -other.center.y };
-			const maj = { x: other.majorAxisPoint.x, y: -other.majorAxisPoint.y };
-			const min = { x: other.minorAxisPoint.x, y: -other.minorAxisPoint.y };
-			const r = distancesFrom(sc, maj, min);
+			const sc = new Vec2(other.center.x, -other.center.y);
+			const maj = new Vec2(other.majorAxisPoint.x, -other.majorAxisPoint.y);
+			const min = new Vec2(other.minorAxisPoint.x, -other.minorAxisPoint.y);
+			const r = Vec2.from(sc).distancesTo(maj, min);
 			if (r.x < 1e-6 || r.y < 1e-6) continue;
-			const { axisU: u, axisV: v } = ellipseAxes(angleFromTo(sc, maj));
+			const { axisU: u, axisV: v } = ellipseAxes(Vec2.from(sc).angleToPoint(maj));
 
 			const f = (p: Vec2) => {
-				const sp = { x: p.x, y: -p.y };
-				const dir = sub(sp, sc);
-				const up = dot(dir, u);
-				const vp = dot(dir, v);
+				const sp = new Vec2(p.x, -p.y);
+				const dir = new Vec2().subVectors(sp, sc);
+				const up = dir.dot(u);
+				const vp = dir.dot(v);
 				return (up * up) / (r.x * r.x) + (vp * vp) / (r.y * r.y) - 1.0;
 			};
 			const rPts = findBezierImplicitRoots(b, f);
@@ -1052,7 +1033,7 @@ export function createCutPoint(
 	// Check if there is already an existing point at pos (excluding newPt)
 	let attachedCoincident = false;
 	for (const pt of sketch.points.values()) {
-		if (pt.id !== newPt.id && Math.hypot(pt.x - pos.x, pt.y - pos.y) < eps) {
+		if (pt.id !== newPt.id && pos.distanceTo(pt) < eps) {
 			const c = sketch.addCoincidentConstraint(newPt.id, pt.id);
 			if (c) {
 				attachedCoincident = true;
@@ -1200,24 +1181,18 @@ function replaceSplineWithInterval(
 		if (j === 0) {
 			const p0 = subSegments[0][0];
 			rawPoints.push(p0);
-			const v = {
-				x: subSegments[0][1].x - p0.x,
-				y: subSegments[0][1].y - p0.y,
-			};
+			const v = new Vec2().subVectors(subSegments[0][1], p0);
 			rawHandles.push({
-				h1: { x: p0.x - v.x, y: p0.y - v.y },
-				h2: { x: p0.x + v.x, y: p0.y + v.y },
+				h1: new Vec2().subVectors(p0, v),
+				h2: new Vec2().addVectors(p0, v),
 			});
 		} else if (j === M) {
 			const pM = subSegments[M - 1][3];
 			rawPoints.push(pM);
-			const v = {
-				x: pM.x - subSegments[M - 1][2].x,
-				y: pM.y - subSegments[M - 1][2].y,
-			};
+			const v = new Vec2().subVectors(pM, subSegments[M - 1][2]);
 			rawHandles.push({
-				h1: { x: pM.x - v.x, y: pM.y - v.y },
-				h2: { x: pM.x + v.x, y: pM.y + v.y },
+				h1: new Vec2().subVectors(pM, v),
+				h2: new Vec2().addVectors(pM, v),
 			});
 		} else {
 			const pJ = subSegments[j][0];
@@ -1233,10 +1208,7 @@ function replaceSplineWithInterval(
 	const points: Vec2[] = [];
 	const handles: Array<{ h1: Vec2; h2: Vec2 }> = [];
 	for (let k = 0; k < rawPoints.length; k++) {
-		if (
-			points.length === 0 ||
-			Math.hypot(rawPoints[k].x - points[points.length - 1].x, rawPoints[k].y - points[points.length - 1].y) >= 1e-3
-		) {
+		if (points.length === 0 || points[points.length - 1].distanceTo(rawPoints[k]) >= 1e-3) {
 			points.push(rawPoints[k]);
 			handles.push(rawHandles[k]);
 		}
@@ -1250,7 +1222,7 @@ function replaceSplineWithInterval(
 		let matchedId: string | null = null;
 		for (const pid of originalSpline.pointIds) {
 			const pt = sketch.points.get(pid);
-			if (pt && Math.hypot(pt.x - pos.x, pt.y - pos.y) < 1e-2) {
+			if (pt && pos.distanceTo(pt) < 1e-2) {
 				matchedId = pid;
 				break;
 			}
@@ -1289,7 +1261,7 @@ function replaceSplineWithInterval(
 			let matchedId: string | null = null;
 			for (const pid of originalSpline.pointIds) {
 				const pt = sketch.points.get(pid);
-				if (pt && Math.hypot(pt.x - pos.x, pt.y - pos.y) < 1e-2) {
+				if (pt && pos.distanceTo(pt) < 1e-2) {
 					matchedId = pid;
 					break;
 				}

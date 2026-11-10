@@ -1,7 +1,7 @@
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation } from './base';
+import { BaseConstraint, readParamPoint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
-import { dot, vec, add, addScaled, dist, projectPointOntoSegment, scale, sub } from '../../math/vector';
+import { Vec2, projectPointOntoSegment } from '../../math/vector';
 
 /**
  * Constrains two lines to be perpendicular (dot product of unit vectors = 0)
@@ -25,20 +25,14 @@ export class PerpendicularConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const dir1 = vec(
-			(paramMap.get(`${this.l1P2}.x`) ?? 0) - (paramMap.get(`${this.l1P1}.x`) ?? 0),
-			(paramMap.get(`${this.l1P2}.y`) ?? 0) - (paramMap.get(`${this.l1P1}.y`) ?? 0)
-		);
-		const dir2 = vec(
-			(paramMap.get(`${this.l2P2}.x`) ?? 0) - (paramMap.get(`${this.l2P1}.x`) ?? 0),
-			(paramMap.get(`${this.l2P2}.y`) ?? 0) - (paramMap.get(`${this.l2P1}.y`) ?? 0)
-		);
+		const dir1 = readParamPoint(paramMap, this.l1P2).sub(readParamPoint(paramMap, this.l1P1));
+		const dir2 = readParamPoint(paramMap, this.l2P2).sub(readParamPoint(paramMap, this.l2P1));
 
-		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
-		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
+		const l1 = Math.max(dir1.length(), 1e-7);
+		const l2 = Math.max(dir2.length(), 1e-7);
 		const avgL = (l1 + l2) * 0.5;
 
-		const dotProd = dot(dir1, dir2) / (l1 * l2);
+		const dotProd = dir1.dot(dir2) / (l1 * l2);
 		return [dotProd * avgL * this.weight];
 	}
 
@@ -62,10 +56,10 @@ export class PerpendicularConstraint extends BaseConstraint {
 			p1.id === p4.id ||
 			p2.id === p3.id ||
 			p2.id === p4.id ||
-			dist(p1, p3) < 1e-3 ||
-			dist(p1, p4) < 1e-3 ||
-			dist(p2, p3) < 1e-3 ||
-			dist(p2, p4) < 1e-3;
+			p1.distanceTo(p3) < 1e-3 ||
+			p1.distanceTo(p4) < 1e-3 ||
+			p2.distanceTo(p3) < 1e-3 ||
+			p2.distanceTo(p4) < 1e-3;
 
 		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4);
 
@@ -75,29 +69,29 @@ export class PerpendicularConstraint extends BaseConstraint {
 
 		if (isSharedPoint || isNearSegments) {
 			const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-			const sRay1 = ctx.viewport.worldToScreen(addScaled(geom.pInt, geom.u1, 20));
-			const sRay2 = ctx.viewport.worldToScreen(addScaled(geom.pInt, geom.u2, 20));
+			const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
+			const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
 
-			const d1 = sub(sRay1, sCenter);
-			const d2 = sub(sRay2, sCenter);
-			const l1 = Math.hypot(d1.x, d1.y);
-			const l2 = Math.hypot(d2.x, d2.y);
+			const d1 = new Vec2().subVectors(sRay1, sCenter);
+			const d2 = new Vec2().subVectors(sRay2, sCenter);
+			const l1 = d1.length();
+			const l2 = d2.length();
 
-			let dir = { x: 1, y: -1 };
+			let dir = new Vec2(1, -1);
 			if (l1 > 1e-4 && l2 > 1e-4) {
-				const u1 = scale(d1, 1.0 / l1);
-				const u2 = scale(d2, 1.0 / l2);
-				const bis = add(u1, u2);
-				const bisLen = Math.hypot(bis.x, bis.y);
+				const u1 = d1.clone().multiplyScalar(1.0 / l1);
+				const u2 = d2.clone().multiplyScalar(1.0 / l2);
+				const bis = new Vec2().addVectors(u1, u2);
+				const bisLen = bis.length();
 				if (bisLen > 1e-3) {
-					dir = scale(bis, 1.0 / bisLen);
+					dir = bis.clone().multiplyScalar(1.0 / bisLen);
 				} else {
-					dir = { x: -u1.y, y: u1.x };
+					dir = u1.clone().perpendicular();
 				}
 			}
 
 			const offset = 18;
-			const badge = addScaled(sCenter, dir, offset);
+			const badge = sCenter.clone().addScaledVector(dir, offset);
 			ctx.renderBadge(this.id, badge, '⊥');
 			return;
 		}

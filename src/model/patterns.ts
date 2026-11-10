@@ -1,4 +1,3 @@
-import { vec, sub } from '../math/vector';
 import type { SketchDocument } from './sketch';
 import {
 	CircularPatternConstraint,
@@ -26,8 +25,6 @@ export function generateCircularPatternCopy(
 
 	const angleDeg = computePatternCopyAngle(copyIndex, quantity, distribution, totalAngle);
 	const rad = (angleDeg * Math.PI) / 180;
-	const cosA = Math.cos(rad);
-	const sinA = Math.sin(rad);
 
 	const pointMap = new Map<string, string>();
 	const pointPairs: PatternPointPair[] = [];
@@ -46,14 +43,13 @@ export function generateCircularPatternCopy(
 		const pt = sketch.points.get(origPtId);
 		if (!pt) return origPtId;
 
-		const distToCenter = Math.hypot(pt.x - centerPt.x, pt.y - centerPt.y);
+		const distToCenter = centerPt.distanceTo(pt);
 		if (distToCenter < 1e-3 && !splinePointIds.has(origPtId)) {
 			pointMap.set(origPtId, centerPtId);
 			return centerPtId;
 		}
 
-		const dir = sub(pt, centerPt);
-		const rotated = vec(centerPt.x + dir.x * cosA - dir.y * sinA, centerPt.y + dir.x * sinA + dir.y * cosA);
+		const rotated = pt.clone().rotateAround(centerPt, rad);
 		const newPt = sketch.addPoint(rotated, false);
 		pointMap.set(origPtId, newPt.id);
 		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
@@ -307,16 +303,12 @@ export function updateCircularPattern(
 		for (const copy of c.copies) {
 			const aDeg = computePatternCopyAngle(copy.copyIndex, newQty, newDist, newAngle);
 			const rad = (aDeg * Math.PI) / 180;
-			const cosA = Math.cos(rad);
-			const sinA = Math.sin(rad);
 
 			for (const pair of copy.pointPairs) {
 				const sPt = sketch.points.get(pair.sourcePtId);
 				const pPt = sketch.points.get(pair.patternPtId);
 				if (sPt && pPt) {
-					const dir = sub(sPt, centerPt);
-					pPt.x = centerPt.x + dir.x * cosA - dir.y * sinA;
-					pPt.y = centerPt.y + dir.x * sinA + dir.y * cosA;
+					pPt.copy(sPt.clone().rotateAround(centerPt, rad));
 				}
 			}
 		}
@@ -363,7 +355,7 @@ export function generateRectangularPatternCopy(
 		const pt = sketch.points.get(origPtId);
 		if (!pt) return origPtId;
 
-		const translated = vec(pt.x + offset.dx, pt.y + offset.dy);
+		const translated = pt.clone().add(offset);
 		const newPt = sketch.addPoint(translated, false);
 		pointMap.set(origPtId, newPt.id);
 		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
@@ -623,8 +615,7 @@ export function updateRectangularPattern(
 			const sPt = sketch.points.get(pair.sourcePtId);
 			const pPt = sketch.points.get(pair.patternPtId);
 			if (sPt && pPt) {
-				pPt.x = sPt.x + offset.dx;
-				pPt.y = sPt.y + offset.dy;
+				pPt.addVectors(sPt, offset);
 			}
 		}
 	}

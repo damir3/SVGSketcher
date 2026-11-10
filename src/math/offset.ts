@@ -1,20 +1,8 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint } from '../model/types';
 import { CoincidentConstraint } from '../solver/constraints';
-import {
-	angleFromTo,
-	vec,
-	addScaled,
-	cross,
-	dist,
-	dot,
-	mid,
-	normalize,
-	normalizeOrNull,
-	sub,
-	type Vec2,
-} from './vector';
-import { computeNaturalFitHandles } from './spline';
+import { Vec2 } from './vector';
+import { computeNaturalFitHandles, evaluateBezier } from './spline';
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import { OffsetConstraint, type OffsetPair, type OffsetSplinePoint } from '../solver/constraints/offset';
 
@@ -543,12 +531,9 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pts: Vec2[] = [];
 		for (let i = 0; i < numSamples; i++) {
 			const a = (i / numSamples) * Math.PI * 2;
-			pts.push({
-				x: center.x + c.radius * Math.cos(a),
-				y: center.y + c.radius * Math.sin(a),
-			});
+			pts.push(Vec2.fromPolar(c.radius, a).add(center));
 		}
-		pts.push({ ...pts[0] });
+		pts.push(pts[0].clone());
 		return pts;
 	}
 
@@ -559,14 +544,14 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const maj = sketch.points.get(el.majorAxisPointId);
 		const min = sketch.points.get(el.minorAxisPointId);
 		if (!center || !maj || !min) return [];
-		const radii = vec(dist(center, maj), dist(center, min));
-		const { axisU, axisV } = ellipseAxes(angleFromTo(center, maj));
+		const radii = new Vec2(center.distanceTo(maj), center.distanceTo(min));
+		const { axisU, axisV } = ellipseAxes(center.angleToPoint(maj));
 		const pts: Vec2[] = [];
 		for (let i = 0; i < numSamples; i++) {
 			const theta = (i / numSamples) * Math.PI * 2;
 			pts.push(ellipsePointAtParameter(theta, center, radii, axisU, axisV));
 		}
-		pts.push({ ...pts[0] });
+		pts.push(pts[0].clone());
 		return pts;
 	}
 
@@ -578,8 +563,8 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pEnd = sketch.points.get(item.endPointId || arc.endPointId);
 		if (!center || !pStart || !pEnd) return [];
 
-		const aStart = angleFromTo(center, pStart);
-		const aEnd = angleFromTo(center, pEnd);
+		const aStart = center.angleToPoint(pStart);
+		const aEnd = center.angleToPoint(pEnd);
 		const isReversed = item.startPointId === arc.endPointId;
 		const effectiveClockwise = isReversed ? !arc.clockwise : !!arc.clockwise;
 
@@ -590,10 +575,7 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		for (let i = 0; i <= numSamples; i++) {
 			const t = i / numSamples;
 			const ang = effectiveClockwise ? aStart - t * sweep : aStart + t * sweep;
-			pts.push({
-				x: center.x + arc.radius * Math.cos(ang),
-				y: center.y + arc.radius * Math.sin(ang),
-			});
+			pts.push(Vec2.fromPolar(arc.radius, ang).add(center));
 		}
 		return pts;
 	}
@@ -610,19 +592,7 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 			const totalT = t * beziers.length;
 			const segIdx = Math.min(Math.floor(totalT), beziers.length - 1);
 			const localT = totalT - segIdx;
-			const [p0, p1, p2, p3] = beziers[segIdx];
-			const mt = 1 - localT;
-			const point = vec(
-				mt * mt * mt * p0.x +
-					3 * mt * mt * localT * p1.x +
-					3 * mt * localT * localT * p2.x +
-					localT * localT * localT * p3.x,
-				mt * mt * mt * p0.y +
-					3 * mt * mt * localT * p1.y +
-					3 * mt * localT * localT * p2.y +
-					localT * localT * localT * p3.y
-			);
-			pts.push(point);
+			pts.push(evaluateBezier(beziers[segIdx], localT));
 		}
 		const isReversed =
 			item.reversed ||
@@ -642,8 +612,8 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
 		const pStart = sketch.points.get(item.startPointId || ea.startPointId);
 		const pEnd = sketch.points.get(item.endPointId || ea.endPointId);
 		if (!center || !maj || !min || !pStart || !pEnd) return [];
-		const radii = vec(dist(center, maj), dist(center, min));
-		const { axisU, axisV } = ellipseAxes(angleFromTo(center, maj));
+		const radii = new Vec2(center.distanceTo(maj), center.distanceTo(min));
+		const { axisU, axisV } = ellipseAxes(center.angleToPoint(maj));
 		const tStart = ellipseParameterAtPoint(pStart, center, radii, axisU, axisV);
 		const tEnd = ellipseParameterAtPoint(pEnd, center, radii, axisU, axisV);
 		const isReversed = item.startPointId === ea.endPointId;
@@ -668,11 +638,11 @@ function sampleChainItemPoints(sketch: SketchDocument, item: ChainItem, numSampl
  * Calculates 2D line intersection between infinite lines p1 + t*d1 and p2 + s*d2.
  */
 export function intersectLines2D(p1: Vec2, d1: Vec2, p2: Vec2, d2: Vec2): Vec2 | null {
-	const determinant = cross(d1, d2);
+	const determinant = d1.cross(d2);
 	if (Math.abs(determinant) < 1e-7) return null;
-	const dir = sub(p2, p1);
-	const t = cross(dir, d2) / determinant;
-	return addScaled(p1, d1, t);
+	const dir = new Vec2().subVectors(p2, p1);
+	const t = dir.cross(d2) / determinant;
+	return p1.clone().addScaledVector(d1, t);
 }
 
 /**
@@ -685,7 +655,7 @@ function isPolygonCounterClockwise(pts: Vec2[]): boolean {
 	const n = pts.length;
 	for (let i = 0; i < n; i++) {
 		const j = (i + 1) % n;
-		area += cross(pts[i], pts[j]);
+		area += pts[i].cross(pts[j]);
 	}
 	return area > 0;
 }
@@ -739,7 +709,7 @@ function computeSingleOffsetSide(
 				{
 					sourceId: c.id,
 					type: 'circle',
-					circleCenter: { x: center.x, y: center.y },
+					circleCenter: center.clone(),
 					circleRadius: newR,
 				},
 			],
@@ -756,10 +726,10 @@ function computeSingleOffsetSide(
 		const maj = el ? sketch.points.get(el.majorAxisPointId) : null;
 		const min = el ? sketch.points.get(el.minorAxisPointId) : null;
 		if (!el || !center || !maj || !min) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
-		const a = dist(center, maj);
-		const b = dist(center, min);
-		const { axisU, axisV } = ellipseAxes(angleFromTo(center, maj));
-		const radii = vec(a, b);
+		const a = center.distanceTo(maj);
+		const b = center.distanceTo(min);
+		const { axisU, axisV } = ellipseAxes(center.angleToPoint(maj));
+		const radii = new Vec2(a, b);
 
 		const samples = 24;
 		const fitPts: Vec2[] = [];
@@ -767,24 +737,18 @@ function computeSingleOffsetSide(
 			const theta = (i / samples) * Math.PI * 2;
 			const p = ellipsePointAtParameter(theta, center, radii, axisU, axisV);
 			// Tangent
-			const tangent = vec(
-				-a * Math.sin(theta) * axisU.x + b * Math.cos(theta) * axisV.x,
-				-a * Math.sin(theta) * axisU.y + b * Math.cos(theta) * axisV.y
-			);
-			const uT = normalize(tangent);
+			const tangent = axisU
+				.clone()
+				.multiplyScalar(-a * Math.sin(theta))
+				.addScaledVector(axisV, b * Math.cos(theta));
+			const normal = tangent.normalizeOrUnitX().perpendicular().negate();
 			// Outward normal: points away from center
-			let nx = uT.y;
-			let ny = -uT.x;
-			if ((p.x + nx - center.x) ** 2 + (p.y + ny - center.y) ** 2 < (p.x - center.x) ** 2 + (p.y - center.y) ** 2) {
-				nx = -nx;
-				ny = -ny;
+			if (p.clone().add(normal).distanceToSquared(center) < p.distanceToSquared(center)) {
+				normal.negate();
 			}
-			fitPts.push({
-				x: p.x + signedDistance * nx,
-				y: p.y + signedDistance * ny,
-			});
+			fitPts.push(p.addScaledVector(normal, signedDistance));
 		}
-		fitPts.push({ ...fitPts[0] });
+		fitPts.push(fitPts[0].clone());
 
 		return {
 			primitives: [
@@ -849,8 +813,8 @@ function computeSingleOffsetSide(
 			const p2 = sketch.points.get(item.endPointId || l.p2Id);
 			if (!p1 || !p2) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
 
-			const dir = sub(p2, p1);
-			const uT = normalize(dir);
+			const dir = new Vec2().subVectors(p2, p1);
+			const uT = dir.clone().normalizeOrUnitX();
 
 			// Left normal is (-uT.y, uT.x). Right normal is (uT.y, -uT.x)
 			// For closed CCW: outward is right normal (uT.y, -uT.x).
@@ -858,13 +822,13 @@ function computeSingleOffsetSide(
 			// For open chain: default outward/positive is left normal (-uT.y, uT.x).
 			let norm: Vec2;
 			if (chain.isClosed) {
-				norm = isCCW ? { x: uT.y, y: -uT.x } : { x: -uT.y, y: uT.x };
+				norm = isCCW ? uT.clone().perpendicular().negate() : uT.clone().perpendicular();
 			} else {
-				norm = { x: -uT.y, y: uT.x };
+				norm = uT.clone().perpendicular();
 			}
 
-			const offP1 = addScaled(p1, norm, signedDistance);
-			const offP2 = addScaled(p2, norm, signedDistance);
+			const offP1 = p1.clone().addScaledVector(norm, signedDistance);
+			const offP2 = p2.clone().addScaledVector(norm, signedDistance);
 
 			rawItems.push({
 				sourceId: l.id,
@@ -882,18 +846,18 @@ function computeSingleOffsetSide(
 			if (!center || !p1 || !p2) return { primitives: [], side: 1, distance: signedDistance, isValid: false };
 
 			const midSample = sampleChainItemPoints(sketch, item, 4)[2] || p1;
-			const toMid = normalize(sub(midSample, center));
+			const toMid = new Vec2().subVectors(midSample, center).normalizeOrUnitX();
 
 			// Check if chain normal at mid points radially away from center
-			const uT = normalize(sub(p2, p1));
+			const uT = new Vec2().subVectors(p2, p1).normalizeOrUnitX();
 			let chainNorm: Vec2;
 			if (chain.isClosed) {
-				chainNorm = isCCW ? { x: uT.y, y: -uT.x } : { x: -uT.y, y: uT.x };
+				chainNorm = isCCW ? uT.clone().perpendicular().negate() : uT.clone().perpendicular();
 			} else {
-				chainNorm = { x: -uT.y, y: uT.x };
+				chainNorm = uT.clone().perpendicular();
 			}
 
-			const radiallyOutward = dot(chainNorm, toMid) >= 0;
+			const radiallyOutward = chainNorm.dot(toMid) >= 0;
 			const rDelta = radiallyOutward ? signedDistance : -signedDistance;
 			const newR = arc.radius + rDelta;
 
@@ -907,11 +871,11 @@ function computeSingleOffsetSide(
 				};
 			}
 
-			const sRad1 = normalize(sub(p1, center));
-			const sRad2 = normalize(sub(p2, center));
+			const sRad1 = new Vec2().subVectors(p1, center).normalizeOrUnitX();
+			const sRad2 = new Vec2().subVectors(p2, center).normalizeOrUnitX();
 
-			const offP1 = addScaled(center, sRad1, newR);
-			const offP2 = addScaled(center, sRad2, newR);
+			const offP1 = center.clone().addScaledVector(sRad1, newR);
+			const offP2 = center.clone().addScaledVector(sRad2, newR);
 
 			const isReversed = item.startPointId === arc.endPointId;
 			const effectiveClockwise = isReversed ? !arc.clockwise : !!arc.clockwise;
@@ -919,7 +883,7 @@ function computeSingleOffsetSide(
 			rawItems.push({
 				sourceId: arc.id,
 				type: 'arc',
-				center: { x: center.x, y: center.y },
+				center: center.clone(),
 				start: offP1,
 				end: offP2,
 				radius: newR,
@@ -936,30 +900,23 @@ function computeSingleOffsetSide(
 			for (let k = 0; k < samples.length; k++) {
 				const prev = samples[Math.max(0, k - 1)];
 				const next = samples[Math.min(samples.length - 1, k + 1)];
-				const uT = normalize(sub(next, prev));
+				const uT = new Vec2().subVectors(next, prev).normalizeOrUnitX();
 				let norm: Vec2;
 				if (chain.isClosed) {
-					norm = isCCW ? { x: uT.y, y: -uT.x } : { x: -uT.y, y: uT.x };
+					norm = isCCW ? uT.clone().perpendicular().negate() : uT.clone().perpendicular();
 				} else {
-					norm = { x: -uT.y, y: uT.x };
+					norm = uT.clone().perpendicular();
 				}
 				splineBases.push(samples[k]);
 				splineNormals.push(norm);
-				offSamples.push({
-					x: samples[k].x + signedDistance * norm.x,
-					y: samples[k].y + signedDistance * norm.y,
-				});
+				offSamples.push(samples[k].clone().addScaledVector(norm, signedDistance));
 			}
 
 			// Compute exact endpoint tangents for spline
-			let startTangent = normalize({
-				x: offSamples[1].x - offSamples[0].x,
-				y: offSamples[1].y - offSamples[0].y,
-			});
-			let endTangent = normalize({
-				x: offSamples[offSamples.length - 1].x - offSamples[offSamples.length - 2].x,
-				y: offSamples[offSamples.length - 1].y - offSamples[offSamples.length - 2].y,
-			});
+			let startTangent = new Vec2().subVectors(offSamples[1], offSamples[0]).normalizeOrUnitX();
+			let endTangent = new Vec2()
+				.subVectors(offSamples[offSamples.length - 1], offSamples[offSamples.length - 2])
+				.normalizeOrUnitX();
 
 			const s = sketch.splines.get(item.id);
 			if (s && s.pointIds.length >= 2) {
@@ -971,47 +928,33 @@ function computeSingleOffsetSide(
 						item.reversed ||
 						(ep && item.startPointId ? getCoincidentPointGroup(sketch, item.startPointId).has(ep.p2Id) : false);
 					if (!isReversed) {
-						startTangent = normalize({
-							x: beziers[0][1].x - beziers[0][0].x,
-							y: beziers[0][1].y - beziers[0][0].y,
-						});
-						endTangent = normalize({
-							x: beziers[beziers.length - 1][3].x - beziers[beziers.length - 1][2].x,
-							y: beziers[beziers.length - 1][3].y - beziers[beziers.length - 1][2].y,
-						});
+						startTangent = new Vec2().subVectors(beziers[0][1], beziers[0][0]).normalizeOrUnitX();
+						endTangent = new Vec2()
+							.subVectors(beziers[beziers.length - 1][3], beziers[beziers.length - 1][2])
+							.normalizeOrUnitX();
 					} else {
-						startTangent = normalize({
-							x: beziers[beziers.length - 1][2].x - beziers[beziers.length - 1][3].x,
-							y: beziers[beziers.length - 1][2].y - beziers[beziers.length - 1][3].y,
-						});
-						endTangent = normalize({
-							x: beziers[0][0].x - beziers[0][1].x,
-							y: beziers[0][0].y - beziers[0][1].y,
-						});
+						startTangent = new Vec2()
+							.subVectors(beziers[beziers.length - 1][2], beziers[beziers.length - 1][3])
+							.normalizeOrUnitX();
+						endTangent = new Vec2().subVectors(beziers[0][0], beziers[0][1]).normalizeOrUnitX();
 					}
 				}
 			}
 
 			const startNorm = chain.isClosed
 				? isCCW
-					? { x: startTangent.y, y: -startTangent.x }
-					: { x: -startTangent.y, y: startTangent.x }
-				: { x: -startTangent.y, y: startTangent.x };
+					? startTangent.clone().perpendicular().negate()
+					: startTangent.clone().perpendicular()
+				: startTangent.clone().perpendicular();
 			const endNorm = chain.isClosed
 				? isCCW
-					? { x: endTangent.y, y: -endTangent.x }
-					: { x: -endTangent.y, y: endTangent.x }
-				: { x: -endTangent.y, y: endTangent.x };
+					? endTangent.clone().perpendicular().negate()
+					: endTangent.clone().perpendicular()
+				: endTangent.clone().perpendicular();
 			splineNormals[0] = startNorm;
 			splineNormals[splineNormals.length - 1] = endNorm;
-			offSamples[0] = {
-				x: samples[0].x + signedDistance * startNorm.x,
-				y: samples[0].y + signedDistance * startNorm.y,
-			};
-			offSamples[offSamples.length - 1] = {
-				x: samples[samples.length - 1].x + signedDistance * endNorm.x,
-				y: samples[samples.length - 1].y + signedDistance * endNorm.y,
-			};
+			offSamples[0] = samples[0].clone().addScaledVector(startNorm, signedDistance);
+			offSamples[offSamples.length - 1] = samples[samples.length - 1].clone().addScaledVector(endNorm, signedDistance);
 
 			rawItems.push({
 				sourceId: item.id,
@@ -1046,13 +989,13 @@ function computeSingleOffsetSide(
 			const p1 = cur.p1!;
 			const d = cur.dir!;
 			// Project c onto line
-			const tProj = dot(sub(c, p1), d);
+			const tProj = new Vec2().subVectors(c, p1).dot(d);
 			const perpDistSq = (p1.x + tProj * d.x - c.x) ** 2 + (p1.y + tProj * d.y - c.y) ** 2;
 			if (perpDistSq <= r * r) {
 				const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-				const i1 = addScaled(p1, d, tProj - dt);
-				const i2 = addScaled(p1, d, tProj + dt);
-				const best = dist(i1, cur.p2!) < dist(i2, cur.p2!) ? i1 : i2;
+				const i1 = p1.clone().addScaledVector(d, tProj - dt);
+				const i2 = p1.clone().addScaledVector(d, tProj + dt);
+				const best = i1.distanceTo(cur.p2!) < i2.distanceTo(cur.p2!) ? i1 : i2;
 				cur.p2 = best;
 				next.start = best;
 			}
@@ -1061,13 +1004,13 @@ function computeSingleOffsetSide(
 			const r = cur.radius!;
 			const p1 = next.p1!;
 			const d = next.dir!;
-			const tProj = dot(sub(c, p1), d);
+			const tProj = new Vec2().subVectors(c, p1).dot(d);
 			const perpDistSq = (p1.x + tProj * d.x - c.x) ** 2 + (p1.y + tProj * d.y - c.y) ** 2;
 			if (perpDistSq <= r * r) {
 				const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-				const i1 = addScaled(p1, d, tProj - dt);
-				const i2 = addScaled(p1, d, tProj + dt);
-				const best = dist(i1, cur.end!) < dist(i2, cur.end!) ? i1 : i2;
+				const i1 = p1.clone().addScaledVector(d, tProj - dt);
+				const i2 = p1.clone().addScaledVector(d, tProj + dt);
+				const best = i1.distanceTo(cur.end!) < i2.distanceTo(cur.end!) ? i1 : i2;
 				cur.end = best;
 				next.p1 = best;
 			}
@@ -1079,16 +1022,16 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[0];
-				const dSp = next.startTangent || normalize(sub(spPts[1], spPts[0]));
+				const dSp = next.startTangent || new Vec2().subVectors(spPts[1], spPts[0]).normalizeOrUnitX();
 				const inter = intersectLines2D(pLine, dLine, pSp, dSp);
-				if (inter && dist(inter, cur.p2!) <= 4 * Math.abs(signedDistance)) {
+				if (inter && inter.distanceTo(cur.p2!) <= 4 * Math.abs(signedDistance)) {
 					cur.p2 = inter;
 					spPts[0] = inter;
 					joined = true;
 				}
 			}
 			if (!joined) {
-				const avg = mid(cur.p2!, spPts[0]);
+				const avg = new Vec2().midpoint(cur.p2!, spPts[0]);
 				cur.p2 = avg;
 				spPts[0] = avg;
 			}
@@ -1100,24 +1043,16 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[spPts.length - 1];
-				const dSp =
-					cur.endTangent ||
-					normalize({
-						x: pSp.x - spPts[spPts.length - 2].x,
-						y: pSp.y - spPts[spPts.length - 2].y,
-					});
+				const dSp = cur.endTangent || new Vec2().subVectors(pSp, spPts[spPts.length - 2]).normalizeOrUnitX();
 				const inter = intersectLines2D(pLine, dLine, pSp, dSp);
-				if (inter && dist(inter, next.p1!) <= 4 * Math.abs(signedDistance)) {
+				if (inter && inter.distanceTo(next.p1!) <= 4 * Math.abs(signedDistance)) {
 					spPts[spPts.length - 1] = inter;
 					next.p1 = inter;
 					joined = true;
 				}
 			}
 			if (!joined) {
-				const avg = {
-					x: (spPts[spPts.length - 1].x + next.p1!.x) / 2,
-					y: (spPts[spPts.length - 1].y + next.p1!.y) / 2,
-				};
+				const avg = new Vec2().midpoint(spPts[spPts.length - 1], next.p1!);
 				spPts[spPts.length - 1] = avg;
 				next.p1 = avg;
 			}
@@ -1129,21 +1064,21 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[0];
-				const dSp = next.startTangent || normalize(sub(spPts[1], spPts[0]));
-				const tProj = dot(sub(c, pSp), dSp);
+				const dSp = next.startTangent || new Vec2().subVectors(spPts[1], spPts[0]).normalizeOrUnitX();
+				const tProj = new Vec2().subVectors(c, pSp).dot(dSp);
 				const perpDistSq = (pSp.x + tProj * dSp.x - c.x) ** 2 + (pSp.y + tProj * dSp.y - c.y) ** 2;
 				if (perpDistSq <= r * r) {
 					const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-					const i1 = addScaled(pSp, dSp, tProj - dt);
-					const i2 = addScaled(pSp, dSp, tProj + dt);
-					const best = dist(i1, cur.end!) < dist(i2, cur.end!) ? i1 : i2;
+					const i1 = pSp.clone().addScaledVector(dSp, tProj - dt);
+					const i2 = pSp.clone().addScaledVector(dSp, tProj + dt);
+					const best = i1.distanceTo(cur.end!) < i2.distanceTo(cur.end!) ? i1 : i2;
 					cur.end = best;
 					spPts[0] = best;
 					joined = true;
 				}
 			}
 			if (!joined) {
-				const avg = mid(cur.end!, spPts[0]);
+				const avg = new Vec2().midpoint(cur.end!, spPts[0]);
 				cur.end = avg;
 				spPts[0] = avg;
 			}
@@ -1155,29 +1090,21 @@ function computeSingleOffsetSide(
 			let joined = false;
 			if (spPts.length >= 2) {
 				const pSp = spPts[spPts.length - 1];
-				const dSp =
-					cur.endTangent ||
-					normalize({
-						x: pSp.x - spPts[spPts.length - 2].x,
-						y: pSp.y - spPts[spPts.length - 2].y,
-					});
-				const tProj = dot(sub(c, pSp), dSp);
+				const dSp = cur.endTangent || new Vec2().subVectors(pSp, spPts[spPts.length - 2]).normalizeOrUnitX();
+				const tProj = new Vec2().subVectors(c, pSp).dot(dSp);
 				const perpDistSq = (pSp.x + tProj * dSp.x - c.x) ** 2 + (pSp.y + tProj * dSp.y - c.y) ** 2;
 				if (perpDistSq <= r * r) {
 					const dt = Math.sqrt(Math.max(0, r * r - perpDistSq));
-					const i1 = addScaled(pSp, dSp, tProj - dt);
-					const i2 = addScaled(pSp, dSp, tProj + dt);
-					const best = dist(i1, next.start!) < dist(i2, next.start!) ? i1 : i2;
+					const i1 = pSp.clone().addScaledVector(dSp, tProj - dt);
+					const i2 = pSp.clone().addScaledVector(dSp, tProj + dt);
+					const best = i1.distanceTo(next.start!) < i2.distanceTo(next.start!) ? i1 : i2;
 					spPts[spPts.length - 1] = best;
 					next.start = best;
 					joined = true;
 				}
 			}
 			if (!joined) {
-				const avg = {
-					x: (spPts[spPts.length - 1].x + next.start!.x) / 2,
-					y: (spPts[spPts.length - 1].y + next.start!.y) / 2,
-				};
+				const avg = new Vec2().midpoint(spPts[spPts.length - 1], next.start!);
 				spPts[spPts.length - 1] = avg;
 				next.start = avg;
 			}
@@ -1186,7 +1113,7 @@ function computeSingleOffsetSide(
 			const pCurEnd =
 				cur.type === 'line' ? cur.p2! : cur.type === 'arc' ? cur.end! : cur.fitPoints![cur.fitPoints!.length - 1];
 			const pNextStart = next.type === 'line' ? next.p1! : next.type === 'arc' ? next.start! : next.fitPoints![0];
-			const avg = mid(pCurEnd, pNextStart);
+			const avg = new Vec2().midpoint(pCurEnd, pNextStart);
 
 			if (cur.type === 'line') cur.p2 = avg;
 			else if (cur.type === 'arc') cur.end = avg;
@@ -1205,29 +1132,17 @@ function computeSingleOffsetSide(
 			const count = pts.length - 1;
 			const handles = computeNaturalFitHandles(pts);
 			if (raw.startTangent && handles[0]) {
-				const d0 = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) / 3;
+				const d0 = pts[0].distanceTo(pts[1]) / 3;
 				handles[0] = {
-					h1: {
-						x: pts[0].x - raw.startTangent.x * d0,
-						y: pts[0].y - raw.startTangent.y * d0,
-					},
-					h2: {
-						x: pts[0].x + raw.startTangent.x * d0,
-						y: pts[0].y + raw.startTangent.y * d0,
-					},
+					h1: pts[0].clone().addScaledVector(raw.startTangent, -d0),
+					h2: pts[0].clone().addScaledVector(raw.startTangent, d0),
 				};
 			}
 			if (raw.endTangent && handles[count]) {
-				const dn = Math.hypot(pts[count].x - pts[count - 1].x, pts[count].y - pts[count - 1].y) / 3;
+				const dn = pts[count - 1].distanceTo(pts[count]) / 3;
 				handles[count] = {
-					h1: {
-						x: pts[count].x - raw.endTangent.x * dn,
-						y: pts[count].y - raw.endTangent.y * dn,
-					},
-					h2: {
-						x: pts[count].x + raw.endTangent.x * dn,
-						y: pts[count].y + raw.endTangent.y * dn,
-					},
+					h1: pts[count].clone().addScaledVector(raw.endTangent, -dn),
+					h2: pts[count].clone().addScaledVector(raw.endTangent, dn),
 				};
 			}
 			raw.handles = handles;
@@ -1290,8 +1205,8 @@ export function calculateOffsetGeometry(
 	if (!chain || chain.items.length === 0) {
 		return {
 			sides: [],
-			gizmoAnchor: { x: 0, y: 0 },
-			gizmoNormal: { x: 1, y: 0 },
+			gizmoAnchor: new Vec2(0, 0),
+			gizmoNormal: new Vec2(1, 0),
 			isValid: false,
 			errorMessage: 'No primitives selected in chain',
 		};
@@ -1300,8 +1215,8 @@ export function calculateOffsetGeometry(
 	// 1. Calculate gizmo anchor and normal at the exact middle of the first selected primitive
 	const refId = chain.firstSelectedId || chain.items[0]?.id;
 	const refItem = chain.items.find(it => it.id === refId) || chain.items[0];
-	let gizmoAnchor: Vec2 = { x: 0, y: 0 };
-	let gizmoNormal: Vec2 = { x: 0, y: 1 };
+	let gizmoAnchor: Vec2 = new Vec2(0, 0);
+	let gizmoNormal: Vec2 = new Vec2(0, 1);
 
 	// Sample poly for inside/outside orientation test if chain is closed
 	const poly: Vec2[] = [];
@@ -1318,14 +1233,14 @@ export function calculateOffsetGeometry(
 		const p2 = l ? sketch.points.get(refItem.endPointId || l.p2Id) : null;
 		if (l && p1 && p2) {
 			// Exact middle of the first selected line
-			gizmoAnchor = mid(p1, p2);
-			const uT = normalize(sub(p2, p1));
+			gizmoAnchor = new Vec2().midpoint(p1, p2);
+			const uT = new Vec2().subVectors(p2, p1).normalizeOrUnitX();
 			// Normal candidate (left of line direction)
-			gizmoNormal = { x: -uT.y, y: uT.x };
+			gizmoNormal = uT.clone().perpendicular();
 			if (chain.isClosed && poly.length >= 3) {
-				const testPt = addScaled(gizmoAnchor, gizmoNormal, 0.5);
+				const testPt = gizmoAnchor.clone().addScaledVector(gizmoNormal, 0.5);
 				if (isPointInPolygon(testPt, poly)) {
-					gizmoNormal = { x: -gizmoNormal.x, y: -gizmoNormal.y };
+					gizmoNormal = gizmoNormal.clone().negate();
 				}
 			}
 		}
@@ -1335,23 +1250,20 @@ export function calculateOffsetGeometry(
 		const p1 = arc ? sketch.points.get(refItem.startPointId || arc.startPointId) : null;
 		const p2 = arc ? sketch.points.get(refItem.endPointId || arc.endPointId) : null;
 		if (arc && center && p1 && p2) {
-			const a1 = angleFromTo(center, p1);
-			const a2 = angleFromTo(center, p2);
+			const a1 = center.angleToPoint(p1);
+			const a2 = center.angleToPoint(p2);
 			let sweep = arc.clockwise ? a1 - a2 : a2 - a1;
 			while (sweep < 0) sweep += 2 * Math.PI;
 			while (sweep >= 2 * Math.PI) sweep -= 2 * Math.PI;
 			const midAngle = arc.clockwise ? a1 - sweep / 2 : a1 + sweep / 2;
 
 			// Exact middle of the arc along its curve
-			gizmoAnchor = {
-				x: center.x + arc.radius * Math.cos(midAngle),
-				y: center.y + arc.radius * Math.sin(midAngle),
-			};
-			gizmoNormal = { x: Math.cos(midAngle), y: Math.sin(midAngle) };
+			gizmoAnchor = Vec2.fromPolar(arc.radius, midAngle).add(center);
+			gizmoNormal = Vec2.fromPolar(1, midAngle);
 			if (chain.isClosed && poly.length >= 3) {
-				const testPt = addScaled(gizmoAnchor, gizmoNormal, 0.5);
+				const testPt = gizmoAnchor.clone().addScaledVector(gizmoNormal, 0.5);
 				if (isPointInPolygon(testPt, poly)) {
-					gizmoNormal = { x: -gizmoNormal.x, y: -gizmoNormal.y };
+					gizmoNormal = gizmoNormal.clone().negate();
 				}
 			}
 		}
@@ -1359,16 +1271,16 @@ export function calculateOffsetGeometry(
 		const c = sketch.circles.get(refItem.id);
 		const center = c ? sketch.points.get(c.centerId) : null;
 		if (c && center) {
-			gizmoAnchor = { x: center.x + c.radius, y: center.y };
-			gizmoNormal = { x: 1, y: 0 };
+			gizmoAnchor = new Vec2(center.x + c.radius, center.y);
+			gizmoNormal = new Vec2(1, 0);
 		}
 	} else if (refItem.type === 'ellipse') {
 		const el = sketch.ellipses.get(refItem.id);
 		const center = el ? sketch.points.get(el.centerId) : null;
 		const maj = el ? sketch.points.get(el.majorAxisPointId) : null;
 		if (el && center && maj) {
-			gizmoAnchor = { x: maj.x, y: maj.y };
-			gizmoNormal = normalize(sub(maj, center));
+			gizmoAnchor = maj.clone();
+			gizmoNormal = new Vec2().subVectors(maj, center).normalizeOrUnitX();
 		}
 	} else if (refItem.type === 'spline') {
 		const splinePts = sampleChainItemPoints(sketch, refItem, 64);
@@ -1377,12 +1289,12 @@ export function calculateOffsetGeometry(
 			gizmoAnchor = splinePts[midIdx];
 			const pPrev = splinePts[Math.max(0, midIdx - 1)];
 			const pNext = splinePts[Math.min(splinePts.length - 1, midIdx + 1)];
-			const uT = normalize(sub(pNext, pPrev));
-			gizmoNormal = { x: -uT.y, y: uT.x };
+			const uT = new Vec2().subVectors(pNext, pPrev).normalizeOrUnitX();
+			gizmoNormal = uT.clone().perpendicular();
 			if (chain.isClosed && poly.length >= 3) {
-				const testPt = addScaled(gizmoAnchor, gizmoNormal, 0.5);
+				const testPt = gizmoAnchor.clone().addScaledVector(gizmoNormal, 0.5);
 				if (isPointInPolygon(testPt, poly)) {
-					gizmoNormal = { x: -gizmoNormal.x, y: -gizmoNormal.y };
+					gizmoNormal = gizmoNormal.clone().negate();
 				}
 			}
 		}
@@ -1448,10 +1360,8 @@ export function commitOffsetToSketch(
 			const cornerCount = chain.isClosed ? numPrims : numPrims + 1;
 			for (let i = 0; i < cornerCount; i++) {
 				const prim = side.primitives[i % numPrims];
-				const pt = (prim.type === 'line' ? prim.p1 : prim.type === 'arc' ? prim.start : prim.fitPoints?.[0]) || {
-					x: 0,
-					y: 0,
-				};
+				const pt =
+					(prim.type === 'line' ? prim.p1 : prim.type === 'arc' ? prim.start : prim.fitPoints?.[0]) || new Vec2(0, 0);
 				cornerPoints.push(sketch.addPoint(pt));
 			}
 		}
@@ -1495,8 +1405,8 @@ export function commitOffsetToSketch(
 					const op2 = sketch.points.get(origLine.p2Id);
 					let lineSide = 1;
 					if (op1 && op2 && prim.p1) {
-						const dir = normalizeOrNull(sub(op2, op1), 1e-9);
-						const hLeft = dir ? cross(dir, sub(prim.p1, op1)) : 0;
+						const dir = new Vec2().subVectors(op2, op1).normalizeOrNull(1e-9);
+						const hLeft = dir ? dir.cross(new Vec2().subVectors(prim.p1, op1)) : 0;
 						lineSide = hLeft >= 0 ? 1 : -1;
 					}
 					offsetPairs.push({

@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { CanvasInteraction } from '../src/canvas/interaction';
@@ -106,7 +107,7 @@ it('moves from the offset image pivot and holds it fixed during rotation and sca
 	>[0]);
 	tool.imageId = id;
 	const eventAt = (x: number, y: number) => {
-		const world = { x, y };
+		const world = new Vec2(x, y);
 		return { world, screen: viewport.worldToScreen(world) } as ToolMouseEvent;
 	};
 	const drag = (from: ToolMouseEvent, to: ToolMouseEvent) => {

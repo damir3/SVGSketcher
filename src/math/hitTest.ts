@@ -1,5 +1,5 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
-import { ORIGIN, angleFromTo, sub, type Vec2, dist, distancesFrom, projectPointOntoSegment } from './vector';
+import { ORIGIN, Vec2, projectPointOntoSegment } from './vector';
 import { getSplineParamAtPoint, type BezierSegment } from './spline';
 
 const TWO_PI = 2 * Math.PI;
@@ -8,7 +8,7 @@ const TWO_PI = 2 * Math.PI;
  * Calculates Euclidean distance from a query point to a target point.
  */
 export function distanceToPoint(point: Vec2, target: Vec2): number {
-	return dist(point, target);
+	return point.distanceTo(target);
 }
 
 /**
@@ -22,7 +22,7 @@ export function distanceToSegment(point: Vec2, p1: Vec2, p2: Vec2): number {
  * Calculates distance from a query point to the perimeter of a circle.
  */
 export function distanceToCircle(point: Vec2, center: Vec2, radius: number): number {
-	return Math.abs(dist(point, center) - radius);
+	return Math.abs(point.distanceTo(center) - radius);
 }
 
 /**
@@ -38,13 +38,13 @@ export function distanceToArc(
 	clockwise: boolean,
 	thresholdPx = 18
 ): number | null {
-	const dToCenter = dist(point, center);
+	const dToCenter = point.distanceTo(center);
 	const dToPerimeter = Math.abs(dToCenter - radius);
 	if (dToPerimeter > thresholdPx) return null;
 
-	const as = angleFromTo(center, start);
-	const ae = angleFromTo(center, end);
-	const ap = angleFromTo(center, point);
+	const as = center.angleToPoint(start);
+	const ae = center.angleToPoint(end);
+	const ap = center.angleToPoint(point);
 
 	let sweepAngle = clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
 	if (sweepAngle < 0) sweepAngle += TWO_PI;
@@ -63,17 +63,17 @@ export function distanceToArc(
  * Returns null if the ellipse is degenerate (rx < 0.1 or ry < 0.1).
  */
 export function distanceToEllipse(point: Vec2, center: Vec2, majorPt: Vec2, minorPt: Vec2): number | null {
-	const r = distancesFrom(center, majorPt, minorPt);
+	const r = center.distancesTo(majorPt, minorPt);
 	if (r.x < 0.1 || r.y < 0.1) return null;
 
-	const { axisU, axisV } = ellipseAxes(angleFromTo(center, majorPt));
+	const { axisU, axisV } = ellipseAxes(center.angleToPoint(majorPt));
 
-	const dir = sub(point, center);
+	const dir = new Vec2().subVectors(point, center);
 
 	const t = ellipseParameterAtPoint(point, center, r, axisU, axisV);
 	const ellipsePoint = ellipsePointAtParameter(t, ORIGIN, r, axisU, axisV);
 
-	return Math.hypot(dir.x - ellipsePoint.x, dir.y - ellipsePoint.y);
+	return ellipsePoint.distanceTo(dir);
 }
 
 /**
@@ -90,17 +90,17 @@ export function distanceToEllipticalArc(
 	clockwise: boolean,
 	thresholdPx = 18
 ): number | null {
-	const r = distancesFrom(center, majorPt, minorPt);
+	const r = center.distancesTo(majorPt, minorPt);
 	if (r.x < 0.1 || r.y < 0.1) return null;
 
-	const { axisU, axisV } = ellipseAxes(angleFromTo(center, majorPt));
+	const { axisU, axisV } = ellipseAxes(center.angleToPoint(majorPt));
 
-	const dir = sub(point, center);
+	const dir = new Vec2().subVectors(point, center);
 
 	const t = ellipseParameterAtPoint(point, center, r, axisU, axisV);
 	const ellipsePoint = ellipsePointAtParameter(t, ORIGIN, r, axisU, axisV);
 
-	const dPerimeter = Math.hypot(dir.x - ellipsePoint.x, dir.y - ellipsePoint.y);
+	const dPerimeter = ellipsePoint.distanceTo(dir);
 	if (dPerimeter > thresholdPx) return null;
 
 	const ts = ellipseParameterAtPoint(startPt, center, r, axisU, axisV);

@@ -7,7 +7,7 @@ import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
 import { exportSketchToSVG } from '../src/model/io/svgIO';
 import { SVG_EXPORT_STYLE } from '../src/canvas/styles';
-import { vec } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { getFontSync } from '../src/canvas/fonts';
 import { generateTextSvgPathData, createPathEvaluator } from '../src/math/textPath';
 import type { GeoSegment, GeoCircle, GeoArc, GeoSpline } from '../src/math/intersection';
@@ -201,10 +201,10 @@ describe('Text Model & Entity Lifecycle', () => {
 		const corners = text.getRectangleCorners(sketch);
 		assert.ok(corners);
 		assert.equal(corners.length, 4);
-		assert.deepEqual(corners[0], { x: -50, y: 20 });
-		assert.deepEqual(corners[1], { x: 50, y: 20 });
-		assert.deepEqual(corners[2], { x: 50, y: -20 });
-		assert.deepEqual(corners[3], { x: -50, y: -20 });
+		assert.deepEqual(corners[0], new Vec2(-50, 20));
+		assert.deepEqual(corners[1], new Vec2(50, 20));
+		assert.deepEqual(corners[2], new Vec2(50, -20));
+		assert.deepEqual(corners[3], new Vec2(-50, -20));
 	});
 
 	it('deleting a rectangle point cascades to deleting the text entity', () => {
@@ -316,27 +316,27 @@ describe('Text Layout & Path Mathematics', () => {
 		};
 		const seg: GeoSegment = {
 			type: 'segment',
-			p1: vec(0, 0),
-			p2: vec(100, 0),
+			p1: new Vec2(0, 0),
+			p2: new Vec2(100, 0),
 		};
 		const evalSeg = createPathEvaluator(seg);
 		assert.equal(evalSeg.length, 100);
 		const midSeg = evalSeg.getSampleAtDistance(50);
-		assert.deepEqual(midSeg.point, { x: 50, y: 0 });
-		assert.deepEqual(midSeg.tangent, { x: 1, y: 0 });
+		assert.deepEqual(midSeg.point, new Vec2(50, 0));
+		assert.deepEqual(midSeg.tangent, new Vec2(1, 0));
 		assert.equal(Math.abs(midSeg.normal.x), 0);
 		assert.equal(midSeg.normal.y, 1);
 
 		const circle: GeoCircle = {
 			type: 'circle',
-			center: vec(0, 0),
+			center: new Vec2(0, 0),
 			radius: 10,
 		};
 		const evalCirc = createPathEvaluator(circle);
 		assert.ok(Math.abs(evalCirc.length - 2 * Math.PI * 10) < 1e-4);
-		near(evalCirc.getSampleAtDistance(0).point, vec(-10, 0));
-		near(evalCirc.getSampleAtDistance(0).tangent, vec(0, 1));
-		near(evalCirc.getSampleAtDistance(evalCirc.length / 4).point, vec(0, 10));
+		near(evalCirc.getSampleAtDistance(0).point, new Vec2(-10, 0));
+		near(evalCirc.getSampleAtDistance(0).tangent, new Vec2(0, 1));
+		near(evalCirc.getSampleAtDistance(evalCirc.length / 4).point, new Vec2(0, 10));
 
 		const arc: GeoArc = {
 			type: 'arc',
@@ -344,27 +344,27 @@ describe('Text Layout & Path Mathematics', () => {
 			centerId: 'c1',
 			startPointId: 'p1',
 			endPointId: 'p2',
-			center: vec(0, 0),
+			center: new Vec2(0, 0),
 			radius: 20,
-			start: vec(20, 0),
-			end: vec(-20, 0),
+			start: new Vec2(20, 0),
+			end: new Vec2(-20, 0),
 			clockwise: false,
 		};
 		const evalArc = createPathEvaluator(arc);
 		assert.ok(Math.abs(evalArc.length - Math.PI * 20) < 1e-4);
 		near(evalArc.getSampleAtDistance(evalArc.length).point, arc.end);
-		near(evalArc.getSampleAtDistance(1.5 * evalArc.length).point, vec(0, -20));
+		near(evalArc.getSampleAtDistance(1.5 * evalArc.length).point, new Vec2(0, -20));
 		near(evalArc.getSampleAtDistance(2 * evalArc.length).point, arc.start);
 
 		const clockwiseArc = createPathEvaluator({ ...arc, clockwise: true });
-		near(clockwiseArc.getSampleAtDistance(1.5 * clockwiseArc.length).point, vec(0, 20));
+		near(clockwiseArc.getSampleAtDistance(1.5 * clockwiseArc.length).point, new Vec2(0, 20));
 	});
 
 	it('wraps a rotated ellipse and both directions of an elliptical arc by distance', () => {
 		const sketch = new SketchDocument();
-		const center = sketch.addPoint(vec(2, 3));
-		const major = sketch.addPoint(vec(2, 23));
-		const minor = sketch.addPoint(vec(-3, 3));
+		const center = sketch.addPoint(new Vec2(2, 3));
+		const major = sketch.addPoint(new Vec2(2, 23));
+		const minor = sketch.addPoint(new Vec2(-3, 3));
 		const ellipse = sketch.addEllipse(center.id, major.id, minor.id).toGeoCurve(sketch);
 		assert.ok(ellipse);
 		const full = createPathEvaluator(ellipse);
@@ -372,9 +372,9 @@ describe('Text Layout & Path Mathematics', () => {
 			assert.ok(Math.hypot(actual.x - expected.x, actual.y - expected.y) < 1e-6);
 		};
 		near(full.getSampleAtDistance(full.length / 4).point, minor);
-		near(full.getSampleAtDistance(0).point, vec(2, -17));
-		near(full.getSampleAtDistance(0).tangent, vec(-1, 0));
-		near(full.getSampleAtDistance(full.length).point, vec(2, -17));
+		near(full.getSampleAtDistance(0).point, new Vec2(2, -17));
+		near(full.getSampleAtDistance(0).tangent, new Vec2(-1, 0));
+		near(full.getSampleAtDistance(full.length).point, new Vec2(2, -17));
 
 		const checkArc = (clockwise: boolean, length: number, tangentX: number) => {
 			const arc = sketch
@@ -385,14 +385,11 @@ describe('Text Layout & Path Mathematics', () => {
 			assert.ok(Math.abs(path.length - length) < 1e-6);
 			near(path.getSampleAtDistance(0).point, major);
 			near(path.getSampleAtDistance(path.length).point, minor);
-			near(
-				path.getSampleAtDistance(path.length + full.length / 4).point,
-				clockwise ? major : vec(2, -17)
-			);
+			near(path.getSampleAtDistance(path.length + full.length / 4).point, clockwise ? major : new Vec2(2, -17));
 			near(path.getSampleAtDistance(full.length + path.length).point, minor);
 			near(path.getSampleAtDistance(path.length - full.length).point, minor);
-			near(path.getSampleAtDistance(0).tangent, vec(tangentX, 0));
-			near(path.getSampleAtDistance(0).normal, vec(0, 1));
+			near(path.getSampleAtDistance(0).tangent, new Vec2(tangentX, 0));
+			near(path.getSampleAtDistance(0).normal, new Vec2(0, 1));
 		};
 		checkArc(false, full.length / 4, -1);
 		checkArc(true, (3 * full.length) / 4, 1);
@@ -403,14 +400,14 @@ describe('Text Layout & Path Mathematics', () => {
 			type: 'spline',
 			id: 'spline',
 			bezierSegments: [
-				[vec(0, 0), vec(10 / 3, 0), vec(20 / 3, 0), vec(10, 0)],
-				[vec(10, 0), vec(10, 10 / 3), vec(10, 20 / 3), vec(10, 10)],
+				[new Vec2(0, 0), new Vec2(10 / 3, 0), new Vec2(20 / 3, 0), new Vec2(10, 0)],
+				[new Vec2(10, 0), new Vec2(10, 10 / 3), new Vec2(10, 20 / 3), new Vec2(10, 10)],
 			],
 		};
 		const path = createPathEvaluator(spline);
 		const { point, tangent } = path.getSampleAtDistance(10.25);
 		assert.ok(Math.hypot(point.x - 10, point.y - 0.25) < 1e-6);
-		assert.deepEqual(tangent, vec(0, 1));
+		assert.deepEqual(tangent, new Vec2(0, 1));
 	});
 
 	it('generates SVG path data for Text mode in oriented rectangle', () => {
@@ -428,7 +425,7 @@ describe('Text Layout & Path Mathematics', () => {
 				flipHorizontal: false,
 				flipVertical: false,
 				alignment: 'center',
-				rectangleCorners: [vec(-40, 15), vec(40, 15), vec(40, -15), vec(-40, -15)],
+				rectangleCorners: [new Vec2(-40, 15), new Vec2(40, 15), new Vec2(40, -15), new Vec2(-40, -15)],
 				coordSystem: 'svg',
 			},
 			font
@@ -444,8 +441,8 @@ describe('Text Layout & Path Mathematics', () => {
 
 		const lineCurve: GeoSegment = {
 			type: 'segment',
-			p1: vec(0, 0),
-			p2: vec(100, 0),
+			p1: new Vec2(0, 0),
+			p2: new Vec2(100, 0),
 		};
 
 		const dFit = generateTextSvgPathData(
@@ -475,8 +472,8 @@ describe('Text Layout & Path Mathematics', () => {
 
 		const lineCurve: GeoSegment = {
 			type: 'segment',
-			p1: vec(0, 0),
-			p2: vec(100, 0),
+			p1: new Vec2(0, 0),
+			p2: new Vec2(100, 0),
 		};
 
 		const dNormal = generateTextSvgPathData(
@@ -615,23 +612,23 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// First click at (-25, 10)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(300, 200),
-			client: vec(300, 200),
-			world: vec(-25, 10),
+			screen: new Vec2(300, 200),
+			client: new Vec2(300, 200),
+			world: new Vec2(-25, 10),
 			snap: null,
-			effectiveWorld: vec(-25, 10),
-			effectiveScreen: vec(300, 200),
+			effectiveWorld: new Vec2(-25, 10),
+			effectiveScreen: new Vec2(300, 200),
 		});
 
 		// Second click at (25, -10)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(500, 400),
-			client: vec(500, 400),
-			world: vec(25, -10),
+			screen: new Vec2(500, 400),
+			client: new Vec2(500, 400),
+			world: new Vec2(25, -10),
 			snap: null,
-			effectiveWorld: vec(25, -10),
-			effectiveScreen: vec(500, 400),
+			effectiveWorld: new Vec2(25, -10),
+			effectiveScreen: new Vec2(500, 400),
 		});
 
 		assert.equal(sketch.texts.size, 1, 'Text entity created');
@@ -674,21 +671,21 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// First rectangle: (-20, 10) to (20, -10)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(300, 200),
-			client: vec(300, 200),
-			world: vec(-20, 10),
+			screen: new Vec2(300, 200),
+			client: new Vec2(300, 200),
+			world: new Vec2(-20, 10),
 			snap: null,
-			effectiveWorld: vec(-20, 10),
-			effectiveScreen: vec(300, 200),
+			effectiveWorld: new Vec2(-20, 10),
+			effectiveScreen: new Vec2(300, 200),
 		});
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(500, 400),
-			client: vec(500, 400),
-			world: vec(20, -10),
+			screen: new Vec2(500, 400),
+			client: new Vec2(500, 400),
+			world: new Vec2(20, -10),
 			snap: null,
-			effectiveWorld: vec(20, -10),
-			effectiveScreen: vec(500, 400),
+			effectiveWorld: new Vec2(20, -10),
+			effectiveScreen: new Vec2(500, 400),
 		});
 
 		assert.equal(sketch.texts.size, 1);
@@ -701,21 +698,21 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Second rectangle in same invocation: (100, 80) to (160, 40)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(600, 200),
-			client: vec(600, 200),
-			world: vec(100, 80),
+			screen: new Vec2(600, 200),
+			client: new Vec2(600, 200),
+			world: new Vec2(100, 80),
 			snap: null,
-			effectiveWorld: vec(100, 80),
-			effectiveScreen: vec(600, 200),
+			effectiveWorld: new Vec2(100, 80),
+			effectiveScreen: new Vec2(600, 200),
 		});
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(700, 300),
-			client: vec(700, 300),
-			world: vec(160, 40),
+			screen: new Vec2(700, 300),
+			client: new Vec2(700, 300),
+			world: new Vec2(160, 40),
 			snap: null,
-			effectiveWorld: vec(160, 40),
-			effectiveScreen: vec(700, 300),
+			effectiveWorld: new Vec2(160, 40),
+			effectiveScreen: new Vec2(700, 300),
 		});
 
 		// Must NOT create a second text; existing text must update its position
@@ -764,21 +761,21 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Hover line 1 and click
 		tool.onMouseMove({
 			raw: {} as MouseEvent,
-			screen: vec(100, 100),
-			client: vec(100, 100),
-			world: vec(25, 0),
+			screen: new Vec2(100, 100),
+			client: new Vec2(100, 100),
+			world: new Vec2(25, 0),
 			snap: null,
-			effectiveWorld: vec(25, 0),
-			effectiveScreen: vec(100, 100),
+			effectiveWorld: new Vec2(25, 0),
+			effectiveScreen: new Vec2(100, 100),
 		});
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(100, 100),
-			client: vec(100, 100),
-			world: vec(25, 0),
+			screen: new Vec2(100, 100),
+			client: new Vec2(100, 100),
+			world: new Vec2(25, 0),
 			snap: null,
-			effectiveWorld: vec(25, 0),
-			effectiveScreen: vec(100, 100),
+			effectiveWorld: new Vec2(25, 0),
+			effectiveScreen: new Vec2(100, 100),
 		});
 
 		assert.equal(sketch.texts.size, 1);
@@ -789,21 +786,21 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		hoverItem = { id: line2.id, type: 'line' };
 		tool.onMouseMove({
 			raw: {} as MouseEvent,
-			screen: vec(100, 200),
-			client: vec(100, 200),
-			world: vec(25, 50),
+			screen: new Vec2(100, 200),
+			client: new Vec2(100, 200),
+			world: new Vec2(25, 50),
 			snap: null,
-			effectiveWorld: vec(25, 50),
-			effectiveScreen: vec(100, 200),
+			effectiveWorld: new Vec2(25, 50),
+			effectiveScreen: new Vec2(100, 200),
 		});
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(100, 200),
-			client: vec(100, 200),
-			world: vec(25, 50),
+			screen: new Vec2(100, 200),
+			client: new Vec2(100, 200),
+			world: new Vec2(25, 50),
 			snap: null,
-			effectiveWorld: vec(25, 50),
-			effectiveScreen: vec(100, 200),
+			effectiveWorld: new Vec2(25, 50),
+			effectiveScreen: new Vec2(100, 200),
 		});
 
 		assert.equal(sketch.texts.size, 1, 'Only one text must exist; second path click updates target');
@@ -813,14 +810,12 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 	for (const type of ['ellipse', 'elliptical_arc'] as const) {
 		it(`binds text to a hovered ${type} and exports its glyphs`, () => {
 			const sketch = new SketchDocument();
-			const center = sketch.addPoint(vec(0, 0));
-			const major = sketch.addPoint(vec(30, 0));
-			const minor = sketch.addPoint(vec(0, 10));
+			const center = sketch.addPoint(new Vec2(0, 0));
+			const major = sketch.addPoint(new Vec2(30, 0));
+			const minor = sketch.addPoint(new Vec2(0, 10));
 			const ellipse = type === 'ellipse' ? sketch.addEllipse(center.id, major.id, minor.id) : null;
 			const arc =
-				type === 'elliptical_arc'
-					? sketch.addEllipticalArc(center.id, major.id, minor.id, major.id, minor.id)
-					: null;
+				type === 'elliptical_arc' ? sketch.addEllipticalArc(center.id, major.id, minor.id, major.id, minor.id) : null;
 			const target = ellipse ?? arc;
 			assert.ok(target);
 
@@ -994,21 +989,21 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Draw first rectangle
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(100, 100),
-			client: vec(100, 100),
-			world: vec(0, 50),
+			screen: new Vec2(100, 100),
+			client: new Vec2(100, 100),
+			world: new Vec2(0, 50),
 			snap: null,
-			effectiveWorld: vec(0, 50),
-			effectiveScreen: vec(100, 100),
+			effectiveWorld: new Vec2(0, 50),
+			effectiveScreen: new Vec2(100, 100),
 		});
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(200, 200),
-			client: vec(200, 200),
-			world: vec(50, 0),
+			screen: new Vec2(200, 200),
+			client: new Vec2(200, 200),
+			world: new Vec2(50, 0),
 			snap: null,
-			effectiveWorld: vec(50, 0),
-			effectiveScreen: vec(200, 200),
+			effectiveWorld: new Vec2(50, 0),
+			effectiveScreen: new Vec2(200, 200),
 		});
 
 		assert.equal(sketch.texts.size, 1);
@@ -1022,12 +1017,12 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Start drawing second rectangle (mousedown 1)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(300, 300),
-			client: vec(300, 300),
-			world: vec(100, 100),
+			screen: new Vec2(300, 300),
+			client: new Vec2(300, 300),
+			world: new Vec2(100, 100),
 			snap: null,
-			effectiveWorld: vec(100, 100),
-			effectiveScreen: vec(300, 300),
+			effectiveWorld: new Vec2(100, 100),
+			effectiveScreen: new Vec2(300, 300),
 		});
 
 		// Now drawingStep === 1; old text and its rectangle points/lines must be hidden
@@ -1044,12 +1039,12 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Complete second rectangle
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(400, 400),
-			client: vec(400, 400),
-			world: vec(150, 50),
+			screen: new Vec2(400, 400),
+			client: new Vec2(400, 400),
+			world: new Vec2(150, 50),
 			snap: null,
-			effectiveWorld: vec(150, 50),
-			effectiveScreen: vec(400, 400),
+			effectiveWorld: new Vec2(150, 50),
+			effectiveScreen: new Vec2(400, 400),
 		});
 
 		// Finished drawing, hiddenEntityIds no longer set
@@ -1068,15 +1063,15 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const mockCtx: any = {
 			viewport: new Viewport(800, 600),
 			targetGroup: previewSvg,
-			worldMouse: vec(50, 50),
-			screenMouse: vec(100, 100),
+			worldMouse: new Vec2(50, 50),
+			screenMouse: new Vec2(100, 100),
 			snap: null,
 		};
 
 		// Set drawing step 1
 		(tool as any).drawingStep = 1;
-		(tool as any).startWorld = vec(0, 50);
-		(tool as any).currentWorld = vec(50, 0);
+		(tool as any).startWorld = new Vec2(0, 50);
+		(tool as any).currentWorld = new Vec2(50, 0);
 
 		tool.renderPreview(mockCtx);
 
@@ -1195,23 +1190,23 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// First click at (-20, 10)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(100, 100),
-			client: vec(100, 100),
-			world: vec(-20, 10),
+			screen: new Vec2(100, 100),
+			client: new Vec2(100, 100),
+			world: new Vec2(-20, 10),
 			snap: null,
-			effectiveWorld: vec(-20, 10),
-			effectiveScreen: vec(100, 100),
+			effectiveWorld: new Vec2(-20, 10),
+			effectiveScreen: new Vec2(100, 100),
 		});
 
 		// Second click at (20, -10)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(300, 300),
-			client: vec(300, 300),
-			world: vec(20, -10),
+			screen: new Vec2(300, 300),
+			client: new Vec2(300, 300),
+			world: new Vec2(20, -10),
 			snap: null,
-			effectiveWorld: vec(20, -10),
-			effectiveScreen: vec(300, 300),
+			effectiveWorld: new Vec2(20, -10),
+			effectiveScreen: new Vec2(300, 300),
 		});
 
 		const text = [...sketch.texts.values()][0];
@@ -1223,43 +1218,43 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		assert.equal(TEXT_ROTATION_HANDLE_DISTANCE_PX, 36);
 
 		// Mock rotation gizmo handle at top
-		const c = vec(0, 0); // center of (-20, 10) and (20, -10)
+		const c = new Vec2(0, 0); // center of (-20, 10) and (20, -10)
 		(mockCtx.renderer as any).textRotationGizmo = {
 			textId: text.id,
 			centerWorld: c,
-			handleScreen: vec(200, 80),
+			handleScreen: new Vec2(200, 80),
 		};
 
 		// Click rotation handle
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(200, 80),
-			client: vec(200, 80),
-			world: vec(0, 30),
+			screen: new Vec2(200, 80),
+			client: new Vec2(200, 80),
+			world: new Vec2(0, 30),
 			snap: null,
-			effectiveWorld: vec(0, 30),
-			effectiveScreen: vec(200, 80),
+			effectiveWorld: new Vec2(0, 30),
+			effectiveScreen: new Vec2(200, 80),
 		});
 
 		// Drag handle 90 degrees counter-clockwise (to mouseWorld = vec(-30, 0))
 		tool.onMouseMove({
 			raw: {} as MouseEvent,
-			screen: vec(100, 200),
-			client: vec(100, 200),
-			world: vec(-30, 0),
+			screen: new Vec2(100, 200),
+			client: new Vec2(100, 200),
+			world: new Vec2(-30, 0),
 			snap: null,
-			effectiveWorld: vec(-30, 0),
-			effectiveScreen: vec(100, 200),
+			effectiveWorld: new Vec2(-30, 0),
+			effectiveScreen: new Vec2(100, 200),
 		});
 
 		tool.onMouseUp({
 			raw: {} as MouseEvent,
-			screen: vec(100, 200),
-			client: vec(100, 200),
-			world: vec(-30, 0),
+			screen: new Vec2(100, 200),
+			client: new Vec2(100, 200),
+			world: new Vec2(-30, 0),
 			snap: null,
-			effectiveWorld: vec(-30, 0),
-			effectiveScreen: vec(100, 200),
+			effectiveWorld: new Vec2(-30, 0),
+			effectiveScreen: new Vec2(100, 200),
 		});
 
 		// Verify points have rotated around center (0, 0)
@@ -1291,30 +1286,30 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Create text rectangle from (-20, 10) to (20, -10)
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(100, 100),
-			client: vec(100, 100),
-			world: vec(-20, 10),
+			screen: new Vec2(100, 100),
+			client: new Vec2(100, 100),
+			world: new Vec2(-20, 10),
 			snap: null,
-			effectiveWorld: vec(-20, 10),
-			effectiveScreen: vec(100, 100),
+			effectiveWorld: new Vec2(-20, 10),
+			effectiveScreen: new Vec2(100, 100),
 		});
 
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(300, 300),
-			client: vec(300, 300),
-			world: vec(20, -10),
+			screen: new Vec2(300, 300),
+			client: new Vec2(300, 300),
+			world: new Vec2(20, -10),
 			snap: null,
-			effectiveWorld: vec(20, -10),
-			effectiveScreen: vec(300, 300),
+			effectiveWorld: new Vec2(20, -10),
+			effectiveScreen: new Vec2(300, 300),
 		});
 
 		const text = [...sketch.texts.values()][0];
 		assert.ok(text && text.rectanglePointIds);
 
 		// Center is at (0, 0)
-		const centerWorld = vec(0, 0);
-		const centerScreen = vec(200, 200);
+		const centerWorld = new Vec2(0, 0);
+		const centerScreen = new Vec2(200, 200);
 		(mockCtx.renderer as any).textDragGizmo = {
 			textId: text.id,
 			centerWorld,
@@ -1324,33 +1319,33 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Click on center drag handle
 		tool.onMouseDown({
 			raw: {} as MouseEvent,
-			screen: vec(200, 200),
-			client: vec(200, 200),
-			world: vec(0, 0),
+			screen: new Vec2(200, 200),
+			client: new Vec2(200, 200),
+			world: new Vec2(0, 0),
 			snap: null,
-			effectiveWorld: vec(0, 0),
-			effectiveScreen: vec(200, 200),
+			effectiveWorld: new Vec2(0, 0),
+			effectiveScreen: new Vec2(200, 200),
 		});
 
 		// Drag handle by (+15, -25) in world coordinates
 		tool.onMouseMove({
 			raw: {} as MouseEvent,
-			screen: vec(230, 250),
-			client: vec(230, 250),
-			world: vec(15, -25),
+			screen: new Vec2(230, 250),
+			client: new Vec2(230, 250),
+			world: new Vec2(15, -25),
 			snap: null,
-			effectiveWorld: vec(15, -25),
-			effectiveScreen: vec(230, 250),
+			effectiveWorld: new Vec2(15, -25),
+			effectiveScreen: new Vec2(230, 250),
 		});
 
 		tool.onMouseUp({
 			raw: {} as MouseEvent,
-			screen: vec(230, 250),
-			client: vec(230, 250),
-			world: vec(15, -25),
+			screen: new Vec2(230, 250),
+			client: new Vec2(230, 250),
+			world: new Vec2(15, -25),
 			snap: null,
-			effectiveWorld: vec(15, -25),
-			effectiveScreen: vec(230, 250),
+			effectiveWorld: new Vec2(15, -25),
+			effectiveScreen: new Vec2(230, 250),
 		});
 
 		// Verify points have moved by (+15, -25)
@@ -1377,7 +1372,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Circle
 		const circle: GeoCircle = {
 			type: 'circle',
-			center: vec(0, 0),
+			center: new Vec2(0, 0),
 			radius: 50,
 		};
 		const dCircle = generateTextSvgPathData(
@@ -1405,10 +1400,10 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			centerId: 'c1',
 			startPointId: 'p1',
 			endPointId: 'p2',
-			center: vec(0, 0),
+			center: new Vec2(0, 0),
 			radius: 40,
-			start: vec(40, 0),
-			end: vec(0, 40),
+			start: new Vec2(40, 0),
+			end: new Vec2(0, 40),
 			clockwise: false,
 		};
 		const dArc = generateTextSvgPathData(
@@ -1434,7 +1429,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const font = getFontSync('Arial', false, false);
 		assert.ok(font);
 
-		const rectCorners = [vec(-50, 30), vec(50, 30), vec(50, -30), vec(-50, -30)];
+		const rectCorners = [new Vec2(-50, 30), new Vec2(50, 30), new Vec2(50, -30), new Vec2(-50, -30)];
 
 		const multilineText = 'First Line\nSecond Line\nThird Line';
 
@@ -1511,8 +1506,8 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 		const seg: GeoSegment = {
 			type: 'segment',
-			p1: vec(-100, 0),
-			p2: vec(100, 0),
+			p1: new Vec2(-100, 0),
+			p2: new Vec2(100, 0),
 		};
 
 		const d = generateTextSvgPathData(
@@ -1597,8 +1592,8 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 		const line: GeoSegment = {
 			type: 'segment',
-			p1: vec(0, 0),
-			p2: vec(100, 0),
+			p1: new Vec2(0, 0),
+			p2: new Vec2(100, 0),
 		};
 
 		// Above: in CAD coords, points should have Y > 0
@@ -1654,8 +1649,8 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// Short line of 20mm, but text is long (e.g. 80mm naturally)
 		const shortLine: GeoSegment = {
 			type: 'segment',
-			p1: vec(0, 0),
-			p2: vec(20, 0),
+			p1: new Vec2(0, 0),
+			p2: new Vec2(20, 0),
 		};
 
 		const dFit = generateTextSvgPathData(
@@ -1677,7 +1672,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 		assert.ok(dFit && dFit.startsWith('M'));
 		const yCoords = (dFit.match(/[-+]?\d*\.?\d+/g) || []).filter((_, idx) => idx % 2 === 1).map(Number);
-		const yBounds = AABB.fromPoints(yCoords.map(y => vec(0, y)))!;
+		const yBounds = AABB.fromPoints(yCoords.map(y => new Vec2(0, y)))!;
 		const heightSpan = yBounds.max.y - yBounds.min.y;
 		assert.ok(heightSpan >= 6 && heightSpan <= 11, `Glyph height should be preserved (~10), got ${heightSpan}`);
 	});
@@ -1686,7 +1681,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const font = getFontSync('Arial', false, false);
 		assert.ok(font);
 
-		const rectCorners = [vec(-50, 20), vec(50, 20), vec(50, -20), vec(-50, -20)];
+		const rectCorners = [new Vec2(-50, 20), new Vec2(50, 20), new Vec2(50, -20), new Vec2(-50, -20)];
 
 		// Test Left Alignment with and without horizontal flip
 		const dLeftNormal = generateTextSvgPathData(
@@ -1727,8 +1722,9 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 		const boundsForPath = (path: string) => {
 			const coords = (path.match(/[-+]?\d*\.?\d+/g) || []).map(Number);
-			const points = Array.from({ length: Math.floor(coords.length / 2) }, (_, index) =>
-				vec(coords[index * 2], coords[index * 2 + 1])
+			const points = Array.from(
+				{ length: Math.floor(coords.length / 2) },
+				(_, index) => new Vec2(coords[index * 2], coords[index * 2 + 1])
 			);
 			return AABB.fromPoints(points)!;
 		};
@@ -1785,8 +1781,8 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			.filter((_, idx) => idx % 2 === 1)
 			.map(Number);
 
-		const topNormalBounds = AABB.fromPoints(yCoordsNormalTop.map(y => vec(0, y)))!;
-		const topFlippedBounds = AABB.fromPoints(yCoordsFlippedTop.map(y => vec(0, y)))!;
+		const topNormalBounds = AABB.fromPoints(yCoordsNormalTop.map(y => new Vec2(0, y)))!;
+		const topFlippedBounds = AABB.fromPoints(yCoordsFlippedTop.map(y => new Vec2(0, y)))!;
 		assert.ok(Math.abs(topNormalBounds.max.y - 19) < 3, `Normal max.y should be near 19, got ${topNormalBounds.max.y}`);
 		assert.ok(
 			Math.abs(topFlippedBounds.max.y - 19) < 3,
@@ -1865,7 +1861,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const splineCurve: GeoSpline = {
 			type: 'spline',
 			id: 'spline1',
-			bezierSegments: [[vec(0, 0), vec(20, 30), vec(80, -30), vec(100, 0)]],
+			bezierSegments: [[new Vec2(0, 0), new Vec2(20, 30), new Vec2(80, -30), new Vec2(100, 0)]],
 			isClosed: false,
 		};
 
@@ -1954,8 +1950,8 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		// 5. Test on a line from (0,0) to (100,0) to strictly verify CAD coordinates
 		const lineSeg: GeoSegment = {
 			type: 'segment',
-			p1: vec(0, 0),
-			p2: vec(100, 0),
+			p1: new Vec2(0, 0),
+			p2: new Vec2(100, 0),
 		};
 
 		const dLineNormal = generateTextSvgPathData(

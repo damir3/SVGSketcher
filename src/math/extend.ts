@@ -19,7 +19,7 @@ import {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 } from '../solver/constraints';
-import { angleFromTo, dot, vec, addScaled, dist, normalize, scale, sub, type Vec2 } from './vector';
+import { Vec2 } from './vector';
 import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import {
 	type GeoCurve,
@@ -139,13 +139,13 @@ function findExtendCandidateForLine(
 ): ExtendCandidate | null {
 	const p1 = target.p1;
 	const p2 = target.p2;
-	const d1 = dist(cursorWorldPos, p1);
-	const d2 = dist(cursorWorldPos, p2);
+	const d1 = cursorWorldPos.distanceTo(p1);
+	const d2 = cursorWorldPos.distanceTo(p2);
 
 	const edge: 'start' | 'end' = d2 <= d1 ? 'end' : 'start';
 	const fromPoint = edge === 'end' ? p2 : p1;
 	const baseOtherPoint = edge === 'end' ? p1 : p2;
-	const dir = normalize(sub(fromPoint, baseOtherPoint));
+	const dir = new Vec2().subVectors(fromPoint, baseOtherPoint).normalizeOrUnitX();
 
 	// Forward ray segment
 	const rayLen = 50000;
@@ -153,7 +153,7 @@ function findExtendCandidateForLine(
 		type: 'segment',
 		id: '__extend_ray__',
 		p1: fromPoint,
-		p2: addScaled(fromPoint, dir, rayLen),
+		p2: fromPoint.clone().addScaledVector(dir, rayLen),
 	};
 
 	let closestT = Infinity;
@@ -164,7 +164,7 @@ function findExtendCandidateForLine(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(raySegment, other);
 		for (const pt of inters) {
-			const t = dot(sub(pt, fromPoint), dir);
+			const t = new Vec2().subVectors(pt, fromPoint).dot(dir);
 			if (t > 1e-3 && t < closestT) {
 				closestT = t;
 				closestPt = pt;
@@ -183,7 +183,7 @@ function findExtendCandidateForLine(
 		intersectedCurveType = intersectedCurve?.type;
 	} else {
 		// No intersection ahead: extend by +50mm
-		toPoint = addScaled(fromPoint, dir, 50);
+		toPoint = fromPoint.clone().addScaledVector(dir, 50);
 	}
 
 	return {
@@ -214,13 +214,13 @@ function findExtendCandidateForArc(
 	const pStart = target.start;
 	const pEnd = target.end;
 
-	const dStart = dist(cursorWorldPos, pStart);
-	const dEnd = dist(cursorWorldPos, pEnd);
+	const dStart = cursorWorldPos.distanceTo(pStart);
+	const dEnd = cursorWorldPos.distanceTo(pEnd);
 	const edge: 'start' | 'end' = dEnd <= dStart ? 'end' : 'start';
 	const fromPoint = edge === 'end' ? pEnd : pStart;
 
-	const thetaS = angleFromTo(c, pStart);
-	const thetaE = angleFromTo(c, pEnd);
+	const thetaS = c.angleToPoint(pStart);
+	const thetaE = c.angleToPoint(pEnd);
 
 	let currentSweep = target.clockwise ? thetaS - thetaE : thetaE - thetaS;
 	while (currentSweep < 0) currentSweep += 2 * Math.PI;
@@ -246,7 +246,7 @@ function findExtendCandidateForArc(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(fullCircle, other);
 		for (const pt of inters) {
-			const thetaP = angleFromTo(c, pt);
+			const thetaP = c.angleToPoint(pt);
 			let sweep: number;
 			if (edge === 'end') {
 				sweep = target.clockwise ? thetaE - thetaP : thetaP - thetaE;
@@ -318,8 +318,8 @@ function findExtendCandidateForEllipticalArc(
 	const pStart = target.start;
 	const pEnd = target.end;
 
-	const dStart = dist(cursorWorldPos, pStart);
-	const dEnd = dist(cursorWorldPos, pEnd);
+	const dStart = cursorWorldPos.distanceTo(pStart);
+	const dEnd = cursorWorldPos.distanceTo(pEnd);
 	const edge: 'start' | 'end' = dEnd <= dStart ? 'end' : 'start';
 	const fromPoint = edge === 'end' ? pEnd : pStart;
 
@@ -336,8 +336,8 @@ function findExtendCandidateForEllipticalArc(
 
 	const maj = target.majorAxisPoint;
 	const min = target.minorAxisPoint;
-	const radii = vec(dist(c, maj), dist(c, min));
-	const { axisU, axisV } = ellipseAxes(angleFromTo(c, maj));
+	const radii = new Vec2(c.distanceTo(maj), c.distanceTo(min));
+	const { axisU, axisV } = ellipseAxes(c.angleToPoint(maj));
 	const thetaS = ellipseParameterAtPoint(pStart, c, radii, axisU, axisV);
 	const thetaE = ellipseParameterAtPoint(pEnd, c, radii, axisU, axisV);
 	let currentSweep = target.clockwise ? thetaS - thetaE : thetaE - thetaS;
@@ -426,18 +426,18 @@ function findExtendCandidateForSpline(
 	const pStart = getPointAtParam(target, 0);
 	const pEnd = getPointAtParam(target, 1);
 
-	const dStart = dist(cursorWorldPos, pStart);
-	const dEnd = dist(cursorWorldPos, pEnd);
+	const dStart = cursorWorldPos.distanceTo(pStart);
+	const dEnd = cursorWorldPos.distanceTo(pEnd);
 	const edge: 'start' | 'end' = dEnd <= dStart ? 'end' : 'start';
 	const fromPoint = edge === 'end' ? pEnd : pStart;
 
 	let dir: Vec2;
 	if (edge === 'end') {
 		const tEnd = getSplineTangentAtParam(target.bezierSegments, 1.0);
-		dir = normalize(tEnd);
+		dir = tEnd.clone().normalizeOrUnitX();
 	} else {
 		const tStart = getSplineTangentAtParam(target.bezierSegments, 0.0);
-		dir = normalize(scale(tStart, -1));
+		dir = tStart.clone().multiplyScalar(-1).clone().normalizeOrUnitX();
 	}
 
 	const rayLen = 50000;
@@ -445,7 +445,7 @@ function findExtendCandidateForSpline(
 		type: 'segment',
 		id: '__extend_ray__',
 		p1: fromPoint,
-		p2: addScaled(fromPoint, dir, rayLen),
+		p2: fromPoint.clone().addScaledVector(dir, rayLen),
 	};
 
 	let closestT = Infinity;
@@ -456,7 +456,7 @@ function findExtendCandidateForSpline(
 		if (other.id === target.id) continue;
 		const inters = intersectCurves(raySegment, other);
 		for (const pt of inters) {
-			const t = dot(sub(pt, fromPoint), dir);
+			const t = new Vec2().subVectors(pt, fromPoint).dot(dir);
 			if (t > 1e-3 && t < closestT) {
 				closestT = t;
 				closestPt = pt;
@@ -475,7 +475,7 @@ function findExtendCandidateForSpline(
 		intersectedCurveType = intersectedCurve?.type;
 	} else {
 		// No intersection ahead: extend by +50mm
-		toPoint = addScaled(fromPoint, dir, 50);
+		toPoint = fromPoint.clone().addScaledVector(dir, 50);
 	}
 
 	return {
@@ -574,7 +574,7 @@ export function executeExtend(
 						}
 						const fixedPt = sketch.points.get(fixedEndId);
 						if (fixedPt) {
-							const newLen = Math.hypot(toPoint.x - fixedPt.x, toPoint.y - fixedPt.y);
+							const newLen = fixedPt.distanceTo(toPoint);
 							c.targetDistance = newLen;
 							c.value = newLen;
 						}
@@ -654,7 +654,7 @@ export function executeExtend(
 		// Update DistanceConstraint length if present
 		const fixedPt = sketch.points.get(fixedEndId);
 		if (fixedPt) {
-			const newLen = Math.hypot(toPoint.x - fixedPt.x, toPoint.y - fixedPt.y);
+			const newLen = fixedPt.distanceTo(toPoint);
 			for (const c of sketch.constraints.values()) {
 				if (
 					c instanceof DistanceConstraint &&

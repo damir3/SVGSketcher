@@ -1,13 +1,13 @@
-import { cross, sub, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
 export function signedDistanceToLine(point: Vec2, start: Vec2, end: Vec2): number {
-	const dir = sub(end, start);
-	const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
-	return cross(sub(point, start), dir) / lineLen;
+	const dir = new Vec2().subVectors(end, start);
+	const lineLen = Math.max(dir.length(), 1e-7);
+	return new Vec2().subVectors(point, start).cross(dir) / lineLen;
 }
 
 /**
@@ -49,6 +49,6 @@ export class PointOnLineConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x, y: s.y + 14 }, '⚲', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s.x, s.y + 14), '⚲', COLORS.primary);
 	}
 }

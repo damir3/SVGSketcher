@@ -94,21 +94,7 @@ import {
 	type SelectionState,
 } from './types';
 import type { GeoCurve } from '../math/intersection';
-import {
-	add,
-	angleFromTo,
-	addScaled,
-	cross,
-	dist,
-	dot,
-	mid,
-	mix,
-	reflectPoint,
-	scale,
-	sub,
-	vec,
-	type Vec2,
-} from '../math/vector';
+import { Vec2, type XY } from '../math/vector';
 import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { AutomaticSplineHandlesConstraint } from '../solver/constraints/automaticSplineHandles';
@@ -431,7 +417,7 @@ export class SketchDocument {
 	}
 
 	// --- Point methods ---
-	addPoint(point: Vec2, fixed = false): SketchPoint {
+	addPoint(point: XY, fixed = false): SketchPoint {
 		this.pushHistory();
 		const id = this.nextId('Point');
 		const pt = new SketchPoint({ id, x: point.x, y: point.y, fixed });
@@ -650,10 +636,7 @@ export class SketchDocument {
 				(pointIds[0] === pointIds[pointIds.length - 1] ||
 					(this.points.has(pointIds[0]) &&
 						this.points.has(pointIds[pointIds.length - 1]) &&
-						Math.hypot(
-							this.points.get(pointIds[0])!.x - this.points.get(pointIds[pointIds.length - 1])!.x,
-							this.points.get(pointIds[0])!.y - this.points.get(pointIds[pointIds.length - 1])!.y
-						) < 1e-4)));
+						this.points.get(pointIds[pointIds.length - 1])!.distanceTo(this.points.get(pointIds[0])!) < 1e-4)));
 
 		const actualPointIds = [...pointIds];
 		if (closed && actualPointIds[0] !== actualPointIds[actualPointIds.length - 1]) {
@@ -687,8 +670,8 @@ export class SketchDocument {
 						isAutomaticSplineHandle: !explicitHandles,
 					});
 					this.lines.set(lineId, hLine);
-					const d1 = dist(pFit, h.h1);
-					const d2 = dist(pFit, h.h2);
+					const d1 = pFit.distanceTo(h.h1);
+					const d2 = pFit.distanceTo(h.h2);
 					const ratio = d1 + d2 > 1e-6 ? d1 / (d1 + d2) : 0.5;
 					const midC = new MidpointConstraint(this.nextId('c_midpoint'), pFit.id, p1Id, p2Id, 1.0, ratio);
 					this.constraints.set(midC.id, midC);
@@ -1051,7 +1034,7 @@ export class SketchDocument {
 			return existing;
 		}
 
-		let measured = dist(p1, p2);
+		let measured = p1.distanceTo(p2);
 		if (effectiveOrientation === 'horizontal') {
 			measured = Math.abs(p2.x - p1.x);
 		} else if (effectiveOrientation === 'vertical') {
@@ -1110,9 +1093,9 @@ export class SketchDocument {
 			return existing;
 		}
 
-		const dir = sub(p2, p1);
-		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
-		const signedArea = cross(sub(pt, p1), dir);
+		const dir = new Vec2().subVectors(p2, p1);
+		const lineLen = Math.max(dir.length(), 1e-7);
+		const signedArea = new Vec2().subVectors(pt, p1).cross(dir);
 		const measured = Math.abs(signedArea) / lineLen;
 		const side = signedArea >= 0 ? 1 : -1;
 
@@ -1181,7 +1164,7 @@ export class SketchDocument {
 			return existing;
 		}
 
-		let measured = Math.hypot(pt.x, pt.y);
+		let measured = pt.length();
 		let side = 1;
 		if (orientation === 'horizontal') {
 			measured = Math.abs(pt.x);
@@ -1351,9 +1334,9 @@ export class SketchDocument {
 		line1Id?: string,
 		line2Id?: string
 	): {
-		pInt: { x: number; y: number };
-		u1: { x: number; y: number };
-		u2: { x: number; y: number };
+		pInt: Vec2;
+		u1: Vec2;
+		u2: Vec2;
 		s1: number;
 		s2: number;
 		initialAngleDeg: number;
@@ -1366,21 +1349,21 @@ export class SketchDocument {
 			(line2Id && BUILT_IN_LINES.has(line2Id)) || BUILT_IN_LINES.has(p3.id) || BUILT_IN_LINES.has(p4.id)
 		);
 
-		const v1 = sub(p2, p1);
-		const v2 = sub(p4, p3);
-		const l1 = Math.max(Math.hypot(v1.x, v1.y), 1e-7);
-		const l2 = Math.max(Math.hypot(v2.x, v2.y), 1e-7);
+		const v1 = new Vec2().subVectors(p2, p1);
+		const v2 = new Vec2().subVectors(p4, p3);
+		const l1 = Math.max(v1.length(), 1e-7);
+		const l2 = Math.max(v2.length(), 1e-7);
 
 		// Direction unit vectors along the raw segments (p1->p2, p3->p4)
-		const e1 = scale(v1, 1.0 / l1);
-		const e2 = scale(v2, 1.0 / l2);
+		const e1 = v1.clone().multiplyScalar(1.0 / l1);
+		const e2 = v2.clone().multiplyScalar(1.0 / l2);
 
-		let pInt: { x: number; y: number };
+		let pInt: Vec2;
 		let defS1 = 1;
 		let defS2 = 1;
 
 		if (!isAxis1 && !isAxis2 && (p1.id === p3.id || (Math.abs(p1.x - p3.x) < 1e-4 && Math.abs(p1.y - p3.y) < 1e-4))) {
-			pInt = { x: p1.x, y: p1.y };
+			pInt = p1.clone();
 			defS1 = 1;
 			defS2 = 1;
 		} else if (
@@ -1388,7 +1371,7 @@ export class SketchDocument {
 			!isAxis2 &&
 			(p1.id === p4.id || (Math.abs(p1.x - p4.x) < 1e-4 && Math.abs(p1.y - p4.y) < 1e-4))
 		) {
-			pInt = { x: p1.x, y: p1.y };
+			pInt = p1.clone();
 			defS1 = 1;
 			defS2 = -1;
 		} else if (
@@ -1396,7 +1379,7 @@ export class SketchDocument {
 			!isAxis2 &&
 			(p2.id === p3.id || (Math.abs(p2.x - p3.x) < 1e-4 && Math.abs(p2.y - p3.y) < 1e-4))
 		) {
-			pInt = { x: p2.x, y: p2.y };
+			pInt = p2.clone();
 			defS1 = -1;
 			defS2 = 1;
 		} else if (
@@ -1404,61 +1387,61 @@ export class SketchDocument {
 			!isAxis2 &&
 			(p2.id === p4.id || (Math.abs(p2.x - p4.x) < 1e-4 && Math.abs(p2.y - p4.y) < 1e-4))
 		) {
-			pInt = { x: p2.x, y: p2.y };
+			pInt = p2.clone();
 			defS1 = -1;
 			defS2 = -1;
 		} else {
-			const det = cross(v1, v2);
+			const det = v1.cross(v2);
 			if (Math.abs(det) < 1e-6) {
 				if (isAxis2) {
-					const m1 = mid(p1, p2);
-					pInt = { x: m1.x * Math.abs(e2.x), y: m1.y * Math.abs(e2.y) };
+					const m1 = new Vec2().midpoint(p1, p2);
+					pInt = m1.multiply(new Vec2(Math.abs(e2.x), Math.abs(e2.y)));
 					defS1 = 1;
-					defS2 = dot(v1, e2) >= 0 ? 1 : -1;
+					defS2 = v1.dot(e2) >= 0 ? 1 : -1;
 				} else if (isAxis1) {
-					const m2 = mid(p3, p4);
-					pInt = { x: m2.x * Math.abs(e1.x), y: m2.y * Math.abs(e1.y) };
+					const m2 = new Vec2().midpoint(p3, p4);
+					pInt = m2.multiply(new Vec2(Math.abs(e1.x), Math.abs(e1.y)));
 					defS2 = 1;
-					defS1 = dot(v2, e1) >= 0 ? 1 : -1;
+					defS1 = v2.dot(e1) >= 0 ? 1 : -1;
 				} else {
-					pInt = mid(p1, p3);
+					pInt = new Vec2().midpoint(p1, p3);
 					defS1 = 1;
 					defS2 = 1;
 				}
 			} else {
-				const t = cross(sub(p3, p1), v2) / det;
-				pInt = addScaled(p1, v1, t);
-				let m1 = mid(p1, p2);
-				let m2 = mid(p3, p4);
+				const t = new Vec2().subVectors(p3, p1).cross(v2) / det;
+				pInt = p1.clone().addScaledVector(v1, t);
+				let m1 = new Vec2().midpoint(p1, p2);
+				let m2 = new Vec2().midpoint(p3, p4);
 				if (isAxis2) {
-					m2 = { x: m1.x * Math.abs(e2.x), y: m1.y * Math.abs(e2.y) };
+					m2 = m1.clone().multiply(new Vec2(Math.abs(e2.x), Math.abs(e2.y)));
 				} else if (isAxis1) {
-					m1 = { x: m2.x * Math.abs(e1.x), y: m2.y * Math.abs(e1.y) };
+					m1 = m2.clone().multiply(new Vec2(Math.abs(e1.x), Math.abs(e1.y)));
 				}
-				const w1 = sub(m1, pInt);
-				const w2 = sub(m2, pInt);
-				defS1 = dot(w1, v1) >= 0 ? 1 : -1;
-				defS2 = dot(w2, v2) >= 0 ? 1 : -1;
+				const w1 = new Vec2().subVectors(m1, pInt);
+				const w2 = new Vec2().subVectors(m2, pInt);
+				defS1 = w1.dot(v1) >= 0 ? 1 : -1;
+				defS2 = w2.dot(v2) >= 0 ? 1 : -1;
 			}
 		}
 
 		// Default rays pointing along the physical segments from pInt:
-		const u1Seg = scale(e1, defS1);
-		const u2Seg = scale(e2, defS2);
+		const u1Seg = e1.clone().multiplyScalar(defS1);
+		const u2Seg = e2.clone().multiplyScalar(defS2);
 
 		let s1 = defS1;
 		let s2 = defS2;
 
 		if (cursorPos) {
-			const w = sub(cursorPos, pInt);
-			const wLen = Math.hypot(w.x, w.y);
+			const w = new Vec2().subVectors(cursorPos, pInt);
+			const wLen = w.length();
 			if (wLen > 1e-3) {
 				// Decompose w in the basis of (u1Seg, u2Seg):
 				// w = alpha * u1Seg + beta * u2Seg
-				const detSeg = cross(u1Seg, u2Seg);
+				const detSeg = u1Seg.cross(u2Seg);
 				if (Math.abs(detSeg) > 1e-6) {
-					const alpha = cross(w, u2Seg) / detSeg;
-					const beta = cross(u1Seg, w) / detSeg;
+					const alpha = w.cross(u2Seg) / detSeg;
+					const beta = u1Seg.cross(w) / detSeg;
 					const signAlpha = alpha >= 0 ? 1 : -1;
 					const signBeta = beta >= 0 ? 1 : -1;
 					s1 = signAlpha * defS1;
@@ -1467,12 +1450,12 @@ export class SketchDocument {
 			}
 		}
 
-		const u1 = scale(v1, s1 / l1);
-		const u2 = scale(v2, s2 / l2);
+		const u1 = v1.clone().multiplyScalar(s1 / l1);
+		const u2 = v2.clone().multiplyScalar(s2 / l2);
 
-		const dotVal = Math.min(1, Math.max(-1, dot(u1, u2)));
+		const dotVal = Math.min(1, Math.max(-1, u1.dot(u2)));
 		const initialAngleDeg = (Math.acos(dotVal) * 180) / Math.PI;
-		const crossVal = cross(u1, u2);
+		const crossVal = u1.cross(u2);
 		const sign = crossVal >= 0 ? 1 : -1;
 
 		return { pInt, u1, u2, s1, s2, initialAngleDeg, sign };
@@ -1865,19 +1848,19 @@ export class SketchDocument {
 
 		const reflectAcrossAxis = (p: Vec2): Vec2 => {
 			if (axisId === 'origin') {
-				return scale(p, -1);
+				return p.clone().multiplyScalar(-1);
 			}
 			const axisLine = this.getLine(axisId);
 			if (axisLine) {
 				const a = this.points.get(axisLine.p1Id);
 				const b = this.points.get(axisLine.p2Id);
 				if (a && b) {
-					const dir = sub(b, a);
-					const lenSq = dot(dir, dir);
+					const dir = new Vec2().subVectors(b, a);
+					const lenSq = dir.lengthSq();
 					if (lenSq > 1e-12) {
 						const len = Math.sqrt(lenSq);
-						const normal = vec(-dir.y / len, dir.x / len);
-						return reflectPoint(p, a, normal);
+						const normal = dir.clone().perpendicular().divideScalar(len);
+						return p.clone().reflectAcrossLine(a, normal);
 					}
 				}
 			}
@@ -2030,7 +2013,7 @@ export class SketchDocument {
 		const vertices: SketchPoint[] = [];
 		for (let k = 0; k < N; k++) {
 			const a = baseAngle + k * step;
-			const v = vec(centerPt.x + R * Math.cos(a), centerPt.y + R * Math.sin(a));
+			const v = Vec2.fromPolar(R, a).add(centerPt);
 			const pt = existingVertices[k] ?? this.addPoint(v, false);
 			vertices.push(pt);
 		}
@@ -2357,7 +2340,7 @@ export class SketchDocument {
 			const center2 = this.points.get(circ2.centerId);
 			if (!center1 || !center2) return null;
 
-			const d = dist(center1, center2);
+			const d = center1.distanceTo(center2);
 			const r1 = circ1.radius;
 			const r2 = circ2.radius;
 
@@ -2414,8 +2397,8 @@ export class SketchDocument {
 		const p2 = this.points.get(line.p2Id);
 		const center = this.points.get(centerId);
 		if (!p1 || !p2 || !center) return 1;
-		const dir = sub(p2, p1);
-		return cross(sub(center, p1), dir) >= 0 ? 1 : -1;
+		const dir = new Vec2().subVectors(p2, p1);
+		return new Vec2().subVectors(center, p1).cross(dir) >= 0 ? 1 : -1;
 	}
 
 	addConcentricConstraint(c1Id: string, c2Id: string): ConcentricConstraint | null {
@@ -3109,7 +3092,8 @@ export class SketchDocument {
 				const p1 = this.points.get(line.p1Id);
 				const p2 = this.points.get(line.p2Id);
 				// Older snapshots only stored the handle geometry.
-				line.isAutomaticSplineHandle = !!p1 && !!p2 && dist(p1, handle.h1) < 1e-5 && dist(p2, handle.h2) < 1e-5;
+				line.isAutomaticSplineHandle =
+					!!p1 && !!p2 && p1.distanceTo(handle.h1) < 1e-5 && p2.distanceTo(handle.h2) < 1e-5;
 			}
 		}
 	}
@@ -3184,19 +3168,19 @@ export class SketchDocument {
 				}
 
 				const ratio = midpoint.ratio;
-				const dir: Vec2 = sub(fit, mix(p1, p2, ratio));
+				const dir: Vec2 = new Vec2().subVectors(fit, p1.clone().lerp(p2, ratio));
 				if (editP1 && !editP2 && ratio > 1e-6) {
-					Object.assign(p2, addScaled(p2, dir, 1 / ratio));
+					p2.addScaledVector(dir, 1 / ratio);
 				} else if (editP2 && !editP1 && 1 - ratio > 1e-6) {
-					Object.assign(p1, addScaled(p1, dir, 1 / (1 - ratio)));
+					p1.addScaledVector(dir, 1 / (1 - ratio));
 				} else if (!editP1 && !editP2 && line.isAutomaticSplineHandle) {
-					Object.assign(p1, natural[index].h1);
-					Object.assign(p2, natural[index].h2);
+					p1.copy(natural[index].h1);
+					p2.copy(natural[index].h2);
 					automatic.push({ index, midpoint });
 					replaced.add(midpoint);
 				} else if (editedPoints.has(fit.id)) {
-					Object.assign(p1, add(p1, dir));
-					Object.assign(p2, add(p2, dir));
+					p1.add(dir);
+					p2.add(dir);
 				}
 			}
 			if (automatic.length > 0) {
@@ -3291,10 +3275,10 @@ export class SketchDocument {
 	}
 
 	getPointDragTarget(pointId: string, target: Vec2): Vec2 {
-		return {
-			x: this.getPointToAxisConstraint(pointId, 'y')?.targetDistance === 0 ? 0 : target.x,
-			y: this.getPointToAxisConstraint(pointId, 'x')?.targetDistance === 0 ? 0 : target.y,
-		};
+		return new Vec2(
+			this.getPointToAxisConstraint(pointId, 'y')?.targetDistance === 0 ? 0 : target.x,
+			this.getPointToAxisConstraint(pointId, 'x')?.targetDistance === 0 ? 0 : target.y
+		);
 	}
 
 	dragPoint(pointId: string, targetX: number, targetY: number): SolverResult {
@@ -3304,7 +3288,7 @@ export class SketchDocument {
 		}
 
 		// Apply axis locks before automatic spline tangents are seeded for the solve.
-		const target = this.getPointDragTarget(pointId, { x: targetX, y: targetY });
+		const target = this.getPointDragTarget(pointId, new Vec2(targetX, targetY));
 		pt.x = target.x;
 		pt.y = target.y;
 
@@ -3444,7 +3428,7 @@ export class SketchDocument {
 					const start = this.points.get(arc.startPointId);
 					const end = this.points.get(arc.endPointId);
 					if (center && start && end && !this.isPointFixed(arc.endPointId)) {
-						const as = angleFromTo(center, start);
+						const as = center.angleToPoint(start);
 						const sweepRad = (clampedAngle * Math.PI) / 180;
 						const newAe = arc.clockwise ? as - sweepRad : as + sweepRad;
 						end.x = center.x + Math.cos(newAe) * arc.radius;
@@ -3471,12 +3455,12 @@ export class SketchDocument {
 				const end = this.points.get(arc.endPointId);
 				if (center && start && end) {
 					if (!this.isPointFixed(arc.startPointId)) {
-						const as = angleFromTo(center, start);
+						const as = center.angleToPoint(start);
 						start.x = center.x + Math.cos(as) * targetRad;
 						start.y = center.y + Math.sin(as) * targetRad;
 					}
 					if (!this.isPointFixed(arc.endPointId)) {
-						const ae = angleFromTo(center, end);
+						const ae = center.angleToPoint(end);
 						end.x = center.x + Math.cos(ae) * targetRad;
 						end.y = center.y + Math.sin(ae) * targetRad;
 					}

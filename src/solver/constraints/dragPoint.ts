@@ -1,4 +1,4 @@
-import { vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 
@@ -22,7 +22,10 @@ export class DragPointConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p = vec(paramMap.get(`${this.pointId}.x`) ?? this.targetX, paramMap.get(`${this.pointId}.y`) ?? this.targetY);
+		const p = new Vec2(
+			paramMap.get(`${this.pointId}.x`) ?? this.targetX,
+			paramMap.get(`${this.pointId}.y`) ?? this.targetY
+		);
 		return [(p.x - this.targetX) * this.weight, (p.y - this.targetY) * this.weight];
 	}
 

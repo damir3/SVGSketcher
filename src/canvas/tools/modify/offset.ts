@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import { AABB } from '../../../math/aabb';
 import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
-import { dot, addScaled, dist, sub, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import { VariationToolPanel } from '../../../ui/panels/tools';
@@ -305,7 +305,7 @@ export class OffsetTool extends BaseTool {
 		const norm = this.geomResult.gizmoNormal;
 
 		const addTargetWorld = (offsetVal: number, sign: number) => {
-			const w = addScaled(anchor, norm, sign * offsetVal);
+			const w = anchor.clone().addScaledVector(norm, sign * offsetVal);
 			pts.push(this.ctx.viewport.worldToScreen(w));
 		};
 
@@ -324,7 +324,7 @@ export class OffsetTool extends BaseTool {
 
 		if (this.ctx.renderer.offsetGizmoHandles && this.ctx.renderer.offsetGizmoHandles.length > 0) {
 			for (const gh of this.ctx.renderer.offsetGizmoHandles) {
-				pts.push({ x: gh.screenX, y: gh.screenY });
+				pts.push(new Vec2(gh.screenX, gh.screenY));
 			}
 		}
 
@@ -384,7 +384,7 @@ export class OffsetTool extends BaseTool {
 		// 1. Check for Offset Gizmo handle click / drag
 		if (this.ctx.renderer.offsetGizmoHandles && this.ctx.renderer.offsetGizmoHandles.length > 0) {
 			for (const gh of this.ctx.renderer.offsetGizmoHandles) {
-				if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
+				if (screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX) {
 					this.gizmoDragState = {
 						handle: gh,
 						startMouseWorld: world,
@@ -465,8 +465,8 @@ export class OffsetTool extends BaseTool {
 			this.ctx.setCursor('grabbing');
 			const { handle, startMouseWorld, startValue } = this.gizmoDragState;
 
-			const delta = sub(world, startMouseWorld);
-			const offset = dot(delta, handle.normal);
+			const delta = new Vec2().subVectors(world, startMouseWorld);
+			const offset = delta.dot(handle.normal);
 			let newDist = Math.round((startValue + offset) * 2) / 2;
 			if (Math.abs(newDist) < 0.1) {
 				newDist = startValue + offset < 0 ? -0.5 : 0.5;
@@ -490,7 +490,7 @@ export class OffsetTool extends BaseTool {
 
 		// Update cursor
 		const isOverGizmo = this.ctx.renderer.offsetGizmoHandles?.some(
-			gh => dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX
+			gh => screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX
 		);
 
 		if (this.gizmoDragState) {

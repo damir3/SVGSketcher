@@ -1,4 +1,4 @@
-import { addScaled, sub, vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import { signedDistanceToLine } from './pointOnLine';
@@ -51,8 +51,8 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 
 		const r1 = paramMap.get(`${this.circle1Id}.r`) ?? 10;
 		const r2 = paramMap.get(`${this.circle2Id}.r`) ?? 10;
-		const dir = sub(c2, c1);
-		const dist = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const dir = new Vec2().subVectors(c2, c1);
+		const dist = Math.max(dir.length(), 1e-7);
 
 		let targetDist: number;
 		if (!this.isInternal || !this.outerCircleId) {
@@ -94,51 +94,26 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		const r1Screen = entity1.radius * ctx.viewport.zoom;
 		const r2Screen = entity2.radius * ctx.viewport.zoom;
 
-		const dir = sub(sCenter2, sCenter1);
-		const distScreen = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(sCenter2, sCenter1);
+		const distScreen = dir.length();
 
-		let ux = 1;
-		let uy = 0;
-		if (distScreen > 1e-4) {
-			ux = dir.x / distScreen;
-			uy = dir.y / distScreen;
-		}
+		const direction = distScreen > 1e-4 ? dir.divideScalar(distScreen) : new Vec2(1, 0);
+		const normal = direction.clone().perpendicular();
 
 		const sharedPoint = this.sharedPointId ? ctx.sketch.points.get(this.sharedPointId) : undefined;
 		if (sharedPoint) {
-			const badge = addScaled(ctx.viewport.worldToScreen(sharedPoint), vec(-uy, ux), 14);
+			const badge = ctx.viewport.worldToScreen(sharedPoint).clone().addScaledVector(normal, 14);
 			ctx.renderBadge(this.id, badge, 'tangent');
 			return;
 		}
 
-		let tanPt1X: number;
-		let tanPt1Y: number;
-		let tanPt2X: number;
-		let tanPt2Y: number;
-
-		const isInternal = this.isInternal;
-		const outerId = this.outerCircleId;
-
-		if (!isInternal || !outerId) {
-			tanPt1X = sCenter1.x + ux * r1Screen;
-			tanPt1Y = sCenter1.y + uy * r1Screen;
-			tanPt2X = sCenter2.x - ux * r2Screen;
-			tanPt2Y = sCenter2.y - uy * r2Screen;
-		} else if (outerId === this.circle1Id) {
-			tanPt1X = sCenter1.x + ux * r1Screen;
-			tanPt1Y = sCenter1.y + uy * r1Screen;
-			tanPt2X = sCenter2.x + ux * r2Screen;
-			tanPt2Y = sCenter2.y + uy * r2Screen;
-		} else {
-			tanPt1X = sCenter1.x - ux * r1Screen;
-			tanPt1Y = sCenter1.y - uy * r1Screen;
-			tanPt2X = sCenter2.x - ux * r2Screen;
-			tanPt2Y = sCenter2.y - uy * r2Screen;
-		}
-
-		const tan = vec((tanPt1X + tanPt2X) * 0.5, (tanPt1Y + tanPt2Y) * 0.5);
-
-		const distBetweenContactPts = Math.hypot(tanPt2X - tanPt1X, tanPt2Y - tanPt1Y);
+		const outerId = this.isInternal ? this.outerCircleId : undefined;
+		const radius1 = outerId && outerId !== this.circle1Id ? -r1Screen : r1Screen;
+		const radius2 = outerId === this.circle1Id ? r2Screen : -r2Screen;
+		const contact1 = sCenter1.clone().addScaledVector(direction, radius1);
+		const contact2 = sCenter2.clone().addScaledVector(direction, radius2);
+		const tan = new Vec2().midpoint(contact1, contact2);
+		const distBetweenContactPts = contact1.distanceTo(contact2);
 
 		let isNearArc1 = true;
 		if (arc1 && ctx.isAngleNearArc) {
@@ -152,9 +127,8 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		const isNear = distBetweenContactPts < 60 && isNearArc1 && isNearArc2;
 
 		if (isNear) {
-			const normal = vec(-uy, ux);
 			const offset = 14;
-			const badge = addScaled(tan, normal, offset);
+			const badge = tan.clone().addScaledVector(normal, offset);
 			ctx.renderBadge(this.id, badge, 'tangent');
 			return;
 		}

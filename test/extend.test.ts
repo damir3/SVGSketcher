@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -64,7 +65,7 @@ describe('Extend Tool Math and Logic', () => {
 		const l1Curve = l1.toGeoCurve(sketch)!;
 
 		// Cursor closer to p1 (50, 0): should extend forward from p1 towards x = 80
-		const cand = findExtendCandidate(sketch, l1Curve, allCurves, { x: 45, y: 0 });
+		const cand = findExtendCandidate(sketch, l1Curve, allCurves, new Vec2(45, 0));
 		assert.ok(cand);
 		assert.equal(cand.targetType, 'line');
 		assert.equal(cand.edge, 'end');
@@ -95,14 +96,14 @@ describe('Extend Tool Math and Logic', () => {
 		const l1Curve = l1.toGeoCurve(sketch)!;
 
 		// Cursor near p1: extends forward along (1, 0) by +50mm
-		const cand = findExtendCandidate(sketch, l1Curve, allCurves, { x: 80, y: 0 });
+		const cand = findExtendCandidate(sketch, l1Curve, allCurves, new Vec2(80, 0));
 		assert.ok(cand);
 		assert.equal(cand.edge, 'end');
 		assert.equal(cand.toPoint.x, 150);
 		assert.equal(cand.toPoint.y, 0);
 
 		// Cursor near p0: extends backward along (-1, 0) by +50mm
-		const candStart = findExtendCandidate(sketch, l1Curve, allCurves, { x: 10, y: 0 });
+		const candStart = findExtendCandidate(sketch, l1Curve, allCurves, new Vec2(10, 0));
 		assert.ok(candStart);
 		assert.equal(candStart.edge, 'start');
 		assert.equal(candStart.toPoint.x, -50);
@@ -135,7 +136,7 @@ describe('Extend Tool Math and Logic', () => {
 		const arcCurve = arc.toGeoCurve(sketch)!;
 
 		// Cursor near pEnd: extends CCW towards 180 deg (-50, 0)
-		const cand = findExtendCandidate(sketch, arcCurve, allCurves, { x: 5, y: 45 });
+		const cand = findExtendCandidate(sketch, arcCurve, allCurves, new Vec2(5, 45));
 		assert.ok(cand);
 		assert.equal(cand.targetType, 'arc');
 		assert.equal(cand.edge, 'end');
@@ -163,7 +164,7 @@ describe('Extend Tool Math and Logic', () => {
 		const allCurves = getAllGeoCurves(sketch);
 		const arcCurve = arc.toGeoCurve(sketch)!;
 
-		const cand = findExtendCandidate(sketch, arcCurve, allCurves, { x: 5, y: 45 });
+		const cand = findExtendCandidate(sketch, arcCurve, allCurves, new Vec2(5, 45));
 		assert.ok(cand);
 		assert.equal(cand.becomesFullLoop, true);
 
@@ -197,7 +198,7 @@ describe('Extend Tool Math and Logic', () => {
 		const spCurve = spline.toGeoCurve(sketch)!;
 
 		// Cursor near end (90, 0)
-		const cand = findExtendCandidate(sketch, spCurve, allCurves, { x: 85, y: 5 });
+		const cand = findExtendCandidate(sketch, spCurve, allCurves, new Vec2(85, 5));
 		assert.ok(cand);
 		assert.equal(cand.targetType, 'spline');
 		assert.equal(cand.edge, 'end');
@@ -229,7 +230,7 @@ describe('Extend Tool Math and Logic', () => {
 		const allCurves = getAllGeoCurves(sketch);
 		const spCurve = spline.toGeoCurve(sketch)!;
 
-		const cand = findExtendCandidate(sketch, spCurve, allCurves, { x: 85, y: 5 });
+		const cand = findExtendCandidate(sketch, spCurve, allCurves, new Vec2(85, 5));
 		assert.ok(cand);
 		assert.equal(cand.edge, 'end');
 		// Tangent at end is (30, -40) -> normalized (0.6, -0.8). +50mm => (90 + 30, 0 - 40) = (120, -40)
@@ -258,7 +259,7 @@ describe('Extend Tool Math and Logic', () => {
 		const allCurves = getAllGeoCurves(sketch);
 		const spCurve = spline.toGeoCurve(sketch)!;
 
-		const cand = findExtendCandidate(sketch, spCurve, allCurves, { x: 45, y: 10 })!;
+		const cand = findExtendCandidate(sketch, spCurve, allCurves, new Vec2(45, 10))!;
 		assert.ok(cand);
 		assert.equal(cand.edge, 'end');
 
@@ -295,7 +296,7 @@ describe('Extend Tool Math and Logic', () => {
 		sketch.addPointOnLineConstraint(p5.id, p8.id); // p5 on Line-5
 
 		const allCurves = getAllGeoCurves(sketch);
-		const cand = findExtendCandidate(sketch, l4.toGeoCurve(sketch)!, allCurves, { x: -10, y: 30 })!;
+		const cand = findExtendCandidate(sketch, l4.toGeoCurve(sketch)!, allCurves, new Vec2(-10, 30))!;
 		assert.ok(cand);
 		assert.ok(Math.abs(cand.toPoint.x - 31.25) < 1e-2);
 		assert.ok(Math.abs(cand.toPoint.y - 30) < 1e-2);
@@ -333,7 +334,7 @@ describe('Extend Tool Math and Logic', () => {
 		sketch.addLine(pA.id, pB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
-		const cand = findExtendCandidate(sketch, lineA.toGeoCurve(sketch)!, allCurves, { x: 45, y: 30 })!;
+		const cand = findExtendCandidate(sketch, lineA.toGeoCurve(sketch)!, allCurves, new Vec2(45, 30))!;
 		assert.ok(cand);
 		assert.equal(cand.toPoint.x, 100);
 		assert.equal(cand.toPoint.y, 30);
@@ -384,7 +385,7 @@ describe('Extend Tool Math and Logic', () => {
 		sketch.addLine(pA.id, pB.id);
 
 		const allCurves = getAllGeoCurves(sketch);
-		const cand = findExtendCandidate(sketch, l1.toGeoCurve(sketch)!, allCurves, { x: 45, y: 45 })!;
+		const cand = findExtendCandidate(sketch, l1.toGeoCurve(sketch)!, allCurves, new Vec2(45, 45))!;
 		assert.ok(cand);
 		assert.equal(cand.toPoint.x, 100);
 		assert.equal(cand.toPoint.y, 100);
@@ -417,7 +418,7 @@ describe('Extend Tool Math and Logic', () => {
 		assert.ok(sketch.constraints.has(cEq.id));
 
 		const allCurves = getAllGeoCurves(sketch);
-		const cand = findExtendCandidate(sketch, l1.toGeoCurve(sketch)!, allCurves, { x: 40, y: 0 })!;
+		const cand = findExtendCandidate(sketch, l1.toGeoCurve(sketch)!, allCurves, new Vec2(40, 0))!;
 		assert.ok(cand);
 
 		sketch.beginTransaction();
@@ -448,8 +449,8 @@ describe('ExtendTool Interaction and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				requestRender: () => {},
 				setCursor: () => {},
@@ -462,8 +463,8 @@ describe('ExtendTool Interaction and Workflow', () => {
 
 			// Click near p1 to extend line
 			tool.onMouseDown({
-				screen: { x: 45, y: 0 },
-				world: { x: 45, y: 0 },
+				screen: new Vec2(45, 0),
+				world: new Vec2(45, 0),
 				raw: {} as any,
 			});
 

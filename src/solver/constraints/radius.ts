@@ -6,7 +6,7 @@ import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgLine, createSvgRect, createSvgText } from '../../canvas/svg';
 import type { Viewport } from '../../canvas/viewport';
 import { distanceToSegment } from '../../math/hitTest';
-import { angleFromTo, addScaled, dist, sub, vec, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { SketchDocument } from '../../model/sketch';
 
 const DEFAULT_LEADER_OFFSET = 8;
@@ -67,10 +67,10 @@ export class RadiusConstraint extends BaseConstraint {
 
 		const screenCenter = viewport.worldToScreen(center);
 		const screenRadius = entity.radius * viewport.zoom;
-		const targetDistance = labelTarget && dist(screenCenter, labelTarget);
+		const targetDistance = labelTarget && screenCenter.distanceTo(labelTarget);
 		let angle = this.leaderAngle;
 		if (labelTarget && targetDistance) {
-			angle = angleFromTo(screenCenter, labelTarget);
+			angle = screenCenter.angleToPoint(labelTarget);
 		}
 
 		if (arc) {
@@ -79,8 +79,8 @@ export class RadiusConstraint extends BaseConstraint {
 			if (start && end) {
 				const ss = viewport.worldToScreen(start);
 				const se = viewport.worldToScreen(end);
-				const startAngle = angleFromTo(screenCenter, ss);
-				const endAngle = angleFromTo(screenCenter, se);
+				const startAngle = screenCenter.angleToPoint(ss);
+				const endAngle = screenCenter.angleToPoint(se);
 				const sign = arc.clockwise ? 1 : -1;
 				let sweep = ((endAngle - startAngle) * sign) % TWO_PI;
 				if (sweep < 0) sweep += TWO_PI;
@@ -92,25 +92,25 @@ export class RadiusConstraint extends BaseConstraint {
 		}
 
 		angle ??= -Math.PI / 4;
-		const dir = vec(Math.cos(angle), Math.sin(angle));
+		const dir = Vec2.fromPolar(1, angle);
 		const isDiameter = this.displayMode === 'diameter';
 		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
 		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
 		const prefix = this.expression ? 'fx: ' : '';
 		const text = isDiameter ? `${prefix}Ø ${numStr}` : `${prefix}R ${numStr}`;
-		const labelSize = vec(text.length * 8 + 14, LABEL_HEIGHT);
+		const labelSize = new Vec2(text.length * 8 + 14, LABEL_HEIGHT);
 
 		const offset =
 			targetDistance === undefined
 				? (this.leaderOffset ?? DEFAULT_LEADER_OFFSET)
 				: (targetDistance - screenRadius) / viewport.zoom;
 		const isInside = offset < 0;
-		const edge = addScaled(screenCenter, dir, screenRadius);
-		const anchor = addScaled(screenCenter, dir, Math.max(0, screenRadius + offset * viewport.zoom));
-		const labelCenter = isInside ? anchor : vec(anchor.x + ((dir.x >= 0 ? 1 : -1) * labelSize.x) / 2, anchor.y);
-		const labelOrigin = vec(labelCenter.x - labelSize.x / 2, labelCenter.y - labelSize.y / 2);
+		const edge = screenCenter.clone().addScaledVector(dir, screenRadius);
+		const anchor = screenCenter.clone().addScaledVector(dir, Math.max(0, screenRadius + offset * viewport.zoom));
+		const labelCenter = isInside ? anchor : new Vec2(anchor.x + ((dir.x >= 0 ? 1 : -1) * labelSize.x) / 2, anchor.y);
+		const labelOrigin = labelCenter.clone().addScaledVector(labelSize, -(1 / 2));
 		return {
-			start: isDiameter ? addScaled(screenCenter, dir, -screenRadius) : screenCenter,
+			start: isDiameter ? screenCenter.clone().addScaledVector(dir, -screenRadius) : screenCenter,
 			edge,
 			anchor,
 			isInside,
@@ -185,7 +185,7 @@ export class RadiusConstraint extends BaseConstraint {
 		);
 
 		createSvgText(
-			vec(labelCenter.x, labelCenter.y + 4),
+			new Vec2(labelCenter.x, labelCenter.y + 4),
 			text,
 			{
 				'text-anchor': 'middle',
@@ -202,7 +202,7 @@ export class RadiusConstraint extends BaseConstraint {
 		const layout = this.getLayout(sketch, viewport);
 		if (!layout) return null;
 		const { start, edge, anchor, isInside, labelOrigin, labelSize } = layout;
-		const local = sub(screen, labelOrigin);
+		const local = new Vec2().subVectors(screen, labelOrigin);
 		const labelDistance = Math.hypot(
 			Math.max(0, -local.x, local.x - labelSize.x),
 			Math.max(0, -local.y, local.y - labelSize.y)

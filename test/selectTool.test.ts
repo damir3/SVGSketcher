@@ -5,7 +5,7 @@ import { SelectTool } from '../src/canvas/tools/selection/select';
 import { HighlightManager } from '../src/canvas/highlightManager';
 import { DistanceConstraint } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
-import { vec, sub, type Vec2 } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 
 function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {}): any {
 	const children: any[] = [];
@@ -80,8 +80,8 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		zoom: 1,
 		panX: 0,
 		panY: 0,
-		screenToWorld: (p: { x: number; y: number }) => vec(p.x, p.y),
-		worldToScreen: (p: { x: number; y: number }) => vec(p.x, p.y),
+		screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+		worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 	} as any;
 
 	const renderer = {
@@ -104,7 +104,7 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		findPointNear: (screen: Vec2, radius = 10) => {
 			for (const pt of sketch.points.values()) {
 				const s = viewport.worldToScreen(pt);
-				const dir = sub(s, screen);
+				const dir = new Vec2().subVectors(s, screen);
 				if (Math.hypot(dir.x, dir.y) <= radius) {
 					return pt;
 				}
@@ -203,12 +203,12 @@ describe('Select Tool Hover Mechanism', () => {
 
 		const toolEvent: ToolMouseEvent = {
 			raw: {} as MouseEvent,
-			screen: vec(50, 2),
-			client: vec(50, 2),
-			world: vec(50, 2),
+			screen: new Vec2(50, 2),
+			client: new Vec2(50, 2),
+			world: new Vec2(50, 2),
 			snap: null,
-			effectiveWorld: vec(50, 2),
-			effectiveScreen: vec(50, 2),
+			effectiveWorld: new Vec2(50, 2),
+			effectiveScreen: new Vec2(50, 2),
 		};
 
 		assert.strictEqual(tool.isHighlightEnabled(), true);
@@ -220,7 +220,7 @@ describe('Select Tool Hover Mechanism', () => {
 		assert.strictEqual(lineG.classList.contains('select-hover'), true);
 
 		// Move mouse away
-		ctx.highlightManager!.update(tool, vec(50, 80));
+		ctx.highlightManager!.update(tool, new Vec2(50, 80));
 		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 		assert.strictEqual(lineG.classList.contains('select-hover'), false);
 	});
@@ -236,7 +236,7 @@ describe('Select Tool Hover Mechanism', () => {
 		const tool = new SelectTool();
 		tool.activate(ctx);
 
-		const target = ctx.highlightManager!.update(tool, vec(2, 1));
+		const target = ctx.highlightManager!.update(tool, new Vec2(2, 1));
 		assert.ok(target);
 		assert.strictEqual(target.type, 'point');
 		assert.strictEqual(target.id, p1.id);
@@ -273,12 +273,12 @@ describe('Select Tool Hover Mechanism', () => {
 		// Hover near badge1
 		const toolEvent: ToolMouseEvent = {
 			raw: {} as MouseEvent,
-			screen: vec(25, -2),
-			client: vec(25, -2),
-			world: vec(25, -2),
+			screen: new Vec2(25, -2),
+			client: new Vec2(25, -2),
+			world: new Vec2(25, -2),
 			snap: null,
-			effectiveWorld: vec(25, -2),
-			effectiveScreen: vec(25, -2),
+			effectiveWorld: new Vec2(25, -2),
+			effectiveScreen: new Vec2(25, -2),
 		};
 
 		ctx.highlightManager!.update(tool, toolEvent.screen, toolEvent.raw?.target as SVGElement);
@@ -310,7 +310,7 @@ describe('Select Tool Hover Mechanism', () => {
 		const handleLine = sketch.lines.get(handleLineId)!;
 		const handlePt = sketch.points.get(handleLine.p1Id)!;
 
-		const target = ctx.highlightManager!.update(tool, vec(handlePt.x, handlePt.y));
+		const target = ctx.highlightManager!.update(tool, new Vec2(handlePt.x, handlePt.y));
 		assert.ok(target);
 		assert.strictEqual(target.type, 'point');
 		assert.strictEqual(target.id, handlePt.id);
@@ -347,19 +347,19 @@ describe('Select Tool Hover Mechanism', () => {
 		assert.strictEqual(tool.canHighlight({ type: 'line', id: 'axis_y' }), false);
 
 		// Hover directly over origin (0, 0)
-		const targetOrigin = ctx.highlightManager!.update(tool, vec(0, 0), originG as unknown as SVGElement);
+		const targetOrigin = ctx.highlightManager!.update(tool, new Vec2(0, 0), originG as unknown as SVGElement);
 		assert.strictEqual(targetOrigin, null);
 		assert.strictEqual(originG.classList.contains('select-hover'), false);
 		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 
 		// Hover over X axis (100, 0)
-		const targetAxisX = ctx.highlightManager!.update(tool, vec(100, 0), axisXG as unknown as SVGElement);
+		const targetAxisX = ctx.highlightManager!.update(tool, new Vec2(100, 0), axisXG as unknown as SVGElement);
 		assert.strictEqual(targetAxisX, null);
 		assert.strictEqual(axisXG.classList.contains('select-hover'), false);
 		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);
 
 		// Hover over Y axis (0, 100)
-		const targetAxisY = ctx.highlightManager!.update(tool, vec(0, 100), axisYG as unknown as SVGElement);
+		const targetAxisY = ctx.highlightManager!.update(tool, new Vec2(0, 100), axisYG as unknown as SVGElement);
 		assert.strictEqual(targetAxisY, null);
 		assert.strictEqual(axisYG.classList.contains('select-hover'), false);
 		assert.strictEqual(ctx.highlightManager!.getHoveredId(), null);

@@ -1,4 +1,4 @@
-import { dot, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 
@@ -35,14 +35,14 @@ export class EllipseAxisConstraint extends BaseConstraint {
 		const p1 = readParamPoint(paramMap, this.majorAxisPointId);
 		const p2 = readParamPoint(paramMap, this.minorAxisPointId);
 
-		const dir1 = sub(p1, center);
-		const dir2 = sub(p2, center);
+		const dir1 = new Vec2().subVectors(p1, center);
+		const dir2 = new Vec2().subVectors(p2, center);
 
-		const r1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
-		const r2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
+		const r1 = Math.max(dir1.length(), 1e-7);
+		const r2 = Math.max(dir2.length(), 1e-7);
 		const avgR = (r1 + r2) * 0.5;
 
-		const alignment = dot(dir1, dir2) / (r1 * r2);
+		const alignment = dir1.dot(dir2) / (r1 * r2);
 		return [alignment * avgR * this.weight];
 	}
 

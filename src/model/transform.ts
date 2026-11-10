@@ -1,5 +1,5 @@
 import { AABB, getCurveBoundingBox } from '../math/aabb';
-import { add, mid, scale, sub, vec, type Vec2 } from '../math/vector';
+import { ORIGIN, Vec2, type XY } from '../math/vector';
 import { FixedConstraint, OffsetConstraint } from '../solver/constraints';
 import { deserializeConstraint, serializeConstraint } from '../solver/constraints/serialization';
 import type { IConstraint } from '../solver/types';
@@ -24,12 +24,15 @@ export interface TransformValues {
 
 export function createTransform(center: Vec2, values: TransformValues) {
 	const angle = ((values.angle % 360) * Math.PI) / 180;
-	const cos = Math.cos(angle);
-	const sin = Math.sin(angle);
-	const rotate = ({ x, y }: Vec2) => vec(x * cos - y * sin, x * sin + y * cos);
+	const translation = new Vec2(values.x, values.y);
+	const rotate = (vector: XY) => Vec2.from(vector).rotateAround(ORIGIN, angle);
 	return {
 		rotate,
-		point: (point: Vec2) => add(add(center, vec(values.x, values.y)), scale(rotate(sub(point, center)), values.scale)),
+		point: (point: XY) =>
+			center
+				.clone()
+				.add(translation)
+				.addScaledVector(new Vec2().subVectors(point, center).rotateAround(ORIGIN, angle), values.scale),
 	};
 }
 
@@ -92,7 +95,7 @@ export function getTransformSelection(sketch: SketchDocument) {
 		}
 	}
 	if (![bounds.min.x, bounds.min.y, bounds.max.x, bounds.max.y].every(Number.isFinite)) return null;
-	return { entities, selected, previewIds, bounds, center: mid(bounds.min, bounds.max), minScale };
+	return { entities, selected, previewIds, bounds, center: new Vec2().midpoint(bounds.min, bounds.max), minScale };
 }
 
 type TransformSelection = NonNullable<ReturnType<typeof getTransformSelection>>;

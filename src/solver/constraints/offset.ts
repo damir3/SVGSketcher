@@ -4,7 +4,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
-import { angleFromTo, cross, dot, vec, addScaled, mid, sub, type Vec2 } from '../../math/vector';
+import { Vec2, type XY } from '../../math/vector';
 
 /**
  * Line pair: both endpoints of the offset line lie at signed distance `side * d`
@@ -35,8 +35,8 @@ export interface OffsetCirclePair {
 
 export interface OffsetSplinePoint {
 	pointId: string;
-	basePos: Vec2;
-	normal: Vec2;
+	basePos: XY;
+	normal: XY;
 	side: number;
 }
 
@@ -118,9 +118,9 @@ export class OffsetConstraint extends BaseConstraint {
 		const point = readParamPoint(pm, ptId);
 		const p1 = readParamPoint(pm, p.origP1Id);
 		const p2 = readParamPoint(pm, p.origP2Id);
-		const dir = sub(p2, p1);
-		const len = Math.max(Math.hypot(dir.x, dir.y), 1e-9);
-		const hLeft = cross(dir, sub(point, p1)) / len;
+		const dir = new Vec2().subVectors(p2, p1);
+		const len = Math.max(dir.length(), 1e-9);
+		const hLeft = dir.cross(new Vec2().subVectors(point, p1)) / len;
 		return (hLeft - p.side * this.targetDistance) * this.weight;
 	}
 
@@ -141,10 +141,7 @@ export class OffsetConstraint extends BaseConstraint {
 			} else if (p.kind === 'spline') {
 				for (const sp of p.points) {
 					const point = readParamPoint(pm, sp.pointId);
-					const target = vec(
-						sp.basePos.x + sp.side * this.targetDistance * sp.normal.x,
-						sp.basePos.y + sp.side * this.targetDistance * sp.normal.y
-					);
+					const target = Vec2.from(sp.basePos).addScaledVector(sp.normal, sp.side * this.targetDistance);
 					res.push((point.x - target.x) * this.weight);
 					res.push((point.y - target.y) * this.weight);
 				}
@@ -206,12 +203,12 @@ export class OffsetConstraint extends BaseConstraint {
 			const f1 = sketch.points.get(p.offP1Id);
 			const f2 = sketch.points.get(p.offP2Id);
 			if (!o1 || !o2 || !f1 || !f2) return null;
-			const fm = mid(f1, f2);
-			const dir = sub(o2, o1);
-			const l2 = dot(dir, dir);
+			const fm = new Vec2().midpoint(f1, f2);
+			const dir = new Vec2().subVectors(o2, o1);
+			const l2 = dir.lengthSq();
 			if (l2 < 1e-12) return null;
-			const t = dot(sub(fm, o1), dir) / l2;
-			return { a: addScaled(o1, dir, t), b: fm };
+			const t = new Vec2().subVectors(fm, o1).dot(dir) / l2;
+			return { a: Vec2.from(o1).addScaledVector(dir, t), b: fm };
 		}
 		if (p.kind === 'spline') {
 			const midSp = p.points[Math.floor(p.points.length / 2)];
@@ -219,8 +216,8 @@ export class OffsetConstraint extends BaseConstraint {
 			const pt = sketch.points.get(midSp.pointId);
 			if (!pt) return null;
 			return {
-				a: midSp.basePos,
-				b: { x: pt.x, y: pt.y },
+				a: Vec2.from(midSp.basePos),
+				b: new Vec2(pt.x, pt.y),
 			};
 		}
 		const orig = sketch.circles.get(p.origId) ?? sketch.arcs.get(p.origId);
@@ -234,17 +231,17 @@ export class OffsetConstraint extends BaseConstraint {
 			const s = sketch.points.get(off.startPointId);
 			const e = sketch.points.get(off.endPointId);
 			if (s && e) {
-				const as = angleFromTo(cOff, s);
-				const ae = angleFromTo(cOff, e);
+				const as = Vec2.from(cOff).angleToPoint(s);
+				const ae = Vec2.from(cOff).angleToPoint(e);
 				let sweep = off.clockwise ? as - ae : ae - as;
 				while (sweep < 0) sweep += 2 * Math.PI;
 				ang = off.clockwise ? as - sweep / 2 : as + sweep / 2;
 			}
 		}
-		const u = { x: Math.cos(ang), y: Math.sin(ang) };
+		const u = Vec2.fromPolar(1, ang);
 		return {
-			a: addScaled(c, u, orig.radius),
-			b: addScaled(cOff, u, off.radius),
+			a: Vec2.from(c).addScaledVector(u, orig.radius),
+			b: Vec2.from(cOff).addScaledVector(u, off.radius),
 		};
 	}
 
@@ -253,7 +250,7 @@ export class OffsetConstraint extends BaseConstraint {
 		if (!pts) return;
 		const d1 = ctx.viewport.worldToScreen(pts.a);
 		const d2 = ctx.viewport.worldToScreen(pts.b);
-		if (Math.hypot(d2.x - d1.x, d2.y - d1.y) < 1e-3) return;
+		if (d1.distanceTo(d2) < 1e-3) return;
 		ctx.renderLinearDimensionVisual({
 			d1,
 			d2,

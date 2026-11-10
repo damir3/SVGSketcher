@@ -1,3 +1,4 @@
+import { Vec2 } from '../../../math/vector';
 import type { InspectorContext, ISidebarPanel } from '../inspector/types';
 import type { BaseConstraint } from '../../../solver/constraints/base';
 import type {
@@ -303,7 +304,7 @@ export class ConstraintPanel implements ISidebarPanel {
 						btn.addEventListener('click', e => {
 							e.stopPropagation();
 							const btnRect = btn.getBoundingClientRect();
-							const screenPos = { x: btnRect.left - 240, y: btnRect.top - 10 };
+							const screenPos = new Vec2(btnRect.left - 240, btnRect.top - 10);
 							context.onEditDimension?.(c, screenPos);
 						});
 					});
@@ -314,7 +315,7 @@ export class ConstraintPanel implements ISidebarPanel {
 						el.addEventListener('dblclick', e => {
 							e.stopPropagation();
 							const elRect = el.getBoundingClientRect();
-							const screenPos = { x: elRect.left - 240, y: elRect.top - 10 };
+							const screenPos = new Vec2(elRect.left - 240, elRect.top - 10);
 							context.onEditDimension?.(c, screenPos);
 						});
 					});

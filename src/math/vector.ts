@@ -1,183 +1,241 @@
-export interface Vec2 {
+/** Coordinates accepted at data boundaries and as read-only vector operands. */
+export type XY = Readonly<{ x: number; y: number }>;
+
+/** A 2D vector. Mutating methods return this vector for chaining. */
+export class Vec2 {
 	x: number;
 	y: number;
-}
 
-export const ORIGIN: Readonly<Vec2> = Object.freeze({ x: 0, y: 0 });
-
-export function vec(x: number, y: number): Vec2 {
-	return { x, y };
-}
-
-export function mid(a: Vec2, b: Vec2): Vec2 {
-	return { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
-}
-
-export function mix(a: Vec2, b: Vec2, t: number): Vec2 {
-	return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-export function abs(a: Vec2, b: Vec2): Vec2 {
-	return { x: Math.abs(a.x - b.x), y: Math.abs(a.y - b.y) };
-}
-
-export function mul(a: Vec2, b: Vec2): Vec2 {
-	return { x: a.x * b.x, y: a.y * b.y };
-}
-
-export function dist(a: Vec2, b: Vec2): number {
-	const dx = b.x - a.x;
-	const dy = b.y - a.y;
-	return Math.hypot(dx, dy);
-}
-
-export function distancesFrom(origin: Vec2, a: Vec2, b: Vec2): Vec2 {
-	return { x: dist(origin, a), y: dist(origin, b) };
-}
-
-export function distSq(a: Vec2, b: Vec2): number {
-	const dx = b.x - a.x;
-	const dy = b.y - a.y;
-	return dx * dx + dy * dy;
-}
-
-export function dot(a: Vec2, b: Vec2): number {
-	return a.x * b.x + a.y * b.y;
-}
-
-export function cross(a: Vec2, b: Vec2): number {
-	return a.x * b.y - a.y * b.x;
-}
-
-export function add(a: Vec2, b: Vec2): Vec2 {
-	return { x: a.x + b.x, y: a.y + b.y };
-}
-
-export function addScaled(a: Vec2, b: Vec2, s: number): Vec2 {
-	return { x: a.x + b.x * s, y: a.y + b.y * s };
-}
-
-/** Reflects p across the line through axisPoint with the given unit normal. */
-export function reflectPoint(p: Vec2, axisPoint: Vec2, unitNormal: Vec2): Vec2 {
-	const signedDistance = dot(sub(p, axisPoint), unitNormal);
-	return addScaled(p, unitNormal, -2 * signedDistance);
-}
-
-export function sum(vectors: Iterable<Vec2>): Vec2 {
-	let x = 0;
-	let y = 0;
-	for (const v of vectors) {
-		x += v.x;
-		y += v.y;
+	constructor(x = 0, y = 0) {
+		this.x = x;
+		this.y = y;
 	}
-	return { x, y };
-}
 
-export function centroid(vectors: Iterable<Vec2>): Vec2 {
-	const pts = Array.isArray(vectors) ? vectors : [...vectors];
-	if (pts.length === 0) return { x: 0, y: 0 };
-	return scale(sum(pts), 1.0 / pts.length);
-}
-
-export function sub(a: Vec2, b: Vec2): Vec2 {
-	return { x: a.x - b.x, y: a.y - b.y };
-}
-
-export function addScalar(a: Vec2, f: number): Vec2 {
-	return { x: a.x + f, y: a.y + f };
-}
-
-export function subScalar(a: Vec2, f: number): Vec2 {
-	return { x: a.x - f, y: a.y - f };
-}
-
-export function scale(v: Vec2, s: number): Vec2 {
-	return { x: v.x * s, y: v.y * s };
-}
-
-export function normalize(v: Vec2): Vec2 {
-	const len = Math.hypot(v.x, v.y);
-	if (len < 1e-12) return { x: 1, y: 0 };
-	return scale(v, 1 / len);
-}
-
-export function normalizeOrNull(v: Vec2, minLength = 0): Vec2 | null {
-	const len = Math.hypot(v.x, v.y);
-	if (len <= minLength) return null;
-	return scale(v, 1 / len);
-}
-
-export function angle(a: Vec2, b: Vec2): number {
-	return Math.atan2(cross(a, b), dot(a, b));
-}
-
-/** Returns the signed direction of a vector in radians, relative to the positive X axis. */
-export function directionAngle(v: Vec2): number {
-	return Math.atan2(v.y, v.x);
-}
-
-/** Returns the signed direction of a vector in degrees, relative to the positive X axis. */
-export function directionAngleDeg(v: Vec2): number {
-	return (directionAngle(v) * 180) / Math.PI;
-}
-
-/** Returns the direction from one point to another in radians, relative to the positive X axis. */
-export function angleFromTo(from: Vec2, to: Vec2): number {
-	return Math.atan2(to.y - from.y, to.x - from.x);
-}
-
-/** Returns the direction from one point to another in degrees, relative to the positive X axis. */
-export function angleFromToDeg(from: Vec2, to: Vec2): number {
-	return (angleFromTo(from, to) * 180) / Math.PI;
-}
-
-/** Returns the unsigned angle to the X axis in radians, from 0 to π/2. */
-export function angleToXAxis(dir: Vec2): number {
-	return Math.atan2(Math.abs(dir.y), Math.abs(dir.x));
-}
-
-/** Returns the unsigned angle to the X axis in degrees, from 0 to 90. */
-export function angleToXAxisDeg(dir: Vec2): number {
-	return (angleToXAxis(dir) * 180) / Math.PI;
-}
-
-export function projectPointOntoSegment(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; t: number; dist: number } {
-	const ab = sub(b, a);
-	const l2 = dot(ab, ab);
-	if (l2 < 1e-12) {
-		return { point: a, t: 0, dist: dist(p, a) };
+	static from(v: XY): Vec2 {
+		return new Vec2(v.x, v.y);
 	}
-	const ap = sub(p, a);
-	const t = Math.max(0, Math.min(1, dot(ap, ab) / l2));
-	const projection = addScaled(a, ab, t);
-	return { point: projection, t, dist: dist(p, projection) };
+
+	static fromPolar(radius: number, angle: number): Vec2 {
+		return new Vec2(radius * Math.cos(angle), radius * Math.sin(angle));
+	}
+
+	static sum(vectors: Iterable<XY>): Vec2 {
+		const result = new Vec2();
+		for (const v of vectors) result.add(v);
+		return result;
+	}
+
+	static centroid(vectors: Iterable<XY>): Vec2 {
+		const result = new Vec2();
+		let count = 0;
+		for (const v of vectors) {
+			result.add(v);
+			count++;
+		}
+		return count ? result.divideScalar(count) : result;
+	}
+
+	set(x: number, y: number): this {
+		this.x = x;
+		this.y = y;
+		return this;
+	}
+
+	copy(v: XY): this {
+		return this.set(v.x, v.y);
+	}
+
+	clone(): Vec2 {
+		return new Vec2(this.x, this.y);
+	}
+
+	add(v: XY): this {
+		return this.addVectors(this, v);
+	}
+
+	addVectors(a: XY, b: XY): this {
+		return this.set(a.x + b.x, a.y + b.y);
+	}
+
+	addScaledVector(v: XY, scale: number): this {
+		return this.set(this.x + v.x * scale, this.y + v.y * scale);
+	}
+
+	addScalar(scalar: number): this {
+		return this.set(this.x + scalar, this.y + scalar);
+	}
+
+	sub(v: XY): this {
+		return this.subVectors(this, v);
+	}
+
+	subVectors(a: XY, b: XY): this {
+		return this.set(a.x - b.x, a.y - b.y);
+	}
+
+	subScalar(scalar: number): this {
+		return this.set(this.x - scalar, this.y - scalar);
+	}
+
+	multiply(v: XY): this {
+		return this.set(this.x * v.x, this.y * v.y);
+	}
+
+	multiplyScalar(scalar: number): this {
+		return this.set(this.x * scalar, this.y * scalar);
+	}
+
+	divideScalar(scalar: number): this {
+		return this.multiplyScalar(1 / scalar);
+	}
+
+	negate(): this {
+		return this.set(-this.x, -this.y);
+	}
+
+	/** Rotates the vector 90° counterclockwise. */
+	perpendicular(): this {
+		return this.set(-this.y, this.x);
+	}
+
+	dot(v: XY): number {
+		return this.x * v.x + this.y * v.y;
+	}
+
+	cross(v: XY): number {
+		return this.x * v.y - this.y * v.x;
+	}
+
+	lengthSq(): number {
+		return this.dot(this);
+	}
+
+	length(): number {
+		return Math.hypot(this.x, this.y);
+	}
+
+	normalize(): this {
+		return this.divideScalar(this.length() || 1);
+	}
+
+	/** Uses the positive X direction when the sketch has no stable direction. */
+	normalizeOrUnitX(): this {
+		const length = this.length();
+		return length < 1e-12 ? this.set(1, 0) : this.divideScalar(length);
+	}
+
+	normalizeOrNull(minLength = 0): this | null {
+		const length = this.length();
+		return length <= minLength ? null : this.divideScalar(length);
+	}
+
+	angle(): number {
+		return Math.atan2(-this.y, -this.x) + Math.PI;
+	}
+
+	signedAngle(): number {
+		return Math.atan2(this.y, this.x);
+	}
+
+	signedAngleDeg(): number {
+		return (this.signedAngle() * 180) / Math.PI;
+	}
+
+	signedAngleTo(v: XY): number {
+		return Math.atan2(this.cross(v), this.dot(v));
+	}
+
+	angleToPoint(v: XY): number {
+		return Math.atan2(v.y - this.y, v.x - this.x);
+	}
+
+	angleToPointDeg(v: XY): number {
+		return (this.angleToPoint(v) * 180) / Math.PI;
+	}
+
+	/** Unsigned angle to the X axis, in degrees from 0 to 90. */
+	angleToXAxisDeg(): number {
+		return (Math.atan2(Math.abs(this.y), Math.abs(this.x)) * 180) / Math.PI;
+	}
+
+	distanceTo(v: XY): number {
+		return Math.hypot(v.x - this.x, v.y - this.y);
+	}
+
+	distanceToSquared(v: XY): number {
+		const dx = v.x - this.x;
+		const dy = v.y - this.y;
+		return dx * dx + dy * dy;
+	}
+
+	distancesTo(a: XY, b: XY): Vec2 {
+		return new Vec2(this.distanceTo(a), this.distanceTo(b));
+	}
+
+	lerp(v: XY, t: number): this {
+		return this.set(this.x + (v.x - this.x) * t, this.y + (v.y - this.y) * t);
+	}
+
+	midpoint(a: XY, b: XY): this {
+		return this.set((a.x + b.x) * 0.5, (a.y + b.y) * 0.5);
+	}
+
+	/** Rotates this vector about a point by an angle in radians. */
+	rotateAround(center: XY, angle: number): this {
+		const cos = Math.cos(angle);
+		const sin = Math.sin(angle);
+		const x = this.x - center.x;
+		const y = this.y - center.y;
+		return this.set(center.x + x * cos - y * sin, center.y + x * sin + y * cos);
+	}
+
+	/** Reflects this point across the line through axisPoint with the given unit normal. */
+	reflectAcrossLine(axisPoint: XY, unitNormal: XY): this {
+		const signedDistance = new Vec2().subVectors(this, axisPoint).dot(unitNormal);
+		return this.addScaledVector(unitNormal, -2 * signedDistance);
+	}
+
+	equals(v: XY): boolean {
+		return this.x === v.x && this.y === v.y;
+	}
 }
 
-export function projectPointOntoLine(p: Vec2, a: Vec2, b: Vec2): { point: Vec2; t: number; dist: number } {
-	const ab = sub(b, a);
-	const l2 = dot(ab, ab);
-	if (l2 < 1e-12) {
-		return { point: a, t: 0, dist: dist(p, a) };
-	}
-	const ap = sub(p, a);
-	const t = dot(ap, ab) / l2;
-	const projection = addScaled(a, ab, t);
-	return { point: projection, t, dist: dist(p, projection) };
+export const ORIGIN: Readonly<Vec2> = Object.freeze(new Vec2());
+
+export function projectPointOntoSegment(p: XY, a: XY, b: XY): { point: Vec2; t: number; dist: number } {
+	return projectPoint(p, a, b, true);
+}
+
+export function projectPointOntoLine(p: XY, a: XY, b: XY): { point: Vec2; t: number; dist: number } {
+	return projectPoint(p, a, b, false);
+}
+
+function projectPoint(p: XY, a: XY, b: XY, clampToSegment: boolean): { point: Vec2; t: number; dist: number } {
+	const ab = new Vec2().subVectors(b, a);
+	const lengthSq = ab.lengthSq();
+	const point = Vec2.from(a);
+	if (lengthSq < 1e-12) return { point, t: 0, dist: point.distanceTo(p) };
+
+	const lineT = new Vec2().subVectors(p, a).dot(ab) / lengthSq;
+	const t = clampToSegment ? Math.max(0, Math.min(1, lineT)) : lineT;
+	point.addScaledVector(ab, t);
+	return { point, t, dist: point.distanceTo(p) };
 }
 
 export function getCircumcircle(p1: Vec2, p2: Vec2, p3: Vec2): { center: Vec2; radius: number } | null {
 	const d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
 	if (Math.abs(d) < 1e-6) return null;
 
-	const p1Sq = dot(p1, p1);
-	const p2Sq = dot(p2, p2);
-	const p3Sq = dot(p3, p3);
+	const p1Sq = p1.lengthSq();
+	const p2Sq = p2.lengthSq();
+	const p3Sq = p3.lengthSq();
 
-	const xc = (p1Sq * (p2.y - p3.y) + p2Sq * (p3.y - p1.y) + p3Sq * (p1.y - p2.y)) / d;
-	const yc = (p1Sq * (p3.x - p2.x) + p2Sq * (p1.x - p3.x) + p3Sq * (p2.x - p1.x)) / d;
+	const center = new Vec2(
+		(p1Sq * (p2.y - p3.y) + p2Sq * (p3.y - p1.y) + p3Sq * (p1.y - p2.y)) / d,
+		(p1Sq * (p3.x - p2.x) + p2Sq * (p1.x - p3.x) + p3Sq * (p2.x - p1.x)) / d
+	);
+	const radius = center.distanceTo(p1);
+	if (!isFinite(radius) || radius < 1e-3 || radius > 1e6) return null;
 
-	const r = Math.hypot(p1.x - xc, p1.y - yc);
-	if (!isFinite(r) || r < 1e-3 || r > 1e6) return null;
-
-	return { center: vec(xc, yc), radius: r };
+	return { center, radius };
 }

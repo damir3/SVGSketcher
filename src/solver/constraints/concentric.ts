@@ -45,6 +45,6 @@ export class ConcentricConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.c1CenterId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x + 12, y: s.y + 12 }, '◎', COLORS.primary);
+		ctx.renderBadge(this.id, s.clone().addScalar(12), '◎', COLORS.primary);
 	}
 }

@@ -4,7 +4,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
-import { sub, vec, centroid, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 
 export interface PatternPointPair {
 	sourcePtId: string;
@@ -130,15 +130,12 @@ export class CircularPatternConstraint extends BaseConstraint {
 
 			const angleDeg = computePatternCopyAngle(copy.copyIndex, this.quantity, this.distribution, this.totalAngle);
 			const rad = (angleDeg * Math.PI) / 180;
-			const cosA = Math.cos(rad);
-			const sinA = Math.sin(rad);
 
 			for (const pair of copy.pointPairs) {
 				const s = readParamPoint(paramMap, pair.sourcePtId);
 				const p = readParamPoint(paramMap, pair.patternPtId);
 
-				const dir = sub(s, center);
-				const target = vec(center.x + dir.x * cosA - dir.y * sinA, center.y + dir.x * sinA + dir.y * cosA);
+				const target = s.rotateAround(center, rad);
 
 				errors.push((p.x - target.x) * this.weight);
 				errors.push((p.y - target.y) * this.weight);
@@ -244,9 +241,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 						if (pt) pts.push(pt);
 					}
 					copyCentroid =
-						pts.length > 0
-							? ctx.viewport.worldToScreen(centroid(pts))
-							: { x: sCtr.x + 40 * Math.cos(rad), y: sCtr.y + 40 * Math.sin(rad) };
+						pts.length > 0 ? ctx.viewport.worldToScreen(Vec2.centroid(pts)) : Vec2.fromPolar(40, rad).add(sCtr);
 				} else if (ctx.renderTransformedObjects) {
 					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
 					const copyWorldPoints = ctx.renderTransformedObjects(
@@ -262,18 +257,12 @@ export class CircularPatternConstraint extends BaseConstraint {
 					);
 
 					if (copyWorldPoints.length > 0) {
-						copyCentroid = ctx.viewport.worldToScreen(centroid(copyWorldPoints));
+						copyCentroid = ctx.viewport.worldToScreen(Vec2.centroid(copyWorldPoints));
 					} else {
-						copyCentroid = {
-							x: sCtr.x + 40 * Math.cos(rad),
-							y: sCtr.y + 40 * Math.sin(rad),
-						};
+						copyCentroid = Vec2.fromPolar(40, rad).add(sCtr);
 					}
 				} else {
-					copyCentroid = {
-						x: sCtr.x + 40 * Math.cos(rad),
-						y: sCtr.y + 40 * Math.sin(rad),
-					};
+					copyCentroid = Vec2.fromPolar(40, rad).add(sCtr);
 				}
 
 				// Register screen position for hit-testing
@@ -293,7 +282,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 			}
 		}
 
-		ctx.renderBadge(this.id, { x: sCtr.x + 14, y: sCtr.y - 14 }, 'circular_pattern', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(sCtr.x + 14, sCtr.y - 14), 'circular_pattern', COLORS.primary);
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

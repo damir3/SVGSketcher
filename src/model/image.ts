@@ -1,5 +1,5 @@
 import { AABB } from '../math/aabb';
-import { vec, type Vec2 } from '../math/vector';
+import { ORIGIN, Vec2 } from '../math/vector';
 
 export interface SketchImage {
 	id: string;
@@ -23,9 +23,7 @@ export function getImagePivotOffset(image: SketchImage): Vec2 {
 	const x = image.naturalWidth ? ((image.pivotX ?? 0) / image.naturalWidth) * image.width : 0;
 	const y = image.naturalHeight ? -((image.pivotY ?? 0) / image.naturalHeight) * image.height : 0;
 	const radians = ((image.angle % 360) * Math.PI) / 180;
-	const cos = Math.cos(radians);
-	const sin = Math.sin(radians);
-	return vec(x * cos - y * sin, x * sin + y * cos);
+	return new Vec2(x, y).rotateAround(ORIGIN, radians);
 }
 
 export function getImageBounds(image: SketchImage): AABB {
@@ -34,10 +32,8 @@ export function getImageBounds(image: SketchImage): AABB {
 	const sin = Math.abs(Math.sin(radians));
 	const halfWidth = (image.width * cos + image.height * sin) / 2;
 	const halfHeight = (image.width * sin + image.height * cos) / 2;
-	return new AABB({ x: image.x - halfWidth, y: image.y - halfHeight }).addPoint({
-		x: image.x + halfWidth,
-		y: image.y + halfHeight,
-	});
+	const halfSize = new Vec2(halfWidth, halfHeight);
+	return new AABB(new Vec2().subVectors(image, halfSize)).addPoint(new Vec2().addVectors(image, halfSize));
 }
 
 export function isValidImage(image: SketchImage): boolean {

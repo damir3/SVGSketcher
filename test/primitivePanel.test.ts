@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
-import { dist } from '../src/math/vector';
 
 describe('PrimitivePanel Integration', () => {
 	it('SketchLine uses PrimitivePanel for sidebar inspector rendering', () => {

@@ -192,7 +192,8 @@ describe('image trace geometry', () => {
 		const image = sketch.addImage({ ...sketchImage });
 		const traceSettings = settings();
 		const result = traceImage(makeImage(200, 140, roundedRect), traceSettings);
-		const built = buildTraceGeometry(sketch, result, image, traceSettings);
+		// The worker transfers coordinates through structured clone.
+		const built = buildTraceGeometry(sketch, structuredClone(result), image, traceSettings);
 
 		assert.equal(sketch.lines.size, 4);
 		assert.equal(sketch.arcs.size, 4);

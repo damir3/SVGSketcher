@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import { AABB } from '../../../math/aabb';
 import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
-import { dot, sub, dist, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import type { HoverTarget } from '../hoverTarget';
 import {
@@ -32,7 +32,7 @@ export class FilletTool extends BaseTool {
 		super();
 		this.popup = new ToolPopup<'radius'>({
 			className: 'fillet-popup',
-			defaultOffset: { x: 150, y: 40 },
+			defaultOffset: new Vec2(150, 40),
 			fields: [
 				{
 					id: 'radius',
@@ -156,18 +156,18 @@ export class FilletTool extends BaseTool {
 		// 1. Check for Fillet Gizmo handle dragging
 		if (this.ctx.renderer.filletGizmoHandle) {
 			const gh = this.ctx.renderer.filletGizmoHandle;
-			if (dist(screen, { x: gh.screenX, y: gh.screenY }) <= GIZMO_DISTANCE_PX) {
+			if (screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX) {
 				const active = this.pendingFillets.find(pf => pf.id === this.activeFilletId) ?? this.pendingFillets.at(-1);
-				const inward = { x: -gh.worldBisectorDir.x, y: -gh.worldBisectorDir.y };
+				const inward = gh.worldBisectorDir.clone().negate();
 				const travelPerRadius =
 					active?.result && active.primitive1.type === 'line' && active.primitive2.type === 'line'
-						? dot(sub(gh.worldMidArc, active.result.cornerVertex), inward) / gh.radius
+						? new Vec2().subVectors(gh.worldMidArc, active.result.cornerVertex).dot(inward) / gh.radius
 						: 1;
 				const gain = travelPerRadius > 1e-6 ? 1 / travelPerRadius : 1;
 				this.filletGizmoDragState = {
 					startMouseWorld: world,
 					startRadius: gh.radius,
-					radiusPerWorldUnit: { x: inward.x * gain, y: inward.y * gain },
+					radiusPerWorldUnit: inward.clone().multiplyScalar(gain),
 				};
 				this.ctx.setCursor('grabbing');
 				e.raw.preventDefault();
@@ -241,8 +241,8 @@ export class FilletTool extends BaseTool {
 		}
 		if (this.ctx.renderer?.filletGizmoHandle) {
 			const gh = this.ctx.renderer.filletGizmoHandle;
-			pts.push({ x: gh.screenX - 16, y: gh.screenY - 16 });
-			pts.push({ x: gh.screenX + 16, y: gh.screenY + 16 });
+			pts.push(new Vec2(gh.screenX - 16, gh.screenY - 16));
+			pts.push(new Vec2(gh.screenX + 16, gh.screenY + 16));
 		}
 
 		if (pts.length === 0) return null;
@@ -257,7 +257,7 @@ export class FilletTool extends BaseTool {
 		// Gizmo drag handling
 		if (this.filletGizmoDragState) {
 			const { startMouseWorld, startRadius, radiusPerWorldUnit } = this.filletGizmoDragState;
-			const delta = dot(sub(world, startMouseWorld), radiusPerWorldUnit);
+			const delta = new Vec2().subVectors(world, startMouseWorld).dot(radiusPerWorldUnit);
 			const newRadius = Math.max(0.5, startRadius + delta);
 			if (Math.abs(newRadius - this.filletRadius) > 1e-4) {
 				const oldRadius = this.filletRadius;
@@ -279,10 +279,9 @@ export class FilletTool extends BaseTool {
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
 		const isOverGizmo =
 			this.ctx.renderer.filletGizmoHandle &&
-			dist(screen, {
-				x: this.ctx.renderer.filletGizmoHandle.screenX,
-				y: this.ctx.renderer.filletGizmoHandle.screenY,
-			}) <= GIZMO_DISTANCE_PX;
+			screen.distanceTo(
+				new Vec2(this.ctx.renderer.filletGizmoHandle.screenX, this.ctx.renderer.filletGizmoHandle.screenY)
+			) <= GIZMO_DISTANCE_PX;
 
 		if (isOverGizmo) {
 			this.ctx.setCursor('grab');
@@ -439,7 +438,7 @@ export class FilletTool extends BaseTool {
 		let candidateResult: FilletResult | null = null;
 		if (c1 && c2) {
 			const filletOpts = {
-				cornerVertex: { x: pt.x, y: pt.y },
+				cornerVertex: pt.clone(),
 				endPointId1: prim1.endPointId,
 				endPointId2: prim2.endPointId,
 			};
@@ -537,7 +536,7 @@ export class FilletTool extends BaseTool {
 				if (conn1.pointIds.has(ep2)) {
 					const pt = this.ctx.sketch.points.get(ep1);
 					if (pt) {
-						sharedCornerPt = { x: pt.x, y: pt.y };
+						sharedCornerPt = pt.clone();
 						endPointId1 = ep1;
 						endPointId2 = ep2;
 						candidate.vertexPointId = ep1;
@@ -605,7 +604,7 @@ export class FilletTool extends BaseTool {
 				let cornerVertex: Vec2 | undefined;
 				if (pf.vertexPointId) {
 					const pt = this.ctx.sketch.points.get(pf.vertexPointId);
-					if (pt) cornerVertex = { x: pt.x, y: pt.y };
+					if (pt) cornerVertex = pt.clone();
 				}
 				pf.result = calculateFilletGeometry(c1, c2, this.filletRadius, {
 					cornerVertex,

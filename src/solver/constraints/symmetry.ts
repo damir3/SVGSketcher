@@ -1,4 +1,4 @@
-import { cross, dot, mid, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -63,16 +63,16 @@ export class SymmetryConstraint extends BaseConstraint {
 		const a = readParamPoint(paramMap, this.lineP1Id);
 		const b = readParamPoint(paramMap, this.lineP2Id);
 
-		const dir = sub(b, a);
-		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const dir = new Vec2().subVectors(b, a);
+		const lineLen = Math.max(dir.length(), 1e-7);
 
 		// Equation 0: Midpoint of (P1, P2) lies on the line AB
-		const midpoint = mid(p1, p2);
-		const eq0 = (cross(sub(midpoint, a), dir) / lineLen) * this.weight;
+		const midpoint = new Vec2().midpoint(p1, p2);
+		const eq0 = (new Vec2().subVectors(midpoint, a).cross(dir) / lineLen) * this.weight;
 
 		// Equation 1: Chord vector (P2 - P1) is perpendicular to line AB
-		const chord = sub(p2, p1);
-		const eq1 = (dot(chord, dir) / lineLen) * this.weight;
+		const chord = new Vec2().subVectors(p2, p1);
+		const eq1 = (chord.dot(dir) / lineLen) * this.weight;
 
 		return [eq0, eq1];
 	}
@@ -99,8 +99,8 @@ export class SymmetryConstraint extends BaseConstraint {
 			createSvgLine(s1, s2, SYMMETRY_CHORD_ATTRS, ctx.targetGroup);
 		}
 
-		ctx.renderBadge(this.id, { x: s1.x + 12, y: s1.y - 12 }, 'symmetry', COLORS.primary);
-		ctx.renderBadge(this.id, { x: s2.x + 12, y: s2.y - 12 }, 'symmetry', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s1.x + 12, s1.y - 12), 'symmetry', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s2.x + 12, s2.y - 12), 'symmetry', COLORS.primary);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
@@ -110,8 +110,8 @@ export class SymmetryConstraint extends BaseConstraint {
 
 		const s1 = viewport.worldToScreen(p1);
 		const s2 = viewport.worldToScreen(p2);
-		const d1 = distanceToPoint(screen, { x: s1.x + 12, y: s1.y - 12 });
-		const d2 = distanceToPoint(screen, { x: s2.x + 12, y: s2.y - 12 });
+		const d1 = distanceToPoint(screen, new Vec2(s1.x + 12, s1.y - 12));
+		const d2 = distanceToPoint(screen, new Vec2(s2.x + 12, s2.y - 12));
 		return Math.min(d1, d2);
 	}
 }

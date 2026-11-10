@@ -1,4 +1,5 @@
-import type { Vec2 } from '../../math/vector';
+import { evaluateBezier, type BezierSegment } from '../../math/spline';
+import { Vec2 } from '../../math/vector';
 import type { FitOptions } from './types';
 
 /** A fitted piece of a polyline, between point indices `start` and `end` of the processed polyline. */
@@ -16,7 +17,7 @@ export interface FittedPolyline {
 	closed: boolean;
 }
 
-const len = (a: Vec2, b: Vec2) => Math.hypot(b.x - a.x, b.y - a.y);
+const len = (a: Vec2, b: Vec2) => a.distanceTo(b);
 
 export function polylineLength(points: Vec2[]): number {
 	let total = 0;
@@ -31,7 +32,7 @@ export function resample(points: Vec2[], spacing: number, closed: boolean): Vec2
 	const total = polylineLength(source);
 	const count = Math.max(closed ? 3 : 1, Math.round(total / spacing));
 	const step = total / count;
-	const out: Vec2[] = [{ ...source[0] }];
+	const out: Vec2[] = [Vec2.from(source[0])];
 	let segment = 1;
 	let segmentStart = 0;
 	for (let k = 1; k < count; k++) {
@@ -44,22 +45,22 @@ export function resample(points: Vec2[], spacing: number, closed: boolean): Vec2
 		const b = source[segment];
 		const l = len(a, b);
 		const t = l > 1e-12 ? Math.min(1, Math.max(0, (target - segmentStart) / l)) : 0;
-		out.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+		out.push(a.clone().lerp(b, t));
 	}
-	if (!closed) out.push({ ...source[source.length - 1] });
+	if (!closed) out.push(Vec2.from(source[source.length - 1]));
 	return out;
 }
 
 /** Gaussian smoothing of polyline points; open polylines keep their end points. */
 export function smooth(points: Vec2[], sigma: number, closed: boolean, pinned?: Set<number>): Vec2[] {
-	if (sigma <= 0.05 || points.length < 3) return points.map(p => ({ ...p }));
+	if (sigma <= 0.05 || points.length < 3) return points.map(p => Vec2.from(p));
 	const radius = Math.ceil(sigma * 2.5);
 	const weights: number[] = [];
 	for (let k = -radius; k <= radius; k++) weights.push(Math.exp(-(k * k) / (2 * sigma * sigma)));
 	const n = points.length;
 	return points.map((point, i) => {
-		if (pinned?.has(i)) return { ...point };
-		if (!closed && (i === 0 || i === n - 1)) return { ...point };
+		if (pinned?.has(i)) return Vec2.from(point);
+		if (!closed && (i === 0 || i === n - 1)) return Vec2.from(point);
 		let sx = 0;
 		let sy = 0;
 		let total = 0;
@@ -80,7 +81,7 @@ export function smooth(points: Vec2[], sigma: number, closed: boolean, pinned?: 
 			sy += points[j].y * w;
 			total += w;
 		}
-		return { x: sx / total, y: sy / total };
+		return new Vec2(sx / total, sy / total);
 	});
 }
 
@@ -219,7 +220,7 @@ export function fitCircle(points: Vec2[], from = 0, to = points.length - 1): Cir
 		if (Math.hypot(solution[0], solution[1], solution[2]) < 1e-6) break;
 	}
 	if (!(r > 0) || !Number.isFinite(cx) || !Number.isFinite(cy)) return null;
-	return { center: { x: cx, y: cy }, radius: r };
+	return { center: new Vec2(cx, cy), radius: r };
 }
 
 function solve3(
@@ -267,11 +268,11 @@ function lineDeviation(points: Vec2[], from: number, to: number): number {
 /** Signed angle swept from a to b around c, accumulated along the points. Returns null if direction reverses. */
 function arcSweep(points: Vec2[], from: number, to: number, center: Vec2): number | null {
 	let total = 0;
-	let previous = Math.atan2(points[from].y - center.y, points[from].x - center.x);
+	let previous = center.angleToPoint(points[from]);
 	let positive = 0;
 	let negative = 0;
 	for (let i = from + 1; i <= to; i++) {
-		const angle = Math.atan2(points[i].y - center.y, points[i].x - center.x);
+		const angle = center.angleToPoint(points[i]);
 		let delta = angle - previous;
 		if (delta > Math.PI) delta -= 2 * Math.PI;
 		if (delta < -Math.PI) delta += 2 * Math.PI;
@@ -328,7 +329,7 @@ export function fitSplineRun(
 		const a = isClosedLoop ? points[(((index - 2) % to) + to) % to] : points[Math.max(from, index - 2)];
 		const b = isClosedLoop ? points[(index + 2) % to] : points[Math.min(to, index + 2)];
 		const l = len(a, b);
-		return l < 1e-9 ? { x: 1, y: 0 } : { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
+		return l < 1e-9 ? new Vec2(1, 0) : new Vec2().subVectors(b, a).divideScalar(l);
 	};
 	const build = (indices: number[]) => {
 		const fit = indices.map(i => points[i]);
@@ -348,19 +349,11 @@ export function fitSplineRun(
 			const backward = previous || next;
 			const forward = next || previous;
 			return {
-				h1: { x: p.x - t.x * backward, y: p.y - t.y * backward },
-				h2: { x: p.x + t.x * forward, y: p.y + t.y * forward },
+				h1: p.clone().addScaledVector(t, -backward),
+				h2: p.clone().addScaledVector(t, forward),
 			};
 		});
 		return { points: fit, handles };
-	};
-	const bezierPoint = (p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number): Vec2 => {
-		const mt = 1 - t;
-		const a = mt * mt * mt;
-		const b = 3 * mt * mt * t;
-		const c = 3 * mt * t * t;
-		const d = t * t * t;
-		return { x: a * p0.x + b * p1.x + c * p2.x + d * p3.x, y: a * p0.y + b * p1.y + c * p2.y + d * p3.y };
 	};
 	const lengths = cumulativeLengths(points);
 
@@ -404,7 +397,8 @@ export function fitSplineRun(
 			const c1 = handles[k].h2;
 			const c2 = handles[k + 1].h1;
 			const samples: Vec2[] = [];
-			for (let s = 0; s <= 16; s++) samples.push(bezierPoint(p0, c1, c2, p3, s / 16));
+			const segment: BezierSegment = [p0, c1, c2, p3];
+			for (let s = 0; s <= 16; s++) samples.push(evaluateBezier(segment, s / 16));
 			const span = lengths[i1] - lengths[i0];
 			for (let i = i0 + 1; i < i1; i++) {
 				const t = span > 1e-9 ? (lengths[i] - lengths[i0]) / span : 0.5;
@@ -483,7 +477,7 @@ class CircleSums {
 		const cv = (bv * suu - bu * suv) / det;
 		const radius = Math.sqrt(cu * cu + cv * cv + (suu + svv) / n);
 		if (!Number.isFinite(radius)) return null;
-		return { center: { x: cu + mx + this.ox, y: cv + my + this.oy }, radius };
+		return { center: new Vec2(cu + mx + this.ox, cv + my + this.oy), radius };
 	}
 }
 
@@ -692,7 +686,7 @@ export function fitPolyline(input: PolylineFitInput, options: FitOptions): Fitte
 		const startIndex = corners.length ? corners[0] : bestClosedStart(points, options);
 		points = [...points.slice(startIndex), ...points.slice(0, startIndex)];
 		corners = corners.map(c => (c - startIndex + points.length) % points.length).sort((a, b) => a - b);
-		points.push({ ...points[0] });
+		points.push(Vec2.from(points[0]));
 		if (!corners.length || corners[0] !== 0) corners.unshift(0);
 	}
 
@@ -718,15 +712,12 @@ export function fitPolyline(input: PolylineFitInput, options: FitOptions): Fitte
 		if (piece.kind !== 'arc') continue;
 		for (const idx of [piece.start, piece.end]) {
 			const p = points[idx];
-			const angle = Math.atan2(p.y - piece.center.y, p.x - piece.center.x);
-			points[idx] = {
-				x: piece.center.x + piece.radius * Math.cos(angle),
-				y: piece.center.y + piece.radius * Math.sin(angle),
-			};
+			const angle = piece.center.angleToPoint(p);
+			points[idx] = Vec2.fromPolar(piece.radius, angle).add(piece.center);
 		}
 	}
 	if (closed && points.length > 1) {
-		points[points.length - 1] = { ...points[0] };
+		points[points.length - 1] = Vec2.from(points[0]);
 	}
 
 	const isInflectionLineBetweenConvertedArcs = (index: number): boolean => {
@@ -771,7 +762,7 @@ export function fitPolyline(input: PolylineFitInput, options: FitOptions): Fitte
 			const n = points.length - 1;
 			const shift = pieces[firstNonSpline].start;
 			const loop = points.slice(0, n);
-			points = [...loop.slice(shift), ...loop.slice(0, shift), { ...loop[shift] }];
+			points = [...loop.slice(shift), ...loop.slice(0, shift), Vec2.from(loop[shift])];
 			pieces = [...pieces.slice(firstNonSpline), ...pieces.slice(0, firstNonSpline)].map(p => {
 				const start = (p.start - shift + n) % n;
 				const endRaw = (p.end - shift + n) % n;
@@ -819,8 +810,8 @@ function pieceToKnots(points: Vec2[], piece: FittedPiece): SplineKnot[] {
 		const a = points[piece.start];
 		const b = points[piece.end];
 		return [
-			{ point: { x: a.x, y: a.y }, inVec: null, outVec: null },
-			{ point: { x: b.x, y: b.y }, inVec: null, outVec: null },
+			{ point: a.clone(), inVec: null, outVec: null },
+			{ point: b.clone(), inVec: null, outVec: null },
 		];
 	}
 	if (piece.kind === 'arc') {
@@ -829,35 +820,29 @@ function pieceToKnots(points: Vec2[], piece: FittedPiece): SplineKnot[] {
 		const mid = points[Math.round((piece.start + piece.end) / 2)];
 		const { center, radius } = piece;
 		const ccw = (from: number, to: number) => (((to - from) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-		const thetaA = Math.atan2(a.y - center.y, a.x - center.x);
-		const thetaMid = Math.atan2(mid.y - center.y, mid.x - center.x);
-		const thetaB = Math.atan2(b.y - center.y, b.x - center.x);
+		const thetaA = center.angleToPoint(a);
+		const thetaMid = center.angleToPoint(mid);
+		const thetaB = center.angleToPoint(b);
 		const ccwTotal = ccw(thetaA, thetaB);
 		const ccwMid = ccw(thetaA, thetaMid);
 		const sweep = ccwMid <= ccwTotal ? ccwTotal : ccwTotal - 2 * Math.PI;
 		const segCount = Math.max(1, Math.ceil(Math.abs(sweep) / (Math.PI / 2)));
 		const alpha = sweep / segCount;
 		const dir = sweep >= 0 ? 1 : -1;
-		const rA = Math.hypot(a.x - center.x, a.y - center.y) || radius;
-		const rB = Math.hypot(b.x - center.x, b.y - center.y) || radius;
+		const rA = center.distanceTo(a) || radius;
+		const rB = center.distanceTo(b) || radius;
 		const kFactor = (4 / 3) * Math.tan(Math.abs(alpha) / 4);
 		const knots: SplineKnot[] = [];
 		for (let i = 0; i <= segCount; i++) {
 			const theta = thetaA + i * alpha;
 			const r = i === 0 ? rA : i === segCount ? rB : radius;
-			const pt =
-				i === 0
-					? { x: a.x, y: a.y }
-					: i === segCount
-						? { x: b.x, y: b.y }
-						: { x: center.x + radius * Math.cos(theta), y: center.y + radius * Math.sin(theta) };
-			const tx = -dir * Math.sin(theta);
-			const ty = dir * Math.cos(theta);
+			const pt = i === 0 ? a.clone() : i === segCount ? b.clone() : Vec2.fromPolar(radius, theta).add(center);
+			const tangent = Vec2.fromPolar(1, theta).perpendicular().multiplyScalar(dir);
 			const hLen = kFactor * r;
 			knots.push({
 				point: pt,
-				inVec: i > 0 ? { x: -tx * hLen, y: -ty * hLen } : null,
-				outVec: i < segCount ? { x: tx * hLen, y: ty * hLen } : null,
+				inVec: i > 0 ? tangent.clone().multiplyScalar(-hLen) : null,
+				outVec: i < segCount ? tangent.multiplyScalar(hLen) : null,
 			});
 		}
 		return knots;
@@ -865,9 +850,9 @@ function pieceToKnots(points: Vec2[], piece: FittedPiece): SplineKnot[] {
 	return piece.points.map((pt, i) => {
 		const h = piece.handles[i];
 		return {
-			point: { x: pt.x, y: pt.y },
-			inVec: i > 0 ? { x: h.h1.x - pt.x, y: h.h1.y - pt.y } : null,
-			outVec: i < piece.points.length - 1 ? { x: h.h2.x - pt.x, y: h.h2.y - pt.y } : null,
+			point: pt.clone(),
+			inVec: i > 0 ? new Vec2().subVectors(h.h1, pt) : null,
+			outVec: i < piece.points.length - 1 ? new Vec2().subVectors(h.h2, pt) : null,
 		};
 	});
 }
@@ -884,16 +869,12 @@ export function piecesToSpline(
 	if (!closed && pieces.length === 1 && pieces[0].kind === 'line') {
 		const a = points[pieces[0].start];
 		const b = points[pieces[0].end];
-		const dx = (b.x - a.x) / 3;
-		const dy = (b.y - a.y) / 3;
+		const handle = new Vec2().subVectors(b, a).divideScalar(3);
 		return {
-			points: [
-				{ x: a.x, y: a.y },
-				{ x: b.x, y: b.y },
-			],
+			points: [a.clone(), b.clone()],
 			handles: [
-				{ h1: { x: a.x - dx, y: a.y - dy }, h2: { x: a.x + dx, y: a.y + dy } },
-				{ h1: { x: b.x - dx, y: b.y - dy }, h2: { x: b.x + dx, y: b.y + dy } },
+				{ h1: a.clone().sub(handle), h2: a.clone().add(handle) },
+				{ h1: b.clone().sub(handle), h2: b.clone().add(handle) },
 			],
 		};
 	}
@@ -922,58 +903,52 @@ export function piecesToSpline(
 		const p = knot.point;
 		const { inVec, outVec } = knot;
 		if (!inVec && !outVec) {
-			return [{ point: { ...p }, h1: { ...p }, h2: { ...p } }];
+			return [{ point: Vec2.from(p), h1: Vec2.from(p), h2: Vec2.from(p) }];
 		}
 		if (inVec && !outVec) {
 			if (!closed && isLast) {
 				return [
 					{
-						point: { ...p },
-						h1: { x: p.x + inVec.x, y: p.y + inVec.y },
-						h2: { x: p.x - inVec.x, y: p.y - inVec.y },
+						point: Vec2.from(p),
+						h1: new Vec2().addVectors(p, inVec),
+						h2: new Vec2().subVectors(p, inVec),
 					},
 				];
 			}
-			return [{ point: { ...p }, h1: { x: p.x + inVec.x, y: p.y + inVec.y }, h2: { ...p } }];
+			return [{ point: Vec2.from(p), h1: new Vec2().addVectors(p, inVec), h2: Vec2.from(p) }];
 		}
 		if (!inVec && outVec) {
 			if (!closed && isFirst) {
 				return [
 					{
-						point: { ...p },
-						h1: { x: p.x - outVec.x, y: p.y - outVec.y },
-						h2: { x: p.x + outVec.x, y: p.y + outVec.y },
+						point: Vec2.from(p),
+						h1: new Vec2().subVectors(p, outVec),
+						h2: new Vec2().addVectors(p, outVec),
 					},
 				];
 			}
-			return [{ point: { ...p }, h1: { ...p }, h2: { x: p.x + outVec.x, y: p.y + outVec.y } }];
+			return [{ point: Vec2.from(p), h1: Vec2.from(p), h2: new Vec2().addVectors(p, outVec) }];
 		}
-		const d1 = Math.hypot(inVec!.x, inVec!.y);
-		const d2 = Math.hypot(outVec!.x, outVec!.y);
-		if (d1 < 1e-9 && d2 < 1e-9) return [{ point: { ...p }, h1: { ...p }, h2: { ...p } }];
-		if (d1 < 1e-9) return [{ point: { ...p }, h1: { ...p }, h2: { x: p.x + outVec!.x, y: p.y + outVec!.y } }];
-		if (d2 < 1e-9) return [{ point: { ...p }, h1: { x: p.x + inVec!.x, y: p.y + inVec!.y }, h2: { ...p } }];
-		const u1x = -inVec!.x / d1;
-		const u1y = -inVec!.y / d1;
-		const u2x = outVec!.x / d2;
-		const u2y = outVec!.y / d2;
-		if (u1x * u2x + u1y * u2y >= Math.cos((20 * Math.PI) / 180)) {
-			const tx = u1x + u2x;
-			const ty = u1y + u2y;
-			const tl = Math.hypot(tx, ty) || 1;
-			const ux = tx / tl;
-			const uy = ty / tl;
+		const d1 = inVec!.length();
+		const d2 = outVec!.length();
+		if (d1 < 1e-9 && d2 < 1e-9) return [{ point: Vec2.from(p), h1: Vec2.from(p), h2: Vec2.from(p) }];
+		if (d1 < 1e-9) return [{ point: Vec2.from(p), h1: Vec2.from(p), h2: new Vec2().addVectors(p, outVec!) }];
+		if (d2 < 1e-9) return [{ point: Vec2.from(p), h1: new Vec2().addVectors(p, inVec!), h2: Vec2.from(p) }];
+		const incoming = inVec!.clone().negate().divideScalar(d1);
+		const outgoing = outVec!.clone().divideScalar(d2);
+		if (incoming.dot(outgoing) >= Math.cos((20 * Math.PI) / 180)) {
+			const tangent = incoming.add(outgoing).normalize();
 			return [
 				{
-					point: { ...p },
-					h1: { x: p.x - ux * d1, y: p.y - uy * d1 },
-					h2: { x: p.x + ux * d2, y: p.y + uy * d2 },
+					point: Vec2.from(p),
+					h1: p.clone().addScaledVector(tangent, -d1),
+					h2: p.clone().addScaledVector(tangent, d2),
 				},
 			];
 		}
 		return [
-			{ point: { ...p }, h1: { x: p.x + inVec!.x, y: p.y + inVec!.y }, h2: { ...p } },
-			{ point: { ...p }, h1: { ...p }, h2: { x: p.x + outVec!.x, y: p.y + outVec!.y } },
+			{ point: Vec2.from(p), h1: new Vec2().addVectors(p, inVec!), h2: Vec2.from(p) },
+			{ point: Vec2.from(p), h1: Vec2.from(p), h2: new Vec2().addVectors(p, outVec!) },
 		];
 	};
 
@@ -998,8 +973,8 @@ export function piecesToSpline(
 		outHandles.push({ h1: seamTrailing.h1, h2: seamTrailing.h2 });
 	}
 	if (closed && outPoints.length > 0) {
-		outPoints.push({ ...outPoints[0] });
-		outHandles.push({ h1: { ...outHandles[0].h1 }, h2: { ...outHandles[0].h2 } });
+		outPoints.push(Vec2.from(outPoints[0]));
+		outHandles.push({ h1: Vec2.from(outHandles[0].h1), h2: Vec2.from(outHandles[0].h2) });
 	}
 	return { points: outPoints, handles: outHandles };
 }
@@ -1013,17 +988,12 @@ export function circleToClosedSpline(circle: CircleFit): {
 	const r = circle.radius;
 	const k = (4 / 3) * Math.tan(Math.PI / 8) * r;
 	return {
-		points: [
-			{ x: cx + r, y: cy },
-			{ x: cx, y: cy + r },
-			{ x: cx - r, y: cy },
-			{ x: cx, y: cy - r },
-		],
+		points: [new Vec2(cx + r, cy), new Vec2(cx, cy + r), new Vec2(cx - r, cy), new Vec2(cx, cy - r)],
 		handles: [
-			{ h1: { x: cx + r, y: cy - k }, h2: { x: cx + r, y: cy + k } },
-			{ h1: { x: cx + k, y: cy + r }, h2: { x: cx - k, y: cy + r } },
-			{ h1: { x: cx - r, y: cy + k }, h2: { x: cx - r, y: cy - k } },
-			{ h1: { x: cx - k, y: cy - r }, h2: { x: cx + k, y: cy - r } },
+			{ h1: new Vec2(cx + r, cy - k), h2: new Vec2(cx + r, cy + k) },
+			{ h1: new Vec2(cx + k, cy + r), h2: new Vec2(cx - k, cy + r) },
+			{ h1: new Vec2(cx - r, cy + k), h2: new Vec2(cx - r, cy - k) },
+			{ h1: new Vec2(cx - k, cy - r), h2: new Vec2(cx + k, cy - r) },
 		],
 	};
 }

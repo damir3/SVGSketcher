@@ -1,5 +1,5 @@
 import * as opentype from 'opentype.js';
-import { angleFromTo, vec, dist, distancesFrom, mid, normalize, normalizeOrNull, sub, type Vec2 } from './vector';
+import { Vec2 } from './vector';
 import type { GeoCurve, GeoSegment, GeoEllipse, GeoEllipticalArc, GeoSpline } from './intersection';
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
 import { evaluateBezier, evaluateBezierDerivative } from './spline';
@@ -33,8 +33,8 @@ export interface PathEvaluator {
 
 function createEllipsePathEvaluator(curve: GeoEllipse | GeoEllipticalArc): PathEvaluator {
 	const { center, majorAxisPoint, minorAxisPoint } = curve;
-	const radii = distancesFrom(center, majorAxisPoint, minorAxisPoint);
-	const { axisU, axisV } = ellipseAxes(angleFromTo(center, majorAxisPoint));
+	const radii = center.distancesTo(majorAxisPoint, minorAxisPoint);
+	const { axisU, axisV } = ellipseAxes(center.angleToPoint(majorAxisPoint));
 	const fullTurn = 2 * Math.PI;
 	const direction = curve.type === 'ellipse' || curve.clockwise ? -1 : 1;
 	let start = Math.PI;
@@ -58,7 +58,7 @@ function createEllipsePathEvaluator(curve: GeoEllipse | GeoEllipticalArc): PathE
 	let previous = ellipsePointAtParameter(start, center, radii, axisU, axisV);
 	for (let i = 1; i < angles.length; i++) {
 		const point = ellipsePointAtParameter(start + direction * angles[i], center, radii, axisU, axisV);
-		lengths.push(lengths[i - 1] + dist(previous, point));
+		lengths.push(lengths[i - 1] + previous.distanceTo(point));
 		previous = point;
 	}
 
@@ -82,11 +82,11 @@ function createEllipsePathEvaluator(curve: GeoEllipse | GeoEllipticalArc): PathE
 			const theta = start + direction * angle;
 			const du = -radii.x * Math.sin(theta);
 			const dv = radii.y * Math.cos(theta);
-			const forward = normalize(vec(du * axisU.x + dv * axisV.x, du * axisU.y + dv * axisV.y));
+			const forward = axisU.clone().multiplyScalar(du).addScaledVector(axisV, dv).normalizeOrUnitX();
 			return {
 				point: ellipsePointAtParameter(theta, center, radii, axisU, axisV),
-				tangent: vec(direction * forward.x, direction * forward.y),
-				normal: vec(forward.y, -forward.x),
+				tangent: forward.clone().multiplyScalar(direction),
+				normal: forward.clone().perpendicular().negate(),
 			};
 		},
 	};
@@ -96,16 +96,16 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 	switch (curve.type) {
 		case 'segment': {
 			const seg = curve as GeoSegment;
-			const totalLen = dist(seg.p1, seg.p2);
-			const delta = sub(seg.p2, seg.p1);
-			const dir = totalLen > 1e-9 ? vec(delta.x / totalLen, delta.y / totalLen) : vec(1, 0);
-			const norm = vec(-dir.y, dir.x);
+			const totalLen = seg.p1.distanceTo(seg.p2);
+			const delta = new Vec2().subVectors(seg.p2, seg.p1);
+			const dir = totalLen > 1e-9 ? delta.clone().divideScalar(totalLen) : new Vec2(1, 0);
+			const norm = dir.clone().perpendicular();
 			return {
 				length: totalLen,
 				getSampleAtDistance(s: number) {
 					const clampedS = Math.max(0, Math.min(totalLen, s));
 					return {
-						point: vec(seg.p1.x + dir.x * clampedS, seg.p1.y + dir.y * clampedS),
+						point: seg.p1.clone().addScaledVector(dir, clampedS),
 						tangent: dir,
 						normal: norm,
 					};
@@ -117,10 +117,10 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 			const { center, radius } = curve;
 			const fullTurn = 2 * Math.PI;
 			const direction = curve.type === 'circle' || curve.clockwise ? -1 : 1;
-			const start = curve.type === 'circle' ? Math.PI : angleFromTo(center, curve.start);
+			const start = curve.type === 'circle' ? Math.PI : center.angleToPoint(curve.start);
 			let sweep = fullTurn;
 			if (curve.type === 'arc') {
-				const end = angleFromTo(center, curve.end);
+				const end = center.angleToPoint(curve.end);
 				sweep = (direction * (end - start)) % fullTurn;
 				if (sweep <= 0) sweep += fullTurn;
 			}
@@ -130,12 +130,11 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 				getSampleAtDistance(s: number) {
 					const offset = radius > 0 ? (s % circumference) / radius : 0;
 					const theta = start + direction * offset;
-					const cos = Math.cos(theta);
-					const sin = Math.sin(theta);
+					const normal = Vec2.fromPolar(1, theta);
 					return {
-						point: vec(center.x + radius * cos, center.y + radius * sin),
-						tangent: vec(-direction * sin, direction * cos),
-						normal: vec(cos, sin),
+						point: center.clone().addScaledVector(normal, radius),
+						tangent: normal.clone().perpendicular().multiplyScalar(direction),
+						normal,
 					};
 				},
 			};
@@ -150,7 +149,7 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 				return {
 					length: 0,
 					getSampleAtDistance() {
-						return { point: vec(0, 0), tangent: vec(1, 0), normal: vec(0, 1) };
+						return { point: new Vec2(0, 0), tangent: new Vec2(1, 0), normal: new Vec2(0, 1) };
 					},
 				};
 			}
@@ -169,7 +168,7 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 				for (let step = 1; step <= stepsPerSeg; step++) {
 					const t = step / stepsPerSeg;
 					const p = evaluateBezier(seg, t);
-					cumLen += dist(prevP, p);
+					cumLen += prevP.distanceTo(p);
 					subSamples.push({ t, segIdx: i, cumLen });
 					prevP = p;
 				}
@@ -203,8 +202,8 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 					const seg = segments[s1.segIdx];
 					const pt = evaluateBezier(seg, t);
 					const d = evaluateBezierDerivative(seg, t);
-					const tan = normalizeOrNull(d, 1e-9) ?? vec(1, 0);
-					const norm = vec(-tan.y, tan.x);
+					const tan = d.clone().normalizeOrNull(1e-9) ?? new Vec2(1, 0);
+					const norm = tan.clone().perpendicular();
 					return {
 						point: pt,
 						tangent: tan,
@@ -217,7 +216,7 @@ export function createPathEvaluator(curve: GeoCurve): PathEvaluator {
 			return {
 				length: 0,
 				getSampleAtDistance() {
-					return { point: vec(0, 0), tangent: vec(1, 0), normal: vec(0, 1) };
+					return { point: new Vec2(0, 0), tangent: new Vec2(1, 0), normal: new Vec2(0, 1) };
 				},
 			};
 	}
@@ -245,14 +244,14 @@ export function generateTextSvgPathData(
 
 	if (options.mode === 'text' && options.rectangleCorners) {
 		const [p0, p1, _p2, p3] = options.rectangleCorners;
-		const width = dist(p0, p1);
-		const height = dist(p0, p3);
+		const width = p0.distanceTo(p1);
+		const height = p0.distanceTo(p3);
 
 		if (width <= 1e-3 || height <= 1e-3) return '';
 
-		const center = mid(p0, _p2);
-		const ux = normalize(vec(p1.x - p0.x, p1.y - p0.y));
-		const uy = normalize(vec(p0.x - p3.x, p0.y - p3.y));
+		const center = new Vec2().midpoint(p0, _p2);
+		const ux = new Vec2().subVectors(p1, p0).normalizeOrUnitX();
+		const uy = new Vec2().subVectors(p0, p3).normalizeOrUnitX();
 
 		const lines = (options.text || '').split(/\r?\n/);
 		const numLines = Math.max(1, lines.length);
@@ -320,10 +319,10 @@ export function generateTextSvgPathData(
 						}
 
 						// Map to CAD coordinates
-						const cad = vec(center.x + lx * ux.x + ly * uy.x, center.y + lx * ux.y + ly * uy.y);
+						const cad = center.clone().addScaledVector(ux, lx).addScaledVector(uy, ly);
 
 						if (isSvgCoord) {
-							return vec(cad.x, -cad.y);
+							return new Vec2(cad.x, -cad.y);
 						}
 						return cad;
 					};
@@ -398,7 +397,7 @@ export function generateTextSvgPathData(
 			let norm = sample.normal;
 
 			if (options.flipHorizontal) {
-				tan = vec(-tan.x, -tan.y);
+				tan = tan.clone().negate();
 			}
 
 			const gPath = g.getPath(0, 0, effectiveHeight);
@@ -408,10 +407,10 @@ export function generateTextSvgPathData(
 					const dx = x - w / 2;
 					const dy = normalOffset + normalDirection * y;
 
-					const cad = vec(sample.point.x + dx * tan.x + dy * norm.x, sample.point.y + dx * tan.y + dy * norm.y);
+					const cad = sample.point.clone().addScaledVector(tan, dx).addScaledVector(norm, dy);
 
 					if (isSvgCoord) {
-						return vec(cad.x, -cad.y);
+						return new Vec2(cad.x, -cad.y);
 					}
 					return cad;
 				};

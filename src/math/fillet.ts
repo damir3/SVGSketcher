@@ -1,5 +1,4 @@
-import type { Vec2 } from './vector';
-import { angleFromTo, add, addScaled, cross, dist, dot, mix, normalize, sub } from './vector';
+import { Vec2 } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchLine, SketchSpline } from '../model/types';
 import { remapLineConstraints } from '../model/constraintLinks';
@@ -155,11 +154,11 @@ export interface FilletCandidate {
  * Calculates intersection of two infinite 2D lines
  */
 function intersectLines(p1: Vec2, d1: Vec2, p2: Vec2, d2: Vec2): Vec2 | null {
-	const determinant = cross(d1, d2);
+	const determinant = d1.cross(d2);
 	if (Math.abs(determinant) < 1e-9) return null;
-	const dir = sub(p2, p1);
-	const t = cross(dir, d2) / determinant;
-	return addScaled(p1, d1, t);
+	const dir = new Vec2().subVectors(p2, p1);
+	const t = dir.cross(d2) / determinant;
+	return p1.clone().addScaledVector(d1, t);
 }
 
 /**
@@ -170,9 +169,9 @@ export function evaluateCurveExtended(curve: GeoCurve, t: number): { point: Vec2
 	if (curve.type === 'segment') {
 		const p1 = curve.p1;
 		const p2 = curve.p2;
-		const d = normalize(sub(p2, p1));
-		const normal = { x: -d.y, y: d.x };
-		const point = mix(p1, p2, t);
+		const d = new Vec2().subVectors(p2, p1).normalizeOrUnitX();
+		const normal = d.clone().perpendicular();
+		const point = p1.clone().lerp(p2, t);
 		return { point, tangent: d, normal };
 	}
 
@@ -180,8 +179,8 @@ export function evaluateCurveExtended(curve: GeoCurve, t: number): { point: Vec2
 		const point = getPointAtParam(curve, t);
 		const dt = 1e-4;
 		const pNext = getPointAtParam(curve, t + dt);
-		const tangent = normalize(sub(pNext, point));
-		const normal = { x: -tangent.y, y: tangent.x };
+		const tangent = new Vec2().subVectors(pNext, point).normalizeOrUnitX();
+		const normal = tangent.clone().perpendicular();
 		return { point, tangent, normal };
 	}
 
@@ -189,7 +188,7 @@ export function evaluateCurveExtended(curve: GeoCurve, t: number): { point: Vec2
 		const spline = curve;
 		const segs = spline.bezierSegments;
 		if (segs.length === 0) {
-			return { point: { x: 0, y: 0 }, tangent: { x: 1, y: 0 }, normal: { x: 0, y: 1 } };
+			return { point: new Vec2(0, 0), tangent: new Vec2(1, 0), normal: new Vec2(0, 1) };
 		}
 
 		if (t >= 0 && t <= 1) {
@@ -200,8 +199,8 @@ export function evaluateCurveExtended(curve: GeoCurve, t: number): { point: Vec2
 			const tB = Math.min(1, t + dt);
 			const pA = getPointAtParam(curve, tA);
 			const pB = getPointAtParam(curve, tB);
-			const tangent = normalize(sub(pB, pA));
-			const normal = { x: -tangent.y, y: tangent.x };
+			const tangent = new Vec2().subVectors(pB, pA).normalizeOrUnitX();
+			const normal = tangent.clone().perpendicular();
 			return { point: pt, tangent, normal };
 		}
 
@@ -209,31 +208,25 @@ export function evaluateCurveExtended(curve: GeoCurve, t: number): { point: Vec2
 		if (t < 0) {
 			const p0 = segs[0][0];
 			const p1 = segs[0][1];
-			const d = normalize(sub(p1, p0));
-			const point = {
-				x: p0.x + t * d.x * 100,
-				y: p0.y + t * d.y * 100,
-			};
+			const d = new Vec2().subVectors(p1, p0).normalizeOrUnitX();
+			const point = p0.clone().addScaledVector(d, 100 * t);
 			const tangent = d;
-			const normal = { x: -tangent.y, y: tangent.x };
+			const normal = tangent.clone().perpendicular();
 			return { point, tangent, normal };
 		} else {
 			const lastSeg = segs[segs.length - 1];
 			const pEnd = lastSeg[3];
 			const pPrev = lastSeg[2];
-			const d = normalize(sub(pEnd, pPrev));
-			const point = {
-				x: pEnd.x + (t - 1) * d.x * 100,
-				y: pEnd.y + (t - 1) * d.y * 100,
-			};
+			const d = new Vec2().subVectors(pEnd, pPrev).normalizeOrUnitX();
+			const point = pEnd.clone().addScaledVector(d, 100 * (t - 1));
 			const tangent = d;
-			const normal = { x: -tangent.y, y: tangent.x };
+			const normal = tangent.clone().perpendicular();
 			return { point, tangent, normal };
 		}
 	}
 
-	const pt = { x: 0, y: 0 };
-	return { point: pt, tangent: { x: 1, y: 0 }, normal: { x: 0, y: 1 } };
+	const pt = new Vec2(0, 0);
+	return { point: pt, tangent: new Vec2(1, 0), normal: new Vec2(0, 1) };
 }
 
 /**
@@ -243,25 +236,25 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
 	if (curve.type === 'segment') {
 		const p1 = curve.p1;
 		const p2 = curve.p2;
-		const delta = sub(p2, p1);
-		const lenSq = dot(delta, delta);
-		if (lenSq < 1e-12) return { t: 0, point: p1, dist: dist(pt, p1) };
-		const t = dot(sub(pt, p1), delta) / lenSq;
-		const proj = addScaled(p1, delta, t);
-		return { t, point: proj, dist: dist(pt, proj) };
+		const delta = new Vec2().subVectors(p2, p1);
+		const lenSq = delta.lengthSq();
+		if (lenSq < 1e-12) return { t: 0, point: p1, dist: pt.distanceTo(p1) };
+		const t = new Vec2().subVectors(pt, p1).dot(delta) / lenSq;
+		const proj = p1.clone().addScaledVector(delta, t);
+		return { t, point: proj, dist: pt.distanceTo(proj) };
 	}
 
 	if (curve.type === 'arc') {
-		const sc = { x: curve.center.x, y: -curve.center.y };
+		const sc = new Vec2(curve.center.x, -curve.center.y);
 		const r = curve.radius;
-		const spt = { x: pt.x, y: -pt.y };
-		const dCenter = normalize(sub(spt, sc));
-		const sproj = addScaled(sc, dCenter, r);
-		const ss = { x: curve.start.x, y: -curve.start.y };
-		const se = { x: curve.end.x, y: -curve.end.y };
-		const as = angleFromTo(sc, ss);
-		const ae = angleFromTo(sc, se);
-		const ap = angleFromTo(sc, sproj);
+		const spt = new Vec2(pt.x, -pt.y);
+		const dCenter = new Vec2().subVectors(spt, sc).normalizeOrUnitX();
+		const sproj = Vec2.from(sc).addScaledVector(dCenter, r);
+		const ss = new Vec2(curve.start.x, -curve.start.y);
+		const se = new Vec2(curve.end.x, -curve.end.y);
+		const as = Vec2.from(sc).angleToPoint(ss);
+		const ae = Vec2.from(sc).angleToPoint(se);
+		const ap = Vec2.from(sc).angleToPoint(sproj);
 		const clockwise = curve.clockwise;
 
 		let sweep = 0;
@@ -278,8 +271,8 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
 			if (cur < 0) cur += TWO_PI;
 		}
 		const t = sweep > 1e-6 ? cur / sweep : 0;
-		const proj = { x: sproj.x, y: -sproj.y };
-		return { t, point: proj, dist: dist(pt, proj) };
+		const proj = new Vec2(sproj.x, -sproj.y);
+		return { t, point: proj, dist: pt.distanceTo(proj) };
 	}
 
 	if (curve.type === 'spline') {
@@ -288,12 +281,12 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
 		if (segs.length > 0) {
 			const p0 = segs[0][0];
 			const p1 = segs[0][1];
-			const d0 = normalize(sub(p0, p1));
-			const v0 = sub(pt, p0);
-			const dot0 = dot(v0, d0);
+			const d0 = new Vec2().subVectors(p0, p1).normalizeOrUnitX();
+			const v0 = new Vec2().subVectors(pt, p0);
+			const dot0 = v0.dot(d0);
 			if (dot0 > 0) {
-				const projPt = addScaled(p0, d0, dot0);
-				const extDist = dist(pt, projPt);
+				const projPt = p0.clone().addScaledVector(d0, dot0);
+				const extDist = pt.distanceTo(projPt);
 				if (extDist < proj.distance) {
 					return { t: -dot0 / 100, point: projPt, dist: extDist };
 				}
@@ -302,12 +295,12 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
 			const lastSeg = segs[segs.length - 1];
 			const pEnd = lastSeg[3];
 			const pPrev = lastSeg[2];
-			const dEnd = normalize(sub(pEnd, pPrev));
-			const vEnd = sub(pt, pEnd);
-			const dotEnd = dot(vEnd, dEnd);
+			const dEnd = new Vec2().subVectors(pEnd, pPrev).normalizeOrUnitX();
+			const vEnd = new Vec2().subVectors(pt, pEnd);
+			const dotEnd = vEnd.dot(dEnd);
 			if (dotEnd > 0) {
-				const projPt = addScaled(pEnd, dEnd, dotEnd);
-				const extDist = dist(pt, projPt);
+				const projPt = pEnd.clone().addScaledVector(dEnd, dotEnd);
+				const extDist = pt.distanceTo(projPt);
 				if (extDist < proj.distance) {
 					return { t: 1 + dotEnd / 100, point: projPt, dist: extDist };
 				}
@@ -324,8 +317,8 @@ export function projectOntoCurveExtended(curve: GeoCurve, pt: Vec2): { t: number
  * between t1 and t2 on a circle centered at center.
  */
 function computeFilletArcClockwise(center: Vec2, t1: Vec2, t2: Vec2): boolean {
-	const asScreen = -angleFromTo(center, t1);
-	const aeScreen = -angleFromTo(center, t2);
+	const asScreen = -center.angleToPoint(t1);
+	const aeScreen = -center.angleToPoint(t2);
 	let sweepCW = (aeScreen - asScreen) % TWO_PI;
 	if (sweepCW < 0) sweepCW += TWO_PI;
 	return sweepCW < Math.PI;
@@ -335,10 +328,10 @@ function computeFilletArcClockwise(center: Vec2, t1: Vec2, t2: Vec2): boolean {
  * Calculates the midpoint of the minor arc (< 180°) between t1 and t2 on a circle centered at center.
  */
 function computeFilletMidArc(center: Vec2, t1: Vec2, t2: Vec2, radius: number): Vec2 {
-	const v1 = sub(t1, center);
-	const v2 = sub(t2, center);
-	const midDir = normalize(add(v1, v2));
-	return addScaled(center, midDir, radius);
+	const v1 = new Vec2().subVectors(t1, center);
+	const v2 = new Vec2().subVectors(t2, center);
+	const midDir = new Vec2().addVectors(v1, v2).normalizeOrUnitX();
+	return center.clone().addScaledVector(midDir, radius);
 }
 
 function solveFilletBranch(
@@ -353,7 +346,7 @@ function solveFilletBranch(
 ): { center: Vec2; pt1: Vec2; pt2: Vec2 } | null {
 	const r0 = Math.min(radius, 1.0);
 	const dTan0 = r0 / Math.tan(halfAngle);
-	const p0 = projectOntoCurveExtended(prim1, addScaled(V, dir1, dTan0));
+	const p0 = projectOntoCurveExtended(prim1, V.clone().addScaledVector(dir1, dTan0));
 	let t1 = p0.t;
 
 	const isSpline1 = prim1.type === 'spline';
@@ -362,8 +355,8 @@ function solveFilletBranch(
 	if (isSpline1) {
 		const s0 = evaluateCurveExtended(prim1, 0).point;
 		const s1 = evaluateCurveExtended(prim1, 1).point;
-		const d0 = Math.hypot(V.x - s0.x, V.y - s0.y);
-		const d1 = Math.hypot(V.x - s1.x, V.y - s1.y);
+		const d0 = s0.distanceTo(V);
+		const d1 = s1.distanceTo(V);
 		isEndpoint1 = Math.min(d0, d1) < 2.0;
 		isStart1 = d0 < d1;
 	}
@@ -374,32 +367,29 @@ function solveFilletBranch(
 	if (isSpline2) {
 		const s0 = evaluateCurveExtended(prim2, 0).point;
 		const s1 = evaluateCurveExtended(prim2, 1).point;
-		const d0 = Math.hypot(V.x - s0.x, V.y - s0.y);
-		const d1 = Math.hypot(V.x - s1.x, V.y - s1.y);
+		const d0 = s0.distanceTo(V);
+		const d1 = s1.distanceTo(V);
 		isEndpoint2 = Math.min(d0, d1) < 2.0;
 		isStart2 = d0 < d1;
 	}
 
 	// Consistent interior side of curves based on candidate normal pointing towards bisectorDir
 	const ev1_0 = evaluateCurveExtended(prim1, t1);
-	const na1 = { x: -ev1_0.tangent.y, y: ev1_0.tangent.x };
-	const dotNa1 = dot(na1, bisectorDir);
-	const side1 = Math.abs(dotNa1) > 1e-4 ? (dotNa1 > 0 ? 1 : -1) : dot(na1, dir2) > 0 ? 1 : -1;
+	const na1 = ev1_0.tangent.clone().perpendicular();
+	const dotNa1 = Vec2.from(na1).dot(bisectorDir);
+	const side1 = Math.abs(dotNa1) > 1e-4 ? (dotNa1 > 0 ? 1 : -1) : Vec2.from(na1).dot(dir2) > 0 ? 1 : -1;
 
-	const center0 = {
-		x: ev1_0.point.x + r0 * side1 * na1.x,
-		y: ev1_0.point.y + r0 * side1 * na1.y,
-	};
+	const center0 = ev1_0.point.clone().addScaledVector(na1, r0 * side1);
 	const proj2_0 = projectOntoCurveExtended(prim2, center0);
 	const ev2_0 = evaluateCurveExtended(prim2, proj2_0.t);
-	const na2 = { x: -ev2_0.tangent.y, y: ev2_0.tangent.x };
-	const dotNa2 = dot(na2, bisectorDir);
-	const side2 = Math.abs(dotNa2) > 1e-4 ? (dotNa2 > 0 ? 1 : -1) : dot(na2, dir1) > 0 ? 1 : -1;
+	const na2 = ev2_0.tangent.clone().perpendicular();
+	const dotNa2 = Vec2.from(na2).dot(bisectorDir);
+	const side2 = Math.abs(dotNa2) > 1e-4 ? (dotNa2 > 0 ? 1 : -1) : Vec2.from(na2).dot(dir1) > 0 ? 1 : -1;
 
 	const numSteps = radius <= 5 ? 1 : Math.max(2, Math.ceil(radius / 5));
-	let center = { x: 0, y: 0 };
-	let pt1 = { x: 0, y: 0 };
-	let pt2 = { x: 0, y: 0 };
+	let center = new Vec2(0, 0);
+	let pt1 = new Vec2(0, 0);
+	let pt2 = new Vec2(0, 0);
 
 	for (let s = 1; s <= numSteps; s++) {
 		const r = (radius * s) / numSteps;
@@ -408,20 +398,20 @@ function solveFilletBranch(
 		for (let iter = 0; iter < 24; iter++) {
 			const ev1 = evaluateCurveExtended(prim1, t1);
 			pt1 = ev1.point;
-			const n1 = { x: side1 * -ev1.tangent.y, y: side1 * ev1.tangent.x };
-			center = addScaled(pt1, n1, r);
+			const n1 = ev1.tangent.clone().perpendicular().multiplyScalar(side1);
+			center = Vec2.from(pt1).addScaledVector(n1, r);
 
 			const proj2 = projectOntoCurveExtended(prim2, center);
 			pt2 = proj2.point;
 			const ev2 = evaluateCurveExtended(prim2, proj2.t);
-			const n2 = { x: side2 * -ev2.tangent.y, y: side2 * ev2.tangent.x };
+			const n2 = ev2.tangent.clone().perpendicular().multiplyScalar(side2);
 
-			const signedDist = dot(sub(center, pt2), n2);
+			const signedDist = new Vec2().subVectors(center, pt2).dot(n2);
 			const err = signedDist - r;
 
-			const dotBisector = dot(sub(center, V), bisectorDir);
-			const dot1 = dot(sub(pt1, V), dir1);
-			const dot2 = dot(sub(pt2, V), dir2);
+			const dotBisector = new Vec2().subVectors(center, V).dot(bisectorDir);
+			const dot1 = new Vec2().subVectors(pt1, V).dot(dir1);
+			const dot2 = new Vec2().subVectors(pt2, V).dot(dir2);
 
 			// Center must stay in interior corner direction, and tangent points must not step backwards past corner
 			if (dotBisector <= 0 || dot1 < -1.0 || dot2 < -1.0) break;
@@ -435,15 +425,12 @@ function solveFilletBranch(
 
 			const dt = 1e-3;
 			const ev1Next = evaluateCurveExtended(prim1, t1 + dt);
-			const n1Next = { x: side1 * -ev1Next.tangent.y, y: side1 * ev1Next.tangent.x };
-			const centerNext = {
-				x: ev1Next.point.x + r * n1Next.x,
-				y: ev1Next.point.y + r * n1Next.y,
-			};
+			const n1Next = ev1Next.tangent.clone().perpendicular().multiplyScalar(side1);
+			const centerNext = ev1Next.point.clone().addScaledVector(n1Next, r);
 			const proj2Next = projectOntoCurveExtended(prim2, centerNext);
 			const ev2Next = evaluateCurveExtended(prim2, proj2Next.t);
-			const n2Next = { x: side2 * -ev2Next.tangent.y, y: side2 * ev2Next.tangent.x };
-			const signedDistNext = dot(sub(centerNext, proj2Next.point), n2Next);
+			const n2Next = ev2Next.tangent.clone().perpendicular().multiplyScalar(side2);
+			const signedDistNext = new Vec2().subVectors(centerNext, proj2Next.point).dot(n2Next);
 
 			const deriv = (signedDistNext - signedDist) / dt;
 			if (Math.abs(deriv) < 1e-6) break;
@@ -482,77 +469,77 @@ export function calculateFilletGeometry(
 
 		// Direction into curve 1 away from V
 		if (curve1.type === 'segment') {
-			const d1 = dist(V, curve1.p1);
-			const d2 = dist(V, curve1.p2);
+			const d1 = V.distanceTo(curve1.p1);
+			const d2 = V.distanceTo(curve1.p2);
 			if (d1 < d2) {
-				u1 = normalize(sub(curve1.p2, curve1.p1));
+				u1 = new Vec2().subVectors(curve1.p2, curve1.p1).normalizeOrUnitX();
 			} else {
-				u1 = normalize(sub(curve1.p1, curve1.p2));
+				u1 = new Vec2().subVectors(curve1.p1, curve1.p2).normalizeOrUnitX();
 			}
 		} else if (curve1.type === 'arc') {
-			const dStart = dist(V, curve1.start);
-			const dEnd = dist(V, curve1.end);
+			const dStart = V.distanceTo(curve1.start);
+			const dEnd = V.distanceTo(curve1.end);
 			if (dStart < dEnd) {
 				const ev = evaluateCurveExtended(curve1, 0.01);
-				u1 = normalize(sub(ev.point, V));
+				u1 = new Vec2().subVectors(ev.point, V).normalizeOrUnitX();
 			} else {
 				const ev = evaluateCurveExtended(curve1, 0.99);
-				u1 = normalize(sub(ev.point, V));
+				u1 = new Vec2().subVectors(ev.point, V).normalizeOrUnitX();
 			}
 		} else {
 			// Spline
 			const ev0 = evaluateCurveExtended(curve1, 0);
 			const ev1 = evaluateCurveExtended(curve1, 1);
-			if (dist(V, ev0.point) < dist(V, ev1.point)) {
+			if (V.distanceTo(ev0.point) < V.distanceTo(ev1.point)) {
 				u1 = ev0.tangent;
 			} else {
-				u1 = { x: -ev1.tangent.x, y: -ev1.tangent.y };
+				u1 = ev1.tangent.clone().negate();
 			}
 		}
 
 		// Direction into curve 2 away from V
 		if (curve2.type === 'segment') {
-			const d1 = dist(V, curve2.p1);
-			const d2 = dist(V, curve2.p2);
+			const d1 = V.distanceTo(curve2.p1);
+			const d2 = V.distanceTo(curve2.p2);
 			if (d1 < d2) {
-				u2 = normalize(sub(curve2.p2, curve2.p1));
+				u2 = new Vec2().subVectors(curve2.p2, curve2.p1).normalizeOrUnitX();
 			} else {
-				u2 = normalize(sub(curve2.p1, curve2.p2));
+				u2 = new Vec2().subVectors(curve2.p1, curve2.p2).normalizeOrUnitX();
 			}
 		} else if (curve2.type === 'arc') {
-			const dStart = dist(V, curve2.start);
-			const dEnd = dist(V, curve2.end);
+			const dStart = V.distanceTo(curve2.start);
+			const dEnd = V.distanceTo(curve2.end);
 			if (dStart < dEnd) {
 				const ev = evaluateCurveExtended(curve2, 0.01);
-				u2 = normalize(sub(ev.point, V));
+				u2 = new Vec2().subVectors(ev.point, V).normalizeOrUnitX();
 			} else {
 				const ev = evaluateCurveExtended(curve2, 0.99);
-				u2 = normalize(sub(ev.point, V));
+				u2 = new Vec2().subVectors(ev.point, V).normalizeOrUnitX();
 			}
 		} else {
 			// Spline
 			const ev0 = evaluateCurveExtended(curve2, 0);
 			const ev1 = evaluateCurveExtended(curve2, 1);
-			if (dist(V, ev0.point) < dist(V, ev1.point)) {
+			if (V.distanceTo(ev0.point) < V.distanceTo(ev1.point)) {
 				u2 = ev0.tangent;
 			} else {
-				u2 = { x: -ev1.tangent.x, y: -ev1.tangent.y };
+				u2 = ev1.tangent.clone().negate();
 			}
 		}
 	} else {
 		// Case B: Selected via two primitives with click positions
-		const click1 = options.clickPos1 || { x: 0, y: 0 };
-		const click2 = options.clickPos2 || { x: 0, y: 0 };
+		const click1 = options.clickPos1 || new Vec2(0, 0);
+		const click2 = options.clickPos2 || new Vec2(0, 0);
 
 		// Approximate corner intersection of curve extensions
 		if (curve1.type === 'segment' && curve2.type === 'segment') {
-			const d1 = normalize(sub(curve1.p2, curve1.p1));
-			const d2 = normalize(sub(curve2.p2, curve2.p1));
+			const d1 = new Vec2().subVectors(curve1.p2, curve1.p1).normalizeOrUnitX();
+			const d2 = new Vec2().subVectors(curve2.p2, curve2.p1).normalizeOrUnitX();
 			const inter = intersectLines(curve1.p1, d1, curve2.p1, d2);
 			if (!inter) return null;
 			V = inter;
-			u1 = normalize(sub(click1, V));
-			u2 = normalize(sub(click2, V));
+			u1 = new Vec2().subVectors(click1, V).normalizeOrUnitX();
+			u2 = new Vec2().subVectors(click2, V).normalizeOrUnitX();
 		} else {
 			// Find facing endpoints between the two curves for extension
 			const ev1_0 = evaluateCurveExtended(curve1, 0);
@@ -572,7 +559,7 @@ export function calculateFilletGeometry(
 			for (const [tA, tB] of pairs) {
 				const ptA = tA === 0 ? ev1_0.point : ev1_1.point;
 				const ptB = tB === 0 ? ev2_0.point : ev2_1.point;
-				const d = dist(ptA, ptB);
+				const d = ptA.distanceTo(ptB);
 				if (d < minDist) {
 					minDist = d;
 					bestT1 = tA;
@@ -592,32 +579,29 @@ export function calculateFilletGeometry(
 
 			if (interFacing) {
 				V = interFacing;
-				u1 = bestT1 === 1 ? { x: -ev1Facing.tangent.x, y: -ev1Facing.tangent.y } : ev1Facing.tangent;
-				u2 = bestT2 === 1 ? { x: -ev2Facing.tangent.x, y: -ev2Facing.tangent.y } : ev2Facing.tangent;
+				u1 = bestT1 === 1 ? ev1Facing.tangent.clone().negate() : ev1Facing.tangent;
+				u2 = bestT2 === 1 ? ev2Facing.tangent.clone().negate() : ev2Facing.tangent;
 			} else if (interClick) {
 				V = interClick;
-				u1 = normalize(sub(click1, V));
-				u2 = normalize(sub(click2, V));
+				u1 = new Vec2().subVectors(click1, V).normalizeOrUnitX();
+				u2 = new Vec2().subVectors(click2, V).normalizeOrUnitX();
 			} else {
 				const p1ToClick2 = projectOntoCurveExtended(curve1, click2);
 				const p2ToClick1 = projectOntoCurveExtended(curve2, click1);
-				V = {
-					x: (p1ToClick2.point.x + p2ToClick1.point.x) * 0.5,
-					y: (p1ToClick2.point.y + p2ToClick1.point.y) * 0.5,
-				};
-				u1 = normalize(sub(click1, V));
-				u2 = normalize(sub(click2, V));
+				V = new Vec2().midpoint(p1ToClick2.point, p2ToClick1.point);
+				u1 = new Vec2().subVectors(click1, V).normalizeOrUnitX();
+				u2 = new Vec2().subVectors(click2, V).normalizeOrUnitX();
 			}
 		}
 	}
 
-	const cosTheta = dot(u1, u2);
+	const cosTheta = u1.dot(u2);
 	if (cosTheta > 0.9999 || cosTheta < -0.9999) {
 		// Collinear or parallel curves cannot have a fillet
 		return null;
 	}
 
-	const bisectorDir = normalize(add(u1, u2));
+	const bisectorDir = new Vec2().addVectors(u1, u2).normalizeOrUnitX();
 	const halfAngle = Math.acos(Math.max(-1, Math.min(1, cosTheta))) * 0.5;
 	if (halfAngle < 1e-3 || Math.sin(halfAngle) < 1e-4) return null;
 
@@ -627,13 +611,13 @@ export function calculateFilletGeometry(
 	if (curve1.type === 'segment' && curve2.type === 'segment') {
 		const dCenter = radius / Math.sin(halfAngle);
 
-		const center = addScaled(V, bisectorDir, dCenter);
-		const t1 = addScaled(V, u1, dTangent);
-		const t2 = addScaled(V, u2, dTangent);
+		const center = V.clone().addScaledVector(bisectorDir, dCenter);
+		const t1 = V.clone().addScaledVector(u1, dTangent);
+		const t2 = V.clone().addScaledVector(u2, dTangent);
 
 		const clockwise = computeFilletArcClockwise(center, t1, t2);
 		const midArc = computeFilletMidArc(center, t1, t2, radius);
-		const arcBisectorDir = normalize(sub(midArc, center));
+		const arcBisectorDir = new Vec2().subVectors(midArc, center).normalizeOrUnitX();
 
 		const p1Info = projectOntoCurveExtended(curve1, t1);
 		const p2Info = projectOntoCurveExtended(curve2, t2);
@@ -683,7 +667,7 @@ export function calculateFilletGeometry(
 		clockwise,
 		cornerVertex: V,
 		midArc,
-		bisectorDir: normalize(sub(midArc, center)),
+		bisectorDir: new Vec2().subVectors(midArc, center).normalizeOrUnitX(),
 		param1: p1Info.t,
 		param2: p2Info.t,
 		endPointId1: options.endPointId1,
@@ -767,7 +751,7 @@ export function commitFilletToSketch(
 
 	if (res.cornerVertex) {
 		for (const pt of sketch.points.values()) {
-			if (dist(pt, res.cornerVertex) < 0.5 && !sketch.isPointUsed(pt.id)) {
+			if (pt.distanceTo(res.cornerVertex) < 0.5 && !sketch.isPointUsed(pt.id)) {
 				candidatesToClean.add(pt.id);
 			}
 		}
@@ -859,7 +843,7 @@ export function getFilletLineEndPointId(
 	if (cornerVertex) {
 		const p1 = sketch.points.get(line.p1Id);
 		const p2 = sketch.points.get(line.p2Id);
-		if (p1 && p2) return dist(p1, cornerVertex) < dist(p2, cornerVertex) ? line.p1Id : line.p2Id;
+		if (p1 && p2) return p1.distanceTo(cornerVertex) < p2.distanceTo(cornerVertex) ? line.p1Id : line.p2Id;
 	}
 	return param <= 0.5 ? line.p1Id : line.p2Id;
 }
@@ -902,7 +886,7 @@ function trimOrExtendPrimitive(
 			const ptStart = sketch.points.get(arc.startPointId);
 			const ptEnd = sketch.points.get(arc.endPointId);
 			if (ptStart && ptEnd) {
-				replaceStart = dist(ptStart, cornerVertex) < dist(ptEnd, cornerVertex);
+				replaceStart = ptStart.distanceTo(cornerVertex) < ptEnd.distanceTo(cornerVertex);
 			} else {
 				replaceStart = param <= 0.5;
 			}
@@ -928,7 +912,7 @@ function trimOrExtendPrimitive(
 			const ptStart = sketch.points.get(startPtId);
 			const ptEnd = sketch.points.get(endPtId);
 			if (ptStart && ptEnd) {
-				isNearStart = dist(ptStart, cornerVertex) < dist(ptEnd, cornerVertex);
+				isNearStart = ptStart.distanceTo(cornerVertex) < ptEnd.distanceTo(cornerVertex);
 			} else {
 				isNearStart = param <= 0.5;
 			}
@@ -971,7 +955,7 @@ function trimOrExtendPrimitive(
 				}
 			}
 		} else if (oldPt && newPt && spline.tangentLineIds && spline.tangentLineIds.length > 0) {
-			const dir = sub(newPt, oldPt);
+			const dir = new Vec2().subVectors(newPt, oldPt);
 			const handleLineId = isNearStart
 				? spline.tangentLineIds[0]
 				: spline.tangentLineIds[spline.tangentLineIds.length - 1];
@@ -1040,7 +1024,7 @@ function replaceSplineWithInterval(
 			let matchedId: string | null = null;
 			for (const pid of curve.pointIds) {
 				const pt = sketch.points.get(pid);
-				if (pt && Math.hypot(pt.x - pos.x, pt.y - pos.y) < 1e-2) {
+				if (pt && pos.distanceTo(pt) < 1e-2) {
 					matchedId = pid;
 					break;
 				}
@@ -1067,28 +1051,28 @@ function replaceSplineWithInterval(
 		if (j === 0) {
 			const p0 = subSegments[0][0];
 			rawPoints.push(p0);
-			const v = sub(subSegments[0][1], p0);
+			const v = new Vec2().subVectors(subSegments[0][1], p0);
 			rawHandles.push({
-				h1: sub(p0, v),
-				h2: add(p0, v),
+				h1: new Vec2().subVectors(p0, v),
+				h2: new Vec2().addVectors(p0, v),
 			});
 		} else if (j === M) {
 			const pM = subSegments[M - 1][3];
 			rawPoints.push(pM);
-			const v = sub(pM, subSegments[M - 1][2]);
+			const v = new Vec2().subVectors(pM, subSegments[M - 1][2]);
 			rawHandles.push({
-				h1: sub(pM, v),
-				h2: add(pM, v),
+				h1: new Vec2().subVectors(pM, v),
+				h2: new Vec2().addVectors(pM, v),
 			});
 		} else {
 			const pJ = subSegments[j][0];
 			rawPoints.push(pJ);
-			const vin = sub(pJ, subSegments[j - 1][2]);
-			const vout = sub(subSegments[j][1], pJ);
-			const tangentSum = add(vin, vout);
+			const vin = new Vec2().subVectors(pJ, subSegments[j - 1][2]);
+			const vout = new Vec2().subVectors(subSegments[j][1], pJ);
+			const tangentSum = new Vec2().addVectors(vin, vout);
 			rawHandles.push({
-				h1: addScaled(pJ, tangentSum, -0.5),
-				h2: addScaled(pJ, tangentSum, 0.5),
+				h1: pJ.clone().addScaledVector(tangentSum, -0.5),
+				h2: pJ.clone().addScaledVector(tangentSum, 0.5),
 			});
 		}
 	}

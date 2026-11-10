@@ -1,7 +1,7 @@
 import { BaseTool } from '../base';
 import { POINT_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { dist, type Vec2 } from '../../../math/vector';
+import { type Vec2 } from '../../../math/vector';
 import { renderSplinePreviewVisual } from '../../previewHelpers';
 import { VariationToolPanel } from '../../../ui/panels/tools';
 import { dispatchToolModeChange } from '../modeChangeEvent';
@@ -110,7 +110,7 @@ export class SplineTool extends BaseTool {
 		const screen = e.screen;
 
 		// Check if clicking checkmark to complete spline
-		if (this.checkmarkPos && dist(screen, this.checkmarkPos) <= POINT_DISTANCE_PX) {
+		if (this.checkmarkPos && screen.distanceTo(this.checkmarkPos) <= POINT_DISTANCE_PX) {
 			this.ctx.renderer.clearPreviews();
 			this.finishSpline(false);
 			e.raw.preventDefault();
@@ -127,7 +127,7 @@ export class SplineTool extends BaseTool {
 				return;
 			}
 			const firstPtPos = this.ctx.viewport.worldToScreen(this.points[0]);
-			if (dist(screen, firstPtPos) <= POINT_DISTANCE_PX) {
+			if (screen.distanceTo(firstPtPos) <= POINT_DISTANCE_PX) {
 				this.finishSpline(true);
 				this.ctx.showToast('Closed spline created');
 				return;
@@ -161,7 +161,7 @@ export class SplineTool extends BaseTool {
 
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this.points.length > 0 && this.checkmarkPos) {
-			if (dist(e.screen, this.checkmarkPos) <= POINT_DISTANCE_PX) {
+			if (e.screen.distanceTo(this.checkmarkPos) <= POINT_DISTANCE_PX) {
 				this.ctx.setCursor('pointer');
 			} else {
 				this.ctx.setCursor(this.defaultCursor);

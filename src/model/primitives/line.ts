@@ -1,4 +1,4 @@
-import { angleFromToDeg, dist, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
 import type { GeoSegment } from '../../math/intersection';
@@ -70,8 +70,8 @@ export class SketchLine implements ISketchPrimitive {
 		return {
 			type: 'segment',
 			id: this.id,
-			p1: { x: p1.x, y: p1.y },
-			p2: { x: p2.x, y: p2.y },
+			p1: new Vec2(p1.x, p1.y),
+			p2: new Vec2(p2.x, p2.y),
 			isConstruction: this.isConstruction,
 		};
 	}
@@ -86,7 +86,7 @@ export class SketchLine implements ISketchPrimitive {
 				getValue: ctx => {
 					const p1 = ctx.sketch.points.get(this.p1Id);
 					const p2 = ctx.sketch.points.get(this.p2Id);
-					return p1 && p2 ? Number(dist(p1, p2).toFixed(2)) : 0;
+					return p1 && p2 ? Number(p1.distanceTo(p2).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setLineLength(this.id, val),
 				validate: val => !isNaN(val) && isFinite(val) && val > 0,
@@ -98,7 +98,7 @@ export class SketchLine implements ISketchPrimitive {
 				getValue: ctx => {
 					const p1 = ctx.sketch.points.get(this.p1Id);
 					const p2 = ctx.sketch.points.get(this.p2Id);
-					return p1 && p2 ? Number(angleFromToDeg(p1, p2).toFixed(2)) : 0;
+					return p1 && p2 ? Number(p1.angleToPointDeg(p2).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setLineAngle(this.id, val),
 			},

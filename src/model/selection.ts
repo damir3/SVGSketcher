@@ -1,6 +1,6 @@
 import { getImageBounds } from './image';
 import type { SketchDocument } from './sketch';
-import { sub, vec, distancesFrom } from '../math/vector';
+import { Vec2 } from '../math/vector';
 import { AABB } from '../math/aabb';
 import type { SketchPoint } from './types';
 
@@ -315,16 +315,16 @@ export function getBoundingBox(sketch: SketchDocument): AABB | null {
 	for (const c of sketch.circles.values()) {
 		const center = sketch.points.get(c.centerId);
 		if (center) {
-			bounds.addPoint({ x: center.x - c.radius, y: center.y - c.radius });
-			bounds.addPoint({ x: center.x + c.radius, y: center.y + c.radius });
+			bounds.addPoint(center.clone().subScalar(c.radius));
+			bounds.addPoint(center.clone().addScalar(c.radius));
 		}
 	}
 
 	for (const a of sketch.arcs.values()) {
 		const center = sketch.points.get(a.centerId);
 		if (center) {
-			bounds.addPoint({ x: center.x - a.radius, y: center.y - a.radius });
-			bounds.addPoint({ x: center.x + a.radius, y: center.y + a.radius });
+			bounds.addPoint(center.clone().subScalar(a.radius));
+			bounds.addPoint(center.clone().addScalar(a.radius));
 		}
 	}
 
@@ -333,10 +333,10 @@ export function getBoundingBox(sketch: SketchDocument): AABB | null {
 		const maj = sketch.points.get(e.majorAxisPointId);
 		const min = sketch.points.get(e.minorAxisPointId);
 		if (center && maj && min) {
-			const r = distancesFrom(center, maj, min);
+			const r = center.distancesTo(maj, min);
 			const rMax = Math.max(r.x, r.y);
-			bounds.addPoint({ x: center.x - rMax, y: center.y - rMax });
-			bounds.addPoint({ x: center.x + rMax, y: center.y + rMax });
+			bounds.addPoint(center.clone().subScalar(rMax));
+			bounds.addPoint(center.clone().addScalar(rMax));
 		}
 	}
 
@@ -345,10 +345,10 @@ export function getBoundingBox(sketch: SketchDocument): AABB | null {
 		const maj = sketch.points.get(ea.majorAxisPointId);
 		const min = sketch.points.get(ea.minorAxisPointId);
 		if (center && maj && min) {
-			const r = distancesFrom(center, maj, min);
+			const r = center.distancesTo(maj, min);
 			const rMax = Math.max(r.x, r.y);
-			bounds.addPoint({ x: center.x - rMax, y: center.y - rMax });
-			bounds.addPoint({ x: center.x + rMax, y: center.y + rMax });
+			bounds.addPoint(center.clone().subScalar(rMax));
+			bounds.addPoint(center.clone().addScalar(rMax));
 		}
 	}
 
@@ -385,8 +385,8 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 		if (c) {
 			const center = sketch.points.get(c.centerId);
 			if (center) {
-				bounds.addPoint({ x: center.x - c.radius, y: center.y - c.radius });
-				bounds.addPoint({ x: center.x + c.radius, y: center.y + c.radius });
+				bounds.addPoint(center.clone().subScalar(c.radius));
+				bounds.addPoint(center.clone().addScalar(c.radius));
 				count++;
 			}
 		}
@@ -397,8 +397,8 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 		if (a) {
 			const center = sketch.points.get(a.centerId);
 			if (center) {
-				bounds.addPoint({ x: center.x - a.radius, y: center.y - a.radius });
-				bounds.addPoint({ x: center.x + a.radius, y: center.y + a.radius });
+				bounds.addPoint(center.clone().subScalar(a.radius));
+				bounds.addPoint(center.clone().addScalar(a.radius));
 				count++;
 			}
 			includePoint(sketch.points.get(a.startPointId));
@@ -413,11 +413,11 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 			const maj = sketch.points.get(e.majorAxisPointId);
 			const min = sketch.points.get(e.minorAxisPointId);
 			if (center && maj && min) {
-				const u = sub(maj, center);
-				const v = sub(min, center);
-				const dir = vec(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
-				bounds.addPoint({ x: center.x - dir.x, y: center.y - dir.y });
-				bounds.addPoint({ x: center.x + dir.x, y: center.y + dir.y });
+				const u = new Vec2().subVectors(maj, center);
+				const v = new Vec2().subVectors(min, center);
+				const dir = new Vec2(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
+				bounds.addPoint(new Vec2().subVectors(center, dir));
+				bounds.addPoint(new Vec2().addVectors(center, dir));
 				count++;
 			}
 		}
@@ -430,11 +430,11 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 			const maj = sketch.points.get(ea.majorAxisPointId);
 			const min = sketch.points.get(ea.minorAxisPointId);
 			if (center && maj && min) {
-				const u = sub(maj, center);
-				const v = sub(min, center);
-				const dir = vec(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
-				bounds.addPoint({ x: center.x - dir.x, y: center.y - dir.y });
-				bounds.addPoint({ x: center.x + dir.x, y: center.y + dir.y });
+				const u = new Vec2().subVectors(maj, center);
+				const v = new Vec2().subVectors(min, center);
+				const dir = new Vec2(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
+				bounds.addPoint(new Vec2().subVectors(center, dir));
+				bounds.addPoint(new Vec2().addVectors(center, dir));
 				count++;
 			}
 			includePoint(sketch.points.get(ea.startPointId));
@@ -479,8 +479,8 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 						if (circle) {
 							const center = sketch.points.get(circle.centerId);
 							if (center) {
-								bounds.addPoint({ x: center.x - circle.radius, y: center.y - circle.radius });
-								bounds.addPoint({ x: center.x + circle.radius, y: center.y + circle.radius });
+								bounds.addPoint(center.clone().subScalar(circle.radius));
+								bounds.addPoint(center.clone().addScalar(circle.radius));
 								count++;
 							}
 						}
@@ -489,8 +489,8 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 						if (arc) {
 							const center = sketch.points.get(arc.centerId);
 							if (center) {
-								bounds.addPoint({ x: center.x - arc.radius, y: center.y - arc.radius });
-								bounds.addPoint({ x: center.x + arc.radius, y: center.y + arc.radius });
+								bounds.addPoint(center.clone().subScalar(arc.radius));
+								bounds.addPoint(center.clone().addScalar(arc.radius));
 								count++;
 							}
 							includePoint(sketch.points.get(arc.startPointId));

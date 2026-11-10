@@ -1,5 +1,5 @@
 import { AABB } from '../src/math/aabb';
-import { vec } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -208,7 +208,7 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 	it('getTargetFit returns expected pan and zoom matching fitToBounds', () => {
 		const vp = new Viewport(800, 600);
-		const bounds = AABB.fromPoints([vec(0, 0), vec(100, 100)])!;
+		const bounds = AABB.fromPoints([new Vec2(0, 0), new Vec2(100, 100)])!;
 		const target = vp.getTargetFit(bounds, 80);
 		vp.fitToBounds(bounds, 80);
 
@@ -246,7 +246,7 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 			// 1. Zoom with selection (should zoom to l1 only: [0, 0] to [20, 20])
 			sketch.selectEntity(l1.id, 'line');
-			const targetSelected = vp.getTargetFit(AABB.fromPoints([vec(0, 0), vec(20, 20)])!);
+			const targetSelected = vp.getTargetFit(AABB.fromPoints([new Vec2(0, 0), new Vec2(20, 20)])!);
 			interaction.fitToView(false);
 
 			assert.equal(vp.panX, targetSelected.panX);
@@ -255,7 +255,7 @@ describe('Fit to View & Selection Bounding Box', () => {
 
 			// 2. Zoom without selection (should zoom to whole scene: [0, 0] to [300, 300])
 			sketch.clearSelection();
-			const targetAll = vp.getTargetFit(AABB.fromPoints([vec(0, 0), vec(300, 300)])!);
+			const targetAll = vp.getTargetFit(AABB.fromPoints([new Vec2(0, 0), new Vec2(300, 300)])!);
 			interaction.fitToView(false);
 
 			assert.equal(vp.panX, targetAll.panX);

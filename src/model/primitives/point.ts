@@ -1,33 +1,30 @@
-import type { Vec2 } from '../../math/vector';
-import { distanceToPoint } from '../../math/hitTest';
+import { Vec2, type XY } from '../../math/vector';
 import { pointIntersectsAABB } from '../../math/aabb';
 import type { ISketchPrimitive } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
-export class SketchPoint implements ISketchPrimitive {
+export class SketchPoint extends Vec2 implements ISketchPrimitive {
 	readonly type = 'point' as const;
 	id: string;
-	x: number;
-	y: number;
 	fixed: boolean;
 
 	constructor(dataOrId: string | { id: string; x: number; y: number; fixed?: boolean }, x = 0, y = 0, fixed = false) {
-		if (typeof dataOrId === 'object') {
-			this.id = dataOrId.id;
-			this.x = dataOrId.x;
-			this.y = dataOrId.y;
-			this.fixed = dataOrId.fixed ?? false;
-		} else {
-			this.id = dataOrId;
-			this.x = x;
-			this.y = y;
-			this.fixed = fixed;
-		}
+		const data = typeof dataOrId === 'string' ? { id: dataOrId, x, y, fixed } : dataOrId;
+		super(data.x, data.y);
+		this.id = data.id;
+		this.fixed = data.fixed ?? false;
 	}
 
-	distanceTo(screen: Vec2, _sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const s = viewport.worldToScreen(this);
-		return distanceToPoint(screen, s);
+	// One argument measures world distance; the primitive hit test supplies a viewport.
+	override distanceTo(v: XY): number;
+	override distanceTo(
+		screen: XY,
+		sketch: unknown,
+		viewport: { worldToScreen(point: XY): XY },
+		thresholdPx?: number
+	): number;
+	override distanceTo(v: XY, _sketch?: unknown, viewport?: { worldToScreen(point: XY): XY }): number {
+		return viewport ? Vec2.from(viewport.worldToScreen(this)).distanceTo(v) : super.distanceTo(v);
 	}
 
 	intersectsAABB(min: Vec2, max: Vec2, _sketch?: any): boolean {

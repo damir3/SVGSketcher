@@ -1,5 +1,5 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
-import { angleFromTo, angleFromToDeg, distancesFrom, vec, type Vec2 } from '../math/vector';
+import { Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
@@ -61,11 +61,7 @@ export function renderPolygonPreviewVisual(
 	const R = radiusToVertex ? radius : radius / Math.cos(Math.PI / N);
 	const baseAngle = radiusToVertex ? angleRad : angleRad - Math.PI / N;
 
-	const handle = showGuide
-		? viewport.worldToScreen(
-				vec(centerWorld.x + radius * Math.cos(angleRad), centerWorld.y + radius * Math.sin(angleRad))
-			)
-		: null;
+	const handle = showGuide ? viewport.worldToScreen(Vec2.fromPolar(radius, angleRad).add(centerWorld)) : null;
 	if (handle) {
 		createSvgCircle(sCtr, radius * viewport.zoom, GUIDE_OUTLINE_ATTRS, parent);
 		createSvgLine(sCtr, handle, AUX_RAY_ATTRS, parent);
@@ -75,7 +71,7 @@ export function renderPolygonPreviewVisual(
 	const pts: Vec2[] = [];
 	for (let i = 0; i < N; i++) {
 		const a = baseAngle + i * step;
-		const w = vec(centerWorld.x + R * Math.cos(a), centerWorld.y + R * Math.sin(a));
+		const w = Vec2.fromPolar(R, a).add(centerWorld);
 		pts.push(viewport.worldToScreen(w));
 	}
 
@@ -116,8 +112,8 @@ export function renderEllipsePreviewVisual(
 	isConstruction = false,
 	isGuide = false
 ): void {
-	const r = distancesFrom(sc, smaj, smin);
-	const thetaDeg = angleFromToDeg(sc, smaj);
+	const r = sc.distancesTo(smaj, smin);
+	const thetaDeg = sc.angleToPointDeg(smaj);
 
 	createSvgEllipse(
 		sc,
@@ -140,8 +136,8 @@ export function renderEllipticalArcStartPreviewVisual(
 	smin: Vec2,
 	ss: Vec2
 ): void {
-	const r = distancesFrom(sc, smaj, smin);
-	const theta = angleFromTo(sc, smaj);
+	const r = sc.distancesTo(smaj, smin);
+	const theta = sc.angleToPoint(smaj);
 	const thetaDeg = (theta * 180) / Math.PI;
 
 	createSvgEllipse(
@@ -177,10 +173,10 @@ export function renderEllipticalArcPreviewVisual(
 	clockwise: boolean,
 	isConstruction = false
 ): void {
-	const r = distancesFrom(sc, smaj, smin);
+	const r = sc.distancesTo(smaj, smin);
 	if (r.x < 0.1 || r.y < 0.1) return;
 
-	const theta = angleFromTo(sc, smaj);
+	const theta = sc.angleToPoint(smaj);
 	const thetaDeg = (theta * 180) / Math.PI;
 
 	createSvgEllipse(
@@ -239,7 +235,7 @@ export function renderSplinePreviewVisual(
 
 	if (points.length < 2) return {};
 
-	const checkmarkPos = { x: lastPt.x + 20, y: lastPt.y - 12 };
+	const checkmarkPos = new Vec2(lastPt.x + 20, lastPt.y - 12);
 	const checkG = createSvgElement(
 		'g',
 		{
@@ -279,8 +275,8 @@ export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandi
 			const sc = viewport.worldToScreen(curve.center);
 			const smaj = viewport.worldToScreen(curve.majorAxisPoint);
 			const smin = viewport.worldToScreen(curve.minorAxisPoint);
-			const r = distancesFrom(sc, smaj, smin);
-			const thetaDeg = angleFromToDeg(sc, smaj);
+			const r = sc.distancesTo(smaj, smin);
+			const thetaDeg = sc.angleToPointDeg(smaj);
 			createSvgEllipse(
 				sc,
 				r,
@@ -341,8 +337,8 @@ export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandi
 
 export function renderCutMarkerVisual(parent: SVGElement, pt: Vec2): void {
 	const size = 5;
-	createSvgLine({ x: pt.x - size, y: pt.y - size }, { x: pt.x + size, y: pt.y + size }, TRIM_STROKE_ATTRS, parent);
-	createSvgLine({ x: pt.x - size, y: pt.y + size }, { x: pt.x + size, y: pt.y - size }, TRIM_STROKE_ATTRS, parent);
+	createSvgLine(pt.clone().subScalar(size), pt.clone().addScalar(size), TRIM_STROKE_ATTRS, parent);
+	createSvgLine(new Vec2(pt.x - size, pt.y + size), new Vec2(pt.x + size, pt.y - size), TRIM_STROKE_ATTRS, parent);
 }
 
 export function renderBreakPreviewVisual(parent: SVGElement, candidate: TrimCandidate, viewport: Viewport): void {
@@ -406,8 +402,8 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 				const sc = viewport.worldToScreen(c);
 				const smaj = viewport.worldToScreen(maj);
 				const smin = viewport.worldToScreen(min);
-				const r = distancesFrom(sc, smaj, smin);
-				const thetaDeg = angleFromToDeg(sc, smaj);
+				const r = sc.distancesTo(smaj, smin);
+				const thetaDeg = sc.angleToPointDeg(smaj);
 				createSvgEllipse(
 					sc,
 					r,

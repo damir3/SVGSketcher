@@ -10,7 +10,7 @@ import {
 } from '../src/math/chamfer';
 import { PointOnLineConstraint, DistanceConstraint, AngleConstraint } from '../src/solver/constraints';
 import { ChamferTool } from '../src/canvas/tools/modify/chamfer';
-import { dist, vec } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 
 function setupMockDocument() {
 	const origDoc = (globalThis as any).document;
@@ -390,9 +390,9 @@ describe('Chamfer Commit and Document Integration', () => {
 
 	it('places both distances outside when the chamfer lines are selected in reverse order', () => {
 		const sketch = new SketchDocument();
-		const corner = sketch.addPoint(vec(0, 0));
-		const horizontal = sketch.addLine(corner.id, sketch.addPoint(vec(100, 0)).id);
-		const vertical = sketch.addLine(corner.id, sketch.addPoint(vec(0, 100)).id);
+		const corner = sketch.addPoint(new Vec2(0, 0));
+		const horizontal = sketch.addLine(corner.id, sketch.addPoint(new Vec2(100, 0)).id);
+		const vertical = sketch.addLine(corner.id, sketch.addPoint(new Vec2(0, 100)).id);
 		const candidate = findChamferCandidateForLines(sketch, vertical.id, horizontal.id);
 		assert.ok(candidate);
 		const result = commitChamferToSketch(sketch, candidate, 'equal_distance', 10, 10, 45, false);
@@ -480,8 +480,8 @@ describe('ChamferTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 				},
 				renderer: {
 					chamferGizmoHandles: [],
@@ -497,8 +497,8 @@ describe('ChamferTool UI and Workflow', () => {
 			assert.equal(tool.isBusy(), false);
 
 			tool.onMouseDown({
-				screen: { x: 400, y: 300 },
-				world: { x: 0, y: 0 },
+				screen: new Vec2(400, 300),
+				world: new Vec2(0, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -526,8 +526,8 @@ describe('ChamferTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 				},
 				renderer: {
 					chamferGizmoHandles: [],
@@ -544,8 +544,8 @@ describe('ChamferTool UI and Workflow', () => {
 			// Click first line
 			currentHitLine = l1;
 			tool.onMouseDown({
-				screen: { x: 450, y: 300 },
-				world: { x: 50, y: 0 },
+				screen: new Vec2(450, 300),
+				world: new Vec2(50, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 			assert.equal(tool.firstLine?.id, l1.id);
@@ -554,8 +554,8 @@ describe('ChamferTool UI and Workflow', () => {
 			// Click second line
 			currentHitLine = l2;
 			tool.onMouseDown({
-				screen: { x: 400, y: 250 },
-				world: { x: 0, y: 50 },
+				screen: new Vec2(400, 250),
+				world: new Vec2(0, 50),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 			assert.equal(tool.firstLine, null);
@@ -582,8 +582,8 @@ describe('ChamferTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 				},
 				renderer: {
 					chamferGizmoHandles: [],
@@ -597,8 +597,8 @@ describe('ChamferTool UI and Workflow', () => {
 
 			tool.activate(mockCtx);
 			tool.onMouseDown({
-				screen: { x: 400, y: 300 },
-				world: { x: 0, y: 0 },
+				screen: new Vec2(400, 300),
+				world: new Vec2(0, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -637,8 +637,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+						worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+						screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 					},
 					renderer: {
 						chamferGizmoHandles: [
@@ -646,7 +646,7 @@ describe('ChamferTool UI and Workflow', () => {
 								type: 'dist1',
 								screenX: 410,
 								screenY: 290,
-								worldPos: { x: 10, y: 10 },
+								worldPos: new Vec2(10, 10),
 								currentValue: 20,
 							},
 						],
@@ -675,8 +675,8 @@ describe('ChamferTool UI and Workflow', () => {
 				// For 90 deg corner, cos(45 deg) = 1/√2, so deltaD = (10 * √2) / (1/√2) = 20
 				// New dist should be 20 + 20 = 40
 				tool.onMouseMove({
-					screen: { x: 420, y: 280 },
-					world: { x: 20, y: 20 },
+					screen: new Vec2(420, 280),
+					world: new Vec2(20, 20),
 					raw: {} as any,
 				});
 
@@ -707,8 +707,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+						worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+						screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 					},
 					renderer: {
 						chamferGizmoHandles: [],
@@ -731,8 +731,8 @@ describe('ChamferTool UI and Workflow', () => {
 					startValue: 15,
 				};
 				tool.onMouseMove({
-					screen: { x: 425, y: 300 },
-					world: { x: 25, y: 0 },
+					screen: new Vec2(425, 300),
+					world: new Vec2(25, 0),
 					raw: {} as any,
 				});
 				assert.equal(tool.dist1, 25);
@@ -745,8 +745,8 @@ describe('ChamferTool UI and Workflow', () => {
 					startValue: 25,
 				};
 				tool.onMouseMove({
-					screen: { x: 400, y: 265 },
-					world: { x: 0, y: 35 },
+					screen: new Vec2(400, 265),
+					world: new Vec2(0, 35),
 					raw: {} as any,
 				});
 				assert.equal(tool.dist1, 25);
@@ -776,8 +776,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+						worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+						screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 					},
 					renderer: {
 						chamferGizmoHandles: [],
@@ -804,8 +804,8 @@ describe('ChamferTool UI and Workflow', () => {
 				// Drag to (20, 20): from T1(20,0) to mouse(20,20) is (0, 20), perpendicular to line 1.
 				// Angle between (-1, 0) and (0, 1) is 90 deg. Corner angle is 90 deg, so clamped to max 89 deg.
 				tool.onMouseMove({
-					screen: { x: 420, y: 280 },
-					world: { x: 20, y: 20 },
+					screen: new Vec2(420, 280),
+					world: new Vec2(20, 20),
 					raw: {} as any,
 				});
 				assert.equal(tool.angleDeg, 89);
@@ -813,24 +813,24 @@ describe('ChamferTool UI and Workflow', () => {
 				// Drag to (10, 10): from T1(20,0) to mouse(10,10) is (-10, 10).
 				// Angle with (-1, 0) is 45 deg.
 				tool.onMouseMove({
-					screen: { x: 410, y: 290 },
-					world: { x: 10, y: 10 },
+					screen: new Vec2(410, 290),
+					world: new Vec2(10, 10),
 					raw: {} as any,
 				});
 				assert.equal(tool.angleDeg, 45);
 
 				// Drag towards line 1: mouse at (10, 0) is parallel to (-1, 0) -> angle should reach 0
 				tool.onMouseMove({
-					screen: { x: 410, y: 300 },
-					world: { x: 10, y: 0 },
+					screen: new Vec2(410, 300),
+					world: new Vec2(10, 0),
 					raw: {} as any,
 				});
 				assert.equal(tool.angleDeg, 0);
 
 				// Drag past line 1 to outside the corner (y = -10): angle stays at 0 and does NOT increase
 				tool.onMouseMove({
-					screen: { x: 410, y: 310 },
-					world: { x: 10, y: -10 },
+					screen: new Vec2(410, 310),
+					world: new Vec2(10, -10),
 					raw: {} as any,
 				});
 				assert.equal(tool.angleDeg, 0);
@@ -875,8 +875,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const refVertex = triCand.result.t1;
 				// Perpendicular to refDir into the corner (90 deg angle)
 				triTool.onMouseMove({
-					screen: { x: 400, y: 300 },
-					world: { x: refVertex.x + 80, y: refVertex.y - 50 },
+					screen: new Vec2(400, 300),
+					world: new Vec2(refVertex.x + 80, refVertex.y - 50),
 					raw: {} as any,
 				});
 				assert.equal(triTool.angleDeg, 90);
@@ -903,8 +903,8 @@ describe('ChamferTool UI and Workflow', () => {
 				const mockCtx: any = {
 					sketch,
 					viewport: {
-						worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 400, y: 300 - p.y }),
-						screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 400, y: 300 - p.y }),
+						worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 400, 300 - p.y),
+						screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 400, 300 - p.y),
 					},
 					renderer: {
 						chamferGizmoHandles: [] as any[],
@@ -920,13 +920,13 @@ describe('ChamferTool UI and Workflow', () => {
 				tool.activate(mockCtx);
 
 				// 1. Initial selection mode: onMouseMove sets crosshair
-				tool.onMouseMove({ screen: { x: 10, y: 10 }, world: { x: 0, y: 0 }, raw: {} as any });
+				tool.onMouseMove({ screen: new Vec2(10, 10), world: new Vec2(0, 0), raw: {} as any });
 				assert.equal(currentCursor, 'crosshair');
 
 				// 2. Select corner: cursor becomes default
 				tool.onMouseDown({
-					screen: { x: 400, y: 300 },
-					world: { x: 0, y: 0 },
+					screen: new Vec2(400, 300),
+					world: new Vec2(0, 0),
 					raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 				});
 				assert.ok(tool.candidate);
@@ -936,25 +936,25 @@ describe('ChamferTool UI and Workflow', () => {
 				mockCtx.renderer.chamferGizmoHandles = [{ screenX: 420, screenY: 300, currentValue: 10, type: 'dist1' }];
 
 				// 3. Move mouse over canvas away from gizmo: stays default
-				tool.onMouseMove({ screen: { x: 50, y: 50 }, world: { x: 0, y: 0 }, raw: {} as any });
+				tool.onMouseMove({ screen: new Vec2(50, 50), world: new Vec2(0, 0), raw: {} as any });
 				assert.equal(currentCursor, 'default');
 
 				// 4. Move mouse over gizmo handle: becomes grab
-				tool.onMouseMove({ screen: { x: 420, y: 300 }, world: { x: 20, y: 0 }, raw: {} as any });
+				tool.onMouseMove({ screen: new Vec2(420, 300), world: new Vec2(20, 0), raw: {} as any });
 				assert.equal(currentCursor, 'grab');
 
 				// 5. Drag gizmo handle: becomes grabbing
 				tool.onMouseDown({
-					screen: { x: 420, y: 300 },
-					world: { x: 20, y: 0 },
+					screen: new Vec2(420, 300),
+					world: new Vec2(20, 0),
 					raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 				});
-				tool.onMouseMove({ screen: { x: 430, y: 300 }, world: { x: 30, y: 0 }, raw: {} as any });
+				tool.onMouseMove({ screen: new Vec2(430, 300), world: new Vec2(30, 0), raw: {} as any });
 				assert.equal(currentCursor, 'grabbing');
 
 				// 6. Release mouse: returns to default away from gizmo
 				tool.onMouseUp({} as any);
-				tool.onMouseMove({ screen: { x: 50, y: 50 }, world: { x: 0, y: 0 }, raw: {} as any });
+				tool.onMouseMove({ screen: new Vec2(50, 50), world: new Vec2(0, 0), raw: {} as any });
 				assert.equal(currentCursor, 'default');
 
 				// 7. Cancel chamfer: returns to crosshair

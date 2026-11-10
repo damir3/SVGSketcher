@@ -1,4 +1,4 @@
-import type { Vec2 } from '../math/vector';
+import { Vec2 } from '../math/vector';
 import { parseNumericOrExpression, getExpressionIfValid } from '../math/expression';
 import type { SketchDocument } from '../model/sketch';
 import { updateExpressionPreview } from './expression-preview';
@@ -65,8 +65,8 @@ export class ToolPopup<TFieldId extends string = string> {
 
 	constructor(options: ToolPopupOptions<TFieldId>) {
 		this.sketch = options.sketch;
-		this.defaultOffset = options.defaultOffset ?? { x: 150, y: 40 };
-		this.bboxOffset = options.bboxOffset ?? { x: 100, y: 0 };
+		this.defaultOffset = options.defaultOffset ?? new Vec2(150, 40);
+		this.bboxOffset = options.bboxOffset ?? new Vec2(100, 0);
 		this.onKeyDown = options.onKeyDown;
 
 		// Initialize fieldMap first so state is available even in headless/Node test environments

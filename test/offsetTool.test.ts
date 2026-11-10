@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -142,8 +143,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -172,8 +173,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Click l0 to start chain
 			tool.onMouseDown({
-				screen: { x: 25, y: 0 },
-				world: { x: 25, y: 0 },
+				screen: new Vec2(25, 0),
+				world: new Vec2(25, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -187,8 +188,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Click l1 to extend chain
 			tool.onMouseDown({
-				screen: { x: 50, y: 25 },
-				world: { x: 50, y: 25 },
+				screen: new Vec2(50, 25),
+				world: new Vec2(50, 25),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -219,8 +220,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -240,8 +241,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Clicking one line of the loop traverses the entire loop automatically
 			tool.onMouseDown({
-				screen: { x: 25, y: 0 },
-				world: { x: 25, y: 0 },
+				screen: new Vec2(25, 0),
+				world: new Vec2(25, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -267,8 +268,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [
@@ -300,15 +301,15 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// First select line
 			tool.onMouseDown({
-				screen: { x: 10, y: 0 },
-				world: { x: 10, y: 0 },
+				screen: new Vec2(10, 0),
+				world: new Vec2(10, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
 			// Now click the gizmo handle at (50, 10)
 			tool.onMouseDown({
-				screen: { x: 50, y: 10 },
-				world: { x: 50, y: 10 },
+				screen: new Vec2(50, 10),
+				world: new Vec2(50, 10),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -316,8 +317,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Drag gizmo to (50, 25)
 			tool.onMouseMove({
-				screen: { x: 50, y: 25 },
-				world: { x: 50, y: 25 },
+				screen: new Vec2(50, 25),
+				world: new Vec2(50, 25),
 				raw: {} as any,
 			});
 
@@ -325,8 +326,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Release gizmo
 			tool.onMouseUp({
-				screen: { x: 50, y: 25 },
-				world: { x: 50, y: 25 },
+				screen: new Vec2(50, 25),
+				world: new Vec2(50, 25),
 				raw: {} as any,
 			});
 
@@ -352,8 +353,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -378,8 +379,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Select line
 			tool.onMouseDown({
-				screen: { x: 20, y: 0 },
-				world: { x: 20, y: 0 },
+				screen: new Vec2(20, 0),
+				world: new Vec2(20, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -420,8 +421,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -441,8 +442,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// First click: select loop
 			tool.onMouseDown({
-				screen: { x: 25, y: 0 },
-				world: { x: 25, y: 0 },
+				screen: new Vec2(25, 0),
+				world: new Vec2(25, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 			assert.ok(tool.chain);
@@ -453,8 +454,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Second click on the same line: toggles selection off
 			tool.onMouseDown({
-				screen: { x: 25, y: 0 },
-				world: { x: 25, y: 0 },
+				screen: new Vec2(25, 0),
+				world: new Vec2(25, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 			assert.equal(tool.chain, null);
@@ -478,8 +479,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -499,8 +500,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Select triangle loop
 			tool.onMouseDown({
-				screen: { x: 0, y: 0 },
-				world: { x: 0, y: 0 },
+				screen: new Vec2(0, 0),
+				world: new Vec2(0, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -559,8 +560,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -578,8 +579,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			tool.activate(mockCtx);
 			tool.onMouseDown({
-				screen: { x: 50, y: 0 },
-				world: { x: 50, y: 0 },
+				screen: new Vec2(50, 0),
+				world: new Vec2(50, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -617,8 +618,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: { offsetGizmoHandles: [] },
 				findLineNear: () => firstLine,
@@ -634,8 +635,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			tool.activate(mockCtx);
 			tool.onMouseDown({
-				screen: { x: 0, y: 0 },
-				world: { x: 0, y: 0 },
+				screen: new Vec2(0, 0),
+				world: new Vec2(0, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 
@@ -689,8 +690,8 @@ describe('OffsetTool UI and Workflow', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x + 200, y: 150 - p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x - 200, y: 150 - p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x + 200, 150 - p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x - 200, 150 - p.y),
 				},
 				renderer: {
 					offsetGizmoHandles: [],
@@ -710,8 +711,8 @@ describe('OffsetTool UI and Workflow', () => {
 
 			// Click line to start offset
 			tool.onMouseDown({
-				screen: { x: 250, y: 150 },
-				world: { x: 50, y: 0 },
+				screen: new Vec2(250, 150),
+				world: new Vec2(50, 0),
 				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
 			});
 

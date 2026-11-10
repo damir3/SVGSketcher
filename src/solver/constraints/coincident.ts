@@ -45,6 +45,6 @@ export class CoincidentConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.p1Id);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x - 12, y: s.y - 12 }, '●', COLORS.primary);
+		ctx.renderBadge(this.id, s.clone().subScalar(12), '●', COLORS.primary);
 	}
 }

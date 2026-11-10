@@ -15,7 +15,7 @@ import {
 	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import { ICONS } from './icons';
-import { dist, type Vec2 } from '../math/vector';
+import { type Vec2 } from '../math/vector';
 import type { IInspectable, InspectorContext } from './panels/inspector/types';
 
 export class Sidebar {
@@ -326,7 +326,7 @@ export class Sidebar {
 		const isSelected = this.sketch.selection.lineIds.has(line.id);
 		const p1 = this.sketch.points.get(line.p1Id);
 		const p2 = this.sketch.points.get(line.p2Id);
-		const len = p1 && p2 ? dist(p1, p2).toFixed(1) : '?';
+		const len = p1 && p2 ? p1.distanceTo(p2).toFixed(1) : '?';
 
 		return `
 			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="line" data-id="${line.id}">
@@ -373,8 +373,8 @@ export class Sidebar {
 		const center = this.sketch.points.get(ellipse.centerId);
 		const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
 		const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
-		const rx = center && majorPt ? dist(center, majorPt).toFixed(1) : '?';
-		const ry = center && minorPt ? dist(center, minorPt).toFixed(1) : '?';
+		const rx = center && majorPt ? center.distanceTo(majorPt).toFixed(1) : '?';
+		const ry = center && minorPt ? center.distanceTo(minorPt).toFixed(1) : '?';
 		return `
 			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="ellipse" data-id="${ellipse.id}">
 				<div class="tree-item-info">
@@ -392,8 +392,8 @@ export class Sidebar {
 		const center = this.sketch.points.get(arc.centerId);
 		const majorPt = this.sketch.points.get(arc.majorAxisPointId);
 		const minorPt = this.sketch.points.get(arc.minorAxisPointId);
-		const rx = center && majorPt ? dist(center, majorPt).toFixed(1) : '?';
-		const ry = center && minorPt ? dist(center, minorPt).toFixed(1) : '?';
+		const rx = center && majorPt ? center.distanceTo(majorPt).toFixed(1) : '?';
+		const ry = center && minorPt ? center.distanceTo(minorPt).toFixed(1) : '?';
 		return `
 			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="elliptical_arc" data-id="${arc.id}">
 				<div class="tree-item-info">

@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { marchingSquares, pixelEdgeContours } from './contours';
 import {
 	circleToClosedSpline,
@@ -61,7 +61,7 @@ export function traceImage(input: TraceInput, settings: ImageTraceSettings): Tra
 	const { width, height, yScale } = input;
 	const options = getFitOptions(settings, input);
 	const { mask, threshold } = prepareMask(input, settings);
-	const scaleY = (points: Vec2[]) => points.map(p => ({ x: p.x, y: p.y * yScale }));
+	const scaleY = (points: Vec2[]) => points.map(p => new Vec2(p.x, p.y * yScale));
 
 	const builder = new TraceBuilder(options);
 	if (settings.mode === 'outline') {
@@ -85,7 +85,7 @@ export function traceImage(input: TraceInput, settings: ImageTraceSettings): Tra
 			let vertex = nodeVertices.get(node);
 			if (vertex === undefined) {
 				const p = graph.nodes[node];
-				vertex = builder.addVertex({ x: p.x, y: p.y * yScale });
+				vertex = builder.addVertex(new Vec2(p.x, p.y * yScale));
 				nodeVertices.set(node, vertex);
 			}
 			return vertex;
@@ -124,7 +124,7 @@ class TraceBuilder {
 	}
 
 	addVertex(p: Vec2): number {
-		this.vertices.push({ x: p.x, y: p.y });
+		this.vertices.push(p.clone());
 		return this.vertices.length - 1;
 	}
 
@@ -186,7 +186,7 @@ function toSegment(points: Vec2[], piece: FittedPiece, a: number, b: number): Tr
 	if (piece.kind === 'line') return { kind: 'line', a, b };
 	if (piece.kind === 'arc') {
 		const mid = points[Math.round((piece.start + piece.end) / 2)];
-		return { kind: 'arc', a, b, center: piece.center, radius: piece.radius, mid: { ...mid } };
+		return { kind: 'arc', a, b, center: piece.center, radius: piece.radius, mid: mid.clone() };
 	}
 	return { kind: 'spline', a, b, points: piece.points.slice(1, -1), handles: piece.handles };
 }
@@ -195,19 +195,19 @@ function toSegment(points: Vec2[], piece: FittedPiece, a: number, b: number): Tr
 function endDirection(points: Vec2[], piece: FittedPiece, at: 'start' | 'end'): Vec2 {
 	const p = points[at === 'start' ? piece.start : piece.end];
 	const near = points[at === 'start' ? Math.min(piece.end, piece.start + 2) : Math.max(piece.start, piece.end - 2)];
-	const travel = at === 'start' ? { x: near.x - p.x, y: near.y - p.y } : { x: p.x - near.x, y: p.y - near.y };
+	const travel = at === 'start' ? new Vec2().subVectors(near, p) : new Vec2().subVectors(p, near);
 	let direction: Vec2;
 	if (piece.kind === 'line') {
 		const a = points[piece.start];
 		const b = points[piece.end];
-		direction = { x: b.x - a.x, y: b.y - a.y };
+		direction = new Vec2().subVectors(b, a);
 	} else if (piece.kind === 'arc') {
-		const radial = { x: p.x - piece.center.x, y: p.y - piece.center.y };
-		direction = { x: -radial.y, y: radial.x };
-		if (direction.x * travel.x + direction.y * travel.y < 0) direction = { x: -direction.x, y: -direction.y };
+		const radial = new Vec2().subVectors(p, piece.center);
+		direction = radial.clone().perpendicular();
+		if (direction.x * travel.x + direction.y * travel.y < 0) direction = direction.clone().negate();
 	} else {
 		direction = travel;
 	}
-	const l = Math.hypot(direction.x, direction.y) || 1;
-	return { x: direction.x / l, y: direction.y / l };
+	const l = direction.length() || 1;
+	return direction.clone().divideScalar(l);
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
-import { vec } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 import { computeNaturalFitHandles } from '../src/math/spline';
 
 function setupMockDocument() {
@@ -112,7 +112,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(gridPointScreen.y, 220);
 
 			// Cursor 3px away from (20,20) on screen (within 4px snap radius)
-			const snap = interaction.findSnap(vec(gridPointScreen.x + 3, gridPointScreen.y));
+			const snap = interaction.findSnap(new Vec2(gridPointScreen.x + 3, gridPointScreen.y));
 			assert.ok(snap, 'Snap should be found');
 			assert.equal(snap.type, 'grid');
 			assert.equal(snap.worldPos.x, 20);
@@ -121,16 +121,16 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(snap.screenPos.y, 220);
 
 			// Cursor 5px away (outside 4px snap radius) -> returns null
-			const snapTooFar = interaction.findSnap(vec(gridPointScreen.x + 5, gridPointScreen.y));
+			const snapTooFar = interaction.findSnap(new Vec2(gridPointScreen.x + 5, gridPointScreen.y));
 			assert.equal(snapTooFar, null, 'Grid snap should not trigger beyond 4px');
 
 			// When allowGrid is false, grid snap is suppressed
-			const snapNoGrid = interaction.findSnap(vec(gridPointScreen.x + 3, gridPointScreen.y), undefined, false);
+			const snapNoGrid = interaction.findSnap(new Vec2(gridPointScreen.x + 3, gridPointScreen.y), undefined, false);
 			assert.equal(snapNoGrid, null, 'Grid snap should be suppressed when allowGrid=false');
 
 			// But existing point is still found even when allowGrid=false
 			sketch.addPoint({ x: 20, y: 20 });
-			const snapPt = interaction.findSnap(vec(gridPointScreen.x + 3, gridPointScreen.y), undefined, false);
+			const snapPt = interaction.findSnap(new Vec2(gridPointScreen.x + 3, gridPointScreen.y), undefined, false);
 			assert.ok(snapPt, 'Point snap should still be found when allowGrid=false');
 			assert.equal(snapPt.type, 'point');
 		} finally {
@@ -165,7 +165,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			// Simulate point drag
 			(interaction as any).isDraggingPoint = true;
 			(interaction as any).draggedPointId = pt.id;
-			(interaction as any).dragPointStartWorld = vec(pt.x, pt.y);
+			(interaction as any).dragPointStartWorld = new Vec2(pt.x, pt.y);
 			(interaction as any).hasDragged = true;
 
 			// Release mouse near screen pos corresponding to world (25, 20)
@@ -179,19 +179,19 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(pt.x, 25, 'Point X should snap exactly to grid 25');
 			assert.equal(pt.y, 20, 'Point Y should snap exactly to grid 20');
 
-			const points = [vec(15, 40), vec(30, 40), vec(45, 55)].map(point => sketch.addPoint(point));
+			const points = [new Vec2(15, 40), new Vec2(30, 40), new Vec2(45, 55)].map(point => sketch.addPoint(point));
 			const spline = sketch.addFitSpline(points.map(point => point.id));
 			sketch.selectEntity(points[1].id, 'point');
-			const nearGrid = viewport.worldToScreen(vec(20, 40));
+			const nearGrid = viewport.worldToScreen(new Vec2(20, 40));
 			// The previous fit point's forward handle sits on this grid intersection.
 			assert.equal(interaction.findSnap(nearGrid, points[1].id)?.type, 'grid');
 
 			(interaction as any).isDraggingPoint = true;
 			(interaction as any).draggedPointId = points[1].id;
-			(interaction as any).dragPointStartWorld = vec(30, 40);
+			(interaction as any).dragPointStartWorld = new Vec2(30, 40);
 			(interaction as any).hasDragged = true;
 			(interaction as any).handleMouseUp({ clientX: nearGrid.x + 1, clientY: nearGrid.y, button: 0 });
-			assert.deepEqual(vec(points[1].x, points[1].y), vec(20, 40));
+			assert.deepEqual(new Vec2(points[1].x, points[1].y), new Vec2(20, 40));
 			assert.equal(sketch.constraints.size, 3);
 
 			const checkHandles = () => {
@@ -200,8 +200,8 @@ describe('Grid Snapping & Drag Precision', () => {
 					const line = sketch.lines.get(id)!;
 					const h1 = sketch.points.get(line.p1Id)!;
 					const h2 = sketch.points.get(line.p2Id)!;
-					assert.deepEqual(vec(h1.x, h1.y), expected[i].h1);
-					assert.deepEqual(vec(h2.x, h2.y), expected[i].h2);
+					assert.deepEqual(new Vec2(h1.x, h1.y), expected[i].h1);
+					assert.deepEqual(new Vec2(h2.x, h2.y), expected[i].h2);
 				}
 			};
 			checkHandles();
@@ -210,14 +210,14 @@ describe('Grid Snapping & Drag Precision', () => {
 
 			const tangent = sketch.lines.get(spline.tangentLineIds![1])!;
 			const handle = sketch.points.get(tangent.p2Id)!;
-			const handleTarget = viewport.worldToScreen(vec(25, 50));
+			const handleTarget = viewport.worldToScreen(new Vec2(25, 50));
 			(interaction as any).isDraggingPoint = true;
 			(interaction as any).draggedPointId = handle.id;
-			(interaction as any).dragPointStartWorld = vec(handle.x, handle.y);
+			(interaction as any).dragPointStartWorld = new Vec2(handle.x, handle.y);
 			(interaction as any).hasDragged = true;
 			(interaction as any).handleMouseUp({ clientX: handleTarget.x + 1, clientY: handleTarget.y, button: 0 });
-			assert.deepEqual(vec(handle.x, handle.y), vec(25, 50));
-			assert.deepEqual(vec(points[1].x, points[1].y), vec(20, 40));
+			assert.deepEqual(new Vec2(handle.x, handle.y), new Vec2(25, 50));
+			assert.deepEqual(new Vec2(points[1].x, points[1].y), new Vec2(20, 40));
 			assert.equal(sketch.constraints.size, 3);
 		} finally {
 			cleanupDoc();
@@ -230,7 +230,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			const sketch = new SketchDocument();
 			const viewport = new Viewport(800, 600);
 			viewport.zoom = 4;
-			const point = sketch.addPoint(vec(12, 16));
+			const point = sketch.addPoint(new Vec2(12, 16));
 			const svg = {
 				style: {},
 				classList: { add() {}, remove() {}, toggle() {} },
@@ -251,7 +251,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			const interaction = new CanvasInteraction(svg, sketch, viewport, renderer as any);
 			sketch.onChange(() => renderer.render());
 			const eventAt = (x: number, y: number) => {
-				const screen = viewport.worldToScreen(vec(x, y));
+				const screen = viewport.worldToScreen(new Vec2(x, y));
 				return {
 					button: 0,
 					clientX: screen.x,
@@ -305,7 +305,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			const sX = viewport.worldToScreen({ x: 20, y: 0 });
 
 			// Cursor 2px offset along X and 2px offset along Y (both <= 4px threshold)
-			const snapXNear = interaction.findSnap(vec(sX.x + 2, sX.y + 2));
+			const snapXNear = interaction.findSnap(new Vec2(sX.x + 2, sX.y + 2));
 			assert.ok(snapXNear, 'Snap on X-axis should be found');
 			assert.equal(snapXNear.type, 'line');
 			assert.equal(snapXNear.id, 'axis_x');
@@ -315,7 +315,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(snapXNear.screenPos.y, sX.y);
 
 			// Cursor 6px offset along X (>4px threshold) but 2px along Y (<10px axis snap)
-			const snapXFar = interaction.findSnap(vec(sX.x + 6, sX.y + 2));
+			const snapXFar = interaction.findSnap(new Vec2(sX.x + 6, sX.y + 2));
 			assert.ok(snapXFar, 'Snap on X-axis should still be found');
 			assert.equal(snapXFar.type, 'line');
 			assert.equal(snapXFar.id, 'axis_x');
@@ -323,14 +323,14 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.notEqual(snapXFar.worldPos.x, 20, 'World X should NOT snap to 20 when > 4px away');
 
 			// When allowGrid is false, axis snapping is also suppressed
-			const snapXNoGrid = interaction.findSnap(vec(sX.x + 2, sX.y + 2), undefined, false);
+			const snapXNoGrid = interaction.findSnap(new Vec2(sX.x + 2, sX.y + 2), undefined, false);
 			assert.equal(snapXNoGrid, null, 'Axis snap should be suppressed when allowGrid=false');
 
 			// Test Y-axis at world (0, 20)
 			const sY = viewport.worldToScreen({ x: 0, y: 20 });
 
 			// Cursor 2px offset along X (<10px axis snap) and 2px offset along Y (<= 4px grid snap)
-			const snapYNear = interaction.findSnap(vec(sY.x + 2, sY.y + 2));
+			const snapYNear = interaction.findSnap(new Vec2(sY.x + 2, sY.y + 2));
 			assert.ok(snapYNear, 'Snap on Y-axis should be found');
 			assert.equal(snapYNear.type, 'line');
 			assert.equal(snapYNear.id, 'axis_y');
@@ -340,7 +340,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.equal(snapYNear.screenPos.y, sY.y);
 
 			// Cursor 2px offset along X but 6px offset along Y (>4px threshold)
-			const snapYFar = interaction.findSnap(vec(sY.x + 2, sY.y + 6));
+			const snapYFar = interaction.findSnap(new Vec2(sY.x + 2, sY.y + 6));
 			assert.ok(snapYFar, 'Snap on Y-axis should still be found');
 			assert.equal(snapYFar.type, 'line');
 			assert.equal(snapYFar.id, 'axis_y');
@@ -348,7 +348,7 @@ describe('Grid Snapping & Drag Precision', () => {
 			assert.notEqual(snapYFar.worldPos.y, 20, 'World Y should NOT snap to 20 when > 4px away');
 
 			// When allowGrid is false, Y axis snapping is also suppressed
-			const snapYNoGrid = interaction.findSnap(vec(sY.x + 2, sY.y + 2), undefined, false);
+			const snapYNoGrid = interaction.findSnap(new Vec2(sY.x + 2, sY.y + 2), undefined, false);
 			assert.equal(snapYNoGrid, null, 'Axis snap should be suppressed when allowGrid=false');
 		} finally {
 			cleanupDoc();

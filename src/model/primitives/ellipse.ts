@@ -1,4 +1,4 @@
-import { angleFromToDeg, dist, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { distanceToEllipse } from '../../math/hitTest';
 import { ellipseIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipse } from '../../math/intersection';
@@ -72,12 +72,12 @@ export class SketchEllipse implements ISketchPrimitive {
 		return {
 			type: 'ellipse',
 			id: this.id,
-			center: { x: center.x, y: center.y },
+			center: new Vec2(center.x, center.y),
 			centerId: this.centerId,
 			majorAxisPointId: this.majorAxisPointId,
 			minorAxisPointId: this.minorAxisPointId,
-			majorAxisPoint: { x: maj.x, y: maj.y },
-			minorAxisPoint: { x: min.x, y: min.y },
+			majorAxisPoint: new Vec2(maj.x, maj.y),
+			minorAxisPoint: new Vec2(min.x, min.y),
 			isConstruction: this.isConstruction,
 		};
 	}
@@ -92,7 +92,7 @@ export class SketchEllipse implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(dist(center, majorPt).toFixed(2)) : 0;
+					return center && majorPt ? Number(center.distanceTo(majorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rx: val }),
 				validate: val => !isNaN(val) && isFinite(val) && val > 0,
@@ -104,7 +104,7 @@ export class SketchEllipse implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
-					return center && minorPt ? Number(dist(center, minorPt).toFixed(2)) : 0;
+					return center && minorPt ? Number(center.distanceTo(minorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { ry: val }),
 				validate: val => !isNaN(val) && isFinite(val) && val > 0,
@@ -116,7 +116,7 @@ export class SketchEllipse implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(angleFromToDeg(center, majorPt).toFixed(2)) : 0;
+					return center && majorPt ? Number(center.angleToPointDeg(majorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
 			},

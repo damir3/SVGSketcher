@@ -2,19 +2,7 @@ import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import {
-	ORIGIN,
-	cross,
-	directionAngleDeg,
-	dist,
-	dot,
-	mid,
-	normalize,
-	scale,
-	sub,
-	vec,
-	type Vec2,
-} from '../../../math/vector';
+import { ORIGIN, Vec2 } from '../../../math/vector';
 import { RadiusConstraint } from '../../../solver/constraints/radius';
 
 export interface DimensionState {
@@ -34,25 +22,25 @@ export function determineDistanceOrientation(
 	orientation: 'aligned' | 'horizontal' | 'vertical';
 	offsetScreen: number;
 } {
-	const len = dist(s1, s2);
+	const len = s1.distanceTo(s2);
 
-	const midPoint = mid(s1, s2);
-	const v = sub(cursor, midPoint);
+	const midPoint = new Vec2().midpoint(s1, s2);
+	const v = new Vec2().subVectors(cursor, midPoint);
 
 	if (len < 1e-4) {
 		return { orientation: 'aligned', offsetScreen: 0 };
 	}
 
-	const dir = normalize(sub(s2, s1));
-	const normal = vec(-dir.y, dir.x);
-	const normalOffset = dot(v, normal);
+	const dir = new Vec2().subVectors(s2, s1).normalizeOrUnitX();
+	const normal = dir.clone().perpendicular();
+	const normalOffset = v.dot(normal);
 
 	// Angle of cursor from midpoint in degrees (-180 to 180)
 	// -90° is UP, +90° is DOWN, 0° is RIGHT, ±180° is LEFT
-	const theta = directionAngleDeg(v);
+	const theta = v.signedAngleDeg();
 
 	// Angle of line and line normal in degrees
-	const lineAngle = directionAngleDeg(dir);
+	const lineAngle = dir.signedAngleDeg();
 	const norm1 = lineAngle + 90;
 	const norm2 = lineAngle - 90;
 
@@ -447,12 +435,12 @@ export class DimensionTool extends BaseTool {
 							const sp = this.ctx.viewport.worldToScreen(pt);
 							const s1 = this.ctx.viewport.worldToScreen(lp1);
 							const s2 = this.ctx.viewport.worldToScreen(lp2);
-							const dir = sub(s2, s1);
-							const lineLen = Math.hypot(dir.x, dir.y);
+							const dir = new Vec2().subVectors(s2, s1);
+							const lineLen = dir.length();
 							if (lineLen > 1e-4) {
-								const u = scale(dir, 1 / lineLen);
-								const tProj = dot(sub(sp, s1), u);
-								const tCursor = dot(sub(screen, s1), u);
+								const u = dir.clone().multiplyScalar(1 / lineLen);
+								const tProj = new Vec2().subVectors(sp, s1).dot(u);
+								const tCursor = new Vec2().subVectors(screen, s1).dot(u);
 								let offsetScreen = tCursor - tProj;
 								if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
 									offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
@@ -581,12 +569,12 @@ export class DimensionTool extends BaseTool {
 					const sp = this.ctx.viewport.worldToScreen(pt);
 					const s1 = this.ctx.viewport.worldToScreen(lp1);
 					const s2 = this.ctx.viewport.worldToScreen(lp2);
-					const dir = sub(s2, s1);
-					const lineLen = Math.hypot(dir.x, dir.y);
+					const dir = new Vec2().subVectors(s2, s1);
+					const lineLen = dir.length();
 					if (lineLen > 1e-4) {
-						const u = scale(dir, 1 / lineLen);
-						const tProj = dot(sub(sp, s1), u);
-						const tCursor = dot(sub(screen, s1), u);
+						const u = dir.clone().multiplyScalar(1 / lineLen);
+						const tProj = new Vec2().subVectors(sp, s1).dot(u);
+						const tCursor = new Vec2().subVectors(screen, s1).dot(u);
 						let offsetScreen = tCursor - tProj;
 						if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
 							offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
@@ -664,7 +652,7 @@ export class DimensionTool extends BaseTool {
 				const p3 = this.ctx.sketch.points.get(this.state.point3Id);
 				if (p1 && p2 && p3) {
 					const geom = this.ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
-					const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
+					const arcRadiusWorld = Math.max(10, world.distanceTo(geom.pInt));
 					const existed = this.ctx.sketch.hasThreePointAngleConstraint(
 						this.state.point1Id,
 						this.state.point2Id,
@@ -723,7 +711,7 @@ export class DimensionTool extends BaseTool {
 						const { orientation, offsetScreen } = determineDistanceOrientation(sOrigin, sPt, screen);
 						let offsetWorld = offsetScreen / this.ctx.viewport.zoom;
 						if (orientation === 'horizontal') {
-							const sAxisY = this.ctx.viewport.worldToScreen({ x: 0, y: 100 });
+							const sAxisY = this.ctx.viewport.worldToScreen(new Vec2(0, 100));
 							const dy = sAxisY.y - sOrigin.y;
 							const lineLen = Math.hypot(0, dy);
 							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
@@ -817,12 +805,12 @@ export class DimensionTool extends BaseTool {
 						const sp = this.ctx.viewport.worldToScreen(pt);
 						const s1 = this.ctx.viewport.worldToScreen(p1);
 						const s2 = this.ctx.viewport.worldToScreen(p2);
-						const dir = sub(s2, s1);
-						const lineLen = Math.hypot(dir.x, dir.y);
+						const dir = new Vec2().subVectors(s2, s1);
+						const lineLen = dir.length();
 						if (lineLen > 1e-4) {
-							const u = scale(dir, 1 / lineLen);
-							const tProj = dot(sub(sp, s1), u);
-							const tCursor = dot(sub(screen, s1), u);
+							const u = dir.clone().multiplyScalar(1 / lineLen);
+							const tProj = new Vec2().subVectors(sp, s1).dot(u);
+							const tCursor = new Vec2().subVectors(screen, s1).dot(u);
 							const offsetWorld = (tCursor - tProj) / this.ctx.viewport.zoom;
 
 							const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(this.state.point1Id, this.state.line1Id);
@@ -880,7 +868,7 @@ export class DimensionTool extends BaseTool {
 			const p4 = this.ctx.sketch.points.get(l2.p2Id);
 			if (p1 && p2 && p3 && p4) {
 				const geom = this.ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, line1Id, line2Id);
-				const arcRadiusWorld = Math.max(10, Math.hypot(world.x - geom.pInt.x, world.y - geom.pInt.y));
+				const arcRadiusWorld = Math.max(10, world.distanceTo(geom.pInt));
 				const existed = this.ctx.sketch.hasAngleConstraint(line1Id, line2Id);
 				const c = this.ctx.sketch.addAngleConstraint(line1Id, line2Id, undefined, arcRadiusWorld, world);
 				if (c) {
@@ -928,9 +916,9 @@ export class DimensionTool extends BaseTool {
 					const p1 = ctx.sketch.points.get(l1.p1Id);
 					const p2 = ctx.sketch.points.get(l1.p2Id);
 					if (p1 && p2) {
-						const dir = sub(p2, p1);
-						const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
-						const perpDist = Math.abs(cross(sub(hitPt, p1), dir)) / lineLen;
+						const dir = new Vec2().subVectors(p2, p1);
+						const lineLen = Math.max(dir.length(), 1e-7);
+						const perpDist = Math.abs(new Vec2().subVectors(hitPt, p1).cross(dir)) / lineLen;
 						const sp = ctx.viewport.worldToScreen(hitPt);
 						const s1 = ctx.viewport.worldToScreen(p1);
 						const s2 = ctx.viewport.worldToScreen(p2);
@@ -949,8 +937,8 @@ export class DimensionTool extends BaseTool {
 			if (p1 && p2 && p3) {
 				const geom = ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
 				const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-				const sRay1 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u1.x * 20, y: geom.pInt.y + geom.u1.y * 20 });
-				const sRay2 = ctx.viewport.worldToScreen({ x: geom.pInt.x + geom.u2.x * 20, y: geom.pInt.y + geom.u2.y * 20 });
+				const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
+				const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
 				const hasSeg1 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point1Id));
 				const hasSeg2 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point3Id));
 				const sp1 = ctx.viewport.worldToScreen(p1);
@@ -987,14 +975,8 @@ export class DimensionTool extends BaseTool {
 				if (p1 && p2 && p3) {
 					const geom = ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
 					const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-					const sRay1 = ctx.viewport.worldToScreen({
-						x: geom.pInt.x + geom.u1.x * 20,
-						y: geom.pInt.y + geom.u1.y * 20,
-					});
-					const sRay2 = ctx.viewport.worldToScreen({
-						x: geom.pInt.x + geom.u2.x * 20,
-						y: geom.pInt.y + geom.u2.y * 20,
-					});
+					const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
+					const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
 					const hasSeg1 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point1Id));
 					const hasSeg2 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, hoverPtId));
 					const sp1 = ctx.viewport.worldToScreen(p1);
@@ -1043,7 +1025,7 @@ export class DimensionTool extends BaseTool {
 				if (snapPt) {
 					const targetScreen = snapPt.screenPos;
 					const targetWorld = snapPt.worldPos;
-					const currentDist = dist(p1, targetWorld);
+					const currentDist = p1.distanceTo(targetWorld);
 					this.ctx.renderer.renderDistanceLinePreview(s1, targetScreen, currentDist, true);
 					return;
 				}
@@ -1054,9 +1036,9 @@ export class DimensionTool extends BaseTool {
 					const lp1 = ctx.sketch.points.get(hitLine.p1Id);
 					const lp2 = ctx.sketch.points.get(hitLine.p2Id);
 					if (lp1 && lp2) {
-						const dir = sub(lp2, lp1);
-						const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
-						const perpDist = Math.abs(cross(sub(p1, lp1), dir)) / lineLen;
+						const dir = new Vec2().subVectors(lp2, lp1);
+						const lineLen = Math.max(dir.length(), 1e-7);
+						const perpDist = Math.abs(new Vec2().subVectors(p1, lp1).cross(dir)) / lineLen;
 						if (perpDist >= 0.5) {
 							const sp = ctx.viewport.worldToScreen(p1);
 							const s1Line = ctx.viewport.worldToScreen(lp1);
@@ -1068,7 +1050,7 @@ export class DimensionTool extends BaseTool {
 				}
 
 				// 3. Fallback: Free cursor in empty space
-				const currentDist = dist(p1, world);
+				const currentDist = p1.distanceTo(world);
 				this.ctx.renderer.renderDistanceLinePreview(s1, screen, currentDist, false);
 			}
 		}
@@ -1080,7 +1062,7 @@ export class DimensionTool extends BaseTool {
 				const s1 = ctx.viewport.worldToScreen(p1);
 				const s2 = ctx.viewport.worldToScreen(p2);
 				const { orientation } = determineDistanceOrientation(s1, s2, screen);
-				let currentDist = dist(p1, p2);
+				let currentDist = p1.distanceTo(p2);
 				if (orientation === 'horizontal') {
 					currentDist = Math.abs(p2.x - p1.x);
 				} else if (orientation === 'vertical') {
@@ -1103,14 +1085,8 @@ export class DimensionTool extends BaseTool {
 				if (p1 && p2 && p3 && p4) {
 					const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, line1Id, line2Id);
 					const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-					const sRay1 = ctx.viewport.worldToScreen({
-						x: geom.pInt.x + geom.u1.x * 20,
-						y: geom.pInt.y + geom.u1.y * 20,
-					});
-					const sRay2 = ctx.viewport.worldToScreen({
-						x: geom.pInt.x + geom.u2.x * 20,
-						y: geom.pInt.y + geom.u2.y * 20,
-					});
+					const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
+					const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
 					const sp1 = hasUserLine1 ? ctx.viewport.worldToScreen(p1) : undefined;
 					const sp2 = hasUserLine1 ? ctx.viewport.worldToScreen(p2) : undefined;
 					const sp3 = hasUserLine2 ? ctx.viewport.worldToScreen(p3) : undefined;
@@ -1128,9 +1104,9 @@ export class DimensionTool extends BaseTool {
 					const sp = ctx.viewport.worldToScreen(pt);
 					const s1 = ctx.viewport.worldToScreen(p1);
 					const s2 = ctx.viewport.worldToScreen(p2);
-					const dir = sub(p2, p1);
-					const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
-					const perpDist = Math.abs(cross(sub(pt, p1), dir)) / lineLen;
+					const dir = new Vec2().subVectors(p2, p1);
+					const lineLen = Math.max(dir.length(), 1e-7);
+					const perpDist = Math.abs(new Vec2().subVectors(pt, p1).cross(dir)) / lineLen;
 					this.ctx.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, perpDist);
 				}
 			}

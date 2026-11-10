@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
@@ -154,7 +155,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 20;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		});
@@ -189,7 +190,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 10;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 100 },
+			cornerVertex: new Vec2(0, 100),
 			endPointId1: pPeak.id,
 			endPointId2: pPeak.id,
 		});
@@ -208,7 +209,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		// Reverse curve selection order
 		const resRev = calculateFilletGeometry(c2, c1, radius, {
-			cornerVertex: { x: 0, y: 100 },
+			cornerVertex: new Vec2(0, 100),
 			endPointId1: pPeak.id,
 			endPointId2: pPeak.id,
 		});
@@ -235,7 +236,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 10;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		});
@@ -259,8 +260,8 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 15;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			clickPos1: { x: 20, y: 50 },
-			clickPos2: { x: 50, y: 20 },
+			clickPos1: new Vec2(20, 50),
+			clickPos2: new Vec2(50, 20),
 		});
 
 		assert.ok(res);
@@ -285,7 +286,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 15;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		});
@@ -312,7 +313,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 12;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		});
@@ -339,8 +340,8 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 20;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			clickPos1: { x: -100, y: 90 },
-			clickPos2: { x: -50, y: 30 },
+			clickPos1: new Vec2(-100, 90),
+			clickPos2: new Vec2(-50, 30),
 		});
 
 		assert.ok(res);
@@ -391,7 +392,7 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 10;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		});
@@ -439,8 +440,8 @@ describe('Fillet Mathematics & Geometry', () => {
 
 		const radius = 20;
 		const res = calculateFilletGeometry(c1, c2, radius, {
-			clickPos1: { x: -140, y: 90 },
-			clickPos2: { x: -50, y: 30 },
+			clickPos1: new Vec2(-140, 90),
+			clickPos2: new Vec2(-50, 30),
 		});
 
 		assert.ok(res);
@@ -471,7 +472,7 @@ describe('Fillet Commit and Document Integration', () => {
 		const c2 = sketchPrimitiveToGeoCurve(sketch, 'line', line2.id)!;
 		const radius = 25;
 		const filletRes = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: pCorner.id,
 			endPointId2: pCorner.id,
 		})!;
@@ -577,13 +578,22 @@ describe('Fillet Commit and Document Integration', () => {
 		const copy = sketch.addPoint({ x: -20, y: -20 });
 		const line1 = sketch.addLine(corner.id, sketch.addPoint({ x: 120, y: 20 }).id);
 		const line2 = sketch.addLine(corner.id, sketch.addPoint({ x: 20, y: 120 }).id);
-		const pattern = sketch.addCircularPatternConstraint(center.id, [corner.id], 'full', 360, 2, false, [], [
-			{
-				copyIndex: 1,
-				pointPairs: [{ sourcePtId: corner.id, patternPtId: copy.id }],
-				createdEntityIds: [{ type: 'point', id: copy.id }],
-			},
-		]);
+		const pattern = sketch.addCircularPatternConstraint(
+			center.id,
+			[corner.id],
+			'full',
+			360,
+			2,
+			false,
+			[],
+			[
+				{
+					copyIndex: 1,
+					pointPairs: [{ sourcePtId: corner.id, patternPtId: copy.id }],
+					createdEntityIds: [{ type: 'point', id: copy.id }],
+				},
+			]
+		);
 		assert.ok(pattern);
 
 		const result = calculateFilletGeometry(line1.toGeoCurve(sketch)!, line2.toGeoCurve(sketch)!, 10, {
@@ -592,15 +602,19 @@ describe('Fillet Commit and Document Integration', () => {
 			endPointId2: corner.id,
 		});
 		assert.ok(result);
-		const fillet = commitFilletToSketch(sketch, {
-			id: 'pattern-corner',
-			vertexPointId: corner.id,
-			primitive1: { type: 'line', id: line1.id },
-			primitive2: { type: 'line', id: line2.id },
-			endPointId1: corner.id,
-			endPointId2: corner.id,
-			result,
-		}, true);
+		const fillet = commitFilletToSketch(
+			sketch,
+			{
+				id: 'pattern-corner',
+				vertexPointId: corner.id,
+				primitive1: { type: 'line', id: line1.id },
+				primitive2: { type: 'line', id: line2.id },
+				endPointId1: corner.id,
+				endPointId2: corner.id,
+				result,
+			},
+			true
+		);
 		assert.ok(fillet);
 		assert.ok(sketch.points.has(corner.id));
 		assert.equal(sketch.constraints.get(pattern.id), pattern);
@@ -609,8 +623,14 @@ describe('Fillet Commit and Document Integration', () => {
 		const links = [...sketch.constraints.values()].filter(
 			c => c instanceof PointOnLineConstraint && c.pointId === corner.id
 		);
-		assert.deepEqual(links.map(c => c.lineP1Id), [fillet.p1Id, fillet.p2Id]);
-		assert.deepEqual(links.map(c => c.lineP2Id), [line1.p2Id, line2.p2Id]);
+		assert.deepEqual(
+			links.map(c => c.lineP1Id),
+			[fillet.p1Id, fillet.p2Id]
+		);
+		assert.deepEqual(
+			links.map(c => c.lineP2Id),
+			[line1.p2Id, line2.p2Id]
+		);
 		assert.ok(sketch.solve().finalError < 1e-8);
 	});
 
@@ -635,7 +655,7 @@ describe('Fillet Commit and Document Integration', () => {
 		const cBottom = sketchPrimitiveToGeoCurve(sketch, 'line', lBottom.id)!;
 		const cLeft = sketchPrimitiveToGeoCurve(sketch, 'line', lLeft.id)!;
 		const res0 = calculateFilletGeometry(cBottom, cLeft, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		})!;
@@ -652,7 +672,7 @@ describe('Fillet Commit and Document Integration', () => {
 		// Fillet at p1 (Bottom & Right)
 		const cRight = sketchPrimitiveToGeoCurve(sketch, 'line', lRight.id)!;
 		const res1 = calculateFilletGeometry(cBottom, cRight, radius, {
-			cornerVertex: { x: 100, y: 0 },
+			cornerVertex: new Vec2(100, 0),
 			endPointId1: p1.id,
 			endPointId2: p1.id,
 		})!;
@@ -723,7 +743,7 @@ describe('Fillet Commit and Document Integration', () => {
 		const c1 = sketchPrimitiveToGeoCurve(sketch, 'line', l1.id)!;
 		const c2 = sketchPrimitiveToGeoCurve(sketch, 'line', l2.id)!;
 		const res = calculateFilletGeometry(c1, c2, 10, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		})!;
@@ -772,7 +792,7 @@ describe('Fillet Commit and Document Integration', () => {
 		const radius = 20;
 
 		const filletRes = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: pCorner.id,
 			endPointId2: pCorner.id,
 		})!;
@@ -828,7 +848,7 @@ describe('Fillet Commit and Document Integration', () => {
 		const c2 = sketchPrimitiveToGeoCurve(sketch, 'line', l2.id)!;
 		const startRadius = 10;
 		const res = calculateFilletGeometry(c1, c2, startRadius, {
-			cornerVertex: { x: 0, y: 0 },
+			cornerVertex: new Vec2(0, 0),
 			endPointId1: p0.id,
 			endPointId2: p0.id,
 		})!;
@@ -882,7 +902,7 @@ describe('Fillet Commit and Document Integration', () => {
 		// Large radius R = 35: tangent point is past the midpoint (param < 0.5)
 		const radius = 35;
 		const filletRes = calculateFilletGeometry(c1, c2, radius, {
-			cornerVertex: { x: pPeak.x, y: pPeak.y },
+			cornerVertex: new Vec2(pPeak.x, pPeak.y),
 			endPointId1: pPeak.id,
 			endPointId2: pPeak.id,
 		});
@@ -933,7 +953,7 @@ describe('Fillet Commit and Document Integration', () => {
 
 		// R = 30: fits inside the bowl in the corner (-50, 0)
 		const res30 = calculateFilletGeometry(cLine, cSpline, 30, {
-			cornerVertex: { x: p1.x, y: p1.y },
+			cornerVertex: new Vec2(p1.x, p1.y),
 			endPointId1: p1.id,
 			endPointId2: p1.id,
 		});
@@ -945,7 +965,7 @@ describe('Fillet Commit and Document Integration', () => {
 		// R = 50: does not fit inside the bowl (max inscribed radius is ~35mm)
 		// It MUST NOT flip to the exterior (x < -50)
 		const res50 = calculateFilletGeometry(cLine, cSpline, 50, {
-			cornerVertex: { x: p1.x, y: p1.y },
+			cornerVertex: new Vec2(p1.x, p1.y),
 			endPointId1: p1.id,
 			endPointId2: p1.id,
 		});
@@ -968,7 +988,7 @@ describe('Fillet Commit and Document Integration', () => {
 			cLine,
 			cSpline,
 			{
-				cornerVertex: { x: p1.x, y: p1.y },
+				cornerVertex: new Vec2(p1.x, p1.y),
 				endPointId1: p1.id,
 				endPointId2: p1.id,
 			},
@@ -991,7 +1011,7 @@ describe('Fillet Commit and Document Integration', () => {
 			cLineA,
 			cLineB,
 			{
-				cornerVertex: { x: 0, y: 0 },
+				cornerVertex: new Vec2(0, 0),
 				endPointId1: pA.id,
 				endPointId2: pA.id,
 			},
@@ -1016,9 +1036,9 @@ describe('Fillet Commit and Document Integration', () => {
 		const cSpline = sketchPrimitiveToGeoCurve(sketch, 'spline', spline.id)!;
 
 		const res = calculateFilletGeometry(cLine, cSpline, 20, {
-			cornerVertex: { x: -50, y: 0 },
-			clickPos1: { x: -40, y: 0 },
-			clickPos2: { x: -50, y: -20 },
+			cornerVertex: new Vec2(-50, 0),
+			clickPos1: new Vec2(-40, 0),
+			clickPos2: new Vec2(-50, -20),
 		});
 		assert.ok(res);
 

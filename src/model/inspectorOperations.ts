@@ -9,13 +9,13 @@ import {
 	DragPointConstraint,
 	AngleConstraint,
 } from '../solver/constraints';
-import { angleFromTo, addScaled, cross, dot, normalizeOrNull, scale, sub, vec } from '../math/vector';
+import { Vec2 } from '../math/vector';
 
 export function setPointCoords(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
 	const pt = sketch.points.get(pointId);
 	if (!pt || !isFinite(targetX) || !isFinite(targetY)) return false;
 
-	const dir = vec(targetX - pt.x, targetY - pt.y);
+	const dir = new Vec2(targetX - pt.x, targetY - pt.y);
 
 	let hadFixed = false;
 	for (const c of sketch.constraints.values()) {
@@ -102,7 +102,7 @@ export function setLineLength(sketch: SketchDocument, lineId: string, newLength:
 	const p2 = sketch.points.get(line.p2Id);
 	if (!p1 || !p2) return false;
 
-	const dir = normalizeOrNull(sub(p2, p1), 1e-9) ?? { x: 1, y: 0 };
+	const dir = new Vec2().subVectors(p2, p1).normalizeOrNull(1e-9) ?? new Vec2(1, 0);
 
 	// Update any existing distance constraint on this line
 	let updatedExisting = false;
@@ -157,10 +157,10 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 	const p2 = sketch.points.get(line.p2Id);
 	if (!p1 || !p2) return false;
 
-	const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+	const len = p1.distanceTo(p2);
 	if (len < 1e-9) return false;
 	const rad = (newAngleDeg * Math.PI) / 180;
-	const u = vec(Math.cos(rad), Math.sin(rad));
+	const u = Vec2.fromPolar(1, rad);
 
 	const origValues = sketch.paramManager.getCurrentValues();
 
@@ -173,8 +173,8 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 		p2.x = p1.x + u.x * len;
 		p2.y = p1.y + u.y * len;
 	}
-	const targetP1 = { x: p1.x, y: p1.y };
-	const targetP2 = { x: p2.x, y: p2.y };
+	const targetP1 = p1.clone();
+	const targetP2 = p2.clone();
 
 	const tempAngleConstraint: IConstraint = {
 		id: '__temp_line_angle',
@@ -186,9 +186,9 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 		isDimensional: false,
 		getEquationsCount: () => 1,
 		evaluate: paramMap => {
-			const point1 = vec(paramMap.get(`${line.p1Id}.x`) ?? p1.x, paramMap.get(`${line.p1Id}.y`) ?? p1.y);
-			const point2 = vec(paramMap.get(`${line.p2Id}.x`) ?? p2.x, paramMap.get(`${line.p2Id}.y`) ?? p2.y);
-			return [cross(u, sub(point2, point1))];
+			const point1 = new Vec2(paramMap.get(`${line.p1Id}.x`) ?? p1.x, paramMap.get(`${line.p1Id}.y`) ?? p1.y);
+			const point2 = new Vec2(paramMap.get(`${line.p2Id}.x`) ?? p2.x, paramMap.get(`${line.p2Id}.y`) ?? p2.y);
+			return [u.cross(new Vec2().subVectors(point2, point1))];
 		},
 		jacobian: (paramIndices, baseRow) => {
 			const entries = [];
@@ -205,8 +205,8 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 	};
 
 	const checkDirection = () => {
-		const dir = sub(p2, p1);
-		return Math.hypot(dir.x, dir.y) > 1e-3 && dot(dir, u) > 0;
+		const dir = new Vec2().subVectors(p2, p1);
+		return dir.length() > 1e-3 && dir.dot(u) > 0;
 	};
 
 	const fallbackDrags = [
@@ -237,12 +237,12 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 					const op1 = sketch.points.get(otherLine.p1Id);
 					const op2 = sketch.points.get(otherLine.p2Id);
 					if (op1 && op2) {
-						const otherDir = sub(op2, op1);
-						const otherLen = Math.max(Math.hypot(otherDir.x, otherDir.y), 1e-7);
-						const otherUnit = vec(otherDir.x / otherLen, otherDir.y / otherLen);
-						const u1 = scale(c.line1Id === lineId ? u : otherUnit, c.s1);
-						const u2 = scale(c.line2Id === lineId ? u : otherUnit, c.s2);
-						const dotVal = Math.max(-1, Math.min(1, dot(u1, u2)));
+						const otherDir = new Vec2().subVectors(op2, op1);
+						const otherLen = Math.max(otherDir.length(), 1e-7);
+						const otherUnit = otherDir.clone().divideScalar(otherLen);
+						const u1 = (c.line1Id === lineId ? u : otherUnit).clone().multiplyScalar(c.s1);
+						const u2 = (c.line2Id === lineId ? u : otherUnit).clone().multiplyScalar(c.s2);
+						const dotVal = Math.max(-1, Math.min(1, u1.dot(u2)));
 						const newRelAngle = Math.min(179.9, Math.max(0.1, (Math.acos(dotVal) * 180) / Math.PI));
 						c.targetAngle = newRelAngle;
 						c.value = newRelAngle;
@@ -301,12 +301,12 @@ export function setLinesRelativeAngle(
 
 	const clampedAngle = Math.min(179.9, Math.max(0.1, newAngleDeg));
 	const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, line1Id, line2Id);
-	const len1 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-	const len2 = Math.hypot(p4.x - p3.x, p4.y - p3.y);
+	const len1 = p1.distanceTo(p2);
+	const len2 = p3.distanceTo(p4);
 	if (len1 < 1e-7 || len2 < 1e-7) return false;
 
-	const originalDir1 = sub(p2, p1);
-	const originalDir2 = sub(p4, p3);
+	const originalDir1 = new Vec2().subVectors(p2, p1);
+	const originalDir2 = new Vec2().subVectors(p4, p3);
 
 	const tempRelAngle = new AngleConstraint(
 		'__temp_rel_ang',
@@ -326,19 +326,19 @@ export function setLinesRelativeAngle(
 	const tempDist2 = hasUserLine2 ? new DistanceConstraint('__temp_d2', l2.p1Id, l2.p2Id, len2, 1.0) : null;
 
 	const checkNonDegenerate = () => {
-		const dir1 = sub(p2, p1);
-		const dir2 = sub(p4, p3);
-		const d1 = Math.hypot(dir1.x, dir1.y);
-		const d2 = Math.hypot(dir2.x, dir2.y);
+		const dir1 = new Vec2().subVectors(p2, p1);
+		const dir2 = new Vec2().subVectors(p4, p3);
+		const d1 = dir1.length();
+		const d2 = dir2.length();
 		if (d1 < 1e-3 || d2 < 1e-3) return false;
-		const u1 = vec((dir1.x / d1) * geom.s1, (dir1.y / d1) * geom.s1);
-		const u2 = vec((dir2.x / d2) * geom.s2, (dir2.y / d2) * geom.s2);
-		const dotVal = Math.max(-1, Math.min(1, dot(u1, u2)));
+		const u1 = dir1.clone().multiplyScalar((geom.s1 * 1) / d1);
+		const u2 = dir2.clone().multiplyScalar((geom.s2 * 1) / d2);
+		const dotVal = Math.max(-1, Math.min(1, u1.dot(u2)));
 		const achievedDeg = (Math.acos(dotVal) * 180) / Math.PI;
 		return (
 			Math.abs(achievedDeg - clampedAngle) < 0.5 &&
-			dot(dir1, originalDir1) > -0.5 * d1 * len1 &&
-			dot(dir2, originalDir2) > -0.5 * d2 * len2
+			dir1.dot(originalDir1) > -0.5 * d1 * len1 &&
+			dir2.dot(originalDir2) > -0.5 * d2 * len2
 		);
 	};
 
@@ -389,12 +389,12 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 		const start = sketch.points.get(arc.startPointId);
 		const end = sketch.points.get(arc.endPointId);
 		if (start && !sketch.isPointFixed(arc.startPointId)) {
-			const as = angleFromTo(center, start);
+			const as = center.angleToPoint(start);
 			start.x = center.x + Math.cos(as) * newRadius;
 			start.y = center.y + Math.sin(as) * newRadius;
 		}
 		if (end && !sketch.isPointFixed(arc.endPointId)) {
-			const ae = angleFromTo(center, end);
+			const ae = center.angleToPoint(end);
 			end.x = center.x + Math.cos(ae) * newRadius;
 			end.y = center.y + Math.sin(ae) * newRadius;
 		}
@@ -405,7 +405,7 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 			if (c instanceof PointOnCircleConstraint && c.circleId === entityId) {
 				const pt = sketch.points.get(c.pointId);
 				if (pt && !sketch.isPointFixed(c.pointId)) {
-					const ang = angleFromTo(center, pt);
+					const ang = center.angleToPoint(pt);
 					pt.x = center.x + Math.cos(ang) * newRadius;
 					pt.y = center.y + Math.sin(ang) * newRadius;
 				}
@@ -448,12 +448,12 @@ export function setArcAngle(sketch: SketchDocument, arcId: string, newSweepDeg: 
 
 	const sweepRad = (clampedDeg * Math.PI) / 180;
 	if (sketch.isPointFixed(arc.endPointId) && !sketch.isPointFixed(arc.startPointId)) {
-		const ae = angleFromTo(center, end);
+		const ae = center.angleToPoint(end);
 		const newAs = arc.clockwise ? ae + sweepRad : ae - sweepRad;
 		start.x = center.x + Math.cos(newAs) * arc.radius;
 		start.y = center.y + Math.sin(newAs) * arc.radius;
 	} else if (!sketch.isPointFixed(arc.endPointId)) {
-		const as = angleFromTo(center, start);
+		const as = center.angleToPoint(start);
 		const newAe = arc.clockwise ? as - sweepRad : as + sweepRad;
 		end.x = center.x + Math.cos(newAe) * arc.radius;
 		end.y = center.y + Math.sin(newAe) * arc.radius;
@@ -503,21 +503,21 @@ export function setEllipseParams(
 	const minorPt = sketch.points.get(entity.minorAxisPointId);
 	if (!center || !majorPt || !minorPt) return false;
 
-	const u = sub(majorPt, center);
-	const v = sub(minorPt, center);
-	const curRx = Math.max(Math.hypot(u.x, u.y), 1e-7);
-	const curRy = Math.max(Math.hypot(v.x, v.y), 1e-7);
+	const u = new Vec2().subVectors(majorPt, center);
+	const v = new Vec2().subVectors(minorPt, center);
+	const curRx = Math.max(u.length(), 1e-7);
+	const curRy = Math.max(v.length(), 1e-7);
 
-	let uHat = scale(u, 1 / curRx);
-	let vHat = scale(v, 1 / curRy);
-	const sign = cross(uHat, vHat) >= 0 ? 1 : -1;
+	let uHat = u.clone().multiplyScalar(1 / curRx);
+	let vHat = v.clone().multiplyScalar(1 / curRy);
+	const sign = uHat.cross(vHat) >= 0 ? 1 : -1;
 
 	let tS = 0;
 	let tE = 0;
 	const startPt = 'startPointId' in entity ? sketch.points.get(entity.startPointId) : undefined;
 	const endPt = 'endPointId' in entity ? sketch.points.get(entity.endPointId) : undefined;
 	if (startPt && endPt) {
-		const radii = vec(curRx, curRy);
+		const radii = new Vec2(curRx, curRy);
 		tS = ellipseParameterAtPoint(startPt, center, radii, uHat, vHat);
 
 		tE = ellipseParameterAtPoint(endPt, center, radii, uHat, vHat);
@@ -542,15 +542,15 @@ export function setEllipseParams(
 	}
 	if (params.rotationDeg !== undefined && isFinite(params.rotationDeg)) {
 		const rad = (params.rotationDeg * Math.PI) / 180;
-		uHat = { x: Math.cos(rad), y: Math.sin(rad) };
-		vHat = { x: -Math.sin(rad) * sign, y: Math.cos(rad) * sign };
+		uHat = Vec2.fromPolar(1, rad);
+		vHat = new Vec2(-Math.sin(rad) * sign, Math.cos(rad) * sign);
 	}
 
 	if (!sketch.isPointFixed(entity.majorAxisPointId)) {
-		Object.assign(majorPt, addScaled(center, uHat, newRx));
+		majorPt.copy(center).addScaledVector(uHat, newRx);
 	}
 	if (!sketch.isPointFixed(entity.minorAxisPointId)) {
-		Object.assign(minorPt, addScaled(center, vHat, newRy));
+		minorPt.copy(center).addScaledVector(vHat, newRy);
 	}
 
 	const extraDrags: IConstraint[] = [
@@ -560,12 +560,12 @@ export function setEllipseParams(
 	];
 
 	if (startPt && endPt && 'startPointId' in entity) {
-		const radii = vec(newRx, newRy);
+		const radii = new Vec2(newRx, newRy);
 		if (!sketch.isPointFixed(entity.startPointId)) {
-			Object.assign(startPt, ellipsePointAtParameter(tS, center, radii, uHat, vHat));
+			startPt.copy(ellipsePointAtParameter(tS, center, radii, uHat, vHat));
 		}
 		if (!sketch.isPointFixed(entity.endPointId)) {
-			Object.assign(endPt, ellipsePointAtParameter(tE, center, radii, uHat, vHat));
+			endPt.copy(ellipsePointAtParameter(tE, center, radii, uHat, vHat));
 		}
 		extraDrags.push(
 			new DragPointConstraint(entity.startPointId, startPt.x, startPt.y, 0.005),

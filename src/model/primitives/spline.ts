@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { bsplineToBezier, fitPointsToBezier, type BezierSegment } from '../../math/spline';
 import { distanceToSpline } from '../../math/hitTest';
 import { intersectSplineCurve, type GeoSpline } from '../../math/intersection';
@@ -51,7 +51,7 @@ export class SketchSpline implements ISketchPrimitive {
 		for (const pid of this.pointIds) {
 			const p = sketch.points.get(pid);
 			if (!p) return null;
-			pts.push({ x: p.x, y: p.y });
+			pts.push(new Vec2(p.x, p.y));
 		}
 		if (pts.length < 2) return null;
 
@@ -113,7 +113,7 @@ export class SketchSpline implements ISketchPrimitive {
 			)
 		)
 			return true;
-		const corners = [min, { x: max.x, y: min.y }, max, { x: min.x, y: max.y }];
+		const corners = [min, new Vec2(max.x, min.y), max, new Vec2(min.x, max.y)];
 		return corners.some(
 			(p1, index) =>
 				intersectSplineCurve(curve, {

@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { CenterlineAlgorithm } from './types';
 
 /** Thins a binary mask in place to a one pixel wide 8-connected skeleton. */
@@ -134,7 +134,7 @@ export function extractSkeletonGraph(skeleton: Uint8Array, width: number, height
 	};
 	const center = (index: number): Vec2 => {
 		const x = index % width;
-		return { x: x + 0.5, y: (index - x) / width + 0.5 };
+		return new Vec2(x + 0.5, (index - x) / width + 0.5);
 	};
 
 	const degree = new Uint8Array(skeleton.length);
@@ -169,7 +169,7 @@ export function extractSkeletonGraph(skeleton: Uint8Array, width: number, height
 				}
 			}
 		}
-		nodes.push({ x: sx / count, y: sy / count });
+		nodes.push(new Vec2(sx / count, sy / count));
 	}
 
 	const visited = new Uint8Array(skeleton.length);
@@ -236,8 +236,7 @@ export function extractSkeletonGraph(skeleton: Uint8Array, width: number, height
 
 function polylineLength(points: Vec2[]): number {
 	let length = 0;
-	for (let i = 1; i < points.length; i++)
-		length += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+	for (let i = 1; i < points.length; i++) length += points[i - 1].distanceTo(points[i]);
 	return length;
 }
 

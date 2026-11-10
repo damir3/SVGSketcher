@@ -1,6 +1,6 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
 import { COLORS, SVG_NS, STROKE_WIDTH, type SvgAttrs } from './styles';
-import { angleFromTo, vec, distancesFrom, type Vec2 } from '../math/vector';
+import { Vec2, type XY } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
 	return typeof v === 'number' ? (Number.isInteger(v) ? v.toString() : v.toFixed(1)) : String(v);
@@ -36,7 +36,7 @@ export function createSvgElement<K extends keyof SVGElementTagNameMap>(
 	return el;
 }
 
-export function createSvgLine(start: Vec2, end: Vec2, attrs?: SvgAttrs, parent?: SVGElement): SVGLineElement {
+export function createSvgLine(start: XY, end: XY, attrs?: SvgAttrs, parent?: SVGElement): SVGLineElement {
 	return createSvgElement(
 		'line',
 		{
@@ -51,7 +51,7 @@ export function createSvgLine(start: Vec2, end: Vec2, attrs?: SvgAttrs, parent?:
 }
 
 export function createSvgCircle(
-	center: Vec2,
+	center: XY,
 	r: number | string,
 	attrs?: SvgAttrs,
 	parent?: SVGElement
@@ -130,13 +130,13 @@ export function renderDimensionLabel(
 	const width = label.length * 8 + 14;
 	const isAngle = kind === 'angle';
 	createSvgRect(
-		{ x: center.x - width * 0.5, y: center.y - 10 },
-		{ x: width, y: 20 },
+		new Vec2(center.x - width * 0.5, center.y - 10),
+		new Vec2(width, 20),
 		{ rx: 4, fill: COLORS.white, stroke: color, 'stroke-width': isAngle ? STROKE_WIDTH.dimension : STROKE_WIDTH.thin },
 		parent
 	);
 	createSvgText(
-		{ x: center.x, y: center.y + 4 },
+		new Vec2(center.x, center.y + 4),
 		label,
 		{
 			'text-anchor': 'middle',
@@ -152,8 +152,8 @@ export function renderDimensionLabel(
 const TWO_PI = 2 * Math.PI;
 
 export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
-	const as = angleFromTo(sc, ss);
-	const ae = angleFromTo(sc, se);
+	const as = sc.angleToPoint(ss);
+	const ae = sc.angleToPoint(se);
 
 	let sweepAngle = 0;
 	const sweepFlag = clockwise ? 1 : 0;
@@ -170,7 +170,7 @@ export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwis
 	}
 
 	const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
-	const midpoint = vec(sc.x + sr * Math.cos(midAngle), sc.y + sr * Math.sin(midAngle));
+	const midpoint = Vec2.fromPolar(sr, midAngle).add(sc);
 
 	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${midpoint.x.toFixed(2)} ${midpoint.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
 }
@@ -183,10 +183,10 @@ export function getEllipticalArcSvgPath(
 	se: Vec2,
 	clockwise: boolean
 ): string {
-	const r = distancesFrom(sc, smaj, smin);
+	const r = sc.distancesTo(smaj, smin);
 	if (r.x < 0.1 || r.y < 0.1) return '';
 
-	const theta = angleFromTo(sc, smaj);
+	const theta = sc.angleToPoint(smaj);
 	const thetaDeg = (theta * 180) / Math.PI;
 
 	const { axisU: u, axisV: v } = ellipseAxes(theta);

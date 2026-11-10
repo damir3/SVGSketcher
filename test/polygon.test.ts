@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { CircularPatternConstraint } from '../src/solver/constraints';
 import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
-import { dist } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 
 describe('Polygon Geometry and Constraints', () => {
 	it('addPolygon creates correct number of vertices, edges, and CircularPatternConstraint', () => {
@@ -28,7 +28,7 @@ describe('Polygon Geometry and Constraints', () => {
 		// Check circumradius R = r / cos(pi / 6) = 50 / (sqrt(3)/2) = 57.735 mm
 		const expectedR = inradius / Math.cos(Math.PI / 6);
 		for (const v of poly.vertices) {
-			const d = dist(center, v);
+			const d = Vec2.from(center).distanceTo(v);
 			assert.ok(Math.abs(d - expectedR) < 1e-3, `Vertex distance ${d} should match circumradius ${expectedR}`);
 		}
 
@@ -37,7 +37,7 @@ describe('Polygon Geometry and Constraints', () => {
 			const p1 = doc.points.get(line.p1Id)!;
 			const p2 = doc.points.get(line.p2Id)!;
 			const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-			const d = dist(center, mid);
+			const d = Vec2.from(center).distanceTo(mid);
 			assert.ok(Math.abs(d - inradius) < 1e-3, `Edge midpoint distance ${d} should match inradius ${inradius}`);
 		}
 
@@ -46,7 +46,7 @@ describe('Polygon Geometry and Constraints', () => {
 		for (const line of poly.lines) {
 			const p1 = doc.points.get(line.p1Id)!;
 			const p2 = doc.points.get(line.p2Id)!;
-			const len = dist(p1, p2);
+			const len = Vec2.from(p1).distanceTo(p2);
 			assert.ok(Math.abs(len - expectedEdgeLen) < 1e-3, `Edge length ${len} should match ${expectedEdgeLen}`);
 		}
 	});
@@ -87,7 +87,7 @@ describe('Polygon Geometry and Constraints', () => {
 		// Check that all vertices have circumradius distance
 		const expectedR = inradius / Math.cos(Math.PI / 6);
 		for (const v of poly.vertices) {
-			const d = dist(center, v);
+			const d = Vec2.from(center).distanceTo(v);
 			assert.ok(Math.abs(d - expectedR) < 1e-2, `Distance to center should remain circumradius ${expectedR}`);
 		}
 	});

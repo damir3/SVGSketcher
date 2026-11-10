@@ -9,7 +9,7 @@ import { SVG_EXPORT_STYLE } from '../../canvas/styles';
 import { getFontSync } from '../../canvas/fonts';
 import { generateTextSvgPathData } from '../../math/textPath';
 import type { GeoCurve } from '../../math/intersection';
-import { angleFromTo, angleFromToDeg, cross, distancesFrom, dot, vec, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -327,7 +327,7 @@ function getSvgArcCenter(segment: Extract<SvgPathSegment, { kind: 'arc' }>) {
 	const cos = Math.cos(phi);
 	const sin = Math.sin(phi);
 
-	const deltaPoint = vec((segment.start[0] - segment.end[0]) / 2, (segment.start[1] - segment.end[1]) / 2);
+	const deltaPoint = new Vec2((segment.start[0] - segment.end[0]) / 2, (segment.start[1] - segment.end[1]) / 2);
 	const xp = cos * deltaPoint.x + sin * deltaPoint.y;
 	const yp = -sin * deltaPoint.x + cos * deltaPoint.y;
 
@@ -347,12 +347,12 @@ function getSvgArcCenter(segment: Extract<SvgPathSegment, { kind: 'arc' }>) {
 	const cx = cos * cxp - sin * cyp + (segment.start[0] + segment.end[0]) / 2;
 	const cy = sin * cxp + cos * cyp + (segment.start[1] + segment.end[1]) / 2;
 
-	const angle = (u: Vec2, v: Vec2) => Math.atan2(cross(u, v), dot(u, v));
+	const angle = (u: Vec2, v: Vec2) => Math.atan2(u.cross(v), u.dot(v));
 
-	const u = vec((xp - cxp) / rx, (yp - cyp) / ry);
-	const v = vec((-xp - cxp) / rx, (-yp - cyp) / ry);
+	const u = new Vec2((xp - cxp) / rx, (yp - cyp) / ry);
+	const v = new Vec2((-xp - cxp) / rx, (-yp - cyp) / ry);
 
-	const start = angle(vec(1, 0), u);
+	const start = angle(new Vec2(1, 0), u);
 	let delta = angle(u, v);
 	if (!segment.sweep && delta > 0) delta -= 2 * Math.PI;
 	if (segment.sweep && delta < 0) delta += 2 * Math.PI;
@@ -406,7 +406,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 	let viewMatrix: SvgMatrix = [1, 0, 0, 1, 0, 0];
 
 	if (rootViewBox?.length === 4 && rootViewBox.every(Number.isFinite)) {
-		const min = { x: rootViewBox[0], y: rootViewBox[1] };
+		const min = new Vec2(rootViewBox[0], rootViewBox[1]);
 		const width = rootViewBox[2];
 		const height = rootViewBox[3];
 		const viewportWidth = parseSvgLengthInMillimeters(root.getAttribute('width')) ?? width;
@@ -430,7 +430,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 		const key = `${mapped[0].toFixed(10)},${mapped[1].toFixed(10)}`;
 		let id = pathPointIds.get(key);
 		if (!id) {
-			id = sketch.addPoint({ x: mapped[0], y: mapped[1] }).id;
+			id = sketch.addPoint(new Vec2(mapped[0], mapped[1])).id;
 			pathPointIds.set(key, id);
 		}
 		return id;
@@ -438,7 +438,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 	const addPolyline = (coords: Array<[number, number]>, closed = false) => {
 		const points = coords.map(([x, y]) => point(x, y, activeMatrix));
-		const pointIds = points.map(([x, y]) => sketch.addPoint({ x: x, y: y }).id);
+		const pointIds = points.map(([x, y]) => sketch.addPoint(new Vec2(x, y)).id);
 		for (let i = 1; i < points.length; i++) {
 			sketch.addLine(pointIds[i - 1], pointIds[i]);
 		}
@@ -472,12 +472,12 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 					const end = point(segment.end[0], segment.end[1], activeMatrix);
 					const handles = [
 						{
-							h1: { x: 2 * start[0] - c1[0], y: 2 * start[1] - c1[1] },
-							h2: { x: c1[0], y: c1[1] },
+							h1: new Vec2(2 * start[0] - c1[0], 2 * start[1] - c1[1]),
+							h2: new Vec2(c1[0], c1[1]),
 						},
 						{
-							h1: { x: c2[0], y: c2[1] },
-							h2: { x: 2 * end[0] - c2[0], y: 2 * end[1] - c2[1] },
+							h1: new Vec2(c2[0], c2[1]),
+							h2: new Vec2(2 * end[0] - c2[0], 2 * end[1] - c2[1]),
 						},
 					];
 					sketch.addFitSpline([startId, endId], undefined, false, undefined, false, handles);
@@ -491,8 +491,8 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 				const cos = Math.cos(arc.phi);
 				const sin = Math.sin(arc.phi);
 
-				const u = vec(arc.rx * (m[0] * cos + m[2] * sin), -arc.rx * (m[1] * cos + m[3] * sin));
-				const v = vec(arc.ry * (-m[0] * sin + m[2] * cos), arc.ry * (m[1] * sin - m[3] * cos));
+				const u = new Vec2(arc.rx * (m[0] * cos + m[2] * sin), -arc.rx * (m[1] * cos + m[3] * sin));
+				const v = new Vec2(arc.ry * (-m[0] * sin + m[2] * cos), arc.ry * (m[1] * sin - m[3] * cos));
 
 				const qxx = u.x * u.x + v.x * v.x;
 				const qxy = u.x * u.y + v.x * v.y;
@@ -514,14 +514,14 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 				const start = getPathPointId(segment.start);
 				const end = getPathPointId(segment.end);
-				const clockwise = cross(u, v) < 0 === (segment.sweep === 1);
-				const centerId = sketch.addPoint({ x: center[0], y: center[1] }).id;
+				const clockwise = u.cross(v) < 0 === (segment.sweep === 1);
+				const centerId = sketch.addPoint(new Vec2(center[0], center[1])).id;
 
 				if (Math.abs(majorRadius - minorRadius) < 1e-8) {
 					sketch.addArc(centerId, start, end, majorRadius, clockwise);
 				} else {
-					const majorId = sketch.addPoint({ x: major[0], y: major[1] }).id;
-					const minorId = sketch.addPoint({ x: minor[0], y: minor[1] }).id;
+					const majorId = sketch.addPoint(new Vec2(major[0], major[1])).id;
+					const minorId = sketch.addPoint(new Vec2(minor[0], minor[1])).id;
 					sketch.addEllipticalArc(centerId, majorId, minorId, start, end, clockwise);
 				}
 				i++;
@@ -603,8 +603,8 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 
 					const center = point(cx, cy, activeMatrix);
 					const matrix = multiplySvgMatrices(viewMatrix, activeMatrix);
-					const u = vec(matrix[0] * rx, -matrix[1] * rx);
-					const v = vec(matrix[2] * ry, -matrix[3] * ry);
+					const u = new Vec2(matrix[0] * rx, -matrix[1] * rx);
+					const v = new Vec2(matrix[2] * ry, -matrix[3] * ry);
 
 					const qxx = u.x * u.x + v.x * v.x;
 					const qxy = u.x * u.y + v.x * v.y;
@@ -624,12 +624,12 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 						center[1] + minorRadius * Math.cos(angle),
 					];
 
-					const c = sketch.addPoint({ x: center[0], y: center[1] });
+					const c = sketch.addPoint(new Vec2(center[0], center[1]));
 					if (Math.abs(majorRadius - minorRadius) < 1e-8 && shape.tag === 'circle') {
 						sketch.addCircle(c.id, majorRadius);
 					} else {
-						const p1 = sketch.addPoint({ x: major[0], y: major[1] });
-						const p2 = sketch.addPoint({ x: minor[0], y: minor[1] });
+						const p1 = sketch.addPoint(new Vec2(major[0], major[1]));
+						const p2 = sketch.addPoint(new Vec2(minor[0], minor[1]));
 						sketch.addEllipse(c.id, p1.id, p2.id);
 					}
 					break;
@@ -794,12 +794,12 @@ export function exportSketchToSVG(
 		const end = sketch.points.get(arc.endPointId);
 		if (center && start && end) {
 			// Convert to SVG coordinates (Y-down)
-			const sc = { x: center.x, y: -center.y };
-			const ss = { x: start.x, y: -start.y };
-			const se = { x: end.x, y: -end.y };
+			const sc = new Vec2(center.x, -center.y);
+			const ss = new Vec2(start.x, -start.y);
+			const se = new Vec2(end.x, -end.y);
 
-			const as = angleFromTo(sc, ss);
-			const ae = angleFromTo(sc, se);
+			const as = Vec2.from(sc).angleToPoint(ss);
+			const ae = Vec2.from(sc).angleToPoint(se);
 			const clockwise = !!arc.clockwise;
 
 			let sweepAngle = 0;
@@ -832,11 +832,11 @@ export function exportSketchToSVG(
 		const maj = sketch.points.get(el.majorAxisPointId);
 		const min = sketch.points.get(el.minorAxisPointId);
 		if (center && maj && min) {
-			const sc = { x: center.x, y: -center.y };
-			const smaj = { x: maj.x, y: -maj.y };
-			const smin = { x: min.x, y: -min.y };
-			const r = distancesFrom(sc, smaj, smin);
-			const deg = angleFromToDeg(sc, smaj);
+			const sc = new Vec2(center.x, -center.y);
+			const smaj = new Vec2(maj.x, -maj.y);
+			const smin = new Vec2(min.x, -min.y);
+			const r = Vec2.from(sc).distancesTo(smaj, smin);
+			const deg = Vec2.from(sc).angleToPointDeg(smaj);
 			const dash = el.isConstruction
 				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
@@ -859,14 +859,14 @@ export function exportSketchToSVG(
 		const start = sketch.points.get(elarc.startPointId);
 		const end = sketch.points.get(elarc.endPointId);
 		if (center && maj && min && start && end) {
-			const sc = { x: center.x, y: -center.y };
-			const smaj = { x: maj.x, y: -maj.y };
-			const smin = { x: min.x, y: -min.y };
-			const ss = { x: start.x, y: -start.y };
-			const se = { x: end.x, y: -end.y };
+			const sc = new Vec2(center.x, -center.y);
+			const smaj = new Vec2(maj.x, -maj.y);
+			const smin = new Vec2(min.x, -min.y);
+			const ss = new Vec2(start.x, -start.y);
+			const se = new Vec2(end.x, -end.y);
 
-			const r = distancesFrom(sc, smaj, smin);
-			const theta = angleFromTo(sc, smaj);
+			const r = Vec2.from(sc).distancesTo(smaj, smin);
+			const theta = Vec2.from(sc).angleToPoint(smaj);
 			const thetaDeg = (theta * 180) / Math.PI;
 
 			const { axisU: u, axisV: v } = ellipseAxes(theta);
@@ -913,7 +913,7 @@ export function exportSketchToSVG(
 			let segments: BezierSegment[] = [];
 			if (spline.splineType === 'control') {
 				segments = bsplineToBezier(
-					pts.map(p => ({ x: p.x, y: -p.y })),
+					pts.map(p => new Vec2(p.x, -p.y)),
 					spline.knots
 				);
 			} else {
@@ -924,12 +924,12 @@ export function exportSketchToSVG(
 					const p2 = sketch.points.get(line.p2Id);
 					if (!p1 || !p2) return null;
 					return {
-						h1: { x: p1.x, y: -p1.y },
-						h2: { x: p2.x, y: -p2.y },
+						h1: new Vec2(p1.x, -p1.y),
+						h2: new Vec2(p2.x, -p2.y),
 					};
 				});
 				segments = fitPointsToBezier(
-					pts.map(p => ({ x: p.x, y: -p.y })),
+					pts.map(p => new Vec2(p.x, -p.y)),
 					handles
 				);
 			}

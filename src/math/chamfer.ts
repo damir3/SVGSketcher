@@ -1,5 +1,4 @@
-import type { Vec2 } from './vector';
-import { centroid, cross, dist, dot, mid, normalize, vec } from './vector';
+import { Vec2 } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import { remapLineConstraints } from '../model/constraintLinks';
 import { CoincidentConstraint } from '../solver/constraints';
@@ -170,20 +169,20 @@ function buildChamferCandidate(
 
 	if (!pCorner1 || !pOther1 || !pOther2) return null;
 
-	const vertexPos = vec(pCorner1.x, pCorner1.y);
+	const vertexPos = pCorner1.clone();
 
-	const v1 = vec(pOther1.x - vertexPos.x, pOther1.y - vertexPos.y);
-	const v2 = vec(pOther2.x - vertexPos.x, pOther2.y - vertexPos.y);
+	const v1 = new Vec2().subVectors(pOther1, vertexPos);
+	const v2 = new Vec2().subVectors(pOther2, vertexPos);
 
-	const len1 = Math.hypot(v1.x, v1.y);
-	const len2 = Math.hypot(v2.x, v2.y);
+	const len1 = v1.length();
+	const len2 = v2.length();
 
 	if (len1 < 1e-4 || len2 < 1e-4) return null;
 
-	const dir1 = vec(v1.x / len1, v1.y / len1);
-	const dir2 = vec(v2.x / len2, v2.y / len2);
+	const dir1 = v1.clone().divideScalar(len1);
+	const dir2 = v2.clone().divideScalar(len2);
 
-	const dotValue = Math.max(-1, Math.min(1, dot(dir1, dir2)));
+	const dotValue = Math.max(-1, Math.min(1, dir1.dot(dir2)));
 	// Check collinearity
 	if (Math.abs(dotValue) > 0.9999) return null;
 
@@ -251,17 +250,11 @@ export function calculateChamferGeometry(
 		}
 		// Angle at A via arctan2 / trigonometry in triangle VAB:
 		// Vector AB = t2 - t1
-		const pt1 = vec(
-			candidate.vertexPos.x + candidate.dir1.x * effDist1,
-			candidate.vertexPos.y + candidate.dir1.y * effDist1
-		);
-		const pt2 = vec(
-			candidate.vertexPos.x + candidate.dir2.x * effDist2,
-			candidate.vertexPos.y + candidate.dir2.y * effDist2
-		);
-		const vAB = vec(pt2.x - pt1.x, pt2.y - pt1.y);
-		const vAV = vec(-candidate.dir1.x, -candidate.dir1.y);
-		const dotAB_AV = Math.max(-1, Math.min(1, dot(vAB, vAV) / (Math.hypot(vAB.x, vAB.y) || 1)));
+		const pt1 = candidate.vertexPos.clone().addScaledVector(candidate.dir1, effDist1);
+		const pt2 = candidate.vertexPos.clone().addScaledVector(candidate.dir2, effDist2);
+		const vAB = new Vec2().subVectors(pt2, pt1);
+		const vAV = candidate.dir1.clone().negate();
+		const dotAB_AV = Math.max(-1, Math.min(1, vAB.dot(vAV) / (vAB.length() || 1)));
 		effAngleDeg = Math.acos(dotAB_AV) * (180 / Math.PI);
 	} else if (mode === 'distance_angle') {
 		const d = Math.max(0.1, dist1Input);
@@ -305,18 +298,12 @@ export function calculateChamferGeometry(
 		}
 	}
 
-	const t1 = vec(
-		candidate.vertexPos.x + candidate.dir1.x * effDist1,
-		candidate.vertexPos.y + candidate.dir1.y * effDist1
-	);
-	const t2 = vec(
-		candidate.vertexPos.x + candidate.dir2.x * effDist2,
-		candidate.vertexPos.y + candidate.dir2.y * effDist2
-	);
+	const t1 = candidate.vertexPos.clone().addScaledVector(candidate.dir1, effDist1);
+	const t2 = candidate.vertexPos.clone().addScaledVector(candidate.dir2, effDist2);
 
-	const chamferLength = dist(t1, t2);
-	const midPoint = mid(t1, t2);
-	const bisectorDir = normalize(vec(candidate.dir1.x + candidate.dir2.x, candidate.dir1.y + candidate.dir2.y));
+	const chamferLength = t1.distanceTo(t2);
+	const midPoint = new Vec2().midpoint(t1, t2);
+	const bisectorDir = new Vec2().addVectors(candidate.dir1, candidate.dir2).normalizeOrUnitX();
 
 	return {
 		t1,
@@ -400,7 +387,7 @@ export function commitChamferToSketch(
 
 	// 6. Add Distance / Angle constraints
 	// Positive dimension offsets use the clockwise normal in world coordinates.
-	const offset1 = cross(candidate.dir1, candidate.dir2) > 0 ? 10 : -10;
+	const offset1 = candidate.dir1.cross(candidate.dir2) > 0 ? 10 : -10;
 	const offset2 = -offset1;
 	if (mode === 'equal_distance') {
 		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
@@ -413,7 +400,7 @@ export function commitChamferToSketch(
 		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
 		if (c2 && expressions?.dist2) c2.expression = expressions.dist2;
 	} else if (mode === 'distance_angle') {
-		const cornerCentroid = centroid([candidate.vertexPos, res.t1, res.t2]);
+		const cornerCentroid = Vec2.centroid([candidate.vertexPos, res.t1, res.t2]);
 		if (!flip) {
 			// Distance along line 1
 			const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);

@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { Viewport } from '../src/canvas/viewport';
@@ -11,15 +12,15 @@ it('keeps the panned view in frame and restores it after mixed-aspect resizes', 
 
 	viewport.resize(400, 600);
 	assert.equal(viewport.zoom, 2);
-	assert.deepEqual(viewport.worldToScreen(center), { x: 200, y: 300 });
-	assert.deepEqual(viewport.worldToScreen(leftTop), { x: 0, y: 150 });
-	assert.deepEqual(viewport.worldToScreen(rightBottom), { x: 400, y: 450 });
+	assert.deepEqual(viewport.worldToScreen(center), new Vec2(200, 300));
+	assert.deepEqual(viewport.worldToScreen(leftTop), new Vec2(0, 150));
+	assert.deepEqual(viewport.worldToScreen(rightBottom), new Vec2(400, 450));
 
 	viewport.resize(400, 300);
 	assert.equal(viewport.zoom, 2);
 	viewport.resize(800, 600);
 	assert.equal(viewport.zoom, 4);
-	assert.deepEqual(viewport.worldToScreen(center), { x: 400, y: 300 });
+	assert.deepEqual(viewport.worldToScreen(center), new Vec2(400, 300));
 });
 
 it('uses the current camera after zooming and ignores a collapsed canvas', () => {

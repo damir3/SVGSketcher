@@ -1,4 +1,4 @@
-import { angleFromToDeg, dist, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { distanceToEllipticalArc } from '../../math/hitTest';
 import { ellipticalArcIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipticalArc } from '../../math/intersection';
@@ -95,16 +95,16 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 		return {
 			type: 'elliptical_arc',
 			id: this.id,
-			center: { x: center.x, y: center.y },
+			center: new Vec2(center.x, center.y),
 			centerId: this.centerId,
 			majorAxisPointId: this.majorAxisPointId,
 			minorAxisPointId: this.minorAxisPointId,
 			startPointId: this.startPointId,
 			endPointId: this.endPointId,
-			majorAxisPoint: { x: maj.x, y: maj.y },
-			minorAxisPoint: { x: min.x, y: min.y },
-			start: { x: start.x, y: start.y },
-			end: { x: end.x, y: end.y },
+			majorAxisPoint: new Vec2(maj.x, maj.y),
+			minorAxisPoint: new Vec2(min.x, min.y),
+			start: new Vec2(start.x, start.y),
+			end: new Vec2(end.x, end.y),
 			clockwise: !!this.clockwise,
 			isConstruction: this.isConstruction,
 		};
@@ -120,7 +120,7 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(dist(center, majorPt).toFixed(2)) : 0;
+					return center && majorPt ? Number(center.distanceTo(majorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rx: val }),
 				validate: val => !isNaN(val) && isFinite(val) && val > 0,
@@ -132,7 +132,7 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
-					return center && minorPt ? Number(dist(center, minorPt).toFixed(2)) : 0;
+					return center && minorPt ? Number(center.distanceTo(minorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { ry: val }),
 				validate: val => !isNaN(val) && isFinite(val) && val > 0,
@@ -144,7 +144,7 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 				getValue: ctx => {
 					const center = ctx.sketch.points.get(this.centerId);
 					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(angleFromToDeg(center, majorPt).toFixed(2)) : 0;
+					return center && majorPt ? Number(center.angleToPointDeg(majorPt).toFixed(2)) : 0;
 				},
 				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
 			},

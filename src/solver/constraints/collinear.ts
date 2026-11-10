@@ -1,4 +1,4 @@
-import { cross, mid, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -35,23 +35,23 @@ export class CollinearConstraint extends BaseConstraint {
 		const p21 = readParamPoint(paramMap, this.l2P1);
 		const p22 = readParamPoint(paramMap, this.l2P2);
 
-		const dir1 = sub(p12, p11);
-		const dir2 = sub(p22, p21);
+		const dir1 = new Vec2().subVectors(p12, p11);
+		const dir2 = new Vec2().subVectors(p22, p21);
 
-		const l1 = Math.max(Math.hypot(dir1.x, dir1.y), 1e-7);
-		const l2 = Math.max(Math.hypot(dir2.x, dir2.y), 1e-7);
+		const l1 = Math.max(dir1.length(), 1e-7);
+		const l2 = Math.max(dir2.length(), 1e-7);
 		const avgL = (l1 + l2) * 0.5;
 
 		// Equation 0: Direction parallel (cross product of unit vectors)
-		const eq0 = (cross(dir1, dir2) / (l1 * l2)) * avgL * this.weight;
+		const eq0 = (dir1.cross(dir2) / (l1 * l2)) * avgL * this.weight;
 
 		if (this.isThreePoint()) {
 			return [eq0];
 		}
 
 		// Equation 1: Perpendicular distance from midpoint of line 2 to infinite line 1
-		const mid2 = mid(p21, p22);
-		const ptCross = cross(sub(mid2, p11), dir1);
+		const mid2 = new Vec2().midpoint(p21, p22);
+		const ptCross = new Vec2().subVectors(mid2, p11).cross(dir1);
 		const eq1 = (ptCross / l1) * this.weight;
 
 		return [eq0, eq1];

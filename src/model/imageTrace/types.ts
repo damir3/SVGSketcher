@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import type { XY } from '../../math/vector';
 
 export type TraceMode = 'outline' | 'centerline';
 export type OutlineAlgorithm = 'marching-squares' | 'pixel-edges';
@@ -107,9 +107,9 @@ export interface FitOptions {
 
 export type TracedSegment =
 	| { kind: 'line'; a: number; b: number }
-	| { kind: 'arc'; a: number; b: number; center: Vec2; radius: number; mid: Vec2 }
+	| { kind: 'arc'; a: number; b: number; center: XY; radius: number; mid: XY }
 	/** Fit spline from vertex `a` through `points` to vertex `b`. `handles` has one entry per fit point including both ends. */
-	| { kind: 'spline'; a: number; b: number; points: Vec2[]; handles: Array<{ h1: Vec2; h2: Vec2 }> };
+	| { kind: 'spline'; a: number; b: number; points: XY[]; handles: Array<{ h1: XY; h2: XY }> };
 
 export interface TracedPath {
 	segments: TracedSegment[];
@@ -119,14 +119,14 @@ export interface TracedPath {
 }
 
 export interface TracedCircle {
-	center: Vec2;
+	center: XY;
 	radius: number;
 }
 
 /** Closed spline that has no shared vertices (a smooth closed loop that is not a circle). */
 export interface TracedClosedSpline {
-	points: Vec2[];
-	handles: Array<{ h1: Vec2; h2: Vec2 }>;
+	points: XY[];
+	handles: Array<{ h1: XY; h2: XY }>;
 }
 
 export interface TraceStats {
@@ -143,7 +143,7 @@ export interface TraceResult {
 	/** Fitting units are x pixels; image y coordinates were multiplied by this factor. */
 	yScale: number;
 	threshold: number;
-	vertices: Vec2[];
+	vertices: XY[];
 	paths: TracedPath[];
 	circles: TracedCircle[];
 	closedSplines: TracedClosedSpline[];

@@ -18,11 +18,11 @@ export interface ConstraintRenderContext {
 	renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void;
 	renderDashedExtensionLines?(
 		g: SVGGElement,
-		sCenter: { x: number; y: number },
+		sCenter: Vec2,
 		angle: number,
 		rScreen: number,
-		sp1: { x: number; y: number },
-		sp2: { x: number; y: number },
+		sp1: Vec2,
+		sp2: Vec2,
 		color: string
 	): void;
 
@@ -35,7 +35,7 @@ export interface ConstraintRenderContext {
 		objectIds: Iterable<string>,
 		transform:
 			| { center: { x: number; y: number }; angleDeg: number }
-			| { dx: number; dy: number }
+			| Vec2
 			| ((x: number, y: number) => { x: number; y: number }),
 		options: {
 			targetGroup?: SVGGElement;

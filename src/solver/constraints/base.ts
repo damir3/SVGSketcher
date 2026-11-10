@@ -1,11 +1,11 @@
 import type { IConstraint, ConstraintType, JacobianEntry } from '../types';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
-import { vec, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 export * from './renderContext';
 
 export function readParamPoint(paramMap: ReadonlyMap<string, number>, pointId: string): Vec2 {
-	return vec(paramMap.get(`${pointId}.x`) ?? 0, paramMap.get(`${pointId}.y`) ?? 0);
+	return new Vec2(paramMap.get(`${pointId}.x`) ?? 0, paramMap.get(`${pointId}.y`) ?? 0);
 }
 
 export class BaseConstraint implements IConstraint {

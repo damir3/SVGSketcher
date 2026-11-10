@@ -1,4 +1,4 @@
-import { cross, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -57,11 +57,11 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		const p1 = readParamPoint(paramMap, this.lineP1Id);
 		const p2 = readParamPoint(paramMap, this.lineP2Id);
 
-		const dir = sub(p2, p1);
-		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const dir = new Vec2().subVectors(p2, p1);
+		const lineLen = Math.max(dir.length(), 1e-7);
 
 		// Signed perpendicular distance from point to line (p1->p2)
-		const h = cross(sub(p, p1), dir) / lineLen;
+		const h = new Vec2().subVectors(p, p1).cross(dir) / lineLen;
 
 		return [(h - this.side * this.targetDistance) * this.weight];
 	}

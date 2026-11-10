@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { SnapResult, ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
-import { addScaled, angleFromToDeg, dist, normalizeOrNull, sub, vec, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { createSvgLine } from '../../svg';
 import { getPreviewStrokeAttrs } from '../../styles';
@@ -95,8 +95,8 @@ export class LineTool extends BaseTool {
 		const start = this.getStartPoint();
 		if (!start || !this.lastPointer) return;
 		const { end } = this.getSegmentGeometry(start, this.lastPointer.world, this.lastPointer.snap);
-		this.popup.updateValueIfUnlocked('length', dist(start, end));
-		this.popup.updateValueIfUnlocked('angle', angleFromToDeg(start, end));
+		this.popup.updateValueIfUnlocked('length', start.distanceTo(end));
+		this.popup.updateValueIfUnlocked('angle', start.angleToPointDeg(end));
 	}
 
 	private getSegmentGeometry(start: Vec2, world: Vec2, snap: SnapResult | null) {
@@ -105,16 +105,18 @@ export class LineTool extends BaseTool {
 		const target = snap?.worldPos ?? world;
 		if (angle !== undefined) {
 			const radians = (angle * Math.PI) / 180;
-			const direction = vec(Math.cos(radians), Math.sin(radians));
-			const end = addScaled(start, direction, length ?? dist(start, target));
+			const direction = Vec2.fromPolar(1, radians);
+			const end = start.clone().addScaledVector(direction, length ?? start.distanceTo(target));
 			return { end, length, angle };
 		}
 
 		const snapped = this.ctx.getAxisSnappedWorldPos?.(start, target, snap).pos ?? target;
 		if (length === undefined) return { end: snapped, length, angle };
 		const direction =
-			normalizeOrNull(sub(snapped, start), 1e-9) ?? normalizeOrNull(sub(world, start), 1e-9) ?? vec(1, 0);
-		return { end: addScaled(start, direction, length), length, angle };
+			new Vec2().subVectors(snapped, start).normalizeOrNull(1e-9) ??
+			new Vec2().subVectors(world, start).normalizeOrNull(1e-9) ??
+			new Vec2(1, 0);
+		return { end: start.clone().addScaledVector(direction, length), length, angle };
 	}
 
 	private startSegment(pointId: string, client: Vec2): void {
@@ -137,9 +139,9 @@ export class LineTool extends BaseTool {
 
 		const { end, length, angle } = this.getSegmentGeometry(start, pointer.world, pointer.snap);
 		if (length !== undefined && length <= 0) return false;
-		if (dist(start, end) < 1e-9) return false;
+		if (start.distanceTo(end) < 1e-9) return false;
 		const snap =
-			pointer.snap && ((length === undefined && angle === undefined) || dist(end, pointer.snap.worldPos) < 1e-6)
+			pointer.snap && ((length === undefined && angle === undefined) || end.distanceTo(pointer.snap.worldPos) < 1e-6)
 				? pointer.snap
 				: null;
 

@@ -1,6 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
-import type { Vec2 } from './vector';
-import { angleFromTo, angleFromToDeg, vec, cross, dist, distancesFrom } from './vector';
+import { Vec2 } from './vector';
 import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurves } from './intersection';
 import { extractSplineInterval, type BezierSegment } from './spline';
@@ -15,7 +14,7 @@ export interface SketchRegion {
 const KEY_SCALE = 1e5;
 const key = (p: Vec2) => `${Math.round(p.x * KEY_SCALE)},${Math.round(p.y * KEY_SCALE)}`;
 const polygonArea = (points: Vec2[]) =>
-	points.reduce((sum, p, i) => sum + cross(p, points[(i + 1) % points.length]), 0) / 2;
+	points.reduce((sum, p, i) => sum + p.cross(points[(i + 1) % points.length]), 0) / 2;
 function pointInPolygon(point: Vec2, points: Vec2[]): boolean {
 	let inside = false;
 	for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
@@ -104,17 +103,17 @@ function exactRingPath(points: Vec2[], edges: BoundaryEdge[]): string {
 			const center = curve.center,
 				major = curve.majorAxisPoint,
 				minor = curve.minorAxisPoint;
-			const r = distancesFrom(center, major, minor);
+			const r = center.distancesTo(major, minor);
 			rx = r.x;
 			ry = r.y;
-			rotation = -angleFromToDeg(center, major);
+			rotation = -center.angleToPointDeg(major);
 			sweep = curve.type === 'ellipse' ? (run.forward ? 1 : 0) : curve.clockwise === run.forward ? 1 : 0;
 		}
 		const span =
 			Math.abs(run.b - run.a) * (curve.type === 'arc' || curve.type === 'elliptical_arc' ? getArcSweep(curve) : 1);
 		const arcCommand = (to: Vec2, arcSpan: number) =>
 			` A ${rx.toFixed(5)} ${ry.toFixed(5)} ${rotation.toFixed(5)} ${arcSpan > Math.PI ? 1 : 0} ${sweep} ${pointText(to)}`;
-		if (Math.hypot(points[run.start].x - end.x, points[run.start].y - end.y) < 1e-5 && span > Math.PI * 1.99) {
+		if (end.distanceTo(points[run.start]) < 1e-5 && span > Math.PI * 1.99) {
 			const mid = getPointAtParam(curve, (run.a + run.b) / 2);
 			d += arcCommand(mid, span / 2) + arcCommand(end, span / 2);
 		} else d += arcCommand(end, span);
@@ -123,20 +122,20 @@ function exactRingPath(points: Vec2[], edges: BoundaryEdge[]): string {
 }
 function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc' }>): number {
 	if (curve.type === 'elliptical_arc') {
-		const center = { x: curve.center.x, y: -curve.center.y };
-		const major = { x: curve.majorAxisPoint.x, y: -curve.majorAxisPoint.y };
-		const minor = { x: curve.minorAxisPoint.x, y: -curve.minorAxisPoint.y };
-		const start = { x: curve.start.x, y: -curve.start.y };
-		const end = { x: curve.end.x, y: -curve.end.y };
-		const r = distancesFrom(center, major, minor);
-		const { axisU, axisV } = ellipseAxes(angleFromTo(center, major));
-		const paramRadii = vec(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
+		const center = new Vec2(curve.center.x, -curve.center.y);
+		const major = new Vec2(curve.majorAxisPoint.x, -curve.majorAxisPoint.y);
+		const minor = new Vec2(curve.minorAxisPoint.x, -curve.minorAxisPoint.y);
+		const start = new Vec2(curve.start.x, -curve.start.y);
+		const end = new Vec2(curve.end.x, -curve.end.y);
+		const r = Vec2.from(center).distancesTo(major, minor);
+		const { axisU, axisV } = ellipseAxes(Vec2.from(center).angleToPoint(major));
+		const paramRadii = new Vec2(Math.max(r.x, 1e-6), Math.max(r.y, 1e-6));
 		const ts = ellipseParameterAtPoint(start, center, paramRadii, axisU, axisV);
 		const te = ellipseParameterAtPoint(end, center, paramRadii, axisU, axisV);
 		let sweep = curve.clockwise ? (te - ts) % (2 * Math.PI) : (ts - te) % (2 * Math.PI);
 		return sweep < 0 ? sweep + 2 * Math.PI : sweep;
 	}
-	const angle = (point: Vec2) => -angleFromTo(curve.center, point);
+	const angle = (point: Vec2) => -curve.center.angleToPoint(point);
 	const start = angle(curve.start),
 		end = angle(curve.end);
 	let sweep = curve.clockwise ? (end - start) % (2 * Math.PI) : (start - end) % (2 * Math.PI);
@@ -146,13 +145,13 @@ function getArcSweep(curve: Extract<RegionCurve, { type: 'arc' | 'elliptical_arc
 function intersectionCut(curve: ReturnType<typeof getAllGeoCurves>[number], point: Vec2): { t: number; p: Vec2 } {
 	if (curve.type === 'arc' || curve.type === 'elliptical_arc') {
 		const tolerance = curve.type === 'arc' ? Math.max(1e-3, curve.radius * 2e-4) : 2e-3;
-		if (Math.hypot(point.x - curve.start.x, point.y - curve.start.y) < tolerance) return { t: 0, p: curve.start };
-		if (Math.hypot(point.x - curve.end.x, point.y - curve.end.y) < tolerance) return { t: 1, p: curve.end };
+		if (curve.start.distanceTo(point) < tolerance) return { t: 0, p: curve.start };
+		if (curve.end.distanceTo(point) < tolerance) return { t: 1, p: curve.end };
 	} else if (curve.type === 'spline' && !curve.isClosed) {
 		const start = curve.bezierSegments[0]?.[0];
 		const end = curve.bezierSegments.at(-1)?.[3];
-		if (start && dist(point, start) <= 1 / KEY_SCALE) return { t: 0, p: start };
-		if (end && dist(point, end) <= 1 / KEY_SCALE) return { t: 1, p: end };
+		if (start && point.distanceTo(start) <= 1 / KEY_SCALE) return { t: 0, p: start };
+		if (end && point.distanceTo(end) <= 1 / KEY_SCALE) return { t: 1, p: end };
 	}
 	return { t: getParamAtPoint(curve, point), p: point };
 }
@@ -228,7 +227,7 @@ export function findCurveRegions(curves: RegionCurve[]): SketchRegion[] {
 			let prev = p0;
 			for (let k = 1; k <= count; k++) {
 				const next = k === count ? p1 : curvePointAt(item, t0 + ((t1 - t0) * k) / count);
-				if (Math.hypot(next.x - prev.x, next.y - prev.y) > 1e-7) {
+				if (prev.distanceTo(next) > 1e-7) {
 					const nextT = t0 + ((t1 - t0) * k) / count;
 					const prevT = t0 + ((t1 - t0) * (k - 1)) / count;
 					segments.push({ a: prev, b: next, curve, t0: prevT, t1: nextT });
@@ -251,7 +250,7 @@ export function findCurveRegions(curves: RegionCurve[]): SketchRegion[] {
 			for (let dy = -1; dy <= 1; dy++) {
 				const neighborKey = `${x + dx},${y + dy}`;
 				const neighbor = nodes.get(neighborKey);
-				if (neighbor && dist(point, neighbor) <= 1 / KEY_SCALE) return neighborKey;
+				if (neighbor && point.distanceTo(neighbor) <= 1 / KEY_SCALE) return neighborKey;
 			}
 		}
 		nodes.set(ownKey, point);
@@ -325,7 +324,7 @@ export function findCurveRegions(curves: RegionCurve[]): SketchRegion[] {
 				const source = edgeSources.get(edgeKey(a, b));
 				if (source) loopEdges.push(source);
 				const around = [...(edges.get(b) ?? [])].sort(
-					(u, v) => angleFromTo(nodes.get(b)!, nodes.get(u)!) - angleFromTo(nodes.get(b)!, nodes.get(v)!)
+					(u, v) => nodes.get(b)!.angleToPoint(nodes.get(u)!) - nodes.get(b)!.angleToPoint(nodes.get(v)!)
 				);
 				const index = around.indexOf(a);
 				if (index < 0 || !around.length) break;
@@ -337,7 +336,7 @@ export function findCurveRegions(curves: RegionCurve[]): SketchRegion[] {
 			for (const id of localEdges) visited.add(id);
 			if (loop.length < 3 || a !== from || b !== to) continue;
 			let area = 0;
-			for (let i = 0; i < loop.length; i++) area += cross(loop[i], loop[(i + 1) % loop.length]);
+			for (let i = 0; i < loop.length; i++) area += loop[i].cross(loop[(i + 1) % loop.length]);
 			area /= 2;
 			if (area <= 1e-7) continue;
 			loops.push({

@@ -33,7 +33,7 @@ import {
 	PointOnCircleConstraint,
 } from '../src/solver/constraints';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
-import { dist, mid, vec, type Vec2 } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 
 function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstruction: { value: boolean } } {
 	const isConstruction = { value: false };
@@ -43,8 +43,8 @@ function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstr
 			zoom: 1,
 			panX: 0,
 			panY: 0,
-			worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-			screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+			worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+			screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 		} as any,
 		renderer: {
 			clearPreviews: () => {},
@@ -107,23 +107,23 @@ function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstr
 function makeMouseEvent(worldX: number, worldY: number, snap: any = null): ToolMouseEvent {
 	return {
 		raw: { preventDefault() {} } as MouseEvent,
-		screen: vec(worldX, worldY),
-		client: vec(worldX, worldY),
-		world: vec(worldX, worldY),
+		screen: new Vec2(worldX, worldY),
+		client: new Vec2(worldX, worldY),
+		world: new Vec2(worldX, worldY),
 		snap,
-		effectiveWorld: snap ? snap.worldPos : vec(worldX, worldY),
-		effectiveScreen: snap ? snap.screenPos : vec(worldX, worldY),
+		effectiveWorld: snap ? snap.worldPos : new Vec2(worldX, worldY),
+		effectiveScreen: snap ? snap.screenPos : new Vec2(worldX, worldY),
 	};
 }
 
 describe('Corner modification shortcuts', () => {
 	it('applies the previous chamfer when the next corner is clicked and refreshes the shared line', () => {
 		const sketch = new SketchDocument();
-		const left = sketch.addPoint(vec(0, 0));
-		const right = sketch.addPoint(vec(100, 0));
+		const left = sketch.addPoint(new Vec2(0, 0));
+		const right = sketch.addPoint(new Vec2(100, 0));
 		const shared = sketch.addLine(left.id, right.id);
-		sketch.addLine(left.id, sketch.addPoint(vec(0, 100)).id);
-		sketch.addLine(right.id, sketch.addPoint(vec(100, 100)).id);
+		sketch.addLine(left.id, sketch.addPoint(new Vec2(0, 100)).id);
+		sketch.addLine(right.id, sketch.addPoint(new Vec2(100, 100)).id);
 		const { ctx } = createMockContext(sketch);
 		const tool = new ChamferTool();
 		tool.activate(ctx);
@@ -138,9 +138,9 @@ describe('Corner modification shortcuts', () => {
 
 	it('moves the fillet handle with the cursor along a line corner bisector', () => {
 		const sketch = new SketchDocument();
-		const corner = sketch.addPoint(vec(0, 0));
-		sketch.addLine(corner.id, sketch.addPoint(vec(100, 0)).id);
-		sketch.addLine(corner.id, sketch.addPoint(vec(0, 100)).id);
+		const corner = sketch.addPoint(new Vec2(0, 0));
+		sketch.addLine(corner.id, sketch.addPoint(new Vec2(100, 0)).id);
+		sketch.addLine(corner.id, sketch.addPoint(new Vec2(0, 100)).id);
 		const { ctx } = createMockContext(sketch);
 		ctx.toGeoCurve = (type, id) => sketchPrimitiveToGeoCurve(sketch, type, id);
 		const tool = new FilletTool();
@@ -162,7 +162,7 @@ describe('Corner modification shortcuts', () => {
 		grab.raw.stopPropagation = () => {};
 		tool.onMouseDown(grab);
 
-		const target = vec(start.midArc.x + 3.25, start.midArc.y + 3.25);
+		const target = new Vec2(start.midArc.x + 3.25, start.midArc.y + 3.25);
 		tool.onMouseMove(makeMouseEvent(target.x, target.y));
 		assert.ok(fillet.result);
 		assert.ok(Math.hypot(fillet.result.midArc.x - target.x, fillet.result.midArc.y - target.y) < 1e-6);
@@ -174,9 +174,9 @@ describe('Corner modification shortcuts', () => {
 	] as const) {
 		it(`applies ${Tool.name} with ${code} outside the popup`, () => {
 			const sketch = new SketchDocument();
-			const corner = sketch.addPoint(vec(0, 0));
-			sketch.addLine(corner.id, sketch.addPoint(vec(100, 0)).id);
-			sketch.addLine(corner.id, sketch.addPoint(vec(0, 100)).id);
+			const corner = sketch.addPoint(new Vec2(0, 0));
+			sketch.addLine(corner.id, sketch.addPoint(new Vec2(100, 0)).id);
+			sketch.addLine(corner.id, sketch.addPoint(new Vec2(0, 100)).id);
 			const { ctx } = createMockContext(sketch);
 			const toolChanges: string[] = [];
 			ctx.setTool = next => {
@@ -263,8 +263,8 @@ describe('Primitive Tools Creation', () => {
 		const [line] = sketch.lines.values();
 		const start = sketch.points.get(line.p1Id)!;
 		const end = sketch.points.get(line.p2Id)!;
-		assert.ok(dist(start, vec(10, 20)) < 1e-6);
-		assert.ok(dist(end, vec(10, -10)) < 1e-6);
+		assert.ok(Vec2.from(start).distanceTo(new Vec2(10, 20)) < 1e-6);
+		assert.ok(Vec2.from(end).distanceTo(new Vec2(10, -10)) < 1e-6);
 		assert.equal(sketch.getDistanceConstraint(line.p1Id, line.p2Id)?.expression, '60 / 2');
 		const angle = [...sketch.constraints.values()].find(c => c instanceof AngleConstraint);
 		assert.equal(angle?.targetAngle, 90);
@@ -528,8 +528,8 @@ describe('Primitive Tools Creation', () => {
 		const snap1 = {
 			type: 'point' as const,
 			id: existingPt.id,
-			worldPos: vec(0, 0),
-			screenPos: vec(0, 0),
+			worldPos: new Vec2(0, 0),
+			screenPos: new Vec2(0, 0),
 		};
 		rectTool.onMouseDown(makeMouseEvent(0, 0, snap1));
 		assert.equal(rectTool.step, 1);
@@ -538,8 +538,8 @@ describe('Primitive Tools Creation', () => {
 		const snap2 = {
 			type: 'line' as const,
 			id: existingLine.id,
-			worldPos: vec(50, 40),
-			screenPos: vec(50, 40),
+			worldPos: new Vec2(50, 40),
+			screenPos: new Vec2(50, 40),
 		};
 		rectTool.onMouseMove(makeMouseEvent(50, 40, snap2));
 		rectTool.onMouseDown(makeMouseEvent(50, 40, snap2));
@@ -576,8 +576,8 @@ describe('Primitive Tools Creation', () => {
 				viewport: ctx.viewport,
 				sketch,
 				targetGroup,
-				cursorScreen: vec(100, 80),
-				cursorWorld: vec(100, 80),
+				cursorScreen: new Vec2(100, 80),
+				cursorWorld: new Vec2(100, 80),
 				snap: null,
 				isConstruction: false,
 			});
@@ -809,13 +809,13 @@ describe('Primitive Tools Creation', () => {
 	it('undo and redo spline creation include new points and preserve reused points', () => {
 		for (const mode of ['fit', 'control'] as const) {
 			const sketch = new SketchDocument();
-			const existing = sketch.addPoint(vec(10, 10));
+			const existing = sketch.addPoint(new Vec2(10, 10));
 			const before = sketch.takeSnapshot();
 			const { ctx } = createMockContext(sketch);
 			const tool = new SplineTool(mode);
 			tool.activate(ctx);
 			const first = makeMouseEvent(10, 10);
-			first.snap = { type: 'point', id: existing.id, worldPos: vec(10, 10), screenPos: vec(10, 10) };
+			first.snap = { type: 'point', id: existing.id, worldPos: new Vec2(10, 10), screenPos: new Vec2(10, 10) };
 			tool.onMouseDown(first);
 			assert.ok(tool.undoPoint());
 			assert.ok(sketch.points.has(existing.id));
@@ -835,7 +835,7 @@ describe('Primitive Tools Creation', () => {
 
 	it('cancelling spline creation rolls back its points and retains point redo while drawing', () => {
 		const sketch = new SketchDocument();
-		const existing = sketch.addPoint(vec(10, 10));
+		const existing = sketch.addPoint(new Vec2(10, 10));
 		const before = sketch.takeSnapshot();
 		const { ctx } = createMockContext(sketch);
 		const tool = new SplineTool();
@@ -874,8 +874,8 @@ describe('Primitive Tools Creation', () => {
 				viewport: ctx.viewport,
 				sketch,
 				targetGroup,
-				cursorScreen: vec(100, 20),
-				cursorWorld: vec(100, 20),
+				cursorScreen: new Vec2(100, 20),
+				cursorWorld: new Vec2(100, 20),
 				snap: null,
 				isConstruction: false,
 			});
@@ -940,8 +940,8 @@ describe('Primitive Tools Creation', () => {
 				viewport: ctx.viewport,
 				sketch,
 				targetGroup: targetGroup as any,
-				cursorScreen: vec(20, 50),
-				cursorWorld: vec(20, 50),
+				cursorScreen: new Vec2(20, 50),
+				cursorWorld: new Vec2(20, 50),
 				snap: null,
 				isConstruction: false,
 			});
@@ -956,8 +956,8 @@ describe('Primitive Tools Creation', () => {
 				viewport: ctx.viewport,
 				sketch,
 				targetGroup: targetGroup as any,
-				cursorScreen: vec(20, 50),
-				cursorWorld: vec(20, 50),
+				cursorScreen: new Vec2(20, 50),
+				cursorWorld: new Vec2(20, 50),
 				snap: null,
 				isConstruction: false,
 			});
@@ -1013,7 +1013,7 @@ describe('Primitive Tools Creation', () => {
 		arcTool.activate(ctx);
 
 		// Click 1 on line endpoint p2 (50, 0)
-		const snapP2 = { type: 'point', id: p2.id, worldPos: vec(50, 0), screenPos: vec(50, 0) };
+		const snapP2 = { type: 'point', id: p2.id, worldPos: new Vec2(50, 0), screenPos: new Vec2(50, 0) };
 		arcTool.onMouseDown(makeMouseEvent(50, 0, snapP2));
 		assert.equal(arcTool.step, 1);
 
@@ -1051,7 +1051,7 @@ describe('Primitive Tools Creation', () => {
 		arcTool.activate(ctx);
 
 		// Click 1 on arc1 endpoint ePt (0, 50)
-		const snapEPt = { type: 'point', id: ePt.id, worldPos: vec(0, 50), screenPos: vec(0, 50) };
+		const snapEPt = { type: 'point', id: ePt.id, worldPos: new Vec2(0, 50), screenPos: new Vec2(0, 50) };
 		arcTool.onMouseDown(makeMouseEvent(0, 50, snapEPt));
 		assert.equal(arcTool.step, 1);
 
@@ -1109,7 +1109,7 @@ describe('Primitive Tools Creation', () => {
 		arcTool.activate(ctx);
 
 		// Click 1 on line endpoint p2 (50, 0), tangentDir is (1, 0)
-		const snapP2 = { type: 'point', id: p2.id, worldPos: vec(50, 0), screenPos: vec(50, 0) };
+		const snapP2 = { type: 'point', id: p2.id, worldPos: new Vec2(50, 0), screenPos: new Vec2(50, 0) };
 		arcTool.onMouseDown(makeMouseEvent(50, 0, snapP2));
 		assert.equal(arcTool.step, 1);
 
@@ -1554,7 +1554,7 @@ describe('Primitive Tools Creation', () => {
 
 		// Verify snapping is ignored on the radius step even if a snap point is present in the event
 		const snappedEvt = makeMouseEvent(0, 72);
-		snappedEvt.snap = { type: 'point', worldPos: { x: 0, y: 100 }, screenPos: { x: 0, y: 100 } };
+		snappedEvt.snap = { type: 'point', worldPos: new Vec2(0, 100), screenPos: { x: 0, y: 100 } };
 		snappedEvt.effectiveWorld = { x: 0, y: 100 };
 		slotTool.onMouseMove(snappedEvt);
 		assert.equal(slotTool.radius, 12);
@@ -1937,7 +1937,7 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Click 2: radius at (40, 10), even if an artificial snap is in the event, it is ignored
 		const snappedEvt = makeMouseEvent(40, 10);
-		snappedEvt.snap = { type: 'point', worldPos: { x: 999, y: 999 }, screenPos: { x: 999, y: 999 } };
+		snappedEvt.snap = { type: 'point', worldPos: new Vec2(999, 999), screenPos: { x: 999, y: 999 } };
 		snappedEvt.effectiveWorld = { x: 999, y: 999 };
 		circleTool.onMouseDown(snappedEvt);
 
@@ -1963,7 +1963,7 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Step 1 -> major axis at (50, 0), ignores snap
 		const snappedEvt1 = makeMouseEvent(50, 0);
-		snappedEvt1.snap = { type: 'point', worldPos: { x: 888, y: 888 }, screenPos: { x: 888, y: 888 } };
+		snappedEvt1.snap = { type: 'point', worldPos: new Vec2(888, 888), screenPos: { x: 888, y: 888 } };
 		snappedEvt1.effectiveWorld = { x: 888, y: 888 };
 		ellipseTool.onMouseDown(snappedEvt1);
 		assert.equal(ellipseTool.step, 2);
@@ -1971,7 +1971,7 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Step 2 -> minor axis at (0, 20), ignores snap
 		const snappedEvt2 = makeMouseEvent(0, 20);
-		snappedEvt2.snap = { type: 'point', worldPos: { x: 777, y: 777 }, screenPos: { x: 777, y: 777 } };
+		snappedEvt2.snap = { type: 'point', worldPos: new Vec2(777, 777), screenPos: { x: 777, y: 777 } };
 		snappedEvt2.effectiveWorld = { x: 777, y: 777 };
 		ellipseTool.onMouseDown(snappedEvt2);
 		assert.equal(ellipseTool.step, 0);
@@ -2031,8 +2031,8 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 				targetGroup: {
 					appendChild: () => {},
 				} as any,
-				cursorScreen: { x: 100, y: 60 },
-				cursorWorld: { x: 100, y: 60 },
+				cursorScreen: new Vec2(100, 60),
+				cursorWorld: new Vec2(100, 60),
 				snap: null,
 				isConstruction: false,
 			};
@@ -2075,14 +2075,14 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Step 1: Start point / radius snapped to targetPt (40, 0)
 		const snappedEvt1 = makeMouseEvent(40, 0);
-		snappedEvt1.snap = { type: 'point', id: targetPt.id, worldPos: { x: 40, y: 0 }, screenPos: { x: 40, y: 0 } };
+		snappedEvt1.snap = { type: 'point', id: targetPt.id, worldPos: new Vec2(40, 0), screenPos: { x: 40, y: 0 } };
 		arcTool.onMouseDown(snappedEvt1);
 		assert.equal(arcTool.step, 2);
 		assert.equal(arcTool.shouldSnap(), 'no-grid');
 
 		// Step 2: End point / sweep angle snapped to targetPt2 (0, 40)
 		const snappedEvt2 = makeMouseEvent(0, 40);
-		snappedEvt2.snap = { type: 'point', id: targetPt2.id, worldPos: { x: 0, y: 40 }, screenPos: { x: 0, y: 40 } };
+		snappedEvt2.snap = { type: 'point', id: targetPt2.id, worldPos: new Vec2(0, 40), screenPos: { x: 0, y: 40 } };
 		arcTool.onMouseDown(snappedEvt2);
 		assert.equal(arcTool.step, 0);
 		assert.equal(sketch.arcs.size, 1);
@@ -2107,21 +2107,21 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Step 0: First boundary point snapped to pTarget1
 		const snapEvt0 = makeMouseEvent(0, 0);
-		snapEvt0.snap = { type: 'point', id: pTarget1.id, worldPos: { x: 0, y: 0 }, screenPos: { x: 0, y: 0 } };
+		snapEvt0.snap = { type: 'point', id: pTarget1.id, worldPos: new Vec2(0, 0), screenPos: { x: 0, y: 0 } };
 		arcTool.onMouseDown(snapEvt0);
 		assert.equal(arcTool.step, 1);
 		assert.equal(arcTool.shouldSnap(), 'no-grid');
 
 		// Step 1: Second boundary point snapped to pTarget2
 		const snapEvt1 = makeMouseEvent(40, 0);
-		snapEvt1.snap = { type: 'point', id: pTarget2.id, worldPos: { x: 40, y: 0 }, screenPos: { x: 40, y: 0 } };
+		snapEvt1.snap = { type: 'point', id: pTarget2.id, worldPos: new Vec2(40, 0), screenPos: { x: 40, y: 0 } };
 		arcTool.onMouseDown(snapEvt1);
 		assert.equal(arcTool.step, 2);
 		assert.equal(arcTool.shouldSnap(), false);
 
 		// Step 2: Third point at (20, 20), ignores snap
 		const snappedEvt = makeMouseEvent(20, 20);
-		snappedEvt.snap = { type: 'point', worldPos: { x: 777, y: 777 }, screenPos: { x: 777, y: 777 } };
+		snappedEvt.snap = { type: 'point', worldPos: new Vec2(777, 777), screenPos: { x: 777, y: 777 } };
 		arcTool.onMouseDown(snappedEvt);
 		assert.equal(arcTool.step, 0);
 		assert.equal(sketch.arcs.size, 1);
@@ -2148,14 +2148,14 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Step 0: Click endpoint p2 (50, 0)
 		const snapEvt0 = makeMouseEvent(50, 0);
-		snapEvt0.snap = { type: 'point', id: p2.id, worldPos: { x: 50, y: 0 }, screenPos: { x: 50, y: 0 } };
+		snapEvt0.snap = { type: 'point', id: p2.id, worldPos: new Vec2(50, 0), screenPos: { x: 50, y: 0 } };
 		arcTool.onMouseDown(snapEvt0);
 		assert.equal(arcTool.step, 1);
 		assert.equal(arcTool.shouldSnap(), 'no-grid');
 
 		// Step 1: End point at targetEndPt (80, 30), snaps to target point
 		const snappedEvt1 = makeMouseEvent(80, 30);
-		snappedEvt1.snap = { type: 'point', id: targetEndPt.id, worldPos: { x: 80, y: 30 }, screenPos: { x: 80, y: 30 } };
+		snappedEvt1.snap = { type: 'point', id: targetEndPt.id, worldPos: new Vec2(80, 30), screenPos: { x: 80, y: 30 } };
 		arcTool.onMouseDown(snappedEvt1);
 		assert.equal(arcTool.step, 0);
 		assert.equal(sketch.arcs.size, 1);
@@ -2180,28 +2180,28 @@ describe('Inspector Primitive & Constraint Editing Methods', () => {
 
 		// Step 1: Major axis at (60, 0)
 		const evt1 = makeMouseEvent(60, 0);
-		evt1.snap = { type: 'point', worldPos: { x: 999, y: 999 }, screenPos: { x: 999, y: 999 } };
+		evt1.snap = { type: 'point', worldPos: new Vec2(999, 999), screenPos: { x: 999, y: 999 } };
 		elArcTool.onMouseDown(evt1);
 		assert.equal(elArcTool.step, 2);
 		assert.equal(elArcTool.shouldSnap(), false);
 
 		// Step 2: Minor axis at (0, 30)
 		const evt2 = makeMouseEvent(0, 30);
-		evt2.snap = { type: 'point', worldPos: { x: 888, y: 888 }, screenPos: { x: 888, y: 888 } };
+		evt2.snap = { type: 'point', worldPos: new Vec2(888, 888), screenPos: { x: 888, y: 888 } };
 		elArcTool.onMouseDown(evt2);
 		assert.equal(elArcTool.step, 3);
 		assert.equal(elArcTool.shouldSnap(), false);
 
 		// Step 3: Start point angle at (60, 0)
 		const evt3 = makeMouseEvent(60, 0);
-		evt3.snap = { type: 'point', worldPos: { x: 777, y: 777 }, screenPos: { x: 777, y: 777 } };
+		evt3.snap = { type: 'point', worldPos: new Vec2(777, 777), screenPos: { x: 777, y: 777 } };
 		elArcTool.onMouseDown(evt3);
 		assert.equal(elArcTool.step, 4);
 		assert.equal(elArcTool.shouldSnap(), false);
 
 		// Step 4: End point angle at (0, 30)
 		const evt4 = makeMouseEvent(0, 30);
-		evt4.snap = { type: 'point', worldPos: { x: 666, y: 666 }, screenPos: { x: 666, y: 666 } };
+		evt4.snap = { type: 'point', worldPos: new Vec2(666, 666), screenPos: { x: 666, y: 666 } };
 		elArcTool.onMouseDown(evt4);
 		assert.equal(elArcTool.step, 0);
 		assert.equal(sketch.ellipticalArcs.size, 1);
@@ -2285,8 +2285,8 @@ describe('Polygon tool modes', () => {
 			const [edge] = sketch.lines.values();
 			const start = sketch.points.get(edge.p1Id)!;
 			const end = sketch.points.get(edge.p2Id)!;
-			const handle = mode === 'inscribed' ? start : mid(start, end);
-			assert.ok(dist(handle, vec(12, 9)) < 1e-6);
+			const handle = mode === 'inscribed' ? start : new Vec2().midpoint(start, end);
+			assert.ok(Vec2.from(handle).distanceTo(new Vec2(12, 9)) < 1e-6);
 		}
 	});
 
@@ -2315,8 +2315,8 @@ describe('Polygon tool modes', () => {
 			const tool = new PolygonTool();
 			tool.setMode('edge');
 			tool.activate(ctx);
-			const a = sketch.addPoint(vec(3, 2), true);
-			const b = sketch.addPoint(vec(13, 2), true);
+			const a = sketch.addPoint(new Vec2(3, 2), true);
+			const b = sketch.addPoint(new Vec2(13, 2), true);
 			const base = sketch.addLine(a.id, b.id, true);
 			for (const point of [a, b]) {
 				tool.onMouseDown(
@@ -2340,7 +2340,7 @@ describe('Polygon tool modes', () => {
 				assert.equal(line.isConstruction, true);
 				const p1 = sketch.points.get(line.p1Id)!;
 				const p2 = sketch.points.get(line.p2Id)!;
-				assert.ok(Math.abs(dist(p1, p2) - 10) < 1e-6);
+				assert.ok(Math.abs(Vec2.from(p1).distanceTo(p2) - 10) < 1e-6);
 				assert.ok((p1.y - 2) * side >= -1e-6);
 				assert.ok((p2.y - 2) * side >= -1e-6);
 			}
@@ -2376,8 +2376,8 @@ describe('Polygon tool modes', () => {
 			const [edge] = sketch.lines.values();
 			const start = sketch.points.get(edge.p1Id)!;
 			const end = sketch.points.get(edge.p2Id)!;
-			const handle = mode === 'inscribed' ? start : mid(start, end);
-			assert.ok(dist(handle, vec(0.5, 0)) < 1e-6);
+			const handle = mode === 'inscribed' ? start : new Vec2().midpoint(start, end);
+			assert.ok(Vec2.from(handle).distanceTo(new Vec2(0.5, 0)) < 1e-6);
 		}
 	});
 
@@ -2408,7 +2408,7 @@ describe('Polygon tool modes', () => {
 		for (const line of sketch.lines.values()) {
 			const start = sketch.points.get(line.p1Id)!;
 			const end = sketch.points.get(line.p2Id)!;
-			assert.ok(Math.abs(dist(start, end) - 9) < 1e-6);
+			assert.ok(Math.abs(Vec2.from(start).distanceTo(end) - 9) < 1e-6);
 			assert.ok(start.y <= 1e-6 && end.y <= 1e-6);
 		}
 		const length = [...sketch.constraints.values()].find(c => c instanceof DistanceConstraint);
@@ -2442,20 +2442,20 @@ describe('Polygon tool modes', () => {
 
 			const mouseEvent = (x: number, y: number) => ({
 				...makeMouseEvent(x, y),
-				client: vec(x + 100, y + 50),
+				client: new Vec2(x + 100, y + 50),
 			});
 			tool.setMode(mode);
 			tool.activate(ctx);
 			tool.onMouseDown(mouseEvent(15, 10));
 			tool.onMouseMove(mouseEvent(35, 10));
 			ctx.requestRender();
-			const expected = [vec(115, 60), vec(135, 60)];
+			const expected = [new Vec2(115, 60), new Vec2(135, 60)];
 
 			if (mode === 'edge') {
 				tool.onMouseDown(mouseEvent(40, 10));
 				tool.onMouseMove(mouseEvent(30, 25));
 				ctx.requestRender();
-				expected.push(vec(140, 60), vec(130, 75));
+				expected.push(new Vec2(140, 60), new Vec2(130, 75));
 			}
 
 			assert.deepEqual(positions, expected);
@@ -2541,8 +2541,8 @@ describe('Arc and Ellipse measurement popups', () => {
 	it('creates a tangent arc with the entered radius and sweep', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);
-		const a = sketch.addPoint(vec(-20, 0));
-		const b = sketch.addPoint(vec(0, 0));
+		const a = sketch.addPoint(new Vec2(-20, 0));
+		const b = sketch.addPoint(new Vec2(0, 0));
 		sketch.addLine(a.id, b.id);
 		const tool = new ArcTool('tangent');
 		tool.activate(ctx);
@@ -2557,7 +2557,7 @@ describe('Arc and Ellipse measurement popups', () => {
 		const [arc] = sketch.arcs.values();
 		const end = sketch.points.get(arc.endPointId)!;
 		assert.ok(Math.abs(arc.radius - 15) < 1e-6);
-		assert.ok(dist(end, vec(-15, 15)) < 1e-6);
+		assert.ok(Vec2.from(end).distanceTo(new Vec2(-15, 15)) < 1e-6);
 		assert.equal([...sketch.constraints.values()].find(c => c instanceof AngleConstraint)?.targetAngle, 270);
 	});
 
@@ -2586,8 +2586,8 @@ describe('Arc and Ellipse measurement popups', () => {
 
 			const [entity] = (mode === 'ellipse' ? sketch.ellipses : sketch.ellipticalArcs).values();
 			const center = sketch.points.get(entity.centerId)!;
-			assert.ok(Math.abs(dist(center, sketch.points.get(entity.majorAxisPointId)!) - 20) < 1e-6);
-			assert.ok(Math.abs(dist(center, sketch.points.get(entity.minorAxisPointId)!) - 8) < 1e-6);
+			assert.ok(Math.abs(Vec2.from(center).distanceTo(sketch.points.get(entity.majorAxisPointId)!) - 20) < 1e-6);
+			assert.ok(Math.abs(Vec2.from(center).distanceTo(sketch.points.get(entity.minorAxisPointId)!) - 8) < 1e-6);
 			assert.equal([...sketch.constraints.values()].find(c => c instanceof DistanceConstraint)?.expression, '40 / 2');
 			assert.equal(tool.popup.isOpen(), false);
 		}

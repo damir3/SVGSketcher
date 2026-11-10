@@ -1,4 +1,4 @@
-import { vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -24,7 +24,10 @@ export class FixedConstraint extends BaseConstraint {
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
-		const p = vec(paramMap.get(`${this.pointId}.x`) ?? this.targetX, paramMap.get(`${this.pointId}.y`) ?? this.targetY);
+		const p = new Vec2(
+			paramMap.get(`${this.pointId}.x`) ?? this.targetX,
+			paramMap.get(`${this.pointId}.y`) ?? this.targetY
+		);
 		return [(p.x - this.targetX) * this.weight, (p.y - this.targetY) * this.weight];
 	}
 
@@ -43,6 +46,6 @@ export class FixedConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x + 12, y: s.y - 12 }, 'fixed', COLORS.fixed);
+		ctx.renderBadge(this.id, new Vec2(s.x + 12, s.y - 12), 'fixed', COLORS.fixed);
 	}
 }

@@ -1,3 +1,4 @@
+import { Vec2 } from '../math/vector';
 import type { SketchImage } from '../model/image';
 import {
 	buildTraceGeometry,
@@ -532,7 +533,7 @@ export class ImageTraceModal {
 			if ((e.target as HTMLElement).closest('button')) return;
 			if (!this.dialogEl) return;
 			const rect = this.dialogEl.getBoundingClientRect();
-			this.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+			this.dragOffset = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
 			this.dialogEl.style.left = `${rect.left}px`;
 			this.dialogEl.style.top = `${rect.top}px`;
 			this.dialogEl.style.right = 'auto';

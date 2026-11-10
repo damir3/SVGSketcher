@@ -1,3 +1,4 @@
+import { Vec2 } from './math/vector';
 import './style.css';
 import { DEFAULT_ZOOM } from './constants';
 import { SketchDocument } from './model/sketch';
@@ -246,7 +247,7 @@ function initApp(): void {
 	// Track cursor coordinates
 	svg.addEventListener('mousemove', e => {
 		const rect = svg.getBoundingClientRect();
-		const screen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+		const screen = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
 		const snap = interaction.isSnappingEnabled ? interaction.findSnap(screen) : null;
 		const world = snap ? snap.worldPos : viewport.screenToWorld(screen);
 		const { subStep } = viewport.getGridStep();
@@ -389,7 +390,7 @@ function initApp(): void {
 				});
 				interaction.selectImage(replacement.id);
 			} else {
-				const center = viewport.screenToWorld({ x: viewport.width / 2, y: viewport.height / 2 });
+				const center = viewport.screenToWorld(new Vec2(viewport.width / 2, viewport.height / 2));
 				const image = sketch.addImage({
 					...center,
 					...source,

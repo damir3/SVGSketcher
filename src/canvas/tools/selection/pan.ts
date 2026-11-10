@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
-import { ORIGIN, sub, type Vec2 } from '../../../math/vector';
+import { ORIGIN, Vec2 } from '../../../math/vector';
 
 export class PanTool extends BaseTool {
 	readonly id = 'pan' as const;
@@ -36,7 +36,7 @@ export class PanTool extends BaseTool {
 
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this.isPanning) {
-			const dir = sub(e.screen, this.lastMouseScreen);
+			const dir = new Vec2().subVectors(e.screen, this.lastMouseScreen);
 			this.ctx.viewport.pan(dir.x, dir.y);
 			this.lastMouseScreen = e.screen;
 			this.ctx.requestRender();

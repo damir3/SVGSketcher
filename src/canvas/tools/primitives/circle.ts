@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
-import { cross, dot, addScaled, dist, getCircumcircle, sub, type Vec2, vec } from '../../../math/vector';
+import { getCircumcircle, Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine } from '../../svg';
 import { AUX_RAY_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
@@ -18,7 +18,7 @@ export class CircleTool extends BaseTool {
 
 	readonly popup = new ToolPopup<'radius'>({
 		className: 'circle-popup',
-		defaultOffset: { x: 150, y: 40 },
+		defaultOffset: new Vec2(150, 40),
 		fields: [
 			{
 				id: 'radius',
@@ -41,7 +41,7 @@ export class CircleTool extends BaseTool {
 	private lineIds: string[] = [];
 	private _mode: CircleMode = 'center_diameter';
 	private onStateChange?: () => void;
-	private lastCursorWorld: Vec2 = vec(0, 0);
+	private lastCursorWorld: Vec2 = new Vec2(0, 0);
 
 	readonly sidebarPanel = new VariationToolPanel<CircleMode>({
 		title: 'Circle Tool',
@@ -250,7 +250,9 @@ export class CircleTool extends BaseTool {
 				this.notify();
 			} else {
 				const locked = this.popup.isLocked('radius');
-				const radius = locked ? this.popup.getNumericValue('radius', 20) / 2 : Math.max(5, dist(this.center!, e.world));
+				const radius = locked
+					? this.popup.getNumericValue('radius', 20) / 2
+					: Math.max(5, this.center!.distanceTo(e.world));
 				this.finish(this.center!, radius, this.centerId!, locked ? 'diameter' : undefined);
 			}
 
@@ -277,17 +279,11 @@ export class CircleTool extends BaseTool {
 			if (this._mode === 'two_point' && this.points.length === 2) {
 				const [a, cursor] = this.points;
 				const locked = this.popup.isLocked('radius');
-				const diameter = locked ? this.popup.getNumericValue('radius', 20) : dist(a, cursor);
-				const directionLength = dist(a, cursor);
-				const b =
-					locked && directionLength > 1e-9
-						? vec(
-								a.x + ((cursor.x - a.x) / directionLength) * diameter,
-								a.y + ((cursor.y - a.y) / directionLength) * diameter
-							)
-						: cursor;
+				const diameter = locked ? this.popup.getNumericValue('radius', 20) : a.distanceTo(cursor);
+				const directionLength = a.distanceTo(cursor);
+				const b = locked && directionLength > 1e-9 ? a.clone().lerp(cursor, diameter / directionLength) : cursor;
 
-				this.finish(vec((a.x + b.x) / 2, (a.y + b.y) / 2), diameter / 2, undefined, locked ? 'diameter' : undefined);
+				this.finish(new Vec2().midpoint(a, b), diameter / 2, undefined, locked ? 'diameter' : undefined);
 				return;
 			}
 
@@ -366,13 +362,13 @@ export class CircleTool extends BaseTool {
 
 		if (this._mode === 'center_diameter' && this.drawingStep === 1 && !this.popup.isLocked('radius')) {
 			this.popup.updateValues({
-				radius: 2 * Math.max(5, dist(this.center!, e.effectiveWorld)),
+				radius: 2 * Math.max(5, this.center!.distanceTo(e.effectiveWorld)),
 			});
 		}
 
 		if (this._mode === 'two_point' && this.drawingStep > 0 && !this.popup.isLocked('radius')) {
 			this.popup.updateValues({
-				radius: Math.max(5, dist(this.points[0], e.effectiveWorld)),
+				radius: Math.max(5, this.points[0].distanceTo(e.effectiveWorld)),
 			});
 		}
 
@@ -397,13 +393,13 @@ export class CircleTool extends BaseTool {
 		const pointB = this.ctx.sketch.points.get(line.p2Id);
 		if (!pointA || !pointB) return null;
 
-		const dir = sub(pointB, pointA);
-		const length = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(pointB, pointA);
+		const length = dir.length();
 		if (length < 1e-9) return null;
 
 		return {
-			p: vec(pointA.x, pointA.y),
-			n: vec(-dir.y / length, dir.x / length),
+			p: pointA.clone(),
+			n: dir.clone().perpendicular().divideScalar(length),
 		};
 	}
 
@@ -437,9 +433,9 @@ export class CircleTool extends BaseTool {
 			for (const s2 of [-1, 1]) {
 				for (const s3 of [-1, 1]) {
 					const [a, b, c] = lines;
-					const h1 = dot(a.p, a.n);
-					const h2 = dot(b.p, b.n);
-					const h3 = dot(c.p, c.n);
+					const h1 = a.p.dot(a.n);
+					const h2 = b.p.dot(b.n);
+					const h3 = c.p.dot(c.n);
 					const rows = [
 						[a.n.x, a.n.y, -s1],
 						[b.n.x, b.n.y, -s2],
@@ -473,7 +469,7 @@ export class CircleTool extends BaseTool {
 
 					if (matrix.some((row, index) => Math.abs(row[index]) < 1e-8)) continue;
 
-					const center = vec(matrix[0][3], matrix[1][3]);
+					const center = new Vec2(matrix[0][3], matrix[1][3]);
 					const radius = Math.abs(matrix[2][3]);
 					if (radius > 0.01 && (!best || radius < best.radius)) {
 						best = { center, radius };
@@ -490,28 +486,29 @@ export class CircleTool extends BaseTool {
 		if (circle) return circle;
 
 		const [a, b] = this.points;
-		const dir = sub(b, a);
-		const length = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(b, a);
+		const length = dir.length();
 		if (length < 1e-8) return null;
 
 		const offset = Math.max(10, length / 2);
-		const fallbackPoint = vec((a.x + b.x) / 2 - (dir.y / length) * offset, (a.y + b.y) / 2 + (dir.x / length) * offset);
+		const normal = dir.perpendicular().divideScalar(length);
+		const fallbackPoint = new Vec2().midpoint(a, b).addScaledVector(normal, offset);
 		return getCircumcircle(a, b, fallbackPoint);
 	}
 
 	private getThreePointCircleForDiameter(diameter: number, cursor: Vec2): CircleGeometry | null {
 		const [a, b] = this.points;
-		const dir = sub(b, a);
-		const chord = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(b, a);
+		const chord = dir.length();
 		const radius = diameter / 2;
 		if (chord < 1e-8 || radius < chord / 2) return null;
 
 		const h = Math.sqrt(Math.max(0, radius * radius - (chord * chord) / 4));
-		const midpoint = vec((a.x + b.x) / 2, (a.y + b.y) / 2);
-		const normal = vec(-dir.y / chord, dir.x / chord);
-		const centerA = vec(midpoint.x + normal.x * h, midpoint.y + normal.y * h);
-		const centerB = vec(midpoint.x - normal.x * h, midpoint.y - normal.y * h);
-		const center = dist(centerA, cursor) <= dist(centerB, cursor) ? centerA : centerB;
+		const midpoint = new Vec2().midpoint(a, b);
+		const normal = dir.clone().perpendicular().divideScalar(chord);
+		const centerA = midpoint.clone().addScaledVector(normal, h);
+		const centerB = midpoint.clone().addScaledVector(normal, -h);
+		const center = centerA.distanceTo(cursor) <= centerB.distanceTo(cursor) ? centerA : centerB;
 
 		return { center, radius };
 	}
@@ -574,20 +571,15 @@ export class CircleTool extends BaseTool {
 		const cursor = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
 		const radius = this.popup.isLocked('radius')
 			? this.popup.getNumericValue('radius', 20) / 2
-			: dist(this.center!, cursor);
-		const dir = sub(cursor, this.center!);
-		const length = Math.hypot(dir.x, dir.y) || 1;
-		const edge = ctx.viewport.worldToScreen(addScaled(this.center!, dir, radius / length));
+			: this.center!.distanceTo(cursor);
+		const dir = new Vec2().subVectors(cursor, this.center!);
+		const length = dir.length() || 1;
+		const edge = ctx.viewport.worldToScreen(this.center!.clone().addScaledVector(dir, radius / length));
 		const centerScreen = ctx.viewport.worldToScreen(this.center!);
 		const radiusPixels = radius * ctx.viewport.zoom;
 
 		createSvgCircle(centerScreen, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
-		createSvgLine(
-			{ x: 2 * centerScreen.x - edge.x, y: 2 * centerScreen.y - edge.y },
-			edge,
-			AUX_RAY_ATTRS,
-			ctx.targetGroup
-		);
+		createSvgLine(centerScreen.clone().multiplyScalar(2).sub(edge), edge, AUX_RAY_ATTRS, ctx.targetGroup);
 	}
 
 	private renderTwoTangentPreview(ctx: ToolRenderContext): void {
@@ -604,23 +596,26 @@ export class CircleTool extends BaseTool {
 		const intersection = this.lineIntersection();
 		if (!intersection) return;
 
-		const b = sub(circle.center, intersection);
-		const length = Math.hypot(b.x, b.y) || 1;
-		const dir = vec((-b.y / length) * circle.radius, (b.x / length) * circle.radius);
-		const pointA = ctx.viewport.worldToScreen({ x: circle.center.x - dir.x, y: circle.center.y - dir.y });
-		const pointB = ctx.viewport.worldToScreen({ x: circle.center.x + dir.x, y: circle.center.y + dir.y });
+		const b = new Vec2().subVectors(circle.center, intersection);
+		const length = b.length() || 1;
+		const dir = b
+			.clone()
+			.perpendicular()
+			.multiplyScalar((circle.radius * 1) / length);
+		const pointA = ctx.viewport.worldToScreen(new Vec2().subVectors(circle.center, dir));
+		const pointB = ctx.viewport.worldToScreen(new Vec2().addVectors(circle.center, dir));
 		createSvgLine(pointA, pointB, AUX_RAY_ATTRS, ctx.targetGroup);
 	}
 
 	private renderTwoPointPreview(ctx: ToolRenderContext, cursor: Vec2): void {
 		const firstPoint = this.points[0];
-		const dir = sub(cursor, firstPoint);
-		const length = Math.hypot(dir.x, dir.y) || 1;
-		const diameter = this.popup.isLocked('radius')
-			? this.popup.getNumericValue('radius', 20)
-			: Math.hypot(dir.x, dir.y);
-		const secondPoint = this.popup.isLocked('radius') ? addScaled(firstPoint, dir, diameter / length) : cursor;
-		const center = vec((firstPoint.x + secondPoint.x) / 2, (firstPoint.y + secondPoint.y) / 2);
+		const dir = new Vec2().subVectors(cursor, firstPoint);
+		const length = dir.length() || 1;
+		const diameter = this.popup.isLocked('radius') ? this.popup.getNumericValue('radius', 20) : dir.length();
+		const secondPoint = this.popup.isLocked('radius')
+			? firstPoint.clone().addScaledVector(dir, diameter / length)
+			: cursor;
+		const center = new Vec2().midpoint(firstPoint, secondPoint);
 		const screenA = ctx.viewport.worldToScreen(firstPoint);
 		const screenB = ctx.viewport.worldToScreen(secondPoint);
 
@@ -639,13 +634,13 @@ export class CircleTool extends BaseTool {
 
 			const firstPoint = ctx.viewport.worldToScreen(this.points[0]);
 			const center = ctx.viewport.worldToScreen(circle.center);
-			const dir = sub(firstPoint, center);
-			const length = Math.hypot(dir.x, dir.y) || 1;
+			const dir = new Vec2().subVectors(firstPoint, center);
+			const length = dir.length() || 1;
 			const radiusPixels = circle.radius * ctx.viewport.zoom;
 
 			createSvgLine(
-				addScaled(center, dir, -radiusPixels / length),
-				addScaled(center, dir, radiusPixels / length),
+				center.clone().addScaledVector(dir, -radiusPixels / length),
+				center.clone().addScaledVector(dir, radiusPixels / length),
 				AUX_RAY_ATTRS,
 				ctx.targetGroup
 			);
@@ -685,8 +680,8 @@ export class CircleTool extends BaseTool {
 		if (!Number.isFinite(radius) || radius <= 0) return;
 
 		const screenCenter = ctx.viewport.worldToScreen(center);
-		const screenEdge = ctx.viewport.worldToScreen({ x: center.x + radius, y: center.y });
-		const radiusPixels = Math.hypot(screenEdge.x - screenCenter.x, screenEdge.y - screenCenter.y);
+		const screenEdge = ctx.viewport.worldToScreen(new Vec2(center.x + radius, center.y));
+		const radiusPixels = screenCenter.distanceTo(screenEdge);
 		createSvgCircle(screenCenter, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
 	}
 
@@ -695,12 +690,12 @@ export class CircleTool extends BaseTool {
 		const lineB = this.getLine(this.lineIds[1]);
 		if (!lineA || !lineB) return null;
 
-		const determinant = cross(lineA.n, lineB.n);
+		const determinant = lineA.n.cross(lineB.n);
 		if (Math.abs(determinant) < 1e-8) return null;
 
-		const h1 = dot(lineA.p, lineA.n);
-		const h2 = dot(lineB.p, lineB.n);
-		return vec((h1 * lineB.n.y - lineA.n.y * h2) / determinant, (lineA.n.x * h2 - h1 * lineB.n.x) / determinant);
+		const h1 = lineA.p.dot(lineA.n);
+		const h2 = lineB.p.dot(lineB.n);
+		return new Vec2((h1 * lineB.n.y - lineA.n.y * h2) / determinant, (lineA.n.x * h2 - h1 * lineB.n.x) / determinant);
 	}
 
 	private getTwoTangentCircle(cursor: Vec2): CircleGeometry | null {
@@ -709,20 +704,19 @@ export class CircleTool extends BaseTool {
 		const intersection = this.lineIntersection();
 		if (!lineA || !lineB || !intersection) return null;
 
-		const candidates = [
-			vec(lineA.n.x + lineB.n.x, lineA.n.y + lineB.n.y),
-			vec(lineA.n.x - lineB.n.x, lineA.n.y - lineB.n.y),
-		].filter(vector => Math.hypot(vector.x, vector.y) > 1e-8);
+		const candidates = [new Vec2().addVectors(lineA.n, lineB.n), new Vec2().subVectors(lineA.n, lineB.n)].filter(
+			vector => vector.length() > 1e-8
+		);
 		let best: (CircleGeometry & { distance: number }) | null = null;
-		const cursorOffset = sub(cursor, intersection);
+		const cursorOffset = new Vec2().subVectors(cursor, intersection);
 
 		for (const raw of candidates) {
-			const length = Math.hypot(raw.x, raw.y);
-			const axis = vec(raw.x / length, raw.y / length);
-			const t = dot(cursorOffset, axis);
-			const center = vec(intersection.x + t * axis.x, intersection.y + t * axis.y);
-			const radius = Math.abs(dot(sub(center, lineA.p), lineA.n));
-			const distance = dist(center, cursor);
+			const length = raw.length();
+			const axis = raw.clone().divideScalar(length);
+			const t = cursorOffset.dot(axis);
+			const center = intersection.clone().addScaledVector(axis, t);
+			const radius = Math.abs(new Vec2().subVectors(center, lineA.p).dot(lineA.n));
+			const distance = center.distanceTo(cursor);
 
 			if (radius > 1e-6 && (!best || distance < best.distance)) {
 				best = { center, radius, distance };
@@ -737,7 +731,7 @@ export class CircleTool extends BaseTool {
 		const lineB = this.getLine(this.lineIds[1]);
 		if (!lineA || !lineB) return null;
 
-		const determinant = cross(lineA.n, lineB.n);
+		const determinant = lineA.n.cross(lineB.n);
 		if (Math.abs(determinant) < 1e-8) return null;
 
 		let best: Vec2 | null = null;
@@ -745,13 +739,13 @@ export class CircleTool extends BaseTool {
 
 		for (const signA of [-1, 1]) {
 			for (const signB of [-1, 1]) {
-				const q1 = dot(lineA.p, lineA.n) + signA * radius;
-				const q2 = dot(lineB.p, lineB.n) + signB * radius;
-				const center = vec(
+				const q1 = lineA.p.dot(lineA.n) + signA * radius;
+				const q2 = lineB.p.dot(lineB.n) + signB * radius;
+				const center = new Vec2(
 					(q1 * lineB.n.y - lineA.n.y * q2) / determinant,
 					(lineA.n.x * q2 - q1 * lineB.n.x) / determinant
 				);
-				const distance = dist(center, cursor);
+				const distance = center.distanceTo(cursor);
 
 				if (distance < bestDistance) {
 					best = center;

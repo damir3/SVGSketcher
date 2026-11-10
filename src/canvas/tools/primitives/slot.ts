@@ -1,15 +1,6 @@
 import { BaseTool } from '../base';
 import type { SnapResult, ToolMouseEvent, ToolRenderContext } from '../types';
-import {
-	angleFromTo,
-	dot,
-	sub,
-	dist,
-	projectPointOntoSegment,
-	getCircumcircle,
-	vec,
-	type Vec2,
-} from '../../../math/vector';
+import { projectPointOntoSegment, getCircumcircle, Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, getArcSvgPath } from '../../svg';
 import {
 	AUX_AXIS_ATTRS,
@@ -45,9 +36,9 @@ function isArcClockwiseThroughPoint(
 	const se = viewport.worldToScreen(end);
 	const sm = viewport.worldToScreen(midPoint);
 
-	const as = angleFromTo(sc, ss);
-	const ae = angleFromTo(sc, se);
-	const am = angleFromTo(sc, sm);
+	const as = sc.angleToPoint(ss);
+	const ae = sc.angleToPoint(se);
+	const am = sc.angleToPoint(sm);
 
 	let sweepCW = (ae - as) % TWO_PI;
 	if (sweepCW < 0) sweepCW += TWO_PI;
@@ -100,7 +91,7 @@ export class SlotTool extends BaseTool {
 		const isArc = this._mode === 'three_point_arc' || this._mode === 'center_point_arc';
 		this.popup = new ToolPopup<'distance' | 'angle' | 'radius'>({
 			className: 'slot-popup rectangle-popup',
-			defaultOffset: { x: 150, y: 40 },
+			defaultOffset: new Vec2(150, 40),
 			fields: [
 				{
 					id: 'distance',
@@ -404,19 +395,13 @@ export class SlotTool extends BaseTool {
 	private updateCenterArcEndpointsForRadius(): void {
 		if (!this.arcCenterWorld) return;
 		if (this.arcStartWorld) {
-			const theta1 = angleFromTo(this.arcCenterWorld, this.arcStartWorld);
-			this.arcStartWorld = vec(
-				this.arcCenterWorld.x + this.arcRadius * Math.cos(theta1),
-				this.arcCenterWorld.y + this.arcRadius * Math.sin(theta1)
-			);
+			const theta1 = this.arcCenterWorld.angleToPoint(this.arcStartWorld);
+			this.arcStartWorld = Vec2.fromPolar(this.arcRadius, theta1).add(this.arcCenterWorld);
 			this.secondWorldPos = this.arcStartWorld;
 		}
 		if (this.arcEndWorld) {
-			const theta2 = angleFromTo(this.arcCenterWorld, this.arcEndWorld);
-			this.arcEndWorld = vec(
-				this.arcCenterWorld.x + this.arcRadius * Math.cos(theta2),
-				this.arcCenterWorld.y + this.arcRadius * Math.sin(theta2)
-			);
+			const theta2 = this.arcCenterWorld.angleToPoint(this.arcEndWorld);
+			this.arcEndWorld = Vec2.fromPolar(this.arcRadius, theta2).add(this.arcCenterWorld);
 		}
 	}
 
@@ -560,7 +545,7 @@ export class SlotTool extends BaseTool {
 
 		if (this.isLinearMode()) {
 			if (this.drawingStep === 1) {
-				const d = dist(this.firstWorldPos, effectiveWorld);
+				const d = this.firstWorldPos.distanceTo(effectiveWorld);
 				if (!this.isDistanceLocked && !this.popup.isLocked('distance')) {
 					this.distance = Math.max(0.1, d);
 				}
@@ -577,7 +562,7 @@ export class SlotTool extends BaseTool {
 
 		if (this._mode === 'three_point_arc') {
 			if (this.drawingStep === 1) {
-				const d = dist(this.firstWorldPos, effectiveWorld);
+				const d = this.firstWorldPos.distanceTo(effectiveWorld);
 				if (!this.isDistanceLocked && !this.popup.isLocked('distance')) {
 					this.distance = Math.max(0.1, d);
 				}
@@ -594,7 +579,7 @@ export class SlotTool extends BaseTool {
 
 		if (this._mode === 'center_point_arc') {
 			if (this.drawingStep === 1 && this.arcCenterWorld) {
-				const d = dist(this.arcCenterWorld, effectiveWorld);
+				const d = this.arcCenterWorld.distanceTo(effectiveWorld);
 				if (!this.isDistanceLocked && !this.popup.isLocked('distance')) {
 					this.distance = Math.max(0.1, d);
 					this.arcRadius = this.distance;
@@ -645,7 +630,7 @@ export class SlotTool extends BaseTool {
 		if (this.drawingStep === 1) {
 			const effectiveWorld = snap ? snap.worldPos : world;
 			const p2 = this.computeLinearSecondPoint(effectiveWorld);
-			const d = dist(this.firstWorldPos!, p2);
+			const d = this.firstWorldPos!.distanceTo(p2);
 			if (d < 0.5) return;
 
 			this.secondWorldPos = p2;
@@ -699,7 +684,7 @@ export class SlotTool extends BaseTool {
 		if (this.drawingStep === 1) {
 			const effectiveWorld = snap ? snap.worldPos : world;
 			const p2 = this.computeLinearSecondPoint(effectiveWorld);
-			const d = dist(this.firstWorldPos!, p2);
+			const d = this.firstWorldPos!.distanceTo(p2);
 			if (d < 1) return;
 
 			this.secondWorldPos = p2;
@@ -731,9 +716,9 @@ export class SlotTool extends BaseTool {
 			this.thirdSnap = null;
 
 			// Determine world sweep sign from p1 -> p2 through p3
-			const theta1 = angleFromTo(circum.center, p1);
-			const theta2 = angleFromTo(circum.center, p2);
-			const theta3 = angleFromTo(circum.center, p3);
+			const theta1 = circum.center.angleToPoint(p1);
+			const theta2 = circum.center.angleToPoint(p2);
+			const theta3 = circum.center.angleToPoint(p3);
 			const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 			const ccwMid = (((theta3 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 			this.arcWorldSweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;
@@ -788,7 +773,7 @@ export class SlotTool extends BaseTool {
 		if (this.drawingStep === 1) {
 			const effectiveWorld = snap ? snap.worldPos : world;
 			const p1 = this.computeLinearSecondPoint(effectiveWorld);
-			const rArc = dist(this.arcCenterWorld!, p1);
+			const rArc = this.arcCenterWorld!.distanceTo(p1);
 			if (rArc < 1) return;
 
 			this.secondWorldPos = p1;
@@ -797,7 +782,7 @@ export class SlotTool extends BaseTool {
 			this.arcRadius = rArc;
 			this.distance = rArc;
 
-			const theta1 = angleFromTo(this.arcCenterWorld!, p1);
+			const theta1 = this.arcCenterWorld!.angleToPoint(p1);
 			this.arcCenterPrevAngle = theta1;
 			this.arcCenterTotalAngle = 0;
 			this.arcWorldSweepSign = 1;
@@ -854,12 +839,12 @@ export class SlotTool extends BaseTool {
 
 	private computeLinearSecondPoint(effectiveWorld: Vec2): Vec2 {
 		const p1 = this.firstWorldPos!;
-		const v = sub(effectiveWorld, p1);
-		const d = Math.hypot(v.x, v.y);
+		const v = new Vec2().subVectors(effectiveWorld, p1);
+		const d = v.length();
 
 		if (this.isDistanceLocked || this.popup.isLocked('distance')) {
-			const dir = vec(d > 1e-4 ? v.x / d : 1, d > 1e-4 ? v.y / d : 0);
-			return vec(p1.x + dir.x * this.distance, p1.y + dir.y * this.distance);
+			const dir = d > 1e-4 ? v.divideScalar(d) : new Vec2(1, 0);
+			return p1.clone().addScaledVector(dir, this.distance);
 		}
 		return effectiveWorld;
 	}
@@ -869,23 +854,23 @@ export class SlotTool extends BaseTool {
 		p2: Vec2,
 		radius: number
 	): { c1: Vec2; c2: Vec2; u: Vec2; n: Vec2; effectiveR: number } {
-		const v = sub(p2, p1);
-		const len = Math.hypot(v.x, v.y);
-		const u = len > 1e-4 ? vec(v.x / len, v.y / len) : vec(1, 0);
-		const n = vec(-u.y, u.x);
+		const v = new Vec2().subVectors(p2, p1);
+		const len = v.length();
+		const u = len > 1e-4 ? v.clone().divideScalar(len) : new Vec2(1, 0);
+		const n = u.clone().perpendicular();
 
 		if (this._mode === 'center_to_center') {
 			return { c1: p1, c2: p2, u, n, effectiveR: Math.max(0.1, radius) };
 		} else if (this._mode === 'center_point') {
 			// p1 is midpoint M, p2 is C1; C2 is 2*M - C1
-			const c2 = vec(2 * p1.x - p2.x, 2 * p1.y - p2.y);
+			const c2 = p1.clone().multiplyScalar(2).sub(p2);
 			return { c1: c2, c2: p2, u, n, effectiveR: Math.max(0.1, radius) };
 		} else {
 			// overall mode: p1 is outer edge E1, p2 is outer edge E2
 			const maxR = Math.max(0.1, len / 2 - 0.1);
 			const effectiveR = Math.max(0.1, Math.min(radius, maxR));
-			const c1 = vec(p1.x + u.x * effectiveR, p1.y + u.y * effectiveR);
-			const c2 = vec(p2.x - u.x * effectiveR, p2.y - u.y * effectiveR);
+			const c1 = p1.clone().addScaledVector(u, effectiveR);
+			const c2 = p2.clone().addScaledVector(u, -effectiveR);
 			return { c1, c2, u, n, effectiveR };
 		}
 	}
@@ -895,13 +880,13 @@ export class SlotTool extends BaseTool {
 		const p2 = this.secondWorldPos!;
 
 		if (this._mode === 'overall') {
-			const v = sub(p2, p1);
-			const len = Math.hypot(v.x, v.y);
-			const u = len > 1e-4 ? vec(v.x / len, v.y / len) : vec(1, 0);
-			const n = vec(-u.y, u.x);
-			const perpDist = Math.abs(dot(sub(effectiveWorld, p1), n));
+			const v = new Vec2().subVectors(p2, p1);
+			const len = v.length();
+			const u = len > 1e-4 ? v.clone().divideScalar(len) : new Vec2(1, 0);
+			const n = u.clone().perpendicular();
+			const perpDist = Math.abs(new Vec2().subVectors(effectiveWorld, p1).dot(n));
 			const maxR = Math.max(0.1, len / 2 - 0.1);
-			return Math.max(0.1, Math.min(perpDist > 0.1 ? perpDist : dist(p2, effectiveWorld), maxR));
+			return Math.max(0.1, Math.min(perpDist > 0.1 ? perpDist : p2.distanceTo(effectiveWorld), maxR));
 		}
 
 		const { c1, c2 } = this.computeLinearCenters(p1, p2, this.radius ?? 10);
@@ -914,8 +899,8 @@ export class SlotTool extends BaseTool {
 		const start = this.arcStartWorld!;
 		const rArc = this.arcRadius;
 
-		const theta1 = angleFromTo(center, start);
-		const thetaCur = angleFromTo(center, effectiveWorld);
+		const theta1 = center.angleToPoint(start);
+		const thetaCur = center.angleToPoint(effectiveWorld);
 
 		if (this.arcCenterPrevAngle === null) {
 			this.arcCenterPrevAngle = theta1;
@@ -954,17 +939,17 @@ export class SlotTool extends BaseTool {
 	private applyLockedCenterArcAngle(rArc = this.arcRadius): void {
 		const center = this.arcCenterWorld!;
 		const start = this.arcStartWorld!;
-		const theta1 = angleFromTo(center, start);
+		const theta1 = center.angleToPoint(start);
 		const sweepSign = this.arcWorldSweepSign || 1;
 		const sweepRad = (Math.max(0.1, Math.min(359.9, this.angle)) * Math.PI) / 180;
 
 		const theta2 = theta1 + sweepSign * sweepRad;
-		this.arcEndWorld = vec(center.x + rArc * Math.cos(theta2), center.y + rArc * Math.sin(theta2));
+		this.arcEndWorld = Vec2.fromPolar(rArc, theta2).add(center);
 	}
 
 	private computeArcSlotRadiusFromCursor(effectiveWorld: Vec2): number {
 		const center = this.arcCenterWorld!;
-		const d = dist(center, effectiveWorld);
+		const d = center.distanceTo(effectiveWorld);
 		const rawR = Math.abs(d - this.arcRadius);
 		const maxR = Math.max(0.1, this.arcRadius - 0.5);
 		return Math.max(0.1, Math.min(rawR, maxR));
@@ -992,31 +977,31 @@ export class SlotTool extends BaseTool {
 		const maxR = Math.max(0.1, rArc - 0.5);
 		const effectiveR = Math.max(0.1, Math.min(slotRadius, maxR));
 
-		const theta1 = angleFromTo(center, c1);
-		const theta2 = angleFromTo(center, c2);
+		const theta1 = center.angleToPoint(c1);
+		const theta2 = center.angleToPoint(c2);
 
 		const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 		const span = sweepSign > 0 ? ccwSpan : (TWO_PI - ccwSpan) % TWO_PI;
 		const thetaMid = theta1 + sweepSign * (span * 0.5);
 
-		const r1 = vec(Math.cos(theta1), Math.sin(theta1));
-		const r2 = vec(Math.cos(theta2), Math.sin(theta2));
-		const rMid = vec(Math.cos(thetaMid), Math.sin(thetaMid));
+		const r1 = Vec2.fromPolar(1, theta1);
+		const r2 = Vec2.fromPolar(1, theta2);
+		const rMid = Vec2.fromPolar(1, thetaMid);
 
 		// Unit tangents pointing from C1 toward C2 along the arc
-		const t1 = vec(sweepSign * -r1.y, sweepSign * r1.x);
-		const t2 = vec(sweepSign * -r2.y, sweepSign * r2.x);
+		const t1 = r1.clone().perpendicular().multiplyScalar(sweepSign);
+		const t2 = r2.clone().perpendicular().multiplyScalar(sweepSign);
 
-		const p1Outer = vec(center.x + (rArc + effectiveR) * r1.x, center.y + (rArc + effectiveR) * r1.y);
-		const p1Inner = vec(center.x + (rArc - effectiveR) * r1.x, center.y + (rArc - effectiveR) * r1.y);
-		const p2Outer = vec(center.x + (rArc + effectiveR) * r2.x, center.y + (rArc + effectiveR) * r2.y);
-		const p2Inner = vec(center.x + (rArc - effectiveR) * r2.x, center.y + (rArc - effectiveR) * r2.y);
+		const p1Outer = center.clone().addScaledVector(r1, rArc + effectiveR);
+		const p1Inner = center.clone().addScaledVector(r1, rArc - effectiveR);
+		const p2Outer = center.clone().addScaledVector(r2, rArc + effectiveR);
+		const p2Inner = center.clone().addScaledVector(r2, rArc - effectiveR);
 
-		const midCenterArc = vec(center.x + rArc * rMid.x, center.y + rArc * rMid.y);
-		const midOuterArc = vec(center.x + (rArc + effectiveR) * rMid.x, center.y + (rArc + effectiveR) * rMid.y);
-		const midInnerArc = vec(center.x + (rArc - effectiveR) * rMid.x, center.y + (rArc - effectiveR) * rMid.y);
-		const midCap1 = vec(c1.x - effectiveR * t1.x, c1.y - effectiveR * t1.y);
-		const midCap2 = vec(c2.x + effectiveR * t2.x, c2.y + effectiveR * t2.y);
+		const midCenterArc = center.clone().addScaledVector(rMid, rArc);
+		const midOuterArc = center.clone().addScaledVector(rMid, rArc + effectiveR);
+		const midInnerArc = center.clone().addScaledVector(rMid, rArc - effectiveR);
+		const midCap1 = c1.clone().addScaledVector(t1, -effectiveR);
+		const midCap2 = c2.clone().addScaledVector(t2, effectiveR);
 
 		return {
 			effectiveR,
@@ -1069,10 +1054,10 @@ export class SlotTool extends BaseTool {
 			}
 
 			if (hasRadius && (this.drawingStep === 2 || this.isRadiusLocked || this.popup.isLocked('radius'))) {
-				const pt1 = vec(c1.x + effectiveR * n.x, c1.y + effectiveR * n.y);
-				const pt2 = vec(c2.x + effectiveR * n.x, c2.y + effectiveR * n.y);
-				const pt3 = vec(c2.x - effectiveR * n.x, c2.y - effectiveR * n.y);
-				const pt4 = vec(c1.x - effectiveR * n.x, c1.y - effectiveR * n.y);
+				const pt1 = c1.clone().addScaledVector(n, effectiveR);
+				const pt2 = c2.clone().addScaledVector(n, effectiveR);
+				const pt3 = c2.clone().addScaledVector(n, -effectiveR);
+				const pt4 = c1.clone().addScaledVector(n, -effectiveR);
 
 				const sPt1 = ctx.viewport.worldToScreen(pt1);
 				const sPt2 = ctx.viewport.worldToScreen(pt2);
@@ -1083,8 +1068,8 @@ export class SlotTool extends BaseTool {
 				createSvgLine(sPt1, sPt2, previewAttrs, ctx.targetGroup);
 				createSvgLine(sPt3, sPt4, previewAttrs, ctx.targetGroup);
 
-				const mid1 = vec(c1.x - effectiveR * u.x, c1.y - effectiveR * u.y);
-				const mid2 = vec(c2.x + effectiveR * u.x, c2.y + effectiveR * u.y);
+				const mid1 = c1.clone().addScaledVector(u, -effectiveR);
+				const mid2 = c2.clone().addScaledVector(u, effectiveR);
 				const cw1 = isArcClockwiseThroughPoint(ctx.viewport, c1, pt4, pt1, mid1);
 				const cw2 = isArcClockwiseThroughPoint(ctx.viewport, c2, pt2, pt3, mid2);
 
@@ -1119,9 +1104,9 @@ export class SlotTool extends BaseTool {
 					return;
 				}
 
-				const theta1 = angleFromTo(circum.center, p1);
-				const theta2 = angleFromTo(circum.center, p2);
-				const theta3 = angleFromTo(circum.center, p3);
+				const theta1 = circum.center.angleToPoint(p1);
+				const theta2 = circum.center.angleToPoint(p2);
+				const theta3 = circum.center.angleToPoint(p3);
 				const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 				const ccwMid = (((theta3 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
 				const sweepSign = ccwMid > 0 && ccwMid < ccwSpan ? 1 : -1;
@@ -1162,7 +1147,7 @@ export class SlotTool extends BaseTool {
 			if (this.drawingStep === 1) {
 				const p1 = this.computeLinearSecondPoint(effectiveWorld);
 				const sCur = ctx.viewport.worldToScreen(p1);
-				const rScreen = dist(center, p1) * ctx.viewport.zoom;
+				const rScreen = center.distanceTo(p1) * ctx.viewport.zoom;
 				createSvgLine(sCenter, sCur, AUX_RAY_ATTRS, ctx.targetGroup);
 				createSvgCircle(sCenter, rScreen, GUIDE_OUTLINE_ATTRS, ctx.targetGroup);
 				createSvgCircle(sCur, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
@@ -1309,7 +1294,7 @@ export class SlotTool extends BaseTool {
 		if (this.isLinearMode()) {
 			if (!this.firstWorldPos) return;
 			if (!this.secondWorldPos) {
-				const eff = this.lastEffectiveWorld ?? vec(this.firstWorldPos.x + this.distance, this.firstWorldPos.y);
+				const eff = this.lastEffectiveWorld ?? new Vec2(this.firstWorldPos.x + this.distance, this.firstWorldPos.y);
 				this.secondWorldPos = this.computeLinearSecondPoint(eff);
 			}
 			this.commitLinearSlot();
@@ -1381,10 +1366,10 @@ export class SlotTool extends BaseTool {
 		}
 
 		// 4 tangent points on the straight sides
-		const pt1Pos = vec(c1.x + effectiveR * n.x, c1.y + effectiveR * n.y);
-		const pt2Pos = vec(c2.x + effectiveR * n.x, c2.y + effectiveR * n.y);
-		const pt3Pos = vec(c2.x - effectiveR * n.x, c2.y - effectiveR * n.y);
-		const pt4Pos = vec(c1.x - effectiveR * n.x, c1.y - effectiveR * n.y);
+		const pt1Pos = c1.clone().addScaledVector(n, effectiveR);
+		const pt2Pos = c2.clone().addScaledVector(n, effectiveR);
+		const pt3Pos = c2.clone().addScaledVector(n, -effectiveR);
+		const pt4Pos = c1.clone().addScaledVector(n, -effectiveR);
 
 		const pt1 = sketch.addPoint(pt1Pos);
 		const pt2 = sketch.addPoint(pt2Pos);
@@ -1397,8 +1382,8 @@ export class SlotTool extends BaseTool {
 		const bottomLine = sketch.addLine(pt3.id, pt4.id, isConst);
 
 		// End-cap arcs
-		const mid1 = vec(c1.x - effectiveR * u.x, c1.y - effectiveR * u.y);
-		const mid2 = vec(c2.x + effectiveR * u.x, c2.y + effectiveR * u.y);
+		const mid1 = c1.clone().addScaledVector(u, -effectiveR);
+		const mid2 = c2.clone().addScaledVector(u, effectiveR);
 		const cw1 = isArcClockwiseThroughPoint(this.ctx.viewport, c1, pt4Pos, pt1Pos, mid1);
 		const cw2 = isArcClockwiseThroughPoint(this.ctx.viewport, c2, pt2Pos, pt3Pos, mid2);
 

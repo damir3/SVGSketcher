@@ -1,5 +1,5 @@
 import type { ToolContext } from './types';
-import { ORIGIN, vec, type Vec2 } from '../../math/vector';
+import { ORIGIN, Vec2 } from '../../math/vector';
 import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../distances';
 
 export interface HoverTarget {
@@ -58,7 +58,7 @@ export function findHoverTarget(
 		for (const badge of Array.from(ctx.svg.querySelectorAll('.constraint-badge[data-id]'))) {
 			const rect = badge.querySelector('rect');
 			if (!rect) continue;
-			const pos = vec(parseFloat(rect.getAttribute('x') || '0'), parseFloat(rect.getAttribute('y') || '0'));
+			const pos = new Vec2(parseFloat(rect.getAttribute('x') || '0'), parseFloat(rect.getAttribute('y') || '0'));
 			const bw = parseFloat(rect.getAttribute('width') || '18');
 			const bh = parseFloat(rect.getAttribute('height') || '18');
 			if (screen.x >= pos.x - 3 && screen.x <= pos.x + bw + 3 && screen.y >= pos.y - 3 && screen.y <= pos.y + bh + 3) {
@@ -84,7 +84,7 @@ export function findHoverTarget(
 		return { type: 'point', id: pt.id };
 	}
 	const sOrigin = ctx.viewport.worldToScreen(ORIGIN);
-	if (allowOrigin && Math.hypot(screen.x - sOrigin.x, screen.y - sOrigin.y) <= pointRadius) {
+	if (allowOrigin && sOrigin.distanceTo(screen) <= pointRadius) {
 		return { type: 'point', id: 'origin' };
 	}
 

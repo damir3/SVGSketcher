@@ -1,4 +1,4 @@
-import { dot, scale, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -47,19 +47,19 @@ export class PointOnEllipseConstraint extends BaseConstraint {
 		const p1 = readParamPoint(paramMap, this.majorAxisPointId);
 		const p2 = readParamPoint(paramMap, this.minorAxisPointId);
 
-		const axisU = sub(p1, center);
-		const axisV = sub(p2, center);
+		const axisU = new Vec2().subVectors(p1, center);
+		const axisV = new Vec2().subVectors(p2, center);
 
-		const rx = Math.max(Math.hypot(axisU.x, axisU.y), 1e-7);
-		const ry = Math.max(Math.hypot(axisV.x, axisV.y), 1e-7);
+		const rx = Math.max(axisU.length(), 1e-7);
+		const ry = Math.max(axisV.length(), 1e-7);
 		const avgR = (rx + ry) * 0.5;
 
-		const uHat = scale(axisU, 1 / rx);
-		const vHat = scale(axisV, 1 / ry);
+		const uHat = axisU.clone().multiplyScalar(1 / rx);
+		const vHat = axisV.clone().multiplyScalar(1 / ry);
 
-		const dir = sub(p, center);
-		const u = dot(dir, uHat);
-		const v = dot(dir, vHat);
+		const dir = new Vec2().subVectors(p, center);
+		const u = dir.dot(uHat);
+		const v = dir.dot(vHat);
 
 		const res = ((u * u) / (rx * rx) + (v * v) / (ry * ry) - 1.0) * avgR * this.weight;
 		return [res];
@@ -77,6 +77,6 @@ export class PointOnEllipseConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x, y: s.y + 14 }, '⚲', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s.x, s.y + 14), '⚲', COLORS.primary);
 	}
 }

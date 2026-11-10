@@ -1,4 +1,4 @@
-import { angleFromTo, type Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
 import type { GeoArc } from '../../math/intersection';
@@ -83,13 +83,13 @@ export class SketchArc implements ISketchPrimitive {
 		return {
 			type: 'arc',
 			id: this.id,
-			center: { x: center.x, y: center.y },
+			center: new Vec2(center.x, center.y),
 			centerId: this.centerId,
 			startPointId: this.startPointId,
 			endPointId: this.endPointId,
 			radius: this.radius,
-			start: { x: start.x, y: start.y },
-			end: { x: end.x, y: end.y },
+			start: new Vec2(start.x, start.y),
+			end: new Vec2(end.x, end.y),
 			clockwise: !!this.clockwise,
 			isConstruction: this.isConstruction,
 		};
@@ -115,8 +115,8 @@ export class SketchArc implements ISketchPrimitive {
 					const start = ctx.sketch.points.get(this.startPointId);
 					const end = ctx.sketch.points.get(this.endPointId);
 					if (center && start && end) {
-						const as = angleFromTo(center, start);
-						const ae = angleFromTo(center, end);
+						const as = center.angleToPoint(start);
+						const ae = center.angleToPoint(end);
 						let sweep = this.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
 						if (sweep < 0) sweep += 2 * Math.PI;
 						return Number(((sweep * 180) / Math.PI).toFixed(2));

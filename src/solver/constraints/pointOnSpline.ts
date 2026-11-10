@@ -1,9 +1,8 @@
-import { dot, sub, vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
-import type { Vec2 } from '../../math/vector';
 import {
 	bsplineToBezier,
 	fitPointsToBezier,
@@ -70,7 +69,7 @@ export class PointOnSplineConstraint extends BaseConstraint {
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const pts: Vec2[] = [];
 		for (const pid of this.splinePointIds) {
-			const point = { x: paramMap.get(`${pid}.x`), y: paramMap.get(`${pid}.y`) };
+			const point = new Vec2(paramMap.get(`${pid}.x`), paramMap.get(`${pid}.y`));
 			if (point.x === undefined || point.y === undefined) return [0];
 			pts.push(point);
 		}
@@ -84,8 +83,8 @@ export class PointOnSplineConstraint extends BaseConstraint {
 			if (this.handlePoints && this.handlePoints.length > 0) {
 				handles = this.handlePoints.map(hp => {
 					if (!hp) return null;
-					const h1 = { x: paramMap.get(`${hp.p1Id}.x`), y: paramMap.get(`${hp.p1Id}.y`) };
-					const h2 = { x: paramMap.get(`${hp.p2Id}.x`), y: paramMap.get(`${hp.p2Id}.y`) };
+					const h1 = new Vec2(paramMap.get(`${hp.p1Id}.x`), paramMap.get(`${hp.p1Id}.y`));
+					const h2 = new Vec2(paramMap.get(`${hp.p2Id}.x`), paramMap.get(`${hp.p2Id}.y`));
 					if (h1.x === undefined || h1.y === undefined || h2.x === undefined || h2.y === undefined) return null;
 					return { h1, h2 };
 				});
@@ -94,15 +93,15 @@ export class PointOnSplineConstraint extends BaseConstraint {
 		}
 		if (bezierSegments.length === 0) return [0];
 
-		const point = { x: paramMap.get(`${this.pointId}.x`), y: paramMap.get(`${this.pointId}.y`) };
+		const point = new Vec2(paramMap.get(`${this.pointId}.x`), paramMap.get(`${this.pointId}.y`));
 		if (point.x === undefined || point.y === undefined) return [0];
 
 		const proj = getSplineParamAtPoint(bezierSegments, point);
 		const tangent = getSplineTangentAtParam(bezierSegments, proj.param);
-		const tLen = Math.max(Math.hypot(tangent.x, tangent.y), 1e-7);
-		const normal = vec(-tangent.y / tLen, tangent.x / tLen);
+		const tLen = Math.max(tangent.length(), 1e-7);
+		const normal = tangent.clone().perpendicular().divideScalar(tLen);
 
-		const signedDist = dot(sub(point, proj.point), normal);
+		const signedDist = new Vec2().subVectors(point, proj.point).dot(normal);
 		return [signedDist * this.weight];
 	}
 
@@ -118,6 +117,6 @@ export class PointOnSplineConstraint extends BaseConstraint {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, { x: s.x, y: s.y + 14 }, '⚲', COLORS.primary);
+		ctx.renderBadge(this.id, new Vec2(s.x, s.y + 14), '⚲', COLORS.primary);
 	}
 }

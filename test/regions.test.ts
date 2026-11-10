@@ -1,3 +1,4 @@
+import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -18,11 +19,11 @@ function addTriangle(sketch: SketchDocument) {
 describe('sketch regions', () => {
 	it('finds a face whose tessellated boundary is too deep for recursive traversal', () => {
 		const count = 180;
-		const center = { x: 0, y: 0 };
+		const center = new Vec2();
 		const radius = 100;
 		const points = Array.from({ length: count }, (_, i) => {
 			const angle = (i * 2 * Math.PI) / count;
-			return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+			return new Vec2(Math.cos(angle) * radius, Math.sin(angle) * radius);
 		});
 		const curves: GeoArc[] = points.map((start, i) => {
 			const next = (i + 1) % count;
@@ -54,10 +55,10 @@ describe('sketch regions', () => {
 
 		const regions = findSketchRegions(sketch);
 		assert.equal(regions.length, 2);
-		const outer = regions.find(region => pointInRegion({ x: -80, y: 0 }, region));
+		const outer = regions.find(region => pointInRegion(new Vec2(-80, 0), region));
 		assert.ok(outer);
-		assert.equal(pointInRegion({ x: 0, y: 0 }, outer), false);
-		assert.ok(regions.some(region => pointInRegion({ x: 0, y: 0 }, region)));
+		assert.equal(pointInRegion(new Vec2(0, 0), outer), false);
+		assert.ok(regions.some(region => pointInRegion(new Vec2(0, 0), region)));
 		assert.equal((outer.path.match(/ A /g) ?? []).length, 1);
 		assert.equal((outer.path.match(/ C /g) ?? []).length, 3);
 	});
@@ -70,7 +71,7 @@ describe('sketch regions', () => {
 
 		const regions = findSketchRegions(sketch);
 		assert.equal(regions.length, 2);
-		const largeRegion = regions.find(region => pointInRegion({ x: -80, y: 10 }, region));
+		const largeRegion = regions.find(region => pointInRegion(new Vec2(-80, 10), region));
 		assert.ok(largeRegion);
 		assert.equal(largeRegion.holes.length, 0);
 		assert.equal((largeRegion.path.match(/ A /g) ?? []).length, 2);
@@ -140,10 +141,10 @@ describe('sketch regions', () => {
 			regions.some(region => (region.path.match(/ A /g) ?? []).length <= 2),
 			'a full circle should export as two SVG arc commands'
 		);
-		assert.equal(pointInRegion({ x: 30, y: 20 }, ring), true);
-		assert.equal(pointInRegion({ x: 0, y: 30 }, ring), false);
+		assert.equal(pointInRegion(new Vec2(30, 20), ring), true);
+		assert.equal(pointInRegion(new Vec2(0, 30), ring), false);
 		assert.equal(
-			regions.some(region => pointInRegion({ x: 0, y: 30 }, region)),
+			regions.some(region => pointInRegion(new Vec2(0, 30), region)),
 			true
 		);
 	});
@@ -303,6 +304,6 @@ describe('sketch regions', () => {
 		assert.equal(regions.length, 1);
 		assert.ok(regions[0].area > 7000);
 		assert.equal((regions[0].path.match(/ A /g) ?? []).length, 4);
-		assert.equal(pointInRegion({ x: 50, y: 35 }, regions[0]), true);
+		assert.equal(pointInRegion(new Vec2(50, 35), regions[0]), true);
 	});
 });

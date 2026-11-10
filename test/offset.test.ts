@@ -7,7 +7,8 @@ import {
 	calculateOffsetGeometry,
 	commitOffsetToSketch,
 } from '../src/math/offset';
-import { dist } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
+import { OffsetConstraint } from '../src/solver/constraints/offset';
 
 describe('Offset Chain Building and Continuation', () => {
 	it('builds closed chain for circle and ellipse', () => {
@@ -141,7 +142,7 @@ describe('Offset Geometry Calculation', () => {
 			const cur = prims[i];
 			const next = prims[(i + 1) % 4];
 			assert.ok(cur.p2 && next.p1);
-			assert.ok(dist(cur.p2, next.p1) < 1e-4, `Corner ${i} must match`);
+			assert.ok(Vec2.from(cur.p2).distanceTo(next.p1) < 1e-4, `Corner ${i} must match`);
 		}
 	});
 
@@ -305,6 +306,16 @@ describe('Offset Geometry Calculation', () => {
 
 		const res = commitOffsetToSketch(sketch, chain, geom, 'one_side', 10, 10, false)!;
 		assert.ok(res);
+
+		// Snapshots store spline offset vectors as plain coordinates.
+		sketch.restoreSnapshot(JSON.parse(JSON.stringify(sketch.takeSnapshot())));
+		const restored = sketch.constraints.get(res.constraintIds[0]);
+		assert.ok(restored instanceof OffsetConstraint);
+		restored.dimPairIndex = restored.pairs.findIndex(pair => pair.kind === 'spline');
+		assert.ok(restored.dimPairIndex >= 0);
+		const dimension = restored.getDimensionWorldPoints(sketch);
+		assert.ok(dimension?.a instanceof Vec2);
+		assert.ok(dimension.b instanceof Vec2);
 
 		// Update offset distance constraint to 3
 		sketch.updateDimensionalConstraint(res.constraintIds[0], 3);

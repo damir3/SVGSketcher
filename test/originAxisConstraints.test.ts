@@ -17,14 +17,18 @@ import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
 import { LineTool } from '../src/canvas/tools/primitives/line';
-import { angleToXAxisDeg, vec, sub } from '../src/math/vector';
+import { Vec2 } from '../src/math/vector';
 
 describe('Origin & Axis Constraints', () => {
 	describe('Origin Distance & Coincident Constraints', () => {
 		it('applies Coincident to the points in a mixed box selection and preserves the selection', () => {
 			const sketch = new SketchDocument();
-			const points = [sketch.addPoint(vec(10, 20)), sketch.addPoint(vec(30, 40)), sketch.addPoint(vec(50, 60))];
-			const outside = sketch.addPoint(vec(80, 20));
+			const points = [
+				sketch.addPoint(new Vec2(10, 20)),
+				sketch.addPoint(new Vec2(30, 40)),
+				sketch.addPoint(new Vec2(50, 60)),
+			];
+			const outside = sketch.addPoint(new Vec2(80, 20));
 			const line = sketch.addLine(points[0].id, outside.id);
 			const viewport = new Viewport(800, 600);
 			const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
@@ -37,7 +41,11 @@ describe('Origin & Axis Constraints', () => {
 				splinePointsStart: new Map(),
 				render() {},
 			});
-			interaction['finishBoxSelection'](viewport.worldToScreen(vec(60, 70)), viewport.worldToScreen(vec(5, 15)), false);
+			interaction['finishBoxSelection'](
+				viewport.worldToScreen(new Vec2(60, 70)),
+				viewport.worldToScreen(new Vec2(5, 15)),
+				false
+			);
 			assert.deepEqual(
 				[...sketch.selection.pointIds],
 				points.map(({ id }) => id)
@@ -61,8 +69,8 @@ describe('Origin & Axis Constraints', () => {
 
 		it('makes the entire point group coincident with the origin when selected', () => {
 			const sketch = new SketchDocument();
-			const p1 = sketch.addPoint(vec(10, 20));
-			const p2 = sketch.addPoint(vec(30, 40));
+			const p1 = sketch.addPoint(new Vec2(10, 20));
+			const p2 = sketch.addPoint(new Vec2(30, 40));
 
 			assert.ok(sketch.addCoincidentConstraints([p1.id, 'origin', p2.id]));
 			assert.ok(Math.hypot(p1.x, p1.y) < 1e-4);
@@ -384,7 +392,7 @@ describe('Origin & Axis Constraints', () => {
 			const mockRenderCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				renderBadge: (_id: string, position: { x: number; y: number }, label: string) => {
@@ -399,7 +407,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(renderedX, -12);
 			assert.equal(renderedY, -12);
 
-			const dist = c.distanceTo({ x: -12, y: -12 }, sketch, mockRenderCtx.viewport);
+			const dist = c.distanceTo(new Vec2(-12, -12), sketch, mockRenderCtx.viewport);
 			assert.ok(dist !== null && dist < 1e-3);
 		});
 
@@ -415,7 +423,7 @@ describe('Origin & Axis Constraints', () => {
 			const mockRenderCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				renderBadge: (_id: string, position: { x: number; y: number }, label: string) => {
@@ -430,26 +438,26 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(renderedX, 50);
 			assert.equal(renderedY, 14);
 
-			const dist = c.distanceTo({ x: 50, y: 14 }, sketch, mockRenderCtx.viewport);
+			const dist = c.distanceTo(new Vec2(50, 14), sketch, mockRenderCtx.viewport);
 			assert.ok(dist !== null && dist < 1e-3);
 		});
 
 		it('determineDistanceOrientation supports aligned distance to (0,0) and axes', () => {
-			const sOrigin = { x: 0, y: 0 };
-			const sPt = { x: 100, y: 100 }; // 45 deg line
+			const sOrigin = new Vec2(0, 0);
+			const sPt = new Vec2(100, 100); // 45 deg line
 
 			// Normal is at 135 deg (-45 deg). Cursor pulled perpendicular:
-			const cursorNormal = { x: 20, y: 80 };
+			const cursorNormal = new Vec2(20, 80);
 			const resAligned = determineDistanceOrientation(sOrigin, sPt, cursorNormal);
 			assert.equal(resAligned.orientation, 'aligned');
 
 			// Cursor pulled up/down (vertical direction) => horizontal dimension:
-			const cursorVertical = { x: 50, y: 200 };
+			const cursorVertical = new Vec2(50, 200);
 			const resHoriz = determineDistanceOrientation(sOrigin, sPt, cursorVertical);
 			assert.equal(resHoriz.orientation, 'horizontal');
 
 			// Cursor pulled left/right (horizontal direction) => vertical dimension:
-			const cursorHorizontal = { x: 200, y: 50 };
+			const cursorHorizontal = new Vec2(200, 50);
 			const resVert = determineDistanceOrientation(sOrigin, sPt, cursorHorizontal);
 			assert.equal(resVert.orientation, 'vertical');
 		});
@@ -461,8 +469,8 @@ describe('Origin & Axis Constraints', () => {
 				sketch,
 				viewport: {
 					zoom: 1,
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: { clearPreviews: () => {} },
 				isConstructionMode: false,
@@ -477,15 +485,15 @@ describe('Origin & Axis Constraints', () => {
 			lineTool.activate(mockCtx);
 
 			// Step 1: Click at (0,0) with origin snap
-			const snapOrigin = { type: 'point', id: 'origin', worldPos: vec(0, 0), screenPos: vec(0, 0) };
+			const snapOrigin = { type: 'point', id: 'origin', worldPos: new Vec2(0, 0), screenPos: new Vec2(0, 0) };
 			lineTool.onMouseDown({
 				raw: {} as MouseEvent,
-				screen: vec(0, 0),
-				client: vec(0, 0),
-				world: vec(0, 0),
+				screen: new Vec2(0, 0),
+				client: new Vec2(0, 0),
+				world: new Vec2(0, 0),
 				snap: snapOrigin as any,
-				effectiveWorld: vec(0, 0),
-				effectiveScreen: vec(0, 0),
+				effectiveWorld: new Vec2(0, 0),
+				effectiveScreen: new Vec2(0, 0),
 			});
 
 			assert.equal(sketch.points.size, 1, 'Should create a sketch point at (0,0)');
@@ -496,12 +504,12 @@ describe('Origin & Axis Constraints', () => {
 			// Step 2: Click to place end point
 			lineTool.onMouseDown({
 				raw: { preventDefault() {} } as MouseEvent,
-				screen: vec(80, 60),
-				client: vec(80, 60),
-				world: vec(80, 60),
+				screen: new Vec2(80, 60),
+				client: new Vec2(80, 60),
+				world: new Vec2(80, 60),
 				snap: null,
-				effectiveWorld: vec(80, 60),
-				effectiveScreen: vec(80, 60),
+				effectiveWorld: new Vec2(80, 60),
+				effectiveScreen: new Vec2(80, 60),
 			});
 
 			assert.equal(sketch.lines.size, 1, 'Line starting from (0,0) should be created');
@@ -519,7 +527,7 @@ describe('Origin & Axis Constraints', () => {
 				zoom: 1,
 				panX: 0,
 				panY: 500, // screen Y = 500 - wy * zoom
-				worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: 500 - p.y }),
+				worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, 500 - p.y),
 			};
 
 			const sp = viewport.worldToScreen(p); // (50, 450)
@@ -529,7 +537,7 @@ describe('Origin & Axis Constraints', () => {
 			const uy = dy / Math.hypot(0, dy); // -1
 
 			// Dragging cursor UP by 40px: screen.y = 410 (sp.y = 450)
-			const cursorScreen = { x: 50, y: 410 };
+			const cursorScreen = new Vec2(50, 410);
 			const screenOffset = (cursorScreen.y - sp.y) * uy; // (410 - 450) * (-1) = 40
 			c.offset = screenOffset / viewport.zoom; // 40
 
@@ -567,8 +575,8 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(c.line2Id, 'axis_x');
 
 			// Check angle of line with X-axis
-			const dir = sub(p2, p1);
-			const actualAngle = angleToXAxisDeg(dir);
+			const dir = new Vec2().subVectors(p2, p1);
+			const actualAngle = Vec2.from(dir).angleToXAxisDeg();
 			assert.ok(Math.abs(actualAngle - 30) < 0.5, `Expected angle ~ 30, got ${actualAngle}`);
 
 			// Update angle to 60 degrees
@@ -576,7 +584,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(updated, true);
 			assert.equal(c.targetAngle, 60);
 
-			const actualAngle60 = angleToXAxisDeg(sub(p2, p1));
+			const actualAngle60 = new Vec2().subVectors(p2, p1).angleToXAxisDeg();
 			assert.ok(Math.abs(actualAngle60 - 60) < 0.5, `Expected angle ~ 60, got ${actualAngle60}`);
 		});
 
@@ -594,8 +602,8 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(c.targetAngle, 45);
 			assert.equal(c.line2Id, 'axis_y');
 
-			const dir = sub(p2, p1);
-			const actualAngleWithY = 90 - angleToXAxisDeg(dir);
+			const dir = new Vec2().subVectors(p2, p1);
+			const actualAngleWithY = 90 - Vec2.from(dir).angleToXAxisDeg();
 			assert.ok(Math.abs(actualAngleWithY - 45) < 0.5, `Expected angle with Y ~ 45, got ${actualAngleWithY}`);
 		});
 
@@ -612,8 +620,8 @@ describe('Origin & Axis Constraints', () => {
 					zoom: 1,
 					panX: 0,
 					panY: 0,
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					clearPreviews: () => {},
@@ -652,20 +660,20 @@ describe('Origin & Axis Constraints', () => {
 			tool.activate(mockCtx);
 
 			// Click 1: select line
-			tool.onMouseDown(makeEvent(vec(30, 25), line.id, 'line'));
+			tool.onMouseDown(makeEvent(new Vec2(30, 25), line.id, 'line'));
 
 			assert.equal((tool as any).state.step, 1);
 			assert.equal((tool as any).state.line1Id, line.id);
 
 			// Click 2: click X-axis -> transitions to Step 2 (Angle mode)
-			tool.onMouseDown(makeEvent(vec(50, 0), 'axis_x', 'line'));
+			tool.onMouseDown(makeEvent(new Vec2(50, 0), 'axis_x', 'line'));
 
 			assert.equal((tool as any).state.step, 2);
 			assert.equal((tool as any).state.line1Id, line.id);
 			assert.equal((tool as any).state.line2Id, 'axis_x');
 
 			// Click 3: place dimension arc/text
-			tool.onMouseDown(makeEvent(vec(40, 10)));
+			tool.onMouseDown(makeEvent(new Vec2(40, 10)));
 
 			assert.equal((tool as any).state.step, 0);
 			assert.ok(editedConstraint, 'Dimension edit callback should have been called');
@@ -687,8 +695,8 @@ describe('Origin & Axis Constraints', () => {
 					zoom: 1,
 					panX: 0,
 					panY: 0,
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				renderer: {
 					clearPreviews: () => {},
@@ -727,20 +735,20 @@ describe('Origin & Axis Constraints', () => {
 			tool.activate(mockCtx);
 
 			// Click 1: select axis
-			tool.onMouseDown(makeEvent(vec(50, 0), 'axis_x', 'line'));
+			tool.onMouseDown(makeEvent(new Vec2(50, 0), 'axis_x', 'line'));
 
 			assert.equal((tool as any).state.step, 1);
 			assert.equal((tool as any).state.line1Id, 'axis_x');
 
 			// Click 2: click line -> transitions to Step 2 (Angle mode)
-			tool.onMouseDown(makeEvent(vec(30, 25), line.id, 'line'));
+			tool.onMouseDown(makeEvent(new Vec2(30, 25), line.id, 'line'));
 
 			assert.equal((tool as any).state.step, 2);
 			assert.equal((tool as any).state.line1Id, 'axis_x');
 			assert.equal((tool as any).state.line2Id, line.id);
 
 			// Click 3: place dimension arc/text
-			tool.onMouseDown(makeEvent(vec(40, 10)));
+			tool.onMouseDown(makeEvent(new Vec2(40, 10)));
 
 			assert.equal((tool as any).state.step, 0);
 			assert.ok(editedConstraint);
@@ -845,8 +853,8 @@ describe('Origin & Axis Constraints', () => {
 				sketch,
 				viewport: {
 					zoom: 1,
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				showToast: () => {},
 				requestRender: () => {},
@@ -876,18 +884,18 @@ describe('Origin & Axis Constraints', () => {
 			tool.activate(mockCtx);
 
 			// 1. Two points + Y-axis
-			tool.onMouseDown(makeEvent(vec(20, 30), p1.id, 'point'));
-			tool.onMouseDown(makeEvent(vec(-10, 25), p2.id, 'point'));
-			tool.onMouseDown(makeEvent(vec(0, 50), 'axis_y', 'line'));
+			tool.onMouseDown(makeEvent(new Vec2(20, 30), p1.id, 'point'));
+			tool.onMouseDown(makeEvent(new Vec2(-10, 25), p2.id, 'point'));
+			tool.onMouseDown(makeEvent(new Vec2(0, 50), 'axis_y', 'line'));
 
 			assert.ok(Math.abs(p2.x - -20) < 1e-3);
 			assert.ok(Math.abs(p2.y - 30) < 1e-3);
 
 			// 2. Two points + origin
 			const p3 = sketch.addPoint({ x: -15, y: -20 });
-			tool.onMouseDown(makeEvent(vec(20, 30), p1.id, 'point'));
-			tool.onMouseDown(makeEvent(vec(-15, -20), p3.id, 'point'));
-			tool.onMouseDown(makeEvent(vec(0, 0), 'origin', 'point'));
+			tool.onMouseDown(makeEvent(new Vec2(20, 30), p1.id, 'point'));
+			tool.onMouseDown(makeEvent(new Vec2(-15, -20), p3.id, 'point'));
+			tool.onMouseDown(makeEvent(new Vec2(0, 0), 'origin', 'point'));
 
 			assert.ok(Math.abs(p3.x - -20) < 1e-3);
 			assert.ok(Math.abs(p3.y - -30) < 1e-3);
@@ -901,9 +909,9 @@ describe('Origin & Axis Constraints', () => {
 			const c2Center = sketch.addPoint({ x: 35, y: -20 });
 			const c2 = sketch.addCircle(c2Center.id, 8);
 
-			tool.onMouseDown(makeEvent(vec(40, 37), c1.id, 'circle'));
-			tool.onMouseDown(makeEvent(vec(35, -28), c2.id, 'circle'));
-			tool.onMouseDown(makeEvent(vec(50, 0), 'axis_x', 'line'));
+			tool.onMouseDown(makeEvent(new Vec2(40, 37), c1.id, 'circle'));
+			tool.onMouseDown(makeEvent(new Vec2(35, -28), c2.id, 'circle'));
+			tool.onMouseDown(makeEvent(new Vec2(50, 0), 'axis_x', 'line'));
 
 			assert.ok(Math.abs(c2Center.x - 40) < 1e-3);
 			assert.ok(Math.abs(c2Center.y - -25) < 1e-3);
@@ -978,7 +986,7 @@ describe('Origin & Axis Constraints', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				renderBadge: (_id: string, position: { x: number; y: number }) => {
@@ -986,8 +994,8 @@ describe('Origin & Axis Constraints', () => {
 				},
 			};
 			c.render(mockCtx);
-			assert.deepEqual(badgePos, { x: 0, y: -14 });
-			assert.ok(c.distanceTo({ x: 0, y: -14 }, sketch, mockCtx.viewport)! < 1e-3);
+			assert.deepEqual(badgePos, new Vec2(0, -14));
+			assert.ok(c.distanceTo(new Vec2(0, -14), sketch, mockCtx.viewport)! < 1e-3);
 
 			assert.ok(sketch.getConstraintsForEntity('point', 'origin').some(sc => sc.id === c.id));
 			assert.ok(sketch.getEntitiesForConstraint(c).some(e => e.id === 'origin' && e.type === 'point'));
@@ -1026,8 +1034,8 @@ describe('Origin & Axis Constraints', () => {
 				sketch,
 				viewport: {
 					zoom: 1,
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 				},
 				showToast: () => {},
 				requestRender: () => {},
@@ -1048,9 +1056,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click 1: circle
 			tool.onMouseDown({
-				screen: vec(0, 40),
-				world: vec(0, 40),
-				client: vec(0, 40),
+				screen: new Vec2(0, 40),
+				world: new Vec2(0, 40),
+				client: new Vec2(0, 40),
 				raw: {
 					target: {
 						closest: () => ({
@@ -1062,9 +1070,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click 2: near (0,0) where raw.target is 'origin' (point), should fall through to axis_x
 			tool.onMouseDown({
-				screen: vec(2, 0),
-				world: vec(2, 0),
-				client: vec(2, 0),
+				screen: new Vec2(2, 0),
+				world: new Vec2(2, 0),
+				client: new Vec2(2, 0),
 				raw: {
 					target: {
 						closest: () => ({
@@ -1088,7 +1096,7 @@ describe('Origin & Axis Constraints', () => {
 			const mockCtx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				renderBadge: (_id: string, _position: { x: number; y: number }, label: string) => {
@@ -1151,7 +1159,7 @@ describe('Origin & Axis Constraints', () => {
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				findPointNear: () => null,
@@ -1181,9 +1189,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click axis_y
 			tool.onMouseDown({
-				screen: vec(400, 200),
-				world: vec(0, 100),
-				client: vec(400, 200),
+				screen: new Vec2(400, 200),
+				world: new Vec2(0, 100),
+				client: new Vec2(400, 200),
 				raw: {
 					target: {
 						closest: () => ({
@@ -1242,7 +1250,7 @@ describe('Origin & Axis Constraints', () => {
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				findPointNear: () => null,
@@ -1259,9 +1267,9 @@ describe('Origin & Axis Constraints', () => {
 
 			for (const pt of [p1, p2, p3]) {
 				tool.onMouseDown({
-					screen: vec(pt.x, pt.y),
-					world: vec(pt.x, pt.y),
-					client: vec(pt.x, pt.y),
+					screen: new Vec2(pt.x, pt.y),
+					world: new Vec2(pt.x, pt.y),
+					client: new Vec2(pt.x, pt.y),
 					raw: {
 						target: {
 							closest: () => ({
@@ -1310,7 +1318,7 @@ describe('Origin & Axis Constraints', () => {
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				findPointNear: () => null,
@@ -1327,9 +1335,9 @@ describe('Origin & Axis Constraints', () => {
 
 			for (const id of ['origin', p1.id, p2.id]) {
 				tool.onMouseDown({
-					screen: vec(0, 0),
-					world: vec(0, 0),
-					client: vec(0, 0),
+					screen: new Vec2(0, 0),
+					world: new Vec2(0, 0),
+					client: new Vec2(0, 0),
 					raw: {
 						target: {
 							closest: () => ({
@@ -1395,8 +1403,8 @@ describe('Origin & Axis Constraints', () => {
 			const ctx: any = {
 				sketch,
 				viewport: {
-					worldToScreen: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
-					screenToWorld: (p: { x: number; y: number }) => ({ x: p.x, y: p.y }),
+					worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
+					screenToWorld: (p: { x: number; y: number }) => new Vec2(p.x, p.y),
 					zoom: 1,
 				},
 				renderer: {
@@ -1423,9 +1431,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click 1: p1
 			tool.onMouseDown({
-				screen: vec(100, 0),
-				world: vec(100, 0),
-				client: vec(100, 0),
+				screen: new Vec2(100, 0),
+				world: new Vec2(100, 0),
+				client: new Vec2(100, 0),
 				raw: {
 					target: {
 						closest: () => ({
@@ -1439,9 +1447,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click 2: p2 (vertex)
 			tool.onMouseDown({
-				screen: vec(0, 0),
-				world: vec(0, 0),
-				client: vec(0, 0),
+				screen: new Vec2(0, 0),
+				world: new Vec2(0, 0),
+				client: new Vec2(0, 0),
 				raw: {
 					target: {
 						closest: () => ({
@@ -1455,9 +1463,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click 3: p3
 			tool.onMouseDown({
-				screen: vec(0, 100),
-				world: vec(0, 100),
-				client: vec(0, 100),
+				screen: new Vec2(0, 100),
+				world: new Vec2(0, 100),
+				client: new Vec2(0, 100),
 				raw: {
 					target: {
 						closest: () => ({
@@ -1471,9 +1479,9 @@ describe('Origin & Axis Constraints', () => {
 
 			// Click 4: place angle dimension arc at (30, 30)
 			tool.onMouseDown({
-				screen: vec(30, 30),
-				world: vec(30, 30),
-				client: vec(30, 30),
+				screen: new Vec2(30, 30),
+				world: new Vec2(30, 30),
+				client: new Vec2(30, 30),
 				raw: {
 					target: {
 						closest: () => null,

@@ -3,7 +3,7 @@ import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
-import { angleFromToDeg, directionAngleDeg, addScalar, subScalar, sub, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 import { calculateObjectsCentroid, findTransformObjectId } from './utils';
@@ -213,7 +213,7 @@ export class CircularPatternTool extends BaseTool {
 		super();
 		this.popup = new ToolPopup<'angle' | 'quantity'>({
 			className: 'pattern-popup circular-pattern-popup',
-			bboxOffset: { x: 150, y: 0 },
+			bboxOffset: new Vec2(150, 0),
 			fields: [
 				{
 					id: 'angle',
@@ -343,7 +343,7 @@ export class CircularPatternTool extends BaseTool {
 			const pt = this.ctx.sketch.points.get(this.state.centerPointId);
 			if (pt) {
 				const sCenter = this.ctx.viewport.worldToScreen(pt);
-				pts.push(subScalar(sCenter, 20), addScalar(sCenter, 20));
+				pts.push(sCenter.clone().subScalar(20), sCenter.clone().addScalar(20));
 			}
 		}
 
@@ -356,13 +356,9 @@ export class CircularPatternTool extends BaseTool {
 				for (let k = 1; k < bboxQuantity; k++) {
 					const radians =
 						(computePatternCopyAngle(k, bboxQuantity, this.state.distribution, this.state.angle) * Math.PI) / 180;
-					const dir = sub(centroid, center);
-					const copy = {
-						x: center.x + dir.x * Math.cos(radians) - dir.y * Math.sin(radians),
-						y: center.y + dir.x * Math.sin(radians) + dir.y * Math.cos(radians),
-					};
+					const copy = centroid.clone().rotateAround(center, radians);
 					const screen = this.ctx.viewport.worldToScreen(copy);
-					pts.push(subScalar(screen, 14), addScalar(screen, 14));
+					pts.push(screen.clone().subScalar(14), screen.clone().addScalar(14));
 				}
 			}
 		}
@@ -417,15 +413,11 @@ export class CircularPatternTool extends BaseTool {
 			};
 		}
 		const angleHandle = this.ctx.renderer?.patternAngleHandle;
-		if (
-			this.state.distribution !== 'full' &&
-			angleHandle &&
-			Math.hypot(e.screen.x - angleHandle.x, e.screen.y - angleHandle.y) <= LINE_DISTANCE_PX
-		) {
+		if (this.state.distribution !== 'full' && angleHandle && e.screen.distanceTo(angleHandle) <= LINE_DISTANCE_PX) {
 			const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 			if (!center) return false;
 			this.angleDrag = {
-				previousPointerAngle: angleFromToDeg(center, e.world),
+				previousPointerAngle: center.angleToPointDeg(e.world),
 				accumulatedDelta: 0,
 				startAngle: this.state.angle,
 			};
@@ -494,9 +486,9 @@ export class CircularPatternTool extends BaseTool {
 		if (!this.angleDrag || !this.state || !this.ctx) return;
 		const center = this.state.centerPointId ? this.ctx.sketch.points.get(this.state.centerPointId) : null;
 		if (!center) return;
-		const dir = sub(e.world, center);
-		if (Math.hypot(dir.x, dir.y) < 1e-4) return;
-		const radialAngle = directionAngleDeg(dir);
+		const dir = new Vec2().subVectors(e.world, center);
+		if (dir.length() < 1e-4) return;
+		const radialAngle = dir.signedAngleDeg();
 		let step = radialAngle - this.angleDrag.previousPointerAngle;
 		while (step > 180) step -= 360;
 		while (step < -180) step += 360;

@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import { distanceToCircle } from '../../math/hitTest';
 import { circleIntersectsAABB } from '../../math/aabb';
 import type { GeoCircle } from '../../math/intersection';
@@ -51,7 +51,7 @@ export class SketchCircle implements ISketchPrimitive {
 		return {
 			type: 'circle',
 			id: this.id,
-			center: { x: center.x, y: center.y },
+			center: new Vec2(center.x, center.y),
 			centerId: this.centerId,
 			radius: this.radius,
 			isConstruction: this.isConstruction,

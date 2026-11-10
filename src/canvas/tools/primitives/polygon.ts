@@ -1,7 +1,7 @@
 import { BaseTool } from '../base';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
-import { addScaled, angleFromTo, cross, dist, mid, sub, vec, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { VariationToolPanel } from '../../../ui/panels/tools/variationToolPanel';
 import { renderPolygonPreviewVisual } from '../../previewHelpers';
@@ -64,7 +64,7 @@ export class PolygonTool extends BaseTool {
 
 		this.popup = new ToolPopup<'sides' | 'radius' | 'size'>({
 			className: 'polygon-popup',
-			defaultOffset: { x: 50, y: 0 },
+			defaultOffset: new Vec2(50, 0),
 			fields: [
 				{
 					id: 'radius',
@@ -177,7 +177,7 @@ export class PolygonTool extends BaseTool {
 			this.commitCenteredPolygon(e);
 		} else if (!this.edgeEnd) {
 			const end = this.getEdgeEnd(anchor, e.effectiveWorld);
-			const length = dist(anchor, end);
+			const length = anchor.distanceTo(end);
 			if (length < MIN_POINT_DISTANCE) return;
 			this.edgeEnd = e;
 			this.edgeCursor = null;
@@ -196,10 +196,10 @@ export class PolygonTool extends BaseTool {
 		if (this.mode === 'edge') {
 			this.edgeCursor = e;
 		} else {
-			this.currentAngle = angleFromTo(anchor, e.effectiveWorld);
+			this.currentAngle = anchor.angleToPoint(e.effectiveWorld);
 		}
 		if (!this.sizeLocked && !this.edgeEnd) {
-			this.updateSize(dist(anchor, e.effectiveWorld));
+			this.updateSize(anchor.distanceTo(e.effectiveWorld));
 		}
 		this.popup.updatePosition(e.client);
 	}
@@ -301,25 +301,25 @@ export class PolygonTool extends BaseTool {
 
 	private getEdgeEnd(start: Vec2, target: Vec2): Vec2 {
 		if (!this.sizeLocked) return target;
-		const angle = angleFromTo(start, target);
-		return addScaled(start, vec(Math.cos(angle), Math.sin(angle)), this.size);
+		const angle = start.angleToPoint(target);
+		return start.clone().addScaledVector(Vec2.fromPolar(1, angle), this.size);
 	}
 
 	private getEdgeSide(start: Vec2, end: Vec2, toward: Vec2): number {
-		const length = dist(start, end);
+		const length = start.distanceTo(end);
 		if (length < MIN_POINT_DISTANCE) return 0;
-		const signedDistance = cross(sub(end, start), sub(toward, start)) / length;
+		const signedDistance = new Vec2().subVectors(end, start).cross(new Vec2().subVectors(toward, start)) / length;
 		return Math.abs(signedDistance) < MIN_POINT_DISTANCE ? 0 : Math.sign(signedDistance);
 	}
 
 	private getEdgeGeometry(start: Vec2, end: Vec2, reversed: boolean) {
-		const edge = sub(end, start);
-		const length = dist(start, end);
+		const edge = new Vec2().subVectors(end, start);
+		const length = start.distanceTo(end);
 		const halfAngle = Math.PI / this.sides;
-		const normal = vec(-edge.y / length, edge.x / length);
+		const normal = edge.clone().perpendicular().divideScalar(length);
 		const apothem = length / (2 * Math.tan(halfAngle));
-		const center = addScaled(mid(start, end), normal, reversed ? -apothem : apothem);
-		const angle = angleFromTo(center, reversed ? end : start);
+		const center = new Vec2().midpoint(start, end).addScaledVector(normal, reversed ? -apothem : apothem);
+		const angle = center.angleToPoint(reversed ? end : start);
 		return { center, radius: length / (2 * Math.sin(halfAngle)), angle };
 	}
 
@@ -330,7 +330,7 @@ export class PolygonTool extends BaseTool {
 
 		const endEvent = this.edgeEnd ?? this.edgeCursor;
 		const end = this.getEdgeEnd(start, endEvent?.effectiveWorld ?? start);
-		if (dist(start, end) < MIN_POINT_DISTANCE) return false;
+		if (start.distanceTo(end) < MIN_POINT_DISTANCE) return false;
 		const toward = direction ?? (this.edgeEnd ? this.edgeCursor?.world : undefined);
 		const side = toward ? this.getEdgeSide(start, end, toward) : 0;
 		if (direction && side === 0) return false;
@@ -338,7 +338,7 @@ export class PolygonTool extends BaseTool {
 		const { sketch } = this.ctx;
 		const endId = endEvent && !this.sizeLocked ? this.placePoint(endEvent) : sketch.addPoint(end).id;
 		const endPoint = sketch.points.get(endId)!;
-		if (dist(start, endPoint) < MIN_POINT_DISTANCE) {
+		if (start.distanceTo(endPoint) < MIN_POINT_DISTANCE) {
 			this.cancel();
 			return false;
 		}
@@ -354,13 +354,13 @@ export class PolygonTool extends BaseTool {
 		const center = this.startPoint;
 		if (!centerId || !center) return false;
 
-		const radius = this.sizeLocked || !e ? this.size : dist(center, e.effectiveWorld);
+		const radius = this.sizeLocked || !e ? this.size : center.distanceTo(e.effectiveWorld);
 		if (radius < MIN_POINT_DISTANCE) return false;
-		const angle = e ? angleFromTo(center, e.effectiveWorld) : this.currentAngle;
+		const angle = e ? center.angleToPoint(e.effectiveWorld) : this.currentAngle;
 		if (e && this.mode === 'inscribed' && !this.sizeLocked) {
 			const vertexId = this.placePoint(e);
 			const vertex = this.ctx.sketch.points.get(vertexId)!;
-			return this.commitPolygon(centerId, dist(center, vertex), angleFromTo(center, vertex), false, [vertexId]);
+			return this.commitPolygon(centerId, center.distanceTo(vertex), center.angleToPoint(vertex), false, [vertexId]);
 		}
 		return this.commitPolygon(centerId, radius, angle, this.sizeLocked);
 	}

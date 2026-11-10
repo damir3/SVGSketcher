@@ -1,4 +1,4 @@
-import { sub, vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -59,8 +59,8 @@ export class DistanceConstraint extends BaseConstraint {
 			return [(dy * sign - this.targetDistance) * this.weight];
 		}
 
-		const dir = sub(p2, p1);
-		const cur = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(p2, p1);
+		const cur = dir.length();
 
 		return [(cur - this.targetDistance) * this.weight];
 	}
@@ -90,10 +90,10 @@ export class DistanceConstraint extends BaseConstraint {
 			return res;
 		}
 
-		const dir = sub(p2, p1);
-		const cur = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const dir = new Vec2().subVectors(p2, p1);
+		const cur = Math.max(dir.length(), 1e-7);
 
-		const dP2 = vec((dir.x / cur) * this.weight, (dir.y / cur) * this.weight);
+		const dP2 = dir.clone().multiplyScalar((this.weight * 1) / cur);
 
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -dP2.x);
 		this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -dP2.y);

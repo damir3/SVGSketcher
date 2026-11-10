@@ -1,4 +1,4 @@
-import { cross, dot, addScaled, vec, scale, sub } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -58,11 +58,11 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const p1 = readParamPoint(paramMap, this.lineP1Id);
 		const p2 = readParamPoint(paramMap, this.lineP2Id);
 
-		const dir = sub(p2, p1);
-		const lineLen = Math.max(Math.hypot(dir.x, dir.y), 1e-7);
+		const dir = new Vec2().subVectors(p2, p1);
+		const lineLen = Math.max(dir.length(), 1e-7);
 
 		// Signed distance from center to line
-		const signedDist = cross(sub(center, p1), dir) / lineLen;
+		const signedDist = new Vec2().subVectors(center, p1).cross(dir) / lineLen;
 		return [(signedDist - this.initialSide * r) * this.weight];
 	}
 
@@ -92,31 +92,22 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const s2 = ctx.viewport.worldToScreen(p2);
 		const rScreen = entity.radius * ctx.viewport.zoom;
 
-		const dir = sub(s2, s1);
-		const lineLen = Math.hypot(dir.x, dir.y);
+		const dir = new Vec2().subVectors(s2, s1);
+		const lineLen = dir.length();
 		if (lineLen < 1e-4) return;
 
-		const u = scale(dir, 1 / lineLen);
+		const u = dir.clone().multiplyScalar(1 / lineLen);
 
-		const v = sub(sCenter, s1);
-		const t = dot(v, u);
-		const proj = addScaled(s1, u, t);
+		const v = new Vec2().subVectors(sCenter, s1);
+		const t = v.dot(u);
+		const proj = s1.clone().addScaledVector(u, t);
 
-		const normal = sub(proj, sCenter);
-		const normDist = Math.hypot(normal.x, normal.y);
+		const normal = new Vec2().subVectors(proj, sCenter);
+		const normDist = normal.length();
 
-		let dirX = 0;
-		let dirY = 0;
-		if (normDist > 1e-3) {
-			dirX = normal.x / normDist;
-			dirY = normal.y / normDist;
-		} else {
-			dirX = -u.y;
-			dirY = u.x;
-		}
-
-		const circPt = vec(sCenter.x + dirX * rScreen, sCenter.y + dirY * rScreen);
-		const tan = vec((proj.x + circPt.x) * 0.5, (proj.y + circPt.y) * 0.5);
+		const direction = normDist > 1e-3 ? normal.divideScalar(normDist) : u.clone().perpendicular();
+		const circPt = sCenter.clone().addScaledVector(direction, rScreen);
+		const tan = new Vec2().midpoint(proj, circPt);
 
 		const distToSeg = isAxis ? 0 : t < 0 ? -t : t > lineLen ? t - lineLen : 0;
 		const distToCirc = Math.abs(normDist - rScreen);
@@ -126,7 +117,7 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 
 		if (isNear) {
 			const offset = 14;
-			const badge = vec(tan.x - dirX * offset, tan.y - dirY * offset);
+			const badge = tan.clone().addScaledVector(direction, -offset);
 			ctx.renderBadge(this.id, badge, 'tangent');
 			return;
 		}

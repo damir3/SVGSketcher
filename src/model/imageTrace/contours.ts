@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 
 /**
  * Contour extraction. Coordinates are continuous image coordinates: pixel (x, y) covers [x, x + 1] × [y, y + 1].
@@ -90,12 +90,10 @@ export function marchingSquares(field: Float32Array, width: number, height: numb
 		const v0 = value(i0, j0);
 		const v1 = value(i1, j1);
 		const t = Math.abs(v1 - v0) < 1e-12 ? 0.5 : Math.min(1, Math.max(0, (iso - v0) / (v1 - v0)));
-		return { x: i0 + (i1 - i0) * t + 0.5, y: j0 + (j1 - j0) * t + 0.5 };
+		return new Vec2(i0 + (i1 - i0) * t + 0.5, j0 + (j1 - j0) * t + 0.5);
 	};
-	const cornerPoint = (i: number, j: number, corner: number): Vec2 => ({
-		x: i + (corner === 1 || corner === 2 ? 1 : 0) + 0.5,
-		y: j + (corner >= 2 ? 1 : 0) + 0.5,
-	});
+	const cornerPoint = (i: number, j: number, corner: number): Vec2 =>
+		new Vec2(i + (corner === 1 || corner === 2 ? 1 : 0) + 0.5, j + (corner >= 2 ? 1 : 0) + 0.5);
 
 	const starts = new Map<number, number>();
 	const segmentEnds: number[] = [];
@@ -180,7 +178,7 @@ export function pixelEdgeContours(mask: Uint8Array, width: number, height: numbe
 
 	const used = new Uint8Array(edgeFrom.length);
 	const contours: Vec2[][] = [];
-	const toPoint = (id: number): Vec2 => ({ x: id % (width + 1), y: Math.floor(id / (width + 1)) });
+	const toPoint = (id: number): Vec2 => new Vec2(id % (width + 1), Math.floor(id / (width + 1)));
 	for (let start = 0; start < edgeFrom.length; start++) {
 		if (used[start]) continue;
 		const corners: Vec2[] = [];

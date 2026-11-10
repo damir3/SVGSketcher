@@ -1,5 +1,4 @@
-import type { Vec2 } from '../../math/vector';
-import { dist, dot, mid, vec } from '../../math/vector';
+import { Vec2 } from '../../math/vector';
 import type { SketchDocument } from '../sketch';
 import type { IInspectable, ISidebarPanel } from '../../ui/panels/inspector/types';
 import { TextInspectorPanel } from '../../ui/panels/primitives/textPanel';
@@ -113,7 +112,7 @@ export class SketchText implements IInspectable {
 		const p2 = sketch.points.get(p2Id);
 		const p3 = sketch.points.get(p3Id);
 		if (!p0 || !p1 || !p2 || !p3) return null;
-		return [vec(p0.x, p0.y), vec(p1.x, p1.y), vec(p2.x, p2.y), vec(p3.x, p3.y)];
+		return [p0.clone(), p1.clone(), p2.clone(), p3.clone()];
 	}
 
 	/**
@@ -127,24 +126,24 @@ export class SketchText implements IInspectable {
 			const world = viewport.screenToWorld(screenPos);
 
 			// Test if inside oriented rectangle
-			const u = vec(p1.x - p0.x, p1.y - p0.y);
-			const v = vec(p3.x - p0.x, p3.y - p0.y);
-			const uLenSq = dot(u, u);
-			const vLenSq = dot(v, v);
+			const u = new Vec2().subVectors(p1, p0);
+			const v = new Vec2().subVectors(p3, p0);
+			const uLenSq = u.lengthSq();
+			const vLenSq = v.lengthSq();
 			if (uLenSq < 1e-9 || vLenSq < 1e-9) return null;
 
-			const rel = vec(world.x - p0.x, world.y - p0.y);
-			const projU = dot(rel, u) / uLenSq;
-			const projV = dot(rel, v) / vLenSq;
+			const rel = new Vec2().subVectors(world, p0);
+			const projU = rel.dot(u) / uLenSq;
+			const projV = rel.dot(v) / vLenSq;
 
 			if (projU >= 0 && projU <= 1 && projV >= 0 && projV <= 1) {
 				return 0; // Directly inside rectangle
 			}
 
 			// Distance to center in screen pixels
-			const centerWorld = mid(p0, p2);
+			const centerWorld = new Vec2().midpoint(p0, p2);
 			const centerScreen = viewport.worldToScreen(centerWorld);
-			return dist(screenPos, centerScreen);
+			return screenPos.distanceTo(centerScreen);
 		}
 
 		if (this.mode === 'text_on_path' && this.targetPrimitiveId) {

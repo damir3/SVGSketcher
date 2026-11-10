@@ -1,4 +1,4 @@
-import { add, angleFromTo, dot, scale, sub, vec, type Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { applyTransform, createTransform, getTransformSelection, type TransformValues } from '../../../model/transform';
 import { ModifyToolPanel, type ModifyParamItem } from '../../../ui/panels/tools/modifyToolPanel';
 import { createSvgElement } from '../../svg';
@@ -102,10 +102,10 @@ export class TransformTool extends BaseTool {
 		const handle = hitTransformGizmo(e.screen, gizmo);
 		if (!handle) return false;
 		if (handle.type === 'move') {
-			this.drag = { type: 'move', start: e.world, offset: vec(this.values.x, this.values.y) };
+			this.drag = { type: 'move', start: e.world, offset: new Vec2(this.values.x, this.values.y) };
 		} else if (handle.type === 'rotate') {
 			const center = this.ctx.viewport.screenToWorld(gizmo.center);
-			this.drag = { type: 'rotate', center, lastAngle: angleFromTo(center, e.world) };
+			this.drag = { type: 'rotate', center, lastAngle: center.angleToPoint(e.world) };
 		} else {
 			this.drag = {
 				type: 'scale',
@@ -126,16 +126,16 @@ export class TransformTool extends BaseTool {
 			return;
 		}
 		if (drag.type === 'move') {
-			const offset = add(drag.offset, sub(e.world, drag.start));
+			const offset = new Vec2().addVectors(drag.offset, new Vec2().subVectors(e.world, drag.start));
 			this.values.x = offset.x;
 			this.values.y = offset.y;
 		} else if (drag.type === 'rotate') {
-			const angle = angleFromTo(drag.center, e.world);
+			const angle = drag.center.angleToPoint(e.world);
 			const delta = angle - drag.lastAngle;
 			this.values.angle += (Math.atan2(Math.sin(delta), Math.cos(delta)) * 180) / Math.PI;
 			drag.lastAngle = angle;
 		} else {
-			const delta = dot(sub(e.screen, drag.start), drag.direction) / dot(drag.direction, drag.direction);
+			const delta = new Vec2().subVectors(e.screen, drag.start).dot(drag.direction) / drag.direction.lengthSq();
 			this.values.scale = Math.max(drag.minScale, drag.initialScale * (1 + delta));
 		}
 		for (const { key } of FIELDS) {
@@ -184,7 +184,7 @@ export class TransformTool extends BaseTool {
 		const { bounds, center } = selection;
 		const transform = createTransform(center, this.values);
 		const screenCenter = viewport.worldToScreen(transform.point(center));
-		const half = scale(sub(bounds.max, bounds.min), (this.values.scale * viewport.zoom) / 2);
+		const half = new Vec2().subVectors(bounds.max, bounds.min).multiplyScalar((this.values.scale * viewport.zoom) / 2);
 		return getTransformGizmo(screenCenter, half, this.values.angle);
 	}
 

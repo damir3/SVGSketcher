@@ -1,4 +1,4 @@
-import type { Vec2 } from '../../math/vector';
+import { ORIGIN, Vec2, type XY } from '../../math/vector';
 import type { SketchImage } from '../image';
 import type { SelectableEntityType } from '../selection';
 import type { SketchDocument } from '../sketch';
@@ -17,17 +17,15 @@ export interface TracePlacement {
 export function createTraceTransform(
 	result: Pick<TraceResult, 'width' | 'height' | 'yScale'>,
 	placement: TracePlacement
-): { toWorld: (p: Vec2) => Vec2; scale: number } {
+): { toWorld: (p: XY) => Vec2; scale: number } {
 	const radians = (placement.angle * Math.PI) / 180;
-	const cos = Math.cos(radians);
-	const sin = Math.sin(radians);
 	const scale = placement.width / result.width;
 	return {
 		scale,
-		toWorld: (p: Vec2) => {
+		toWorld: (p: XY) => {
 			const lx = (p.x / result.width - 0.5) * placement.width;
 			const ly = (0.5 - p.y / result.yScale / result.height) * placement.height;
-			return { x: placement.x + lx * cos - ly * sin, y: placement.y + lx * sin + ly * cos };
+			return new Vec2(lx, ly).rotateAround(ORIGIN, radians).add(placement);
 		},
 	};
 }
@@ -66,7 +64,7 @@ export function buildTraceGeometry(
 	sketch.beginTransaction();
 	try {
 		sketch.withDeferredSolve(() => {
-			const addPoint = (p: Vec2): string => {
+			const addPoint = (p: XY): string => {
 				const id = sketch.addPoint(toWorld(p)).id;
 				createdPoints.add(id);
 				return id;
@@ -80,7 +78,7 @@ export function buildTraceGeometry(
 				}
 				return id;
 			};
-			const worldHandles = (handles: Array<{ h1: Vec2; h2: Vec2 }>) =>
+			const worldHandles = (handles: Array<{ h1: XY; h2: XY }>) =>
 				handles.map(h => ({ h1: toWorld(h.h1), h2: toWorld(h.h2) }));
 
 			for (const path of result.paths) {
@@ -160,7 +158,7 @@ export function buildTraceGeometry(
 			inferAxisAndRelations(sketch, settings, scale, lineIds, radial, inferred);
 			for (const id of createdPoints) {
 				const point = sketch.points.get(id);
-				if (point) traced.points.set(id, { x: point.x, y: point.y });
+				if (point) traced.points.set(id, point.clone());
 			}
 			for (const item of radial) traced.radii.set(item.id, item.radius);
 		});
@@ -183,7 +181,7 @@ function lineAngle(sketch: SketchDocument, lineId: string): number | null {
 	const p1 = line && sketch.points.get(line.p1Id);
 	const p2 = line && sketch.points.get(line.p2Id);
 	if (!p1 || !p2) return null;
-	let angle = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
+	let angle = (p1.angleToPoint(p2) * 180) / Math.PI;
 	angle = ((angle % 180) + 180) % 180;
 	return angle;
 }
@@ -192,7 +190,7 @@ function lineLength(sketch: SketchDocument, lineId: string): number {
 	const line = sketch.lines.get(lineId);
 	const p1 = line && sketch.points.get(line.p1Id);
 	const p2 = line && sketch.points.get(line.p2Id);
-	return p1 && p2 ? Math.hypot(p2.x - p1.x, p2.y - p1.y) : 0;
+	return p1 && p2 ? p1.distanceTo(p2) : 0;
 }
 
 const angleDifference = (a: number, b: number) => {
@@ -312,7 +310,7 @@ function inferAxisAndRelations(
 			for (let j = i + 1; j < radial.length; j++) {
 				if (used.has(j)) continue;
 				const other = sketch.points.get(radial[j].centerId);
-				if (!other || Math.hypot(other.x - center.x, other.y - center.y) > distanceTolerance * 2) continue;
+				if (!other || center.distanceTo(other) > distanceTolerance * 2) continue;
 				const c = sketch.addConcentricConstraint(radial[i].id, radial[j].id);
 				if (c) {
 					inferred.push({ constraint: c, group: 'relation' });
@@ -361,7 +359,7 @@ function validateConstraints(
 		for (const [id, p] of original.points) {
 			const point = sketch.points.get(id);
 			if (!point) continue;
-			const d = Math.hypot(point.x - p.x, point.y - p.y);
+			const d = p.distanceTo(point);
 			if (d > maxDisplacement) moved.set(id, d);
 		}
 		return moved;
