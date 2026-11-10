@@ -40,9 +40,7 @@ export const COLORS = {
 
 	// Spline styles and colors
 	splineHandle: '#84cc16', // Amber-700: tangent handle & control polygon idle stroke
-	splineHandleSelected: '#0284c7', // Sky-600: selected tangent handle stroke
-	splineHandleDotFill: '#22c55e', // Green-500: tangent handle endpoint dot fill
-	splineHandleDotStroke: 'none',
+	splineHandleDotStroke: '#22c55e', // Green-500: tangent handle endpoint outline
 	splineClosedFill: 'rgba(56, 189, 248, 0.12)', // Sky-400 12%: closed spline fill
 	splinePreview: '#84cc16', // Lime-500: spline drawing preview stroke
 	splineCheckmarkFill: '#22c55e', // Green-500: spline completion checkmark fill
@@ -109,6 +107,7 @@ export const STROKE_WIDTH = {
 	majorGrid: 1,
 	dimension: 1,
 	normal: 1.5,
+	construction: 1,
 	thick: 2,
 	selected: 2,
 	trim: 2,
@@ -541,7 +540,7 @@ export const SPLINE_HANDLE_ATTRS: SvgAttrs = {
 export const SPLINE_HANDLE_SELECTED_ATTRS: SvgAttrs = {
 	class: 'entity-visible visible-spline-handle',
 	fill: 'none',
-	stroke: COLORS.splineHandleSelected,
+	stroke: COLORS.selected,
 	'stroke-width': STROKE_WIDTH.splineHandleSelected,
 	'stroke-dasharray': 'none',
 	'stroke-linecap': 'round',
@@ -620,7 +619,6 @@ export const SPLINE_STYLES = {
 	},
 	controlPolygon: SPLINE_CONTROL_POLYGON_ATTRS,
 	handleDot: {
-		fill: COLORS.splineHandleDotFill,
 		stroke: COLORS.splineHandleDotStroke,
 		r: 3,
 	},
@@ -651,8 +649,12 @@ export function getPrimitiveStrokeAttrs(
 	return {
 		class: 'entity-visible visible-primitive',
 		fill: 'none',
-		stroke: isSelected ? COLORS.primary : isConstruction ? COLORS.construction : baseColor,
-		'stroke-width': isSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.normal,
+		stroke: isSelected ? COLORS.selected : isConstruction ? COLORS.construction : baseColor,
+		'stroke-width': isSelected
+			? STROKE_WIDTH.selected
+			: isConstruction
+				? STROKE_WIDTH.construction
+				: STROKE_WIDTH.normal,
 		'stroke-linecap': roundCap ? 'round' : undefined,
 		'stroke-dasharray': isConstruction ? DASH_ARRAY.construction : undefined,
 		'pointer-events': 'stroke',
@@ -662,7 +664,7 @@ export function getPrimitiveStrokeAttrs(
 export function getPreviewStrokeAttrs(isConstruction = false, isGuide = false, roundCap = false): SvgAttrs {
 	return {
 		stroke: isGuide ? COLORS.primary : isConstruction ? COLORS.construction : COLORS.unconstrained,
-		'stroke-width': STROKE_WIDTH.normal,
+		'stroke-width': !isGuide && isConstruction ? STROKE_WIDTH.construction : STROKE_WIDTH.normal,
 		'stroke-linecap': roundCap ? 'round' : undefined,
 		'stroke-dasharray': isGuide ? DASH_ARRAY.guideCircle : isConstruction ? DASH_ARRAY.construction : undefined,
 		fill: 'none',

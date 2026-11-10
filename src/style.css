@@ -340,11 +340,26 @@ body {
 }
 
 #cad-svg .visible-point {
-	stroke-width: 1px;
+	stroke-width: 1.3px;
 	transition:
-		fill 0.08s ease,
 		stroke 0.08s ease,
 		r 0.08s ease;
+}
+
+#cad-svg .sketch-point.is-selected .visible-point {
+	stroke-width: 2px;
+}
+
+#cad-svg .sketch-line.is-selected .visible-primitive {
+	stroke-width: 2.5px;
+}
+
+#cad-svg .sketch-spline-tangent .visible-spline-handle {
+	stroke-width: 1.5px;
+}
+
+#cad-svg .sketch-spline-tangent.is-selected .visible-spline-handle {
+	stroke-width: 2.5px;
 }
 
 #cad-svg .constraint-badge rect {
@@ -361,8 +376,7 @@ body {
 
 #cad-svg:not(.is-dragging) .sketch-point:not(.is-selected).select-hover .visible-point {
 	stroke: #0ea5e9 !important;
-	fill: #0ea5e9 !important;
-	stroke-width: 1px !important;
+	stroke-width: 2px !important;
 	r: 5px !important;
 	filter: drop-shadow(0 0 5px rgba(14, 165, 233, 0.85)) !important;
 }
@@ -376,10 +390,21 @@ body {
 
 #cad-svg:not(.is-dragging) .sketch-point.is-selected.select-hover .visible-point {
 	stroke: #38bdf8 !important;
-	fill: #38bdf8 !important;
-	stroke-width: 1px !important;
+	stroke-width: 2px !important;
 	r: 5.5px !important;
 	filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9)) !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-line.is-selected.select-hover .visible-primitive {
+	stroke-width: 3.5px !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-spline-tangent:not(.is-selected).select-hover .visible-spline-handle {
+	stroke-width: 2.5px !important;
+}
+
+#cad-svg:not(.is-dragging) .sketch-spline-tangent.is-selected.select-hover .visible-spline-handle {
+	stroke-width: 3.5px !important;
 }
 
 /* Axis & Origin Hover & Selection Highlighting */
@@ -492,8 +517,7 @@ body {
 
 #cad-svg.tool-delete .sketch-point.delete-hover .visible-point {
 	stroke: rgba(255, 0, 0, 0.95) !important;
-	fill: rgba(255, 0, 0, 0.95) !important;
-	stroke-width: 1px !important;
+	stroke-width: 2px !important;
 	r: 5px !important;
 	filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.85)) !important;
 }

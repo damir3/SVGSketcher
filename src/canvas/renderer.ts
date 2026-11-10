@@ -784,6 +784,7 @@ export class SVGRenderer {
 		}
 
 		// 1. Render Lines
+		const splineTangentGroups: SVGGElement[] = [];
 		for (const line of sketch.lines.values()) {
 			if (options.hiddenEntityIds?.has(line.id)) continue;
 			const p1 = sketch.points.get(line.p1Id);
@@ -834,7 +835,9 @@ export class SVGRenderer {
 				if (parentSpline?.splineType === 'control') {
 					createSvgLine(s1, s2, isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_CONTROL_POLYGON_ATTRS, lineG);
 				} else {
+					lineG.classList.add('sketch-spline-tangent');
 					createSvgLine(s1, s2, getSplineHandleStrokeAttrs(isSelected), lineG);
+					splineTangentGroups.push(lineG);
 				}
 			} else if (isMirrorLine) {
 				createSvgLine(s1, s2, MIRROR_LINE_ATTRS, lineG);
@@ -1176,6 +1179,9 @@ export class SVGRenderer {
 			);
 		}
 
+		// Paint tangent handles above the spline paths.
+		for (const group of splineTangentGroups) this.geometryGroup.appendChild(group);
+
 		// 6. Render Points (Vertices)
 		const handlePointToSpline = new Map<string, { spline: SketchSpline; isHandleDot: boolean }>();
 		const controlPointToSpline = new Map<string, SketchSpline>();
@@ -1245,25 +1251,20 @@ export class SVGRenderer {
 			createSvgCircle(s, 14, HIT_AREA_POINT_ATTRS, ptG);
 
 			// Visible point handle
-			let fillColor: string = COLORS.primary; // Default interactive CAD vertex color
-			let strokeColor: string = 'none';
+			let strokeColor: string = COLORS.primary;
 
 			if (splineHandleInfo?.isHandleDot) {
-				fillColor = SPLINE_STYLES.handleDot.fill;
 				strokeColor = SPLINE_STYLES.handleDot.stroke;
 			} else if (pt.fixed) {
-				fillColor = COLORS.fixed; // Fixed points highlighted amber
+				strokeColor = COLORS.fixed;
 			} else if (!hasConflict && isPointConstrained(pt.id)) {
-				fillColor = COLORS.constrained; // Fully defined
+				strokeColor = COLORS.constrained;
 			}
 
-			if (isSelected) {
-				fillColor = COLORS.selected;
-				strokeColor = COLORS.tooltipBg;
-			}
 			if (isPatternCenter) {
-				fillColor = COLORS.patternCenter;
-				strokeColor = COLORS.white;
+				strokeColor = COLORS.patternCenter;
+			} else if (isSelected) {
+				strokeColor = COLORS.selected;
 			}
 
 			createSvgCircle(
@@ -1271,7 +1272,7 @@ export class SVGRenderer {
 				isSelected ? 4 : splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3,
 				{
 					class: 'entity-visible visible-point',
-					fill: fillColor,
+					fill: COLORS.white,
 					stroke: strokeColor,
 					'stroke-width': STROKE_WIDTH.thin,
 					'pointer-events': 'all',
