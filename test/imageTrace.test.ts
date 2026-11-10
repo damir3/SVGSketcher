@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildTraceGeometry } from '../src/model/imageTrace/build';
-import { traceImage, type TraceInput } from '../src/model/imageTrace/trace';
+import { filterTracePrimitives, traceImage, type TraceInput } from '../src/model/imageTrace/trace';
 import { cloneTraceSettings, DEFAULT_TRACE_SETTINGS, type ImageTraceSettings } from '../src/model/imageTrace/types';
 import { SketchDocument } from '../src/model/sketch';
 
@@ -97,25 +97,32 @@ describe('image tracing', () => {
 		assert.equal(result.stats.lines, 4);
 	});
 
-	it('converts circles to a single closed spline when circles are disabled', () => {
+	it('omits disabled circles and converts them in spline mode', () => {
 		const disk = makeImage(120, 120, (x, y) => Math.hypot(x - 60, y - 60) < 40);
-		const outlineResult = traceImage(disk, settings({ useCircles: false }));
+		assert.deepEqual(traceImage(disk, settings({ useCircles: false })).stats, {
+			lines: 0,
+			arcs: 0,
+			circles: 0,
+			splines: 0,
+		});
+		const outlineResult = traceImage(disk, settings({ useSplines: true, useCircles: false, includeSplines: false }));
 		assert.deepEqual(outlineResult.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
 		assert.equal(outlineResult.closedSplines.length, 1);
 		assert.equal(outlineResult.closedSplines[0].points.length, 4);
 		assert.equal(outlineResult.paths.length, 0);
 
 		const ring = makeImage(120, 120, (x, y) => Math.abs(Math.hypot(x - 60, y - 60) - 40) < 3);
-		const centerResult = traceImage(ring, settings({ mode: 'centerline', useCircles: false }));
+		const centerResult = traceImage(ring, settings({ mode: 'centerline', useSplines: true }));
 		assert.deepEqual(centerResult.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
 		assert.equal(centerResult.closedSplines.length, 1);
 		assert.equal(centerResult.closedSplines[0].points.length, 4);
 		assert.equal(centerResult.paths.length, 0);
 	});
 
-	it('converts closed line loops into a single closed spline when lines are disabled', () => {
+	it('converts closed line loops into a single closed spline in spline mode', () => {
 		const rect = makeImage(160, 120, (x, y) => x > 20 && x < 140 && y > 30 && y < 90);
-		const result = traceImage(rect, settings({ useLines: false }));
+		const traceSettings = settings({ useSplines: true });
+		const result = traceImage(rect, traceSettings);
 		assert.deepEqual(result.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
 		assert.equal(result.closedSplines.length, 1);
 		assert.equal(result.closedSplines[0].points.length, 4);
@@ -132,22 +139,22 @@ describe('image tracing', () => {
 			angle: 0,
 			opacity: 1,
 		});
-		buildTraceGeometry(sketch, result, img, settings({ useLines: false }));
+		buildTraceGeometry(sketch, result, img, traceSettings);
 		assert.equal(sketch.splines.size, 1);
 		assert.equal([...sketch.lines.values()].filter(l => !l.isSplineHandle).length, 0);
 		const spline = [...sketch.splines.values()][0];
 		assert.equal(spline.isClosed, true);
 	});
 
-	it('converts open lines to splines when lines are disabled', () => {
+	it('converts open lines to splines in spline mode', () => {
 		const image = makeImage(160, 60, (x, y) => x > 20 && x < 140 && Math.abs(y - 30) < 3);
-		const result = traceImage(image, settings({ mode: 'centerline', useLines: false }));
+		const result = traceImage(image, settings({ mode: 'centerline', useSplines: true }));
 		assert.deepEqual(result.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
 		assert.equal(result.closedSplines.length, 0);
 		assert.equal(result.paths.length, 1);
 	});
 
-	it('converts disabled lines or arcs on a rounded rectangle into splines and merges into one closed spline when both are disabled', () => {
+	it('omits disabled lines and arcs and keeps the remaining segments disconnected', () => {
 		const r = 20;
 		const inside = (x: number, y: number) => {
 			const cx = Math.min(Math.max(x, 20 + r), 180 - r);
@@ -156,16 +163,30 @@ describe('image tracing', () => {
 		};
 		const img = makeImage(200, 140, inside);
 
-		const noArcs = traceImage(img, settings({ useArcs: false }));
-		assert.deepEqual(noArcs.stats, { lines: 4, arcs: 0, circles: 0, splines: 4 });
+		const result = traceImage(img, settings());
+		const noArcs = filterTracePrimitives(result, settings({ useArcs: false }));
+		assert.deepEqual(noArcs.stats, { lines: 4, arcs: 0, circles: 0, splines: 0 });
+		assert.equal(noArcs.paths.length, 4);
+		assert.ok(noArcs.paths.every(path => !path.closed && path.segments.length === 1 && !path.tangent[0]));
 
-		const noLines = traceImage(img, settings({ useLines: false }));
-		assert.deepEqual(noLines.stats, { lines: 0, arcs: 4, circles: 0, splines: 4 });
+		const noLines = filterTracePrimitives(result, settings({ useLines: false }));
+		assert.deepEqual(noLines.stats, { lines: 0, arcs: 4, circles: 0, splines: 0 });
 
-		const neither = traceImage(img, settings({ useLines: false, useArcs: false }));
-		assert.deepEqual(neither.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
-		assert.equal(neither.closedSplines.length, 1);
-		assert.equal(neither.paths.length, 0);
+		const neither = filterTracePrimitives(result, settings({ useLines: false, useArcs: false }));
+		assert.deepEqual(neither.stats, { lines: 0, arcs: 0, circles: 0, splines: 0 });
+		assert.deepEqual(result.stats, { lines: 4, arcs: 4, circles: 0, splines: 0 });
+		assert.equal(result.paths.length, 1);
+		assert.equal(result.paths[0].closed, true);
+
+		const converted = traceImage(img, settings({ useSplines: true }));
+		assert.deepEqual(converted.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		assert.equal(converted.closedSplines.length, 1);
+
+		const withFiltersDisabled = traceImage(
+			img,
+			settings({ useSplines: true, useLines: false, useArcs: false, useCircles: false, includeSplines: false })
+		);
+		assert.deepEqual(withFiltersDisabled.stats, converted.stats);
 	});
 });
 
@@ -229,21 +250,22 @@ describe('image trace geometry', () => {
 	});
 
 	it('falls back to a spline on curves that are not lines or circular arcs without creating tiny segments', () => {
-		// Sinusoidal wave in centerline mode with arcs disabled -> single spline, 0 lines.
+		// A sinusoidal wave in centerline mode includes spline segments.
 		const image = makeImage(
 			200,
 			100,
 			(x, y) => x > 15 && x < 185 && Math.abs(y - (50 + 22 * Math.sin(((x - 15) / 170) * Math.PI * 2))) < 2.5
 		);
-		const traceSettings = settings({ mode: 'centerline', useArcs: false });
+		const traceSettings = settings({ mode: 'centerline', autoMinSegment: false, minSegment: 230 });
 		const result = traceImage(image, traceSettings);
-		assert.equal(result.stats.lines, 0);
-		assert.equal(result.stats.splines, 1);
+		assert.ok(result.stats.splines > 0);
+		const noSplines = traceImage(image, { ...traceSettings, includeSplines: false });
+		assert.deepEqual(noSplines.stats, { ...result.stats, splines: 0 });
 
 		const sketch = new SketchDocument();
 		const img = sketch.addImage({ ...sketchImage, width: 200, height: 100 });
 		buildTraceGeometry(sketch, result, img, traceSettings);
-		assert.equal(sketch.splines.size, 1);
+		assert.equal(sketch.splines.size, result.stats.splines);
 	});
 
 	it('infers concentric and equal-radius constraints for concentric rings', () => {

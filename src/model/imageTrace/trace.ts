@@ -40,9 +40,8 @@ export function getFitOptions(settings: ImageTraceSettings, input: Omit<TraceInp
 		minSegment: getEffectiveMinSegment(settings, input.width, input.height),
 		cornerAngle: settings.cornerAngle,
 		smoothing: settings.smoothing,
-		useLines: settings.useLines,
-		useArcs: settings.useArcs,
 		useCircles: settings.useCircles,
+		useSplines: settings.useSplines,
 		minRadius: Math.max(settings.tolerance * 2, MIN_WORLD_RADIUS / Math.max(1e-9, input.pixelSize)),
 		maxRadius: Math.hypot(input.width, input.height * input.yScale) * 3,
 	};
@@ -109,7 +108,7 @@ export function traceImage(input: TraceInput, settings: ImageTraceSettings): Tra
 		circles: builder.circles,
 		closedSplines: builder.closedSplines,
 	};
-	return { ...result, stats: countTraceStats(result), elapsedMs };
+	return filterTracePrimitives({ ...result, stats: countTraceStats(result), elapsedMs }, settings);
 }
 
 class TraceBuilder {
@@ -132,10 +131,10 @@ class TraceBuilder {
 		if (points.length < 3 || polylineLength([...points, points[0]]) < this.options.minSegment) return;
 		const circle = detectClosedCircle(points, this.options);
 		if (circle) {
-			if (this.options.useCircles) {
-				this.circles.push(circle);
-			} else {
+			if (this.options.useSplines) {
 				this.closedSplines.push(circleToClosedSpline(circle));
+			} else {
+				this.circles.push(circle);
 			}
 			return;
 		}
@@ -180,6 +179,53 @@ class TraceBuilder {
 		});
 		this.paths.push({ segments, closed: fitted.closed, tangent });
 	}
+}
+
+/** Filters fitted primitives without changing the underlying trace or connecting across gaps. */
+export function filterTracePrimitives(result: TraceResult, settings: ImageTraceSettings): TraceResult {
+	if (
+		settings.useSplines ||
+		(settings.useLines && settings.useArcs && settings.useCircles && settings.includeSplines)
+	) {
+		return result;
+	}
+
+	const included = { line: settings.useLines, arc: settings.useArcs, spline: settings.includeSplines };
+	const paths: TracedPath[] = [];
+	for (const original of result.paths) {
+		const { segments, closed, tangent } = original;
+		const gap = segments.findIndex(segment => !included[segment.kind]);
+		if (gap === -1) {
+			paths.push(original);
+			continue;
+		}
+
+		// Start after a gap in a closed path to keep connected segments across the seam together.
+		const start = closed ? gap + 1 : 0;
+		let path: TracedPath | undefined;
+		for (let offset = 0; offset < segments.length; offset++) {
+			const index = (start + offset) % segments.length;
+			const segment = segments[index];
+			if (!included[segment.kind]) {
+				path = undefined;
+				continue;
+			}
+			if (!path) {
+				path = { segments: [], closed: false, tangent: [] };
+				paths.push(path);
+			}
+			path.tangent.push(path.segments.length > 0 && tangent[index]);
+			path.segments.push(segment);
+		}
+	}
+
+	const filtered = {
+		...result,
+		paths,
+		circles: settings.useCircles ? result.circles : [],
+		closedSplines: settings.includeSplines ? result.closedSplines : [],
+	};
+	return { ...filtered, stats: countTraceStats(filtered) };
 }
 
 function toSegment(points: Vec2[], piece: FittedPiece, a: number, b: number): TracedSegment {

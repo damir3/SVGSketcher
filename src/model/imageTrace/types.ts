@@ -32,6 +32,8 @@ export interface ImageTraceSettings {
 	useLines: boolean;
 	useArcs: boolean;
 	useCircles: boolean;
+	includeSplines: boolean;
+	useSplines: boolean;
 	constraints: {
 		tangent: boolean;
 		horizontalVertical: boolean;
@@ -63,6 +65,8 @@ export const DEFAULT_TRACE_SETTINGS: ImageTraceSettings = {
 	useLines: true,
 	useArcs: true,
 	useCircles: true,
+	includeSplines: true,
+	useSplines: false,
 	constraints: {
 		tangent: true,
 		horizontalVertical: true,
@@ -98,9 +102,8 @@ export interface FitOptions {
 	minSegment: number;
 	cornerAngle: number;
 	smoothing: number;
-	useLines: boolean;
-	useArcs: boolean;
 	useCircles: boolean;
+	useSplines: boolean;
 	minRadius: number;
 	maxRadius: number;
 }
@@ -123,7 +126,7 @@ export interface TracedCircle {
 	radius: number;
 }
 
-/** Closed spline that has no shared vertices (a smooth closed loop that is not a circle). */
+/** Closed spline that has no shared vertices (a fitted loop or a converted circle). */
 export interface TracedClosedSpline {
 	points: XY[];
 	handles: Array<{ h1: XY; h2: XY }>;

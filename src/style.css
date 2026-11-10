@@ -2341,6 +2341,11 @@ body {
 	cursor: pointer;
 }
 
+.trace-inline-check:has(input:disabled) {
+	opacity: 0.55;
+	cursor: default;
+}
+
 .trace-check-row {
 	display: inline-flex;
 	align-items: center;
@@ -2352,6 +2357,7 @@ body {
 
 .trace-checks-inline {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 12px;
 }

@@ -720,33 +720,9 @@ export function fitPolyline(input: PolylineFitInput, options: FitOptions): Fitte
 		points[points.length - 1] = Vec2.from(points[0]);
 	}
 
-	const isInflectionLineBetweenConvertedArcs = (index: number): boolean => {
-		if (options.useArcs || pieces[index].kind !== 'line') return false;
-		const prev = index > 0 ? pieces[index - 1] : closed ? pieces[pieces.length - 1] : undefined;
-		const next = index + 1 < pieces.length ? pieces[index + 1] : closed ? pieces[0] : undefined;
-		if (
-			!prev ||
-			!next ||
-			(prev.kind !== 'arc' && prev.kind !== 'spline') ||
-			(next.kind !== 'arc' && next.kind !== 'spline')
-		) {
-			return false;
-		}
-		const lineLen = lengths[pieces[index].end] - lengths[pieces[index].start];
-		const prevLen = lengths[prev.end] - lengths[prev.start];
-		const nextLen = lengths[next.end] - lengths[next.start];
-		return lineLen < Math.max(options.minSegment * 2.5, Math.min(prevLen, nextLen));
-	};
+	let splineFlags = pieces.map(piece => piece.kind === 'spline');
 
-	let splineFlags = pieces.map(
-		(piece, index) =>
-			piece.kind === 'spline' ||
-			(piece.kind === 'line' && !options.useLines) ||
-			(piece.kind === 'arc' && !options.useArcs) ||
-			isInflectionLineBetweenConvertedArcs(index)
-	);
-
-	if (splineFlags.every(Boolean)) {
+	if (options.useSplines || splineFlags.every(Boolean)) {
 		const fit = piecesToSpline(points, pieces, closed);
 		return {
 			points,

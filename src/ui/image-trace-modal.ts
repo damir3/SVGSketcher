@@ -5,6 +5,7 @@ import {
 	cloneTraceSettings,
 	decodeImageForTrace,
 	DEFAULT_TRACE_SETTINGS,
+	filterTracePrimitives,
 	getAutoMinSegment,
 	getTracePrimitiveCount,
 	ImageTraceRunner,
@@ -37,6 +38,7 @@ export class ImageTraceModal {
 	private runner = new ImageTraceRunner();
 	private settings: ImageTraceSettings = cloneTraceSettings(DEFAULT_TRACE_SETTINGS);
 	private currentImageId: string | null = null;
+	private unfilteredResult: TraceResult | null = null;
 	private latestResult: TraceResult | null = null;
 	private isTracing = false;
 	private isOpen = false;
@@ -67,6 +69,7 @@ export class ImageTraceModal {
 			return;
 		}
 		this.currentImageId = imageId;
+		this.unfilteredResult = null;
 		this.latestResult = null;
 		this.isOpen = true;
 		this.container?.classList.remove('hidden');
@@ -84,6 +87,7 @@ export class ImageTraceModal {
 		}
 		this.runner.dispose();
 		this.currentImageId = null;
+		this.unfilteredResult = null;
 		this.latestResult = null;
 		this.isTracing = false;
 		this.container?.classList.add('hidden');
@@ -227,20 +231,28 @@ export class ImageTraceModal {
 								<span class="trace-unit">°</span>
 							</div>
 						</div>
+						<label class="trace-check-row" title="Convert all traced geometry to editable spline paths">
+							<input type="checkbox" id="trace-use-splines" />
+							<span>Convert to Paths</span>
+						</label>
 						<div class="trace-row">
 							<span class="trace-label">Primitives</span>
 							<div class="trace-checks-inline">
-								<label class="trace-inline-check" title="Fit straight line segments">
+								<label class="trace-inline-check" title="Include fitted lines in the result">
 									<input type="checkbox" id="trace-use-lines" />
 									<span>Lines</span>
 								</label>
-								<label class="trace-inline-check" title="Fit circular arcs to curved segments">
+								<label class="trace-inline-check" title="Include fitted arcs in the result">
 									<input type="checkbox" id="trace-use-arcs" />
 									<span>Arcs</span>
 								</label>
-								<label class="trace-inline-check" title="Detect full circles on closed loops">
+								<label class="trace-inline-check" title="Include fitted circles in the result">
 									<input type="checkbox" id="trace-use-circles" />
 									<span>Circles</span>
+								</label>
+								<label class="trace-inline-check" title="Include fitted splines in the result">
+									<input type="checkbox" id="trace-include-splines" />
+									<span>Splines</span>
 								</label>
 							</div>
 						</div>
@@ -348,9 +360,11 @@ export class ImageTraceModal {
 
 		this.setSliderAndNumber('#trace-smoothing-range', '#trace-smoothing', s.smoothing);
 		this.setSliderAndNumber('#trace-corner-angle-range', '#trace-corner-angle', s.cornerAngle);
-		this.setCheckbox('#trace-use-lines', s.useLines);
-		this.setCheckbox('#trace-use-arcs', s.useArcs);
-		this.setCheckbox('#trace-use-circles', s.useCircles);
+		this.setCheckbox('#trace-use-splines', s.useSplines);
+		this.setCheckbox('#trace-use-lines', s.useLines, s.useSplines);
+		this.setCheckbox('#trace-use-arcs', s.useArcs, s.useSplines);
+		this.setCheckbox('#trace-use-circles', s.useCircles, s.useSplines);
+		this.setCheckbox('#trace-include-splines', s.useSplines || s.includeSplines, s.useSplines);
 
 		this.setCheckbox('#trace-c-tangent', s.constraints.tangent);
 		this.setCheckbox('#trace-c-hv', s.constraints.horizontalVertical);
@@ -368,9 +382,12 @@ export class ImageTraceModal {
 		if (el) el.value = value;
 	}
 
-	private setCheckbox(selector: string, checked: boolean): void {
+	private setCheckbox(selector: string, checked: boolean, disabled = false): void {
 		const el = this.container?.querySelector<HTMLInputElement>(selector);
-		if (el) el.checked = checked;
+		if (el) {
+			el.checked = checked;
+			el.disabled = disabled;
+		}
 	}
 
 	private setSliderAndNumber(rangeSelector: string, numSelector: string, value: number): void {
@@ -483,19 +500,30 @@ export class ImageTraceModal {
 			this.scheduleTrace();
 		});
 
+		c.querySelector<HTMLInputElement>('#trace-use-splines')?.addEventListener('change', e => {
+			this.settings.useSplines = (e.target as HTMLInputElement).checked;
+			this.syncControlsFromSettings();
+			this.scheduleTrace();
+		});
+
+		c.querySelector<HTMLInputElement>('#trace-include-splines')?.addEventListener('change', e => {
+			this.settings.includeSplines = (e.target as HTMLInputElement).checked;
+			this.updatePrimitiveFilter();
+		});
+
 		c.querySelector<HTMLInputElement>('#trace-use-lines')?.addEventListener('change', e => {
 			this.settings.useLines = (e.target as HTMLInputElement).checked;
-			this.scheduleTrace();
+			this.updatePrimitiveFilter();
 		});
 
 		c.querySelector<HTMLInputElement>('#trace-use-arcs')?.addEventListener('change', e => {
 			this.settings.useArcs = (e.target as HTMLInputElement).checked;
-			this.scheduleTrace();
+			this.updatePrimitiveFilter();
 		});
 
 		c.querySelector<HTMLInputElement>('#trace-use-circles')?.addEventListener('change', e => {
 			this.settings.useCircles = (e.target as HTMLInputElement).checked;
-			this.scheduleTrace();
+			this.updatePrimitiveFilter();
 		});
 
 		c.querySelector<HTMLInputElement>('#trace-c-tangent')?.addEventListener('change', e => {
@@ -592,39 +620,44 @@ export class ImageTraceModal {
 
 	private scheduleTrace(immediate = false): void {
 		if (!this.isOpen) return;
+		const epoch = ++this.traceEpoch;
+		this.isTracing = true;
+		this.updateFooterUI();
 		if (this.debounceTimer !== null) {
 			clearTimeout(this.debounceTimer);
 			this.debounceTimer = null;
 		}
 		if (immediate) {
-			void this.runTrace();
+			void this.runTrace(epoch);
 		} else {
 			this.debounceTimer = setTimeout(() => {
 				this.debounceTimer = null;
-				void this.runTrace();
+				void this.runTrace(epoch);
 			}, DEBOUNCE_MS);
 		}
 	}
 
-	private async runTrace(): Promise<void> {
+	private async runTrace(epoch: number): Promise<void> {
 		const image = this.currentImage;
 		if (!image || !image.objectUrl) {
 			this.close();
 			return;
 		}
-		const epoch = ++this.traceEpoch;
-		this.isTracing = true;
-		this.updateFooterUI();
-
 		try {
-			const settingsSnap = cloneTraceSettings(this.settings);
+			const settingsSnap = cloneTraceSettings({
+				...this.settings,
+				useLines: true,
+				useArcs: true,
+				useCircles: true,
+				includeSplines: true,
+			});
 			const input = await decodeImageForTrace(image, settingsSnap.maxResolution);
 			if (!this.isOpen || epoch !== this.traceEpoch) return;
 
 			const result = await this.runner.trace(input, settingsSnap);
 			if (!this.isOpen || epoch !== this.traceEpoch || !result) return;
 
-			this.latestResult = result;
+			this.unfilteredResult = result;
 			this.isTracing = false;
 			if (this.settings.autoThreshold) {
 				this.setSliderAndNumber('#trace-threshold-range', '#trace-threshold', result.threshold);
@@ -636,13 +669,22 @@ export class ImageTraceModal {
 					Math.round(getAutoMinSegment(this.settings, result.width, result.height))
 				);
 			}
-			this.updateFooterUI();
-			this.notifyPreview();
+			this.updatePrimitiveFilter();
 		} catch (err) {
 			if (!this.isOpen || epoch !== this.traceEpoch) return;
 			this.isTracing = false;
+			this.unfilteredResult = null;
+			this.latestResult = null;
+			this.notifyPreview();
 			this.updateFooterUI(err instanceof Error ? err.message : 'Failed to trace image');
 		}
+	}
+
+	private updatePrimitiveFilter(): void {
+		if (!this.unfilteredResult) return;
+		this.latestResult = filterTracePrimitives(this.unfilteredResult, this.settings);
+		this.updateFooterUI();
+		this.notifyPreview();
 	}
 
 	private notifyPreview(): void {
@@ -687,7 +729,7 @@ export class ImageTraceModal {
 			summaryEl.textContent = this.isTracing ? `${text} · updating…` : text;
 		}
 		if (applyBtn) {
-			applyBtn.disabled = total === 0;
+			applyBtn.disabled = this.isTracing || total === 0;
 		}
 
 		if (warningEl) {
@@ -703,7 +745,7 @@ export class ImageTraceModal {
 	private applyConversion(): void {
 		const image = this.currentImage;
 		const result = this.latestResult;
-		if (!image || !result) return;
+		if (!image || !result || this.isTracing) return;
 		const total = getTracePrimitiveCount(result.stats);
 		if (total === 0) {
 			showToast('No primitives detected with the current settings.');

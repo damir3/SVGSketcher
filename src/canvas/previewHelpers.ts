@@ -459,14 +459,16 @@ export function renderTracePreviewVisual(
 ): void {
 	const { toWorld, scale } = createTraceTransform(result, placement);
 	const strokeAttrs = getPreviewStrokeAttrs(isConstruction, false, true);
-	const splineAttrs = getSplinePreviewStrokeAttrs(isConstruction);
 	const group = createSvgElement('g', { class: 'image-trace-preview', 'pointer-events': 'none' }, parent);
 
 	const worldVertices = result.vertices.map(toWorld);
 	const screenVertices = worldVertices.map(p => viewport.worldToScreen(p));
+	const visibleVertices = new Set<number>();
 
 	for (const path of result.paths) {
 		for (const segment of path.segments) {
+			visibleVertices.add(segment.a);
+			visibleVertices.add(segment.b);
 			if (segment.kind === 'line') {
 				createSvgLine(screenVertices[segment.a], screenVertices[segment.b], strokeAttrs, group);
 			} else if (segment.kind === 'arc') {
@@ -483,7 +485,7 @@ export function renderTracePreviewVisual(
 				const handles = segment.handles.map(h => ({ h1: toWorld(h.h1), h2: toWorld(h.h2) }));
 				const beziers = fitPointsToBezier(fitPoints, handles);
 				const d = getSplineSvgPath(beziers, p => viewport.worldToScreen(p), false);
-				createSvgPath(d, splineAttrs, group);
+				createSvgPath(d, strokeAttrs, group);
 			}
 		}
 	}
@@ -501,12 +503,12 @@ export function renderTracePreviewVisual(
 		const worldHandles = spline.handles.map(h => ({ h1: toWorld(h.h1), h2: toWorld(h.h2) }));
 		const beziers = fitPointsToBezier([...worldPoints, worldPoints[0]], [...worldHandles, worldHandles[0]]);
 		const d = getSplineSvgPath(beziers, p => viewport.worldToScreen(p), true);
-		createSvgPath(d, splineAttrs, group);
+		createSvgPath(d, strokeAttrs, group);
 	}
 
-	if (screenVertices.length <= 500) {
-		for (const pt of screenVertices) {
-			createSvgCircle(pt, 2.5, PREVIEW_POINT_ATTRS, group);
+	if (visibleVertices.size <= 500) {
+		for (const index of visibleVertices) {
+			createSvgCircle(screenVertices[index], 2.5, PREVIEW_POINT_ATTRS, group);
 		}
 	}
 }
