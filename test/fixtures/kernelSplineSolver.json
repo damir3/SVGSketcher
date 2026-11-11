@@ -1,0 +1,2397 @@
+{
+  "sourceSha256": {
+    "src/math/spline.ts": "d29b79ede04679594a1f74b4599d83b9f6c7e52e6ddd54ea29d03fa976b47fea",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d",
+    "src/solver/constraints/pointOnSpline.ts": "b256900c219e152b8f42c36298bf6a41d8eba8a9664c3eea15d0fef0f13a0a12",
+    "src/solver/constraints/automaticSplineHandles.ts": "30aac9028adeee7d54bb77cebb09f7da9ad699ac81817de7cda409783efa804b",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379"
+  },
+  "cases": [
+    {
+      "name": "fit point solve 2",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 5,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 0.0014497041420118493,
+        "finalError": 1.5637279847136526e-15,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 7.029585768088143,
+          "p.y": 2.9289941565852504,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 12,
+          "f1.y": 5
+        },
+        "writes": 4
+      }
+    },
+    {
+      "name": "fit point solve 3",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 7.0383124993969215,
+        "finalError": 1.2348308609463005e-19,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 1.873532505432123,
+          "p.y": 4.564332809703899,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "fit point solve 4",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 7.0383124993969215,
+        "finalError": 1.2348308609463005e-19,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 1.873532505432123,
+          "p.y": 4.564332809703899,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "fit point solve 5",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "f4.x",
+          "value": 35,
+          "isFixed": true
+        },
+        {
+          "id": "f4.y",
+          "value": 5,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 7.0383124993969215,
+        "finalError": 1.2348308609463005e-19,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "f4.x",
+          "f4.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 1.873532505432123,
+          "p.y": 4.564332809703899,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9,
+          "f4.x": 35,
+          "f4.y": 5
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "fit point solve 6",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "f4.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f4.y",
+          "value": 0,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 12.00426256163766,
+        "finalError": 2.1060779414621723e-19,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "f4.x",
+          "f4.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 2.615782283982368,
+          "p.y": -2.4567045964646086,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9,
+          "f4.x": 0,
+          "f4.y": 0
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "control point solve 2",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 5,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "control",
+            "splinePointIds": [
+              "f0",
+              "f1"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 0.0014497041420118493,
+        "finalError": 1.5637279847136526e-15,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 7.029585768088143,
+          "p.y": 2.9289941565852504,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 12,
+          "f1.y": 5
+        },
+        "writes": 4
+      }
+    },
+    {
+      "name": "control point solve 3",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "control",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 1.965211377804963,
+        "finalError": 3.447855960649767e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 5.717146612702779,
+          "p.y": 5.524986755290273,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "control point solve 4",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "control",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 1.219574132995083,
+        "finalError": 2.1396670941009958e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 6.41939453928404,
+          "p.y": 5.154240214490874,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "control point solve 5",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "f4.x",
+          "value": 35,
+          "isFixed": true
+        },
+        {
+          "id": "f4.y",
+          "value": 5,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "control",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 2.6765447041347006,
+        "finalError": 4.695846338808018e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "f4.x",
+          "f4.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 5.0353222393442145,
+          "p.y": 5.657952888157499,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9,
+          "f4.x": 35,
+          "f4.y": 5
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "control point solve 6",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "f4.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f4.y",
+          "value": 0,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "control",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "f4"
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 2.6765447041347006,
+        "finalError": 4.695846338808018e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "f4.x",
+          "f4.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 5.0353222393442145,
+          "p.y": 5.657952888157499,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9,
+          "f4.x": 0,
+          "f4.y": 0
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "point explicit handles solve",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "h0a.x",
+          "value": -2,
+          "isFixed": true
+        },
+        {
+          "id": "h0a.y",
+          "value": 3,
+          "isFixed": true
+        },
+        {
+          "id": "h0b.x",
+          "value": 4,
+          "isFixed": true
+        },
+        {
+          "id": "h0b.y",
+          "value": -1,
+          "isFixed": true
+        },
+        {
+          "id": "h1a.x",
+          "value": 6,
+          "isFixed": true
+        },
+        {
+          "id": "h1a.y",
+          "value": 15,
+          "isFixed": true
+        },
+        {
+          "id": "h1b.x",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "h1b.y",
+          "value": 11,
+          "isFixed": true
+        },
+        {
+          "id": "h2a.x",
+          "value": 18,
+          "isFixed": true
+        },
+        {
+          "id": "h2a.y",
+          "value": 5,
+          "isFixed": true
+        },
+        {
+          "id": "h2b.x",
+          "value": 24,
+          "isFixed": true
+        },
+        {
+          "id": "h2b.y",
+          "value": 1,
+          "isFixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "h0a",
+              "h0b",
+              "h1a",
+              "h1b",
+              "h2a",
+              "h2b"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2"
+            ],
+            "handlePoints": [
+              {
+                "p1Id": "h0a",
+                "p2Id": "h0b"
+              },
+              {
+                "p1Id": "h1a",
+                "p2Id": "h1b"
+              },
+              {
+                "p1Id": "h2a",
+                "p2Id": "h2b"
+              }
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 2.8848926026658863,
+        "finalError": 5.0613746787255087e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "h0a.x",
+          "h0a.y",
+          "h0b.x",
+          "h0b.y",
+          "h1a.x",
+          "h1a.y",
+          "h1b.x",
+          "h1b.y",
+          "h2a.x",
+          "h2a.y",
+          "h2b.x",
+          "h2b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "p.x": 3.8249035002979523,
+          "p.y": 4.301473803837913,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "h0a.x": -2,
+          "h0a.y": 3,
+          "h0b.x": 4,
+          "h0b.y": -1,
+          "h1a.x": 6,
+          "h1a.y": 15,
+          "h1b.x": 12,
+          "h1b.y": 11,
+          "h2a.x": 18,
+          "h2a.y": 5,
+          "h2b.x": 24,
+          "h2b.y": 1
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "automatic handles fixed fit",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "h0a.x",
+          "value": -2,
+          "isFixed": false
+        },
+        {
+          "id": "h0a.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "h0b.x",
+          "value": 4,
+          "isFixed": false
+        },
+        {
+          "id": "h0b.y",
+          "value": -1,
+          "isFixed": false
+        },
+        {
+          "id": "h1a.x",
+          "value": 6,
+          "isFixed": false
+        },
+        {
+          "id": "h1a.y",
+          "value": 15,
+          "isFixed": false
+        },
+        {
+          "id": "h1b.x",
+          "value": 12,
+          "isFixed": false
+        },
+        {
+          "id": "h1b.y",
+          "value": 11,
+          "isFixed": false
+        },
+        {
+          "id": "h2a.x",
+          "value": 18,
+          "isFixed": false
+        },
+        {
+          "id": "h2a.y",
+          "value": 5,
+          "isFixed": false
+        },
+        {
+          "id": "h2b.x",
+          "value": 24,
+          "isFixed": false
+        },
+        {
+          "id": "h2b.y",
+          "value": 1,
+          "isFixed": false
+        },
+        {
+          "id": "h3a.x",
+          "value": 25,
+          "isFixed": false
+        },
+        {
+          "id": "h3a.y",
+          "value": -6,
+          "isFixed": false
+        },
+        {
+          "id": "h3b.x",
+          "value": 31,
+          "isFixed": false
+        },
+        {
+          "id": "h3b.y",
+          "value": -10,
+          "isFixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "automatic",
+          "fitPointIds": [
+            "f0",
+            "f1",
+            "f2",
+            "f3"
+          ],
+          "handles": [
+            {
+              "index": 0,
+              "midpoint": {
+                "id": "m0",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f0",
+                  "h0a",
+                  "h0b"
+                ],
+                "midId": "f0",
+                "p1Id": "h0a",
+                "p2Id": "h0b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 1,
+              "midpoint": {
+                "id": "m1",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f1",
+                  "h1a",
+                  "h1b"
+                ],
+                "midId": "f1",
+                "p1Id": "h1a",
+                "p2Id": "h1b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 2,
+              "midpoint": {
+                "id": "m2",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f2",
+                  "h2a",
+                  "h2b"
+                ],
+                "midId": "f2",
+                "p1Id": "h2a",
+                "p2Id": "h2b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 3,
+              "midpoint": {
+                "id": "m3",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f3",
+                  "h3a",
+                  "h3b"
+                ],
+                "midId": "f3",
+                "p1Id": "h3a",
+                "p2Id": "h3b",
+                "ratio": 0.5
+              }
+            }
+          ]
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 65.40900112824276,
+        "finalError": 1.5926976395267155e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "h0a.x",
+          "h0a.y",
+          "h0b.x",
+          "h0b.y",
+          "h1a.x",
+          "h1a.y",
+          "h1b.x",
+          "h1b.y",
+          "h2a.x",
+          "h2a.y",
+          "h2b.x",
+          "h2b.y",
+          "h3a.x",
+          "h3a.y",
+          "h3b.x",
+          "h3b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 18,
+        "equationsCount": 16,
+        "values": {
+          "p.x": 7,
+          "p.y": 3,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9,
+          "h0a.x": -2.6666666666562637,
+          "h0a.y": -3.9999999998907683,
+          "h0b.x": 2.6666666666874725,
+          "h0b.y": 3.9999999999219775,
+          "h1a.x": 2.027422490741205,
+          "h1a.y": 11.402742249124055,
+          "h1b.x": 13.972577509290005,
+          "h1b.y": 12.597257750907154,
+          "h2a.x": 16.77615214407307,
+          "h2a.y": 5.563200261826293,
+          "h2b.x": 23.223847855958137,
+          "h2b.y": -1.5632002617950838,
+          "h3a.x": 24.66666666667187,
+          "h3a.y": -5.333333333343737,
+          "h3b.x": 29.333333333359338,
+          "h3b.y": -12.666666666625055
+        },
+        "writes": 54
+      }
+    },
+    {
+      "name": "automatic handles moving fit",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": false
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": false
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": false
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": false
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "h0a.x",
+          "value": -2,
+          "isFixed": false
+        },
+        {
+          "id": "h0a.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "h0b.x",
+          "value": 4,
+          "isFixed": false
+        },
+        {
+          "id": "h0b.y",
+          "value": -1,
+          "isFixed": false
+        },
+        {
+          "id": "h1a.x",
+          "value": 6,
+          "isFixed": false
+        },
+        {
+          "id": "h1a.y",
+          "value": 15,
+          "isFixed": false
+        },
+        {
+          "id": "h1b.x",
+          "value": 12,
+          "isFixed": false
+        },
+        {
+          "id": "h1b.y",
+          "value": 11,
+          "isFixed": false
+        },
+        {
+          "id": "h2a.x",
+          "value": 18,
+          "isFixed": false
+        },
+        {
+          "id": "h2a.y",
+          "value": 5,
+          "isFixed": false
+        },
+        {
+          "id": "h2b.x",
+          "value": 24,
+          "isFixed": false
+        },
+        {
+          "id": "h2b.y",
+          "value": 1,
+          "isFixed": false
+        },
+        {
+          "id": "h3a.x",
+          "value": 25,
+          "isFixed": false
+        },
+        {
+          "id": "h3a.y",
+          "value": -6,
+          "isFixed": false
+        },
+        {
+          "id": "h3b.x",
+          "value": 31,
+          "isFixed": false
+        },
+        {
+          "id": "h3b.y",
+          "value": -10,
+          "isFixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "automatic",
+          "fitPointIds": [
+            "f0",
+            "f1",
+            "f2",
+            "f3"
+          ],
+          "handles": [
+            {
+              "index": 0,
+              "midpoint": {
+                "id": "m0",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f0",
+                  "h0a",
+                  "h0b"
+                ],
+                "midId": "f0",
+                "p1Id": "h0a",
+                "p2Id": "h0b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 1,
+              "midpoint": {
+                "id": "m1",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f1",
+                  "h1a",
+                  "h1b"
+                ],
+                "midId": "f1",
+                "p1Id": "h1a",
+                "p2Id": "h1b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 2,
+              "midpoint": {
+                "id": "m2",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f2",
+                  "h2a",
+                  "h2b"
+                ],
+                "midId": "f2",
+                "p1Id": "h2a",
+                "p2Id": "h2b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 3,
+              "midpoint": {
+                "id": "m3",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f3",
+                  "h3a",
+                  "h3b"
+                ],
+                "midId": "f3",
+                "p1Id": "h3a",
+                "p2Id": "h3b",
+                "ratio": 0.5
+              }
+            }
+          ]
+        },
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "fix",
+            "type": "fixed",
+            "name": "Fixed Point",
+            "weight": 1,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "f1"
+            ],
+            "pointId": "f1",
+            "targetX": 10,
+            "targetY": 17
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 79.90900112824276,
+        "finalError": 1.883617739772888e-15,
+        "degreesOfFreedom": 4,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f3.x",
+          "f3.y",
+          "h0a.x",
+          "h0a.y",
+          "h0b.x",
+          "h0b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 22,
+        "equationsCount": 18,
+        "values": {
+          "p.x": 7,
+          "p.y": 3,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 9.999999998141362,
+          "f1.y": 16.999999941357235,
+          "f2.x": 20.112483634948283,
+          "f2.y": 2.297872255946604,
+          "f3.x": 27,
+          "f3.y": -9,
+          "h0a.x": -3.3333333325321215,
+          "h0a.y": -5.666666644103979,
+          "h0b.x": 3.3333333325633303,
+          "h0b.y": 5.666666644135188,
+          "h1a.x": 1.9064072457506265,
+          "h1a.y": 16.075298511300552,
+          "h1b.x": 18.093592749535752,
+          "h1b.y": 17.924701354009944,
+          "h2a.x": 17.277564116056162,
+          "h2a.y": 6.63363150834962,
+          "h2b.x": 22.94740315399482,
+          "h2b.y": -2.0378869979831316,
+          "h3a.x": 24.704161211675164,
+          "h3a.y": -5.23404258162119,
+          "h3b.x": 29.295838788356047,
+          "h3b.y": -12.7659574183476
+        },
+        "writes": 66
+      }
+    },
+    {
+      "name": "automatic and point combined",
+      "params": [
+        {
+          "id": "p.x",
+          "value": 7,
+          "isFixed": false
+        },
+        {
+          "id": "p.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "f0.x",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f0.y",
+          "value": 0,
+          "isFixed": true
+        },
+        {
+          "id": "f1.x",
+          "value": 8,
+          "isFixed": true
+        },
+        {
+          "id": "f1.y",
+          "value": 12,
+          "isFixed": true
+        },
+        {
+          "id": "f2.x",
+          "value": 20,
+          "isFixed": true
+        },
+        {
+          "id": "f2.y",
+          "value": 2,
+          "isFixed": true
+        },
+        {
+          "id": "f3.x",
+          "value": 27,
+          "isFixed": true
+        },
+        {
+          "id": "f3.y",
+          "value": -9,
+          "isFixed": true
+        },
+        {
+          "id": "h0a.x",
+          "value": -2,
+          "isFixed": false
+        },
+        {
+          "id": "h0a.y",
+          "value": 3,
+          "isFixed": false
+        },
+        {
+          "id": "h0b.x",
+          "value": 4,
+          "isFixed": false
+        },
+        {
+          "id": "h0b.y",
+          "value": -1,
+          "isFixed": false
+        },
+        {
+          "id": "h1a.x",
+          "value": 6,
+          "isFixed": false
+        },
+        {
+          "id": "h1a.y",
+          "value": 15,
+          "isFixed": false
+        },
+        {
+          "id": "h1b.x",
+          "value": 12,
+          "isFixed": false
+        },
+        {
+          "id": "h1b.y",
+          "value": 11,
+          "isFixed": false
+        },
+        {
+          "id": "h2a.x",
+          "value": 18,
+          "isFixed": false
+        },
+        {
+          "id": "h2a.y",
+          "value": 5,
+          "isFixed": false
+        },
+        {
+          "id": "h2b.x",
+          "value": 24,
+          "isFixed": false
+        },
+        {
+          "id": "h2b.y",
+          "value": 1,
+          "isFixed": false
+        },
+        {
+          "id": "h3a.x",
+          "value": 25,
+          "isFixed": false
+        },
+        {
+          "id": "h3a.y",
+          "value": -6,
+          "isFixed": false
+        },
+        {
+          "id": "h3b.x",
+          "value": 31,
+          "isFixed": false
+        },
+        {
+          "id": "h3b.y",
+          "value": -10,
+          "isFixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "kind": "automatic",
+          "fitPointIds": [
+            "f0",
+            "f1",
+            "f2",
+            "f3"
+          ],
+          "handles": [
+            {
+              "index": 0,
+              "midpoint": {
+                "id": "m0",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f0",
+                  "h0a",
+                  "h0b"
+                ],
+                "midId": "f0",
+                "p1Id": "h0a",
+                "p2Id": "h0b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 1,
+              "midpoint": {
+                "id": "m1",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f1",
+                  "h1a",
+                  "h1b"
+                ],
+                "midId": "f1",
+                "p1Id": "h1a",
+                "p2Id": "h1b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 2,
+              "midpoint": {
+                "id": "m2",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f2",
+                  "h2a",
+                  "h2b"
+                ],
+                "midId": "f2",
+                "p1Id": "h2a",
+                "p2Id": "h2b",
+                "ratio": 0.5
+              }
+            },
+            {
+              "index": 3,
+              "midpoint": {
+                "id": "m3",
+                "type": "midpoint",
+                "name": "Midpoint",
+                "weight": 1,
+                "isSoft": false,
+                "isDimensional": false,
+                "entityIds": [
+                  "f3",
+                  "h3a",
+                  "h3b"
+                ],
+                "midId": "f3",
+                "p1Id": "h3a",
+                "p2Id": "h3b",
+                "ratio": 0.5
+              }
+            }
+          ]
+        },
+        {
+          "kind": "point",
+          "snapshot": {
+            "id": "pos",
+            "type": "point_on_spline",
+            "name": "Point on Spline",
+            "weight": 0.7,
+            "isSoft": false,
+            "isDimensional": false,
+            "entityIds": [
+              "p",
+              "spline",
+              "f0",
+              "f1",
+              "f2",
+              "f3",
+              "h0a",
+              "h0b",
+              "h1a",
+              "h1b",
+              "h2a",
+              "h2b",
+              "h3a",
+              "h3b"
+            ],
+            "pointId": "p",
+            "splineId": "spline",
+            "splineType": "fit",
+            "splinePointIds": [
+              "f0",
+              "f1",
+              "f2",
+              "f3"
+            ],
+            "handlePoints": [
+              {
+                "p1Id": "h0a",
+                "p2Id": "h0b"
+              },
+              {
+                "p1Id": "h1a",
+                "p2Id": "h1b"
+              },
+              {
+                "p1Id": "h2a",
+                "p2Id": "h2b"
+              },
+              {
+                "p1Id": "h3a",
+                "p2Id": "h3b"
+              }
+            ],
+            "isClosed": false
+          }
+        }
+      ],
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 68.29389373090865,
+        "finalError": 1.3124811306130386e-18,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f0.x",
+          "f0.y",
+          "f1.x",
+          "f1.y",
+          "f2.x",
+          "f2.y",
+          "f3.x",
+          "f3.y",
+          "h0a.x",
+          "h0a.y",
+          "h0b.x",
+          "h0b.y",
+          "h1a.x",
+          "h1a.y",
+          "h1b.x",
+          "h1b.y",
+          "h2a.x",
+          "h2a.y",
+          "h2b.x",
+          "h2b.y",
+          "h3a.x",
+          "h3a.y",
+          "h3b.x",
+          "h3b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 18,
+        "equationsCount": 17,
+        "values": {
+          "p.x": 2.0199188823586622,
+          "p.y": 5.044308799803127,
+          "f0.x": 0,
+          "f0.y": 0,
+          "f1.x": 8,
+          "f1.y": 12,
+          "f2.x": 20,
+          "f2.y": 2,
+          "f3.x": 27,
+          "f3.y": -9,
+          "h0a.x": -2.6666666666562637,
+          "h0a.y": -3.9999999998907683,
+          "h0b.x": 2.666666666081876,
+          "h0b.y": 4.000000000099855,
+          "h1a.x": 2.0274224904212517,
+          "h1a.y": 11.402742249221378,
+          "h1b.x": 13.972577509290005,
+          "h1b.y": 12.597257750907154,
+          "h2a.x": 16.77615214407307,
+          "h2a.y": 5.563200261826293,
+          "h2b.x": 23.223847855958137,
+          "h2b.y": -1.5632002617950838,
+          "h3a.x": 24.66666666667187,
+          "h3a.y": -5.333333333343737,
+          "h3b.x": 29.333333333359338,
+          "h3b.y": -12.666666666625055
+        },
+        "writes": 54
+      }
+    }
+  ]
+}

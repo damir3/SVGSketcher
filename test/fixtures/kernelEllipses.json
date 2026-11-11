@@ -1,0 +1,1532 @@
+{
+  "sourceFile": "src/math/intersection.ts",
+  "sourceSha256": "8f1989be02a7afbc102cc50ea1b155b2f078889565f7480f5d2df8d09eff845d",
+  "cases": [
+    {
+      "name": "horizontal secant",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 0
+        },
+        "p2": {
+          "x": 10,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": -5,
+          "y": 0
+        },
+        {
+          "x": 5,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "vertical secant",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": -10
+        },
+        "p2": {
+          "x": 0,
+          "y": 10
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": -3
+        },
+        {
+          "x": 0,
+          "y": 3
+        }
+      ]
+    },
+    {
+      "name": "diagonal secant",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": -10
+        },
+        "p2": {
+          "x": 10,
+          "y": 10
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": -2.5724787771376327,
+          "y": -2.5724787771376327
+        },
+        {
+          "x": 2.5724787771376327,
+          "y": 2.5724787771376327
+        }
+      ]
+    },
+    {
+      "name": "reversed ellipse and segment arguments",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 0
+        },
+        "p2": {
+          "x": 10,
+          "y": 0
+        }
+      },
+      "expected": [
+        {
+          "x": -5,
+          "y": 0
+        },
+        {
+          "x": 5,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "segment tangent",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 3
+        },
+        "p2": {
+          "x": 10,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 3
+        }
+      ]
+    },
+    {
+      "name": "segment gap",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 3.001
+        },
+        "p2": {
+          "x": 10,
+          "y": 3.001
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "short segment inside",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 0
+        },
+        "p2": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "zero length segment",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 5,
+          "y": 0
+        },
+        "p2": {
+          "x": 5,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "endpoint contact",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 5,
+          "y": 0
+        },
+        "p2": {
+          "x": 10,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": 5,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "zero major radius",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 0
+        },
+        "p2": {
+          "x": 10,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 0,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "collapsed minor axis",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 0
+        },
+        "p2": {
+          "x": 10,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 1e-8
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "rotated and translated ellipse",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10,
+          "y": 1
+        },
+        "p2": {
+          "x": 20,
+          "y": 1
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 3,
+          "y": -2
+        },
+        "majorAxisPoint": {
+          "x": 8.777349304367748,
+          "y": 1.9524973137652477
+        },
+        "minorAxisPoint": {
+          "x": 1.8707150532099293,
+          "y": -0.34932877018064334
+        }
+      },
+      "expected": [
+        {
+          "x": 4.096135418140465,
+          "y": 1
+        },
+        {
+          "x": 8.761967591354004,
+          "y": 1
+        }
+      ]
+    },
+    {
+      "name": "ellipse circle crossings",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4
+      },
+      "expected": [
+        {
+          "x": 3.3071891390358994,
+          "y": -2.249999999891439
+        },
+        {
+          "x": -3.3071891390359003,
+          "y": -2.249999999891438
+        },
+        {
+          "x": -3.3071891390359016,
+          "y": 2.249999999891438
+        },
+        {
+          "x": 3.307189139035898,
+          "y": 2.2499999998914397
+        }
+      ]
+    },
+    {
+      "name": "circle ellipse reversed arguments",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": 3.3071891388728942,
+          "y": -2.2499999999380362
+        },
+        {
+          "x": -3.3071891388728956,
+          "y": -2.2499999999380345
+        },
+        {
+          "x": -3.307189138872896,
+          "y": 2.249999999938034
+        },
+        {
+          "x": 3.307189138872899,
+          "y": 2.249999999938029
+        }
+      ]
+    },
+    {
+      "name": "ellipse circle offset",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 4,
+          "y": 1
+        },
+        "radius": 3
+      },
+      "expected": [
+        {
+          "x": 3.7431233090111915,
+          "y": -1.9889821622310642
+        },
+        {
+          "x": 1.62785464456383,
+          "y": 2.8365528608192565
+        }
+      ]
+    },
+    {
+      "name": "ellipse circle external tangent",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 7,
+          "y": 0
+        },
+        "radius": 2
+      },
+      "expected": [
+        {
+          "x": 4.999999999999211,
+          "y": -0.0000016852816273156792
+        }
+      ]
+    },
+    {
+      "name": "disjoint ellipse circle",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 10,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "nested ellipse circle",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "two ellipses four crossings",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 3,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 5
+        }
+      },
+      "expected": [
+        {
+          "x": 2.572478777502429,
+          "y": -2.572478777006306
+        },
+        {
+          "x": -2.572478777502428,
+          "y": -2.5724787770063062
+        },
+        {
+          "x": -2.572478777502435,
+          "y": 2.5724787770063036
+        },
+        {
+          "x": 2.5724787775024334,
+          "y": 2.5724787770063045
+        }
+      ]
+    },
+    {
+      "name": "offset ellipses",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 4,
+          "y": 1
+        },
+        "majorAxisPoint": {
+          "x": 8,
+          "y": 1
+        },
+        "minorAxisPoint": {
+          "x": 4,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": 4.733657900460871,
+          "y": -0.9660713417266733
+        },
+        {
+          "x": 2.0318096280784474,
+          "y": 2.7411366016105765
+        }
+      ]
+    },
+    {
+      "name": "rotated ellipses",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": -1,
+          "y": 2
+        },
+        "majorAxisPoint": {
+          "x": 3.5890531237069307,
+          "y": 5.865306123426146
+        },
+        "minorAxisPoint": {
+          "x": -2.288435374475382,
+          "y": 3.529684374568977
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 2,
+          "y": 1
+        },
+        "majorAxisPoint": {
+          "x": 6.6053049700144255,
+          "y": -0.9470917115432527
+        },
+        "minorAxisPoint": {
+          "x": 3.1682550269259515,
+          "y": 3.7631829820086553
+        }
+      },
+      "expected": [
+        {
+          "x": 3.2119742970055167,
+          "y": 3.744551644967121
+        },
+        {
+          "x": -1.111904460520843,
+          "y": -0.5945403904709878
+        }
+      ]
+    },
+    {
+      "name": "nested ellipses",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 0.955336489125606,
+          "y": 0.29552020666133955
+        },
+        "minorAxisPoint": {
+          "x": -0.14776010333066977,
+          "y": 0.477668244562803
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "disjoint ellipses",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 20,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 25,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 20,
+          "y": 3
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "ellipse ellipse tangent",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 10,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 15,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 10,
+          "y": 3
+        }
+      },
+      "expected": [
+        {
+          "x": 4.999999999999211,
+          "y": -0.0000016852816273156792
+        }
+      ]
+    },
+    {
+      "name": "degenerate ellipse circle",
+      "a": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4
+      },
+      "expected": []
+    },
+    {
+      "name": "elliptical arc segment direction true",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": -10
+        },
+        "p2": {
+          "x": 0,
+          "y": 10
+        }
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": true
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": -3
+        }
+      ]
+    },
+    {
+      "name": "elliptical arc circle direction true",
+      "a": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": true
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4
+      },
+      "expected": [
+        {
+          "x": 3.3071891390358994,
+          "y": -2.249999999891439
+        },
+        {
+          "x": -3.3071891390359003,
+          "y": -2.249999999891438
+        }
+      ]
+    },
+    {
+      "name": "elliptical arc ellipse direction true",
+      "a": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": true
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 3,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 5
+        }
+      },
+      "expected": [
+        {
+          "x": 2.572478777502429,
+          "y": -2.572478777006306
+        },
+        {
+          "x": -2.572478777502428,
+          "y": -2.5724787770063062
+        }
+      ]
+    },
+    {
+      "name": "two elliptical arcs direction true",
+      "a": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": true
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 3,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 5
+        },
+        "start": {
+          "x": 1.8369701987210297e-16,
+          "y": 5
+        },
+        "end": {
+          "x": -5.51091059616309e-16,
+          "y": -5
+        },
+        "clockwise": false
+      },
+      "expected": [
+        {
+          "x": -2.572478777502428,
+          "y": -2.5724787770063062
+        }
+      ]
+    },
+    {
+      "name": "circular and elliptical arcs direction true",
+      "a": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4,
+        "start": {
+          "x": 4,
+          "y": 0
+        },
+        "end": {
+          "x": -4,
+          "y": 0
+        },
+        "clockwise": true
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": true
+      },
+      "expected": [
+        {
+          "x": 3.3071891388728942,
+          "y": -2.2499999999380362
+        },
+        {
+          "x": -3.3071891388728956,
+          "y": -2.2499999999380345
+        }
+      ]
+    },
+    {
+      "name": "rotated wrapped elliptical arc direction true",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -20,
+          "y": 1
+        },
+        "p2": {
+          "x": 20,
+          "y": 1
+        }
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 3,
+          "y": 1
+        },
+        "majorAxisPoint": {
+          "x": 9.447426958020195,
+          "y": 3.725928396160554
+        },
+        "minorAxisPoint": {
+          "x": 2.221163315382699,
+          "y": 2.84212198800577
+        },
+        "start": {
+          "x": 8.118597295130611,
+          "y": 1.6320917140832678
+        },
+        "end": {
+          "x": 7.881526821009732,
+          "y": 4.289946104647882
+        },
+        "clockwise": true
+      },
+      "expected": [
+        {
+          "x": -1.255319337701554,
+          "y": 1
+        },
+        {
+          "x": 7.255319337701543,
+          "y": 1
+        }
+      ]
+    },
+    {
+      "name": "elliptical arc segment direction false",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": -10
+        },
+        "p2": {
+          "x": 0,
+          "y": 10
+        }
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": false
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 3
+        }
+      ]
+    },
+    {
+      "name": "elliptical arc circle direction false",
+      "a": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": false
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4
+      },
+      "expected": [
+        {
+          "x": -3.3071891390359016,
+          "y": 2.249999999891438
+        },
+        {
+          "x": 3.307189139035898,
+          "y": 2.2499999998914397
+        }
+      ]
+    },
+    {
+      "name": "elliptical arc ellipse direction false",
+      "a": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": false
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 3,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 5
+        }
+      },
+      "expected": [
+        {
+          "x": -2.572478777502435,
+          "y": 2.5724787770063036
+        },
+        {
+          "x": 2.5724787775024334,
+          "y": 2.5724787770063045
+        }
+      ]
+    },
+    {
+      "name": "two elliptical arcs direction false",
+      "a": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": false
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 3,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 5
+        },
+        "start": {
+          "x": 1.8369701987210297e-16,
+          "y": 5
+        },
+        "end": {
+          "x": -5.51091059616309e-16,
+          "y": -5
+        },
+        "clockwise": true
+      },
+      "expected": [
+        {
+          "x": 2.5724787775024334,
+          "y": 2.5724787770063045
+        }
+      ]
+    },
+    {
+      "name": "circular and elliptical arcs direction false",
+      "a": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 4,
+        "start": {
+          "x": 4,
+          "y": 0
+        },
+        "end": {
+          "x": -4,
+          "y": 0
+        },
+        "clockwise": false
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "majorAxisPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "minorAxisPoint": {
+          "x": 0,
+          "y": 3
+        },
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 3.6739403974420594e-16
+        },
+        "clockwise": false
+      },
+      "expected": [
+        {
+          "x": -3.307189138872896,
+          "y": 2.249999999938034
+        },
+        {
+          "x": 3.307189138872899,
+          "y": 2.249999999938029
+        }
+      ]
+    },
+    {
+      "name": "rotated wrapped elliptical arc direction false",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -20,
+          "y": 1
+        },
+        "p2": {
+          "x": 20,
+          "y": 1
+        }
+      },
+      "b": {
+        "type": "elliptical_arc",
+        "center": {
+          "x": 3,
+          "y": 1
+        },
+        "majorAxisPoint": {
+          "x": 9.447426958020195,
+          "y": 3.725928396160554
+        },
+        "minorAxisPoint": {
+          "x": 2.221163315382699,
+          "y": 2.84212198800577
+        },
+        "start": {
+          "x": 8.118597295130611,
+          "y": 1.6320917140832678
+        },
+        "end": {
+          "x": 7.881526821009732,
+          "y": 4.289946104647882
+        },
+        "clockwise": false
+      },
+      "expected": []
+    },
+    {
+      "name": "large translated ellipse",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 999980,
+          "y": -2000000
+        },
+        "p2": {
+          "x": 1000020,
+          "y": -2000000
+        }
+      },
+      "b": {
+        "type": "ellipse",
+        "center": {
+          "x": 1000000,
+          "y": -2000000
+        },
+        "majorAxisPoint": {
+          "x": 1000006.6873554239,
+          "y": -1999997.9313585535
+        },
+        "minorAxisPoint": {
+          "x": 999999.11343938,
+          "y": -1999997.1339905327
+        }
+      },
+      "expected": [
+        {
+          "x": 999994.0587076348,
+          "y": -2000000
+        },
+        {
+          "x": 1000005.9412923652,
+          "y": -2000000
+        }
+      ]
+    }
+  ]
+}

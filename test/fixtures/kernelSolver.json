@@ -1,0 +1,1269 @@
+{
+  "sourceFile": "src/solver/solver.ts",
+  "sourceSha256": "d347092ad2fd44876a8e7f01b888aaca12edb5ae52c13e9bec0ecad608535290",
+  "cases": [
+    {
+      "name": "empty system",
+      "params": [],
+      "constraints": [],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 0,
+        "initialError": 0,
+        "finalError": 0,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 0,
+        "equationsCount": 0,
+        "values": {},
+        "writes": 0
+      }
+    },
+    {
+      "name": "unconstrained point",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 2,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 3,
+          "fixed": false
+        }
+      ],
+      "constraints": [],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 0,
+        "initialError": 0,
+        "finalError": 0,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 0,
+        "values": {
+          "a.x": 2,
+          "a.y": 3
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "fixed parameter with no equations",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 3,
+          "fixed": true
+        }
+      ],
+      "constraints": [],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 0,
+        "initialError": 0,
+        "finalError": 0,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 0,
+        "equationsCount": 0,
+        "values": {
+          "a.x": 2,
+          "a.y": 3
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "fixed-point constraint",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 2,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 3,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 3,
+        "initialError": 176.5,
+        "finalError": 4.297801683696687e-20,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 9.999999999875165,
+          "a.y": 19.999999999734722
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "already solved point",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 10,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 20,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 0,
+        "initialError": 0,
+        "finalError": 0,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 10,
+          "a.y": 20
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "distance from built-in origin",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 3,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 4,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "d",
+          "type": "distance",
+          "name": "Distance",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 10,
+          "entityIds": [
+            "origin",
+            "a"
+          ],
+          "p1Id": "origin",
+          "p2Id": "a",
+          "targetDistance": 10,
+          "orientation": "aligned"
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 12.5,
+        "finalError": 7.793001393445527e-13,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 5.999999250936694,
+          "a.y": 7.999999001248557
+        },
+        "writes": 4
+      }
+    },
+    {
+      "name": "horizontal relation",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 2,
+          "fixed": false
+        },
+        {
+          "id": "b.x",
+          "value": 4,
+          "fixed": false
+        },
+        {
+          "id": "b.y",
+          "value": 7,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "h",
+          "type": "horizontal",
+          "name": "Horizontal",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b"
+          ],
+          "p1Id": "a",
+          "p2Id": "b"
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 12.5,
+        "finalError": 4.876714093748552e-14,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 4.4999998438475375,
+          "b.x": 4,
+          "b.y": 4.5000001561523275
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "anchored dimension",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 3,
+          "fixed": false
+        },
+        {
+          "id": "b.y",
+          "value": 4,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "d",
+          "type": "distance",
+          "name": "Distance",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 10,
+          "entityIds": [
+            "a",
+            "b"
+          ],
+          "p1Id": "a",
+          "p2Id": "b",
+          "targetDistance": 10,
+          "orientation": "aligned"
+        },
+        {
+          "id": "h",
+          "type": "horizontal",
+          "name": "Horizontal",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b"
+          ],
+          "p1Id": "a",
+          "p2Id": "b"
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 5,
+        "initialError": 20.5,
+        "finalError": 5.246749604184346e-21,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10.000000000102434,
+          "b.y": 9.237354393754124e-13
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "conflicting fixed points",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 3,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 5,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f1",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 0,
+          "targetY": 0
+        },
+        {
+          "id": "f2",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 0
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 54,
+        "finalError": 25,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 4.999999999968791,
+          "a.y": 7.802256977482673e-11
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "all parameters locked retains current status",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 5,
+          "fixed": true
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 0,
+          "targetY": 0
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 0,
+        "initialError": 0,
+        "finalError": 0,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 0,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 3,
+          "a.y": 5
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "soft drag has no hard degrees of freedom",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "drag_a",
+          "type": "drag_point",
+          "name": "Drag",
+          "weight": 0.05,
+          "isSoft": true,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 4,
+        "initialError": 0.625,
+        "finalError": 9.676963274262977e-12,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 9.999960651377103,
+          "a.y": 19.999921302754206
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "hard constraint and weak drag",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 0,
+          "targetY": 0
+        },
+        {
+          "id": "drag_a",
+          "type": "drag_point",
+          "name": "Drag",
+          "weight": 0.005,
+          "isSoft": true,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 5,
+          "targetY": 5
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 1,
+        "initialError": 0.0006250000000000001,
+        "finalError": 0.0006249843754062088,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 0.00012487200307504802,
+          "a.y": 0.00012487200307504802
+        },
+        "writes": 2
+      }
+    },
+    {
+      "name": "radius lower bound",
+      "params": [
+        {
+          "id": "c.r",
+          "value": 2,
+          "min": 1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "r",
+          "type": "radius",
+          "name": "Radius (-2)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": -2,
+          "entityIds": [
+            "c"
+          ],
+          "circleId": "c",
+          "targetRadius": -2,
+          "displayMode": "radius"
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 40,
+        "initialError": 8,
+        "finalError": 4.5,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.r",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 1,
+        "equationsCount": 1,
+        "values": {
+          "c.r": 1
+        },
+        "writes": 1
+      }
+    },
+    {
+      "name": "temporarily locked radius",
+      "params": [
+        {
+          "id": "c.r",
+          "value": 2,
+          "min": 1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "r",
+          "type": "radius",
+          "name": "Radius (5)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5,
+          "entityIds": [
+            "c"
+          ],
+          "circleId": "c",
+          "targetRadius": 5,
+          "displayMode": "radius"
+        }
+      ],
+      "callOptions": {
+        "lockedParams": [
+          "c.r"
+        ]
+      },
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 0,
+        "initialError": 0,
+        "finalError": 0,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.r",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 0,
+        "equationsCount": 1,
+        "values": {
+          "c.r": 2
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "stiffer x coordinate",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 20,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {
+        "paramStiffness": [
+          [
+            "a.x",
+            1000
+          ]
+        ]
+      },
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 6,
+        "initialError": 400,
+        "finalError": 2.3604330291028772e-17,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 19.999999993129144,
+          "a.y": 20
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "skip freedom analysis",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 3,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 4,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "d",
+          "type": "distance",
+          "name": "Distance",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 10,
+          "entityIds": [
+            "origin",
+            "a"
+          ],
+          "p1Id": "origin",
+          "p2Id": "a",
+          "targetDistance": 10,
+          "orientation": "aligned"
+        }
+      ],
+      "callOptions": {
+        "skipDoF": true
+      },
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 2,
+        "initialError": 12.5,
+        "finalError": 7.793001393445527e-13,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 5.999999250936694,
+          "a.y": 7.999999001248557
+        },
+        "writes": 4
+      }
+    },
+    {
+      "name": "zero maximum iterations",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 2,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 3,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {},
+      "options": {
+        "maxIterations": 0
+      },
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 0,
+        "initialError": 176.5,
+        "finalError": 176.5,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 2,
+          "a.y": 3
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "one iteration",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 2,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 3,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {},
+      "options": {
+        "maxIterations": 1
+      },
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 1,
+        "initialError": 176.5,
+        "finalError": 0.0001761475287948492,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 9.992007992007993,
+          "a.y": 19.983016983016984
+        },
+        "writes": 2
+      }
+    },
+    {
+      "name": "singular undamped normal system",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 3,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 4,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "d",
+          "type": "distance",
+          "name": "Distance",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 10,
+          "entityIds": [
+            "origin",
+            "a"
+          ],
+          "p1Id": "origin",
+          "p2Id": "a",
+          "targetDistance": 10,
+          "orientation": "aligned"
+        }
+      ],
+      "callOptions": {},
+      "options": {
+        "initialLambda": 0,
+        "minLambda": 0,
+        "maxLambda": 0,
+        "maxIterations": 3
+      },
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 12.5,
+        "finalError": 12.5,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 3,
+          "a.y": 4
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "shared-endpoint Jacobian accumulation",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "b.x",
+          "value": 10,
+          "fixed": false
+        },
+        {
+          "id": "b.y",
+          "value": 0,
+          "fixed": false
+        },
+        {
+          "id": "c.x",
+          "value": 3,
+          "fixed": false
+        },
+        {
+          "id": "c.y",
+          "value": 4,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "e",
+          "type": "equal_length",
+          "name": "Equal Length",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "a",
+            "c"
+          ],
+          "line1P1": "a",
+          "line1P2": "b",
+          "line2P1": "a",
+          "line2P2": "c"
+        },
+        {
+          "id": "f",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "b"
+          ],
+          "pointId": "b",
+          "targetX": 10,
+          "targetY": 0
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 12.5,
+        "finalError": 6.255358987660306e-20,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 6,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 1.1116180730965888,
+          "a.y": -2.221787790887381,
+          "b.x": 9.999999999660137,
+          "b.y": -3.423735259056513e-11,
+          "c.x": 4.665978568000511,
+          "c.y": 6.222511808879898
+        },
+        "writes": 18
+      }
+    },
+    {
+      "name": "redundant hard equations",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 2,
+          "fixed": false
+        },
+        {
+          "id": "a.y",
+          "value": 3,
+          "fixed": false
+        }
+      ],
+      "constraints": [
+        {
+          "id": "f1",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        },
+        {
+          "id": "f2",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": 10,
+          "targetY": 20
+        }
+      ],
+      "callOptions": {},
+      "options": {},
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 3,
+        "initialError": 353,
+        "finalError": 8.595603367393374e-20,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 9.999999999875165,
+          "a.y": 19.999999999734722
+        },
+        "writes": 6
+      }
+    }
+  ]
+}

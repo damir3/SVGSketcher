@@ -1,4 +1,4 @@
-import { computeNaturalFitHandles } from '../../math/spline';
+import { computeNaturalFitHandles } from '../../math/splineReference';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { MidpointConstraint } from './midpoint';

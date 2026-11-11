@@ -1,0 +1,8 @@
+[workspace]
+members = ["crates/sketcher-core", "crates/sketcher-wasm"]
+resolver = "2"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

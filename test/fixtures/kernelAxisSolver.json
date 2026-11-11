@@ -1,0 +1,1477 @@
+{
+  "sourceSha256": {
+    "src/solver/constraints/originAxis.ts": "90aa28586d26821f333281aa8d5538ef8e2ca5e0646118c9b83f5a83d7977659",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d"
+  },
+  "cases": [
+    {
+      "name": "origin solve aligned side -1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to (0,0)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "aligned",
+          "side": -1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 6.83061556605412,
+        "finalError": 4.258479749961453e-13,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": -2.1798313743235394,
+          "a.y": 4.8309776403930185,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "origin solve aligned side 1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to (0,0)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "aligned",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 6.83061556605412,
+        "finalError": 4.258479749961453e-13,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": -2.1798313743235394,
+          "a.y": 4.8309776403930185,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "origin solve horizontal side -1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "horizontal",
+          "side": -1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 1.2799999999999994,
+        "finalError": 7.98003344250064e-14,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.x",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": -5.299999600499476,
+          "a.y": 8.2,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "origin solve horizontal side 1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "horizontal",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 40.5,
+        "finalError": 9.861773772480566e-21,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.x",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 5.299999999859559,
+          "a.y": 8.2,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "origin solve vertical side -1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "vertical",
+          "side": -1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 91.125,
+        "finalError": 2.2188990988081274e-20,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": -3.7,
+          "a.y": -5.299999999789339,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "origin solve vertical side 1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "vertical",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 4.204999999999998,
+        "finalError": 2.621565677501579e-13,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": -3.7,
+          "a.y": 5.3000007240947005,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "origin coincident solve",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Coincident with (0,0)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "value": 0,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 0,
+          "orientation": "aligned",
+          "side": 1,
+          "isCoincident": true
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 40.464999999999996,
+        "finalError": 9.853262128771847e-21,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -5.773670163339719e-11,
+          "a.y": 1.279570144307836e-10,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "origin radial singular at zero",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0
+        },
+        {
+          "id": "a.y",
+          "value": 0
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to (0,0)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "aligned",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 0,
+        "initialError": 14.045,
+        "finalError": 14.045,
+        "degreesOfFreedom": 4,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 0
+      }
+    },
+    {
+      "name": "origin locked radial coordinate",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Distance to (0,0)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "aligned",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {
+        "lockedParams": [
+          "a.x"
+        ]
+      },
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 4,
+        "initialError": 6.83061556605412,
+        "finalError": 4.3108246258993946e-21,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 3,
+        "equationsCount": 1,
+        "values": {
+          "a.x": -3.7,
+          "a.y": 3.7947331923317393,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "origin horizontal and vertical combined",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "x",
+          "type": "origin_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "horizontal",
+          "side": -1,
+          "isCoincident": false
+        },
+        {
+          "id": "y",
+          "type": "origin_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 8.1,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 8.1,
+          "orientation": "vertical",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 1.2849999999999993,
+        "finalError": 8.011205447719594e-14,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -5.299999600499476,
+          "a.y": 8.100000024968782,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "line solve axis x collinear false",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "x",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 83.04499999999999,
+        "finalError": 2.022158019400996e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -3.7,
+          "a.y": -4.599999999800262,
+          "b.x": 12.4,
+          "b.y": -4.600000000023407
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "line solve axis x collinear true",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Collinear with X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "x",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": true
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 52.224999999999994,
+        "finalError": 1.2716832192641164e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -3.7,
+          "a.y": 1.279570144307836e-10,
+          "b.x": 12.4,
+          "b.y": -9.518753512536485e-11
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "line solve axis y collinear false",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "y",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 144.905,
+        "finalError": 3.5284476240098845e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -4.599999999985956,
+          "a.y": 8.2,
+          "b.x": -4.599999999734723,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "line solve axis y collinear true",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Collinear with Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "y",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": true
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 83.72500000000001,
+        "finalError": 2.0387109149413846e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -5.773670163339719e-11,
+          "a.y": 8.2,
+          "b.x": 1.9349597304162112e-10,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "line repeated endpoint solve",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "a"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "a",
+          "axis": "x",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 163.83999999999997,
+        "finalError": 3.9895270207654007e-20,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -3.7,
+          "a.y": -4.599999999800262,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "line axis locked endpoint",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "y",
+          "targetDistance": 4.6,
+          "side": 1,
+          "isCollinear": false
+        }
+      ],
+      "options": {},
+      "callOptions": {
+        "lockedParams": [
+          "a.x"
+        ]
+      },
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 64.86500000000001,
+        "finalError": 34.44500000000001,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 3,
+        "equationsCount": 2,
+        "values": {
+          "a.x": -3.7,
+          "a.y": 8.2,
+          "b.x": 4.600000000121715,
+          "b.y": -6.1
+        },
+        "writes": 9
+      }
+    },
+    {
+      "name": "axis soft before hard line",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "soft",
+          "type": "origin_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": true,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "horizontal",
+          "side": 1,
+          "isCoincident": false
+        },
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "x",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 123.54499999999999,
+        "finalError": 3.0083353966490525e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 5.299999999859559,
+          "a.y": -4.599999999800262,
+          "b.x": 12.4,
+          "b.y": -4.600000000023407
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "axis hard line before soft origin",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "x",
+          "targetDistance": 4.6,
+          "side": -1,
+          "isCollinear": false
+        },
+        {
+          "id": "soft",
+          "type": "origin_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": true,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "horizontal",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 123.54499999999999,
+        "finalError": 3.0083353966490525e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 5.299999999859559,
+          "a.y": -4.599999999800262,
+          "b.x": 12.4,
+          "b.y": -4.600000000023407
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "origin coincidence conflicting dimension",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "o",
+          "type": "origin_distance",
+          "name": "Coincident with (0,0)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "value": 0,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 0,
+          "orientation": "aligned",
+          "side": 1,
+          "isCoincident": true
+        },
+        {
+          "id": "x",
+          "type": "origin_distance",
+          "name": "Distance to Y-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 5.3,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetDistance": 5.3,
+          "orientation": "horizontal",
+          "side": 1,
+          "isCoincident": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 80.965,
+        "finalError": 7.022499999999999,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 2.649999999900911,
+          "a.y": 1.279570144307836e-10,
+          "b.x": 12.4,
+          "b.y": -6.1
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "line axis drag with skipped DoF",
+      "params": [
+        {
+          "id": "a.x",
+          "value": -3.7
+        },
+        {
+          "id": "a.y",
+          "value": 8.2
+        },
+        {
+          "id": "b.x",
+          "value": 12.4
+        },
+        {
+          "id": "b.y",
+          "value": -6.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "l",
+          "type": "line_to_axis_distance",
+          "name": "Distance to X-Axis",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4.6,
+          "entityIds": [
+            "line",
+            "a",
+            "b"
+          ],
+          "lineId": "line",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "axis": "x",
+          "targetDistance": 4.6,
+          "side": 1,
+          "isCollinear": false
+        },
+        {
+          "id": "drag_b",
+          "type": "drag_point",
+          "name": "Drag",
+          "weight": 0.05,
+          "isSoft": true,
+          "isDimensional": false,
+          "entityIds": [
+            "b"
+          ],
+          "pointId": "b",
+          "targetX": 15,
+          "targetY": 4.6
+        }
+      ],
+      "options": {},
+      "callOptions": {
+        "skipDoF": true
+      },
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 4,
+        "initialError": 63.87656249999999,
+        "finalError": 1.3083254346712676e-13,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [],
+        "freeParametersCount": 4,
+        "equationsCount": 4,
+        "values": {
+          "a.x": -3.7,
+          "a.y": 4.6000000000000005,
+          "b.x": 14.999989769358047,
+          "b.y": 4.599999999999997
+        },
+        "writes": 16
+      }
+    }
+  ]
+}

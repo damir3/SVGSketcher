@@ -1,0 +1,14 @@
+[package]
+name = "sketcher-wasm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sketcher-core = { path = "../sketcher-core" }
+wasm-bindgen = "=0.2.105"
+js-sys = "=0.3.82"

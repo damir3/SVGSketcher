@@ -1,0 +1,3901 @@
+{
+  "sourceSha256": {
+    "src/solver/constraints/angle.ts": "4950381d20d8ee5138a280587d58d553a0b533219ccef25462a9d76bc2afeceb",
+    "src/solver/constraints/tangentLineCircle.ts": "f0f721a73d31aecfab04a82d0527659d8ed81bf97b54b88bf14ffb881b8884b9",
+    "src/solver/constraints/tangentCircleCircle.ts": "7f1f1fcc259a0f5293bb38232f6b684a55d138d22e26f1e47dac5f921dde6e7f",
+    "src/solver/constraints/ellipseAxis.ts": "32eda10b01457b9ffc8b2bfd53fbf4dbd24aff8aa8b2501b00946bc4e7fb3438",
+    "src/solver/constraints/pointOnEllipse.ts": "b887b4a97b47dc129f7b98a6642bd52946897b6d33634b793c85f0e3557a0416",
+    "src/solver/constraints/arcEndpoints.ts": "87802071695f06016633336f55381e7b5baa5c0d662f8b6f3f3bc8f20e3404d4",
+    "src/solver/constraints/ellipticalArcEndpoints.ts": "0d628091b73116b1c4e8d237b6199f0a6babf8ad203b9d30c68490eaeef56224",
+    "src/solver/constraints/pointToLineDistance.ts": "826c0e2d07c86490b023117174158c658510244cf674bb762dca6278293db732",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d"
+  },
+  "cases": [
+    {
+      "name": "angle weighted",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 67,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 67,
+        "arcRadius": 40,
+        "s1": -1,
+        "s2": 1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -11.923370325135227
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          -0.5283716376425218,
+          -0.23096795089827535,
+          0.5283719984205959,
+          0.2309679315359858,
+          0.0919430359402895,
+          -0.5807069818786204,
+          -0.09194284444902222,
+          0.5807071930874486
+        ]
+      }
+    },
+    {
+      "name": "angle soft locked reversed",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 67,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 67,
+        "arcRadius": 40,
+        "s1": -1,
+        "s2": 1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          9.538696260108182
+        ],
+        "jacobian": [
+          0,
+          0.4226973102205988,
+          0.4645655854673691,
+          0.07355427555921779,
+          0
+        ]
+      }
+    },
+    {
+      "name": "tangent_line_circle weighted",
+      "constraint": {
+        "id": "lc",
+        "type": "tangent_line_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "circle"
+        ],
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "circleCenterId": "c",
+        "circleId": "circle",
+        "initialSide": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -7.570409139946869
+        ],
+        "jacobian": [
+          0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.8828009333328167,
+          0.46974728551418815,
+          -0.013839603418830391,
+          0.00736443563909006,
+          0.896641484970928,
+          -0.4771118973678767
+        ]
+      }
+    },
+    {
+      "name": "tangent_line_circle soft locked reversed",
+      "constraint": {
+        "id": "lc",
+        "type": "tangent_line_circle",
+        "name": "Tangent",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "circle"
+        ],
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "circleCenterId": "c",
+        "circleId": "circle",
+        "initialSide": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          6.056327311957496
+        ],
+        "jacobian": [
+          -0.8000000000230044,
+          0,
+          -0.005891548582326322,
+          -0.7173131880477966,
+          0
+        ]
+      }
+    },
+    {
+      "name": "tangent_circle_circle weighted",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": false,
+        "outerCircleId": null,
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.07200067957864142
+        ],
+        "jacobian": [
+          -0.9999999999621422,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0.8749575753697058,
+          -0.48419944302935386,
+          0,
+          0,
+          -0.8749573762401041,
+          0.48420009335359276
+        ]
+      }
+    },
+    {
+      "name": "tangent_circle_circle soft locked reversed",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": false,
+        "outerCircleId": null,
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          -0.057600543662913145
+        ],
+        "jacobian": [
+          0.7999999999702688,
+          0,
+          0,
+          0.6999659009923608,
+          0.7999999999702688
+        ]
+      }
+    },
+    {
+      "name": "ellipse_axis weighted",
+      "constraint": {
+        "id": "axis",
+        "type": "ellipse_axis",
+        "name": "Ellipse Axis Perpendicularity",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.19829619567051066
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.4887656193913736,
+          0.9001882535497606,
+          0.8582639512894062,
+          -0.46600386566231217,
+          -1.3470298465240171,
+          -0.4341832688770086
+        ]
+      }
+    },
+    {
+      "name": "ellipse_axis soft locked reversed",
+      "constraint": {
+        "id": "axis",
+        "type": "ellipse_axis",
+        "name": "Ellipse Axis Perpendicularity",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          0.15863695653640852
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.3728030925298497,
+          1.0776238772214342,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point_on_ellipse weighted",
+      "constraint": {
+        "id": "point",
+        "type": "point_on_ellipse",
+        "name": "Point on Ellipse",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "d",
+          "a",
+          "b",
+          "c",
+          "ellipse"
+        ],
+        "pointId": "d",
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          13.960513322745852
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          2.8138689742718266,
+          0.7644250910487925,
+          -0.2822429060245213,
+          2.8476040251135255,
+          1.0840407108858585,
+          -2.3145476776065266,
+          -3.6156690370603424,
+          -1.2974710564606085
+        ]
+      }
+    },
+    {
+      "name": "point_on_ellipse soft locked reversed",
+      "constraint": {
+        "id": "point",
+        "type": "point_on_ellipse",
+        "name": "Point on Ellipse",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "d",
+          "a",
+          "b",
+          "c",
+          "ellipse"
+        ],
+        "pointId": "d",
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          -11.168410658196683
+        ],
+        "jacobian": [
+          0,
+          -2.2510951794174616,
+          1.8516381421918024,
+          2.892535229648274,
+          0
+        ]
+      }
+    },
+    {
+      "name": "arc_endpoints weighted",
+      "constraint": {
+        "id": "arcend",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "arc",
+          "a",
+          "b",
+          "c"
+        ],
+        "arcId": "arc",
+        "centerId": "a",
+        "startPointId": "b",
+        "endPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          4.847064428438038,
+          4.272000679578641
+        ],
+        "jacobian": [
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.46974728556864964,
+          0.8828009332238416,
+          -0.46974728556864964,
+          -0.8828009332238416,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0.8749574758237841,
+          -0.48419976817432714,
+          0,
+          0,
+          -0.8749574758237841,
+          0.48419976817432714
+        ]
+      }
+    },
+    {
+      "name": "arc_endpoints soft locked reversed",
+      "constraint": {
+        "id": "arcend",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "arc",
+          "a",
+          "b",
+          "c"
+        ],
+        "arcId": "arc",
+        "centerId": "a",
+        "startPointId": "b",
+        "endPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          -3.877651542750431,
+          -3.4176005436629127
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.7062407465790733,
+          0.3757978284549197,
+          0.8,
+          0,
+          0,
+          0,
+          0.6999659806590274,
+          0.8
+        ]
+      }
+    },
+    {
+      "name": "elliptical_arc_endpoints weighted",
+      "constraint": {
+        "id": "ellend",
+        "type": "elliptical_arc_endpoints",
+        "name": "Elliptical Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e"
+        ],
+        "arcId": "ellarc",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c",
+        "startPointId": "d",
+        "endPointId": "e"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          13.960513322745852,
+          0.7232972448008539
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          2.8138689742718266,
+          0.7644250910487925,
+          -0.2822429060245213,
+          2.8476040251135255,
+          1.0840407108858585,
+          -2.3145476776065266,
+          -3.6156690370603424,
+          -1.2974710564606085,
+          0,
+          0,
+          0.8493167172440862,
+          -1.9073446315465146,
+          0,
+          0,
+          -1.6584974477207302,
+          -0.3279530562116939,
+          -1.2051815696856316,
+          -0.24211856677336382,
+          2.014366477720575,
+          2.477416073642935
+        ]
+      }
+    },
+    {
+      "name": "elliptical_arc_endpoints soft locked reversed",
+      "constraint": {
+        "id": "ellend",
+        "type": "elliptical_arc_endpoints",
+        "name": "Elliptical Arc Endpoints",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "e"
+        ],
+        "arcId": "ellarc",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c",
+        "startPointId": "d",
+        "endPointId": "e"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          -11.168410658196683,
+          -0.5786377958406831
+        ],
+        "jacobian": [
+          0,
+          -2.2510951794174616,
+          1.8516381421918024,
+          2.892535229648274,
+          0,
+          0,
+          0,
+          0.19369485341202972,
+          -1.6114931821853415,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point_to_line_distance weighted",
+      "constraint": {
+        "id": "dist",
+        "type": "point_to_line_distance",
+        "name": "Point-to-Line Distance",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 3.7,
+        "entityIds": [
+          "c",
+          "a",
+          "b"
+        ],
+        "pointId": "c",
+        "lineId": "l1",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "targetDistance": 3.7,
+        "side": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -8.070409139946868
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.8828009335104524,
+          0.46974728533655247,
+          -0.013839603596466075,
+          0.007364435461454376,
+          0.896641484970928,
+          -0.4771118973678767
+        ]
+      }
+    },
+    {
+      "name": "point_to_line_distance soft locked reversed",
+      "constraint": {
+        "id": "dist",
+        "type": "point_to_line_distance",
+        "name": "Point-to-Line Distance",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 3.7,
+        "entityIds": [
+          "c",
+          "a",
+          "b"
+        ],
+        "pointId": "c",
+        "lineId": "l1",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "targetDistance": 3.7,
+        "side": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "d.y",
+        "b.x",
+        "a.y",
+        "arc.r"
+      ],
+      "expected": {
+        "residuals": [
+          6.456327311957494
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.005891548315872796,
+          -0.7173131879589788,
+          0
+        ]
+      }
+    },
+    {
+      "name": "circle tangency internal=true outer=arc",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": true,
+        "outerCircleId": "arc",
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          8.472000679578642
+        ],
+        "jacobian": [
+          0.9999999999621422,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0.8749575751920701,
+          -0.48419944320698954,
+          0,
+          0,
+          -0.8749573762401041,
+          0.48420009335359276
+        ]
+      }
+    },
+    {
+      "name": "circle tangency internal=true outer=circle",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": true,
+        "outerCircleId": "circle",
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          15.07200067957864
+        ],
+        "jacobian": [
+          -0.9999999999621422,
+          0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0.8749575755473414,
+          -0.4841994428517182,
+          0,
+          0,
+          -0.8749573762401041,
+          0.48420009335359276
+        ]
+      }
+    },
+    {
+      "name": "circle tangency internal=true outer=null",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": true,
+        "outerCircleId": null,
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.07200067957864142
+        ],
+        "jacobian": [
+          -0.9999999999621422,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0.8749575753697058,
+          -0.48419944302935386,
+          0,
+          0,
+          -0.8749573762401041,
+          0.48420009335359276
+        ]
+      }
+    },
+    {
+      "name": "circle tangency internal=false outer=circle",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": false,
+        "outerCircleId": "circle",
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.07200067957864142
+        ],
+        "jacobian": [
+          -0.9999999999621422,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0.8749575753697058,
+          -0.48419944302935386,
+          0,
+          0,
+          -0.8749573762401041,
+          0.48420009335359276
+        ]
+      }
+    },
+    {
+      "name": "circle tangency shared point",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle",
+          "d"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": true,
+        "outerCircleId": "arc",
+        "sharedPointId": "d"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          13.043662175994374
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.48419976810265547,
+          0.8749574757160871,
+          -0.5022635317430968,
+          -0.9076002223551426,
+          0,
+          0,
+          0.018063929552170066,
+          0.03264163943583753
+        ]
+      }
+    },
+    {
+      "name": "circle tangency shared aliases",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "c",
+          "circle",
+          "a"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "c",
+        "circle2Id": "circle",
+        "isInternal": false,
+        "outerCircleId": null,
+        "sharedPointId": "a"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "circle tangency concentric",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "arc",
+          "a",
+          "circle"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "arc",
+        "circle2CenterId": "a",
+        "circle2Id": "circle",
+        "isInternal": true,
+        "outerCircleId": "arc",
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.2999999
+        ],
+        "jacobian": [
+          0.9999999999621422,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "circle tangency missing radii",
+      "constraint": {
+        "id": "cc",
+        "type": "tangent_circle_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "missing1",
+          "c",
+          "missing2"
+        ],
+        "circle1CenterId": "a",
+        "circle1Id": "missing1",
+        "circle2CenterId": "c",
+        "circle2Id": "missing2",
+        "isInternal": false,
+        "outerCircleId": null,
+        "sharedPointId": null
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -8.22799932042136
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.8749575753697058,
+          -0.48419944302935386,
+          0,
+          0,
+          -0.8749573762401041,
+          0.48420009335359276
+        ]
+      }
+    },
+    {
+      "name": "line tangency axis -1",
+      "constraint": {
+        "id": "lc",
+        "type": "tangent_line_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "c",
+          "circle",
+          "axis_x"
+        ],
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
+        "circleCenterId": "c",
+        "circleId": "circle",
+        "initialSide": -1,
+        "lineId": "axis_x"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.3999999999999995
+        ],
+        "jacobian": [
+          0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line distance side -1",
+      "constraint": {
+        "id": "dist",
+        "type": "point_to_line_distance",
+        "name": "Point-to-Line Distance",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 3.7,
+        "entityIds": [
+          "c",
+          "a",
+          "b"
+        ],
+        "pointId": "c",
+        "lineId": "l1",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "targetDistance": 3.7,
+        "side": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -8.070409139946868
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.8828009335104524,
+          0.46974728533655247,
+          -0.013839603596466075,
+          0.007364435461454376,
+          0.896641484970928,
+          -0.4771118973678767
+        ]
+      }
+    },
+    {
+      "name": "line tangency axis 1",
+      "constraint": {
+        "id": "lc",
+        "type": "tangent_line_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "c",
+          "circle",
+          "axis_x"
+        ],
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
+        "circleCenterId": "c",
+        "circleId": "circle",
+        "initialSide": 1,
+        "lineId": "axis_x"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -12.8
+        ],
+        "jacobian": [
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line distance side 1",
+      "constraint": {
+        "id": "dist",
+        "type": "point_to_line_distance",
+        "name": "Point-to-Line Distance",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 3.7,
+        "entityIds": [
+          "c",
+          "a",
+          "b"
+        ],
+        "pointId": "c",
+        "lineId": "l1",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "targetDistance": 3.7,
+        "side": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -15.47040913994687
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.882800933155181,
+          0.46974728569182383,
+          -0.013839603241194707,
+          0.007364435816725744,
+          0.896641484970928,
+          -0.4771118973678767
+        ]
+      }
+    },
+    {
+      "name": "line tangency zero length",
+      "constraint": {
+        "id": "lc",
+        "type": "tangent_line_circle",
+        "name": "Tangent",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "a",
+          "c",
+          "circle"
+        ],
+        "lineP1Id": "a",
+        "lineP2Id": "a",
+        "circleCenterId": "c",
+        "circleId": "circle",
+        "initialSide": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.2
+        ],
+        "jacobian": [
+          -0.9999999999621422,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line distance zero length",
+      "constraint": {
+        "id": "dist",
+        "type": "point_to_line_distance",
+        "name": "Point-to-Line Distance",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 3.7,
+        "entityIds": [
+          "c",
+          "a",
+          "a"
+        ],
+        "pointId": "c",
+        "lineId": "l1",
+        "lineP1Id": "a",
+        "lineP2Id": "a",
+        "targetDistance": 3.7,
+        "side": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.7
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "angle sweep 0",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 0,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 0,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": -1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.6359687684068532
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          -0.8468297618136055,
+          0.4774071812763125,
+          0.84683009407005,
+          -0.4774074954583262,
+          0.8950661937290326,
+          -0.5046379251250066,
+          -0.8950665313700589,
+          0.5046382847373465
+        ]
+      }
+    },
+    {
+      "name": "angle sweep 90",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 90,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 90,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": -1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -12.683124360272469
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          -0.2145441042600282,
+          -0.45356175615296473,
+          0.21454435508161393,
+          0.45356186788580993,
+          -0.28004978691598126,
+          -0.41665096546239505,
+          0.2800501381017284,
+          0.4166510423786462
+        ]
+      }
+    },
+    {
+      "name": "angle sweep 180",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 180,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 180,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": -1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.635968768406851
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.8468297618247077,
+          -0.47740718126521026,
+          -0.8468300940589478,
+          0.4774074954583262,
+          -0.895066193651317,
+          0.5046379252027222,
+          0.8950665313811611,
+          -0.5046382846596309
+        ]
+      }
+    },
+    {
+      "name": "angle sweep 270",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 270,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 270,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": -1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          12.683124360272469
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.21454410408239252,
+          0.45356175615296473,
+          -0.21454435508161393,
+          -0.4535618680634456,
+          0.2800497867383456,
+          0.41665096546239505,
+          -0.2800501382793641,
+          -0.4166510425562819
+        ]
+      }
+    },
+    {
+      "name": "angle sweep 359.9",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 359.9,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 359.9,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": -1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.6138315830570713
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          -0.8464540220742832,
+          0.47819806837656736,
+          0.8464543538644341,
+          -0.4781983827140123,
+          0.8955536091481696,
+          -0.5039099637449418,
+          -0.895553947566352,
+          0.5039103231907482
+        ]
+      }
+    },
+    {
+      "name": "angle sweep -45",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": -45,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": -45,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": -1,
+        "sign": -1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          8.518625413017611
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          -0.4470934760192335,
+          0.6582944486410724,
+          0.4470935337508308,
+          -0.6582947499111924,
+          0.8309324785571447,
+          -0.06221617585566718,
+          -0.8309329656341901,
+          0.062216375695811614
+        ]
+      }
+    },
+    {
+      "name": "angle shared vertex",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 37,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "line1Id": "",
+        "line2Id": "",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "a",
+        "l2P2": "c",
+        "targetAngle": 37,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": 1,
+        "sign": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          9.749206456001287
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.06170612536493535,
+          -0.7232997436545928,
+          -0.317640176028533,
+          0.6268934322761766,
+          0.2559336056862094,
+          0.09640558449319768
+        ]
+      }
+    },
+    {
+      "name": "angle axis first",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 83,
+        "entityIds": [
+          "axis_x",
+          "l2",
+          "c",
+          "d"
+        ],
+        "line1Id": "axis_x",
+        "line2Id": "l2",
+        "l1P1": "origin",
+        "l1P2": "axis_x",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 83,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": 1,
+        "sign": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -10.299992297568318
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.12186934341684717,
+          -0.9925461515791766,
+          -0.12186934341684717,
+          0.9925461517568123,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "angle axis second",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 83,
+        "entityIds": [
+          "l1",
+          "axis_y",
+          "a",
+          "b"
+        ],
+        "line1Id": "l1",
+        "line2Id": "axis_y",
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "origin",
+        "l2P2": "axis_y",
+        "targetAngle": 83,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": 1,
+        "sign": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.428391836403558
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.9925461517568123,
+          0.12186934323921149,
+          0.9925461515791766,
+          -0.12186934359448286
+        ]
+      }
+    },
+    {
+      "name": "angle zero direction",
+      "constraint": {
+        "id": "ang",
+        "type": "angle",
+        "name": "Angle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 83,
+        "entityIds": [
+          "l1",
+          "l2",
+          "a",
+          "c",
+          "d"
+        ],
+        "line1Id": "l1",
+        "line2Id": "l2",
+        "l1P1": "a",
+        "l1P2": "a",
+        "l2P1": "c",
+        "l2P2": "d",
+        "targetAngle": 83,
+        "arcRadius": 40,
+        "s1": 1,
+        "s2": 1,
+        "sign": 1
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "arc endpoints at center",
+      "constraint": {
+        "id": "arcend",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "arc",
+          "a",
+          "a",
+          "a"
+        ],
+        "arcId": "arc",
+        "centerId": "a",
+        "startPointId": "a",
+        "endPointId": "a"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -7.5,
+          -7.5
+        ],
+        "jacobian": [
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "arc endpoints shared",
+      "constraint": {
+        "id": "arcend",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "arc",
+          "a",
+          "b",
+          "b"
+        ],
+        "arcId": "arc",
+        "centerId": "a",
+        "startPointId": "b",
+        "endPointId": "b"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          4.847064428438038,
+          4.847064428438038
+        ],
+        "jacobian": [
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.46974728556864964,
+          0.8828009332238416,
+          -0.46974728556864964,
+          -0.8828009332238416,
+          0,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.46974728556864964,
+          0.8828009332238416,
+          -0.46974728556864964,
+          -0.8828009332238416
+        ]
+      }
+    },
+    {
+      "name": "arc missing radius",
+      "constraint": {
+        "id": "arcend",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "missing",
+          "a",
+          "b",
+          "c"
+        ],
+        "arcId": "missing",
+        "centerId": "a",
+        "startPointId": "b",
+        "endPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.3470644284380384,
+          1.7720006795786407
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.46974728556864964,
+          0.8828009332238416,
+          -0.46974728556864964,
+          -0.8828009332238416,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.8749574758237841,
+          -0.48419976817432714,
+          0,
+          0,
+          -0.8749574758237841,
+          0.48419976817432714
+        ]
+      }
+    },
+    {
+      "name": "point ellipse zero axes",
+      "constraint": {
+        "id": "point",
+        "type": "point_on_ellipse",
+        "name": "Point on Ellipse",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "d",
+          "a",
+          "a",
+          "a",
+          "ellipse"
+        ],
+        "pointId": "d",
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "a",
+        "minorAxisPointId": "a"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -1e-7
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point ellipse aliases",
+      "constraint": {
+        "id": "point",
+        "type": "point_on_ellipse",
+        "name": "Point on Ellipse",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "b",
+          "a",
+          "b",
+          "c",
+          "ellipse"
+        ],
+        "pointId": "b",
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.0035869486719596233
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.01834548157206295,
+          -0.032198939032765383,
+          -0.03084627631603359,
+          0.017240793855153452,
+          0.04919439121910638,
+          0.014959166650969217
+        ]
+      }
+    },
+    {
+      "name": "ellipse axes collapsed",
+      "constraint": {
+        "id": "axis",
+        "type": "ellipse_axis",
+        "name": "Ellipse Axis Perpendicularity",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "a",
+          "c"
+        ],
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "a",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "elliptical arc coincident endpoints",
+      "constraint": {
+        "id": "ellend",
+        "type": "elliptical_arc_endpoints",
+        "name": "Elliptical Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d",
+          "d"
+        ],
+        "arcId": "ellarc",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c",
+        "startPointId": "d",
+        "endPointId": "d"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          13.960513322745852,
+          13.960513322745852
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          2.8138689742718266,
+          0.7644250910487925,
+          -0.2822429060245213,
+          2.8476040251135255,
+          1.0840407108858585,
+          -2.3145476776065266,
+          -3.6156690370603424,
+          -1.2974710564606085,
+          0,
+          0,
+          0,
+          0,
+          2.8138689742718266,
+          0.7644250910487925,
+          -0.2822429060245213,
+          2.8476040251135255,
+          1.0840407108858585,
+          -2.3145476776065266,
+          -3.6156690370603424,
+          -1.2974710564606085
+        ]
+      }
+    },
+    {
+      "name": "elliptical arc collapsed",
+      "constraint": {
+        "id": "ellend",
+        "type": "elliptical_arc_endpoints",
+        "name": "Elliptical Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "a",
+          "a",
+          "d",
+          "e"
+        ],
+        "arcId": "ellarc",
+        "centerId": "a",
+        "majorAxisPointId": "a",
+        "minorAxisPointId": "a",
+        "startPointId": "d",
+        "endPointId": "e"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -1e-7,
+          -1e-7
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "elliptical arc one zero axis",
+      "constraint": {
+        "id": "ellend",
+        "type": "elliptical_arc_endpoints",
+        "name": "Elliptical Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "a",
+          "c",
+          "d",
+          "e"
+        ],
+        "arcId": "ellarc",
+        "centerId": "a",
+        "majorAxisPointId": "a",
+        "minorAxisPointId": "c",
+        "startPointId": "d",
+        "endPointId": "e"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.4473698827710509,
+          -2.087225219688726
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.9075998215479774,
+          -0.5022636993368135,
+          -0.3516884823639987,
+          1.508243650222285,
+          0,
+          0,
+          -0.5559118891440562,
+          -1.0059783897786723,
+          0,
+          0,
+          0.7029085124621303,
+          -0.3889879265805973,
+          0,
+          0,
+          -0.9774177464283439,
+          -0.0671291262577256,
+          0,
+          0,
+          0.27451026372027343,
+          0.45611654577726307
+        ]
+      }
+    },
+    {
+      "name": "point ellipse missing coordinates",
+      "constraint": {
+        "id": "point",
+        "type": "point_on_ellipse",
+        "name": "Point on Ellipse",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "missing",
+          "a",
+          "b",
+          "c",
+          "ellipse"
+        ],
+        "pointId": "missing",
+        "ellipseId": "ellipse",
+        "centerId": "a",
+        "majorAxisPointId": "b",
+        "minorAxisPointId": "c"
+      },
+      "params": {
+        "a.x": 2.3,
+        "a.y": -1.7,
+        "b.x": 13.2,
+        "b.y": 4.1,
+        "c.x": -3.4,
+        "c.y": 8.6,
+        "d.x": 7.8,
+        "d.y": 15.3,
+        "e.x": -9.1,
+        "e.y": 2.8,
+        "arc.r": 7.5,
+        "circle.r": 4.2,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "circle.r",
+        "arc.r",
+        "e.y",
+        "e.x",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -11.350728379523433
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.5214300630385083,
+          0.23628783161200315,
+          -0.2661709890716679,
+          -0.4134838674119123,
+          0.4830551747048161,
+          0.5684485238077741
+        ]
+      }
+    }
+  ]
+}

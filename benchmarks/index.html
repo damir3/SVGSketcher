@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sketcher performance benchmarks</title></head>
+<body>
+<main>
+<h1>Sketcher performance benchmarks</h1>
+<p>Scripted model-to-SVG drag pipeline. Both backends use the same deterministic scenes and drag targets.</p>
+<form id="controls">
+<label>Scene <select id="scene"><option value="all">All six scenes</option></select></label>
+<label>Samples per case <input id="samples" type="number" min="5" max="300" value="30"></label>
+<label>Warm-up frames <input id="warmup" type="number" min="1" max="30" value="5"></label>
+<button id="run" type="submit" disabled>Run comparison</button>
+<button id="stop" type="button" disabled>Stop after current frame</button>
+</form>
+<p id="status" role="status">Loading release WASM…</p>
+<p>Timings are milliseconds. Render excludes region computation; pipeline includes solve, SVG creation and forced layout, but excludes event delivery and GPU paint. Frame interval includes scheduling.</p>
+<div id="stage"><svg id="canvas" xmlns="http://www.w3.org/2000/svg" width="1100" height="650"></svg></div>
+<div class="actions"><button id="save" disabled>Download JSON report</button><button id="scene-download" disabled>Download current scene SVG</button></div>
+<table><thead><tr><th>Scene</th><th>Backend</th><th>Regions</th><th>Free params</th><th>Solve p50 / p95</th><th>Regions p50 / p95</th><th>Render p50 / p95</th><th>Layout p50 / p95</th><th>Pipeline p50 / p95</th><th>Frame p95</th></tr></thead><tbody id="results"></tbody></table>
+<details><summary>Raw JSON report</summary><textarea id="report" aria-label="JSON report" readonly></textarea></details>
+</main>
+<script type="module" src="./browser.ts"></script>
+</body></html>

@@ -1,0 +1,1480 @@
+{
+  "coordinateTolerance": 1e-8,
+  "coordinateToleranceReason": "Finite differences amplify floating-point rounding differences between JavaScript Math.hypot and Rust hypot in under-constrained systems. Status, iteration counts, setter writes, DoF and errors retain the existing strict checks.",
+  "sourceSha256": {
+    "src/solver/constraints/angle.ts": "4950381d20d8ee5138a280587d58d553a0b533219ccef25462a9d76bc2afeceb",
+    "src/solver/constraints/tangentLineCircle.ts": "f0f721a73d31aecfab04a82d0527659d8ed81bf97b54b88bf14ffb881b8884b9",
+    "src/solver/constraints/tangentCircleCircle.ts": "7f1f1fcc259a0f5293bb38232f6b684a55d138d22e26f1e47dac5f921dde6e7f",
+    "src/solver/constraints/ellipseAxis.ts": "32eda10b01457b9ffc8b2bfd53fbf4dbd24aff8aa8b2501b00946bc4e7fb3438",
+    "src/solver/constraints/pointOnEllipse.ts": "b887b4a97b47dc129f7b98a6642bd52946897b6d33634b793c85f0e3557a0416",
+    "src/solver/constraints/arcEndpoints.ts": "87802071695f06016633336f55381e7b5baa5c0d662f8b6f3f3bc8f20e3404d4",
+    "src/solver/constraints/ellipticalArcEndpoints.ts": "0d628091b73116b1c4e8d237b6199f0a6babf8ad203b9d30c68490eaeef56224",
+    "src/solver/constraints/pointToLineDistance.ts": "826c0e2d07c86490b023117174158c658510244cf674bb762dca6278293db732",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d"
+  },
+  "cases": [
+    {
+      "name": "angle with fixed reference line",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 1,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        }
+      ],
+      "constraints": [
+        {
+          "id": "ang",
+          "type": "angle",
+          "name": "Angle",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 45,
+          "entityIds": [
+            "l1",
+            "l2",
+            "a",
+            "b",
+            "c",
+            "d"
+          ],
+          "line1Id": "l1",
+          "line2Id": "l2",
+          "l1P1": "a",
+          "l1P2": "b",
+          "l2P1": "c",
+          "l2P2": "d",
+          "targetAngle": 45,
+          "arcRadius": 40,
+          "s1": 1,
+          "s2": 1,
+          "sign": 1
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 2.0833320986915367,
+        "finalError": 5.20099966500792e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 2,
+          "c.y": 1,
+          "d.x": 9.642428282723738,
+          "d.y": 8.642428282249911
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "angle against Y axis",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0
+        },
+        {
+          "id": "a.y",
+          "value": 0
+        },
+        {
+          "id": "b.x",
+          "value": 10
+        },
+        {
+          "id": "b.y",
+          "value": 0
+        },
+        {
+          "id": "c.x",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 1,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        }
+      ],
+      "constraints": [
+        {
+          "id": "ang",
+          "type": "angle",
+          "name": "Angle",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 30,
+          "entityIds": [
+            "axis_y",
+            "l2",
+            "c",
+            "d"
+          ],
+          "line1Id": "axis_y",
+          "line2Id": "l2",
+          "l1P1": "origin",
+          "l1P2": "axis_y",
+          "l2P1": "c",
+          "l2P2": "d",
+          "targetAngle": 30,
+          "arcRadius": 40,
+          "s1": 1,
+          "s2": 1,
+          "sign": 1
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 47.007685902179865,
+        "finalError": 1.1446351802963834e-20,
+        "degreesOfFreedom": 5,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.x",
+          "c.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 6,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 2,
+          "c.y": 1,
+          "d.x": -0.39711431837390904,
+          "d.y": 5.151923791277056
+        },
+        "writes": 18
+      }
+    },
+    {
+      "name": "line circle tangent radius and center drag",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2
+        },
+        {
+          "id": "c.y",
+          "value": 1
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        },
+        {
+          "id": "circle.r",
+          "value": 4,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "tan",
+          "type": "tangent_line_circle",
+          "name": "Tangent",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "c",
+            "circle"
+          ],
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "circleCenterId": "c",
+          "circleId": "circle",
+          "initialSide": -1
+        },
+        {
+          "id": "r",
+          "type": "radius",
+          "name": "Radius (4)",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 4,
+          "entityIds": [
+            "circle"
+          ],
+          "circleId": "circle",
+          "targetRadius": 4,
+          "displayMode": "radius"
+        },
+        {
+          "id": "drag_c",
+          "type": "drag_point",
+          "name": "Drag",
+          "weight": 0.05,
+          "isSoft": true,
+          "isDimensional": false,
+          "entityIds": [
+            "c"
+          ],
+          "pointId": "c",
+          "targetX": 6,
+          "targetY": 4
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 4,
+        "initialError": 4.53125,
+        "finalError": 3.096628247554468e-13,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.y",
+          "circle.r",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 5,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 5.999984260550842,
+          "c.y": 3.9999999999999516,
+          "d.x": 8,
+          "d.y": 10,
+          "circle.r": 3.9999999999999654
+        },
+        "writes": 20
+      }
+    },
+    {
+      "name": "circle tangency null",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 15
+        },
+        {
+          "id": "c.y",
+          "value": 3
+        },
+        {
+          "id": "arc.r",
+          "value": 10,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "circle.r",
+          "value": 4,
+          "fixed": true,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "tan",
+          "type": "tangent_circle_circle",
+          "name": "Tangent",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "arc",
+            "c",
+            "circle"
+          ],
+          "circle1CenterId": "a",
+          "circle1Id": "arc",
+          "circle2CenterId": "c",
+          "circle2Id": "circle",
+          "isInternal": false,
+          "outerCircleId": null,
+          "sharedPointId": null
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 0.8411804291030381,
+        "finalError": 5.248415264083145e-14,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "arc.r",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "circle.r",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "c.x": 13.72812985515726,
+          "c.y": 2.7456255665344393,
+          "arc.r": 10,
+          "circle.r": 4
+        },
+        "writes": 4
+      }
+    },
+    {
+      "name": "circle tangency arc",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 15
+        },
+        {
+          "id": "c.y",
+          "value": 3
+        },
+        {
+          "id": "arc.r",
+          "value": 10,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "circle.r",
+          "value": 4,
+          "fixed": true,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "tan",
+          "type": "tangent_circle_circle",
+          "name": "Tangent",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "arc",
+            "c",
+            "circle"
+          ],
+          "circle1CenterId": "a",
+          "circle1Id": "arc",
+          "circle2CenterId": "c",
+          "circle2Id": "circle",
+          "isInternal": true,
+          "outerCircleId": "arc",
+          "sharedPointId": null
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 43.21764875532988,
+        "finalError": 1.0604720612745887e-20,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "arc.r",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "circle.r",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "c.x": 5.883484611855718,
+          "c.y": 1.1766940230172753,
+          "arc.r": 10,
+          "circle.r": 4
+        },
+        "writes": 6
+      }
+    },
+    {
+      "name": "circle tangency circle",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 15
+        },
+        {
+          "id": "c.y",
+          "value": 3
+        },
+        {
+          "id": "arc.r",
+          "value": 10,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "circle.r",
+          "value": 4,
+          "fixed": true,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "tan",
+          "type": "tangent_circle_circle",
+          "name": "Tangent",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "arc",
+            "c",
+            "circle"
+          ],
+          "circle1CenterId": "a",
+          "circle1Id": "arc",
+          "circle2CenterId": "c",
+          "circle2Id": "circle",
+          "isInternal": true,
+          "outerCircleId": "circle",
+          "sharedPointId": null
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 40,
+        "initialError": 226.78235124467014,
+        "finalError": 18.000115486073938,
+        "degreesOfFreedom": 1,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "arc.r",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "circle.r",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 2,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "c.x": -0.00001739841244554313,
+          "c.y": -0.00000823208372248945,
+          "arc.r": 10,
+          "circle.r": 4
+        },
+        "writes": 28
+      }
+    },
+    {
+      "name": "shared point circle tangent",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10
+        },
+        {
+          "id": "b.y",
+          "value": 0
+        },
+        {
+          "id": "c.x",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 1,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        },
+        {
+          "id": "arc.r",
+          "value": 5,
+          "min": 0.1
+        },
+        {
+          "id": "circle.r",
+          "value": 4,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "tan",
+          "type": "tangent_circle_circle",
+          "name": "Tangent",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "arc",
+            "c",
+            "circle",
+            "d"
+          ],
+          "circle1CenterId": "a",
+          "circle1Id": "arc",
+          "circle2CenterId": "c",
+          "circle2Id": "circle",
+          "isInternal": false,
+          "outerCircleId": null,
+          "sharedPointId": "d"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 14.4,
+        "finalError": 8.977533053519522e-13,
+        "degreesOfFreedom": 5,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.x",
+          "c.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 6,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 2,
+          "c.y": 1,
+          "d.x": 10.399999400939837,
+          "d.y": 5.200001198596503,
+          "arc.r": 5,
+          "circle.r": 4
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "arc structure with fixed radius",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10
+        },
+        {
+          "id": "b.y",
+          "value": 0
+        },
+        {
+          "id": "c.x",
+          "value": 2
+        },
+        {
+          "id": "c.y",
+          "value": 1
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        },
+        {
+          "id": "arc.r",
+          "value": 6,
+          "fixed": true,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "ends",
+          "type": "arc_endpoints",
+          "name": "Arc Endpoints",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "arc",
+            "a",
+            "c",
+            "d"
+          ],
+          "arcId": "arc",
+          "centerId": "a",
+          "startPointId": "c",
+          "endPointId": "d"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 30.246101285807075,
+        "finalError": 7.364971482535564e-21,
+        "degreesOfFreedom": 4,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "arc.r",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 6,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 5.3665631459469765,
+          "c.y": 2.6832815729734523,
+          "d.x": 3.7481702853926055,
+          "d.y": 4.685212856741346,
+          "arc.r": 6
+        },
+        "writes": 18
+      }
+    },
+    {
+      "name": "arc structure and angle mixed",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10
+        },
+        {
+          "id": "b.y",
+          "value": 0
+        },
+        {
+          "id": "c.x",
+          "value": 2
+        },
+        {
+          "id": "c.y",
+          "value": 1
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        },
+        {
+          "id": "arc.r",
+          "value": 6,
+          "fixed": true,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "ends",
+          "type": "arc_endpoints",
+          "name": "Arc Endpoints",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "arc",
+            "a",
+            "c",
+            "d"
+          ],
+          "arcId": "arc",
+          "centerId": "a",
+          "startPointId": "c",
+          "endPointId": "d"
+        },
+        {
+          "id": "ang",
+          "type": "angle",
+          "name": "Angle",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 60,
+          "entityIds": [
+            "arc",
+            "a",
+            "c",
+            "d"
+          ],
+          "line1Id": "arc",
+          "line2Id": "arc",
+          "l1P1": "a",
+          "l1P2": "c",
+          "l2P1": "a",
+          "l2P2": "d",
+          "targetAngle": 60,
+          "arcRadius": 40,
+          "s1": 1,
+          "s2": 1,
+          "sign": 1
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 4,
+        "initialError": 39.65567797676425,
+        "finalError": 1.7696575073511332e-17,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "arc.r",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 6,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 5.994489550572742,
+          "c.y": 0.25708963218498654,
+          "d.x": 2.77459862281774,
+          "d.y": 5.3199250495001715,
+          "arc.r": 6
+        },
+        "writes": 24
+      }
+    },
+    {
+      "name": "ellipse perpendicular axes",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 11,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 3,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2
+        },
+        {
+          "id": "c.y",
+          "value": 8
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 6
+        },
+        {
+          "id": "e.x",
+          "value": -5
+        },
+        {
+          "id": "e.y",
+          "value": -3
+        }
+      ],
+      "constraints": [
+        {
+          "id": "axis",
+          "type": "ellipse_axis",
+          "name": "Ellipse Axis Perpendicularity",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "c"
+          ],
+          "ellipseId": "ellipse",
+          "centerId": "a",
+          "majorAxisPointId": "b",
+          "minorAxisPointId": "c"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 2.2286284290040013,
+        "finalError": 8.526543232181133e-20,
+        "degreesOfFreedom": 5,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 6,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 1,
+          "a.y": 2,
+          "b.x": 11,
+          "b.y": 3,
+          "c.x": 0.38270928847382957,
+          "c.y": 8.172907112093641,
+          "d.x": 8,
+          "d.y": 6,
+          "e.x": -5,
+          "e.y": -3
+        },
+        "writes": 18
+      }
+    },
+    {
+      "name": "point on rotated ellipse",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 11,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 3,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 6
+        },
+        {
+          "id": "e.x",
+          "value": -5
+        },
+        {
+          "id": "e.y",
+          "value": -3
+        }
+      ],
+      "constraints": [
+        {
+          "id": "p",
+          "type": "point_on_ellipse",
+          "name": "Point on Ellipse",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "d",
+            "a",
+            "b",
+            "c",
+            "ellipse"
+          ],
+          "pointId": "d",
+          "ellipseId": "ellipse",
+          "centerId": "a",
+          "majorAxisPointId": "b",
+          "minorAxisPointId": "c"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 1.8549203941798875,
+        "finalError": 6.709075957844764e-17,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 1,
+          "a.y": 2,
+          "b.x": 11,
+          "b.y": 3,
+          "c.x": 2,
+          "c.y": 8,
+          "d.x": 7.3393441789337945,
+          "d.y": 5.560422836045906,
+          "e.x": -5,
+          "e.y": -3
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "elliptical arc endpoints",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 11,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 3,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 6
+        },
+        {
+          "id": "e.x",
+          "value": -5
+        },
+        {
+          "id": "e.y",
+          "value": -3
+        }
+      ],
+      "constraints": [
+        {
+          "id": "e",
+          "type": "elliptical_arc_endpoints",
+          "name": "Elliptical Arc Endpoints",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e"
+          ],
+          "arcId": "ellarc",
+          "centerId": "a",
+          "majorAxisPointId": "b",
+          "minorAxisPointId": "c",
+          "startPointId": "d",
+          "endPointId": "e"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 6.0911334789002165,
+        "finalError": 4.03451211456697e-15,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 1,
+          "a.y": 2,
+          "b.x": 11,
+          "b.y": 3,
+          "c.x": 2,
+          "c.y": 8,
+          "d.x": 7.3393441789337945,
+          "d.y": 5.560422836045906,
+          "e.x": -3.917383211273099,
+          "e.y": -2.40778396155598
+        },
+        "writes": 12
+      }
+    },
+    {
+      "name": "point line distance",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2
+        },
+        {
+          "id": "c.y",
+          "value": 1
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        }
+      ],
+      "constraints": [
+        {
+          "id": "dist",
+          "type": "point_to_line_distance",
+          "name": "Point-to-Line Distance",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3,
+          "entityIds": [
+            "c",
+            "a",
+            "b"
+          ],
+          "pointId": "c",
+          "lineId": "l1",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "targetDistance": 3,
+          "side": -1
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 2,
+        "initialError": 2,
+        "finalError": 1.246880308553479e-13,
+        "degreesOfFreedom": 3,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 4,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 2,
+          "c.y": 2.999999500624328,
+          "d.x": 8,
+          "d.y": 10
+        },
+        "writes": 8
+      }
+    },
+    {
+      "name": "point line distance temporary locks",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 10,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 0,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": 2
+        },
+        {
+          "id": "c.y",
+          "value": 1
+        },
+        {
+          "id": "d.x",
+          "value": 8
+        },
+        {
+          "id": "d.y",
+          "value": 10
+        }
+      ],
+      "constraints": [
+        {
+          "id": "dist",
+          "type": "point_to_line_distance",
+          "name": "Point-to-Line Distance",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3,
+          "entityIds": [
+            "c",
+            "a",
+            "b"
+          ],
+          "pointId": "c",
+          "lineId": "l1",
+          "lineP1Id": "a",
+          "lineP2Id": "b",
+          "targetDistance": 3,
+          "side": -1
+        }
+      ],
+      "options": {},
+      "callOptions": {
+        "lockedParams": [
+          "c.x"
+        ],
+        "skipDoF": true
+      },
+      "expected": {
+        "status": "CONVERGED",
+        "iterations": 2,
+        "initialError": 2,
+        "finalError": 1.246880308553479e-13,
+        "degreesOfFreedom": 0,
+        "constrainedParams": [],
+        "freeParametersCount": 3,
+        "equationsCount": 1,
+        "values": {
+          "a.x": 0,
+          "a.y": 0,
+          "b.x": 10,
+          "b.y": 0,
+          "c.x": 2,
+          "c.y": 2.999999500624328,
+          "d.x": 8,
+          "d.y": 10
+        },
+        "writes": 6
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import type { SketchDocument } from '../model/sketch';
 import { Vec2 } from './vector';
 import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
-import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurves } from './intersection';
+import { getAllGeoCurves, getPointAtParam, getParamAtPoint, intersectCurvePairs } from './intersection';
 import { extractSplineInterval, type BezierSegment } from './spline';
 
 export interface SketchRegion {
@@ -189,13 +189,16 @@ export function findCurveRegions(curves: RegionCurve[]): SketchRegion[] {
 			cuts: [] as Array<{ t: number; p: Vec2 }>,
 		};
 	});
-	for (let i = 0; i < curves.length; i++)
+	// Batch one row at a time: amortize JS/WASM calls without storing O(n²) pairs.
+	for (let i = 0; i < curves.length; i++) {
+		const intersections = intersectCurvePairs(curves.slice(i + 1).map(other => [curves[i], other]));
 		for (let j = i + 1; j < curves.length; j++) {
-			for (const p of intersectCurves(curves[i], curves[j])) {
+			for (const p of intersections[j - i - 1]) {
 				params[i].cuts.push(intersectionCut(curves[i], p));
 				params[j].cuts.push(intersectionCut(curves[j], p));
 			}
 		}
+	}
 	for (const item of params) {
 		const { curve, periodic, period } = item;
 		const unique = item.cuts

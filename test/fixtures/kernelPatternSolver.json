@@ -1,0 +1,3833 @@
+{
+  "sourceSha256": {
+    "src/solver/constraints/symmetry.ts": "ee002861559fdf47dbcb0ba9e0687396b90a22770867402e34fa49353dbf8dc1",
+    "src/solver/constraints/circularPattern.ts": "512a92dfc090122bd01db8499c21b33521bc5996c1271002e9b273f5c4eae098",
+    "src/solver/constraints/rectangularPattern.ts": "8717b43d98a0e9fbc64d67673b09b731bd0d6d5ff08a829e0734a5dcee8404ca",
+    "src/solver/constraints/offset.ts": "52d3fa900e8707d1e2e036e60a67b3787fc7d5e1e4963340bfd156f2350a6360",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d"
+  },
+  "coordinateTolerance": 1e-8,
+  "coordinateToleranceReason": "Numerical derivatives amplify floating-point rounding; under-constrained line-offset scenarios use 1e-7 because their difference step is 1e-6. Other scenarios use 1e-8. Original solver status, iteration counts, writes, DoF and error checks are retained.",
+  "cases": [
+    {
+      "name": "symmetry oblique line",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "sym",
+          "type": "symmetry",
+          "name": "Symmetry",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "c",
+            "d",
+            "a",
+            "b"
+          ],
+          "p1Id": "c",
+          "p2Id": "d",
+          "lineP1Id": "a",
+          "lineP2Id": "b"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 134.5203373382625,
+        "finalError": 6.372033868551215e-17,
+        "degreesOfFreedom": 9,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 11,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 9.780863312667408,
+          "d.y": -11.157834057418013,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 33
+      }
+    },
+    {
+      "name": "symmetry X axis",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "sym",
+          "type": "symmetry",
+          "name": "Symmetry",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "c",
+            "d",
+            "axis_x"
+          ],
+          "p1Id": "c",
+          "p2Id": "d",
+          "lineP1Id": "origin",
+          "lineP2Id": "axis_x",
+          "lineId": "axis_x"
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 117.45625000000001,
+        "finalError": 6.375243776178098e-17,
+        "degreesOfFreedom": 13,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 15,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": -3.1999999998392736,
+          "d.y": -8.399999977418677,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 45
+      }
+    },
+    {
+      "name": "symmetry origin drag",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "sym",
+          "type": "symmetry",
+          "name": "Symmetry",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "c",
+            "d",
+            "origin",
+            "origin"
+          ],
+          "p1Id": "c",
+          "p2Id": "d",
+          "lineP1Id": "origin",
+          "lineP2Id": "",
+          "lineId": "origin"
+        },
+        {
+          "id": "drag_c",
+          "type": "drag_point",
+          "name": "Drag",
+          "weight": 0.05,
+          "isSoft": true,
+          "isDimensional": false,
+          "entityIds": [
+            "c"
+          ],
+          "pointId": "c",
+          "targetX": 6,
+          "targetY": 9
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 5,
+        "initialError": 66.41875000000002,
+        "finalError": 6.282480394899062e-15,
+        "degreesOfFreedom": 15,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 17,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": 5.999998474073132,
+          "c.y": 8.999998361422785,
+          "d.x": -5.999998466424423,
+          "d.y": -8.999998353209415,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 85
+      }
+    },
+    {
+      "name": "circular solve full",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "full",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 459.19999999999993,
+        "finalError": 1.1181584590421078e-19,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": -6.1999999997924595,
+          "d.y": 8.600000000088944,
+          "e.x": -9.799999999990638,
+          "e.y": -7.19999999983147,
+          "f.x": -9.999999999634854,
+          "f.y": -10.199999999942262,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.399999999959428,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "circular solve partial",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "partial",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 337.7708872242754,
+        "finalError": 8.224762501550401e-20,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 3.8321492232128764,
+          "d.y": 10.623971641862992,
+          "e.x": -9.784419762479603,
+          "e.y": 1.8382417883139506,
+          "f.x": -6.460908515562878,
+          "f.y": 8.422423252289637,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.399999999959428,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "circular solve symmetric",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "symmetric",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 30.33752395599084,
+        "finalError": 7.387233072002661e-21,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 3.8321492232128764,
+          "d.y": 10.623971641862992,
+          "e.x": -9.784419762479603,
+          "e.y": 1.8382417883139506,
+          "f.x": 14.56144358913453,
+          "f.y": -5.541498536302087,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.399999999959428,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "circular suppressed solve",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "partial",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": true,
+          "suppressedIndices": [
+            1
+          ],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 320.5722014016463,
+        "finalError": 7.805973818115534e-20,
+        "degreesOfFreedom": 7,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 7.1,
+          "d.y": 14.3,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": -6.460908515562878,
+          "f.y": 8.422423252289637,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "circular center moves with fixed copies",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1,
+          "fixed": true
+        },
+        {
+          "id": "d.y",
+          "value": 14.3,
+          "fixed": true
+        },
+        {
+          "id": "e.x",
+          "value": -9.2,
+          "fixed": true
+        },
+        {
+          "id": "e.y",
+          "value": 3.6,
+          "fixed": true
+        },
+        {
+          "id": "f.x",
+          "value": 13.4,
+          "fixed": true
+        },
+        {
+          "id": "f.y",
+          "value": -6.5,
+          "fixed": true
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "fixed": true,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "partial",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 337.7708872242754,
+        "finalError": 1.3225000000031997,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 9,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 34.95038257805679,
+          "a.y": 11.38136528954724,
+          "b.x": 17.57531491974978,
+          "b.y": 33.341994640963385,
+          "c.x": -1.4692012008259114,
+          "c.y": 37.5236650253787,
+          "d.x": 7.1,
+          "d.y": 14.3,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 3.6500000000585167,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 27
+      }
+    },
+    {
+      "name": "rectangular solve axes 0",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "rect",
+          "type": "rectangular_pattern",
+          "name": "Rectangular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "sourceObjectIds": [
+            "source"
+          ],
+          "line1Id": null,
+          "line1P1Id": null,
+          "line1P2Id": null,
+          "line2Id": null,
+          "line2P1Id": null,
+          "line2P2Id": null,
+          "quantity1": 4,
+          "distance1": 5.3,
+          "direction1": "one_direction",
+          "quantity2": 4,
+          "distance2": 7.1,
+          "direction2": "symmetric",
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 1,
+              "j": 2
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 2,
+              "j": 3
+            }
+          ]
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 651.12,
+        "finalError": 1.5854815134820245e-19,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 17.89999999983147,
+          "d.y": -2.299999999740965,
+          "e.x": 2.0999999998236687,
+          "e.y": 1.3000000000358911,
+          "f.x": 23.199999999847076,
+          "f.y": 18.999999999602085,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.399999999959428,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "rectangular solve axes 1",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "rect",
+          "type": "rectangular_pattern",
+          "name": "Rectangular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "sourceObjectIds": [
+            "source"
+          ],
+          "line1Id": "l1",
+          "line1P1Id": "a",
+          "line1P2Id": "b",
+          "line2Id": null,
+          "line2P1Id": null,
+          "line2P2Id": null,
+          "quantity1": 4,
+          "distance1": 5.3,
+          "direction1": "one_direction",
+          "quantity2": 4,
+          "distance2": 7.1,
+          "direction2": "symmetric",
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 1,
+              "j": 2
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 2,
+              "j": 3
+            }
+          ]
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 713.9301216829462,
+        "finalError": 1.7384253800767264e-19,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 20.94215170379506,
+          "d.y": 1.81528813013677,
+          "e.x": 5.142151703787256,
+          "e.y": 5.415288129913626,
+          "f.x": 13.579174249858145,
+          "f.y": 22.492970857727652,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.399999999959428,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "rectangular solve axes 2",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "rect",
+          "type": "rectangular_pattern",
+          "name": "Rectangular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "sourceObjectIds": [
+            "source"
+          ],
+          "line1Id": "l1",
+          "line1P1Id": "a",
+          "line1P2Id": "b",
+          "line2Id": "l2",
+          "line2P1Id": "a",
+          "line2P2Id": "c",
+          "quantity1": 4,
+          "distance1": 5.3,
+          "direction1": "one_direction",
+          "quantity2": 4,
+          "distance2": 7.1,
+          "direction2": "symmetric",
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 1,
+              "j": 2
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 2,
+              "j": 3
+            }
+          ]
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 730.5850501048578,
+        "finalError": 1.778977119362029e-19,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 8,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 19.683375686322854,
+          "d.y": 1.1510379753350024,
+          "e.x": 3.8833756863150533,
+          "e.y": 4.751037975111858,
+          "f.x": 16.09672628480255,
+          "f.y": 23.821471167331186,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.399999999959428,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "rectangular moving source and axes",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "rect",
+          "type": "rectangular_pattern",
+          "name": "Rectangular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "sourceObjectIds": [
+            "source"
+          ],
+          "line1Id": "l1",
+          "line1P1Id": "a",
+          "line1P2Id": "b",
+          "line2Id": "l2",
+          "line2P1Id": "a",
+          "line2P2Id": "c",
+          "quantity1": 4,
+          "distance1": 5.3,
+          "direction1": "one_direction",
+          "quantity2": 4,
+          "distance2": 7.1,
+          "direction2": "symmetric",
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 1,
+              "j": 2
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": [],
+              "i": 2,
+              "j": 3
+            }
+          ]
+        },
+        {
+          "id": "fix",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "d"
+          ],
+          "pointId": "d",
+          "targetX": 20,
+          "targetY": 25
+        },
+        {
+          "id": "fix2",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "e"
+          ],
+          "pointId": "e",
+          "targetX": -5,
+          "targetY": 30
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 4,
+        "initialError": 1228.3350501048578,
+        "finalError": 4.586548167094872e-18,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 14,
+        "equationsCount": 12,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 15.610387284793594,
+          "b.y": 27.010536651252004,
+          "c.x": -9.38961271371331,
+          "c.y": 32.01053665043984,
+          "d.x": 19.999999998022506,
+          "d.y": 25.000000000074543,
+          "e.x": -5.000000001168524,
+          "e.y": 29.99999999964642,
+          "f.x": 16.030826202574016,
+          "f.y": 50.131509848623345,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 7.3999999999999995,
+          "r2.r": 7.3999999999999995
+        },
+        "writes": 56
+      }
+    },
+    {
+      "name": "offset line child only",
+      "coordinateTolerance": 1e-7,
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "l1",
+            "a",
+            "b",
+            "l2",
+            "d",
+            "e"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "line",
+              "origLineId": "l1",
+              "origP1Id": "a",
+              "origP2Id": "b",
+              "offLineId": "l2",
+              "offP1Id": "d",
+              "offP2Id": "e",
+              "side": 1
+            }
+          ],
+          "dimPairIndex": 0
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 60.93802831068792,
+        "finalError": 1.4838408643409658e-20,
+        "degreesOfFreedom": 15,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 17,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 11.389448970354765,
+          "d.y": 7.837230210652012,
+          "e.x": -4.855913635089657,
+          "e.y": -2.945090102694204,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 51
+      }
+    },
+    {
+      "name": "offset circle child only",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "r0",
+            "a",
+            "r1",
+            "c"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "circle",
+              "origId": "r0",
+              "origCenterId": "a",
+              "offId": "r1",
+              "offCenterId": "c",
+              "side": -1
+            }
+          ],
+          "dimPairIndex": 0
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 71.91000000000003,
+        "finalError": 1.7510102816583434e-20,
+        "degreesOfFreedom": 14,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.x",
+          "c.y",
+          "origin.x",
+          "origin.y",
+          "r1.r"
+        ],
+        "freeParametersCount": 17,
+        "equationsCount": 3,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": 1.2999999999297798,
+          "c.y": -2.6999999998267903,
+          "d.x": 7.1,
+          "d.y": 14.3,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.2000000000093625,
+          "r2.r": 2.5
+        },
+        "writes": 51
+      }
+    },
+    {
+      "name": "offset spline children",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "sp0",
+            "sp1",
+            "f",
+            "g"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "spline",
+              "origSplineId": "sp0",
+              "offSplineId": "sp1",
+              "points": [
+                {
+                  "pointId": "f",
+                  "basePos": {
+                    "x": 2,
+                    "y": -3
+                  },
+                  "normal": {
+                    "x": 0.6,
+                    "y": 0.8
+                  },
+                  "side": 1
+                },
+                {
+                  "pointId": "g",
+                  "basePos": {
+                    "x": 4,
+                    "y": 7
+                  },
+                  "normal": {
+                    "x": -0.8,
+                    "y": 0.6
+                  },
+                  "side": -1
+                }
+              ]
+            }
+          ],
+          "dimPairIndex": 0
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 240.499,
+        "finalError": 5.856183250230172e-20,
+        "degreesOfFreedom": 13,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "f.x",
+          "f.y",
+          "g.x",
+          "g.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 17,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 7.1,
+          "d.y": 14.3,
+          "e.x": -9.2,
+          "e.y": 3.6,
+          "f.x": 3.920000000147931,
+          "f.y": -0.44000000009456286,
+          "g.x": 6.559999999818052,
+          "g.y": 5.079999999769365,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 51
+      }
+    },
+    {
+      "name": "offset mixed chain",
+      "coordinateTolerance": 1e-7,
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "l1",
+            "a",
+            "b",
+            "l2",
+            "d",
+            "e",
+            "r0",
+            "r1",
+            "c",
+            "sp0",
+            "sp1",
+            "f",
+            "g"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "line",
+              "origLineId": "l1",
+              "origP1Id": "a",
+              "origP2Id": "b",
+              "offLineId": "l2",
+              "offP1Id": "d",
+              "offP2Id": "e",
+              "side": 1
+            },
+            {
+              "kind": "circle",
+              "origId": "r0",
+              "origCenterId": "a",
+              "offId": "r1",
+              "offCenterId": "c",
+              "side": -1
+            },
+            {
+              "kind": "spline",
+              "origSplineId": "sp0",
+              "offSplineId": "sp1",
+              "points": [
+                {
+                  "pointId": "f",
+                  "basePos": {
+                    "x": 2,
+                    "y": -3
+                  },
+                  "normal": {
+                    "x": 0.6,
+                    "y": 0.8
+                  },
+                  "side": 1
+                },
+                {
+                  "pointId": "g",
+                  "basePos": {
+                    "x": 4,
+                    "y": 7
+                  },
+                  "normal": {
+                    "x": -0.8,
+                    "y": 0.6
+                  },
+                  "side": -1
+                }
+              ]
+            }
+          ],
+          "dimPairIndex": 0
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 373.34702831068796,
+        "finalError": 9.091034396229481e-20,
+        "degreesOfFreedom": 8,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "c.x",
+          "c.y",
+          "f.x",
+          "f.y",
+          "g.x",
+          "g.y",
+          "origin.x",
+          "origin.y",
+          "r1.r"
+        ],
+        "freeParametersCount": 17,
+        "equationsCount": 9,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": 1.2999999999297798,
+          "c.y": -2.6999999998267903,
+          "d.x": 11.389448970354765,
+          "d.y": 7.837230210652012,
+          "e.x": -4.855913635089657,
+          "e.y": -2.945090102694204,
+          "f.x": 3.920000000147931,
+          "f.y": -0.44000000009456286,
+          "g.x": 6.559999999818052,
+          "g.y": 5.079999999769365,
+          "r0.r": 7.4,
+          "r1.r": 4.2000000000093625,
+          "r2.r": 2.5
+        },
+        "writes": 51
+      }
+    },
+    {
+      "name": "offset children temporary lock",
+      "coordinateTolerance": 1e-7,
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "l1",
+            "a",
+            "b",
+            "l2",
+            "d",
+            "e"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "line",
+              "origLineId": "l1",
+              "origP1Id": "a",
+              "origP2Id": "b",
+              "offLineId": "l2",
+              "offP1Id": "d",
+              "offP2Id": "e",
+              "side": 1
+            }
+          ],
+          "dimPairIndex": 0
+        }
+      ],
+      "options": {},
+      "callOptions": {
+        "lockedParams": [
+          "d.x",
+          "e.x"
+        ]
+      },
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 60.93802831068792,
+        "finalError": 1.3243467049913006e-19,
+        "degreesOfFreedom": 13,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 15,
+        "equationsCount": 2,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 7.1,
+          "d.y": 4.9902508058380235,
+          "e.x": -9.2,
+          "e.y": -5.828333264952909,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 45
+      }
+    },
+    {
+      "name": "offset and dragged master",
+      "coordinateTolerance": 1e-7,
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "l1",
+            "a",
+            "b",
+            "l2",
+            "d",
+            "e"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "line",
+              "origLineId": "l1",
+              "origP1Id": "a",
+              "origP2Id": "b",
+              "offLineId": "l2",
+              "offP1Id": "d",
+              "offP2Id": "e",
+              "side": 1
+            }
+          ],
+          "dimPairIndex": 0
+        },
+        {
+          "id": "drag_a",
+          "type": "drag_point",
+          "name": "Drag",
+          "weight": 0.05,
+          "isSoft": true,
+          "isDimensional": false,
+          "entityIds": [
+            "a"
+          ],
+          "pointId": "a",
+          "targetX": -3,
+          "targetY": 2
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 6,
+        "initialError": 60.98875331068792,
+        "finalError": 8.004185402732854e-16,
+        "degreesOfFreedom": 13,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 15,
+        "equationsCount": 4,
+        "values": {
+          "a.x": -2.999999999989693,
+          "a.y": 1.9999999999887343,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 11.392800310688601,
+          "d.y": 7.834459583597524,
+          "e.x": -6.82910632370123,
+          "e.y": 4.563860917652912,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 90
+      }
+    },
+    {
+      "name": "patterns soft and hard row ordering",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3,
+          "fixed": true
+        },
+        {
+          "id": "a.y",
+          "value": -2.7,
+          "fixed": true
+        },
+        {
+          "id": "b.x",
+          "value": 12.6,
+          "fixed": true
+        },
+        {
+          "id": "b.y",
+          "value": 4.8,
+          "fixed": true
+        },
+        {
+          "id": "c.x",
+          "value": -3.2,
+          "fixed": true
+        },
+        {
+          "id": "c.y",
+          "value": 8.4,
+          "fixed": true
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "fixed": true,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "partial",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": false,
+          "suppressedIndices": [],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        },
+        {
+          "id": "off",
+          "type": "offset",
+          "name": "Offset",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": true,
+          "value": 3.2,
+          "entityIds": [
+            "r0",
+            "a",
+            "r1",
+            "c"
+          ],
+          "targetDistance": 3.2,
+          "pairs": [
+            {
+              "kind": "circle",
+              "origId": "r0",
+              "origCenterId": "a",
+              "offId": "r1",
+              "offCenterId": "c",
+              "side": -1
+            }
+          ],
+          "dimPairIndex": 0
+        },
+        {
+          "id": "fix",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "d"
+          ],
+          "pointId": "d",
+          "targetX": 5,
+          "targetY": 9
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "OVER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 425.9308872242754,
+        "finalError": 75.29028983258759,
+        "degreesOfFreedom": 2,
+        "constrainedParams": [
+          "a.x",
+          "a.y",
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "b.x",
+          "b.y",
+          "c.x",
+          "c.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "f.x",
+          "f.y",
+          "origin.x",
+          "origin.y",
+          "r0.r",
+          "r1.r",
+          "r2.r"
+        ],
+        "freeParametersCount": 10,
+        "equationsCount": 13,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 4.416074611622823,
+          "d.y": 9.811985820972849,
+          "e.x": -9.784419762479603,
+          "e.y": 1.8382417883139506,
+          "f.x": -6.460908515562878,
+          "f.y": 8.422423252289637,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 5.799999999984395,
+          "r2.r": 7.399999999923538
+        },
+        "writes": 30
+      }
+    },
+    {
+      "name": "empty suppressed pattern between constraints",
+      "params": [
+        {
+          "id": "a.x",
+          "value": 1.3
+        },
+        {
+          "id": "a.y",
+          "value": -2.7
+        },
+        {
+          "id": "b.x",
+          "value": 12.6
+        },
+        {
+          "id": "b.y",
+          "value": 4.8
+        },
+        {
+          "id": "c.x",
+          "value": -3.2
+        },
+        {
+          "id": "c.y",
+          "value": 8.4
+        },
+        {
+          "id": "d.x",
+          "value": 7.1
+        },
+        {
+          "id": "d.y",
+          "value": 14.3
+        },
+        {
+          "id": "e.x",
+          "value": -9.2
+        },
+        {
+          "id": "e.y",
+          "value": 3.6
+        },
+        {
+          "id": "f.x",
+          "value": 13.4
+        },
+        {
+          "id": "f.y",
+          "value": -6.5
+        },
+        {
+          "id": "g.x",
+          "value": -5.1
+        },
+        {
+          "id": "g.y",
+          "value": -9.7
+        },
+        {
+          "id": "r0.r",
+          "value": 7.4,
+          "min": 0.1
+        },
+        {
+          "id": "r1.r",
+          "value": 4.8,
+          "min": 0.1
+        },
+        {
+          "id": "r2.r",
+          "value": 2.5,
+          "min": 0.1
+        }
+      ],
+      "constraints": [
+        {
+          "id": "fix",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "d"
+          ],
+          "pointId": "d",
+          "targetX": 5,
+          "targetY": 9
+        },
+        {
+          "id": "circ",
+          "type": "circular_pattern",
+          "name": "Circular Pattern",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "a",
+            "b",
+            "d",
+            "c",
+            "e",
+            "r0",
+            "r1",
+            "f",
+            "r2"
+          ],
+          "centerPtId": "a",
+          "sourceObjectIds": [
+            "source"
+          ],
+          "distribution": "full",
+          "totalAngle": 137,
+          "quantity": 4,
+          "suppression": true,
+          "suppressedIndices": [
+            1,
+            2
+          ],
+          "copies": [
+            {
+              "copyIndex": 1,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "d"
+                },
+                {
+                  "sourcePtId": "c",
+                  "patternPtId": "e"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r1"
+                }
+              ],
+              "createdEntityIds": []
+            },
+            {
+              "copyIndex": 2,
+              "pointPairs": [
+                {
+                  "sourcePtId": "b",
+                  "patternPtId": "f"
+                }
+              ],
+              "radiusPairs": [
+                {
+                  "sourceCircleId": "r0",
+                  "patternCircleId": "r2"
+                }
+              ],
+              "createdEntityIds": []
+            }
+          ],
+          "isReadOnly": false
+        },
+        {
+          "id": "fix2",
+          "type": "fixed",
+          "name": "Fixed Point",
+          "weight": 1,
+          "isSoft": false,
+          "isDimensional": false,
+          "entityIds": [
+            "e"
+          ],
+          "pointId": "e",
+          "targetX": -6,
+          "targetY": 2
+        }
+      ],
+      "options": {},
+      "callOptions": {},
+      "expected": {
+        "status": "UNDER_CONSTRAINED",
+        "iterations": 3,
+        "initialError": 22.650000000000002,
+        "finalError": 5.515254570041821e-21,
+        "degreesOfFreedom": 13,
+        "constrainedParams": [
+          "axis_x.x",
+          "axis_x.y",
+          "axis_y.x",
+          "axis_y.y",
+          "d.x",
+          "d.y",
+          "e.x",
+          "e.y",
+          "origin.x",
+          "origin.y"
+        ],
+        "freeParametersCount": 17,
+        "equationsCount": 4,
+        "values": {
+          "a.x": 1.3,
+          "a.y": -2.7,
+          "b.x": 12.6,
+          "b.y": 4.8,
+          "c.x": -3.2,
+          "c.y": 8.4,
+          "d.x": 5.000000000032769,
+          "d.y": 9.000000000082704,
+          "e.x": -6.000000000049934,
+          "e.y": 2.000000000024967,
+          "f.x": 13.4,
+          "f.y": -6.5,
+          "g.x": -5.1,
+          "g.y": -9.7,
+          "r0.r": 7.4,
+          "r1.r": 4.8,
+          "r2.r": 2.5
+        },
+        "writes": 51
+      }
+    }
+  ]
+}

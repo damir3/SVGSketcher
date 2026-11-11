@@ -1,0 +1,33 @@
+name: Geometry kernel
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install JavaScript dependencies
+        run: npm install
+      - name: Install Rust target and bindings tool
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.105 --locked
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+      - name: Test native Rust
+        run: npm run test:rust
+      - name: Test TypeScript backend
+        run: npm test
+      - name: Build WASM application
+        run: npm run build:wasm
+      - name: Test full editor suite with WASM backend
+        run: npm run test:wasm

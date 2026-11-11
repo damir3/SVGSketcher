@@ -1,17 +1,8 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from './ellipse';
-import { Vec2, projectPointOntoSegment } from './vector';
-import { AABB } from './aabb';
+import { Vec2 } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
-import {
-	getSplinePointAtParam,
-	getSplineParamAtPoint,
-	evaluateBezier,
-	evaluateBezierDerivative,
-	splitBezier,
-	extractSplineInterval,
-	type BezierSegment,
-} from './spline';
+import { getSplinePointAtParam, getSplineParamAtPoint, extractSplineInterval, type BezierSegment } from './spline';
 import {
 	HorizontalConstraint,
 	VerticalConstraint,
@@ -25,6 +16,8 @@ import {
 	SymmetryConstraint,
 } from '../solver/constraints';
 import type { IConstraint } from '../solver/types';
+import { getGeometryKernel } from '../kernel';
+import type { IntersectionPair, KernelCurve, Point2 } from '../kernel/types';
 
 const TWO_PI = 2 * Math.PI;
 
@@ -333,139 +326,80 @@ function deduplicatePoints(pts: Vec2[], eps = 1e-4): Vec2[] {
 // --- INTERSECTION ROUTINES ---
 
 export function intersectSegmentSegment(s1: GeoSegment, s2: GeoSegment): Vec2[] {
-	const dir1 = new Vec2().subVectors(s1.p2, s1.p1);
-	const dir2 = new Vec2().subVectors(s2.p2, s2.p1);
-
-	const det = dir1.cross(dir2);
-	if (Math.abs(det) < 1e-10) return [];
-
-	const delta = new Vec2().subVectors(s2.p1, s1.p1);
-	const t = delta.cross(dir2) / det;
-	const u = delta.cross(dir1) / det;
-
-	const eps = 1e-5;
-	if (t >= -eps && t <= 1 + eps && u >= -eps && u <= 1 + eps) {
-		const clampedT = Math.max(0, Math.min(1, t));
-		return [s1.p1.clone().addScaledVector(dir1, clampedT)];
-	}
-	return [];
+	return intersectKernelCurves(s1, s2);
 }
 
 export function intersectSegmentCircle(s: GeoSegment, c: GeoCircle | GeoArc): Vec2[] {
-	const p1 = s.p1;
-	const p2 = s.p2;
-	const v = new Vec2().subVectors(p2, p1);
-	const w = new Vec2().subVectors(p1, c.center);
-
-	const A = v.lengthSq();
-	if (A < 1e-12) return [];
-
-	const closestT = -w.dot(v) / A;
-	const closest = p1.clone().addScaledVector(v, closestT);
-	const distance = closest.distanceTo(c.center);
-	// Test tangency in world units. A discriminant tolerance depends on segment
-	// length and can turn solver roundoff into a gap or two spurious crossings.
-	// Allow the solver's ~1e-6 residuals, using the same 1e-5 geometric tolerance
-	// as segment intersections and region vertex keys.
-	const isTangent = Math.abs(distance - c.radius) <= 1e-5;
-	if (!isTangent && distance > c.radius) return [];
-
-	const offset = isTangent ? 0 : Math.sqrt(((c.radius - distance) * (c.radius + distance)) / A);
-	const tCandidates = isTangent ? [closestT] : [closestT - offset, closestT + offset];
-	const pts: Vec2[] = [];
-	const eps = 1e-5;
-
-	for (const t of tCandidates) {
-		if (t >= -eps && t <= 1 + eps) {
-			const clampedT = Math.max(0, Math.min(1, t));
-			const pt = p1.clone().addScaledVector(v, clampedT);
-			if (c.type === 'circle' || isPointOnArc(pt, c)) {
-				pts.push(pt);
-			}
-		}
-	}
-	return deduplicatePoints(pts);
+	return intersectKernelCurves(s, c);
 }
 
 export function intersectSegmentEllipse(s: GeoSegment, e: GeoEllipse | GeoEllipticalArc): Vec2[] {
-	const sc = new Vec2(e.center.x, -e.center.y);
-	const smaj = new Vec2(e.majorAxisPoint.x, -e.majorAxisPoint.y);
-	const smin = new Vec2(e.minorAxisPoint.x, -e.minorAxisPoint.y);
-	const s1 = new Vec2(s.p1.x, -s.p1.y);
-	const s2 = new Vec2(s.p2.x, -s.p2.y);
-
-	const r = Vec2.from(sc).distancesTo(smaj, smin);
-	if (r.x < 1e-6 || r.y < 1e-6) return [];
-
-	const { axisU: u, axisV: v } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
-
-	// Transform line segment endpoints to ellipse-local coordinates
-	const d1 = new Vec2().subVectors(s1, sc);
-	const d2 = new Vec2().subVectors(s2, sc);
-
-	const u1 = d1.dot(u);
-	const v1 = d1.dot(v);
-	const u2 = d2.dot(u);
-	const v2 = d2.dot(v);
-
-	const du = u2 - u1;
-	const dv = v2 - v1;
-
-	const A = r.y * r.y * du * du + r.x * r.x * dv * dv;
-	if (A < 1e-12) return [];
-
-	const B = 2 * (r.y * r.y * u1 * du + r.x * r.x * v1 * dv);
-	const C0 = r.y * r.y * u1 * u1 + r.x * r.x * v1 * v1 - r.x * r.x * r.y * r.y;
-
-	const disc = B * B - 4 * A * C0;
-	if (disc < -1e-7) return [];
-
-	const sqrtD = Math.sqrt(Math.max(0, disc));
-	const tCandidates = [(-B - sqrtD) / (2 * A), (-B + sqrtD) / (2 * A)];
-	const pts: Vec2[] = [];
-	const eps = 1e-5;
-
-	for (const t of tCandidates) {
-		if (t >= -eps && t <= 1 + eps) {
-			const clampedT = Math.max(0, Math.min(1, t));
-			const worldPt = s.p1.clone().lerp(s.p2, clampedT);
-			if (e.type === 'ellipse' || isPointOnEllipticalArc(worldPt, e)) {
-				pts.push(worldPt);
-			}
-		}
-	}
-	return deduplicatePoints(pts);
+	return intersectKernelCurves(s, e);
 }
 
 export function intersectCircleCircle(c1: GeoCircle | GeoArc, c2: GeoCircle | GeoArc): Vec2[] {
-	const dir = new Vec2().subVectors(c2.center, c1.center);
-	const d = dir.length();
+	return intersectKernelCurves(c1, c2);
+}
 
-	if (d < 1e-9) return []; // concentric or identical
-	if (d > c1.radius + c2.radius + 1e-5 || d < Math.abs(c1.radius - c2.radius) - 1e-5) return [];
-
-	const a = (c1.radius * c1.radius - c2.radius * c2.radius + d * d) / (2 * d);
-	const h2 = c1.radius * c1.radius - a * a;
-	const h = Math.sqrt(Math.max(0, h2));
-
-	const p0 = c1.center.clone().addScaledVector(dir, a / d);
-
-	const candidates: Vec2[] = [];
-	if (h < 1e-7) {
-		candidates.push(p0);
-	} else {
-		const normal = dir.clone().perpendicular().divideScalar(d);
-		candidates.push(p0.clone().addScaledVector(normal, h));
-		candidates.push(p0.clone().addScaledVector(normal, -h));
+function toKernelCurve(curve: GeoCurve): KernelCurve | null {
+	if (curve.type === 'segment') return curve;
+	if (curve.type === 'circle' || curve.type === 'arc') {
+		return { type: 'circle', center: curve.center, radius: curve.radius };
 	}
-
-	const pts: Vec2[] = [];
-	for (const pt of candidates) {
-		const ok1 = c1.type === 'circle' || isPointOnArc(pt, c1);
-		const ok2 = c2.type === 'circle' || isPointOnArc(pt, c2);
-		if (ok1 && ok2) pts.push(pt);
+	if (curve.type === 'ellipse' || curve.type === 'elliptical_arc') {
+		return {
+			type: 'ellipse',
+			center: curve.center,
+			majorAxisPoint: curve.majorAxisPoint,
+			minorAxisPoint: curve.minorAxisPoint,
+		};
 	}
-	return deduplicatePoints(pts);
+	return null;
+}
+
+function isWithinCurveSpan(p: Vec2, curve: GeoCurve): boolean {
+	if (curve.type === 'arc') return isPointOnArc(p, curve);
+	if (curve.type === 'elliptical_arc') return isPointOnEllipticalArc(p, curve);
+	return true;
+}
+
+function filterKernelPoints(points: Point2[], a: GeoCurve, b: GeoCurve): Vec2[] {
+	return deduplicatePoints(points.map(Vec2.from).filter(p => isWithinCurveSpan(p, a) && isWithinCurveSpan(p, b)));
+}
+
+function intersectKernelCurves(a: GeoCurve, b: GeoCurve): Vec2[] {
+	const points = getGeometryKernel().intersectPairs([{ a: toKernelCurve(a)!, b: toKernelCurve(b)! }])[0];
+	return filterKernelPoints(points, a, b);
+}
+
+/** Flatten composite splines in legacy traversal order, then intersect all primitive pairs in one call. */
+export function intersectCurvePairs(pairs: readonly (readonly [GeoCurve, GeoCurve])[]): Vec2[][] {
+	const results: Point2[][] = pairs.map(() => []);
+	const supported: IntersectionPair[] = [];
+	const indices: number[] = [];
+	pairs.forEach(([first, second], i) => {
+		// Spline order was defined by the spline operand, even when it was passed second.
+		const [a, b] = first.type !== 'spline' && second.type === 'spline' ? [second, first] : [first, second];
+		if (a.id === b.id) return;
+		const curves = (curve: GeoCurve): KernelCurve[] =>
+			curve.type === 'spline'
+				? curve.bezierSegments.map(points => ({ type: 'bezier', points }))
+				: [toKernelCurve(curve)!];
+		const curvesA = curves(a),
+			curvesB = curves(b);
+		for (const ka of curvesA)
+			for (const kb of curvesB) {
+				supported.push({ a: ka, b: kb });
+				indices.push(i);
+			}
+	});
+	if (supported.length) {
+		const hits = getGeometryKernel().intersectPairs(supported);
+		indices.forEach((index, i) => {
+			for (const point of hits[i]) results[index].push(point);
+		});
+	}
+	return results.map((points, i) => filterKernelPoints(points, pairs[i][0], pairs[i][1]));
 }
 
 /**
@@ -475,376 +409,25 @@ export function intersectEllipseEllipse(
 	e1: GeoCircle | GeoArc | GeoEllipse | GeoEllipticalArc,
 	e2: GeoCircle | GeoArc | GeoEllipse | GeoEllipticalArc
 ): Vec2[] {
-	// Parametrize e1 in SVG space
-	const sc1 = new Vec2(e1.center.x, -e1.center.y);
-	let rx1 = 0,
-		ry1 = 0,
-		theta1 = 0;
-	if (e1.type === 'circle' || e1.type === 'arc') {
-		rx1 = e1.radius;
-		ry1 = e1.radius;
-		theta1 = 0;
-	} else {
-		const maj = new Vec2(e1.majorAxisPoint.x, -e1.majorAxisPoint.y);
-		const min = new Vec2(e1.minorAxisPoint.x, -e1.minorAxisPoint.y);
-		const r1 = Vec2.from(sc1).distancesTo(maj, min);
-		rx1 = r1.x;
-		ry1 = r1.y;
-		theta1 = Vec2.from(sc1).angleToPoint(maj);
-	}
-	if (rx1 < 1e-6 || ry1 < 1e-6) return [];
-
-	const { axisU: u1, axisV: v1 } = ellipseAxes(theta1);
-
-	// Parametrize e2 implicit equation in SVG space
-	const sc2 = new Vec2(e2.center.x, -e2.center.y);
-	let rx2 = 0,
-		ry2 = 0,
-		theta2 = 0;
-	if (e2.type === 'circle' || e2.type === 'arc') {
-		rx2 = e2.radius;
-		ry2 = e2.radius;
-		theta2 = 0;
-	} else {
-		const maj = new Vec2(e2.majorAxisPoint.x, -e2.majorAxisPoint.y);
-		const min = new Vec2(e2.minorAxisPoint.x, -e2.minorAxisPoint.y);
-		const r2 = Vec2.from(sc2).distancesTo(maj, min);
-		rx2 = r2.x;
-		ry2 = r2.y;
-		theta2 = Vec2.from(sc2).angleToPoint(maj);
-	}
-	if (rx2 < 1e-6 || ry2 < 1e-6) return [];
-
-	const { axisU: u2, axisV: v2 } = ellipseAxes(theta2);
-
-	const radii1 = new Vec2(rx1, ry1);
-	const pointOnE1 = (t: number): Vec2 => ellipsePointAtParameter(t, sc1, radii1, u1, v1);
-
-	// Implicit value F2 of a point on e2: F2 = 0 on perimeter
-	const implicitE2 = (p: Vec2): number => {
-		const dir = new Vec2().subVectors(p, sc2);
-		const u = dir.dot(u2);
-		const v = dir.dot(v2);
-		return (u * u) / (rx2 * rx2) + (v * v) / (ry2 * ry2) - 1.0;
-	};
-
-	const g = (t: number) => implicitE2(pointOnE1(t));
-
-	const N = 128;
-	const step = TWO_PI / N;
-	const gVals: number[] = new Array(N + 1);
-	for (let i = 0; i <= N; i++) {
-		gVals[i] = g(i * step);
-	}
-
-	const roots: number[] = [];
-	for (let i = 0; i < N; i++) {
-		const tA = i * step;
-		const tB = (i + 1) * step;
-		const gA = gVals[i];
-		const gB = gVals[i + 1];
-
-		if (gA * gB <= 0) {
-			let low = tA;
-			let high = tB;
-			let fLow = gA;
-			for (let iter = 0; iter < 28; iter++) {
-				const mid = (low + high) * 0.5;
-				const fMid = g(mid);
-				if (Math.abs(fMid) < 1e-12 || high - low < 1e-10) {
-					low = mid;
-					break;
-				}
-				if (fLow * fMid <= 0) {
-					high = mid;
-				} else {
-					low = mid;
-					fLow = fMid;
-				}
-			}
-			roots.push((low + high) * 0.5);
-		} else if (
-			Math.abs(gA) < 1e-4 &&
-			(i === 0 || Math.abs(gA) <= Math.abs(gVals[i - 1])) &&
-			Math.abs(gA) <= Math.abs(gB)
-		) {
-			// Near tangency minimum
-			roots.push(tA);
-		}
-	}
-
-	const pts: Vec2[] = [];
-	for (const t of roots) {
-		const svgP = pointOnE1(t);
-		const worldP: Vec2 = new Vec2(svgP.x, -svgP.y);
-
-		let ok1 = true;
-		if (e1.type === 'arc') ok1 = isPointOnArc(worldP, e1);
-		else if (e1.type === 'elliptical_arc') ok1 = isPointOnEllipticalArc(worldP, e1);
-
-		let ok2 = true;
-		if (e2.type === 'arc') ok2 = isPointOnArc(worldP, e2);
-		else if (e2.type === 'elliptical_arc') ok2 = isPointOnEllipticalArc(worldP, e2);
-
-		if (ok1 && ok2) {
-			pts.push(worldP);
-		}
-	}
-	return deduplicatePoints(pts);
+	return intersectKernelCurves(e1, e2);
 }
 
-function findBezierImplicitRoots(b: BezierSegment, f: (p: Vec2) => number): Vec2[] {
-	const N = 16;
-	const nearRootTolerance = 1e-4;
-	const vals: number[] = new Array(N + 1);
-	for (let i = 0; i <= N; i++) {
-		vals[i] = f(evaluateBezier(b, i / N));
-	}
-
-	const roots: number[] = [];
-	for (let i = 0; i < N; i++) {
-		const tA = i / N;
-		const tB = (i + 1) / N;
-		const vA = vals[i];
-		const vB = vals[i + 1];
-
-		if (vA * vB <= 0) {
-			let low = tA;
-			let high = tB;
-			let fLow = vA;
-			for (let iter = 0; iter < 28; iter++) {
-				const mid = (low + high) * 0.5;
-				const fMid = f(evaluateBezier(b, mid));
-				if (Math.abs(fMid) < 1e-12 || high - low < 1e-10) {
-					low = mid;
-					break;
-				}
-				if (fLow * fMid <= 0) {
-					high = mid;
-				} else {
-					low = mid;
-					fLow = fMid;
-				}
-			}
-			roots.push((low + high) * 0.5);
-		} else if (
-			Math.abs(vA) < nearRootTolerance &&
-			(i === 0 || Math.abs(vA) <= Math.abs(vals[i - 1])) &&
-			Math.abs(vA) <= Math.abs(vB)
-		) {
-			roots.push(tA);
-		}
-	}
-	// The loop tests near roots at the left sample of each interval.
-	// Include the final sample too if the last interval did not bracket a root.
-	const last = vals[N];
-	const previous = vals[N - 1];
-	if (last * previous > 0 && Math.abs(last) < nearRootTolerance && Math.abs(last) <= Math.abs(previous)) {
-		roots.push(1);
-	}
-	return roots.map(t => evaluateBezier(b, t));
-}
-
-/**
- * Computes all intersection points between two cubic Bezier segments using recursive bounding box subdivision
- * and Newton-Raphson parameter refinement.
- */
+/** Intersect two cubic segments through the active kernel; retain the 1e-3 pair deduplication. */
 export function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
-	const pts: Vec2[] = [];
-
-	function getBBox(b: BezierSegment): AABB {
-		return AABB.fromPoints(b)!;
-	}
-
-	interface Task {
-		seg1: BezierSegment;
-		t0: number;
-		t1: number;
-		seg2: BezierSegment;
-		u0: number;
-		u1: number;
-		depth: number;
-	}
-
-	const stack: Task[] = [{ seg1: b1, t0: 0, t1: 1, seg2: b2, u0: 0, u1: 1, depth: 0 }];
-
-	while (stack.length > 0 && pts.length < 16) {
-		const { seg1, t0, t1, seg2, u0, u1, depth } = stack.pop()!;
-		const box1 = getBBox(seg1);
-		const box2 = getBBox(seg2);
-
-		if (
-			box1.max.x < box2.min.x - 1e-4 ||
-			box1.min.x > box2.max.x + 1e-4 ||
-			box1.max.y < box2.min.y - 1e-4 ||
-			box1.min.y > box2.max.y + 1e-4
-		) {
-			continue;
-		}
-
-		const span1 = Math.max(box1.max.x - box1.min.x, box1.max.y - box1.min.y);
-		const span2 = Math.max(box2.max.x - box2.min.x, box2.max.y - box2.min.y);
-
-		if ((span1 < 1e-4 && span2 < 1e-4) || depth >= 15) {
-			let t = (t0 + t1) * 0.5;
-			let u = (u0 + u1) * 0.5;
-
-			// Newton-Raphson refinement on the full segments b1 and b2
-			for (let iter = 0; iter < 4; iter++) {
-				const p1 = evaluateBezier(b1, t);
-				const p2 = evaluateBezier(b2, u);
-				const f = new Vec2().subVectors(p1, p2);
-				if (f.length() < 1e-11) break;
-
-				const d1 = evaluateBezierDerivative(b1, t);
-				const d2 = evaluateBezierDerivative(b2, u);
-				const det = d2.cross(d1);
-				if (Math.abs(det) < 1e-12) break;
-
-				const dt = d2.cross(f) / det;
-				const du = d1.cross(f) / det;
-
-				t = Math.max(0, Math.min(1, t - dt));
-				u = Math.max(0, Math.min(1, u - du));
-			}
-
-			const p1 = evaluateBezier(b1, t);
-			const p2 = evaluateBezier(b2, u);
-			if (p2.distanceTo(p1) < 1e-3) {
-				pts.push(new Vec2().midpoint(p1, p2));
-			}
-			continue;
-		}
-
-		const split1 = span1 >= 1e-4;
-		const split2 = span2 >= 1e-4;
-
-		if (split1 && split2) {
-			const s1 = splitBezier(seg1, 0.5);
-			const s2 = splitBezier(seg2, 0.5);
-			const tm = (t0 + t1) * 0.5;
-			const um = (u0 + u1) * 0.5;
-			stack.push({ seg1: s1.left, t0, t1: tm, seg2: s2.left, u0, u1: um, depth: depth + 1 });
-			stack.push({ seg1: s1.left, t0, t1: tm, seg2: s2.right, u0: um, u1, depth: depth + 1 });
-			stack.push({ seg1: s1.right, t0: tm, t1, seg2: s2.left, u0, u1: um, depth: depth + 1 });
-			stack.push({
-				seg1: s1.right,
-				t0: tm,
-				t1,
-				seg2: s2.right,
-				u0: um,
-				u1,
-				depth: depth + 1,
-			});
-		} else if (split1) {
-			const s1 = splitBezier(seg1, 0.5);
-			const tm = (t0 + t1) * 0.5;
-			stack.push({ seg1: s1.left, t0, t1: tm, seg2, u0, u1, depth: depth + 1 });
-			stack.push({ seg1: s1.right, t0: tm, t1, seg2, u0, u1, depth: depth + 1 });
-		} else {
-			const s2 = splitBezier(seg2, 0.5);
-			const um = (u0 + u1) * 0.5;
-			stack.push({ seg1, t0, t1, seg2: s2.left, u0, u1: um, depth: depth + 1 });
-			stack.push({ seg1, t0, t1, seg2: s2.right, u0, u1, depth: depth + 1 });
-		}
-	}
-
-	return deduplicatePoints(pts, 1e-3);
+	return getGeometryKernel()
+		.intersectPairs([{ a: { type: 'bezier', points: b1 }, b: { type: 'bezier', points: b2 } }])[0]
+		.map(Vec2.from);
 }
 
 export function intersectSplineCurve(spline: GeoSpline, other: GeoCurve): Vec2[] {
-	if (spline.id === other.id) return [];
-	const pts: Vec2[] = [];
-
-	for (const b of spline.bezierSegments) {
-		if (other.type === 'segment') {
-			const p1 = other.p1;
-			const p2 = other.p2;
-			const A = -(p2.y - p1.y);
-			const B = p2.x - p1.x;
-			const C = -(A * p1.x + B * p1.y);
-			const len = Math.hypot(A, B);
-			if (len < 1e-12) continue;
-
-			const f = (p: Vec2) => (A * p.x + B * p.y + C) / len;
-			const rPts = findBezierImplicitRoots(b, f);
-			for (const rPt of rPts) {
-				const proj = projectPointOntoSegment(rPt, p1, p2);
-				if (proj.dist < 1e-3 && proj.t >= -1e-4 && proj.t <= 1 + 1e-4) {
-					pts.push(rPt);
-				}
-			}
-		} else if (other.type === 'circle' || other.type === 'arc') {
-			const f = (p: Vec2) => other.center.distanceTo(p) - other.radius;
-			const rPts = findBezierImplicitRoots(b, f);
-			for (const rPt of rPts) {
-				if (other.type === 'circle' || isPointOnArc(rPt, other)) {
-					pts.push(rPt);
-				}
-			}
-		} else if (other.type === 'ellipse' || other.type === 'elliptical_arc') {
-			const sc = new Vec2(other.center.x, -other.center.y);
-			const maj = new Vec2(other.majorAxisPoint.x, -other.majorAxisPoint.y);
-			const min = new Vec2(other.minorAxisPoint.x, -other.minorAxisPoint.y);
-			const r = Vec2.from(sc).distancesTo(maj, min);
-			if (r.x < 1e-6 || r.y < 1e-6) continue;
-			const { axisU: u, axisV: v } = ellipseAxes(Vec2.from(sc).angleToPoint(maj));
-
-			const f = (p: Vec2) => {
-				const sp = new Vec2(p.x, -p.y);
-				const dir = new Vec2().subVectors(sp, sc);
-				const up = dir.dot(u);
-				const vp = dir.dot(v);
-				return (up * up) / (r.x * r.x) + (vp * vp) / (r.y * r.y) - 1.0;
-			};
-			const rPts = findBezierImplicitRoots(b, f);
-			for (const rPt of rPts) {
-				if (other.type === 'ellipse' || isPointOnEllipticalArc(rPt, other)) {
-					pts.push(rPt);
-				}
-			}
-		} else if (other.type === 'spline') {
-			for (const b2 of other.bezierSegments) {
-				const bPts = intersectBezierBezier(b, b2);
-				for (const pt of bPts) {
-					pts.push(pt);
-				}
-			}
-		}
-	}
-
-	return deduplicatePoints(pts);
+	return intersectCurvePairs([[spline, other]])[0];
 }
 
 /**
  * Finds all intersection points between two arbitrary GeoCurves.
  */
 export function intersectCurves(c1: GeoCurve, c2: GeoCurve): Vec2[] {
-	if (c1.id === c2.id) return [];
-
-	if (c1.type === 'spline') {
-		return intersectSplineCurve(c1, c2);
-	}
-	if (c2.type === 'spline') {
-		return intersectSplineCurve(c2, c1);
-	}
-
-	if (c1.type === 'segment') {
-		if (c2.type === 'segment') return intersectSegmentSegment(c1, c2);
-		if (c2.type === 'circle' || c2.type === 'arc') return intersectSegmentCircle(c1, c2);
-		return intersectSegmentEllipse(c1, c2);
-	}
-
-	if (c2.type === 'segment') {
-		if (c1.type === 'circle' || c1.type === 'arc') return intersectSegmentCircle(c2, c1);
-		return intersectSegmentEllipse(c2, c1);
-	}
-
-	if ((c1.type === 'circle' || c1.type === 'arc') && (c2.type === 'circle' || c2.type === 'arc')) {
-		return intersectCircleCircle(c1, c2);
-	}
-
-	return intersectEllipseEllipse(c1, c2);
+	return intersectCurvePairs([[c1, c2]])[0];
 }
 
 /**
@@ -865,9 +448,10 @@ export interface CurveIntersection {
 export function getCurveIntersections(target: GeoCurve, allCurves: GeoCurve[]): CurveIntersection[] {
 	const results: CurveIntersection[] = [];
 
-	for (const other of allCurves) {
-		if (other.id === target.id) continue;
-		const pts = intersectCurves(target, other);
+	const others = allCurves.filter(other => other.id !== target.id);
+	const intersections = intersectCurvePairs(others.map(other => [target, other]));
+	for (const [index, other] of others.entries()) {
+		const pts = intersections[index];
 		for (const pt of pts) {
 			const param = getParamAtPoint(target, pt);
 			// For open curves (segment, arc, elliptical_arc, open spline), ignore intersections right at the endpoints

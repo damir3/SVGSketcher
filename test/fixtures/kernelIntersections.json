@@ -1,0 +1,1226 @@
+{
+  "sourceCommit": "652ce70151235760a81ea53328b98ddbfba32648",
+  "cases": [
+    {
+      "name": "crossing segments",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 2,
+          "y": 2
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 2
+        },
+        "p2": {
+          "x": 2,
+          "y": 0
+        }
+      },
+      "expected": [
+        {
+          "x": 1,
+          "y": 1
+        }
+      ]
+    },
+    {
+      "name": "parallel segments",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 2,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 1
+        },
+        "p2": {
+          "x": 2,
+          "y": 1
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "overlapping segments retain legacy empty result",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 2,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": 1,
+          "y": 0
+        },
+        "p2": {
+          "x": 3,
+          "y": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "shared endpoint",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": 1,
+          "y": 0
+        },
+        "p2": {
+          "x": 1,
+          "y": 1
+        }
+      },
+      "expected": [
+        {
+          "x": 1,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "endpoint tolerance clamps",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": 1.000005,
+          "y": -1
+        },
+        "p2": {
+          "x": 1.000005,
+          "y": 1
+        }
+      },
+      "expected": [
+        {
+          "x": 1,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "outside endpoint tolerance",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": 1.001,
+          "y": -1
+        },
+        "p2": {
+          "x": 1.001,
+          "y": 1
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "degenerate segment",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "zero length segment pair",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": 0
+        },
+        "p2": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 0
+        },
+        "p2": {
+          "x": 1,
+          "y": 0
+        }
+      },
+      "expected": []
+    },
+    {
+      "name": "segment crosses circle",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -2,
+          "y": 0
+        },
+        "p2": {
+          "x": 2,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": [
+        {
+          "x": -1,
+          "y": 0
+        },
+        {
+          "x": 1,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "circle segment reversed argument order",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "b": {
+        "type": "segment",
+        "p1": {
+          "x": -2,
+          "y": 0
+        },
+        "p2": {
+          "x": 2,
+          "y": 0
+        }
+      },
+      "expected": [
+        {
+          "x": -1,
+          "y": 0
+        },
+        {
+          "x": 1,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "short segment inside circle",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -0.1,
+          "y": 0
+        },
+        "p2": {
+          "x": 0.1,
+          "y": 0
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "real gap",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 25.001
+        },
+        "p2": {
+          "x": 100,
+          "y": 25.001
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": []
+    },
+    {
+      "name": "two near tangent crossings",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 24.999
+        },
+        "p2": {
+          "x": 100,
+          "y": 24.999
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": -0.22360456167095322,
+          "y": 24.999
+        },
+        {
+          "x": 0.22360456167096743,
+          "y": 24.999
+        }
+      ]
+    },
+    {
+      "name": "tangent length 1 error -0.000005",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 24.999995
+        },
+        "p2": {
+          "x": 1,
+          "y": 24.999995
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 24.999995
+        }
+      ]
+    },
+    {
+      "name": "tangent length 1 error -0.000001",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 24.999999
+        },
+        "p2": {
+          "x": 1,
+          "y": 24.999999
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 24.999999
+        }
+      ]
+    },
+    {
+      "name": "tangent length 1 error 0",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 25
+        },
+        "p2": {
+          "x": 1,
+          "y": 25
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25
+        }
+      ]
+    },
+    {
+      "name": "tangent length 1 error 0.000001",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 25.000001
+        },
+        "p2": {
+          "x": 1,
+          "y": 25.000001
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25.000001
+        }
+      ]
+    },
+    {
+      "name": "tangent length 1 error 0.000005",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -1,
+          "y": 25.000005
+        },
+        "p2": {
+          "x": 1,
+          "y": 25.000005
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25.000005
+        }
+      ]
+    },
+    {
+      "name": "tangent length 100 error -0.000005",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 24.999995
+        },
+        "p2": {
+          "x": 100,
+          "y": 24.999995
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 24.999995
+        }
+      ]
+    },
+    {
+      "name": "tangent length 100 error -0.000001",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 24.999999
+        },
+        "p2": {
+          "x": 100,
+          "y": 24.999999
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 24.999999
+        }
+      ]
+    },
+    {
+      "name": "tangent length 100 error 0",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 25
+        },
+        "p2": {
+          "x": 100,
+          "y": 25
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25
+        }
+      ]
+    },
+    {
+      "name": "tangent length 100 error 0.000001",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 25.000001
+        },
+        "p2": {
+          "x": 100,
+          "y": 25.000001
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25.000001
+        }
+      ]
+    },
+    {
+      "name": "tangent length 100 error 0.000005",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -100,
+          "y": 25.000005
+        },
+        "p2": {
+          "x": 100,
+          "y": 25.000005
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25.000005
+        }
+      ]
+    },
+    {
+      "name": "tangent length 10000 error -0.000005",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10000,
+          "y": 24.999995
+        },
+        "p2": {
+          "x": 10000,
+          "y": 24.999995
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 24.999995
+        }
+      ]
+    },
+    {
+      "name": "tangent length 10000 error -0.000001",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10000,
+          "y": 24.999999
+        },
+        "p2": {
+          "x": 10000,
+          "y": 24.999999
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 24.999999
+        }
+      ]
+    },
+    {
+      "name": "tangent length 10000 error 0",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10000,
+          "y": 25
+        },
+        "p2": {
+          "x": 10000,
+          "y": 25
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25
+        }
+      ]
+    },
+    {
+      "name": "tangent length 10000 error 0.000001",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10000,
+          "y": 25.000001
+        },
+        "p2": {
+          "x": 10000,
+          "y": 25.000001
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25.000001
+        }
+      ]
+    },
+    {
+      "name": "tangent length 10000 error 0.000005",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": -10000,
+          "y": 25.000005
+        },
+        "p2": {
+          "x": 10000,
+          "y": 25.000005
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 25.000005
+        }
+      ]
+    },
+    {
+      "name": "two circle crossings",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 6,
+          "y": 0
+        },
+        "radius": 5
+      },
+      "expected": [
+        {
+          "x": 3,
+          "y": 4
+        },
+        {
+          "x": 3,
+          "y": -4
+        }
+      ]
+    },
+    {
+      "name": "external circle tangent",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 2,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": [
+        {
+          "x": 1,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "internal circle tangent",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 3
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 2,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": [
+        {
+          "x": 3,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "nested circles",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 3
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 1,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "concentric circles",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 2
+      },
+      "expected": []
+    },
+    {
+      "name": "identical circles",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": []
+    },
+    {
+      "name": "circle tangent tolerance",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 2.000005,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": [
+        {
+          "x": 1.0000025,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "zero radius circle",
+      "a": {
+        "type": "circle",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 0
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 1,
+          "y": 0
+        },
+        "radius": 1
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 0
+        }
+      ]
+    },
+    {
+      "name": "arc span false",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": -10
+        },
+        "p2": {
+          "x": 0,
+          "y": 10
+        }
+      },
+      "b": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 0
+        },
+        "clockwise": false
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": 5
+        }
+      ]
+    },
+    {
+      "name": "arc circle false",
+      "a": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 0
+        },
+        "clockwise": false
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 6,
+          "y": 0
+        },
+        "radius": 5
+      },
+      "expected": [
+        {
+          "x": 3,
+          "y": 4
+        }
+      ]
+    },
+    {
+      "name": "arc arc false",
+      "a": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 0
+        },
+        "clockwise": false
+      },
+      "b": {
+        "type": "arc",
+        "center": {
+          "x": 6,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 11,
+          "y": 0
+        },
+        "end": {
+          "x": 1,
+          "y": 0
+        },
+        "clockwise": true
+      },
+      "expected": []
+    },
+    {
+      "name": "arc span true",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 0,
+          "y": -10
+        },
+        "p2": {
+          "x": 0,
+          "y": 10
+        }
+      },
+      "b": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 0
+        },
+        "clockwise": true
+      },
+      "expected": [
+        {
+          "x": 0,
+          "y": -5
+        }
+      ]
+    },
+    {
+      "name": "arc circle true",
+      "a": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 0
+        },
+        "clockwise": true
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 6,
+          "y": 0
+        },
+        "radius": 5
+      },
+      "expected": [
+        {
+          "x": 3,
+          "y": -4
+        }
+      ]
+    },
+    {
+      "name": "arc arc true",
+      "a": {
+        "type": "arc",
+        "center": {
+          "x": 0,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 5,
+          "y": 0
+        },
+        "end": {
+          "x": -5,
+          "y": 0
+        },
+        "clockwise": true
+      },
+      "b": {
+        "type": "arc",
+        "center": {
+          "x": 6,
+          "y": 0
+        },
+        "radius": 5,
+        "start": {
+          "x": 11,
+          "y": 0
+        },
+        "end": {
+          "x": 1,
+          "y": 0
+        },
+        "clockwise": false
+      },
+      "expected": []
+    },
+    {
+      "name": "large translated geometry",
+      "a": {
+        "type": "segment",
+        "p1": {
+          "x": 99999900,
+          "y": 100000000
+        },
+        "p2": {
+          "x": 100000100,
+          "y": 100000000
+        }
+      },
+      "b": {
+        "type": "circle",
+        "center": {
+          "x": 100000000,
+          "y": 100000000
+        },
+        "radius": 25
+      },
+      "expected": [
+        {
+          "x": 99999975,
+          "y": 100000000
+        },
+        {
+          "x": 100000025,
+          "y": 100000000
+        }
+      ]
+    }
+  ]
+}

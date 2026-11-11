@@ -1132,17 +1132,6 @@ export class SVGRenderer {
 				options.mirrorHighlight?.selectedObjectIds.has(spline.id) ||
 				options.patternHighlight?.selectedObjectIds.has(spline.id) ||
 				options.rectangularPatternHighlight?.selectedObjectIds.has(spline.id) ||
-				spline.pointIds.some(pid => sketch.selection.pointIds.has(pid)) ||
-				(spline.tangentLineIds &&
-					spline.tangentLineIds.some(lid => {
-						const line = sketch.lines.get(lid);
-						return (
-							line &&
-							(sketch.selection.lineIds.has(lid) ||
-								sketch.selection.pointIds.has(line.p1Id) ||
-								sketch.selection.pointIds.has(line.p2Id))
-						);
-					})) ||
 				isFilletSelected;
 
 			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p), !!spline.isClosed);

@@ -1,0 +1,2948 @@
+{
+  "sourceSha256": {
+    "src/solver/constraints/originAxis.ts": "90aa28586d26821f333281aa8d5538ef8e2ca5e0646118c9b83f5a83d7977659",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d"
+  },
+  "cases": [
+    {
+      "name": "origin aligned side -1",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.587277189389076
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.6380535395155127,
+          -0.28790220685456064
+        ]
+      }
+    },
+    {
+      "name": "origin aligned side -1 soft locked",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.435332324666987
+        ],
+        "jacobian": [
+          0,
+          0.49354664032210394
+        ]
+      }
+    },
+    {
+      "name": "origin aligned side 1",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.587277189389076
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.6380535395155127,
+          -0.28790220685456064
+        ]
+      }
+    },
+    {
+      "name": "origin aligned side 1 soft locked",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.435332324666987
+        ],
+        "jacobian": [
+          0,
+          0.49354664032210394
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal side -1",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "horizontal",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          1.1199999999999997
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0.7
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal side -1 soft locked",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to Y-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "horizontal",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -1.9199999999999995
+        ],
+        "jacobian": [
+          0,
+          -1.2
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal side 1",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -6.3
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0.7
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal side 1 soft locked",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to Y-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          10.799999999999999
+        ],
+        "jacobian": [
+          0,
+          -1.2
+        ]
+      }
+    },
+    {
+      "name": "origin vertical side -1",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to X-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "vertical",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          9.45
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.7,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin vertical side -1 soft locked",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to X-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "vertical",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -16.2
+        ],
+        "jacobian": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin vertical side 1",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to X-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "vertical",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.0299999999999994
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.7,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin vertical side 1 soft locked",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to X-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "vertical",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.479999999999999
+        ],
+        "jacobian": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin aligned zero target",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Coincident with (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 0,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          8.996110270555823
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.9115050564507324,
+          -0.41128886693508665
+        ]
+      }
+    },
+    {
+      "name": "origin aligned negative target",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": -5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": -5.3,
+        "orientation": "aligned",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          14.296110270555822
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.9115050564507324,
+          -0.41128886693508665
+        ]
+      }
+    },
+    {
+      "name": "origin aligned coincident",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Coincident with (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.7,
+          8.2
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal zero target",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Point on Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 0,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.7
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal negative target",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": -5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": -5.3,
+        "orientation": "horizontal",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -9
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "origin horizontal coincident",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Coincident with (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.7,
+          8.2
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin vertical zero target",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Point on X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 0,
+        "orientation": "vertical",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          8.2
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin vertical negative target",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": -5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": -5.3,
+        "orientation": "vertical",
+        "side": -1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.8999999999999995
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin vertical coincident",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Coincident with (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "vertical",
+        "side": 1,
+        "isCoincident": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.7,
+          8.2
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin radial point at zero",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": 0,
+        "a.y": 0,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -5.3
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin radial below floor",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": 1e-9,
+        "a.y": -2e-9,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -5.299999997763932
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.02,
+          0.01
+        ]
+      }
+    },
+    {
+      "name": "origin missing point",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "missing"
+        ],
+        "pointId": "missing",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -5.3
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin coincidence missing point",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Coincident with (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 5.3,
+        "entityIds": [
+          "missing"
+        ],
+        "pointId": "missing",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0,
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin unset orientation",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.696110270555823
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.9115050564507324,
+          -0.41128886693508665
+        ]
+      }
+    },
+    {
+      "name": "origin ignores map origin and axes",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to (0,0)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 100,
+        "origin.y": 200,
+        "axis_x.x": 3,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 9
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.696110270555823
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.9115050564507324,
+          -0.41128886693508665
+        ]
+      }
+    },
+    {
+      "name": "origin derivative cutoff",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 1e-13,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -9e-13
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "origin_distance weighted",
+      "constraint": {
+        "id": "o",
+        "type": "origin_distance",
+        "name": "Coincident with (0,0)",
+        "weight": -0.8,
+        "isSoft": true,
+        "isDimensional": false,
+        "value": 5.3,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetDistance": 5.3,
+        "orientation": "aligned",
+        "side": -1,
+        "isCoincident": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.9600000000000004,
+          -6.56
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          -0.8,
+          0,
+          0,
+          -0.8,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side -1 collinear false",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          8.959999999999999,
+          -1.0499999999999998
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side -1 collinear false soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -15.359999999999998,
+          1.7999999999999998
+        ],
+        "jacobian": [
+          0,
+          0,
+          -1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side -1 collinear true",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with X-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          5.739999999999999,
+          -4.27
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side -1 collinear true soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with X-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -9.839999999999998,
+          7.319999999999999
+        ],
+        "jacobian": [
+          0,
+          0,
+          -1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side 1 collinear false",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.5199999999999996,
+          -7.489999999999999
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side 1 collinear false soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.319999999999999,
+          12.839999999999998
+        ],
+        "jacobian": [
+          0,
+          0,
+          -1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side 1 collinear true",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with X-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          5.739999999999999,
+          -4.27
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x side 1 collinear true soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with X-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -9.839999999999998,
+          7.319999999999999
+        ],
+        "jacobian": [
+          0,
+          0,
+          -1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side -1 collinear false",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.6299999999999996,
+          11.899999999999999
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side -1 collinear false soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -1.0799999999999994,
+          -20.4
+        ],
+        "jacobian": [
+          0,
+          -1.2,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side -1 collinear true",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with Y-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.59,
+          8.68
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side -1 collinear true soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with Y-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          4.44,
+          -14.879999999999999
+        ],
+        "jacobian": [
+          0,
+          -1.2,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side 1 collinear false",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -5.8100000000000005,
+          5.46
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side 1 collinear false soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          9.96,
+          -9.360000000000001
+        ],
+        "jacobian": [
+          0,
+          -1.2,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side 1 collinear true",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with Y-Axis",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.59,
+          8.68
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          0.7,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y side 1 collinear true soft locked",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Collinear with Y-Axis",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": false,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": true
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          4.44,
+          -14.879999999999999
+        ],
+        "jacobian": [
+          0,
+          -1.2,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line_to_axis_distance weighted",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          12.799999999999999,
+          -1.5
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x zero target",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 0,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 0,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          8.2,
+          -6.1
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x repeated endpoint",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "a"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "a",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.5999999999999996,
+          3.5999999999999996
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x missing endpoint",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "missing"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "missing",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.5999999999999996,
+          -4.6
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis x negative distance",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": -4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": -4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.5999999999999996,
+          -10.7
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y zero target",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 0,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": 0,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.7,
+          12.4
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y repeated endpoint",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "a"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "a",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -8.3,
+          -8.3
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "name": "line axis y missing endpoint",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "missing"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "missing",
+        "axis": "y",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -8.3,
+          -4.6
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis y negative distance",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": -4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "y",
+        "targetDistance": -4.6,
+        "side": -1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          -8.3,
+          7.800000000000001
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis ignores map axes",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 100,
+        "origin.y": 200,
+        "axis_x.x": 3,
+        "axis_x.y": 8,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.5999999999999996,
+          -10.7
+        ],
+        "jacobian": [
+          0,
+          0,
+          1,
+          0,
+          1,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "line axis derivative cutoff",
+      "constraint": {
+        "id": "l",
+        "type": "line_to_axis_distance",
+        "name": "Distance to X-Axis",
+        "weight": 1e-13,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 4.6,
+        "entityIds": [
+          "line",
+          "a",
+          "b"
+        ],
+        "lineId": "line",
+        "lineP1Id": "a",
+        "lineP2Id": "b",
+        "axis": "x",
+        "targetDistance": 4.6,
+        "side": 1,
+        "isCollinear": false
+      },
+      "params": {
+        "a.x": -3.7,
+        "a.y": 8.2,
+        "b.x": 12.4,
+        "b.y": -6.1,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0,
+        "axis_y.x": 0,
+        "axis_y.y": 1
+      },
+      "freeIds": [
+        "b.y",
+        "b.x",
+        "a.y",
+        "a.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.6e-13,
+          -1.0699999999999999e-12
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}

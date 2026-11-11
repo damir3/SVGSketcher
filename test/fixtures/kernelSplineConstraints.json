@@ -1,0 +1,6061 @@
+{
+  "sourceSha256": {
+    "src/math/spline.ts": "d29b79ede04679594a1f74b4599d83b9f6c7e52e6ddd54ea29d03fa976b47fea",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d",
+    "src/solver/constraints/pointOnSpline.ts": "b256900c219e152b8f42c36298bf6a41d8eba8a9664c3eea15d0fef0f13a0a12",
+    "src/solver/constraints/automaticSplineHandles.ts": "30aac9028adeee7d54bb77cebb09f7da9ad699ac81817de7cda409783efa804b",
+    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379"
+  },
+  "cases": [
+    {
+      "name": "fit shape 0",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3
+      },
+      "freeIds": [
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit shape 1",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0
+      },
+      "freeIds": [
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit shape 2",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 12,
+        "f1.y": 5
+      },
+      "freeIds": [
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.05384615384615413
+        ],
+        "jacobian": [
+          -0.3785160477817739,
+          0.15771495378430478,
+          -0.2676377683134834,
+          0.11151578218626666,
+          0.6461538461580152,
+          -0.26923076922036326
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 2",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 12,
+        "f1.y": 5
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.08461538461538506
+        ],
+        "jacobian": [
+          -1.0153846153923562,
+          -0.17523908629191173
+        ]
+      }
+    },
+    {
+      "name": "fit shape 3",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.751882860484032
+        ],
+        "jacobian": [
+          0.043069261623784875,
+          -0.015048007417917118,
+          -0.13558244287281696,
+          0.2704593863978033,
+          -0.11179034675734555,
+          0.41411110505151777,
+          0.20430357379197514,
+          -0.6695222548369628
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 3",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          5.895815923617765
+        ],
+        "jacobian": [
+          -0.3210484730509222,
+          -0.6507460222238137
+        ]
+      }
+    },
+    {
+      "name": "fit shape 4",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9
+      },
+      "freeIds": [
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.751882860484032
+        ],
+        "jacobian": [
+          0,
+          0,
+          0.043069261623784875,
+          -0.015048007417917118,
+          -0.13558244287281696,
+          0.2704593863978033,
+          -0.11179034675734555,
+          0.41411110505151777,
+          0.20430357379197514,
+          -0.6695222548369628
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 4",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          5.895815923617765
+        ],
+        "jacobian": [
+          -0.3210484730509222,
+          -0.6507460222238137
+        ]
+      }
+    },
+    {
+      "name": "fit shape 5",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 35,
+        "f4.y": 5
+      },
+      "freeIds": [
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.751882860484032
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.043069261623784875,
+          -0.015048007417917118,
+          -0.13558244287281696,
+          0.2704593863978033,
+          -0.11179034675734555,
+          0.41411110505151777,
+          0.20430357379197514,
+          -0.6695222548369628
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 5",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 35,
+        "f4.y": 5
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          5.895815923617765
+        ],
+        "jacobian": [
+          -0.3210484730509222,
+          -0.6507460222238137
+        ]
+      }
+    },
+    {
+      "name": "fit shape 6",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0
+      },
+      "freeIds": [
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.899849500063785
+        ],
+        "jacobian": [
+          0.529786785286035,
+          0.4358770182122384,
+          0.07554163241607625,
+          0.049272555990853555,
+          -0.013098305018388599,
+          0.009516655552488373,
+          -0.04654289291750046,
+          -0.05623097392160047,
+          0,
+          0,
+          -0.5456872201214935,
+          -0.4384352378927758
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 6",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          7.699763500100235
+        ],
+        "jacobian": [
+          0.8575084887496586,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit shape 7",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 10,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.0999999999999996
+        ],
+        "jacobian": [
+          -0.490000105024535,
+          0,
+          -0.23275026812541452,
+          0,
+          0.022750116723813104,
+          0,
+          0.7000000000090266,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 7",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 10,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.3000000000000003
+        ],
+        "jacobian": [
+          -1.100000000020529,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit shape 8",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 10,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.0999999999999996
+        ],
+        "jacobian": [
+          -218291.9016494763,
+          0,
+          -0.4900001049801261,
+          0,
+          -201708.09835052362,
+          -419999.9999999999,
+          0.7000000000090266,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 8",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 10,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.3000000000000003
+        ],
+        "jacobian": [
+          -1.100000000020529,
+          660000
+        ]
+      }
+    },
+    {
+      "name": "fit shape 9",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          -82929.15316174866,
+          35541.065640749424,
+          -99511.61329396423,
+          42647.83426884181,
+          82929.15316175437,
+          -35541.065640751876,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 9",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          55850.2460068958
+        ]
+      }
+    },
+    {
+      "name": "fit shape 10",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 1e-7,
+        "f1.y": 2e-7,
+        "f2.x": 3e-7,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.026299858071176806
+        ],
+        "jacobian": [
+          -82894.54892591466,
+          35451.82495618049,
+          530441.2424060007,
+          12342.62086011041,
+          78389.82884495727,
+          -39603.424878204896,
+          0.0021325120887899507,
+          0.002843188951287545
+        ]
+      }
+    },
+    {
+      "name": "fit soft locked 10",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 1e-7,
+        "f1.y": 2e-7,
+        "f2.x": 3e-7,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.04132834839756356
+        ],
+        "jacobian": [
+          -0.003351090424597025,
+          62233.95338003627
+        ]
+      }
+    },
+    {
+      "name": "control shape 0",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3
+      },
+      "freeIds": [
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "control shape 1",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0
+      },
+      "freeIds": [
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "control shape 2",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 12,
+        "f1.y": 5
+      },
+      "freeIds": [
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.05384615384615413
+        ],
+        "jacobian": [
+          -0.3785160477817739,
+          0.15771495378430478,
+          -0.2676377683134834,
+          0.11151578218626666,
+          0.6461538461580152,
+          -0.26923076922036326
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 2",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 12,
+        "f1.y": 5
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.08461538461538506
+        ],
+        "jacobian": [
+          -1.0153846153923562,
+          -0.17523908629191173
+        ]
+      }
+    },
+    {
+      "name": "control shape 3",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -1.9825293832904283
+        ],
+        "jacobian": [
+          -0.06799572855875624,
+          0.03454614310172133,
+          -0.2760003530166699,
+          0.140225667499827,
+          -0.2800771282673864,
+          0.14229700615597807,
+          0.6240732272067007,
+          -0.317068773436624
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 3",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.1154033165992447
+        ],
+        "jacobian": [
+          -0.9806864998740393,
+          -0.22360958111811155
+        ]
+      }
+    },
+    {
+      "name": "control shape 4",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9
+      },
+      "freeIds": [
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -1.5617772779721717
+        ],
+        "jacobian": [
+          -0.00973190383835032,
+          0.0026229185046133807,
+          -0.09081226985951928,
+          0.024475493964892788,
+          -0.2824685301661134,
+          0.07613020507335477,
+          -0.29286963720842607,
+          0.07893353703991579,
+          0.6758823553942861,
+          -0.18216213015787017
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 4",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.454221436813413
+        ],
+        "jacobian": [
+          -1.0621008442068813,
+          -0.12403841531671843
+        ]
+      }
+    },
+    {
+      "name": "control shape 5",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 35,
+        "f4.y": 5
+      },
+      "freeIds": [
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.313674438694736
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.0015346945048122505,
+          0.0011343994632539989,
+          -0.03538461785801417,
+          0.026155233623370574,
+          -0.2606646601233109,
+          0.19267537423317546,
+          -0.26532878529827997,
+          0.19612302355476172,
+          0.5629127822093238,
+          -0.4160879710557452
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 5",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 35,
+        "f4.y": 5
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.6357741179488707
+        ],
+        "jacobian": [
+          -0.8845772291099506,
+          -0.3081933227289113
+        ]
+      }
+    },
+    {
+      "name": "control shape 6",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0
+      },
+      "freeIds": [
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.313674438694736
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.0015346945048122505,
+          0.0011343994632539989,
+          -0.03538461785801417,
+          0.026155233623370574,
+          -0.2606646601233109,
+          0.19267537423317546,
+          -0.26532878529827997,
+          0.19612302355476172,
+          0.5629127822093238,
+          -0.4160879710557452
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 6",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.6357741179488707
+        ],
+        "jacobian": [
+          -0.8845772291099506,
+          -0.3081933227289113
+        ]
+      }
+    },
+    {
+      "name": "control shape 7",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 10,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.0999999999999996
+        ],
+        "jacobian": [
+          -0.4900001049801261,
+          0,
+          -0.19132413693334624,
+          0,
+          -0.018675934976286612,
+          0,
+          0.7000000000090266,
+          0
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 7",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 10,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.3000000000000003
+        ],
+        "jacobian": [
+          -1.100000000020529,
+          0
+        ]
+      }
+    },
+    {
+      "name": "control shape 8",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 10,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.0999999999999996
+        ],
+        "jacobian": [
+          -84.10229251571977,
+          0,
+          -0.4900001049801261,
+          0,
+          -419915.8977074842,
+          -419999.9999999999,
+          0.7000000000090266,
+          0
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 8",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 10,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.3000000000000003
+        ],
+        "jacobian": [
+          -1.100000000020529,
+          660000
+        ]
+      }
+    },
+    {
+      "name": "control shape 9",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          -489999.9999999999,
+          209999.99999999994,
+          -81705.81476413115,
+          35016.7777560562,
+          489999.9999999999,
+          -209999.99999999994,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 9",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          330000
+        ]
+      }
+    },
+    {
+      "name": "control shape 10",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 1e-7,
+        "f1.y": 2e-7,
+        "f2.x": 3e-7,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          4.949244167468035
+        ],
+        "jacobian": [
+          -980536.8501406021,
+          -275362.04823343153,
+          38170.479167871636,
+          -463615.0626449805,
+          -2805.7841872975328,
+          -714775.2787882824,
+          0.4951004790143542,
+          0.49484898267948546
+        ]
+      }
+    },
+    {
+      "name": "control soft locked 10",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": -1.1,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 1e-7,
+        "f1.y": 2e-7,
+        "f2.x": 3e-7,
+        "f2.y": 0
+      },
+      "freeIds": [
+        "p.y",
+        "f0.x"
+      ],
+      "expected": {
+        "residuals": [
+          -7.777383691735485
+        ],
+        "jacobian": [
+          -0.7780150384384398,
+          1123218.2952387298
+        ]
+      }
+    },
+    {
+      "name": "fit explicit handles 3",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "h0a",
+          "h0b",
+          "h1a",
+          "h1b",
+          "h2a",
+          "h2b"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "handlePoints": [
+          {
+            "p1Id": "h0a",
+            "p2Id": "h0b"
+          },
+          {
+            "p1Id": "h1a",
+            "p2Id": "h1b"
+          },
+          {
+            "p1Id": "h2a",
+            "p2Id": "h2b"
+          }
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1
+      },
+      "freeIds": [
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.4020377193815614
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.07198251634754627,
+          0.17560978080588538,
+          -0.11615866366554427,
+          0.28338253375004285,
+          0,
+          0,
+          0,
+          0,
+          -0.014868991904393168,
+          0.03627464240096856,
+          -0.06248198234359847,
+          0.15243204889436868,
+          0.26549215226268075,
+          -0.6476989401260624
+        ]
+      }
+    },
+    {
+      "name": "fit explicit handles 5",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "h0a",
+          "h0b",
+          "h1a",
+          "h1b",
+          "h2a",
+          "h2b",
+          "h3a",
+          "h3b",
+          "h4a",
+          "h4b"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "handlePoints": [
+          {
+            "p1Id": "h0a",
+            "p2Id": "h0b"
+          },
+          {
+            "p1Id": "h1a",
+            "p2Id": "h1b"
+          },
+          {
+            "p1Id": "h2a",
+            "p2Id": "h2b"
+          },
+          {
+            "p1Id": "h3a",
+            "p2Id": "h3b"
+          },
+          {
+            "p1Id": "h4a",
+            "p2Id": "h4b"
+          }
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1,
+        "h3a.x": 25,
+        "h3a.y": -6,
+        "h3b.x": 31,
+        "h3b.y": -10,
+        "h4a.x": -2,
+        "h4a.y": 3,
+        "h4b.x": 4,
+        "h4b.y": -1
+      },
+      "freeIds": [
+        "h4b.y",
+        "h4b.x",
+        "h4a.y",
+        "h4a.x",
+        "h3b.y",
+        "h3b.x",
+        "h3a.y",
+        "h3a.x",
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.4020377193815614
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.07198251634754627,
+          0.17560978080588538,
+          -0.11615866366554427,
+          0.28338253375004285,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.014868991904393168,
+          0.03627464240096856,
+          -0.06248198234359847,
+          0.15243204889436868,
+          0.26549215226268075,
+          -0.6476989401260624
+        ]
+      }
+    },
+    {
+      "name": "control nonuniform",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5"
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          0,
+          0.2,
+          0.8,
+          1,
+          1,
+          1,
+          1
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 3,
+        "f1.y": 9,
+        "f2.x": 9,
+        "f2.y": 15,
+        "f3.x": 19,
+        "f3.y": 1,
+        "f4.x": 24,
+        "f4.y": 8,
+        "f5.x": 32,
+        "f5.y": -4
+      },
+      "freeIds": [
+        "f5.y",
+        "f5.x",
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.8915241755611114
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          -0.00015995649249589405,
+          0.00039336636170617107,
+          -0.00928208039319145,
+          0.022826577561474434,
+          -0.13375679568383703,
+          0.32893612131879024,
+          -0.12047928592551214,
+          0.2962837270636953,
+          0.2636781535336752,
+          -0.648439535577694
+        ]
+      }
+    },
+    {
+      "name": "control repeated knot",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "control",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6"
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          0,
+          0.5,
+          0.5,
+          0.5,
+          1,
+          1,
+          1,
+          1
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 3,
+        "f1.y": 9,
+        "f2.x": 9,
+        "f2.y": 15,
+        "f3.x": 19,
+        "f3.y": 1,
+        "f4.x": 24,
+        "f4.y": 8,
+        "f5.x": 32,
+        "f5.y": -4,
+        "f6.x": 38,
+        "f6.y": 2
+      },
+      "freeIds": [
+        "f6.y",
+        "f6.x",
+        "f5.y",
+        "f5.x",
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -3.5652342277367786
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.006495597792977036,
+          0.009105222620320319,
+          -0.05788179615606736,
+          0.08113599863079912,
+          -0.17192688392952957,
+          0.240998983214169,
+          -0.17022540124145277,
+          0.2386139639654061,
+          0.40652967592258443,
+          -0.5698540361809279
+        ]
+      }
+    },
+    {
+      "name": "point aliases fit point",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "f1",
+          "spline",
+          "f0",
+          "f2"
+        ],
+        "pointId": "f1",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.0000017892637246838017
+        ],
+        "jacobian": [
+          7.284256966243917e-8,
+          -7.249553592290522e-9,
+          -1.5990654220489998e-7,
+          1.6104928805479868e-8,
+          8.695894265928692e-8,
+          -8.754079263005208e-9,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "missing coordinate defaults",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2
+      },
+      "freeIds": [
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.50065667594544
+        ],
+        "jacobian": [
+          -0.2713950806310095,
+          -0.17466636208496308,
+          -0.4138008439902307,
+          0.10761623956412335,
+          -0.03564842838699178,
+          0.5775797920826164,
+          0.3954764009606037
+        ]
+      }
+    },
+    {
+      "name": "mixed explicit and natural handles",
+      "kind": "point",
+      "constraint": {
+        "id": "pos",
+        "type": "point_on_spline",
+        "name": "Point on Spline",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "p",
+          "spline",
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "h0a",
+          "h0b",
+          "h1a",
+          "h1b",
+          "h2a",
+          "h2b",
+          "h3a",
+          "h3b"
+        ],
+        "pointId": "p",
+        "splineId": "spline",
+        "splineType": "fit",
+        "splinePointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "handlePoints": [
+          {
+            "p1Id": "h0a",
+            "p2Id": "h0b"
+          },
+          null,
+          {
+            "p1Id": "h2a",
+            "p2Id": "h2b"
+          },
+          {
+            "p1Id": "h3a",
+            "p2Id": "h3b"
+          }
+        ],
+        "isClosed": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1,
+        "h3a.x": 25,
+        "h3a.y": -6,
+        "h3b.x": 31,
+        "h3b.y": -10
+      },
+      "freeIds": [
+        "h3b.y",
+        "h3b.x",
+        "h3a.y",
+        "h3a.x",
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2.9411579472000717
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.07093812555147849,
+          0.2873046289320058,
+          0,
+          0,
+          0,
+          0,
+          0.061051304056647375,
+          -0.02227080897476696,
+          -0.14841743238847016,
+          0.27459445464117493,
+          -0.009492880614914156,
+          0.13996292254070397,
+          0.16779720390935893,
+          -0.6795911258627995
+        ]
+      }
+    },
+    {
+      "name": "automatic shape 0",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": 1,
+        "isSoft": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 12,
+        "f1.y": 5,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 10,
+        "h1a.y": 8,
+        "h1b.x": 16,
+        "h1b.y": 4
+      },
+      "freeIds": [
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          2,
+          4.666666666666666,
+          0,
+          -2.6666666666666665,
+          2,
+          4.666666666666666,
+          0,
+          -2.666666666666666
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0.33333333329110815,
+          0,
+          -1.3333333333420683,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0.333333333379926,
+          0,
+          -1.3333333332532504,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -0.33333333329110815,
+          0,
+          -0.6666666666710341,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -0.33333333333551707,
+          0,
+          -0.6666666667154431,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.666666666759852,
+          0,
+          -0.333333333379926,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.6666666665822163,
+          0,
+          -0.33333333329110815,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.3333333331644326,
+          0,
+          0.333333333379926,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.3333333333420683,
+          0,
+          0.33333333329110815,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic soft locked 0",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": -0.8,
+        "isSoft": true
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 12,
+        "f1.y": 5,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 10,
+        "h1a.y": 8,
+        "h1b.x": 16,
+        "h1b.y": 4
+      },
+      "freeIds": [
+        "f0.x",
+        "h0a.y",
+        "h0b.x"
+      ],
+      "expected": {
+        "residuals": [
+          2,
+          4.666666666666666,
+          0,
+          -2.6666666666666665,
+          2,
+          4.666666666666666,
+          0,
+          -2.666666666666666
+        ],
+        "jacobian": [
+          -1.3333333333420683,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -0.6666666666710341,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -0.333333333379926,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.333333333379926,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic shape 1",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 2,
+            "midpoint": {
+              "id": "m2",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f2",
+                "h2a",
+                "h2b"
+              ],
+              "midId": "f2",
+              "p1Id": "h2a",
+              "p2Id": "h2b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 3,
+            "midpoint": {
+              "id": "m3",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f3",
+                "h3a",
+                "h3b"
+              ],
+              "midId": "f3",
+              "p1Id": "h3a",
+              "p2Id": "h3b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": 1,
+        "isSoft": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1,
+        "h3a.x": 25,
+        "h3a.y": -6,
+        "h3b.x": 31,
+        "h3b.y": -10
+      },
+      "freeIds": [
+        "h3b.y",
+        "h3b.x",
+        "h3a.y",
+        "h3a.x",
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.6666666666666665,
+          7,
+          1.3333333333333335,
+          -5,
+          3.972577509320785,
+          3.5972577509320782,
+          -1.9725775093207858,
+          -1.5972577509320782,
+          1.2238478559460262,
+          -0.5632002618350818,
+          0.7761521440539738,
+          2.5632002618350813,
+          0.33333333333333215,
+          -0.6666666666666661,
+          1.6666666666666679,
+          2.666666666666666
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.33333333333551707,
+          0,
+          -1.3333333333420683,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.33333333329110815,
+          0,
+          -1.3333333333420683,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.33333333333551707,
+          0,
+          -0.6666666666710341,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.33333333329110815,
+          0,
+          -0.6666666666710341,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.22231572964770405,
+          0.1011164391329089,
+          0.4093697507201454,
+          -1.0646941998260218,
+          -0.18705400712804018,
+          -0.03642197814457404,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.27639719135663654,
+          -0.019751233715226135,
+          -0.9590630249078912,
+          -0.0064694200219150835,
+          -0.31733418257573476,
+          0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.2223157297365219,
+          -0.10111643895527321,
+          -0.40936975054250974,
+          -0.9353058000982627,
+          0.18705400712804018,
+          0.036421978322209725,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.27639719135663654,
+          0.019751233715226135,
+          -1.0409369750163933,
+          0.0064694200219150835,
+          0.31733418257573476,
+          -0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.01563179168329043,
+          0.1456121061949034,
+          0.03417505247682584,
+          -0.9607748751250255,
+          -0.01854318689709089,
+          -0.18483712764805202,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.18695343833030617,
+          0.02659714581909611,
+          -1.037772426570882,
+          -0.04335408529954065,
+          -0.14918109183525985,
+          0.01675682028690062,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.01563179168329043,
+          -0.1456121061949034,
+          -0.03417505247682584,
+          -1.039225124799259,
+          0.01854318689709089,
+          0.18483712764805202,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.18695343824148833,
+          -0.026597145730278268,
+          -0.9622275733978113,
+          0.04335408529954065,
+          0.14918109183525985,
+          -0.01675682028690062,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.6666666664045806,
+          0,
+          -0.3333333332022903,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.6666666666710341,
+          0,
+          -0.333333333379926,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.333333333519704,
+          0,
+          0.3333333332022903,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.3333333333420683,
+          0,
+          0.333333333379926,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic soft locked 1",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 2,
+            "midpoint": {
+              "id": "m2",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f2",
+                "h2a",
+                "h2b"
+              ],
+              "midId": "f2",
+              "p1Id": "h2a",
+              "p2Id": "h2b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 3,
+            "midpoint": {
+              "id": "m3",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f3",
+                "h3a",
+                "h3b"
+              ],
+              "midId": "f3",
+              "p1Id": "h3a",
+              "p2Id": "h3b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": -0.8,
+        "isSoft": true
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1,
+        "h3a.x": 25,
+        "h3a.y": -6,
+        "h3b.x": 31,
+        "h3b.y": -10
+      },
+      "freeIds": [
+        "f0.x",
+        "h0a.y",
+        "h0b.x"
+      ],
+      "expected": {
+        "residuals": [
+          0.6666666666666665,
+          7,
+          1.3333333333333335,
+          -5,
+          3.972577509320785,
+          3.5972577509320782,
+          -1.9725775093207858,
+          -1.5972577509320782,
+          1.2238478559460262,
+          -0.5632002618350818,
+          0.7761521440539738,
+          2.5632002618350813,
+          0.33333333333333215,
+          -0.6666666666666661,
+          1.6666666666666679,
+          2.666666666666666
+        ],
+        "jacobian": [
+          -1.3333333333420683,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -0.6666666666710341,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -0.03642197814457404,
+          0,
+          0,
+          0.026220702942225668,
+          0,
+          0,
+          0.036421978322209725,
+          0,
+          0,
+          -0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic shape 2",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 2,
+            "midpoint": {
+              "id": "m2",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f2",
+                "h2a",
+                "h2b"
+              ],
+              "midId": "f2",
+              "p1Id": "h2a",
+              "p2Id": "h2b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 3,
+            "midpoint": {
+              "id": "m3",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f3",
+                "h3a",
+                "h3b"
+              ],
+              "midId": "f3",
+              "p1Id": "h3a",
+              "p2Id": "h3b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 4,
+            "midpoint": {
+              "id": "m4",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f4",
+                "h4a",
+                "h4b"
+              ],
+              "midId": "f4",
+              "p1Id": "h4a",
+              "p2Id": "h4b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": 1,
+        "isSoft": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1,
+        "h3a.x": 25,
+        "h3a.y": -6,
+        "h3b.x": 31,
+        "h3b.y": -10,
+        "h4a.x": -2,
+        "h4a.y": 3,
+        "h4b.x": 4,
+        "h4b.y": -1
+      },
+      "freeIds": [
+        "h4b.y",
+        "h4b.x",
+        "h4a.y",
+        "h4a.x",
+        "h3b.y",
+        "h3b.x",
+        "h3a.y",
+        "h3a.x",
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f4.y",
+        "f4.x",
+        "f3.y",
+        "f3.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -7.967784921982252,
+          9.5959728085067,
+          9.967784921982252,
+          -7.5959728085066995,
+          3.972577509320785,
+          3.5972577509320782,
+          -1.9725775093207858,
+          -1.5972577509320782,
+          1.2238478559460262,
+          -0.5632002618350818,
+          0.7761521440539738,
+          2.5632002618350813,
+          -12.313603902416673,
+          1.9686396097583332,
+          14.31360390241667,
+          0.0313603902416677,
+          -7.967784921982252,
+          9.5959728085067,
+          9.967784921982252,
+          -7.5959728085066995
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          -0.16144329979539407,
+          -0.3211321239149356,
+          0,
+          0,
+          0.0972258908049639,
+          0.010385369186849402,
+          0.06421722380522965,
+          -0.6892532167235287,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -0.1356566967203321,
+          0.007779037680677447,
+          0,
+          0,
+          0.20663369699747133,
+          0.33567807431467145,
+          -1.0709769314942719,
+          -0.3434569709526158,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0.16144329979539407,
+          0.3211321239149356,
+          0,
+          0,
+          -0.0972258908049639,
+          -0.010385369186849402,
+          -0.06421722371641181,
+          -1.310746783111938,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.1356566967203321,
+          -0.007779037769495289,
+          0,
+          0,
+          -0.20663369708628918,
+          -0.33567807431467145,
+          -0.9290230683411947,
+          0.3434569709526158,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.22231572964770405,
+          0.1011164391329089,
+          0.4093697507201454,
+          -1.0646941998260218,
+          -0.18705400712804018,
+          -0.03642197814457404,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.27639719135663654,
+          -0.019751233715226135,
+          -0.9590630249078912,
+          -0.0064694200219150835,
+          -0.31733418257573476,
+          0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.2223157297365219,
+          -0.10111643895527321,
+          -0.40936975054250974,
+          -0.9353058000982627,
+          0.18705400712804018,
+          0.036421978322209725,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.27639719135663654,
+          0.019751233715226135,
+          -1.0409369750163933,
+          0.0064694200219150835,
+          0.31733418257573476,
+          -0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.01563179168329043,
+          0.1456121061949034,
+          0.03417505247682584,
+          -0.9607748751250255,
+          -0.01854318689709089,
+          -0.18483712764805202,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.18695343833030617,
+          0.02659714581909611,
+          -1.037772426570882,
+          -0.04335408529954065,
+          -0.14918109183525985,
+          0.01675682028690062,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.01563179168329043,
+          -0.1456121061949034,
+          -0.03417505247682584,
+          -1.039225124799259,
+          0.01854318689709089,
+          0.18483712764805202,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.18695343824148833,
+          -0.026597145730278268,
+          -0.9622275733978113,
+          0.04335408529954065,
+          0.14918109183525985,
+          -0.01675682028690062,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.2510252826937176,
+          0.20042037931489173,
+          0.2597045899221939,
+          -1.564356503536146,
+          -0.008679382546006309,
+          0.36393594982087046,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.49057779234473736,
+          -0.03152599736822026,
+          -0.9740295410232135,
+          -0.05643565037516395,
+          -0.5165481377744641,
+          0.08796157038304385,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.2510252826937176,
+          -0.20042037895962037,
+          -0.25970458956692255,
+          -0.43564349603286695,
+          0.008679382901277677,
+          -0.3639359494655991,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.4905777924335552,
+          0.03152599727940242,
+          -1.0259704589898888,
+          0.05643565028634611,
+          0.5165481377744641,
+          -0.08796157047186169,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.06421722380522965,
+          -0.6892532167235287,
+          -0.16144329979539407,
+          -0.3211321239149356,
+          0,
+          0,
+          0.0972258908049639,
+          0.010385369186849402,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0709769314942719,
+          -0.3434569709526158,
+          -0.1356566967203321,
+          0.007779037680677447,
+          0,
+          0,
+          0.20663369699747133,
+          0.33567807431467145,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.06421722371641181,
+          -1.310746783111938,
+          0.16144329979539407,
+          0.3211321239149356,
+          0,
+          0,
+          -0.0972258908049639,
+          -0.010385369186849402,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.9290230683411947,
+          0.3434569709526158,
+          0.1356566967203321,
+          -0.007779037769495289,
+          0,
+          0,
+          -0.20663369708628918,
+          -0.33567807431467145,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic soft locked 2",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 2,
+            "midpoint": {
+              "id": "m2",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f2",
+                "h2a",
+                "h2b"
+              ],
+              "midId": "f2",
+              "p1Id": "h2a",
+              "p2Id": "h2b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 3,
+            "midpoint": {
+              "id": "m3",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f3",
+                "h3a",
+                "h3b"
+              ],
+              "midId": "f3",
+              "p1Id": "h3a",
+              "p2Id": "h3b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 4,
+            "midpoint": {
+              "id": "m4",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f4",
+                "h4a",
+                "h4b"
+              ],
+              "midId": "f4",
+              "p1Id": "h4a",
+              "p2Id": "h4b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": -0.8,
+        "isSoft": true
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "f3.x": 27,
+        "f3.y": -9,
+        "f4.x": 0,
+        "f4.y": 0,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1,
+        "h3a.x": 25,
+        "h3a.y": -6,
+        "h3b.x": 31,
+        "h3b.y": -10,
+        "h4a.x": -2,
+        "h4a.y": 3,
+        "h4b.x": 4,
+        "h4b.y": -1
+      },
+      "freeIds": [
+        "f0.x",
+        "h0a.y",
+        "h0b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -7.967784921982252,
+          9.5959728085067,
+          9.967784921982252,
+          -7.5959728085066995,
+          3.972577509320785,
+          3.5972577509320782,
+          -1.9725775093207858,
+          -1.5972577509320782,
+          1.2238478559460262,
+          -0.5632002618350818,
+          0.7761521440539738,
+          2.5632002618350813,
+          -12.313603902416673,
+          1.9686396097583332,
+          14.31360390241667,
+          0.0313603902416677,
+          -7.967784921982252,
+          9.5959728085067,
+          9.967784921982252,
+          -7.5959728085066995
+        ],
+        "jacobian": [
+          -0.6892532167235287,
+          0,
+          0,
+          -0.3434569709526158,
+          1,
+          0,
+          -1.310746783111938,
+          0,
+          1,
+          0.3434569709526158,
+          0,
+          0,
+          -0.03642197814457404,
+          0,
+          0,
+          0.026220702942225668,
+          0,
+          0,
+          0.036421978322209725,
+          0,
+          0,
+          -0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic shape 3",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 2,
+            "midpoint": {
+              "id": "m2",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f2",
+                "h2a",
+                "h2b"
+              ],
+              "midId": "f2",
+              "p1Id": "h2a",
+              "p2Id": "h2b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": 1,
+        "isSoft": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": -2,
+        "h1a.y": 3,
+        "h1b.x": 4,
+        "h1b.y": -1,
+        "h2a.x": -2,
+        "h2a.y": 3,
+        "h2b.x": 4,
+        "h2b.y": -1
+      },
+      "freeIds": [
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2,
+          3,
+          4,
+          -1,
+          -2,
+          3,
+          4,
+          -1,
+          -2,
+          3,
+          4,
+          -1
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.16666666666775853,
+          0,
+          -1.0000000000065512,
+          0,
+          -0.16666666664555407,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.16666666664555407,
+          0,
+          -1.0000000000065512,
+          0,
+          -0.16666666664555407,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.16666666664555407,
+          0,
+          -1.0000000000065512,
+          0,
+          0.166666666689963,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.16666666666775853,
+          0,
+          -1.0000000000065512,
+          0,
+          0.16666666666775853,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic soft locked 3",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "handles": [
+          {
+            "index": 0,
+            "midpoint": {
+              "id": "m0",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f0",
+                "h0a",
+                "h0b"
+              ],
+              "midId": "f0",
+              "p1Id": "h0a",
+              "p2Id": "h0b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m1",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "h1a",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "h1a",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          },
+          {
+            "index": 2,
+            "midpoint": {
+              "id": "m2",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f2",
+                "h2a",
+                "h2b"
+              ],
+              "midId": "f2",
+              "p1Id": "h2a",
+              "p2Id": "h2b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": -0.8,
+        "isSoft": true
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 0,
+        "f1.y": 0,
+        "f2.x": 0,
+        "f2.y": 0,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": -2,
+        "h1a.y": 3,
+        "h1b.x": 4,
+        "h1b.y": -1,
+        "h2a.x": -2,
+        "h2a.y": 3,
+        "h2b.x": 4,
+        "h2b.y": -1
+      },
+      "freeIds": [
+        "f0.x",
+        "h0a.y",
+        "h0b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -2,
+          3,
+          4,
+          -1,
+          -2,
+          3,
+          4,
+          -1,
+          -2,
+          3,
+          4,
+          -1
+        ],
+        "jacobian": [
+          -1.0000000000065512,
+          0,
+          0,
+          0,
+          1,
+          0,
+          -1.0000000000065512,
+          0,
+          1,
+          0,
+          0,
+          0,
+          -0.16666666664555407,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.166666666689963,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic fit-child alias",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "handles": [
+          {
+            "index": 1,
+            "midpoint": {
+              "id": "m",
+              "type": "midpoint",
+              "name": "Midpoint",
+              "weight": 1,
+              "isSoft": false,
+              "isDimensional": false,
+              "entityIds": [
+                "f1",
+                "f1",
+                "h1b"
+              ],
+              "midId": "f1",
+              "p1Id": "f1",
+              "p2Id": "h1b",
+              "ratio": 0.5
+            }
+          }
+        ],
+        "weight": 1,
+        "isSoft": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1
+      },
+      "freeIds": [
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [
+          5.972577509320785,
+          0.5972577509320782,
+          -1.9725775093207858,
+          -1.5972577509320782
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.22231572964770405,
+          0.1011164391329089,
+          0.4093697507201454,
+          0.9353058001361205,
+          -0.18705400712804018,
+          -0.03642197814457404,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.27639719135663654,
+          -0.019751233715226135,
+          1.040936975054251,
+          -0.0064694200219150835,
+          -0.31733418257573476,
+          0.026220702942225668,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.2223157297365219,
+          -0.10111643895527321,
+          -0.40936975054250974,
+          -0.9353058000982627,
+          0.18705400712804018,
+          0.036421978322209725,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -0.27639719135663654,
+          0.019751233715226135,
+          -1.0409369750163933,
+          0.0064694200219150835,
+          0.31733418257573476,
+          -0.026220702942225668,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "automatic no handles",
+      "kind": "automatic",
+      "constraint": {
+        "fitPointIds": [
+          "f0",
+          "f1",
+          "f2"
+        ],
+        "handles": [],
+        "weight": 1,
+        "isSoft": false
+      },
+      "params": {
+        "p.x": 7,
+        "p.y": 3,
+        "f0.x": 0,
+        "f0.y": 0,
+        "f1.x": 8,
+        "f1.y": 12,
+        "f2.x": 20,
+        "f2.y": 2,
+        "h0a.x": -2,
+        "h0a.y": 3,
+        "h0b.x": 4,
+        "h0b.y": -1,
+        "h1a.x": 6,
+        "h1a.y": 15,
+        "h1b.x": 12,
+        "h1b.y": 11,
+        "h2a.x": 18,
+        "h2a.y": 5,
+        "h2b.x": 24,
+        "h2b.y": 1
+      },
+      "freeIds": [
+        "h2b.y",
+        "h2b.x",
+        "h2a.y",
+        "h2a.x",
+        "h1b.y",
+        "h1b.x",
+        "h1a.y",
+        "h1a.x",
+        "h0b.y",
+        "h0b.x",
+        "h0a.y",
+        "h0a.x",
+        "f2.y",
+        "f2.x",
+        "f1.y",
+        "f1.x",
+        "f0.y",
+        "f0.x",
+        "p.y",
+        "p.x"
+      ],
+      "expected": {
+        "residuals": [],
+        "jacobian": []
+      }
+    }
+  ]
+}

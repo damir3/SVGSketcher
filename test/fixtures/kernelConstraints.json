@@ -1,0 +1,3176 @@
+{
+  "sourceConstraintTypes": [
+    "fixed",
+    "drag_point",
+    "coincident",
+    "concentric",
+    "horizontal",
+    "vertical",
+    "radius",
+    "equal_radius",
+    "distance",
+    "equal_length",
+    "midpoint",
+    "point_on_circle",
+    "point_on_line",
+    "parallel",
+    "perpendicular",
+    "collinear"
+  ],
+  "baseSourceSha256": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
+  "cases": [
+    {
+      "name": "fixed weighted",
+      "constraint": {
+        "id": "f",
+        "type": "fixed",
+        "name": "Fixed Point",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetX": 10,
+        "targetY": -3
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -5.6,
+          4.199999999999999
+        ],
+        "jacobian": [
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "fixed negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "fixed",
+        "name": "Fixed Point",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetX": 10,
+        "targetY": -3
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          9.6,
+          -7.199999999999999
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "drag weighted",
+      "constraint": {
+        "id": "drag_a",
+        "type": "drag_point",
+        "name": "Drag",
+        "weight": 0.7,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetX": 10,
+        "targetY": -3
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -5.6,
+          4.199999999999999
+        ],
+        "jacobian": [
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "drag negative weight and locked coordinates",
+      "constraint": {
+        "id": "drag_a",
+        "type": "drag_point",
+        "name": "Drag",
+        "weight": -1.2,
+        "isSoft": true,
+        "isDimensional": false,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetX": 10,
+        "targetY": -3
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          9.6,
+          -7.199999999999999
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "coincident weighted",
+      "constraint": {
+        "id": "f",
+        "type": "coincident",
+        "name": "Coincident",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -3.5,
+          -5.6
+        ],
+        "jacobian": [
+          0.7,
+          0,
+          -0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          -0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "coincident negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "coincident",
+        "name": "Coincident",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          6,
+          9.6
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "concentric weighted",
+      "constraint": {
+        "id": "f",
+        "type": "concentric",
+        "name": "Concentric",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "c1CenterId": "a",
+        "c2CenterId": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -3.5,
+          -5.6
+        ],
+        "jacobian": [
+          0.7,
+          0,
+          -0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          -0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "concentric negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "concentric",
+        "name": "Concentric",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "c1CenterId": "a",
+        "c2CenterId": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          6,
+          9.6
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "horizontal weighted",
+      "constraint": {
+        "id": "f",
+        "type": "horizontal",
+        "name": "Horizontal",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          5.6
+        ],
+        "jacobian": [
+          0,
+          -0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "horizontal negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "horizontal",
+        "name": "Horizontal",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -9.6
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.2,
+          0
+        ]
+      }
+    },
+    {
+      "name": "vertical weighted",
+      "constraint": {
+        "id": "f",
+        "type": "vertical",
+        "name": "Vertical",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          3.5
+        ],
+        "jacobian": [
+          -0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "vertical negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "vertical",
+        "name": "Vertical",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -6
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.2
+        ]
+      }
+    },
+    {
+      "name": "radius weighted",
+      "constraint": {
+        "id": "f",
+        "type": "radius",
+        "name": "Radius (7)",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 7,
+        "entityIds": [
+          "r"
+        ],
+        "circleId": "r",
+        "targetRadius": 7,
+        "displayMode": "radius"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -1.4
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          0
+        ]
+      }
+    },
+    {
+      "name": "radius negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "radius",
+        "name": "Radius (7)",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 7,
+        "entityIds": [
+          "r"
+        ],
+        "circleId": "r",
+        "targetRadius": 7,
+        "displayMode": "radius"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          2.4
+        ],
+        "jacobian": [
+          0,
+          -1.2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "equal radius weighted",
+      "constraint": {
+        "id": "f",
+        "type": "equal_radius",
+        "name": "Equal Radius",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "r",
+          "s"
+        ],
+        "circle1Id": "r",
+        "circle2Id": "s"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -2.0999999999999996
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          -0.7
+        ]
+      }
+    },
+    {
+      "name": "equal radius negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "equal_radius",
+        "name": "Equal Radius",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "r",
+          "s"
+        ],
+        "circle1Id": "r",
+        "circle2Id": "s"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.5999999999999996
+        ],
+        "jacobian": [
+          1.2,
+          -1.2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "distance weighted",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Distance",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "aligned"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          2.403786792439622
+        ],
+        "jacobian": [
+          -0.370999258002226,
+          -0.5935988128035616,
+          0.370999258002226,
+          0.5935988128035616,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "distance negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Distance",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "aligned"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -4.120777358467923
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1.0175979648061055,
+          -0.635998728003816
+        ]
+      }
+    },
+    {
+      "name": "equal length weighted",
+      "constraint": {
+        "id": "f",
+        "type": "equal_length",
+        "name": "Equal Length",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1P1": "a",
+        "line1P2": "b",
+        "line2P1": "c",
+        "line2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          0.15010567233460126
+        ],
+        "jacobian": [
+          -0.370999258002226,
+          -0.5935988128035615,
+          0.370999258002226,
+          0.5935988128035615,
+          0.5314796216557076,
+          -0.4555539614191779,
+          -0.5314796216557076,
+          0.4555539614191779,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "equal length negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "equal_length",
+        "name": "Equal Length",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "line1P1": "a",
+        "line1P2": "b",
+        "line2P1": "c",
+        "line2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -0.2573240097164593
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.7809496481471622,
+          0.9111079228383558,
+          0.7809496481471622,
+          -0.9111079228383558,
+          -1.0175979648061055,
+          -0.6359987280038161
+        ]
+      }
+    },
+    {
+      "name": "midpoint weighted",
+      "constraint": {
+        "id": "f",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "midId": "a",
+        "p1Id": "b",
+        "p2Id": "c",
+        "ratio": 0.3
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -1.8199999999999996,
+          -4.129999999999999
+        ],
+        "jacobian": [
+          0.7,
+          0,
+          -0.48999999999999994,
+          0,
+          -0.21,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.7,
+          0,
+          -0.48999999999999994,
+          0,
+          -0.21,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "midpoint negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "midId": "a",
+        "p1Id": "b",
+        "p2Id": "c",
+        "ratio": 0.3
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.1199999999999997,
+          7.079999999999998
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.36,
+          0,
+          0.84,
+          0,
+          0,
+          0,
+          0,
+          0.36,
+          0,
+          0.84,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point circle weighted",
+      "constraint": {
+        "id": "f",
+        "type": "point_on_circle",
+        "name": "Point on Circle",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "r"
+        ],
+        "pointId": "a",
+        "circleCenterId": "b",
+        "circleId": "r"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          3.103786792439622
+        ],
+        "jacobian": [
+          -0.370999258002226,
+          -0.5935988128035616,
+          0.370999258002226,
+          0.5935988128035616,
+          0,
+          0,
+          0,
+          0,
+          -0.7,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point circle negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "point_on_circle",
+        "name": "Point on Circle",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "r"
+        ],
+        "pointId": "a",
+        "circleCenterId": "b",
+        "circleId": "r"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          -5.320777358467923
+        ],
+        "jacobian": [
+          0,
+          1.2,
+          0,
+          0,
+          0,
+          0,
+          -1.0175979648061055,
+          -0.635998728003816
+        ]
+      }
+    },
+    {
+      "name": "point line weighted",
+      "constraint": {
+        "id": "f",
+        "type": "point_on_line",
+        "name": "Point on Line",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "pointId": "a",
+        "lineP1Id": "b",
+        "lineP2Id": "c"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -1.9096633628187023
+        ],
+        "jacobian": [
+          -0.46095322547845535,
+          0.5268036862959846,
+          0.06934693295157501,
+          -0.0792535549409834,
+          0.3916065939524315,
+          -0.44755026378240353,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point line negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "point_on_line",
+        "name": "Point on Line",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "pointId": "a",
+        "lineP1Id": "b",
+        "lineP2Id": "c"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          3.2737086219749183
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0.767229023601601,
+          -0.6713255896073633,
+          0.1358632370163093,
+          -0.11888045645669364
+        ]
+      }
+    },
+    {
+      "name": "parallel weighted",
+      "constraint": {
+        "id": "f",
+        "type": "parallel",
+        "name": "Parallel",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -6.4553970089899195
+        ],
+        "jacobian": [
+          0.2711297029112103,
+          0.2386443594737386,
+          -0.2711297029112103,
+          -0.2386443594737386,
+          0.3316358857308188,
+          -0.14485706976152812,
+          -0.3316358857308188,
+          0.14485706976152812,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "parallel negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "parallel",
+        "name": "Parallel",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          11.066394872554147
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.24832640530547676,
+          0.5685186612147675,
+          0.24832640530547676,
+          -0.5685186612147675,
+          0.4091046162280065,
+          0.4647937763557763
+        ]
+      }
+    },
+    {
+      "name": "perpendicular weighted",
+      "constraint": {
+        "id": "f",
+        "type": "perpendicular",
+        "name": "Perpendicular",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -0.9758158269403366
+        ],
+        "jacobian": [
+          -0.5525348844570566,
+          0.40702398197423045,
+          0.5525346011836518,
+          -0.4070236444775332,
+          -0.4159565164085776,
+          -0.5656653613961282,
+          0.4159561614258677,
+          0.5656657744435023,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "perpendicular negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "perpendicular",
+        "name": "Perpendicular",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          1.6728271318977201
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.9697127562047213,
+          -0.7130677053046596,
+          0.9697120481044762,
+          0.7130683138401038,
+          0.6977548191011705,
+          -0.9472021734735491
+        ]
+      }
+    },
+    {
+      "name": "collinear weighted",
+      "constraint": {
+        "id": "f",
+        "type": "collinear",
+        "name": "Collinear",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -6.4553970089899195,
+          1.0387979224062327
+        ],
+        "jacobian": [
+          0.27112985625521446,
+          0.23864438558618414,
+          -0.27112954956720614,
+          -0.23864433336129307,
+          0.33163599582053394,
+          -0.14485698773825106,
+          -0.3316357756411037,
+          0.14485715178480518,
+          0,
+          0,
+          -0.6836395081810663,
+          0.42727479401261087,
+          0.09004017680336317,
+          -0.05627513415262796,
+          0.296799406385162,
+          -0.18549962899072622,
+          0.296799406385162,
+          -0.18549962901293068,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "collinear negative weight and locked coordinates",
+      "constraint": {
+        "id": "f",
+        "type": "collinear",
+        "name": "Collinear",
+        "weight": -1.2,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c",
+          "d"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "c",
+        "l2P2": "d"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "s.r",
+        "r.r",
+        "d.y",
+        "d.x",
+        "c.y",
+        "c.x",
+        "b.y",
+        "b.x"
+      ],
+      "expected": {
+        "residuals": [
+          11.066394872554147,
+          -1.7807964384106847
+        ],
+        "jacobian": [
+          0,
+          0,
+          -0.24832654581530275,
+          0.568518472654489,
+          0.24832626479565076,
+          -0.568518849775046,
+          0.40910457155263197,
+          0.4647935135437819,
+          0,
+          0,
+          0.31799936401899487,
+          -0.5087989823904238,
+          0.31799936397458595,
+          -0.5087989823904238,
+          0.09647165855053429,
+          -0.15435458879942132
+        ]
+      }
+    },
+    {
+      "name": "horizontal distance direction 1",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Horizontal Distance",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "horizontal"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -0.7
+        ],
+        "jacobian": [
+          -0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "horizontal distance direction -1",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Horizontal Distance",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "horizontal"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": -7,
+        "b.y": -11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          2.0999999999999996
+        ],
+        "jacobian": [
+          0.7,
+          0,
+          -0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "vertical distance direction 1",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Vertical Distance",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "vertical"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          1.4
+        ],
+        "jacobian": [
+          0,
+          -0.7,
+          0,
+          0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "vertical distance direction -1",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Vertical Distance",
+        "weight": 0.7,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "vertical"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": -7,
+        "b.y": -11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          5.6
+        ],
+        "jacobian": [
+          0,
+          0.7,
+          0,
+          -0.7,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "zero-length distance",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Distance",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 6,
+        "entityIds": [
+          "a",
+          "b"
+        ],
+        "p1Id": "a",
+        "p2Id": "b",
+        "targetDistance": 6,
+        "orientation": "aligned"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 2,
+        "b.y": 3,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -6
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "point at circle center",
+      "constraint": {
+        "id": "f",
+        "type": "point_on_circle",
+        "name": "Point on Circle",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "r"
+        ],
+        "pointId": "a",
+        "circleCenterId": "b",
+        "circleId": "r"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 2,
+        "b.y": 3,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -5
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          -1,
+          0
+        ]
+      }
+    },
+    {
+      "name": "zero-length line for point-on-line",
+      "constraint": {
+        "id": "f",
+        "type": "point_on_line",
+        "name": "Point on Line",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "c",
+          "a",
+          "b"
+        ],
+        "pointId": "c",
+        "lineP1Id": "a",
+        "lineP2Id": "b"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 2,
+        "b.y": 3,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          99999.99999999999,
+          300000,
+          -99999.99999999999,
+          -300000,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "shared endpoint equal-length Jacobian aliases",
+      "constraint": {
+        "id": "f",
+        "type": "equal_length",
+        "name": "Equal Length",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "a",
+          "c"
+        ],
+        "line1P1": "a",
+        "line1P2": "b",
+        "line2P1": "a",
+        "line2P2": "c"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          6.271703471888223
+        ],
+        "jacobian": [
+          -1.4786822380536937,
+          -0.53177053798825,
+          0.52999894000318,
+          0.847998304005088,
+          0.9486832980505138,
+          -0.31622776601683794,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "three-point collinear",
+      "constraint": {
+        "id": "f",
+        "type": "collinear",
+        "name": "Collinear",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "c"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "b",
+        "l2P2": "c"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          2.9010421851654384
+        ],
+        "jacobian": [
+          0.7865998985945309,
+          -0.6621307535592535,
+          -0.08288181478910417,
+          0.07745229395617059,
+          -0.7037181476654552,
+          0.5846782298313258,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "shared endpoint parallel central differences",
+      "constraint": {
+        "id": "f",
+        "type": "parallel",
+        "name": "Parallel",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "b",
+          "b",
+          "c"
+        ],
+        "l1P1": "a",
+        "l1P2": "b",
+        "l2P1": "b",
+        "l2P2": "c"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          2.9010421851654384
+        ],
+        "jacobian": [
+          0.786599703794799,
+          -0.6621304722953525,
+          -0.08288178030557702,
+          0.07745240628853622,
+          -0.7037179234670176,
+          0.5846780660068163,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "same point coincidence cancels Jacobian",
+      "constraint": {
+        "id": "f",
+        "type": "coincident",
+        "name": "Coincident",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a",
+          "a"
+        ],
+        "p1Id": "a",
+        "p2Id": "a"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          0,
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "same radius equality cancels Jacobian",
+      "constraint": {
+        "id": "f",
+        "type": "equal_radius",
+        "name": "Equal Radius",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "r",
+          "r"
+        ],
+        "circle1Id": "r",
+        "circle2Id": "r"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "small analytic derivatives are omitted",
+      "constraint": {
+        "id": "f",
+        "type": "fixed",
+        "name": "Fixed Point",
+        "weight": 1e-13,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "a"
+        ],
+        "pointId": "a",
+        "targetX": 5,
+        "targetY": 6
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -3.0000000000000003e-13,
+          -3.0000000000000003e-13
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "built-in origin reference",
+      "constraint": {
+        "id": "f",
+        "type": "distance",
+        "name": "Distance",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 8,
+        "entityIds": [
+          "origin",
+          "a"
+        ],
+        "p1Id": "origin",
+        "p2Id": "a",
+        "targetDistance": 8,
+        "orientation": "aligned"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          -4.39444872453601
+        ],
+        "jacobian": [
+          0.554700196225229,
+          0.8320502943378436,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "missing radius defaults to target",
+      "constraint": {
+        "id": "f",
+        "type": "radius",
+        "name": "Radius (7)",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": true,
+        "value": 7,
+        "entityIds": [
+          "missing"
+        ],
+        "circleId": "missing",
+        "targetRadius": 7,
+        "displayMode": "radius"
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "missing point defaults to target",
+      "constraint": {
+        "id": "f",
+        "type": "fixed",
+        "name": "Fixed Point",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "missing"
+        ],
+        "pointId": "missing",
+        "targetX": 4,
+        "targetY": 5
+      },
+      "params": {
+        "a.x": 2,
+        "a.y": 3,
+        "b.x": 7,
+        "b.y": 11,
+        "c.x": -1,
+        "c.y": 4,
+        "d.x": 6,
+        "d.y": -2,
+        "r.r": 5,
+        "s.r": 8,
+        "origin.x": 0,
+        "origin.y": 0,
+        "axis_x.x": 1,
+        "axis_x.y": 0
+      },
+      "freeIds": [
+        "a.x",
+        "a.y",
+        "b.x",
+        "b.y",
+        "c.x",
+        "c.y",
+        "d.x",
+        "d.y",
+        "r.r",
+        "s.r"
+      ],
+      "expected": {
+        "residuals": [
+          0,
+          0
+        ],
+        "jacobian": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import { ParametersPopup } from './ui/parameters-popup';
 import { ICONS } from './ui/icons';
 import { setToolIconProvider } from './ui/panels/tools/iconProvider';
 import { preloadFonts, setOnFontLoaded } from './canvas/fonts';
+import { initializeGeometryKernel } from './kernel/browser';
 
 setToolIconProvider(name => ICONS[name] ?? '');
 preloadFonts();
@@ -599,4 +600,7 @@ function initApp(): void {
 }
 
 // Start application
-window.addEventListener('DOMContentLoaded', initApp);
+window.addEventListener('DOMContentLoaded', async () => {
+	await initializeGeometryKernel();
+	initApp();
+});

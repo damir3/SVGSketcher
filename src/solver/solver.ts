@@ -1,5 +1,12 @@
-import { Matrix, solveLinearSystem, analyzeNullspace } from '../math/matrix';
+import {
+	analyzeNullspaceSparse,
+	finalizeSparseRows,
+	normalEquationsFromSparseRows,
+	solveSparseLinearSystem,
+} from '../math/matrix';
 import type { IConstraint, ParamRef, SolveCallOptions, SolverOptions, SolverResult, SolverStatus } from './types';
+import { getGeometryKernel } from '../kernel';
+import { solveWithKernel } from './kernelAdapter';
 
 export class ParamManager {
 	private params = new Map<string, ParamRef>();
@@ -110,6 +117,20 @@ export class NumericalSolver {
 	}
 
 	solve(paramMgr: ParamManager, constraints: IConstraint[], callOptions: SolveCallOptions = {}): SolverResult {
+		const kernel = getGeometryKernel();
+		if (kernel.solveSystem) {
+			return solveWithKernel(paramMgr, constraints, callOptions, this.options, (problem, evaluate) =>
+				kernel.solveSystem!(problem, evaluate)
+			);
+		}
+		return this.solveTypescript(paramMgr, constraints, callOptions);
+	}
+
+	private solveTypescript(
+		paramMgr: ParamManager,
+		constraints: IConstraint[],
+		callOptions: SolveCallOptions
+	): SolverResult {
 		paramMgr.prepare(callOptions.lockedParams);
 		const n = paramMgr.getFreeCount();
 		const paramIndices = paramMgr.getIndices();
@@ -168,33 +189,37 @@ export class NumericalSolver {
 
 		let lambda = this.options.initialLambda;
 		let iteration = 0;
+		const F = new Float64Array(totalEquations);
+		const jCols: number[][] = Array.from({ length: totalEquations }, () => []);
+		const jVals: number[][] = Array.from({ length: totalEquations }, () => []);
+		let cachedLinearization: { aCols: number[][]; aVals: number[][]; g: Float64Array } | null = null;
 
 		for (iteration = 0; iteration < this.options.maxIterations; iteration++) {
-			// Build Residuals vector F and Jacobian matrix J
-			const F = new Float64Array(totalEquations);
-			const J = Matrix.zeros(totalEquations, n);
-
-			let eqOffset = 0;
-			for (const c of constraints) {
-				const residuals = c.evaluate(paramMap);
-				for (let i = 0; i < residuals.length; i++) {
-					F[eqOffset + i] = residuals[i];
+			if (!cachedLinearization) {
+				for (let r = 0; r < totalEquations; r++) {
+					jCols[r].length = 0;
+					jVals[r].length = 0;
 				}
+				let eqOffset = 0;
+				for (const c of constraints) {
+					const residuals = c.evaluate(paramMap);
+					for (let i = 0; i < residuals.length; i++) {
+						F[eqOffset + i] = residuals[i];
+					}
 
-				const entries = c.jacobian(paramIndices, eqOffset, paramMap);
-				for (const entry of entries) {
-					// Accumulate: a constraint may reference the same parameter more than once
-					// (e.g. equal length of two lines sharing an endpoint)
-					J.addAt(entry.row, entry.col, entry.val);
+					const entries = c.jacobian(paramIndices, eqOffset, paramMap);
+					for (const entry of entries) {
+						jCols[entry.row].push(entry.col);
+						jVals[entry.row].push(entry.val);
+					}
+
+					eqOffset += c.getEquationsCount();
 				}
-
-				eqOffset += c.getEquationsCount();
+				finalizeSparseRows(jCols, jVals);
+				cachedLinearization = normalEquationsFromSparseRows(jCols, jVals, n, F);
 			}
 
-			// Normal equations: A = J^T * J, g = J^T * F
-			const JT = J.transpose();
-			const A = JT.multiply(J);
-			const g = JT.multiplyVector(F);
+			const { aCols, aVals, g } = cachedLinearization;
 
 			// Gradient norm check
 			let gradNormSq = 0;
@@ -206,16 +231,40 @@ export class NumericalSolver {
 			// Add Levenberg-Marquardt damping: (A + lambda * diag(A + I)) * delta = -g
 			// Stiffer parameters get proportionally more damping, so the solver prefers
 			// moving the other parameters first.
-			const H = A.clone();
+			const hCols: number[][] = new Array(n);
+			const hVals: number[][] = new Array(n);
 			for (let i = 0; i < n; i++) {
-				const diagVal = Math.max(Math.abs(A.get(i, i)), 1.0);
-				H.addAt(i, i, lambda * diagVal * stiffness[i]);
+				const rCols = aCols[i].slice();
+				const rVals = aVals[i].slice();
+				let foundDiag = false;
+				let insertPos = rCols.length;
+				for (let k = 0; k < rCols.length; k++) {
+					if (rCols[k] === i) {
+						const diagVal = Math.max(Math.abs(rVals[k]), 1.0);
+						rVals[k] += lambda * diagVal * stiffness[i];
+						foundDiag = true;
+						break;
+					}
+					if (rCols[k] > i) {
+						insertPos = k;
+						break;
+					}
+				}
+				if (!foundDiag) {
+					const dampVal = lambda * stiffness[i];
+					if (dampVal !== 0) {
+						rCols.splice(insertPos, 0, i);
+						rVals.splice(insertPos, 0, dampVal);
+					}
+				}
+				hCols[i] = rCols;
+				hVals[i] = rVals;
 			}
 
 			const negG = new Float64Array(n);
 			for (let i = 0; i < n; i++) negG[i] = -g[i];
 
-			const deltaX = solveLinearSystem(H, negG);
+			const deltaX = solveSparseLinearSystem(hCols, hVals, negG);
 			if (!deltaX) {
 				// Singular system, increase damping
 				lambda = Math.min(lambda * this.options.lambdaFactor * 2, this.options.maxLambda);
@@ -239,6 +288,7 @@ export class NumericalSolver {
 				// Step accepted
 				x = candidateX;
 				currentError = candidateError;
+				cachedLinearization = null;
 				paramMgr.applyStateVector(x);
 				lambda = Math.max(lambda / this.options.lambdaFactor, this.options.minLambda);
 
@@ -308,18 +358,21 @@ export class NumericalSolver {
 		}
 		if (n === 0 || totalEquations === 0) return { degreesOfFreedom: n, constrainedParams };
 
-		const J = Matrix.zeros(totalEquations, n);
+		const jCols: number[][] = Array.from({ length: totalEquations }, () => []);
+		const jVals: number[][] = Array.from({ length: totalEquations }, () => []);
 
 		let eqOffset = 0;
 		for (const c of hardConstraints) {
 			const entries = c.jacobian(paramIndices, eqOffset, paramMap);
 			for (const entry of entries) {
-				J.addAt(entry.row, entry.col, entry.val);
+				jCols[entry.row].push(entry.col);
+				jVals[entry.row].push(entry.val);
 			}
 			eqOffset += c.getEquationsCount();
 		}
+		finalizeSparseRows(jCols, jVals);
 
-		const { rank, fixedColumns } = analyzeNullspace(J);
+		const { rank, fixedColumns } = analyzeNullspaceSparse(jCols, jVals, n);
 		const freeParams = paramMgr.getFreeParams();
 		for (const col of fixedColumns) constrainedParams.add(freeParams[col].id);
 		return { degreesOfFreedom: n - rank, constrainedParams };

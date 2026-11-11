@@ -24,3 +24,9 @@ dist-ssr
 *.sln
 *.sw?
 package-lock.json
+
+# Rust builds and generated WebAssembly bindings
+/target/
+/public/kernel/
+/dist-bench/
+/benchmarks/generated/

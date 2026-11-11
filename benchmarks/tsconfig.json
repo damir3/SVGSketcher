@@ -1,0 +1,4 @@
+{
+	"extends": "../tsconfig.json",
+	"include": ["../src", "./scenes.ts", "./stats.ts", "./browser.ts"]
+}
