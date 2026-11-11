@@ -161,7 +161,7 @@ export class SketchDocument {
 
 	private idCounter = 1;
 	paramManager = new ParamManager();
-	private solver = new NumericalSolver();
+	private solver = new NumericalSolver({ gradRelTolerance: 1e-6 });
 	lastSolverResult: SolverResult | null = null;
 	lastSolveTimeMs = 0;
 
@@ -3079,6 +3079,50 @@ export class SketchDocument {
 		return sumSq * 0.5;
 	}
 
+	private buildRadiusStiffness(
+		constraints: IConstraint[],
+		allRadii: Set<string>,
+		drivenRadii: Set<string>
+	): Map<string, number> {
+		const linked = new Set<string>(drivenRadii);
+		const edges = new Map<string, string[]>();
+		const link = (a: string, b: string) => {
+			let listA = edges.get(a);
+			if (!listA) edges.set(a, (listA = []));
+			listA.push(b);
+			let listB = edges.get(b);
+			if (!listB) edges.set(b, (listB = []));
+			listB.push(a);
+		};
+		for (const c of constraints) {
+			if (c instanceof EqualRadiusConstraint) {
+				link(`${c.circle1Id}.r`, `${c.circle2Id}.r`);
+			} else if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
+				const suppressed = new Set(c.suppressedIndices);
+				for (const copy of c.copies) {
+					if (c.suppression && suppressed.has(copy.copyIndex)) continue;
+					for (const pair of copy.radiusPairs ?? []) {
+						link(`${pair.sourceCircleId}.r`, `${pair.patternCircleId}.r`);
+					}
+				}
+			}
+		}
+		const queue = [...linked];
+		for (let i = 0; i < queue.length; i++) {
+			for (const next of edges.get(queue[i]) ?? []) {
+				if (!linked.has(next)) {
+					linked.add(next);
+					queue.push(next);
+				}
+			}
+		}
+		const stiffness = new Map<string, number>();
+		for (const id of allRadii) {
+			if (!linked.has(id)) stiffness.set(id, 1000);
+		}
+		return stiffness;
+	}
+
 	private restoreAutomaticSplineHandles(): void {
 		for (const spline of this.splines.values()) {
 			if (spline.splineType !== 'fit' || !spline.tangentLineIds) continue;
@@ -3262,8 +3306,7 @@ export class SketchDocument {
 		// Stage 2: free (non-driven) radii, but make them much stiffer than positions so
 		// that the solver prefers moving geometry over resizing circles. When stage 1
 		// succeeded this is a no-op / polish step that also computes the DoF.
-		const stiffness = new Map<string, number>();
-		for (const id of allRadii) stiffness.set(id, 1000);
+		const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
 		const res = this.solver.solve(this.paramManager, activeConstraints, {
 			lockedParams: drivenRadii,
 			paramStiffness: stiffness,
@@ -3797,29 +3840,47 @@ export class SketchDocument {
 		for (const id of this.circles.keys()) allRadii.add(`${id}.r`);
 		for (const id of this.arcs.keys()) allRadii.add(`${id}.r`);
 
+		const maxError = 1e-8;
 		let solvedOk = false;
-		if (allRadii.size > drivenRadii.size) {
+		if (
+			allRadii.size > drivenRadii.size &&
+			this.lockedRadiusError(activeConstraints, initialValues, maxError) < maxError
+		) {
 			const stage1 = this.solver.solve(this.paramManager, activeConstraints, {
 				lockedParams: allRadii,
 				skipDoF: true,
 			});
 			solvedOk =
-				stage1.status !== 'OVER_CONSTRAINED' && stage1.finalError < 1e-6 && (extraValidator ? extraValidator() : true);
+				stage1.status !== 'OVER_CONSTRAINED' &&
+				stage1.finalError < maxError &&
+				(extraValidator ? extraValidator() : true);
 			if (!solvedOk) {
 				this.paramManager.restoreValues(initialValues);
 			}
 		}
 
 		if (!solvedOk) {
-			const stiffness = new Map<string, number>();
-			for (const id of allRadii) stiffness.set(id, 1000);
-			const stage2 = this.solver.solve(this.paramManager, activeConstraints, {
+			const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
+			let stage2 = this.solver.solve(this.paramManager, activeConstraints, {
 				lockedParams: drivenRadii,
 				paramStiffness: stiffness,
 				skipDoF: true,
 			});
+			if (
+				stage2.status !== 'OVER_CONSTRAINED' &&
+				stage2.finalError >= 1e-10 &&
+				stage2.iterations >= this.solver.maxIterations
+			) {
+				stage2 = this.solver.solve(this.paramManager, activeConstraints, {
+					lockedParams: drivenRadii,
+					paramStiffness: stiffness,
+					skipDoF: true,
+				});
+			}
 			solvedOk =
-				stage2.status !== 'OVER_CONSTRAINED' && stage2.finalError < 1e-4 && (extraValidator ? extraValidator() : true);
+				stage2.status !== 'OVER_CONSTRAINED' &&
+				stage2.finalError < maxError &&
+				(extraValidator ? extraValidator() : true);
 			if (!solvedOk) {
 				this.paramManager.restoreValues(initialValues);
 			}

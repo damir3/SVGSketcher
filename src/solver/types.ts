@@ -82,6 +82,8 @@ export interface IConstraint extends IInspectable {
 export interface SolverOptions {
 	maxIterations?: number;
 	tolerance?: number;
+	/** Minimum relative error decrease required when stopping on small gradient norm; 0 stops immediately. */
+	gradRelTolerance?: number;
 	initialLambda?: number;
 	lambdaFactor?: number;
 	minLambda?: number;

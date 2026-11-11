@@ -21,7 +21,7 @@ pub fn solve_system(
     native_constraints: &[f64],
     evaluate: &Function,
 ) -> Result<Vec<f64>, JsValue> {
-    if settings.len() != 9
+    if (settings.len() != 9 && settings.len() != 10)
         || settings.iter().any(|v| !v.is_finite())
         || (settings[2] != 0.0 && settings[2] != 1.0)
     {
@@ -37,6 +37,7 @@ pub fn solve_system(
         options: Options {
             max_iterations: integer(settings[3])?,
             tolerance: settings[4],
+            grad_rel_tolerance: if settings.len() == 10 { settings[9] } else { 0.0 },
             initial_lambda: settings[5],
             lambda_factor: settings[6],
             min_lambda: settings[7],

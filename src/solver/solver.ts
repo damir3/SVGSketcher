@@ -109,11 +109,16 @@ export class NumericalSolver {
 		this.options = {
 			maxIterations: options?.maxIterations ?? 40,
 			tolerance: options?.tolerance ?? 1e-6,
+			gradRelTolerance: options?.gradRelTolerance ?? 0,
 			initialLambda: options?.initialLambda ?? 1e-3,
 			lambdaFactor: options?.lambdaFactor ?? 4,
 			minLambda: options?.minLambda ?? 1e-9,
 			maxLambda: options?.maxLambda ?? 1e7,
 		};
+	}
+
+	get maxIterations(): number {
+		return this.options.maxIterations;
 	}
 
 	solve(paramMgr: ParamManager, constraints: IConstraint[], callOptions: SolveCallOptions = {}): SolverResult {
@@ -224,9 +229,11 @@ export class NumericalSolver {
 			// Gradient norm check
 			let gradNormSq = 0;
 			for (let i = 0; i < n; i++) gradNormSq += g[i] * g[i];
-			if (Math.sqrt(gradNormSq) < this.options.tolerance) {
+			const gradNorm = Math.sqrt(gradNormSq);
+			if (gradNorm === 0 || (this.options.gradRelTolerance <= 0 && gradNorm < this.options.tolerance)) {
 				break;
 			}
+			const smallGrad = gradNorm < this.options.tolerance;
 
 			// Add Levenberg-Marquardt damping: (A + lambda * diag(A + I)) * delta = -g
 			// Stiffer parameters get proportionally more damping, so the solver prefers
@@ -286,6 +293,8 @@ export class NumericalSolver {
 
 			if (candidateError < currentError) {
 				// Step accepted
+				const relDecrease = (currentError - candidateError) / currentError;
+				const dampedSmall = smallGrad && (lambda < this.options.initialLambda || lambda <= this.options.minLambda);
 				x = candidateX;
 				currentError = candidateError;
 				cachedLinearization = null;
@@ -294,7 +303,8 @@ export class NumericalSolver {
 
 				if (
 					Math.sqrt(stepNormSq) < this.options.tolerance ||
-					currentError < this.options.tolerance * this.options.tolerance
+					currentError < this.options.tolerance * this.options.tolerance ||
+					(dampedSmall && relDecrease < this.options.gradRelTolerance)
 				) {
 					iteration++;
 					break;
@@ -302,6 +312,9 @@ export class NumericalSolver {
 			} else {
 				// Step rejected, revert paramMap
 				paramMgr.applyToMap(paramMap, x);
+				if (smallGrad && (Math.sqrt(stepNormSq) < this.options.tolerance || lambda >= 1)) {
+					break;
+				}
 				lambda = Math.min(lambda * this.options.lambdaFactor, this.options.maxLambda);
 			}
 		}

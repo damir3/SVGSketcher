@@ -19,6 +19,7 @@ pub enum Evaluation {
 pub struct Options {
     pub max_iterations: usize,
     pub tolerance: f64,
+    pub grad_rel_tolerance: f64,
     pub initial_lambda: f64,
     pub lambda_factor: f64,
     pub min_lambda: f64,
@@ -29,6 +30,7 @@ impl Default for Options {
         Self {
             max_iterations: 40,
             tolerance: 1e-6,
+            grad_rel_tolerance: 0.0,
             initial_lambda: 1e-3,
             lambda_factor: 4.0,
             min_lambda: 1e-9,
@@ -227,7 +229,7 @@ fn solve_inner<E>(
     }
     let mut lambda = options.initial_lambda;
     let mut iteration = 0;
-    let mut cached_linearization: Option<(SparseRows, Vec<f64>)> = None;
+    let mut cached_linearization: Option<(SparseRows, Vec<f64>, bool)> = None;
     while iteration < options.max_iterations {
         if cached_linearization.is_none() {
             let (h_rows, g) = if let Some(prog) =
@@ -246,13 +248,18 @@ fn solve_inner<E>(
             for &v in &g {
                 gradient_norm += v * v;
             }
-            if gradient_norm.sqrt() < options.tolerance {
+            let grad_norm = gradient_norm.sqrt();
+            if grad_norm == 0.0
+                || (options.grad_rel_tolerance <= 0.0 && grad_norm < options.tolerance)
+            {
                 break;
             }
+            let small_grad = grad_norm < options.tolerance;
             let neg_g: Vec<f64> = g.into_iter().map(|v| -v).collect();
-            cached_linearization = Some((h_rows, neg_g));
+            cached_linearization = Some((h_rows, neg_g, small_grad));
         }
-        let (base_h_rows, neg_g) = cached_linearization.as_ref().unwrap();
+        let (base_h_rows, neg_g, small_grad) = cached_linearization.as_ref().unwrap();
+        let small_grad = *small_grad;
         let damped_h = damp_sparse_rows(base_h_rows, lambda, problem.stiffness);
         let Some(delta) = solve_sparse_linear_system(&damped_h, neg_g) else {
             lambda = (lambda * options.lambda_factor * 2.0).min(options.max_lambda);
@@ -273,6 +280,9 @@ fn solve_inner<E>(
             &mut callback,
         )?);
         if candidate_error < current_error {
+            let rel_decrease = (current_error - candidate_error) / current_error;
+            let damped_small =
+                small_grad && (lambda < options.initial_lambda || lambda <= options.min_lambda);
             x = candidate;
             current_error = candidate_error;
             cached_linearization = None;
@@ -280,11 +290,15 @@ fn solve_inner<E>(
             lambda = (lambda / options.lambda_factor).max(options.min_lambda);
             if step_norm.sqrt() < options.tolerance
                 || current_error < options.tolerance * options.tolerance
+                || (damped_small && rel_decrease < options.grad_rel_tolerance)
             {
                 iteration += 1;
                 break;
             }
         } else {
+            if small_grad && (step_norm.sqrt() < options.tolerance || lambda >= 1.0) {
+                break;
+            }
             lambda = (lambda * options.lambda_factor).min(options.max_lambda);
         }
         iteration += 1;

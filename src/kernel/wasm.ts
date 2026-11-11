@@ -42,6 +42,7 @@ function solveWasm(
 		options.lambdaFactor,
 		options.minLambda,
 		options.maxLambda,
+		options.gradRelTolerance ?? 0,
 	]);
 	const data = bindings.solve_system(
 		problem.values,

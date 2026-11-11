@@ -383,6 +383,7 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 		}
 	}
 
+	const origValues = sketch.paramManager.getCurrentValues();
 	entity.radius = newRadius;
 	const center = sketch.points.get(entity.centerId);
 	if (center && arc) {
@@ -415,10 +416,15 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 
 	if (updatedExisting) {
 		sketch.solve();
-	} else {
-		sketch.solveWithTemporaryHardConstraints([new RadiusConstraint('__temp_rad', entityId, newRadius, 1.0)]);
+		return true;
 	}
-	return true;
+	if (sketch.tryHardSolve([new RadiusConstraint('__temp_rad', entityId, newRadius, 1.0)])) {
+		sketch.solve();
+		return true;
+	}
+	sketch.paramManager.restoreValues(origValues);
+	sketch.solve();
+	return false;
 }
 
 export function setArcAngle(sketch: SketchDocument, arcId: string, newSweepDeg: number): boolean {

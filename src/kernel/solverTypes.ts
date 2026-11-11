@@ -11,6 +11,7 @@ export type SolverEvaluationMode = (typeof SolverEvaluation)[keyof typeof Solver
 export interface KernelSolverOptions {
 	maxIterations: number;
 	tolerance: number;
+	gradRelTolerance?: number;
 	initialLambda: number;
 	lambdaFactor: number;
 	minLambda: number;
