@@ -6,7 +6,8 @@ import type { SketchPoint, SketchSpline } from '../model/types';
 import type { Viewport } from './viewport';
 import { getAllGeoCurves } from '../math/intersection';
 import { findCurveRegions, pointInRegion, type SketchRegion } from '../math/regions';
-import { getFilletLineEndPointId, type FilletCandidate } from '../math/fillet';
+import type { FilletCandidate } from '../math/fillet';
+import { collectFilletPreviewTrims, filletSplinePreview } from '../math/filletPreview';
 import {
 	computePatternCopyAngle,
 	computeRectangularPatternOffset,
@@ -763,19 +764,12 @@ export class SVGRenderer {
 			}
 			cuts.set(pointId, cut);
 		};
-		for (const fillet of options.filletState?.pendingFillets ?? []) {
-			const result = fillet.result;
-			if (!result) continue;
-			for (const [primitive, cut, param, hint] of [
-				[fillet.primitive1, result.t1, result.param1, fillet.endPointId1],
-				[fillet.primitive2, result.t2, result.param2, fillet.endPointId2],
-			] as const) {
-				if (primitive.type !== 'line') continue;
-				const line = sketch.lines.get(primitive.id);
-				if (!line) continue;
-				const endId = getFilletLineEndPointId(sketch, line, param, hint, result.cornerVertex);
-				addCut(line.id, endId, cut);
-			}
+		const filletTrims = collectFilletPreviewTrims(sketch, options.filletState?.pendingFillets ?? []);
+		for (const [id, trim] of filletTrims) {
+			const line = sketch.lines.get(id);
+			if (!line) continue;
+			if (trim.start) addCut(id, line.p1Id, trim.start.point);
+			if (trim.end) addCut(id, line.p2Id, trim.end.point);
 		}
 		const chamfer = options.chamferState?.candidate;
 		if (chamfer?.result?.isValid) {
@@ -931,6 +925,18 @@ export class SVGRenderer {
 
 			const clockwise = !!arc.clockwise;
 			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
+			const trim = filletTrims.get(arc.id);
+			const previewD = trim
+				? trim.start && trim.end && trim.start.param >= trim.end.param
+					? ''
+					: getArcSvgPath(
+							sc,
+							trim.start ? viewport.worldToScreen(trim.start.point) : ss,
+							trim.end ? viewport.worldToScreen(trim.end.point) : se,
+							sr,
+							clockwise
+						)
+				: d;
 
 			const arcG = createSvgElement(
 				'g',
@@ -947,7 +953,7 @@ export class SVGRenderer {
 
 			// Visible arc path
 			createSvgPath(
-				d,
+				previewD,
 				{
 					fill: 'none',
 					...getPrimitiveStrokeAttrs(
@@ -1135,6 +1141,16 @@ export class SVGRenderer {
 				isFilletSelected;
 
 			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p), !!spline.isClosed);
+			const trim = filletTrims.get(spline.id);
+			const closed = !!spline.isClosed && !trim;
+			const previewD = trim
+				? getSplineSvgPath(
+						filletSplinePreview(bezierSegments, spline.splineType, trim),
+						p => viewport.worldToScreen(p),
+						closed
+					)
+				: d;
+
 			const isConstrained =
 				pts.every(point => isPointConstrained(point.id)) &&
 				(spline.splineType !== 'fit' ||
@@ -1159,9 +1175,9 @@ export class SVGRenderer {
 
 			// Visible spline path
 			createSvgPath(
-				d,
+				previewD,
 				{
-					fill: spline.isClosed ? SPLINE_STYLES.closedFill : 'none',
+					fill: closed ? SPLINE_STYLES.closedFill : 'none',
 					...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, getBaseColor(isConstrained), true),
 				},
 				splineG

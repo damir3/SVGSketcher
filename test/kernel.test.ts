@@ -174,7 +174,7 @@ it('batches ellipses with other supported pairs, preserves order and skips self-
 
 it('rejects incompatible backend versions without replacing the working kernel', () => {
 	const previous = getGeometryKernel();
-	for (const apiVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+	for (const apiVersion of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
 		assert.throws(() => setGeometryKernel({ ...previous, apiVersion } as unknown as GeometryKernel), /API version/);
 		assert.equal(getGeometryKernel(), previous);
 		assert.throws(
@@ -196,6 +196,7 @@ it('rejects malformed packed results at the WASM boundary', () => {
 			spline_geometry: () => new Float64Array(),
 			find_regions_packed: () => new Float64Array([0]),
 			curve_editing: () => new Float64Array([0]),
+			fillet_geometry: () => new Float64Array([0]),
 			solve_system: () => new Float64Array(),
 		});
 		assert.throws(() => kernel.intersectPairs([pair]), /WASM intersection/);

@@ -1,0 +1,227 @@
+{
+  "points": [
+    {
+      "x": -75,
+      "y": 0,
+      "type": "point",
+      "id": "Point-98",
+      "fixed": false
+    },
+    {
+      "x": -25,
+      "y": -50,
+      "type": "point",
+      "id": "Point-100",
+      "fixed": false
+    },
+    {
+      "x": -25,
+      "y": 75,
+      "type": "point",
+      "id": "Point-97",
+      "fixed": false
+    },
+    {
+      "x": 25,
+      "y": 0,
+      "type": "point",
+      "id": "Point-99",
+      "fixed": false
+    },
+    {
+      "x": -41.666666666666664,
+      "y": 100,
+      "type": "point",
+      "id": "Point-101",
+      "fixed": false
+    },
+    {
+      "x": -8.333333333333336,
+      "y": 50,
+      "type": "point",
+      "id": "Point-102",
+      "fixed": false
+    },
+    {
+      "x": 25,
+      "y": 30.23471072985785,
+      "type": "point",
+      "id": "Point-103",
+      "fixed": false
+    },
+    {
+      "x": 25,
+      "y": -30.23471072985785,
+      "type": "point",
+      "id": "Point-104",
+      "fixed": false
+    },
+    {
+      "x": -8.333333333333336,
+      "y": -33.333333333333336,
+      "type": "point",
+      "id": "Point-105",
+      "fixed": false
+    },
+    {
+      "x": -41.666666666666664,
+      "y": -66.66666666666666,
+      "type": "point",
+      "id": "Point-106",
+      "fixed": false
+    }
+  ],
+  "lines": [
+    {
+      "type": "line",
+      "id": "Line-43",
+      "p1Id": "Point-97",
+      "p2Id": "Point-98",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-44",
+      "p1Id": "Point-101",
+      "p2Id": "Point-102",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-45",
+      "p1Id": "Point-103",
+      "p2Id": "Point-104",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-46",
+      "p1Id": "Point-105",
+      "p2Id": "Point-106",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    }
+  ],
+  "circles": [],
+  "arcs": [],
+  "ellipses": [],
+  "ellipticalArcs": [],
+  "splines": [
+    {
+      "type": "spline",
+      "id": "Spline-1",
+      "splineType": "fit",
+      "pointIds": [
+        "Point-97",
+        "Point-99",
+        "Point-100"
+      ],
+      "tangentLineIds": [
+        "Line-44",
+        "Line-45",
+        "Line-46"
+      ],
+      "isClosed": false,
+      "isConstruction": false
+    }
+  ],
+  "texts": [],
+  "images": [],
+  "constraints": [
+    {
+      "id": "c_pt_axis_on-1",
+      "type": "origin_distance",
+      "name": "Point on X-Axis",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "value": 0,
+      "entityIds": [
+        "Point-98"
+      ],
+      "pointId": "Point-98",
+      "targetDistance": 0,
+      "orientation": "vertical",
+      "side": 1,
+      "isCoincident": false
+    },
+    {
+      "id": "c_pt_axis_on-2",
+      "type": "origin_distance",
+      "name": "Point on X-Axis",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "value": 0,
+      "entityIds": [
+        "Point-99"
+      ],
+      "pointId": "Point-99",
+      "targetDistance": 0,
+      "orientation": "vertical",
+      "side": 1,
+      "isCoincident": false
+    },
+    {
+      "id": "c_midpoint-40",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-97",
+        "Point-101",
+        "Point-102"
+      ],
+      "midId": "Point-97",
+      "p1Id": "Point-101",
+      "p2Id": "Point-102",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-41",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-99",
+        "Point-103",
+        "Point-104"
+      ],
+      "midId": "Point-99",
+      "p1Id": "Point-103",
+      "p2Id": "Point-104",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-42",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-100",
+        "Point-105",
+        "Point-106"
+      ],
+      "midId": "Point-100",
+      "p1Id": "Point-105",
+      "p2Id": "Point-106",
+      "ratio": 0.5000000000000001
+    }
+  ],
+  "parameters": [],
+  "idCounter": 218
+}

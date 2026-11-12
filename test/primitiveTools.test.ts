@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { SketchDocument } from '../src/model/sketch';
 import { LineTool } from '../src/canvas/tools/primitives/line';
 import { CircleTool } from '../src/canvas/tools/primitives/circle';
@@ -135,6 +136,48 @@ describe('Corner modification shortcuts', () => {
 		assert.equal(tool.candidate?.line1.otherPointId, shared.p1Id);
 		assert.equal(tool.candidate?.len1, 90);
 	});
+
+	for (const reversed of [false, true])
+		it(`commits Point-94 and Point-98 fillets together, reversed=${reversed}`, () => {
+			const sketch = new SketchDocument();
+			sketch.restoreSnapshot(
+				JSON.parse(readFileSync(new URL('./fixtures/point94-fillet.json', import.meta.url), 'utf8'))
+			);
+			sketch.clearHistory();
+			const { ctx } = createMockContext(sketch);
+			ctx.toGeoCurve = (type, id) => sketchPrimitiveToGeoCurve(sketch, type, id);
+			const ids = reversed ? ['Point-98', 'Point-94'] : ['Point-94', 'Point-98'];
+			ctx.findPointNear = screen =>
+				ids.map(id => sketch.points.get(id)!).find(p => p.distanceTo(screen) < 1e-6) ?? null;
+			const tool = new FilletTool();
+			tool.activate(ctx);
+			for (const id of ids) {
+				const p = sketch.points.get(id)!;
+				tool.onMouseDown(makeMouseEvent(p.x, p.y));
+			}
+			assert.equal(tool.pendingFillets.length, 2);
+			const previews = tool.pendingFillets.map(f => f.result!);
+			assert.ok(previews.every(Boolean));
+			tool.onKeyDown({ key: 'Enter', preventDefault() {} } as KeyboardEvent);
+			assert.equal(tool.pendingFillets.length, 0);
+			assert.equal(sketch.arcs.size, 4);
+			assert.equal(sketch.splines.size, 1);
+			const spline = [...sketch.splines.values()][0];
+			assert.ok(!spline.pointIds.includes('Point-94') && !spline.pointIds.includes('Point-98'));
+			for (const id of [spline.pointIds[0], spline.pointIds.at(-1)!]) {
+				assert.ok(
+					[...sketch.arcs.values()].some(a => a.startPointId === id || a.endPointId === id),
+					'both spline ends connect to a fillet'
+				);
+			}
+			assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+			assert.equal(sketch.undo(), true);
+			assert.equal(sketch.arcs.size, 2);
+			assert.deepEqual(sketch.splines.get('Spline-1')!.pointIds, ['Point-94', 'Point-99', 'Point-98']);
+			assert.equal(sketch.canUndo(), false);
+			assert.equal(sketch.redo(), true);
+			assert.equal(sketch.arcs.size, 4);
+		});
 
 	it('moves the fillet handle with the cursor along a line corner bisector', () => {
 		const sketch = new SketchDocument();

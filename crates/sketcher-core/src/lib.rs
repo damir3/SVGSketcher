@@ -4,6 +4,7 @@ mod bezier;
 pub mod constraints;
 pub mod editing;
 mod ellipse;
+pub mod fillet;
 mod matrix;
 pub mod regions;
 pub mod solver;

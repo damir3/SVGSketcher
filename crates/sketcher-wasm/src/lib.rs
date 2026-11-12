@@ -2,6 +2,7 @@ use sketcher_core::{intersect, Curve, Point2};
 use wasm_bindgen::prelude::*;
 
 mod editing;
+mod fillet;
 mod regions;
 mod solver;
 mod spline;
@@ -11,7 +12,7 @@ const PAIR_STRIDE: usize = CURVE_STRIDE * 2;
 
 #[wasm_bindgen]
 pub fn api_version() -> u32 {
-    12
+    13
 }
 
 fn decode_curve(data: &[f64]) -> Result<Curve, &'static str> {

@@ -1,0 +1,271 @@
+{
+  "points": [
+    {
+      "x": -25.565588835119527,
+      "y": 24.576113194314562,
+      "type": "point",
+      "id": "Point-93",
+      "fixed": false
+    },
+    {
+      "x": 22.223140308164645,
+      "y": 27.18054935287673,
+      "type": "point",
+      "id": "Point-96",
+      "fixed": false
+    },
+    {
+      "x": -0.9917020768231595,
+      "y": 25.487417826383407,
+      "type": "point",
+      "id": "Point-95",
+      "fixed": false
+    },
+    {
+      "x": 4.579990813719732,
+      "y": -18.227885593102528,
+      "type": "point",
+      "id": "Point-98",
+      "fixed": false
+    },
+    {
+      "x": 23.33891199669786,
+      "y": 3.9308040879796096,
+      "type": "point",
+      "id": "Point-97",
+      "fixed": false
+    },
+    {
+      "x": -22.08289216750852,
+      "y": 0.23320369799930774,
+      "type": "point",
+      "id": "Point-94",
+      "fixed": false
+    },
+    {
+      "x": -0.166359509576111,
+      "y": -1.0506209284052517,
+      "type": "point",
+      "id": "Point-99",
+      "fixed": false
+    },
+    {
+      "x": -29.388403053485987,
+      "y": 0.6611452401341609,
+      "type": "point",
+      "id": "Point-100",
+      "fixed": false
+    },
+    {
+      "x": -14.77738128153105,
+      "y": -0.1947378441355454,
+      "type": "point",
+      "id": "Point-101",
+      "fixed": false
+    },
+    {
+      "x": -6.178455202421938,
+      "y": 3.1120885389249286,
+      "type": "point",
+      "id": "Point-102",
+      "fixed": false
+    },
+    {
+      "x": 5.845736183269716,
+      "y": -5.213330395735432,
+      "type": "point",
+      "id": "Point-103",
+      "fixed": false
+    },
+    {
+      "x": 2.9978740392877845,
+      "y": -12.502130704870103,
+      "type": "point",
+      "id": "Point-104",
+      "fixed": false
+    },
+    {
+      "x": 6.162107588151679,
+      "y": -23.95364048133495,
+      "type": "point",
+      "id": "Point-105",
+      "fixed": false
+    }
+  ],
+  "lines": [
+    {
+      "type": "line",
+      "id": "Line-42",
+      "p1Id": "Point-97",
+      "p2Id": "Point-98",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-43",
+      "p1Id": "Point-100",
+      "p2Id": "Point-101",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-44",
+      "p1Id": "Point-102",
+      "p2Id": "Point-103",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    },
+    {
+      "type": "line",
+      "id": "Line-45",
+      "p1Id": "Point-104",
+      "p2Id": "Point-105",
+      "isConstruction": true,
+      "isSplineHandle": true,
+      "parentSplineId": "Spline-1",
+      "isAutomaticSplineHandle": true
+    }
+  ],
+  "circles": [],
+  "arcs": [
+    {
+      "type": "arc",
+      "id": "Arc-1",
+      "centerId": "Point-93",
+      "startPointId": "Point-94",
+      "endPointId": "Point-95",
+      "radius": 24.59077848706663,
+      "clockwise": false,
+      "isConstruction": false
+    },
+    {
+      "type": "arc",
+      "id": "Arc-2",
+      "centerId": "Point-96",
+      "startPointId": "Point-95",
+      "endPointId": "Point-97",
+      "radius": 23.276503202595894,
+      "clockwise": false,
+      "isConstruction": false
+    }
+  ],
+  "ellipses": [],
+  "ellipticalArcs": [],
+  "splines": [
+    {
+      "type": "spline",
+      "id": "Spline-1",
+      "splineType": "fit",
+      "pointIds": [
+        "Point-94",
+        "Point-99",
+        "Point-98"
+      ],
+      "tangentLineIds": [
+        "Line-43",
+        "Line-44",
+        "Line-45"
+      ],
+      "isClosed": false,
+      "isConstruction": false
+    }
+  ],
+  "texts": [],
+  "images": [],
+  "constraints": [
+    {
+      "id": "c_arcept-1",
+      "type": "arc_endpoints",
+      "name": "Arc Endpoints",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Arc-1",
+        "Point-93",
+        "Point-94",
+        "Point-95"
+      ],
+      "arcId": "Arc-1",
+      "centerId": "Point-93",
+      "startPointId": "Point-94",
+      "endPointId": "Point-95"
+    },
+    {
+      "id": "c_arcept-2",
+      "type": "arc_endpoints",
+      "name": "Arc Endpoints",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Arc-2",
+        "Point-96",
+        "Point-95",
+        "Point-97"
+      ],
+      "arcId": "Arc-2",
+      "centerId": "Point-96",
+      "startPointId": "Point-95",
+      "endPointId": "Point-97"
+    },
+    {
+      "id": "c_midpoint-39",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-94",
+        "Point-100",
+        "Point-101"
+      ],
+      "midId": "Point-94",
+      "p1Id": "Point-100",
+      "p2Id": "Point-101",
+      "ratio": 0.4999999999999995
+    },
+    {
+      "id": "c_midpoint-40",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-99",
+        "Point-102",
+        "Point-103"
+      ],
+      "midId": "Point-99",
+      "p1Id": "Point-102",
+      "p2Id": "Point-103",
+      "ratio": 0.5
+    },
+    {
+      "id": "c_midpoint-41",
+      "type": "midpoint",
+      "name": "Midpoint",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-98",
+        "Point-104",
+        "Point-105"
+      ],
+      "midId": "Point-98",
+      "p1Id": "Point-104",
+      "p2Id": "Point-105",
+      "ratio": 0.5
+    }
+  ],
+  "parameters": [],
+  "idCounter": 223
+}

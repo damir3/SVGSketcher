@@ -9,7 +9,7 @@ import {
 	getConnectedPrimitivesForPoint,
 	calculateFilletGeometry,
 	findMaxFilletRadius,
-	commitFilletToSketch,
+	commitFilletsToSketch,
 	type FilletCandidate,
 	type FilletResult,
 } from '../../../math/fillet';
@@ -324,21 +324,11 @@ export class FilletTool extends BaseTool {
 
 	override commit(): boolean {
 		if (!this.pendingFillets.some(pf => pf.result)) return false;
-		this.ctx.sketch.beginTransaction();
-		let firstArcId: string | undefined;
-
-		for (let i = 0; i < this.pendingFillets.length; i++) {
-			const pf = this.pendingFillets[i];
-			if (!pf.result) continue;
-			const expr = this.popup.getExpression('radius');
-			const res = commitFilletToSketch(this.ctx.sketch, pf, i === 0, firstArcId, expr);
-			if (res && i === 0) {
-				firstArcId = res.arcId;
-			}
+		const results = commitFilletsToSketch(this.ctx.sketch, this.pendingFillets, this.popup.getExpression('radius'));
+		if (!results) {
+			this.ctx.showToast('Cannot apply these fillets to the shared curve');
+			return false;
 		}
-
-		this.ctx.sketch.solve();
-		this.ctx.sketch.commitTransaction();
 
 		this.ctx.showToast(`Created ${this.pendingFillets.length} fillet${this.pendingFillets.length > 1 ? 's' : ''}`);
 		this.cancel();
