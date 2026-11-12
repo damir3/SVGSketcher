@@ -1,0 +1,38 @@
+{
+  "beforeCommit": "786867e101692e7fcf0332b684151ac769c3b61c",
+  "beforeRegionsSha256": "d941069cf42a3a68f067bbfee7f00fdbd43fc3c18818f126be7dfc63dc3a4d2a",
+  "afterSourceHashes": {
+    "src/math/regions.ts": "edc37ad00007dcb12cbfa752f5855df267ba8d57b038f06944a6c549f5b24b4e",
+    "src/math/regionBroadPhase.ts": "2d8a5e731c289949faec1d858b4ddd0cdb15b0beda925c52096ea4d7be020070",
+    "test/regionBroadPhase.test.ts": "5c1ca817abf1b2fe1fbbefe69eb155a871e7296bb60a73331b5fb3778e7d5c56"
+  },
+  "beforeArtifacts": {
+    "index.html": "d5ffe664df513f40c894c72b47836108106b1d086459c974784b58a4190c0c9b",
+    "assets/index-BRY5TuFX.js": "855ad159a434836fa494687c03d22caf4d2c62f170fae3d5908ce58c2cbe4e99",
+    "assets/index-DfuLces0.css": "bda55522767342579a6d18d4a61607ea9cf400d83f423f9bb99157b2b4a8f8cd",
+    "kernel/sketcher_wasm.js": "eeba49b2fb84b6bb10015062a4e5326a37eb1a29ceb3d305b2c83a9e020efb0e",
+    "kernel/sketcher_wasm_bg.wasm": "91d5424ee60901be3a5589a2d7ed86ad86e69df10a44431a6848944db43430c3"
+  },
+  "afterArtifacts": {
+    "index.html": "76d4b2f1bf6f2d44fbcb593c98281438e39f345441174344f364b9d319172458",
+    "assets/index-BBDsqhlz.js": "bbfcab4dc5e7b7c575de436bb6f5bf5e882be239532bb22ac7afd2449d48c9b0",
+    "assets/index-DfuLces0.css": "bda55522767342579a6d18d4a61607ea9cf400d83f423f9bb99157b2b4a8f8cd",
+    "kernel/sketcher_wasm.js": "eeba49b2fb84b6bb10015062a4e5326a37eb1a29ceb3d305b2c83a9e020efb0e",
+    "kernel/sketcher_wasm_bg.wasm": "91d5424ee60901be3a5589a2d7ed86ad86e69df10a44431a6848944db43430c3"
+  },
+  "runtime": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+  "node": "v20.18.0",
+  "platform": "darwin/arm64",
+  "method": "Before is an isolated copy of current HEAD, after is the working tree. Same release WASM binary and benchmark harness; fresh browser reports measured sequentially, before then after, without concurrent builds/tests. Node runs also sequential. Five warm-up and thirty measured frames per case.",
+  "verification": {
+    "mixedPairs": 5040,
+    "backends": [
+      "typescript",
+      "wasm"
+    ],
+    "exactRegionComparisons": 48,
+    "fullWasmTests": 1196,
+    "typescriptPass": 1180,
+    "typescriptWasmOnlySkips": 16
+  }
+}

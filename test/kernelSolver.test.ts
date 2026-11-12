@@ -121,6 +121,7 @@ it('validates the numerical solver packed result before exposing it to the model
 			api_version: () => GEOMETRY_KERNEL_API_VERSION,
 			intersect_pairs: () => new Float64Array(),
 			spline_geometry: () => new Float64Array(),
+			find_regions_packed: () => new Float64Array([0]),
 			solve_system: () => new Float64Array(data),
 		});
 		assert.throws(() => kernel.solveSystem!(simpleProblem(), evaluateSimple), /WASM solver/);

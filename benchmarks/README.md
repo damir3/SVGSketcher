@@ -44,3 +44,7 @@ The first rectangle's corner or the first spline's movable fit point follows an 
 All times are milliseconds; percentiles use nearest rank. Initialization, snapshot restoration and warm-up are excluded. Browser backend order alternates between scenes, and both backends receive the same targets. Runs are sequential; avoid simultaneous tests/builds and keep the measured tab active. Discard reports containing hidden visibility states. Timer resolution, JIT, garbage collection, thermal state and other applications affect results. Repeat the whole run before drawing conclusions from small differences.
 
 The [saved baseline](results/baseline.md) records one local run, not a portable performance guarantee. Correctness tests validate scene determinism, backend isolation, drag parity and region counts without asserting timing thresholds.
+
+The [region broad-phase comparison](results/region-broad-phase.md) measures the same workloads before and after rejecting separated curve bounds, against the current solver version. It includes fresh Node and browser reports for both versions.
+
+The subsequent [native region comparison](results/native-regions.md) measures the transfer of complete region construction to Rust (kernel API 11), against the already filtered TypeScript implementation. Rebuild WASM assets when updating to this API.

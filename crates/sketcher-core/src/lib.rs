@@ -4,6 +4,7 @@ mod bezier;
 pub mod constraints;
 mod ellipse;
 mod matrix;
+pub mod regions;
 pub mod solver;
 pub mod spline;
 

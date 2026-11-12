@@ -13,7 +13,7 @@ fn scale(a: Point2, s: f64) -> Point2 {
 fn add(a: Point2, b: Point2) -> Point2 {
     p(a.x + b.x, a.y + b.y)
 }
-fn length(a: Point2) -> f64 {
+pub(crate) fn length(a: Point2) -> f64 {
     // Match the reference's scaled two-coordinate norm. A single ULP can change
     // which equally close branch the projection search chooses on a retraced curve.
     let (x, y) = (a.x.abs(), a.y.abs());

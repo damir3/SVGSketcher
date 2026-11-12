@@ -1,0 +1,57 @@
+{
+  "baseCommit": "786867e101692e7fcf0332b684151ac769c3b61c",
+  "beforeSourceState": "Base commit plus the previously completed conservative region bounds filter; verified saved production artifact hashes match the earlier broad-phase report.",
+  "beforeApi": 10,
+  "afterApi": 11,
+  "sourceHashes": {
+    "src/math/regions.ts": "2194c4b96feb443b208e4a1f61d010fcea9fb76fcf442b146ff12ea4c0d39e78",
+    "src/math/regionsReference.ts": "edc37ad00007dcb12cbfa752f5855df267ba8d57b038f06944a6c549f5b24b4e",
+    "src/math/regionBroadPhase.ts": "2d8a5e731c289949faec1d858b4ddd0cdb15b0beda925c52096ea4d7be020070",
+    "src/kernel/regionTypes.ts": "6e3cf92fb26d5d9493193d6bcffa8662ee46f4ea1bf7714a5ead454760b76e01",
+    "src/kernel/regionWasm.ts": "f7855490d2851f9636e282ecea15bf15fc25f511b64280e313a0c42b04320e5c",
+    "src/kernel/types.ts": "02fcf43f855612c6ed920e2994d92c08ce57a1bef3a43e4179120d354533f13c",
+    "src/kernel/wasm.ts": "615169817ef532478773f557856cc8761871f0f83318e9f51c1cf9713499d92e",
+    "crates/sketcher-core/src/regions.rs": "03e9475ae2ee507895fd95c4ebd71e516827e47e4fd4bb7246c45ff04cc4b221",
+    "crates/sketcher-core/src/lib.rs": "1052372ed94d4d0f65f33961d9b8b84b7871fa35d929c57dea8ae3572bb69812",
+    "crates/sketcher-core/src/spline.rs": "47598e5a69f7194fe8160cfe18534819f9495ae30ea3c39d55ad72604a922217",
+    "crates/sketcher-wasm/src/regions.rs": "847bf04026ebaf93970dc26ddfa0684ca98031228827e4f0efcc4a81f17decf0",
+    "crates/sketcher-wasm/src/lib.rs": "80660680f498030aba10bf5fa715a7cb963001913d35e47309444328a32adccb",
+    "test/regionKernel.test.ts": "246c61009dd6a6c542bbbf76541e615796d82d8813c8a065779b4c470faafd88",
+    "test/fixtures/kernelRegions.json": "687696d9a01f915dd83079381977dcbb95db664043b49d8661ef0a69296ad3d2",
+    "crates/sketcher-wasm/src/solver.rs": "8926381d8ebe328822f273d123a40abae4732961c88521874f64bba41481021f"
+  },
+  "beforeArtifacts": {
+    "index.html": "76d4b2f1bf6f2d44fbcb593c98281438e39f345441174344f364b9d319172458",
+    "assets/index-BBDsqhlz.js": "bbfcab4dc5e7b7c575de436bb6f5bf5e882be239532bb22ac7afd2449d48c9b0",
+    "assets/index-DfuLces0.css": "bda55522767342579a6d18d4a61607ea9cf400d83f423f9bb99157b2b4a8f8cd",
+    "kernel/sketcher_wasm.js": "eeba49b2fb84b6bb10015062a4e5326a37eb1a29ceb3d305b2c83a9e020efb0e",
+    "kernel/sketcher_wasm_bg.wasm": "91d5424ee60901be3a5589a2d7ed86ad86e69df10a44431a6848944db43430c3"
+  },
+  "afterArtifacts": {
+    "index.html": "ac893d2a6cabbe16981572a881c8a356251797df5e7a0d8e570ad0de88690a0e",
+    "assets/index-1LrtYvJX.js": "c2772abd76b273e36b75198a38f5ab47ca30389a0dc23d404785e00572a2b8d1",
+    "assets/index-DfuLces0.css": "bda55522767342579a6d18d4a61607ea9cf400d83f423f9bb99157b2b4a8f8cd",
+    "kernel/sketcher_wasm.js": "a3bc70728c91706ff784a81b12ab05676da74f0d97ac8e1d4a12bb048469743b",
+    "kernel/sketcher_wasm_bg.wasm": "560f7b837dc728025db9aa93761bf8ee139fc83ac5cd49e8668f40240ecef8ab"
+  },
+  "node": "v20.18.0",
+  "platform": "darwin/arm64",
+  "runtime": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "method": "Sequential before/after browser runs, five warm-up and thirty measured frames in each of 24 cases, all visible. No concurrent builds, tests or Node measurements during browser runs. Both versions use Rust release opt-level=3; only after has native region construction and API 11.",
+  "tests": {
+    "frozenCases": 120,
+    "draggedReferenceStates": 24,
+    "wasm": 1321,
+    "typescriptPass": 1303,
+    "typescriptSkips": 18,
+    "rust": 42,
+    "clippy": "passed -D warnings"
+  },
+  "measurements": {
+    "browserBefore": "2026-11-12T04:53:06.192Z",
+    "browserAfter": "2026-11-12T05:00:11.170Z",
+    "nodeBefore": "2026-11-12T04:40:16.870Z",
+    "nodeAfter": "2026-11-12T04:59:35.957Z"
+  }
+}

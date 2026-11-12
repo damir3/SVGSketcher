@@ -37,7 +37,11 @@ pub fn solve_system(
         options: Options {
             max_iterations: integer(settings[3])?,
             tolerance: settings[4],
-            grad_rel_tolerance: if settings.len() == 10 { settings[9] } else { 0.0 },
+            grad_rel_tolerance: if settings.len() == 10 {
+                settings[9]
+            } else {
+                0.0
+            },
             initial_lambda: settings[5],
             lambda_factor: settings[6],
             min_lambda: settings[7],
