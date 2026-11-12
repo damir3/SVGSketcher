@@ -1,6 +1,7 @@
 //! Browser-independent geometry. Preserve existing editor tolerances during migration.
 
 mod bezier;
+pub mod chamfer;
 pub mod constraints;
 pub mod editing;
 mod ellipse;

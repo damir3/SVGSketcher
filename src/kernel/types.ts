@@ -3,9 +3,10 @@ import type { SplineKernel } from './splineTypes';
 import type { RegionKernel } from './regionTypes';
 import type { EditingKernel } from './editingTypes';
 import type { FilletKernel } from './filletTypes';
+import type { ChamferKernel } from './chamferTypes';
 
 /** Versioned, UI-independent boundary for migrated kernel operations. */
-export const GEOMETRY_KERNEL_API_VERSION = 13;
+export const GEOMETRY_KERNEL_API_VERSION = 14;
 export const KERNEL_CURVE_STRIDE = 9;
 export const MAX_BEZIER_INTERSECTION_CANDIDATES = 17;
 // The existing sampled conic algorithm can emit one candidate per interval, including coincident curves.
@@ -40,4 +41,5 @@ export interface GeometryKernel {
 	findRegions?: RegionKernel;
 	editing?: EditingKernel;
 	fillet?: FilletKernel;
+	chamfer?: ChamferKernel;
 }

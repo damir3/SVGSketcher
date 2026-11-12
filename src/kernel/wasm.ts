@@ -15,8 +15,11 @@ import { createWasmEditingKernel, type EditingBinding } from './editingWasm';
 
 import { createWasmFilletKernel, type FilletBinding } from './filletWasm';
 
+import { createWasmChamferKernel, type ChamferBinding } from './chamferWasm';
+
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	chamfer_geometry: ChamferBinding;
 	fillet_geometry: FilletBinding;
 	curve_editing: EditingBinding;
 	find_regions_packed: RegionBinding;
@@ -124,11 +127,13 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.find_regions_packed !== 'function') throw new Error('WASM kernel has no region operations');
 	if (typeof bindings.curve_editing !== 'function') throw new Error('WASM kernel has no curve editing operations');
 	if (typeof bindings.fillet_geometry !== 'function') throw new Error('WASM kernel has no fillet operations');
+	if (typeof bindings.chamfer_geometry !== 'function') throw new Error('WASM kernel has no chamfer operations');
 	return {
 		backend: 'wasm',
 		apiVersion: GEOMETRY_KERNEL_API_VERSION,
 		spline: createWasmSplineKernel((...args) => bindings.spline_geometry(...args)),
 		findRegions: createWasmRegionKernel(data => bindings.find_regions_packed(data)),
+		chamfer: createWasmChamferKernel((data, settings) => bindings.chamfer_geometry(data, settings)),
 		fillet: createWasmFilletKernel((data, settings) => bindings.fillet_geometry(data, settings)),
 		editing: createWasmEditingKernel((data, settings) => bindings.curve_editing(data, settings)),
 		solveSystem: (problem, evaluate) => solveWasm(bindings, problem, evaluate),

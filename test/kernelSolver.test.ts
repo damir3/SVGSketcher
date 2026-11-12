@@ -124,6 +124,7 @@ it('validates the numerical solver packed result before exposing it to the model
 			find_regions_packed: () => new Float64Array([0]),
 			curve_editing: () => new Float64Array([0]),
 			fillet_geometry: () => new Float64Array([0]),
+			chamfer_geometry: () => new Float64Array([0]),
 			solve_system: () => new Float64Array(data),
 		});
 		assert.throws(() => kernel.solveSystem!(simpleProblem(), evaluateSimple), /WASM solver/);

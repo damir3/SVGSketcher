@@ -1,0 +1,7065 @@
+{
+  "sourceCommit": "0b14770",
+  "originalSourceHash": "6d0ea9b3c9eda58afc7274aadfb8c8576c3f3e5a93e0deeceb48b53890c6264a",
+  "corners": [
+    {
+      "name": "orthogonal",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 100,
+        "y": 0
+      },
+      "other2": {
+        "x": 0,
+        "y": 80
+      },
+      "result": {
+        "dir1": {
+          "x": 1,
+          "y": 0
+        },
+        "dir2": {
+          "x": 0,
+          "y": 1
+        },
+        "len1": 100,
+        "len2": 80,
+        "cornerAngleRad": 1.5707963267948966
+      }
+    },
+    {
+      "name": "acute",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 100,
+        "y": 0
+      },
+      "other2": {
+        "x": 51.96152422706632,
+        "y": 29.999999999999996
+      },
+      "result": {
+        "dir1": {
+          "x": 1,
+          "y": 0
+        },
+        "dir2": {
+          "x": 0.8660254037844387,
+          "y": 0.49999999999999994
+        },
+        "len1": 100,
+        "len2": 60,
+        "cornerAngleRad": 0.5235987755982987
+      }
+    },
+    {
+      "name": "obtuse",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 100,
+        "y": 0
+      },
+      "other2": {
+        "x": -60,
+        "y": 60
+      },
+      "result": {
+        "dir1": {
+          "x": 1,
+          "y": 0
+        },
+        "dir2": {
+          "x": -0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "len1": 100,
+        "len2": 84.8528137423857,
+        "cornerAngleRad": 2.356194490192345
+      }
+    },
+    {
+      "name": "reflected",
+      "vertex": {
+        "x": 20,
+        "y": -30
+      },
+      "other1": {
+        "x": -80,
+        "y": -30
+      },
+      "other2": {
+        "x": 20,
+        "y": -110
+      },
+      "result": {
+        "dir1": {
+          "x": -1,
+          "y": 0
+        },
+        "dir2": {
+          "x": 0,
+          "y": -1
+        },
+        "len1": 100,
+        "len2": 80,
+        "cornerAngleRad": 1.5707963267948966
+      }
+    },
+    {
+      "name": "rotated",
+      "vertex": {
+        "x": -42,
+        "y": 31
+      },
+      "other1": {
+        "x": -12,
+        "y": 71
+      },
+      "other2": {
+        "x": -66,
+        "y": 49
+      },
+      "result": {
+        "dir1": {
+          "x": 0.6,
+          "y": 0.8
+        },
+        "dir2": {
+          "x": -0.8,
+          "y": 0.6
+        },
+        "len1": 50,
+        "len2": 30,
+        "cornerAngleRad": 1.5707963267948966
+      }
+    },
+    {
+      "name": "short",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 0.2,
+        "y": 0
+      },
+      "other2": {
+        "x": 0,
+        "y": 0.15
+      },
+      "result": {
+        "dir1": {
+          "x": 1,
+          "y": 0
+        },
+        "dir2": {
+          "x": 0,
+          "y": 1
+        },
+        "len1": 0.2,
+        "len2": 0.15,
+        "cornerAngleRad": 1.5707963267948966
+      }
+    },
+    {
+      "name": "minimum length",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 0.0001,
+        "y": 0
+      },
+      "other2": {
+        "x": 0,
+        "y": 0.0001
+      },
+      "result": {
+        "dir1": {
+          "x": 1,
+          "y": 0
+        },
+        "dir2": {
+          "x": 0,
+          "y": 1
+        },
+        "len1": 0.0001,
+        "len2": 0.0001,
+        "cornerAngleRad": 1.5707963267948966
+      }
+    },
+    {
+      "name": "too short",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 9.99e-05,
+        "y": 0
+      },
+      "other2": {
+        "x": 0,
+        "y": 1
+      },
+      "result": null
+    },
+    {
+      "name": "coincident",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 0,
+        "y": 0
+      },
+      "other2": {
+        "x": 0,
+        "y": 10
+      },
+      "result": null
+    },
+    {
+      "name": "parallel",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 10,
+        "y": 0
+      },
+      "other2": {
+        "x": 20,
+        "y": 0
+      },
+      "result": null
+    },
+    {
+      "name": "opposite",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 10,
+        "y": 0
+      },
+      "other2": {
+        "x": -20,
+        "y": 0
+      },
+      "result": null
+    },
+    {
+      "name": "nearly parallel",
+      "vertex": {
+        "x": 0,
+        "y": 0
+      },
+      "other1": {
+        "x": 10,
+        "y": 0
+      },
+      "other2": {
+        "x": 20,
+        "y": 0.01
+      },
+      "result": null
+    }
+  ],
+  "queries": [
+    {
+      "name": "orthogonal equal_distance (10,99,55) flip=false",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (10,99,55) flip=true",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (-5,0,0) flip=false",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (-5,0,0) flip=true",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (99.9,0,45) flip=false",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 99.9,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 99.9
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 45,
+        "chamferLength": 141.27993488107222,
+        "midPoint": {
+          "x": 49.95,
+          "y": 49.95
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (99.9,0,45) flip=true",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 99.9,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 99.9
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 45,
+        "chamferLength": 141.27993488107222,
+        "midPoint": {
+          "x": 49.95,
+          "y": 49.95
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (100,0,45) flip=false",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 100
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 45,
+        "chamferLength": 141.4213562373095,
+        "midPoint": {
+          "x": 50,
+          "y": 50
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal equal_distance (100,0,45) flip=true",
+      "corner": 0,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 100
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 45,
+        "chamferLength": 141.4213562373095,
+        "midPoint": {
+          "x": 50,
+          "y": 50
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal two_distance (12,7,45) flip=false",
+      "corner": 0,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 12,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 7
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 30.256437163529277,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 6,
+          "y": 3.5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal two_distance (12,7,45) flip=true",
+      "corner": 0,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 7,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 12
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 59.743562836470744,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 3.5,
+          "y": 6
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal two_distance (0,-3,45) flip=false",
+      "corner": 0,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal two_distance (0,-3,45) flip=true",
+      "corner": 0,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal two_distance (100,1,45) flip=false",
+      "corner": 0,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 1
+        },
+        "dist1": 100,
+        "dist2": 1,
+        "angleDeg": 0.5729386976826285,
+        "chamferLength": 100.00499987500623,
+        "midPoint": {
+          "x": 50,
+          "y": 0.5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal two_distance (100,1,45) flip=true",
+      "corner": 0,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 100
+        },
+        "dist1": 1,
+        "dist2": 100,
+        "angleDeg": 89.42706130231652,
+        "chamferLength": 100.00499987500623,
+        "midPoint": {
+          "x": 0.5,
+          "y": 50
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,30) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 5.773502691896256
+        },
+        "dist1": 10,
+        "dist2": 5.773502691896256,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 5,
+          "y": 2.886751345948128
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,30) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 5.773502691896256,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 5.773502691896256,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 2.886751345948128,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,60) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 17.32050807568877
+        },
+        "dist1": 10,
+        "dist2": 17.32050807568877,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 5,
+          "y": 8.660254037844386
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,60) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 17.32050807568877,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 17.32050807568877,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 8.660254037844386,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,0) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,0) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,-20) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,-20) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,180) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,180) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.0010000000033333336
+        },
+        "dist1": 10,
+        "dist2": 0.0010000000033333336,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 5,
+          "y": 0.0005000000016666668
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.0010000000033333336,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 0.0010000000033333336,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 0.0005000000016666668,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,89.99427042204869) flip=false",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "orthogonal distance_angle (10,0,89.99427042204869) flip=true",
+      "corner": 0,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "acute equal_distance (10,99,55) flip=false",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 75,
+        "chamferLength": 5.176380902050414,
+        "midPoint": {
+          "x": 9.330127018922195,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute equal_distance (10,99,55) flip=true",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 75,
+        "chamferLength": 5.176380902050414,
+        "midPoint": {
+          "x": 9.330127018922195,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute equal_distance (-5,0,0) flip=false",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0.08660254037844388,
+          "y": 0.049999999999999996
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 75,
+        "chamferLength": 0.05176380902050414,
+        "midPoint": {
+          "x": 0.09330127018922194,
+          "y": 0.024999999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute equal_distance (-5,0,0) flip=true",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0.08660254037844388,
+          "y": 0.049999999999999996
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 75,
+        "chamferLength": 0.05176380902050414,
+        "midPoint": {
+          "x": 0.09330127018922194,
+          "y": 0.024999999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute equal_distance (99.9,0,45) flip=false",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 99.9,
+          "y": 0
+        },
+        "t2": {
+          "x": 86.51593783806543,
+          "y": 49.949999999999996
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 75,
+        "chamferLength": 51.71204521148364,
+        "midPoint": {
+          "x": 93.20796891903271,
+          "y": 24.974999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "acute equal_distance (99.9,0,45) flip=true",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 99.9,
+          "y": 0
+        },
+        "t2": {
+          "x": 86.51593783806543,
+          "y": 49.949999999999996
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 75,
+        "chamferLength": 51.71204521148364,
+        "midPoint": {
+          "x": 93.20796891903271,
+          "y": 24.974999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "acute equal_distance (100,0,45) flip=false",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": 86.60254037844388,
+          "y": 49.99999999999999
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 75,
+        "chamferLength": 51.76380902050414,
+        "midPoint": {
+          "x": 93.30127018922194,
+          "y": 24.999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "acute equal_distance (100,0,45) flip=true",
+      "corner": 1,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": 86.60254037844388,
+          "y": 49.99999999999999
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 75,
+        "chamferLength": 51.76380902050414,
+        "midPoint": {
+          "x": 93.30127018922194,
+          "y": 24.999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "acute two_distance (12,7,45) flip=false",
+      "corner": 1,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 12,
+          "y": 0
+        },
+        "t2": {
+          "x": 6.062177826491071,
+          "y": 3.4999999999999996
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 30.516870695207952,
+        "chamferLength": 6.8925853033687075,
+        "midPoint": {
+          "x": 9.031088913245537,
+          "y": 1.7499999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute two_distance (12,7,45) flip=true",
+      "corner": 1,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 7,
+          "y": 0
+        },
+        "t2": {
+          "x": 10.392304845413264,
+          "y": 5.999999999999999
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 119.48312930479207,
+        "chamferLength": 6.8925853033687075,
+        "midPoint": {
+          "x": 8.696152422706632,
+          "y": 2.9999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute two_distance (0,-3,45) flip=false",
+      "corner": 1,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0.08660254037844388,
+          "y": 0.049999999999999996
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 75.00000000000001,
+        "chamferLength": 0.05176380902050414,
+        "midPoint": {
+          "x": 0.09330127018922194,
+          "y": 0.024999999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute two_distance (0,-3,45) flip=true",
+      "corner": 1,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0.08660254037844388,
+          "y": 0.049999999999999996
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 75.00000000000001,
+        "chamferLength": 0.05176380902050414,
+        "midPoint": {
+          "x": 0.09330127018922194,
+          "y": 0.024999999999999998
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute two_distance (100,1,45) flip=false",
+      "corner": 1,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": 0.8660254037844387,
+          "y": 0.49999999999999994
+        },
+        "dist1": 100,
+        "dist2": 1,
+        "angleDeg": 0.28897910080889794,
+        "chamferLength": 99.13523550808316,
+        "midPoint": {
+          "x": 50.43301270189222,
+          "y": 0.24999999999999997
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "acute two_distance (100,1,45) flip=true",
+      "corner": 1,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 1,
+          "y": 0
+        },
+        "t2": {
+          "x": 86.60254037844388,
+          "y": 49.99999999999999
+        },
+        "dist1": 1,
+        "dist2": 100,
+        "angleDeg": 149.7110208991901,
+        "chamferLength": 99.13523550808317,
+        "midPoint": {
+          "x": 43.80127018922194,
+          "y": 24.999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,30) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 5,
+          "y": 2.886751345948128
+        },
+        "dist1": 10,
+        "dist2": 5.773502691896257,
+        "angleDeg": 30,
+        "chamferLength": 5.773502691896257,
+        "midPoint": {
+          "x": 7.5,
+          "y": 1.443375672974064
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,30) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 5.773502691896257,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 5.773502691896257,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 5.773502691896257,
+        "midPoint": {
+          "x": 7.216878364870322,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,60) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 7.5,
+          "y": 4.330127018922192
+        },
+        "dist1": 10,
+        "dist2": 8.660254037844386,
+        "angleDeg": 60,
+        "chamferLength": 4.999999999999999,
+        "midPoint": {
+          "x": 8.75,
+          "y": 2.165063509461096
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,60) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 8.660254037844386,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 8.660254037844386,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 4.999999999999999,
+        "midPoint": {
+          "x": 8.660254037844386,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,0) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,0) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,-20) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,-20) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,180) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 5.176380902050414,
+        "midPoint": {
+          "x": 9.330127018922195,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,180) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 5.176380902050414,
+        "midPoint": {
+          "x": 9.330127018922195,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0.0017317508652929063,
+          "y": 0.0009998268282462265
+        },
+        "dist1": 10,
+        "dist2": 0.0019996536564924534,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 9.998268299126048,
+        "midPoint": {
+          "x": 5.0008658754326465,
+          "y": 0.0004999134141231132
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.0019996536564924534,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 0.0019996536564924534,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 9.99826829912605,
+        "midPoint": {
+          "x": 4.33112684575044,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,149.9942704220487) flip=false",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 149.9942704220487,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 149.9942704220487,
+        "chamferLength": 5.176380902050414,
+        "midPoint": {
+          "x": 9.330127018922195,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "acute distance_angle (10,0,149.9942704220487) flip=true",
+      "corner": 1,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 149.9942704220487,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 8.660254037844387,
+          "y": 4.999999999999999
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 149.9942704220487,
+        "chamferLength": 5.176380902050414,
+        "midPoint": {
+          "x": 9.330127018922195,
+          "y": 2.4999999999999996
+        },
+        "bisectorDir": {
+          "x": 0.9659258262890683,
+          "y": 0.2588190451025207
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 59.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "obtuse equal_distance (10,99,55) flip=false",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 22.5,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse equal_distance (10,99,55) flip=true",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 22.5,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse equal_distance (-5,0,0) flip=false",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": -0.07071067811865475,
+          "y": 0.07071067811865475
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 22.5,
+        "chamferLength": 0.18477590650225736,
+        "midPoint": {
+          "x": 0.014644660940672627,
+          "y": 0.035355339059327376
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse equal_distance (-5,0,0) flip=true",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": -0.07071067811865475,
+          "y": 0.07071067811865475
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 22.5,
+        "chamferLength": 0.18477590650225736,
+        "midPoint": {
+          "x": 0.014644660940672627,
+          "y": 0.035355339059327376
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse equal_distance (99.9,0,45) flip=false",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 99.9,
+          "y": 0
+        },
+        "t2": {
+          "x": -70.6399674405361,
+          "y": 70.6399674405361
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 22.5,
+        "chamferLength": 184.5911305957551,
+        "midPoint": {
+          "x": 14.630016279731954,
+          "y": 35.31998372026805
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "obtuse equal_distance (99.9,0,45) flip=true",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 99.9,
+          "y": 0
+        },
+        "t2": {
+          "x": -70.6399674405361,
+          "y": 70.6399674405361
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 22.5,
+        "chamferLength": 184.5911305957551,
+        "midPoint": {
+          "x": 14.630016279731954,
+          "y": 35.31998372026805
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "obtuse equal_distance (100,0,45) flip=false",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": -70.71067811865474,
+          "y": 70.71067811865474
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 22.5,
+        "chamferLength": 184.77590650225736,
+        "midPoint": {
+          "x": 14.64466094067263,
+          "y": 35.35533905932737
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "obtuse equal_distance (100,0,45) flip=true",
+      "corner": 2,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": -70.71067811865474,
+          "y": 70.71067811865474
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 22.5,
+        "chamferLength": 184.77590650225736,
+        "midPoint": {
+          "x": 14.64466094067263,
+          "y": 35.35533905932737
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "obtuse two_distance (12,7,45) flip=false",
+      "corner": 2,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 12,
+          "y": 0
+        },
+        "t2": {
+          "x": -4.949747468305832,
+          "y": 4.949747468305832
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 16.279116344213243,
+        "chamferLength": 17.657687822570086,
+        "midPoint": {
+          "x": 3.525126265847084,
+          "y": 2.474873734152916
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse two_distance (12,7,45) flip=true",
+      "corner": 2,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 7,
+          "y": 0
+        },
+        "t2": {
+          "x": -8.48528137423857,
+          "y": 8.48528137423857
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 28.72088365578677,
+        "chamferLength": 17.65768782257009,
+        "midPoint": {
+          "x": -0.7426406871192848,
+          "y": 4.242640687119285
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse two_distance (0,-3,45) flip=false",
+      "corner": 2,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": -0.07071067811865475,
+          "y": 0.07071067811865475
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 22.500000000000004,
+        "chamferLength": 0.18477590650225736,
+        "midPoint": {
+          "x": 0.014644660940672627,
+          "y": 0.035355339059327376
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse two_distance (0,-3,45) flip=true",
+      "corner": 2,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": -0.07071067811865475,
+          "y": 0.07071067811865475
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 22.500000000000004,
+        "chamferLength": 0.18477590650225736,
+        "midPoint": {
+          "x": 0.014644660940672627,
+          "y": 0.035355339059327376
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse two_distance (100,1,45) flip=false",
+      "corner": 2,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 100,
+          "y": 0
+        },
+        "t2": {
+          "x": -0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "dist1": 100,
+        "dist2": 1,
+        "angleDeg": 0.4022910572397174,
+        "chamferLength": 100.70958919704375,
+        "midPoint": {
+          "x": 49.64644660940672,
+          "y": 0.35355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "obtuse two_distance (100,1,45) flip=true",
+      "corner": 2,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 1,
+          "y": 0
+        },
+        "t2": {
+          "x": -70.71067811865474,
+          "y": 70.71067811865474
+        },
+        "dist1": 1,
+        "dist2": 100,
+        "angleDeg": 44.59770894276101,
+        "chamferLength": 100.70958919704373,
+        "midPoint": {
+          "x": -34.85533905932737,
+          "y": 35.35533905932737
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,30) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -13.660254037844382,
+          "y": 13.660254037844382
+        },
+        "dist1": 10,
+        "dist2": 19.318516525781362,
+        "angleDeg": 30,
+        "chamferLength": 27.320508075688767,
+        "midPoint": {
+          "x": -1.830127018922191,
+          "y": 6.830127018922191
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,30) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 19.318516525781362,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 19.318516525781362,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 27.320508075688767,
+        "midPoint": {
+          "x": 6.123724356957943,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,60) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,60) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,0) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,0) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,-20) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,-20) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,180) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,180) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -0.0010001000133350003,
+          "y": 0.0010001000133350003
+        },
+        "dist1": 10,
+        "dist2": 0.0014143550025878708,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.001000150018337,
+        "midPoint": {
+          "x": 4.999499949993332,
+          "y": 0.0005000500066675001
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.0014143550025878708,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 0.0014143550025878708,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.001000150018335,
+        "midPoint": {
+          "x": -3.5348267284314434,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": true
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,44.99427042204869) flip=false",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 44.99427042204869,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 44.99427042204869,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "obtuse distance_angle (10,0,44.99427042204869) flip=true",
+      "corner": 2,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 44.99427042204869,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": -7.071067811865475,
+          "y": 7.071067811865475
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 44.99427042204869,
+        "chamferLength": 18.477590650225736,
+        "midPoint": {
+          "x": 1.4644660940672627,
+          "y": 3.5355339059327373
+        },
+        "bisectorDir": {
+          "x": 0.3826834323650899,
+          "y": 0.9238795325112867
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 84.75281374238571,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "reflected equal_distance (10,99,55) flip=false",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 15,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected equal_distance (10,99,55) flip=true",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 15,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected equal_distance (-5,0,0) flip=false",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 19.9,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623731153,
+        "midPoint": {
+          "x": 19.95,
+          "y": -30.05
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected equal_distance (-5,0,0) flip=true",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 19.9,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623731153,
+        "midPoint": {
+          "x": 19.95,
+          "y": -30.05
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected equal_distance (99.9,0,45) flip=false",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -79.9,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -129.9
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 45,
+        "chamferLength": 141.27993488107222,
+        "midPoint": {
+          "x": -29.950000000000003,
+          "y": -79.95
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "reflected equal_distance (99.9,0,45) flip=true",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": 99.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -79.9,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -129.9
+        },
+        "dist1": 99.9,
+        "dist2": 99.9,
+        "angleDeg": 45,
+        "chamferLength": 141.27993488107222,
+        "midPoint": {
+          "x": -29.950000000000003,
+          "y": -79.95
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "reflected equal_distance (100,0,45) flip=false",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -80,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -130
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 45,
+        "chamferLength": 141.4213562373095,
+        "midPoint": {
+          "x": -30,
+          "y": -80
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "reflected equal_distance (100,0,45) flip=true",
+      "corner": 3,
+      "mode": "equal_distance",
+      "d1": 100,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -80,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -130
+        },
+        "dist1": 100,
+        "dist2": 100,
+        "angleDeg": 45,
+        "chamferLength": 141.4213562373095,
+        "midPoint": {
+          "x": -30,
+          "y": -80
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "reflected two_distance (12,7,45) flip=false",
+      "corner": 3,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 8,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -37
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 30.256437163529277,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 14,
+          "y": -33.5
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected two_distance (12,7,45) flip=true",
+      "corner": 3,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 13,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -42
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 59.743562836470744,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 16.5,
+          "y": -36
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected two_distance (0,-3,45) flip=false",
+      "corner": 3,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 19.9,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623731153,
+        "midPoint": {
+          "x": 19.95,
+          "y": -30.05
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected two_distance (0,-3,45) flip=true",
+      "corner": 3,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 19.9,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623731153,
+        "midPoint": {
+          "x": 19.95,
+          "y": -30.05
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected two_distance (100,1,45) flip=false",
+      "corner": 3,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -80,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -31
+        },
+        "dist1": 100,
+        "dist2": 1,
+        "angleDeg": 0.5729386976826285,
+        "chamferLength": 100.00499987500623,
+        "midPoint": {
+          "x": -30,
+          "y": -30.5
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "reflected two_distance (100,1,45) flip=true",
+      "corner": 3,
+      "mode": "two_distance",
+      "d1": 100,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 19,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -130
+        },
+        "dist1": 1,
+        "dist2": 100,
+        "angleDeg": 89.42706130231652,
+        "chamferLength": 100.00499987500623,
+        "midPoint": {
+          "x": 19.5,
+          "y": -80
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,30) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -35.773502691896255
+        },
+        "dist1": 10,
+        "dist2": 5.773502691896256,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 15,
+          "y": -32.88675134594813
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,30) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 14.226497308103744,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 5.773502691896256,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 17.113248654051873,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,60) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -47.32050807568877
+        },
+        "dist1": 10,
+        "dist2": 17.32050807568877,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 15,
+          "y": -38.66025403784438
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,60) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 2.679491924311229,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 17.32050807568877,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 11.339745962155614,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,0) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 15,
+          "y": -30
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,0) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 15,
+          "y": -30
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,-20) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 15,
+          "y": -30
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,-20) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 15,
+          "y": -30
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,180) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 15,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,180) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 15,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -30.001000000003334
+        },
+        "dist1": 10,
+        "dist2": 0.0010000000033333336,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 15,
+          "y": -30.000500000001665
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 19.998999999996666,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 0.0010000000033333336,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 19.999499999998335,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,89.99427042204869) flip=false",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 15,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "reflected distance_angle (10,0,89.99427042204869) flip=true",
+      "corner": 3,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": -30
+        },
+        "t2": {
+          "x": 20,
+          "y": -40
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 15,
+          "y": -35
+        },
+        "bisectorDir": {
+          "x": -0.7071067811865475,
+          "y": -0.7071067811865475
+        },
+        "maxDist1": 99.9,
+        "maxDist2": 79.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "rotated equal_distance (10,99,55) flip=false",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": -43,
+          "y": 38
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated equal_distance (10,99,55) flip=true",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": -43,
+          "y": 38
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated equal_distance (-5,0,0) flip=false",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -41.94,
+          "y": 31.08
+        },
+        "t2": {
+          "x": -42.08,
+          "y": 31.06
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623731,
+        "midPoint": {
+          "x": -42.01,
+          "y": 31.07
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated equal_distance (-5,0,0) flip=true",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -41.94,
+          "y": 31.08
+        },
+        "t2": {
+          "x": -42.08,
+          "y": 31.06
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623731,
+        "midPoint": {
+          "x": -42.01,
+          "y": 31.07
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated equal_distance (49.9,0,45) flip=false",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": 49.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -12.060000000000002,
+          "y": 70.92
+        },
+        "t2": {
+          "x": -81.92,
+          "y": 60.94
+        },
+        "dist1": 49.9,
+        "dist2": 49.9,
+        "angleDeg": 45,
+        "chamferLength": 70.56925676241745,
+        "midPoint": {
+          "x": -46.99,
+          "y": 65.93
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "rotated equal_distance (49.9,0,45) flip=true",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": 49.9,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -12.060000000000002,
+          "y": 70.92
+        },
+        "t2": {
+          "x": -81.92,
+          "y": 60.94
+        },
+        "dist1": 49.9,
+        "dist2": 49.9,
+        "angleDeg": 45,
+        "chamferLength": 70.56925676241745,
+        "midPoint": {
+          "x": -46.99,
+          "y": 65.93
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "rotated equal_distance (50,0,45) flip=false",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": 50,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -12,
+          "y": 71
+        },
+        "t2": {
+          "x": -82,
+          "y": 61
+        },
+        "dist1": 50,
+        "dist2": 50,
+        "angleDeg": 45,
+        "chamferLength": 70.71067811865476,
+        "midPoint": {
+          "x": -47,
+          "y": 66
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "rotated equal_distance (50,0,45) flip=true",
+      "corner": 4,
+      "mode": "equal_distance",
+      "d1": 50,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -12,
+          "y": 71
+        },
+        "t2": {
+          "x": -82,
+          "y": 61
+        },
+        "dist1": 50,
+        "dist2": 50,
+        "angleDeg": 45,
+        "chamferLength": 70.71067811865476,
+        "midPoint": {
+          "x": -47,
+          "y": 66
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "rotated two_distance (12,7,45) flip=false",
+      "corner": 4,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -34.8,
+          "y": 40.6
+        },
+        "t2": {
+          "x": -47.6,
+          "y": 35.2
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 30.256437163529277,
+        "chamferLength": 13.892443989449808,
+        "midPoint": {
+          "x": -41.2,
+          "y": 37.900000000000006
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated two_distance (12,7,45) flip=true",
+      "corner": 4,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -37.8,
+          "y": 36.6
+        },
+        "t2": {
+          "x": -51.6,
+          "y": 38.2
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 59.743562836470744,
+        "chamferLength": 13.89244398944981,
+        "midPoint": {
+          "x": -44.7,
+          "y": 37.400000000000006
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated two_distance (0,-3,45) flip=false",
+      "corner": 4,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -41.94,
+          "y": 31.08
+        },
+        "t2": {
+          "x": -42.08,
+          "y": 31.06
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.000000000000206,
+        "chamferLength": 0.14142135623731,
+        "midPoint": {
+          "x": -42.01,
+          "y": 31.07
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated two_distance (0,-3,45) flip=true",
+      "corner": 4,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -41.94,
+          "y": 31.08
+        },
+        "t2": {
+          "x": -42.08,
+          "y": 31.06
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.000000000000206,
+        "chamferLength": 0.14142135623731,
+        "midPoint": {
+          "x": -42.01,
+          "y": 31.07
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated two_distance (50,1,45) flip=false",
+      "corner": 4,
+      "mode": "two_distance",
+      "d1": 50,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -12,
+          "y": 71
+        },
+        "t2": {
+          "x": -42.8,
+          "y": 31.6
+        },
+        "dist1": 50,
+        "dist2": 1,
+        "angleDeg": 1.1457628381748262,
+        "chamferLength": 50.00999900019995,
+        "midPoint": {
+          "x": -27.4,
+          "y": 51.3
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "rotated two_distance (50,1,45) flip=true",
+      "corner": 4,
+      "mode": "two_distance",
+      "d1": 50,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -41.4,
+          "y": 31.8
+        },
+        "t2": {
+          "x": -82,
+          "y": 61
+        },
+        "dist1": 1,
+        "dist2": 50,
+        "angleDeg": 88.8542371618249,
+        "chamferLength": 50.00999900019995,
+        "midPoint": {
+          "x": -61.7,
+          "y": 46.4
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,30) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -46.618802153517,
+          "y": 34.46410161513776
+        },
+        "dist1": 10,
+        "dist2": 5.773502691896256,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792511,
+        "midPoint": {
+          "x": -41.309401076758505,
+          "y": 36.73205080756888
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,30) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -38.53589838486224,
+          "y": 35.618802153517
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 5.773502691896256,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792518,
+        "midPoint": {
+          "x": -44.26794919243112,
+          "y": 36.309401076758505
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,60) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -55.856406460551014,
+          "y": 41.392304845413264
+        },
+        "dist1": 10,
+        "dist2": 17.32050807568877,
+        "angleDeg": 60,
+        "chamferLength": 19.999999999999996,
+        "midPoint": {
+          "x": -45.92820323027551,
+          "y": 40.19615242270663
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,60) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -31.607695154586736,
+          "y": 44.856406460551014
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 17.32050807568877,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 19.999999999999996,
+        "midPoint": {
+          "x": -40.80384757729337,
+          "y": 40.92820323027551
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,0) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -42,
+          "y": 31
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": -39,
+          "y": 35
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,0) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -42,
+          "y": 31
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": -39,
+          "y": 35
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,-20) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -42,
+          "y": 31
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": -39,
+          "y": 35
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,-20) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -42,
+          "y": 31
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": -39,
+          "y": 35
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,180) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": -43,
+          "y": 38
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,180) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": -43,
+          "y": 38
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -42.00080000000267,
+          "y": 31.000600000002
+        },
+        "dist1": 10,
+        "dist2": 0.0010000000033333336,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.000000050000002,
+        "midPoint": {
+          "x": -39.000400000001335,
+          "y": 35.000300000001
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -41.999399999998,
+          "y": 31.000800000002666
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 0.0010000000033333336,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.000000050000002,
+        "midPoint": {
+          "x": -45.999699999998995,
+          "y": 34.000400000001335
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": true
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,89.99427042204869) flip=false",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": -43,
+          "y": 38
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "rotated distance_angle (10,0,89.99427042204869) flip=true",
+      "corner": 4,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": -36,
+          "y": 39
+        },
+        "t2": {
+          "x": -50,
+          "y": 37
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": -43,
+          "y": 38
+        },
+        "bisectorDir": {
+          "x": -0.14142135623730953,
+          "y": 0.9899494936611664
+        },
+        "maxDist1": 49.9,
+        "maxDist2": 29.9,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "short equal_distance (10,99,55) flip=false",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short equal_distance (10,99,55) flip=true",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short equal_distance (-5,0,0) flip=false",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "short equal_distance (-5,0,0) flip=true",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "short equal_distance (0.1,0,45) flip=false",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": 0.1,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "short equal_distance (0.1,0,45) flip=true",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": 0.1,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "short equal_distance (0.2,0,45) flip=false",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": 0.2,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.2,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.2
+        },
+        "dist1": 0.2,
+        "dist2": 0.2,
+        "angleDeg": 45,
+        "chamferLength": 0.28284271247461906,
+        "midPoint": {
+          "x": 0.1,
+          "y": 0.1
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short equal_distance (0.2,0,45) flip=true",
+      "corner": 5,
+      "mode": "equal_distance",
+      "d1": 0.2,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.2,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.2
+        },
+        "dist1": 0.2,
+        "dist2": 0.2,
+        "angleDeg": 45,
+        "chamferLength": 0.28284271247461906,
+        "midPoint": {
+          "x": 0.1,
+          "y": 0.1
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short two_distance (12,7,45) flip=false",
+      "corner": 5,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 12,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 7
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 30.256437163529277,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 6,
+          "y": 3.5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short two_distance (12,7,45) flip=true",
+      "corner": 5,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 7,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 12
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 59.743562836470744,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 3.5,
+          "y": 6
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short two_distance (0,-3,45) flip=false",
+      "corner": 5,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "short two_distance (0,-3,45) flip=true",
+      "corner": 5,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "short two_distance (0.2,1,45) flip=false",
+      "corner": 5,
+      "mode": "two_distance",
+      "d1": 0.2,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.2,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 1
+        },
+        "dist1": 0.2,
+        "dist2": 1,
+        "angleDeg": 78.69006752597979,
+        "chamferLength": 1.019803902718557,
+        "midPoint": {
+          "x": 0.1,
+          "y": 0.5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short two_distance (0.2,1,45) flip=true",
+      "corner": 5,
+      "mode": "two_distance",
+      "d1": 0.2,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.2
+        },
+        "dist1": 1,
+        "dist2": 0.2,
+        "angleDeg": 11.309932474020227,
+        "chamferLength": 1.019803902718557,
+        "midPoint": {
+          "x": 0.5,
+          "y": 0.1
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,30) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 5.773502691896256
+        },
+        "dist1": 10,
+        "dist2": 5.773502691896256,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 5,
+          "y": 2.886751345948128
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,30) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 5.773502691896256,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 5.773502691896256,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 2.886751345948128,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,60) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 17.32050807568877
+        },
+        "dist1": 10,
+        "dist2": 17.32050807568877,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 5,
+          "y": 8.660254037844386
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,60) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 17.32050807568877,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 17.32050807568877,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 8.660254037844386,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,0) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,0) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,-20) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,-20) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,180) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,180) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.0010000000033333336
+        },
+        "dist1": 10,
+        "dist2": 0.0010000000033333336,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 5,
+          "y": 0.0005000000016666668
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.0010000000033333336,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 0.0010000000033333336,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 0.0005000000016666668,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,89.99427042204869) flip=false",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "short distance_angle (10,0,89.99427042204869) flip=true",
+      "corner": 5,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "minimum length equal_distance (10,99,55) flip=false",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length equal_distance (10,99,55) flip=true",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": 10,
+      "d2": 99,
+      "angle": 55,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 45,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length equal_distance (-5,0,0) flip=false",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length equal_distance (-5,0,0) flip=true",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": -5,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length equal_distance (0.1,0,45) flip=false",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": 0.1,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length equal_distance (0.1,0,45) flip=true",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": 0.1,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length equal_distance (0.0001,0,45) flip=false",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": 0.0001,
+      "d2": 0,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length equal_distance (0.0001,0,45) flip=true",
+      "corner": 6,
+      "mode": "equal_distance",
+      "d1": 0.0001,
+      "d2": 0,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length two_distance (12,7,45) flip=false",
+      "corner": 6,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 12,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 7
+        },
+        "dist1": 12,
+        "dist2": 7,
+        "angleDeg": 30.256437163529277,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 6,
+          "y": 3.5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length two_distance (12,7,45) flip=true",
+      "corner": 6,
+      "mode": "two_distance",
+      "d1": 12,
+      "d2": 7,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 7,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 12
+        },
+        "dist1": 7,
+        "dist2": 12,
+        "angleDeg": 59.743562836470744,
+        "chamferLength": 13.892443989449806,
+        "midPoint": {
+          "x": 3.5,
+          "y": 6
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length two_distance (0,-3,45) flip=false",
+      "corner": 6,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length two_distance (0,-3,45) flip=true",
+      "corner": 6,
+      "mode": "two_distance",
+      "d1": 0,
+      "d2": -3,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 0.1,
+        "dist2": 0.1,
+        "angleDeg": 45.00000000000001,
+        "chamferLength": 0.14142135623730953,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": true
+      }
+    },
+    {
+      "name": "minimum length two_distance (0.0001,1,45) flip=false",
+      "corner": 6,
+      "mode": "two_distance",
+      "d1": 0.0001,
+      "d2": 1,
+      "angle": 45,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 0.1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 1
+        },
+        "dist1": 0.1,
+        "dist2": 1,
+        "angleDeg": 84.28940686250036,
+        "chamferLength": 1.004987562112089,
+        "midPoint": {
+          "x": 0.05,
+          "y": 0.5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length two_distance (0.0001,1,45) flip=true",
+      "corner": 6,
+      "mode": "two_distance",
+      "d1": 0.0001,
+      "d2": 1,
+      "angle": 45,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 1,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.1
+        },
+        "dist1": 1,
+        "dist2": 0.1,
+        "angleDeg": 5.710593137499568,
+        "chamferLength": 1.004987562112089,
+        "midPoint": {
+          "x": 0.5,
+          "y": 0.05
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,30) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 5.773502691896256
+        },
+        "dist1": 10,
+        "dist2": 5.773502691896256,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 5,
+          "y": 2.886751345948128
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,30) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 30,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 5.773502691896256,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 5.773502691896256,
+        "dist2": 10,
+        "angleDeg": 30,
+        "chamferLength": 11.547005383792515,
+        "midPoint": {
+          "x": 2.886751345948128,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,60) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 17.32050807568877
+        },
+        "dist1": 10,
+        "dist2": 17.32050807568877,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 5,
+          "y": 8.660254037844386
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,60) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 60,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 17.32050807568877,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 17.32050807568877,
+        "dist2": 10,
+        "angleDeg": 60,
+        "chamferLength": 20,
+        "midPoint": {
+          "x": 8.660254037844386,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,0) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,0) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,-20) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,-20) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": -20,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0
+        },
+        "dist1": 10,
+        "dist2": 0,
+        "angleDeg": 0,
+        "chamferLength": 10,
+        "midPoint": {
+          "x": 5,
+          "y": 0
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle must be greater than 0\u00b0"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,180) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,180) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 180,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 179.9,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,0.005729577951308233) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 0.0010000000033333336
+        },
+        "dist1": 10,
+        "dist2": 0.0010000000033333336,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 5,
+          "y": 0.0005000000016666668
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,0.005729577951308233) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 0.005729577951308233,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 0.0010000000033333336,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 0.0010000000033333336,
+        "dist2": 10,
+        "angleDeg": 0.005729577951308233,
+        "chamferLength": 10.00000005,
+        "midPoint": {
+          "x": 0.0005000000016666668,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Distance too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,89.99427042204869) flip=false",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": false,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    },
+    {
+      "name": "minimum length distance_angle (10,0,89.99427042204869) flip=true",
+      "corner": 6,
+      "mode": "distance_angle",
+      "d1": 10,
+      "d2": 0,
+      "angle": 89.99427042204869,
+      "flip": true,
+      "result": {
+        "t1": {
+          "x": 10,
+          "y": 0
+        },
+        "t2": {
+          "x": 0,
+          "y": 10
+        },
+        "dist1": 10,
+        "dist2": 10,
+        "angleDeg": 89.99427042204869,
+        "chamferLength": 14.142135623730951,
+        "midPoint": {
+          "x": 5,
+          "y": 5
+        },
+        "bisectorDir": {
+          "x": 0.7071067811865475,
+          "y": 0.7071067811865475
+        },
+        "maxDist1": 0.1,
+        "maxDist2": 0.1,
+        "isValid": false,
+        "errorMessage": "Angle too large for corner"
+      }
+    }
+  ],
+  "sourceHashes": {
+    "src/math/chamferReference.ts": "b9ade464fcd280ade1082a19b990d010f2e2dbaa88d50ddaa0f893827fcd944a"
+  }
+}
