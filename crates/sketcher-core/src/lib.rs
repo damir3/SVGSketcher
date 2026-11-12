@@ -2,6 +2,7 @@
 
 mod bezier;
 pub mod constraints;
+pub mod editing;
 mod ellipse;
 mod matrix;
 pub mod regions;

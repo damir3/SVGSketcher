@@ -11,9 +11,11 @@ import {
 import type { KernelSolveProblem, KernelSolveResult, KernelSolverEvaluator } from './solverTypes';
 import { createWasmSplineKernel, type SplineGeometryBinding } from './splineWasm';
 import { createWasmRegionKernel, type RegionBinding } from './regionWasm';
+import { createWasmEditingKernel, type EditingBinding } from './editingWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	curve_editing: EditingBinding;
 	find_regions_packed: RegionBinding;
 	spline_geometry: SplineGeometryBinding;
 	api_version(): number;
@@ -117,11 +119,13 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.solve_system !== 'function') throw new Error('WASM kernel has no numerical solver');
 	if (typeof bindings.spline_geometry !== 'function') throw new Error('WASM kernel has no spline operations');
 	if (typeof bindings.find_regions_packed !== 'function') throw new Error('WASM kernel has no region operations');
+	if (typeof bindings.curve_editing !== 'function') throw new Error('WASM kernel has no curve editing operations');
 	return {
 		backend: 'wasm',
 		apiVersion: GEOMETRY_KERNEL_API_VERSION,
 		spline: createWasmSplineKernel((...args) => bindings.spline_geometry(...args)),
 		findRegions: createWasmRegionKernel(data => bindings.find_regions_packed(data)),
+		editing: createWasmEditingKernel((data, settings) => bindings.curve_editing(data, settings)),
 		solveSystem: (problem, evaluate) => solveWasm(bindings, problem, evaluate),
 		intersectPairs(pairs: readonly IntersectionPair[]): Point2[][] {
 			if (!pairs.length) return [];

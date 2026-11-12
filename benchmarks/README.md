@@ -48,3 +48,5 @@ The [saved baseline](results/baseline.md) records one local run, not a portable 
 The [region broad-phase comparison](results/region-broad-phase.md) measures the same workloads before and after rejecting separated curve bounds, against the current solver version. It includes fresh Node and browser reports for both versions.
 
 The subsequent [native region comparison](results/native-regions.md) measures the transfer of complete region construction to Rust (kernel API 11), against the already filtered TypeScript implementation. Rebuild WASM assets when updating to this API.
+
+[Trim/extend query measurements](results/editing.md) cover the next migration stage (API 12). Run `npm run bench:editing` to compare query costs from prepared curves, including packing and candidate reconstruction but excluding document changes, solver and rendering. `--samples`, `--warmup` and `--output` configure the run.

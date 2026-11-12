@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "bench:scenes": "node --import tsx benchmarks/node.mjs --scenes",
     "bench:node": "node --import tsx benchmarks/node.mjs",
+    "bench:editing": "node --import tsx benchmarks/editing.mjs",
     "bench:build": "npm run build:kernel && tsc -p benchmarks/tsconfig.json && vite build --config benchmarks/vite.config.ts",
     "bench:serve": "vite preview --config benchmarks/vite.config.ts",
     "test": "tsx --test test/*.test.ts",

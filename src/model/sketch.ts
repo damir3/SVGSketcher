@@ -2557,6 +2557,24 @@ export class SketchDocument {
 
 	cleanOrphanConstraints(): void {
 		for (const [cid, constraint] of this.constraints.entries()) {
+			if (constraint instanceof CircularPatternConstraint || constraint instanceof RectangularPatternConstraint) {
+				// A trimmed/deleted arc may leave its center and endpoints in use. Keep the
+				// remaining pattern, but never evaluate a radius equation against a missing
+				// entity: the solver would read its radius as zero and collapse its source.
+				const hasRadius = (id: string) => this.circles.has(id) || this.arcs.has(id);
+				const missingRadiusIds = new Set<string>();
+				for (const copy of constraint.copies) {
+					if (!copy.radiusPairs) continue;
+					copy.radiusPairs = copy.radiusPairs.filter(pair => {
+						const sourceExists = hasRadius(pair.sourceCircleId);
+						const copyExists = hasRadius(pair.patternCircleId);
+						if (!sourceExists) missingRadiusIds.add(pair.sourceCircleId);
+						if (!copyExists) missingRadiusIds.add(pair.patternCircleId);
+						return sourceExists && copyExists;
+					});
+				}
+				if (missingRadiusIds.size) constraint.entityIds = constraint.entityIds.filter(id => !missingRadiusIds.has(id));
+			}
 			if (constraint instanceof CircularPatternConstraint) {
 				if (!this.points.get(constraint.centerPtId)) {
 					this.constraints.delete(cid);

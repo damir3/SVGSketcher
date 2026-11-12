@@ -1,0 +1,37 @@
+{
+  "baseCommit": "bd424ee38f46c9cad6b59a8e6e36a89af1494126",
+  "sourceHashes": {
+    "benchmarks/editing.mjs": "63a841cd467f54f4cdeded5d60bc36eaa6896ffee1d8666860b86dfa4befa254",
+    "src/math/intersection.ts": "effda0aa4269fd98fb6285f55b031b79bbb1d27083c34fe82da8f23ba35e8da8",
+    "src/math/extend.ts": "261e8d3d936db65b38244202687549fd1310a07a9cd6afc7dc274a2163cf1cbf",
+    "src/math/trimReference.ts": "f971d2d50ac8c5c4e742eb343bdff69a485ead1855ac798aea5915f3316b2686",
+    "src/math/extendReference.ts": "ae2db880d5407b68d6577dfb79bb870fe9c8ed10c36debf3763c451127ada99a",
+    "src/kernel/types.ts": "05ce83534443cb16c54a42399fb68619fac515779bc1167df47aa4dd41570c14",
+    "src/kernel/wasm.ts": "7a648c37ddf3fb37d8cc3bbfde97c6fc71b6a2a41d85d00e23bf706db88db7f0",
+    "src/kernel/editingTypes.ts": "3c2c1a1b76aa055d92bfd33217d13254fb81756d32cec54e737682c9899884cd",
+    "src/kernel/editingWasm.ts": "812e5192c68e27ebf08d1bcd62cc5d4978deb000cc8d64115ce0bd8d6a50caba",
+    "crates/sketcher-core/src/editing.rs": "3c4cc7eb5cb3f7ccff7b1c9c90ae48266db49bb4de702c8cfb5336c8cf7de3cb",
+    "crates/sketcher-core/src/regions.rs": "4f788f20073f7100180e17cd331cad1e1dd1ee3ecec1e32e50285fd458d06dc7",
+    "crates/sketcher-core/src/lib.rs": "0f4e344f79d1e26ef35a79cca348a8109717648a7e350f0f235ad7f86a4fa004",
+    "crates/sketcher-wasm/src/editing.rs": "7f1d72457b6a787858d5d5cc208010bacdc1a01dee8dafc94e77f7cf4571562e",
+    "crates/sketcher-wasm/src/regions.rs": "612b3bbd2295ecff9cb95552d23537b3d5802ae5c0c398e5da999a6f58fe1de6",
+    "crates/sketcher-wasm/src/lib.rs": "8eab469f7816ebc94288ec81d0d27f745545088db2ac543d36e1f0d311eb8323",
+    "test/editingKernel.test.ts": "5c75a5363d8be199c410c38d08fd9066cf51772ef7d8d6b165e2697a1466bbb2",
+    "test/fixtures/kernelEditing.json": "0f4d2432f234ed5fd88b783183f0cde27b2f69df62c581ad9cb6db546faaa151"
+  },
+  "wasmSha256": "945dd542c0a195c205eaad387fdd4c7e7922525ec1d527be258bace29cef5e31",
+  "bindingsSha256": "854f92f7022b4115b0c2974070862a345cae0c2c83c33025e26d090e15203d48",
+  "runtime": "v20.18.0",
+  "platform": "darwin/arm64",
+  "apiVersion": 12,
+  "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "build": "Rust release opt-level=3; TypeScript via tsx in Node",
+  "tests": {
+    "wasm": 1582,
+    "typescriptPass": 1562,
+    "typescriptNativeOnlySkips": 20,
+    "rust": 47,
+    "fixtureScenes": 256,
+    "cursorProbes": 1024
+  }
+}

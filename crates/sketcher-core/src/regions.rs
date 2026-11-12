@@ -137,7 +137,7 @@ impl Geometry {
             _ => unreachable!(),
         }
     }
-    fn point(&self, t: f64) -> Point2 {
+    pub(crate) fn point(&self, t: f64) -> Point2 {
         match *self {
             Self::Segment(a, b) => {
                 let u = t.clamp(0.0, 1.0);
@@ -175,7 +175,7 @@ impl Geometry {
         }
         self.point(t)
     }
-    fn param(&self, point: Point2) -> f64 {
+    pub(crate) fn param(&self, point: Point2) -> f64 {
         match *self {
             Self::Segment(a, b) => {
                 let (dx, dy) = (b.x - a.x, b.y - a.y);
@@ -252,7 +252,7 @@ impl Geometry {
         let d = delta(a, value, cw);
         d <= sweep(a, b, cw) + tol || d >= TAU - tol
     }
-    fn primitives(&self) -> Vec<Curve> {
+    pub(crate) fn primitives(&self) -> Vec<Curve> {
         match *self {
             Self::Segment(p1, p2) => vec![Curve::Segment { p1, p2 }],
             Self::Circle(center, radius) | Self::Arc(center, radius, ..) => {
@@ -340,7 +340,7 @@ fn may_intersect(a: &Geometry, b: &Geometry, aa: Option<[f64; 4]>, bb: Option<[f
         _ => true,
     }
 }
-fn intersections(a: &Geometry, b: &Geometry, pa: &[Curve], pb: &[Curve]) -> Vec<Point2> {
+pub(crate) fn intersections(a: &Geometry, b: &Geometry, pa: &[Curve], pb: &[Curve]) -> Vec<Point2> {
     let (first, second) = if !matches!(a, Geometry::Spline(..)) && matches!(b, Geometry::Spline(..))
     {
         (pb, pa)

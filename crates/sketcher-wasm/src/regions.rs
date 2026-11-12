@@ -3,7 +3,7 @@ use sketcher_core::Point2;
 use wasm_bindgen::prelude::*;
 
 // Records: [tag, identity, closed/clockwise, payload slots, ...coordinates].
-fn decode(data: &[f64]) -> Result<Vec<RegionCurve>, &'static str> {
+pub(crate) fn decode(data: &[f64]) -> Result<Vec<RegionCurve>, &'static str> {
     if data.iter().any(|x| !x.is_finite()) {
         return Err("Non-finite region curve data");
     }
