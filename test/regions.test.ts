@@ -346,4 +346,57 @@ describe('sketch regions', () => {
 		assert.equal(regions.some(r => pointInRegion(new Vec2(30, 30), r)), true);
 		assert.equal(regions.some(r => pointInRegion(new Vec2(1.85, 158.6), r)), true);
 	});
+
+	it('separates regions when nearly-tangent splines share an endpoint and a multi-segment spline self-intersects', () => {
+		const sketch = new SketchDocument();
+		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
+
+		const shared = pt(49.61295834866398, -25.76020358468419);
+		const top = pt(0, 40);
+		const left = pt(-56.76, -21.5);
+		const rightBottom = pt(41, -56.5);
+
+		// Two fit splines joining at `shared` with nearly parallel endpoint tangents plus an arch closing to `top`.
+		sketch.addFitSpline([shared.id, pt(24, 5).id, top.id]);
+		sketch.addFitSpline([left.id, rightBottom.id, shared.id]);
+		sketch.addLine(left.id, top.id);
+
+		const tangentRegions = findSketchRegions(sketch);
+		assert.equal(tangentRegions.length, 1);
+		assert.ok(tangentRegions[0].area > 2000);
+		assert.equal(pointInRegion(new Vec2(0, -10), tangentRegions[0]), true);
+
+		// Self-intersecting closed fit spline forming a bow-tie (figure-8) crossing at (0, 0).
+		const loopSketch = new SketchDocument();
+		const lpt = (x: number, y: number) => loopSketch.addPoint({ x, y });
+		loopSketch.addFitSpline(
+			[lpt(-40, 25), lpt(40, -25), lpt(40, 25), lpt(-40, -25)].map(p => p.id),
+			undefined,
+			false,
+			undefined,
+			true,
+		);
+		const loopRegions = findSketchRegions(loopSketch);
+		assert.equal(loopRegions.length, 2);
+		assert.equal(loopRegions.some(r => pointInRegion(new Vec2(-25, 0), r)), true);
+		assert.equal(loopRegions.some(r => pointInRegion(new Vec2(25, 0), r)), true);
+
+		// Open self-intersecting spline whose interior crossing splits an outer rectangle in two.
+		const splitSketch = new SketchDocument();
+		const spt = (x: number, y: number) => splitSketch.addPoint({ x, y });
+		const tl = spt(-50, 50);
+		const tr = spt(50, 50);
+		const br = spt(50, -50);
+		const bl = spt(-50, -50);
+		splitSketch.addLine(tl.id, tr.id);
+		splitSketch.addLine(tr.id, br.id);
+		splitSketch.addLine(br.id, bl.id);
+		splitSketch.addLine(bl.id, tl.id);
+		splitSketch.addFitSpline([spt(-50, 0), spt(20, 30), spt(20, -30), spt(-10, 0), spt(50, 0)].map(p => p.id));
+		const splitRegions = findSketchRegions(splitSketch);
+		assert.equal(splitRegions.length, 3);
+		assert.equal(splitRegions.some(r => pointInRegion(new Vec2(0, 40), r)), true);
+		assert.equal(splitRegions.some(r => pointInRegion(new Vec2(0, -40), r)), true);
+		assert.equal(splitRegions.some(r => pointInRegion(new Vec2(10, 0), r)), true);
+	});
 });

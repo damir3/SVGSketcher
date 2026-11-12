@@ -278,7 +278,23 @@ function findBezierImplicitRoots(
 }
 
 function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
-	const pts: Vec2[] = [];
+	const hits: Array<{ point: Vec2; residual: number }> = [];
+	const recordHit = (point: Vec2, residual: number) => {
+		for (let i = 0; i < hits.length; i++) {
+			if (hits[i].point.distanceTo(point) < 1e-3) {
+				if (hits[i].residual > 1e-9 && residual < hits[i].residual) hits[i] = { point, residual };
+				return;
+			}
+		}
+		hits.push({ point, residual });
+	};
+
+	for (const p1 of [b1[0], b1[3]]) {
+		for (const p2 of [b2[0], b2[3]]) {
+			const dist = p1.distanceTo(p2);
+			if (dist < 1e-9) recordHit(new Vec2().midpoint(p1, p2), dist);
+		}
+	}
 
 	function getBBox(b: BezierSegment): AABB {
 		return AABB.fromPoints(b)!;
@@ -295,8 +311,9 @@ function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
 	}
 
 	const stack: Task[] = [{ seg1: b1, t0: 0, t1: 1, seg2: b2, u0: 0, u1: 1, depth: 0 }];
+	let pops = 0;
 
-	while (stack.length > 0 && pts.length < 16) {
+	while (stack.length > 0 && hits.length < 16 && pops++ < 4096) {
 		const { seg1, t0, t1, seg2, u0, u1, depth } = stack.pop()!;
 		const box1 = getBBox(seg1);
 		const box2 = getBBox(seg2);
@@ -338,8 +355,9 @@ function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
 
 			const p1 = evaluateBezier(b1, t);
 			const p2 = evaluateBezier(b2, u);
-			if (p2.distanceTo(p1) < 1e-3) {
-				pts.push(new Vec2().midpoint(p1, p2));
+			const dist = p2.distanceTo(p1);
+			if (dist < 1e-3) {
+				recordHit(new Vec2().midpoint(p1, p2), dist);
 			}
 			continue;
 		}
@@ -377,5 +395,5 @@ function intersectBezierBezier(b1: BezierSegment, b2: BezierSegment): Vec2[] {
 		}
 	}
 
-	return deduplicatePoints(pts, 1e-3);
+	return hits.map(hit => hit.point);
 }

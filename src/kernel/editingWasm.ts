@@ -20,6 +20,7 @@ export function createWasmEditingKernel(binding: EditingBinding): EditingKernel 
 						: target.type === 'elliptical_arc'
 							? '__extend_ellipse__'
 							: undefined;
+		const targetIndex = curves.findIndex(curve => curve.id === target.id);
 		const indices: number[] = [],
 			others: EditingCurve[] = [];
 		curves.forEach((curve, index) => {
@@ -35,6 +36,9 @@ export function createWasmEditingKernel(binding: EditingBinding): EditingKernel 
 		if (!data.every(Number.isFinite)) fail();
 		const source = (value: number) => {
 			if (value === -1) return undefined;
+			if (target.type === 'spline' && value === indices.length) {
+				return targetIndex === -1 ? curves.length : targetIndex;
+			}
 			if (!Number.isInteger(value) || value < 0 || value >= indices.length) fail();
 			return indices[value];
 		};

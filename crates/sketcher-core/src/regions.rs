@@ -1,6 +1,7 @@
 //! Region arrangement, graph traversal and exact boundary commands. Order and tolerances
 //! follow math/regionsReference.ts; hash tables are used only for lookup, never traversal.
-use crate::{intersect, spline, CubicBezier, Curve, Point2};
+use crate::{bezier, intersect, spline, CubicBezier, Curve, Point2};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
 
@@ -683,7 +684,201 @@ fn commands(
     out
 }
 
+fn refine_segment_param(segment: &CubicBezier, point: Point2) -> f64 {
+    let t = spline::project(&[*segment], point).0;
+    let (mut a, mut b) = ((t - 0.05).max(0.0), (t + 0.05).min(1.0));
+    for _ in 0..50 {
+        let t1 = a + (b - a) * 0.382;
+        let t2 = a + (b - a) * 0.618;
+        if distance(bezier::evaluate(segment, t1), point)
+            < distance(bezier::evaluate(segment, t2), point)
+        {
+            b = t2;
+        } else {
+            a = t1;
+        }
+    }
+    (a + b) * 0.5
+}
+
+fn segment_bounds(segment: &CubicBezier) -> [f64; 4] {
+    let mut b = [
+        f64::INFINITY,
+        f64::INFINITY,
+        f64::NEG_INFINITY,
+        f64::NEG_INFINITY,
+    ];
+    for q in segment {
+        b[0] = b[0].min(q.x);
+        b[1] = b[1].min(q.y);
+        b[2] = b[2].max(q.x);
+        b[3] = b[3].max(q.y);
+    }
+    b
+}
+
+fn cubic_self_intersection(segment: &CubicBezier) -> Option<(Point2, f64, f64)> {
+    let [p0, p1, p2, p3] = *segment;
+    let ax = -p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x;
+    let ay = -p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y;
+    let bx = 3.0 * p0.x - 6.0 * p1.x + 3.0 * p2.x;
+    let by = 3.0 * p0.y - 6.0 * p1.y + 3.0 * p2.y;
+    let cx = -3.0 * p0.x + 3.0 * p1.x;
+    let cy = -3.0 * p0.y + 3.0 * p1.y;
+    let denom = ax * by - ay * bx;
+    let aa = ax * ax + ay * ay;
+    if denom.abs() < 1e-12 || aa < 1e-12 {
+        return None;
+    }
+    let s = -(ax * cy - ay * cx) / denom;
+    let p_val = s * s + ((ax * bx + ay * by) * s + (ax * cx + ay * cy)) / aa;
+    let disc = s * s - 4.0 * p_val;
+    if disc <= 1e-12 {
+        return None;
+    }
+    let root = disc.sqrt();
+    let t1 = 0.5 * (s - root);
+    let t2 = 0.5 * (s + root);
+    if t1 < -1e-6 || t2 > 1.0 + 1e-6 || t2 - t1 <= 1e-4 {
+        return None;
+    }
+    let u1 = t1.clamp(0.0, 1.0);
+    let u2 = t2.clamp(0.0, 1.0);
+    let q1 = bezier::evaluate(segment, u1);
+    let q2 = bezier::evaluate(segment, u2);
+    if distance(q1, q2) >= 1e-5 {
+        return None;
+    }
+    Some((
+        Point2 {
+            x: (q1.x + q2.x) * 0.5,
+            y: (q1.y + q2.y) * 0.5,
+        },
+        u1,
+        u2,
+    ))
+}
+
+pub(crate) fn spline_self_intersections(
+    segments: &[CubicBezier],
+    closed: bool,
+) -> Vec<(Point2, f64, f64)> {
+    let n = segments.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mut hits = Vec::new();
+    let nf = n as f64;
+    for (a, seg) in segments.iter().enumerate() {
+        if let Some((pt, u1, u2)) = cubic_self_intersection(seg) {
+            hits.push((pt, (a as f64 + u1) / nf, (a as f64 + u2) / nf));
+        }
+    }
+    if n < 2 {
+        return hits;
+    }
+    let boxes: Vec<_> = segments.iter().map(segment_bounds).collect();
+    for (a, ba) in boxes.iter().enumerate() {
+        for (b, bb) in boxes.iter().enumerate().skip(a + 1) {
+            if ba[2] < bb[0] - 1e-4
+                || ba[0] > bb[2] + 1e-4
+                || ba[3] < bb[1] - 1e-4
+                || ba[1] > bb[3] + 1e-4
+            {
+                continue;
+            }
+            for hit in bezier::intersect_beziers(segments[a], segments[b]) {
+                if b == a + 1 && distance(hit, segments[a][3]) < 1e-3 {
+                    continue;
+                }
+                if closed && a == 0 && b == n - 1 && distance(hit, segments[0][0]) < 1e-3 {
+                    continue;
+                }
+                let ta = refine_segment_param(&segments[a], hit);
+                let tb = refine_segment_param(&segments[b], hit);
+                let pa = bezier::evaluate(&segments[a], ta);
+                let pb = bezier::evaluate(&segments[b], tb);
+                if distance(pa, pb) >= 1e-5 {
+                    continue;
+                }
+                hits.push((
+                    Point2 {
+                        x: (pa.x + pb.x) * 0.5,
+                        y: (pa.y + pb.y) * 0.5,
+                    },
+                    (a as f64 + ta) / nf,
+                    (b as f64 + tb) / nf,
+                ));
+            }
+        }
+    }
+    hits
+}
+
+fn split_self_intersecting_splines(curves: &[RegionCurve]) -> Cow<'_, [RegionCurve]> {
+    let mut out: Option<Vec<RegionCurve>> = None;
+    let mut next_id = curves.iter().map(|c| c.id).max().unwrap_or(0) + 1;
+    for (curve_index, curve) in curves.iter().enumerate() {
+        let Geometry::Spline(ref segments, closed) = curve.geometry else {
+            if let Some(ref mut vec) = out {
+                vec.push(curve.clone());
+            }
+            continue;
+        };
+        let self_hits = spline_self_intersections(segments, closed);
+        let mut raw_cuts = Vec::with_capacity(self_hits.len() * 2);
+        for (_, u, v) in self_hits {
+            raw_cuts.push(u);
+            raw_cuts.push(v);
+        }
+        raw_cuts.retain(|&t| t > 1e-5 && t < 1.0 - 1e-5);
+        raw_cuts.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let cuts: Vec<f64> = raw_cuts
+            .iter()
+            .enumerate()
+            .filter(|(i, t)| *i == 0 || (**t - raw_cuts[i - 1]).abs() > 1e-6)
+            .map(|(_, t)| *t)
+            .collect();
+        if cuts.is_empty() {
+            if let Some(ref mut vec) = out {
+                vec.push(curve.clone());
+            }
+            continue;
+        }
+        let vec = out.get_or_insert_with(|| curves[..curve_index].to_vec());
+        let intervals: Vec<(f64, f64)> = if closed && cuts.len() >= 2 {
+            (0..cuts.len())
+                .map(|k| (cuts[k], cuts[(k + 1) % cuts.len()]))
+                .collect()
+        } else {
+            let mut stops = Vec::with_capacity(cuts.len() + 2);
+            stops.push(0.0);
+            stops.extend_from_slice(&cuts);
+            stops.push(1.0);
+            stops.windows(2).map(|w| (w[0], w[1])).collect()
+        };
+        for (t0, t1) in intervals {
+            let sub = extract(segments, t0, t1);
+            if sub.is_empty() {
+                continue;
+            }
+            let id = next_id;
+            next_id += 1;
+            vec.push(RegionCurve {
+                id,
+                geometry: Geometry::Spline(sub, false),
+            });
+        }
+    }
+    match out {
+        Some(vec) => Cow::Owned(vec),
+        None => Cow::Borrowed(curves),
+    }
+}
+
 pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
+    let curves_storage = split_self_intersecting_splines(curves);
+    let curves: &[RegionCurve] = &curves_storage;
     let bounds: Vec<_> = curves.iter().map(|c| c.geometry.bounds()).collect();
     let primitives: Vec<_> = curves.iter().map(|c| c.geometry.primitives()).collect();
     let mut cuts = vec![vec![]; curves.len()];

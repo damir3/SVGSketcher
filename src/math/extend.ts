@@ -20,8 +20,8 @@ import {
 	OffsetConstraint,
 } from '../solver/constraints';
 import { Vec2 } from './vector';
-import type { GeoCurve } from './intersection';
-import { computeNaturalFitHandles } from './spline';
+import { intersectCurves, type GeoCurve, type GeoSegment } from './intersection';
+import { computeNaturalFitHandles, getSplineTangentAtParam } from './spline';
 import { getGeometryKernel } from '../kernel';
 import { findExtendCandidate as findExtendCandidateReference } from './extendReference';
 
@@ -105,7 +105,35 @@ export function findExtendCandidate(
 	cursorWorldPos: Vec2
 ): ExtendCandidate | null {
 	const editing = getGeometryKernel().editing;
-	if (!editing) return findExtendCandidateReference(sketch, target, allCurves, cursorWorldPos);
+	if (!editing) {
+		const ref = findExtendCandidateReference(sketch, target, allCurves, cursorWorldPos);
+		if (!ref || target.type !== 'spline' || (target.isClosed && target.splineType !== 'control')) return ref;
+		const tangent = getSplineTangentAtParam(target.bezierSegments, ref.edge === 'end' ? 1.0 : 0.0);
+		const dir = (ref.edge === 'end' ? tangent.clone() : tangent.clone().multiplyScalar(-1)).normalizeOrUnitX();
+		const raySegment: GeoSegment = {
+			type: 'segment',
+			id: '__extend_ray__',
+			p1: ref.fromPoint,
+			p2: ref.fromPoint.clone().addScaledVector(dir, 50000),
+		};
+		let bestT = ref.intersectedCurveId ? new Vec2().subVectors(ref.toPoint, ref.fromPoint).dot(dir) : Infinity;
+		let bestPt: Vec2 | null = null;
+		for (const pt of intersectCurves(raySegment, target)) {
+			const t = new Vec2().subVectors(pt, ref.fromPoint).dot(dir);
+			if (t > 1e-3 && t < bestT) {
+				bestT = t;
+				bestPt = pt;
+			}
+		}
+		if (!bestPt) return ref;
+		return {
+			...ref,
+			toPoint: bestPt,
+			intersectedCurveId: target.id,
+			intersectedCurveType: 'spline',
+			previewData: { from: ref.fromPoint, to: bestPt },
+		};
+	}
 	const result = editing.extend(target, allCurves, cursorWorldPos);
 	if (!result) return null;
 	if (target.type === 'circle' || target.type === 'ellipse') throw new Error('Invalid native extend target');
@@ -131,7 +159,7 @@ export function findExtendCandidate(
 		previewType: target.type === 'segment' ? 'line' : target.type === 'spline' ? 'spline' : 'arc',
 	};
 	if (!result.fullLoop) {
-		const cutter = result.source === undefined ? undefined : allCurves[result.source];
+		const cutter = result.source === undefined ? undefined : (allCurves[result.source] ?? target);
 		candidate.intersectedCurveId = cutter?.id;
 		candidate.intersectedCurveType = cutter?.type;
 	}
@@ -436,77 +464,13 @@ export function executeExtend(
 		if (!spline) return null;
 
 		const newPt = sketch.addPoint(toPoint);
-		const isControl = spline.splineType === 'control';
-
-		if (isControl) {
-			const oldBoundaryPtId = edge === 'end' ? spline.pointIds[spline.pointIds.length - 1] : spline.pointIds[0];
-			if (edge === 'end') {
-				spline.pointIds.push(newPt.id);
-			} else {
-				spline.pointIds.unshift(newPt.id);
-			}
-			delete spline.knots;
-
-			const p1 = edge === 'end' ? oldBoundaryPtId : newPt.id;
-			const p2 = edge === 'end' ? newPt.id : oldBoundaryPtId;
-			const polyLine = sketch.addLine(p1, p2);
-			polyLine.isConstruction = true;
-			polyLine.isSplineHandle = true;
-			polyLine.parentSplineId = spline.id;
-
-			if (!spline.tangentLineIds) spline.tangentLineIds = [];
-			if (edge === 'end') {
-				spline.tangentLineIds.push(polyLine.id);
-			} else {
-				spline.tangentLineIds.unshift(polyLine.id);
-			}
+		if (spline.splineType === 'control') {
+			extendControlSpline(sketch, spline, edge, toPoint, newPt);
 		} else {
-			// Fit spline: update pointIds and regenerate handles safely without deleting fit points
-			if (edge === 'end') {
-				spline.pointIds.push(newPt.id);
-			} else {
-				spline.pointIds.unshift(newPt.id);
-			}
-
-			// Clean up old tangent lines, their handle points, and their midpoint constraints
-			if (spline.tangentLineIds) {
-				for (const lid of spline.tangentLineIds) {
-					const l = sketch.lines.get(lid);
-					if (l) {
-						sketch.lines.delete(lid);
-						sketch.points.delete(l.p1Id);
-						sketch.points.delete(l.p2Id);
-						for (const c of Array.from(sketch.constraints.values())) {
-							if (c.entityIds.includes(lid) || c.entityIds.includes(l.p1Id) || c.entityIds.includes(l.p2Id)) {
-								sketch.constraints.delete(c.id);
-							}
-						}
-					}
-				}
-				spline.tangentLineIds = [];
-			}
-
-			// Construct fresh handles for all fit points
-			const pts = spline.pointIds.map(pid => sketch.points.get(pid)).filter((p): p is SketchPoint => !!p);
-			if (pts.length >= 2) {
-				const handles = computeNaturalFitHandles(pts);
-				for (let i = 0; i < pts.length; i++) {
-					const h = handles[i];
-					const pFit = pts[i];
-					const h1 = sketch.addPoint(h.h1);
-					const h2 = sketch.addPoint(h.h2);
-					const hLine = sketch.addLine(h1.id, h2.id);
-					hLine.isConstruction = true;
-					hLine.isSplineHandle = true;
-					hLine.parentSplineId = spline.id;
-					hLine.isAutomaticSplineHandle = true;
-					spline.tangentLineIds.push(hLine.id);
-					sketch.addConstraint(new MidpointConstraint(sketch.nextId('c_mid'), pFit.id, h1.id, h2.id, 1.0, 0.5));
-				}
-			}
+			extendFitSpline(sketch, spline, edge, toPoint, newPt);
 		}
 
-		if (intersectedCurveId) {
+		if (intersectedCurveId && intersectedCurveId !== spline.id) {
 			if (intersectedCurveType === 'line' || intersectedCurveType === 'segment') {
 				sketch.addPointOnLineConstraint(newPt.id, intersectedCurveId);
 			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
@@ -524,4 +488,222 @@ export function executeExtend(
 	}
 
 	return null;
+}
+
+function addHandlePolygonLine(sketch: SketchDocument, splineId: string, p1Id: string, p2Id: string): string {
+	const polyLine = sketch.addLine(p1Id, p2Id);
+	polyLine.isConstruction = true;
+	polyLine.isSplineHandle = true;
+	polyLine.parentSplineId = splineId;
+	return polyLine.id;
+}
+
+function addFitHandle(
+	sketch: SketchDocument,
+	splineId: string,
+	fitPt: SketchPoint,
+	h1Pos: Vec2,
+	h2Pos: Vec2,
+	isAutomaticSplineHandle: boolean
+): string {
+	const h1 = sketch.addPoint(h1Pos);
+	const h2 = sketch.addPoint(h2Pos);
+	const hLine = sketch.addLine(h1.id, h2.id);
+	hLine.isConstruction = true;
+	hLine.isSplineHandle = true;
+	hLine.parentSplineId = splineId;
+	hLine.isAutomaticSplineHandle = isAutomaticSplineHandle;
+	const d1 = fitPt.distanceTo(h1Pos);
+	const d2 = fitPt.distanceTo(h2Pos);
+	const ratio = d1 + d2 > 1e-6 ? d1 / (d1 + d2) : 0.5;
+	sketch.addConstraint(new MidpointConstraint(sketch.nextId('c_mid'), fitPt.id, h1.id, h2.id, 1.0, ratio));
+	return hLine.id;
+}
+
+function defaultClampedKnots(pointCount: number): number[] {
+	if (pointCount <= 4) return [0, 0, 0, 0, 1, 1, 1, 1];
+	const spans = pointCount - 3;
+	const knots = [0, 0, 0, 0];
+	for (let i = 1; i < spans; i++) knots.push(i);
+	knots.push(spans, spans, spans, spans);
+	return knots;
+}
+
+/**
+ * Extends a control spline by appending/prepending a straight tangent cubic span
+ * while keeping all existing Bezier spans invariant.
+ */
+function extendControlSpline(
+	sketch: SketchDocument,
+	spline: NonNullable<ReturnType<SketchDocument['splines']['get']>>,
+	edge: 'start' | 'end',
+	toPoint: Vec2,
+	newPt: SketchPoint
+): void {
+	const oldPtIds = [...spline.pointIds];
+	const oldPts = oldPtIds.map(id => sketch.points.get(id)).filter((p): p is SketchPoint => !!p);
+	const oldCurve = spline.toGeoCurve(sketch);
+	const oldBoundaryPt = edge === 'end' ? oldPts[oldPts.length - 1] : oldPts[0];
+	const oldBoundaryId = edge === 'end' ? oldPtIds[oldPtIds.length - 1] : oldPtIds[0];
+	if (!oldBoundaryPt || !oldBoundaryId) return;
+
+	const delta = new Vec2().subVectors(toPoint, oldBoundaryPt);
+	// For 'end': oldEnd -> e1 -> e2 -> newPt; for 'start': newPt -> e1 -> e2 -> oldStart.
+	const e1Pos =
+		edge === 'end'
+			? oldBoundaryPt.clone().addScaledVector(delta, 1 / 3)
+			: toPoint.clone().addScaledVector(delta, -1 / 3);
+	const e2Pos =
+		edge === 'end'
+			? toPoint.clone().addScaledVector(delta, -1 / 3)
+			: oldBoundaryPt.clone().addScaledVector(delta, 1 / 3);
+	const e1Pt = sketch.addPoint(e1Pos);
+	const e2Pt = sketch.addPoint(e2Pos);
+
+	if (oldPts.length < 4 && oldCurve && oldCurve.bezierSegments.length === 1) {
+		// Low-degree (< 4 pts) B-splines ignore knots in bsplineToBezier; elevate the existing span cleanly.
+		const seg0 = oldCurve.bezierSegments[0];
+		if (spline.tangentLineIds) {
+			for (const lid of spline.tangentLineIds) sketch.removeEntity(lid);
+		}
+		const b1Pt = sketch.addPoint(seg0[1]);
+		const b2Pt = sketch.addPoint(seg0[2]);
+		const startId = oldPtIds[0];
+		const endId = oldPtIds[oldPtIds.length - 1];
+		const middleUnusedId = oldPtIds.length === 3 ? oldPtIds[1] : null;
+		const baseIds = [startId, b1Pt.id, b2Pt.id, endId];
+		spline.pointIds =
+			edge === 'end' ? [...baseIds, e1Pt.id, e2Pt.id, newPt.id] : [newPt.id, e1Pt.id, e2Pt.id, ...baseIds];
+		spline.knots = [0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2];
+		spline.tangentLineIds = [];
+		for (let i = 0; i < spline.pointIds.length - 1; i++) {
+			spline.tangentLineIds.push(addHandlePolygonLine(sketch, spline.id, spline.pointIds[i], spline.pointIds[i + 1]));
+		}
+		if (middleUnusedId) {
+			const usedElsewhere =
+				[...sketch.constraints.values()].some(c => c.entityIds.includes(middleUnusedId)) ||
+				[...sketch.lines.values()].some(l => l.p1Id === middleUnusedId || l.p2Id === middleUnusedId);
+			if (!usedElsewhere) sketch.points.delete(middleUnusedId);
+		}
+		return;
+	}
+
+	const baseKnots =
+		spline.knots && spline.knots.length === oldPtIds.length + 4
+			? [...spline.knots]
+			: defaultClampedKnots(oldPtIds.length);
+
+	if (!spline.tangentLineIds) spline.tangentLineIds = [];
+	if (edge === 'end') {
+		const kEnd = baseKnots[baseKnots.length - 1];
+		const kNew = kEnd + 1;
+		spline.knots = [...baseKnots.slice(0, -1), kNew, kNew, kNew, kNew];
+		spline.pointIds.push(e1Pt.id, e2Pt.id, newPt.id);
+		spline.tangentLineIds.push(
+			addHandlePolygonLine(sketch, spline.id, oldBoundaryId, e1Pt.id),
+			addHandlePolygonLine(sketch, spline.id, e1Pt.id, e2Pt.id),
+			addHandlePolygonLine(sketch, spline.id, e2Pt.id, newPt.id)
+		);
+	} else {
+		const kStart = baseKnots[0];
+		spline.knots = [kStart, kStart, kStart, kStart, ...baseKnots.slice(1).map(k => k + 1)];
+		spline.pointIds.unshift(newPt.id, e1Pt.id, e2Pt.id);
+		spline.tangentLineIds.unshift(
+			addHandlePolygonLine(sketch, spline.id, newPt.id, e1Pt.id),
+			addHandlePolygonLine(sketch, spline.id, e1Pt.id, e2Pt.id),
+			addHandlePolygonLine(sketch, spline.id, e2Pt.id, oldBoundaryId)
+		);
+	}
+}
+
+/**
+ * Extends a fit spline without modifying existing handles or segments.
+ * Only freezes the old boundary handle (so Catmull-Rom updates do not bend the prior segment),
+ * clamps its outward side if shorter extension requires it, and appends the new endpoint handle.
+ */
+function extendFitSpline(
+	sketch: SketchDocument,
+	spline: NonNullable<ReturnType<SketchDocument['splines']['get']>>,
+	edge: 'start' | 'end',
+	toPoint: Vec2,
+	newPt: SketchPoint
+): void {
+	const oldPts = spline.pointIds.map(pid => sketch.points.get(pid)).filter((p): p is SketchPoint => !!p);
+	if (oldPts.length < 2) return;
+
+	if (!spline.tangentLineIds || spline.tangentLineIds.length < oldPts.length) {
+		const natural = computeNaturalFitHandles(oldPts);
+		spline.tangentLineIds = oldPts.map((pt, i) =>
+			addFitHandle(sketch, spline.id, pt, natural[i].h1, natural[i].h2, true)
+		);
+	}
+
+	const oldBoundaryIdx = edge === 'end' ? oldPts.length - 1 : 0;
+	const oldBoundaryPt = oldPts[oldBoundaryIdx];
+	const oldBoundaryLineId = spline.tangentLineIds[oldBoundaryIdx];
+	const oldBoundaryLine = oldBoundaryLineId ? sketch.lines.get(oldBoundaryLineId) : undefined;
+
+	const delta = new Vec2().subVectors(toPoint, oldBoundaryPt);
+	const extLen = delta.length();
+	const tHat = delta.clone().normalizeOrNull(1e-9);
+
+	let dIn = extLen > 1e-6 ? extLen / 3 : 1;
+	if (oldBoundaryLine) {
+		// Prevent solve() from recomputing this endpoint's handle with the interior Catmull-Rom rule.
+		oldBoundaryLine.isAutomaticSplineHandle = false;
+		const h1 = sketch.points.get(oldBoundaryLine.p1Id);
+		const h2 = sketch.points.get(oldBoundaryLine.p2Id);
+		if (h1 && h2) {
+			const inPt = edge === 'end' ? h1 : h2;
+			const outPt = edge === 'end' ? h2 : h1;
+			dIn = oldBoundaryPt.distanceTo(inPt);
+			const outVec = new Vec2().subVectors(outPt, oldBoundaryPt);
+			const outLen = outVec.length();
+			const isAligned = extLen > 1e-6 && outLen > 1e-6 && tHat !== null && outVec.dot(tHat) / outLen > 1 - 1e-6;
+			if (tHat && extLen > 1e-6 && (!isAligned || outLen > extLen * 0.5 || outLen <= 1e-6)) {
+				const newOutLen = Math.min(outLen > 1e-6 ? outLen : extLen / 3, extLen * 0.5);
+				outPt.x = oldBoundaryPt.x + tHat.x * newOutLen;
+				outPt.y = oldBoundaryPt.y + tHat.y * newOutLen;
+				const newRatio = dIn + newOutLen > 1e-6 ? (edge === 'end' ? dIn : newOutLen) / (dIn + newOutLen) : 0.5;
+				for (const c of Array.from(sketch.constraints.values())) {
+					if (
+						c instanceof MidpointConstraint &&
+						c.midId === oldBoundaryPt.id &&
+						c.p1Id === oldBoundaryLine.p1Id &&
+						c.p2Id === oldBoundaryLine.p2Id
+					) {
+						sketch.constraints.set(c.id, new MidpointConstraint(c.id, c.midId, c.p1Id, c.p2Id, c.weight, newRatio));
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	const oppositeIdx = edge === 'end' ? 0 : oldPts.length - 1;
+	const oppositePt = oldPts[oppositeIdx];
+	if (oppositePt && toPoint.distanceTo(oppositePt) < 1e-3) {
+		const oppLine = sketch.lines.get(spline.tangentLineIds[oppositeIdx]);
+		if (oppLine) oppLine.isAutomaticSplineHandle = false;
+	}
+
+	const dir = tHat ?? new Vec2(1, 0);
+	const dNew = extLen > 1e-6 ? Math.min(dIn > 1e-6 ? dIn : extLen / 3, extLen / 3) : 1;
+	const newH1Pos =
+		edge === 'end'
+			? new Vec2(toPoint.x - dir.x * dNew, toPoint.y - dir.y * dNew)
+			: new Vec2(toPoint.x + dir.x * dNew, toPoint.y + dir.y * dNew);
+	const newH2Pos =
+		edge === 'end'
+			? new Vec2(toPoint.x + dir.x * dNew, toPoint.y + dir.y * dNew)
+			: new Vec2(toPoint.x - dir.x * dNew, toPoint.y - dir.y * dNew);
+	const newHLineId = addFitHandle(sketch, spline.id, newPt, newH1Pos, newH2Pos, false);
+
+	if (edge === 'end') {
+		spline.pointIds.push(newPt.id);
+		spline.tangentLineIds.push(newHLineId);
+	} else {
+		spline.pointIds.unshift(newPt.id);
+		spline.tangentLineIds.unshift(newHLineId);
+	}
 }

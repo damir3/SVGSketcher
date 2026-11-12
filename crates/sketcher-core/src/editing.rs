@@ -1,5 +1,5 @@
 //! Pure trim/extend queries. Mutation, constraint transfer and undo remain with the document.
-use crate::regions::{intersections, Geometry, RegionCurve};
+use crate::regions::{intersections, spline_self_intersections, Geometry, RegionCurve};
 use crate::{spline, Point2};
 use std::f64::consts::TAU;
 
@@ -59,7 +59,24 @@ fn angular(mut value: f64) -> f64 {
 pub fn curve_intersections(target: &RegionCurve, others: &[RegionCurve]) -> Vec<Intersection> {
     let g = &target.geometry;
     let primitives = g.primitives();
+    let is_open = matches!(
+        g,
+        Geometry::Segment(..)
+            | Geometry::Arc(..)
+            | Geometry::EllipticalArc(..)
+            | Geometry::Spline(_, false)
+    );
     let mut result = vec![];
+    let mut push_hit = |point: Point2, param: f64, source: usize| {
+        if is_open && (param < 1e-4 || param > 1.0 - 1e-4) {
+            return;
+        }
+        result.push(Intersection {
+            point,
+            param,
+            source,
+        });
+    };
     for (index, other) in others.iter().enumerate() {
         if other.id == target.id {
             continue;
@@ -70,22 +87,17 @@ pub fn curve_intersections(target: &RegionCurve, others: &[RegionCurve]) -> Vec<
             &primitives,
             &other.geometry.primitives(),
         ) {
-            let param = g.param(point);
-            if matches!(
-                g,
-                Geometry::Segment(..)
-                    | Geometry::Arc(..)
-                    | Geometry::EllipticalArc(..)
-                    | Geometry::Spline(_, false)
-            ) && (param < 1e-4 || param > 1.0 - 1e-4)
-            {
-                continue;
-            }
-            result.push(Intersection {
-                point,
-                param,
-                source: index,
-            });
+            push_hit(point, g.param(point), index);
+        }
+    }
+    if let Geometry::Spline(ref segments, closed) = *g {
+        let self_source = others
+            .iter()
+            .position(|other| other.id == target.id)
+            .unwrap_or(others.len());
+        for (point, u, v) in spline_self_intersections(segments, closed) {
+            push_hit(point, u, self_source);
+            push_hit(point, v, self_source);
         }
     }
     result.sort_by(|a, b| {
@@ -217,6 +229,19 @@ pub fn extend(
                 if t > 1e-3 && t < best {
                     best = t;
                     hit = Some((point, index));
+                }
+            }
+        }
+        if matches!(g, Geometry::Spline(..)) {
+            let self_source = others
+                .iter()
+                .position(|other| other.id == target.id)
+                .unwrap_or(others.len());
+            for point in intersections(&ray, g, &primitives, &g.primitives()) {
+                let t = (point.x - from.x) * dir.x + (point.y - from.y) * dir.y;
+                if t > 1e-3 && t < best {
+                    best = t;
+                    hit = Some((point, self_source));
                 }
             }
         }
@@ -364,5 +389,87 @@ mod tests {
         assert!(r.whole);
         assert_eq!(r.interval, [0.0, TAU]);
         assert!(extend(&t, &[], p(1.0, 0.0), false).is_none());
+    }
+    #[test]
+    fn spline_self_intersections_support_trim_and_self_extend() {
+        let loop_curve = RegionCurve {
+            id: 1,
+            geometry: Geometry::Spline(
+                vec![
+                    [p(-20.0, 0.0), p(0.0, 30.0), p(20.0, 30.0), p(20.0, 0.0)],
+                    [p(20.0, 0.0), p(20.0, -30.0), p(-10.0, -30.0), p(0.0, 30.0)],
+                ],
+                false,
+            ),
+        };
+        let hits = curve_intersections(&loop_curve, &[]);
+        assert_eq!(hits.len(), 2);
+        assert!(hits[0].param < 0.5 && hits[1].param > 0.5);
+
+        let crunode = RegionCurve {
+            id: 2,
+            geometry: Geometry::Spline(
+                vec![[p(0.0, 0.0), p(4.0, 2.0), p(-4.0, 2.0), p(0.0, 0.0)]],
+                false,
+            ),
+        };
+        assert_eq!(curve_intersections(&crunode, &[]).len(), 0);
+        // Shift interior crossing strictly inside (0, 1)
+        let interior_crunode = RegionCurve {
+            id: 3,
+            geometry: Geometry::Spline(
+                vec![[p(-2.0, -2.0), p(6.0, 4.0), p(-6.0, 4.0), p(2.0, -2.0)]],
+                false,
+            ),
+        };
+        let crunode_hits = curve_intersections(&interior_crunode, &[]);
+        assert_eq!(crunode_hits.len(), 2);
+        assert!(crunode_hits[0].point.x.abs() < 1e-6);
+
+        let bow_tie = RegionCurve {
+            id: 4,
+            geometry: Geometry::Spline(
+                vec![
+                    [
+                        p(-40.0, 25.0),
+                        p(-10.0, 25.0),
+                        p(10.0, -25.0),
+                        p(40.0, -25.0),
+                    ],
+                    [p(40.0, -25.0), p(50.0, 0.0), p(50.0, 0.0), p(40.0, 25.0)],
+                    [
+                        p(40.0, 25.0),
+                        p(10.0, 25.0),
+                        p(-10.0, -25.0),
+                        p(-40.0, -25.0),
+                    ],
+                    [
+                        p(-40.0, -25.0),
+                        p(-50.0, 0.0),
+                        p(-50.0, 0.0),
+                        p(-40.0, 25.0),
+                    ],
+                ],
+                true,
+            ),
+        };
+        let trimmed = trim(&bow_tie, &[], p(45.0, 0.0), false);
+        assert!(!trimmed.whole);
+        assert!((trimmed.start.x).hypot(trimmed.start.y) < 1e-6);
+        assert!((trimmed.end.x).hypot(trimmed.end.y) < 1e-6);
+
+        let hook = RegionCurve {
+            id: 5,
+            geometry: Geometry::Spline(
+                vec![
+                    [p(-20.0, 20.0), p(-5.0, 35.0), p(10.0, 35.0), p(20.0, 20.0)],
+                    [p(20.0, 20.0), p(35.0, 5.0), p(10.0, -20.0), p(5.0, 0.0)],
+                ],
+                false,
+            ),
+        };
+        let ext = extend(&hook, &[], p(5.0, 0.0), false).unwrap();
+        assert_eq!(ext.source, Some(0));
+        assert!(ext.to.y > 20.0);
     }
 }

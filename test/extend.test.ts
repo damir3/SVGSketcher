@@ -248,7 +248,7 @@ describe('Extend Tool Math and Logic', () => {
 		}
 	});
 
-	it('extends a control spline safely preserving all control points', () => {
+	it('extends a control spline safely preserving all control points and original shape', () => {
 		const sketch = new SketchDocument();
 		const p0 = sketch.addPoint({ x: -50, y: 0 });
 		const p1 = sketch.addPoint({ x: -50, y: 100 });
@@ -258,6 +258,7 @@ describe('Extend Tool Math and Logic', () => {
 
 		const allCurves = getAllGeoCurves(sketch);
 		const spCurve = spline.toGeoCurve(sketch)!;
+		const beforeSegs = spCurve.bezierSegments;
 
 		const cand = findExtendCandidate(sketch, spCurve, allCurves, new Vec2(45, 10))!;
 		assert.ok(cand);
@@ -269,9 +270,119 @@ describe('Extend Tool Math and Logic', () => {
 
 		assert.ok(res);
 		const updatedSpline = sketch.splines.get(spline.id)!;
-		assert.equal(updatedSpline.pointIds.length, 5);
+		assert.equal(updatedSpline.pointIds.length, 7);
 		for (const pid of [p0.id, p1.id, p2.id, p3.id]) {
 			assert.ok(sketch.points.has(pid), `Expected control point ${pid} to still exist in sketch.points`);
+		}
+		const afterSegs = updatedSpline.toGeoCurve(sketch)!.bezierSegments;
+		assert.equal(afterSegs.length, 2);
+		for (let i = 0; i < 4; i++) {
+			assert.ok(afterSegs[0][i].distanceTo(beforeSegs[0][i]) < 1e-6);
+		}
+		assert.ok(afterSegs[1][3].distanceTo(cand.toPoint) < 1e-6);
+	});
+
+	it('preserves existing spline shape and handles when extending fit splines at arbitrary lengths and both ends', () => {
+		const expectSameSegments = (a: [Vec2, Vec2, Vec2, Vec2][], b: [Vec2, Vec2, Vec2, Vec2][]) => {
+			assert.equal(a.length, b.length);
+			for (let s = 0; s < a.length; s++) {
+				for (let k = 0; k < 4; k++) {
+					assert.ok(a[s][k].distanceTo(b[s][k]) < 1e-6, `seg ${s}[${k}] drifted by ${a[s][k].distanceTo(b[s][k])}`);
+				}
+			}
+		};
+
+		// Short 10mm extend on end + long extend on start + custom manual interior handle
+		const sketch = new SketchDocument();
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 40, y: 50 });
+		const p2 = sketch.addPoint({ x: 90, y: 0 });
+		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
+		// Customize interior handle on p1 so we verify user handles are not reset
+		const midHandle = sketch.lines.get(spline.tangentLineIds![1])!;
+		midHandle.isAutomaticSplineHandle = false;
+		const mh1 = sketch.points.get(midHandle.p1Id)!;
+		const mh2 = sketch.points.get(midHandle.p2Id)!;
+		mh1.x -= 8;
+		mh1.y += 4;
+		mh2.x += 8;
+		mh2.y -= 4;
+		sketch.solve();
+
+		// Wall at x = 96 so end extension length (~10mm) is much shorter than segment length
+		const w1 = sketch.addPoint({ x: 96, y: -50 });
+		const w2 = sketch.addPoint({ x: 96, y: 50 });
+		sketch.addLine(w1.id, w2.id);
+
+		const beforeEndCurve = spline.toGeoCurve(sketch)!;
+		const beforeEndSegs = beforeEndCurve.bezierSegments;
+		const endCand = findExtendCandidate(sketch, beforeEndCurve, getAllGeoCurves(sketch), new Vec2(88, 2))!;
+		assert.equal(endCand.edge, 'end');
+
+		sketch.beginTransaction();
+		executeExtend(sketch, endCand);
+		sketch.commitTransaction();
+
+		const afterEndSegs = spline.toGeoCurve(sketch)!.bezierSegments;
+		assert.equal(afterEndSegs.length, beforeEndSegs.length + 1);
+		expectSameSegments(afterEndSegs.slice(0, beforeEndSegs.length), beforeEndSegs);
+		assert.ok(afterEndSegs[afterEndSegs.length - 1][3].distanceTo(endCand.toPoint) < 1e-6);
+
+		// Now extend start end (+50mm) and verify prior segments (including previous extension) stay unchanged
+		const beforeStartSegs = spline.toGeoCurve(sketch)!.bezierSegments;
+		const startCand = findExtendCandidate(sketch, spline.toGeoCurve(sketch)!, getAllGeoCurves(sketch), new Vec2(2, 2))!;
+		assert.equal(startCand.edge, 'start');
+
+		sketch.beginTransaction();
+		executeExtend(sketch, startCand);
+		sketch.commitTransaction();
+
+		const afterStartSegs = spline.toGeoCurve(sketch)!.bezierSegments;
+		assert.equal(afterStartSegs.length, beforeStartSegs.length + 1);
+		expectSameSegments(afterStartSegs.slice(1), beforeStartSegs);
+		assert.ok(afterStartSegs[0][0].distanceTo(startCand.toPoint) < 1e-6);
+
+		// Undo restores exact prior geometry
+		assert.ok(sketch.undo());
+		expectSameSegments(sketch.splines.get(spline.id)!.toGeoCurve(sketch)!.bezierSegments, beforeStartSegs);
+		assert.ok(sketch.undo());
+		expectSameSegments(sketch.splines.get(spline.id)!.toGeoCurve(sketch)!.bezierSegments, beforeEndSegs);
+	});
+
+	it('preserves existing multi-span B-spline shape when extending a 5-point control spline on both ends', () => {
+		const sketch = new SketchDocument();
+		const pts = [
+			sketch.addPoint({ x: -60, y: 0 }),
+			sketch.addPoint({ x: -30, y: 50 }),
+			sketch.addPoint({ x: 10, y: 40 }),
+			sketch.addPoint({ x: 40, y: 60 }),
+			sketch.addPoint({ x: 70, y: 0 }),
+		];
+		const spline = sketch.addControlSpline(pts.map(p => p.id));
+
+		const beforeSegs = spline.toGeoCurve(sketch)!.bezierSegments;
+		const endCand = findExtendCandidate(sketch, spline.toGeoCurve(sketch)!, getAllGeoCurves(sketch), new Vec2(68, 5))!;
+		assert.equal(endCand.edge, 'end');
+		executeExtend(sketch, endCand);
+
+		const afterEndSegs = spline.toGeoCurve(sketch)!.bezierSegments;
+		assert.equal(afterEndSegs.length, beforeSegs.length + 1);
+		for (let s = 0; s < beforeSegs.length; s++) {
+			for (let k = 0; k < 4; k++) {
+				assert.ok(afterEndSegs[s][k].distanceTo(beforeSegs[s][k]) < 1e-6);
+			}
+		}
+
+		const startCand = findExtendCandidate(sketch, spline.toGeoCurve(sketch)!, getAllGeoCurves(sketch), new Vec2(-58, 5))!;
+		assert.equal(startCand.edge, 'start');
+		executeExtend(sketch, startCand);
+
+		const afterStartSegs = spline.toGeoCurve(sketch)!.bezierSegments;
+		assert.equal(afterStartSegs.length, afterEndSegs.length + 1);
+		for (let s = 0; s < afterEndSegs.length; s++) {
+			for (let k = 0; k < 4; k++) {
+				assert.ok(afterStartSegs[s + 1][k].distanceTo(afterEndSegs[s][k]) < 1e-6);
+			}
 		}
 	});
 

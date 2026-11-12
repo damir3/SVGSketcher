@@ -436,7 +436,7 @@ fn cross(a: Point2, b: Point2) -> f64 {
     a.x * b.y - a.y * b.x
 }
 
-fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
+pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
     struct Task {
         seg1: CubicBezier,
         t0: f64,
@@ -445,6 +445,33 @@ fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
         u0: f64,
         u1: f64,
         depth: usize,
+    }
+    let mut hits: Vec<(Point2, f64)> = Vec::new();
+    let record_hit = |hits: &mut Vec<(Point2, f64)>, point: Point2, residual: f64| {
+        for hit in hits.iter_mut() {
+            if (hit.0.x - point.x).hypot(hit.0.y - point.y) < 1e-3 {
+                if hit.1 > 1e-9 && residual < hit.1 {
+                    *hit = (point, residual);
+                }
+                return;
+            }
+        }
+        hits.push((point, residual));
+    };
+    for p1 in [b1[0], b1[3]] {
+        for p2 in [b2[0], b2[3]] {
+            let dist = (p1.x - p2.x).hypot(p1.y - p2.y);
+            if dist < 1e-9 {
+                record_hit(
+                    &mut hits,
+                    Point2 {
+                        x: (p1.x + p2.x) * 0.5,
+                        y: (p1.y + p2.y) * 0.5,
+                    },
+                    dist,
+                );
+            }
+        }
     }
     let mut stack = vec![Task {
         seg1: b1,
@@ -455,8 +482,9 @@ fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
         u1: 1.0,
         depth: 0,
     }];
-    let mut points = Vec::new();
-    while !stack.is_empty() && points.len() < 16 {
+    let mut pops = 0;
+    while !stack.is_empty() && hits.len() < 16 && pops < 4096 {
+        pops += 1;
         let Task {
             seg1,
             t0,
@@ -498,11 +526,16 @@ fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
                 u = (u - du).clamp(0.0, 1.0);
             }
             let (p1, p2) = (evaluate(&b1, t), evaluate(&b2, u));
-            if (p1.x - p2.x).hypot(p1.y - p2.y) < 1e-3 {
-                points.push(Point2 {
-                    x: (p1.x + p2.x) * 0.5,
-                    y: (p1.y + p2.y) * 0.5,
-                });
+            let dist = (p1.x - p2.x).hypot(p1.y - p2.y);
+            if dist < 1e-3 {
+                record_hit(
+                    &mut hits,
+                    Point2 {
+                        x: (p1.x + p2.x) * 0.5,
+                        y: (p1.y + p2.y) * 0.5,
+                    },
+                    dist,
+                );
             }
             continue;
         }
@@ -591,13 +624,7 @@ fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
             });
         }
     }
-    let mut unique: Vec<Point2> = Vec::new();
-    for p in points {
-        if !unique.iter().any(|u| (u.x - p.x).hypot(u.y - p.y) < 1e-3) {
-            unique.push(p);
-        }
-    }
-    unique
+    hits.into_iter().map(|(point, _)| point).collect()
 }
 
 #[cfg(test)]
@@ -701,5 +728,25 @@ mod tests {
             assert!((hit.x - target_x).abs() < 1e-9);
             assert!(hit.y.abs() < 1e-8);
         }
+    }
+
+    #[test]
+    fn nearly_tangent_shared_endpoint_returns_exact_endpoint() {
+        let shared = p(49.61295834866398, -25.76020358468419);
+        let b1 = [
+            shared,
+            p(42.44238510289348, -2.9859618798756253),
+            p(9.583250450170045, 17.444397623456208),
+            p(4.443064009924984e-19, 40.00009685405597),
+        ];
+        let b2 = [
+            p(40.999982253826545, -56.49998319368469),
+            p(51.06022153273804, -45.59769745530476),
+            p(52.66908742069694, -35.46668336925695),
+            shared,
+        ];
+        let hits = intersect_beziers(b1, b2);
+        assert_eq!(hits.len(), 1);
+        assert!((hits[0].x - shared.x).hypot(hits[0].y - shared.y) < 1e-9);
     }
 }

@@ -9,9 +9,11 @@ import {
 	getCurveIntersections,
 	getTrimCandidate,
 	executeTrim,
+	executeBreak,
 	getAllGeoCurves,
 	type GeoCurve,
 } from '../src/math/intersection';
+import { findSketchRegions, pointInRegion } from '../src/math/regions';
 import { findExtendCandidate, executeExtend } from '../src/math/extend';
 import { getTrimCandidate as trimReference } from '../src/math/trimReference';
 import { findExtendCandidate as extendReference } from '../src/math/extendReference';
@@ -231,5 +233,88 @@ test('trim/extend preserve document constraints and transaction undo/redo', () =
 		compare(snapshot(sketch), before);
 		sketch.redo();
 		compare(snapshot(sketch), after);
+	}
+});
+
+test('spline self-intersections support intersections, trim, break and self-extend across active and reference kernels', () => {
+	const native = getGeometryKernel();
+	const backends = native.editing ? [typescriptGeometryKernel, native] : [typescriptGeometryKernel];
+
+	const makeAlphaSketch = () => {
+		const sketch = new SketchDocument();
+		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
+		sketch.addFitSpline([pt(-40, 0), pt(10, 30), pt(10, -30), pt(-20, 0), pt(30, 0)].map(p => p.id));
+		return sketch;
+	};
+	const makeBowTieSketch = () => {
+		const sketch = new SketchDocument();
+		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
+		sketch.addFitSpline([pt(-40, 25), pt(40, -25), pt(40, 25), pt(-40, -25)].map(p => p.id), undefined, false, undefined, true);
+		return sketch;
+	};
+	const makeHookSketch = () => {
+		const sketch = new SketchDocument();
+		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
+		sketch.addFitSpline([pt(-20, 20), pt(20, 40), pt(40, 10), pt(10, -20), pt(5, 0)].map(p => p.id));
+		return sketch;
+	};
+
+	try {
+		for (const kernel of backends) {
+			setGeometryKernel(kernel);
+
+			// 1. Open self-intersecting fit spline: intersections, middle loop trim, and break
+			const alpha = makeAlphaSketch();
+			const alphaCurves = getAllGeoCurves(alpha);
+			const alphaHits = getCurveIntersections(alphaCurves[0], alphaCurves);
+			assert.equal(alphaHits.length, 2);
+			assert.equal(alphaHits[0].cuttingCurveId, alphaCurves[0].id);
+			assert.equal(alphaHits[1].cuttingCurveId, alphaCurves[0].id);
+
+			const loopCand = getTrimCandidate(alphaCurves[0], alphaCurves, new Vec2(15, 10))!;
+			assert.equal(loopCand.isWholeEntity, false);
+			assert.ok(loopCand.interval[0] > 0.01 && loopCand.interval[1] < 0.99);
+			assert.ok(Math.abs(loopCand.interval[0] - alphaHits[0].param) < 1e-6);
+			assert.ok(Math.abs(loopCand.interval[1] - alphaHits[1].param) < 1e-6);
+			executeTrim(alpha, loopCand);
+			assert.equal(alpha.splines.size, 2);
+			assert.ok([...alpha.constraints.values()].some(c => c.type === 'coincident'));
+
+			const breakAlpha = makeAlphaSketch();
+			const breakCurves = getAllGeoCurves(breakAlpha);
+			const breakCand = getTrimCandidate(breakCurves[0], breakCurves, new Vec2(15, 10))!;
+			executeBreak(breakAlpha, breakCand);
+			assert.equal(breakAlpha.splines.size, 3);
+			assert.equal(findSketchRegions(breakAlpha).length, 1);
+
+			// 2. Closed bow-tie spline: trim one loop instead of deleting the whole curve, or break into two loops
+			const bowTrim = makeBowTieSketch();
+			const bowCurves = getAllGeoCurves(bowTrim);
+			assert.equal(getCurveIntersections(bowCurves[0], bowCurves).length, 2);
+			const bowCand = getTrimCandidate(bowCurves[0], bowCurves, new Vec2(40, 0))!;
+			assert.equal(bowCand.isWholeEntity, false);
+			executeTrim(bowTrim, bowCand);
+			assert.equal(bowTrim.splines.size, 1);
+			assert.equal(findSketchRegions(bowTrim).length, 1);
+			assert.equal(pointInRegion(new Vec2(-25, 0), findSketchRegions(bowTrim)[0]), true);
+
+			const bowBreak = makeBowTieSketch();
+			const bowBreakCurves = getAllGeoCurves(bowBreak);
+			executeBreak(bowBreak, getTrimCandidate(bowBreakCurves[0], bowBreakCurves, new Vec2(40, 0))!);
+			assert.equal(bowBreak.splines.size, 2);
+			assert.equal(findSketchRegions(bowBreak).length, 2);
+
+			// 3. Extend open hook spline until it intersects itself and encloses a region
+			const hook = makeHookSketch();
+			const hookCurves = getAllGeoCurves(hook);
+			const extendCand = findExtendCandidate(hook, hookCurves[0], hookCurves, new Vec2(5, 0))!;
+			assert.equal(extendCand.intersectedCurveId, hookCurves[0].id);
+			assert.equal(extendCand.intersectedCurveType, 'spline');
+			assert.ok(extendCand.toPoint.y > 20);
+			assert.ok(executeExtend(hook, extendCand));
+			assert.equal(findSketchRegions(hook).length, 1);
+		}
+	} finally {
+		setGeometryKernel(native);
 	}
 });

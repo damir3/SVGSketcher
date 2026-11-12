@@ -345,13 +345,34 @@ it('finds small-feature circle and multiple segment crossings within a single co
 		],
 	};
 
+	const sharedJoin = { x: 49.61295834866398, y: -25.76020358468419 };
+	const nearTangentCubicA: Extract<KernelCurve, { type: 'bezier' }> = {
+		type: 'bezier',
+		points: [
+			sharedJoin,
+			{ x: 42.44238510289348, y: -2.9859618798756253 },
+			{ x: 9.583250450170045, y: 17.444397623456208 },
+			{ x: 4.443064009924984e-19, y: 40.00009685405597 },
+		],
+	};
+	const nearTangentCubicB: Extract<KernelCurve, { type: 'bezier' }> = {
+		type: 'bezier',
+		points: [
+			{ x: 40.999982253826545, y: -56.49998319368469 },
+			{ x: 51.06022153273804, y: -45.59769745530476 },
+			{ x: 52.66908742069694, y: -35.46668336925695 },
+			sharedJoin,
+		],
+	};
+
 	const pairs: IntersectionPair[] = [
 		{ a: longCubic, b: smallCircle },
 		{ a: tripleCubic, b: axisLine },
 		{ a: tanCubic, b: axisLine },
+		{ a: nearTangentCubicA, b: nearTangentCubicB },
 	];
 	for (const kernel of [typescriptGeometryKernel, getGeometryKernel()]) {
-		const [circleHits, tripleHits, tanHits] = kernel.intersectPairs(pairs);
+		const [circleHits, tripleHits, tanHits, nearTangentHits] = kernel.intersectPairs(pairs);
 		assert.equal(circleHits.length, 2);
 		for (const p of circleHits) assert.ok(Math.abs(Math.hypot(p.x - 317.123, p.y) - 0.005) < 1e-10);
 		assert.equal(tripleHits.length, 3);
@@ -363,5 +384,7 @@ it('finds small-feature circle and multiple segment crossings within a single co
 		assert.equal(tanHits.length, 1);
 		assert.ok(Math.abs(tanHits[0].x - tsStar) < 1e-6);
 		assert.ok(Math.abs(tanHits[0].y) < 1e-10);
+		assert.equal(nearTangentHits.length, 1);
+		assert.ok(Math.hypot(nearTangentHits[0].x - sharedJoin.x, nearTangentHits[0].y - sharedJoin.y) < 1e-9);
 	}
 });
