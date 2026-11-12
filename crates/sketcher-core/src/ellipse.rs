@@ -68,6 +68,17 @@ impl Frame {
         }
     }
 
+    pub(super) fn normalized_world(&self, point: Point2) -> Point2 {
+        let p = self.local(Point2 {
+            x: point.x,
+            y: -point.y,
+        });
+        Point2 {
+            x: p.x / self.rx,
+            y: p.y / self.ry,
+        }
+    }
+
     pub(super) fn implicit_world(&self, point: Point2) -> f64 {
         let p = self.local(Point2 {
             x: point.x,

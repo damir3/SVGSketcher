@@ -304,3 +304,63 @@ it('WASM agrees with TypeScript for 600 deterministic cubic pairs without mutati
 	actual.forEach((points, i) => assertPoints(points, expected[i]));
 	assert.deepEqual(pairs, before);
 });
+
+it('finds small-feature circle and multiple segment crossings within a single coarse sample interval', () => {
+	const longCubic: Extract<KernelCurve, { type: 'bezier' }> = {
+		type: 'bezier',
+		points: [
+			{ x: 0, y: 0 },
+			{ x: 333, y: 0.02 },
+			{ x: 666, y: -0.02 },
+			{ x: 1000, y: 0 },
+		],
+	};
+	const smallCircle: KernelCurve = { type: 'circle', center: { x: 317.123, y: 0 }, radius: 0.005 };
+
+	// y(t) = 1e4 * (t - 0.01)(t - 0.03)(t - 0.05) places all 3 crossings inside [0, 1/16].
+	const y0 = -0.000015 * 1e4;
+	const y1 = (-0.000015 + 0.0023 / 3) * 1e4;
+	const y2 = (-0.000015 + (2 * 0.0023) / 3 - 0.09 / 3) * 1e4;
+	const y3 = (1 - 0.09 + 0.0023 - 0.000015) * 1e4;
+	const tripleCubic: Extract<KernelCurve, { type: 'bezier' }> = {
+		type: 'bezier',
+		points: [
+			{ x: 0, y: y0 },
+			{ x: 1 / 3, y: y1 },
+			{ x: 2 / 3, y: y2 },
+			{ x: 1, y: y3 },
+		],
+	};
+	const axisLine: KernelCurve = { type: 'segment', p1: { x: -1, y: 0 }, p2: { x: 2, y: 0 } };
+
+	const tsStar = 1 / Math.sqrt(3);
+	const tanCubic: Extract<KernelCurve, { type: 'bezier' }> = {
+		type: 'bezier',
+		points: [
+			{ x: 0, y: 10 * tsStar * tsStar },
+			{ x: 1 / 3, y: 10 * (tsStar * tsStar - (2 * tsStar) / 3) },
+			{ x: 2 / 3, y: 10 * (tsStar * tsStar - (4 * tsStar) / 3 + 1 / 3) },
+			{ x: 1, y: 10 * (tsStar * tsStar - 2 * tsStar + 1) },
+		],
+	};
+
+	const pairs: IntersectionPair[] = [
+		{ a: longCubic, b: smallCircle },
+		{ a: tripleCubic, b: axisLine },
+		{ a: tanCubic, b: axisLine },
+	];
+	for (const kernel of [typescriptGeometryKernel, getGeometryKernel()]) {
+		const [circleHits, tripleHits, tanHits] = kernel.intersectPairs(pairs);
+		assert.equal(circleHits.length, 2);
+		for (const p of circleHits) assert.ok(Math.abs(Math.hypot(p.x - 317.123, p.y) - 0.005) < 1e-10);
+		assert.equal(tripleHits.length, 3);
+		assertPoints(tripleHits, [
+			{ x: 0.01, y: 0 },
+			{ x: 0.03, y: 0 },
+			{ x: 0.05, y: 0 },
+		]);
+		assert.equal(tanHits.length, 1);
+		assert.ok(Math.abs(tanHits[0].x - tsStar) < 1e-6);
+		assert.ok(Math.abs(tanHits[0].y) < 1e-10);
+	}
+});

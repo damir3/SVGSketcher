@@ -306,4 +306,44 @@ describe('sketch regions', () => {
 		assert.equal((regions[0].path.match(/ A /g) ?? []).length, 4);
 		assert.equal(pointInRegion(new Vec2(50, 35), regions[0]), true);
 	});
+
+	it('detects all split enclosed regions when a long spline crosses a small-radius fillet arc twice inside one coarse step', () => {
+		const sketch = new SketchDocument();
+		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
+
+		// Outer contour (200x160 rounded rectangle) with a small r=5 fillet at top-left (x=0..5, y=155..160).
+		const bl = pt(0, 0);
+		const br = pt(200, 0);
+		const tr = pt(200, 160);
+		const tlTop = pt(5, 160);
+		const tlSide = pt(0, 155);
+		const tlCenter = pt(5, 155);
+
+		sketch.addLine(bl.id, br.id);
+		sketch.addLine(br.id, tr.id);
+		sketch.addLine(tr.id, tlTop.id);
+		sketch.arcs.set(
+			'fillet-tl',
+			new SketchArc({
+				id: 'fillet-tl',
+				centerId: tlCenter.id,
+				startPointId: tlTop.id,
+				endPointId: tlSide.id,
+				radius: 5,
+				clockwise: false,
+			}),
+		);
+		sketch.addLine(tlSide.id, bl.id);
+
+		// Long single-cubic control spline passing outside top-left, dipping twice through the r=5 fillet arc
+		// inside a single [5/16, 6/16] coarse interval at (0.39, 156.94) and (3.32, 159.71), then arching over
+		// the top edge and exiting through the bottom edge into 4 enclosed regions.
+		sketch.addControlSpline([pt(-82, 10), pt(1, 220), pt(85, 260), pt(168, -20)].map(p => p.id));
+
+		const regions = findSketchRegions(sketch);
+		assert.equal(regions.length, 4);
+		assert.equal(regions.some(r => pointInRegion(new Vec2(160, 80), r)), true);
+		assert.equal(regions.some(r => pointInRegion(new Vec2(30, 30), r)), true);
+		assert.equal(regions.some(r => pointInRegion(new Vec2(1.85, 158.6), r)), true);
+	});
 });
