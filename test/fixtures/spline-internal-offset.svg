@@ -305,71 +305,71 @@
     "constraints": [
       {
         "id": "c_pt_axis_on-1",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-1"
+          "Point-1",
+          "origin",
+          "axis_x"
         ],
         "pointId": "Point-1",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       {
         "id": "c_pt_axis_on-2",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-3"
+          "Point-3",
+          "origin",
+          "axis_y"
         ],
         "pointId": "Point-3",
-        "targetDistance": 0,
-        "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y"
       },
       {
         "id": "c_pt_axis_on-3",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-5"
+          "Point-5",
+          "origin",
+          "axis_x"
         ],
         "pointId": "Point-5",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       {
         "id": "c_pt_axis_on-4",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-7"
+          "Point-7",
+          "origin",
+          "axis_y"
         ],
         "pointId": "Point-7",
-        "targetDistance": 0,
-        "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y"
       },
       {
         "id": "c_midpoint-1",

@@ -27,8 +27,6 @@ import {
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
 	computeRectangularPatternDirections,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import type {
 	SketchPoint,
@@ -195,9 +193,7 @@ export class CanvasInteraction {
 			| RadiusConstraint
 			| AngleConstraint
 			| PointToLineDistanceConstraint
-			| OffsetConstraint
-			| OriginDistanceConstraint
-			| LineToAxisDistanceConstraint,
+			| OffsetConstraint,
 		screenPos: Vec2
 	) => void;
 	onToolChange?: (tool: ToolType) => void;
@@ -2148,8 +2144,6 @@ export class CanvasInteraction {
 					if (
 						constraint instanceof DistanceConstraint ||
 						constraint instanceof PointToLineDistanceConstraint ||
-						(constraint instanceof OriginDistanceConstraint && !constraint.isCoincident) ||
-						(constraint instanceof LineToAxisDistanceConstraint && !constraint.isCollinear) ||
 						constraint instanceof OffsetConstraint ||
 						constraint instanceof AngleConstraint ||
 						constraint instanceof RadiusConstraint
@@ -2839,9 +2833,7 @@ export class CanvasInteraction {
 					constraint instanceof PointToLineDistanceConstraint ||
 					constraint instanceof OffsetConstraint ||
 					constraint instanceof RadiusConstraint ||
-					constraint instanceof AngleConstraint ||
-					constraint instanceof OriginDistanceConstraint ||
-					constraint instanceof LineToAxisDistanceConstraint) &&
+					constraint instanceof AngleConstraint) &&
 				this.onEditDimension
 			) {
 				this.sketch.selectEntity(constraint.id, 'constraint', false);

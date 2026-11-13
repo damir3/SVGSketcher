@@ -13,11 +13,29 @@ export class CollinearConstraint extends BaseConstraint {
 	readonly l2P2: string;
 
 	constructor(id: string, l1P1: string, l1P2: string, l2P1: string, l2P2: string, weight = 1.0) {
-		super(id, 'collinear', 'Collinear', [...new Set([l1P1, l1P2, l2P1, l2P2].filter(Boolean))], weight);
+		super(
+			id,
+			'collinear',
+			l1P1 === 'origin' && (l1P2 === 'axis_x' || l1P2 === 'axis_y')
+				? `Collinear with ${l1P2 === 'axis_x' ? 'X' : 'Y'}-Axis`
+				: 'Collinear',
+			[...new Set([l1P1, l1P2, l2P1, l2P2].filter(Boolean))],
+			weight
+		);
 		this.l1P1 = l1P1;
 		this.l1P2 = l1P2;
 		this.l2P1 = l2P1;
 		this.l2P2 = l2P2;
+	}
+
+	get axisCoordinate(): 'x' | 'y' | undefined {
+		return this.l1P1 === 'origin'
+			? this.l1P2 === 'axis_x'
+				? 'y'
+				: this.l1P2 === 'axis_y'
+					? 'x'
+					: undefined
+			: undefined;
 	}
 
 	isThreePoint(): boolean {
@@ -25,10 +43,12 @@ export class CollinearConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
-		return this.isThreePoint() ? 1 : 2;
+		return this.axisCoordinate ? 2 : this.isThreePoint() ? 1 : 2;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.axisCoordinate)
+			return [this.l2P1, this.l2P2].map(id => (paramMap.get(`${id}.${this.axisCoordinate}`) ?? 0) * this.weight);
 		const p11 = readParamPoint(paramMap, this.l1P1);
 		const p12 = readParamPoint(paramMap, this.l1P2);
 
@@ -62,6 +82,13 @@ export class CollinearConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
+		if (this.axisCoordinate) {
+			const entries: JacobianEntry[] = [];
+			[this.l2P1, this.l2P2].forEach((id, row) =>
+				this.addJacobianEntry(entries, paramIndices, `${id}.${this.axisCoordinate}`, baseRow + row, this.weight)
+			);
+			return entries;
+		}
 		const j0 = computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 		if (this.isThreePoint()) {
 			return j0;
@@ -71,7 +98,7 @@ export class CollinearConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		ctx.renderBadgeOnSegment(this.id, this.l1P1, this.l1P2, 'collinear');
+		if (!this.axisCoordinate) ctx.renderBadgeOnSegment(this.id, this.l1P1, this.l1P2, 'collinear');
 		ctx.renderBadgeOnSegment(this.id, this.l2P1, this.l2P2, 'collinear');
 	}
 }

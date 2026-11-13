@@ -518,20 +518,20 @@
       },
       {
         "id": "c_pt_axis_on-1",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-6"
+          "Point-6",
+          "origin",
+          "axis_y"
         ],
         "pointId": "Point-6",
-        "targetDistance": 0,
-        "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y"
       },
       {
         "id": "c_midpoint-1",
@@ -621,20 +621,20 @@
       },
       {
         "id": "c_pt_axis_on-2",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-20"
+          "Point-20",
+          "origin",
+          "axis_x"
         ],
         "pointId": "Point-20",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       {
         "id": "c_vert-2",
@@ -652,20 +652,20 @@
       },
       {
         "id": "c_pt_axis_on-3",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-21"
+          "Point-21",
+          "origin",
+          "axis_x"
         ],
         "pointId": "Point-21",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       {
         "id": "c_elaxis-1",
@@ -753,20 +753,20 @@
       },
       {
         "id": "c_pt_axis_on-5",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-31"
+          "Point-31",
+          "origin",
+          "axis_y"
         ],
         "pointId": "Point-31",
-        "targetDistance": 0,
-        "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y"
       },
       {
         "id": "c_midpoint-5",

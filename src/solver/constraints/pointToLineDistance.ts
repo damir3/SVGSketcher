@@ -20,6 +20,9 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	side: number;
 	offset?: number;
 	labelPosition?: number;
+	/** Also constrain this endpoint to the same signed distance, keeping the segment parallel. */
+	readonly secondPointId?: string;
+	readonly constrainedLineId?: string;
 
 	constructor(
 		id: string,
@@ -31,7 +34,9 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		side = 1,
 		weight = 1.0,
 		offset?: number,
-		labelPosition?: number
+		labelPosition?: number,
+		secondPointId?: string,
+		constrainedLineId?: string
 	) {
 		super(
 			id,
@@ -51,13 +56,41 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		this.side = side >= 0 ? 1 : -1;
 		this.offset = offset;
 		this.labelPosition = labelPosition;
+		this.secondPointId = secondPointId;
+		this.constrainedLineId = constrainedLineId;
+		if (secondPointId) this.entityIds.push(secondPointId);
+		if (constrainedLineId) this.entityIds.push(constrainedLineId);
+		this.name = this.displayName;
+	}
+
+	get displayName(): string {
+		if (this.lineId === 'axis_x' || this.lineId === 'axis_y')
+			return `Distance to ${this.lineId === 'axis_x' ? 'X' : 'Y'}-Axis`;
+		return this.secondPointId ? 'Line-to-Line Distance' : 'Point-to-Line Distance';
+	}
+
+	get axisCoordinate(): 'x' | 'y' | undefined {
+		return this.secondPointId && this.lineP1Id === 'origin'
+			? this.lineP2Id === 'axis_x'
+				? 'y'
+				: this.lineP2Id === 'axis_y'
+					? 'x'
+					: undefined
+			: undefined;
 	}
 
 	override getEquationsCount(): number {
-		return 1;
+		return this.secondPointId ? 2 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.axisCoordinate)
+			return [this.pointId, this.secondPointId!].map(
+				id =>
+					((paramMap.get(`${id}.${this.axisCoordinate}`) ?? 0) -
+						(this.axisCoordinate === 'y' ? -this.side : this.side) * this.targetDistance) *
+					this.weight
+			);
 		const p = readParamPoint(paramMap, this.pointId);
 		const p1 = readParamPoint(paramMap, this.lineP1Id);
 		const p2 = readParamPoint(paramMap, this.lineP2Id);
@@ -68,7 +101,14 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		// Signed perpendicular distance from point to line (p1->p2)
 		const h = new Vec2().subVectors(p, p1).cross(dir) / lineLen;
 
-		return [(h - this.side * this.targetDistance) * this.weight];
+		const residuals = [(h - this.side * this.targetDistance) * this.weight];
+		if (this.secondPointId) {
+			const q = readParamPoint(paramMap, this.secondPointId);
+			residuals.push(
+				(new Vec2().subVectors(q, p1).cross(dir) / lineLen - this.side * this.targetDistance) * this.weight
+			);
+		}
+		return residuals;
 	}
 
 	override jacobian(
@@ -76,11 +116,27 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
-		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+		if (this.axisCoordinate) {
+			const entries: JacobianEntry[] = [];
+			[this.pointId, this.secondPointId!].forEach((id, row) =>
+				this.addJacobianEntry(entries, paramIndices, `${id}.${this.axisCoordinate}`, baseRow + row, this.weight)
+			);
+			return entries;
+		}
+		return Array.from({ length: this.getEquationsCount() }, (_, row) =>
+			computeNumericJacobianForEquation(this, paramIndices, baseRow, row, paramMap)
+		).flat();
+	}
+
+	private displayPoint(sketch: SketchDocument): Vec2 | undefined {
+		const point = sketch.points.get(this.pointId);
+		const second = this.secondPointId ? sketch.points.get(this.secondPointId) : undefined;
+		if (this.secondPointId) return point && second ? new Vec2().midpoint(point, second) : undefined;
+		return point;
 	}
 
 	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
-		const pt = sketch.points.get(this.pointId);
+		const pt = this.displayPoint(sketch);
 		const p1 = sketch.points.get(this.lineP1Id);
 		const p2 = sketch.points.get(this.lineP2Id);
 		if (!pt || !p1 || !p2) return;
@@ -100,6 +156,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 			const totalDist = new Vec2().subVectors(sp, pFoot).dot(normal);
 			if (Math.abs(totalDist) > 1e-4) {
 				let t = distToFoot / totalDist;
+				if (this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y')) t = 1 - t;
 				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
 				this.labelPosition = t;
 			}
@@ -107,7 +164,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pt = ctx.sketch.points.get(this.pointId);
+		const pt = this.displayPoint(ctx.sketch);
 		const p1 = ctx.sketch.points.get(this.lineP1Id);
 		const p2 = ctx.sketch.points.get(this.lineP2Id);
 		if (!pt || !p1 || !p2) return;
@@ -120,8 +177,8 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		if (!geom) return;
 
 		ctx.renderLinearDimensionVisual({
-			d1: geom.d1,
-			d2: geom.d2,
+			d1: this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y') ? geom.d2 : geom.d1,
+			d2: this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y') ? geom.d1 : geom.d2,
 			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
 			extensionLines: geom.extensionLines,
 			parent: ctx.targetGroup,
@@ -132,7 +189,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const pt = sketch.points.get(this.pointId);
+		const pt = this.displayPoint(sketch);
 		const p1 = sketch.points.get(this.lineP1Id);
 		const p2 = sketch.points.get(this.lineP2Id);
 		if (!pt || !p1 || !p2) return null;
@@ -144,8 +201,9 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
 		if (!geom) return null;
 
-		const d1 = geom.d1;
-		const d2 = geom.d2;
+		const reverse = this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y');
+		const d1 = reverse ? geom.d2 : geom.d1;
+		const d2 = reverse ? geom.d1 : geom.d2;
 		const t = this.labelPosition ?? 0.5;
 		const basePos = d1.clone().lerp(d2, t);
 		const distToLabel = screen.distanceTo(basePos);
@@ -162,7 +220,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	protected override createSidebarPanel(): ConstraintPanel {
 		return new ConstraintPanel({
 			constraint: this,
-			title: 'Point-to-Line Distance',
+			title: () => this.displayName,
 			dimension: {
 				label: 'Distance',
 				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,

@@ -4,12 +4,7 @@ import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
 import { Vec2 } from '../src/math/vector';
 import { SketchDocument } from '../src/model/sketch';
-import {
-	DistanceConstraint,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
-	PointToLineDistanceConstraint,
-} from '../src/solver/constraints';
+import { DistanceConstraint, PointToLineDistanceConstraint } from '../src/solver/constraints';
 import type { IConstraint } from '../src/solver/types';
 
 const viewport = Object.assign(new Viewport(800, 600), { zoom: 2, panX: 50, panY: 300 });
@@ -58,7 +53,7 @@ for (const [orientation, cursor, offset, position] of [
 	test(`dragging ${orientation} origin distance preserves axis direction and endpoint order`, () => {
 		const sketch = new SketchDocument();
 		const point = sketch.addPoint(new Vec2(100, 80));
-		const constraint = new OriginDistanceConstraint('origin', point.id, point.length(), orientation);
+		const constraint = new DistanceConstraint('origin', 'origin', point.id, point.length(), 1, undefined, orientation);
 		sketch.constraints.set(constraint.id, constraint);
 		drag(sketch, constraint, cursor);
 		assert.ok(Math.abs(constraint.offset! - offset) < 1e-8);
@@ -74,7 +69,20 @@ for (const [axis, offset, position] of [
 		const sketch = new SketchDocument();
 		const a = sketch.addPoint(new Vec2(50, 80));
 		const b = sketch.addPoint(new Vec2(150, 80));
-		const constraint = new LineToAxisDistanceConstraint('axis-distance', 'line', a.id, b.id, axis, 80);
+		const constraint = new PointToLineDistanceConstraint(
+			'axis-distance',
+			a.id,
+			`axis_${axis}`,
+			'origin',
+			`axis_${axis}`,
+			80,
+			1,
+			1,
+			undefined,
+			undefined,
+			b.id,
+			'line'
+		);
 		sketch.constraints.set(constraint.id, constraint);
 		drag(sketch, constraint, new Vec2(60, 30));
 		assert.equal(constraint.offset, offset);
@@ -123,15 +131,13 @@ test('angle dragging preserves quadrant changes, radius floor, and solver calls'
 	assert.equal(solves, 1);
 });
 
-test('label movement ignores degenerate geometry and non-dimensional origin/axis constraints', () => {
+test('label movement ignores degenerate dimensions', () => {
 	const sketch = new SketchDocument();
 	const a = sketch.addPoint(new Vec2(10, 20));
 	const b = sketch.addPoint(new Vec2(10, 20));
 	const constraints = [
 		new DistanceConstraint('distance', a.id, b.id, 0),
 		new PointToLineDistanceConstraint('point-line', a.id, 'line', a.id, b.id, 0),
-		new OriginDistanceConstraint('origin', a.id, 0, 'aligned', undefined, true),
-		new LineToAxisDistanceConstraint('axis', 'line', a.id, b.id, 'x', 0, 1, undefined, true),
 	];
 	for (const constraint of constraints) {
 		constraint.moveLabelTo(new Vec2(200, 100), sketch, viewport);

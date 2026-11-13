@@ -32,8 +32,6 @@ import {
 	type PatternCopyData,
 	RectangularPatternConstraint,
 	type RectangularPatternCopyData,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 } from '.';
 interface ConstraintSnapshotBase {
 	id: string;
@@ -51,6 +49,7 @@ type ConstraintSnapshotData =
 	| { type: 'coincident' | 'horizontal' | 'vertical'; p1Id: string; p2Id: string }
 	| {
 			type: 'distance';
+			side?: number;
 			p1Id: string;
 			p2Id: string;
 			targetDistance: number;
@@ -60,6 +59,8 @@ type ConstraintSnapshotData =
 	  }
 	| {
 			type: 'point_to_line_distance';
+			secondPointId?: string;
+			constrainedLineId?: string;
 			pointId: string;
 			lineId: string;
 			lineP1Id: string;
@@ -219,28 +220,6 @@ type ConstraintSnapshotData =
 			cornerPointIds?: string[];
 			junctionConstraintIds?: string[];
 			emptyDimension?: { anchor: { x: number; y: number }; normal: { x: number; y: number } };
-	  }
-	| {
-			type: 'origin_distance';
-			pointId: string;
-			targetDistance: number;
-			orientation: 'aligned' | 'horizontal' | 'vertical';
-			side: number;
-			offset?: number;
-			isCoincident: boolean;
-			labelPosition?: number;
-	  }
-	| {
-			type: 'line_to_axis_distance';
-			lineId: string;
-			lineP1Id: string;
-			lineP2Id: string;
-			axis: 'x' | 'y';
-			targetDistance: number;
-			side: number;
-			offset?: number;
-			isCollinear: boolean;
-			labelPosition?: number;
 	  };
 
 export type ConstraintSnapshot = ConstraintSnapshotBase & ConstraintSnapshotData;
@@ -275,8 +254,6 @@ const constraintClasses: Record<string, { prototype: BaseConstraint }> = {
 	symmetry: SymmetryConstraint,
 	circular_pattern: CircularPatternConstraint,
 	rectangular_pattern: RectangularPatternConstraint,
-	origin_distance: OriginDistanceConstraint,
-	line_to_axis_distance: LineToAxisDistanceConstraint,
 };
 
 /** Copies data fields only; runtime UI state and methods stay on the class instance. */

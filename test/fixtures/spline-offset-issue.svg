@@ -244,37 +244,37 @@
     "constraints": [
       {
         "id": "c_pt_axis_on-1",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-1"
+          "Point-1",
+          "origin",
+          "axis_x"
         ],
         "pointId": "Point-1",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       {
         "id": "c_pt_axis_on-2",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "Point-4"
+          "Point-4",
+          "origin",
+          "axis_x"
         ],
         "pointId": "Point-4",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       {
         "id": "c_horiz-1",

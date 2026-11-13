@@ -3,8 +3,8 @@
     {
       "type": "point",
       "id": "Point-72",
-      "x": 1.209455609089096e-07,
-      "y": 7.227692371771382e-08,
+      "x": 1.209455609089096e-7,
+      "y": 7.227692371771382e-8,
       "fixed": false
     },
     {
@@ -186,20 +186,18 @@
     },
     {
       "id": "c_origin_coinc-1",
-      "type": "origin_distance",
+      "type": "coincident",
       "name": "Coincident with (0,0)",
       "weight": 1,
       "isSoft": false,
       "isDimensional": false,
       "value": 0,
       "entityIds": [
+        "origin",
         "Point-72"
       ],
-      "pointId": "Point-72",
-      "targetDistance": 0,
-      "orientation": "aligned",
-      "side": 1,
-      "isCoincident": true
+      "p1Id": "origin",
+      "p2Id": "Point-72"
     },
     {
       "id": "c_ptcirc-3",

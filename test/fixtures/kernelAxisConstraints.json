@@ -1,28 +1,32 @@
 {
   "sourceSha256": {
-    "src/solver/constraints/originAxis.ts": "90aa28586d26821f333281aa8d5538ef8e2ca5e0646118c9b83f5a83d7977659",
-    "src/solver/constraints/base.ts": "3fead7f198c1873b7c00cac37f7383c7334466e1d13238a32ab4dfac3f36d379",
-    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d"
+    "src/solver/constraints/base.ts": "668542d3b5e8454c404a4ff5b78a76548c4f937d697dfd51bd5dd34600ad88d1",
+    "src/math/vector.ts": "ff8be4fc084f0f9fb41a3e78491118bcee32215d8d0f09b87a9fa7eb89ddfa9d",
+    "src/solver/constraints/distance.ts": "1ce65fe0c62cbe90dddb842d8b2535156ee1623ec660c372d78379a92f862392",
+    "src/solver/constraints/coincident.ts": "151d8118f92a582d5126ef726acdd9ccc8f9f5309d69f9d8f0d51917e18ca02d",
+    "src/solver/constraints/collinear.ts": "78ebb65f2da3cb79267fab67fbb8c679a6400b08542037685317b46d44a63861",
+    "src/solver/constraints/pointOnLine.ts": "ac1a90a622adc32ec2b699d7215a3122ecf8c568dfd05b34b9424a549abc02d8",
+    "src/solver/constraints/pointToLineDistance.ts": "c0d08ba44b7dd1508edd295b87849c87df25808a37b5cda9e5aed500a14160d3"
   },
   "cases": [
     {
       "name": "origin aligned side -1",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": -1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -58,20 +62,20 @@
       "name": "origin aligned side -1 soft locked",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": -1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -103,20 +107,20 @@
       "name": "origin aligned side 1",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -152,20 +156,20 @@
       "name": "origin aligned side 1 soft locked",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -197,20 +201,21 @@
       "name": "origin horizontal side -1",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to Y-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "horizontal",
-        "side": -1,
-        "isCoincident": false
+        "side": -1
       },
       "params": {
         "a.x": -3.7,
@@ -246,20 +251,21 @@
       "name": "origin horizontal side -1 soft locked",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to Y-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "horizontal",
-        "side": -1,
-        "isCoincident": false
+        "side": -1
       },
       "params": {
         "a.x": -3.7,
@@ -291,20 +297,21 @@
       "name": "origin horizontal side 1",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to Y-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "side": 1
       },
       "params": {
         "a.x": -3.7,
@@ -340,20 +347,21 @@
       "name": "origin horizontal side 1 soft locked",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to Y-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "side": 1
       },
       "params": {
         "a.x": -3.7,
@@ -385,20 +393,21 @@
       "name": "origin vertical side -1",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to X-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "vertical",
-        "side": -1,
-        "isCoincident": false
+        "side": -1
       },
       "params": {
         "a.x": -3.7,
@@ -434,20 +443,21 @@
       "name": "origin vertical side -1 soft locked",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to X-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "vertical",
-        "side": -1,
-        "isCoincident": false
+        "side": -1
       },
       "params": {
         "a.x": -3.7,
@@ -479,20 +489,21 @@
       "name": "origin vertical side 1",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to X-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "side": 1
       },
       "params": {
         "a.x": -3.7,
@@ -528,20 +539,21 @@
       "name": "origin vertical side 1 soft locked",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to X-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "side": 1
       },
       "params": {
         "a.x": -3.7,
@@ -573,20 +585,20 @@
       "name": "origin aligned zero target",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
-        "name": "Coincident with (0,0)",
+        "type": "distance",
+        "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 0,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -622,20 +634,20 @@
       "name": "origin aligned negative target",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": -5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": -5.3,
-        "orientation": "aligned",
-        "side": -1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -671,20 +683,18 @@
       "name": "origin aligned coincident",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "coincident",
         "name": "Coincident with (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
-        "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": true
+        "p1Id": "origin",
+        "p2Id": "a"
       },
       "params": {
         "a.x": -3.7,
@@ -706,17 +716,17 @@
       ],
       "expected": {
         "residuals": [
-          -3.7,
-          8.2
+          3.7,
+          -8.2
         ],
         "jacobian": [
           0,
           0,
           0,
-          1,
+          -1,
           0,
           0,
-          1,
+          -1,
           0
         ]
       }
@@ -725,20 +735,20 @@
       "name": "origin horizontal zero target",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "a"
+          "a",
+          "origin",
+          "axis_y"
         ],
         "pointId": "a",
-        "targetDistance": 0,
-        "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y"
       },
       "params": {
         "a.x": -3.7,
@@ -774,20 +784,21 @@
       "name": "origin horizontal negative target",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": -5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": -5.3,
         "orientation": "horizontal",
-        "side": -1,
-        "isCoincident": false
+        "side": -1
       },
       "params": {
         "a.x": -3.7,
@@ -823,20 +834,18 @@
       "name": "origin horizontal coincident",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "coincident",
         "name": "Coincident with (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
-        "targetDistance": 5.3,
-        "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": true
+        "p1Id": "origin",
+        "p2Id": "a"
       },
       "params": {
         "a.x": -3.7,
@@ -858,17 +867,17 @@
       ],
       "expected": {
         "residuals": [
-          -3.7,
-          8.2
+          3.7,
+          -8.2
         ],
         "jacobian": [
           0,
           0,
           0,
-          1,
+          -1,
           0,
           0,
-          1,
+          -1,
           0
         ]
       }
@@ -877,20 +886,20 @@
       "name": "origin vertical zero target",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "point_on_line",
         "name": "Point on X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 0,
         "entityIds": [
-          "a"
+          "a",
+          "origin",
+          "axis_x"
         ],
         "pointId": "a",
-        "targetDistance": 0,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": false
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x"
       },
       "params": {
         "a.x": -3.7,
@@ -926,20 +935,21 @@
       "name": "origin vertical negative target",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": -5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": -5.3,
         "orientation": "vertical",
-        "side": -1,
-        "isCoincident": false
+        "side": -1
       },
       "params": {
         "a.x": -3.7,
@@ -975,20 +985,18 @@
       "name": "origin vertical coincident",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "coincident",
         "name": "Coincident with (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
-        "targetDistance": 5.3,
-        "orientation": "vertical",
-        "side": 1,
-        "isCoincident": true
+        "p1Id": "origin",
+        "p2Id": "a"
       },
       "params": {
         "a.x": -3.7,
@@ -1010,17 +1018,17 @@
       ],
       "expected": {
         "residuals": [
-          -3.7,
-          8.2
+          3.7,
+          -8.2
         ],
         "jacobian": [
           0,
           0,
           0,
-          1,
+          -1,
           0,
           0,
-          1,
+          -1,
           0
         ]
       }
@@ -1029,20 +1037,20 @@
       "name": "origin radial point at zero",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": 0,
@@ -1078,20 +1086,20 @@
       "name": "origin radial below floor",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": 1e-9,
@@ -1127,20 +1135,20 @@
       "name": "origin missing point",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "missing"
         ],
-        "pointId": "missing",
+        "p1Id": "origin",
+        "p2Id": "missing",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -1176,20 +1184,18 @@
       "name": "origin coincidence missing point",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "coincident",
         "name": "Coincident with (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": false,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "missing"
         ],
-        "pointId": "missing",
-        "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": true
+        "p1Id": "origin",
+        "p2Id": "missing"
       },
       "params": {
         "a.x": -3.7,
@@ -1230,19 +1236,20 @@
       "name": "origin unset orientation",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -1278,20 +1285,20 @@
       "name": "origin ignores map origin and axes",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to (0,0)",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": 1,
-        "isCoincident": false
+        "orientation": "aligned"
       },
       "params": {
         "a.x": -3.7,
@@ -1327,20 +1334,21 @@
       "name": "origin derivative cutoff",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "distance",
         "name": "Distance to Y-Axis",
         "weight": 1e-13,
         "isSoft": false,
         "isDimensional": true,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
+        "p1Id": "origin",
+        "p2Id": "a",
         "targetDistance": 5.3,
         "orientation": "horizontal",
-        "side": 1,
-        "isCoincident": false
+        "side": 1
       },
       "params": {
         "a.x": -3.7,
@@ -1373,23 +1381,21 @@
       }
     },
     {
-      "name": "origin_distance weighted",
+      "name": "origin coincidence weighted",
       "constraint": {
         "id": "o",
-        "type": "origin_distance",
+        "type": "coincident",
         "name": "Coincident with (0,0)",
         "weight": -0.8,
         "isSoft": true,
         "isDimensional": false,
         "value": 5.3,
         "entityIds": [
+          "origin",
           "a"
         ],
-        "pointId": "a",
-        "targetDistance": 5.3,
-        "orientation": "aligned",
-        "side": -1,
-        "isCoincident": true
+        "p1Id": "origin",
+        "p2Id": "a"
       },
       "params": {
         "a.x": -3.7,
@@ -1411,17 +1417,17 @@
       ],
       "expected": {
         "residuals": [
-          2.9600000000000004,
-          -6.56
+          -2.9600000000000004,
+          6.56
         ],
         "jacobian": [
           0,
           0,
           0,
-          -0.8,
+          0.8,
           0,
           0,
-          -0.8,
+          0.8,
           0
         ]
       }
@@ -1430,24 +1436,27 @@
       "name": "line axis x side -1 collinear false",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": false
+        "side": 1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -1488,24 +1497,27 @@
       "name": "line axis x side -1 collinear false soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": false
+        "side": 1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -1540,24 +1552,22 @@
       "name": "line axis x side -1 collinear true",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with X-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_x",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
-        "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_x",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -1598,24 +1608,22 @@
       "name": "line axis x side -1 collinear true soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with X-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_x",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
-        "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_x",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -1650,24 +1658,27 @@
       "name": "line axis x side 1 collinear false",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": false
+        "side": -1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -1708,24 +1719,27 @@
       "name": "line axis x side 1 collinear false soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": false
+        "side": -1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -1760,24 +1774,22 @@
       "name": "line axis x side 1 collinear true",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with X-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_x",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
-        "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_x",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -1818,24 +1830,22 @@
       "name": "line axis x side 1 collinear true soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with X-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_x",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
-        "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_x",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -1870,24 +1880,27 @@
       "name": "line axis y side -1 collinear false",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_y",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 4.6,
         "side": -1,
-        "isCollinear": false
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -1928,24 +1941,27 @@
       "name": "line axis y side -1 collinear false soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_y",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 4.6,
         "side": -1,
-        "isCollinear": false
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -1980,24 +1996,22 @@
       "name": "line axis y side -1 collinear true",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with Y-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_y",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
-        "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_y",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -2038,24 +2052,22 @@
       "name": "line axis y side -1 collinear true soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with Y-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_y",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
-        "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_y",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -2090,24 +2102,27 @@
       "name": "line axis y side 1 collinear false",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_y",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 4.6,
         "side": 1,
-        "isCollinear": false
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2148,24 +2163,27 @@
       "name": "line axis y side 1 collinear false soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_y",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 4.6,
         "side": 1,
-        "isCollinear": false
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2200,24 +2218,22 @@
       "name": "line axis y side 1 collinear true",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with Y-Axis",
         "weight": 0.7,
         "isSoft": false,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_y",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
-        "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_y",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -2258,24 +2274,22 @@
       "name": "line axis y side 1 collinear true soft locked",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "collinear",
         "name": "Collinear with Y-Axis",
         "weight": -1.2,
         "isSoft": true,
         "isDimensional": false,
         "value": 4.6,
         "entityIds": [
-          "line",
+          "origin",
+          "axis_y",
           "a",
           "b"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
-        "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": true
+        "l1P1": "origin",
+        "l1P2": "axis_y",
+        "l2P1": "a",
+        "l2P2": "b"
       },
       "params": {
         "a.x": -3.7,
@@ -2307,27 +2321,30 @@
       }
     },
     {
-      "name": "line_to_axis_distance weighted",
+      "name": "line distance to axis weighted",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": -1,
-        "isCollinear": false
+        "side": 1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2368,24 +2385,27 @@
       "name": "line axis x zero target",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 0,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 0,
-        "side": -1,
-        "isCollinear": false
+        "side": 1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2426,24 +2446,27 @@
       "name": "line axis x repeated endpoint",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "a"
+          "origin",
+          "axis_x",
+          "a",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "a",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": false
+        "side": -1,
+        "secondPointId": "a",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2484,24 +2507,27 @@
       "name": "line axis x missing endpoint",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "missing"
+          "origin",
+          "axis_x",
+          "missing",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "missing",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": false
+        "side": -1,
+        "secondPointId": "missing",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2542,24 +2568,27 @@
       "name": "line axis x negative distance",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": -4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": -4.6,
-        "side": -1,
-        "isCollinear": false
+        "side": 1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2600,24 +2629,27 @@
       "name": "line axis y zero target",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 0,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_y",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 0,
         "side": -1,
-        "isCollinear": false
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2658,24 +2690,27 @@
       "name": "line axis y repeated endpoint",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "a"
+          "origin",
+          "axis_y",
+          "a",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "a",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 4.6,
         "side": 1,
-        "isCollinear": false
+        "secondPointId": "a",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2716,24 +2751,27 @@
       "name": "line axis y missing endpoint",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "missing"
+          "origin",
+          "axis_y",
+          "missing",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "missing",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": 4.6,
         "side": 1,
-        "isCollinear": false
+        "secondPointId": "missing",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2774,24 +2812,27 @@
       "name": "line axis y negative distance",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to Y-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": -4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_y",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "y",
+        "pointId": "a",
+        "lineId": "axis_y",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_y",
         "targetDistance": -4.6,
         "side": -1,
-        "isCollinear": false
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2832,24 +2873,27 @@
       "name": "line axis ignores map axes",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": false
+        "side": -1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,
@@ -2890,24 +2934,27 @@
       "name": "line axis derivative cutoff",
       "constraint": {
         "id": "l",
-        "type": "line_to_axis_distance",
+        "type": "point_to_line_distance",
         "name": "Distance to X-Axis",
         "weight": 1e-13,
         "isSoft": false,
         "isDimensional": true,
         "value": 4.6,
         "entityIds": [
-          "line",
           "a",
-          "b"
+          "origin",
+          "axis_x",
+          "b",
+          "line"
         ],
-        "lineId": "line",
-        "lineP1Id": "a",
-        "lineP2Id": "b",
-        "axis": "x",
+        "pointId": "a",
+        "lineId": "axis_x",
+        "lineP1Id": "origin",
+        "lineP2Id": "axis_x",
         "targetDistance": 4.6,
-        "side": 1,
-        "isCollinear": false
+        "side": -1,
+        "secondPointId": "b",
+        "constrainedLineId": "line"
       },
       "params": {
         "a.x": -3.7,

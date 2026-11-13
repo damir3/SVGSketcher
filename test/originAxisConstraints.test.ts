@@ -2,8 +2,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import {
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
+	DistanceConstraint,
+	CoincidentConstraint,
+	PointOnLineConstraint,
+	PointToLineDistanceConstraint,
 	AngleConstraint,
 	SymmetryConstraint,
 	MidpointConstraint,
@@ -83,8 +85,8 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addOriginCoincidentConstraint(p.id);
 			assert.ok(c, 'Constraint should be created');
-			assert.equal(c.isCoincident, true);
-			assert.equal(c.targetDistance, 0);
+			assert.ok(c instanceof CoincidentConstraint);
+			assert.equal(c.p1Id, 'origin');
 
 			assert.ok(Math.abs(p.x) < 1e-4, `Expected p.x ~ 0, got ${p.x}`);
 			assert.ok(Math.abs(p.y) < 1e-4, `Expected p.y ~ 0, got ${p.y}`);
@@ -137,16 +139,15 @@ describe('Origin & Axis Constraints', () => {
 		});
 	});
 
-	describe('Point To Axis Constraints (via OriginDistanceConstraint)', () => {
+	describe('Point To Axis Constraints (via general constraints)', () => {
 		it('constrains a point to lie on the X-axis (y = 0)', () => {
 			const sketch = new SketchDocument();
 			const p = sketch.addPoint({ x: 35, y: 90 });
 
 			const c = sketch.addPointOnAxisConstraint(p.id, 'x');
 			assert.ok(c);
-			assert.equal(c instanceof OriginDistanceConstraint, true);
-			assert.equal(c.targetDistance, 0);
-			assert.equal(c.orientation, 'vertical');
+			assert.ok(c instanceof PointOnLineConstraint);
+			assert.equal(c.lineP2Id, 'axis_x');
 
 			assert.ok(Math.abs(p.y) < 1e-4, `Expected p.y ~ 0, got ${p.y}`);
 			assert.ok(Math.abs(p.x - 35) < 1e-3, `Expected p.x ~ 35, got ${p.x}`);
@@ -158,9 +159,8 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addPointOnAxisConstraint(p.id, 'y');
 			assert.ok(c);
-			assert.equal(c instanceof OriginDistanceConstraint, true);
-			assert.equal(c.targetDistance, 0);
-			assert.equal(c.orientation, 'horizontal');
+			assert.ok(c instanceof PointOnLineConstraint);
+			assert.equal(c.lineP2Id, 'axis_y');
 
 			assert.ok(Math.abs(p.x) < 1e-4, `Expected p.x ~ 0, got ${p.x}`);
 			assert.ok(Math.abs(p.y - 42) < 1e-3, `Expected p.y ~ 42, got ${p.y}`);
@@ -172,7 +172,7 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addPointToAxisDistanceConstraint(p.id, 'x', 30);
 			assert.ok(c);
-			assert.equal(c instanceof OriginDistanceConstraint, true);
+			assert.ok(c instanceof DistanceConstraint);
 			assert.equal(c.targetDistance, 30);
 			assert.equal(c.orientation, 'vertical');
 
@@ -185,7 +185,7 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addPointToAxisDistanceConstraint(p.id, 'y', 40);
 			assert.ok(c);
-			assert.equal(c instanceof OriginDistanceConstraint, true);
+			assert.ok(c instanceof DistanceConstraint);
 			assert.equal(c.targetDistance, 40);
 			assert.equal(c.orientation, 'horizontal');
 
@@ -215,8 +215,8 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addLineCollinearWithAxisConstraint(l.id, 'x');
 			assert.ok(c);
-			assert.equal(c.isCollinear, true);
-			assert.equal(c.axis, 'x');
+			assert.ok(c instanceof CollinearConstraint);
+			assert.equal(c.l1P2, 'axis_x');
 
 			assert.ok(Math.abs(p1.y) < 1e-4, `Expected p1.y ~ 0, got ${p1.y}`);
 			assert.ok(Math.abs(p2.y) < 1e-4, `Expected p2.y ~ 0, got ${p2.y}`);
@@ -230,8 +230,8 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addLineCollinearWithAxisConstraint(l.id, 'y');
 			assert.ok(c);
-			assert.equal(c.isCollinear, true);
-			assert.equal(c.axis, 'y');
+			assert.ok(c instanceof CollinearConstraint);
+			assert.equal(c.l1P2, 'axis_y');
 
 			assert.ok(Math.abs(p1.x) < 1e-4, `Expected p1.x ~ 0, got ${p1.x}`);
 			assert.ok(Math.abs(p2.x) < 1e-4, `Expected p2.x ~ 0, got ${p2.x}`);
@@ -245,7 +245,7 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addLineToAxisDistanceConstraint(l.id, 'x', 50);
 			assert.ok(c);
-			assert.equal(c.isCollinear, false);
+			assert.ok(c instanceof PointToLineDistanceConstraint);
 
 			assert.ok(Math.abs(Math.abs(p1.y) - 50) < 1e-3, `Expected |p1.y| ~ 50, got ${p1.y}`);
 			assert.ok(Math.abs(Math.abs(p2.y) - 50) < 1e-3, `Expected |p2.y| ~ 50, got ${p2.y}`);
@@ -259,7 +259,7 @@ describe('Origin & Axis Constraints', () => {
 
 			const c = sketch.addLineToAxisDistanceConstraint(l.id, 'y', 40);
 			assert.ok(c);
-			assert.equal(c.isCollinear, false);
+			assert.ok(c instanceof PointToLineDistanceConstraint);
 
 			assert.ok(Math.abs(Math.abs(p1.x) - 40) < 1e-3, `Expected |p1.x| ~ 40, got ${p1.x}`);
 			assert.ok(Math.abs(Math.abs(p2.x) - 40) < 1e-3, `Expected |p2.x| ~ 40, got ${p2.x}`);
@@ -283,23 +283,23 @@ describe('Origin & Axis Constraints', () => {
 	});
 
 	describe('Serialization & History (Undo / Redo)', () => {
-		it('serializes and deserializes OriginDistanceConstraint correctly', () => {
+		it('serializes and deserializes origin DistanceConstraint correctly', () => {
 			const sketch = new SketchDocument();
 			const p = sketch.addPoint({ x: 30, y: 40 });
 			const c1 = sketch.addOriginDistanceConstraint(p.id, 50, 'aligned');
 			assert.ok(c1);
 
 			const serialized = serializeConstraint(c1);
-			const deserialized = deserializeConstraint(serialized) as OriginDistanceConstraint;
+			const deserialized = deserializeConstraint(serialized) as DistanceConstraint;
 
-			assert.ok(deserialized instanceof OriginDistanceConstraint);
-			assert.equal(deserialized.pointId, p.id);
+			assert.ok(deserialized instanceof DistanceConstraint);
+			assert.equal(deserialized.p2Id, p.id);
 			assert.equal(deserialized.targetDistance, 50);
 			assert.equal(deserialized.orientation, 'aligned');
-			assert.equal(deserialized.isCoincident, false);
+			assert.equal(deserialized.p1Id, 'origin');
 		});
 
-		it('serializes and deserializes LineToAxisDistanceConstraint correctly', () => {
+		it('serializes and deserializes line PointToLineDistanceConstraint correctly', () => {
 			const sketch = new SketchDocument();
 			const p1 = sketch.addPoint({ x: 10, y: 20 });
 			const p2 = sketch.addPoint({ x: 50, y: 20 });
@@ -308,13 +308,13 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(c1);
 
 			const serialized = serializeConstraint(c1);
-			const deserialized = deserializeConstraint(serialized) as LineToAxisDistanceConstraint;
+			const deserialized = deserializeConstraint(serialized) as PointToLineDistanceConstraint;
 
-			assert.ok(deserialized instanceof LineToAxisDistanceConstraint);
-			assert.equal(deserialized.lineId, l.id);
-			assert.equal(deserialized.axis, 'y');
+			assert.ok(deserialized instanceof PointToLineDistanceConstraint);
+			assert.equal(deserialized.constrainedLineId, l.id);
+			assert.equal(deserialized.lineId, 'axis_y');
 			assert.equal(deserialized.targetDistance, 35);
-			assert.equal(deserialized.isCollinear, false);
+			assert.equal(deserialized.getEquationsCount(), 2);
 		});
 
 		it('supports undo and redo for origin and axis constraints', () => {
@@ -499,7 +499,7 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(sketch.points.size, 1, 'Should create a sketch point at (0,0)');
 			const [startPt] = Array.from(sketch.points.values());
 			const originC = sketch.getOriginConstraint(startPt.id);
-			assert.ok(originC && originC.isCoincident, 'Should be coincident with origin');
+			assert.ok(originC instanceof CoincidentConstraint, 'Should be coincident with origin');
 
 			// Step 2: Click to place end point
 			lineTool.onMouseDown({
@@ -1124,16 +1124,15 @@ describe('Origin & Axis Constraints', () => {
 	});
 
 	describe('Collinear Constraints with Coordinate Axes', () => {
-		it('addCollinearConstraint delegates to LineToAxisDistanceConstraint when given axis_x or axis_y', () => {
+		it('addCollinearConstraint uses CollinearConstraint when given axis_x or axis_y', () => {
 			const sketch = new SketchDocument();
 			const p1 = sketch.addPoint({ x: 10, y: 15 });
 			const p2 = sketch.addPoint({ x: 50, y: 25 });
 			const line = sketch.addLine(p1.id, p2.id);
 
 			const c = sketch.addCollinearConstraint(line.id, 'axis_x');
-			assert.ok(c instanceof LineToAxisDistanceConstraint);
-			assert.equal(c.isCollinear, true);
-			assert.equal(c.axis, 'x');
+			assert.ok(c instanceof CollinearConstraint);
+			assert.equal(c.l1P2, 'axis_x');
 			assert.ok(Math.abs(p1.y) < 1e-4);
 			assert.ok(Math.abs(p2.y) < 1e-4);
 

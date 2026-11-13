@@ -35,7 +35,7 @@ function close(actual: ArrayLike<number>, expected: ArrayLike<number>, numeric =
 	}
 }
 
-describe('native constraint formulas captured before migration', () => {
+describe('native constraint formulas match residual and Jacobian fixtures', () => {
 	for (const fixture of fixtures)
 		it(fixture.name, () => {
 			const c = deserializeConstraint(fixture.constraint)!;
@@ -186,8 +186,8 @@ it('evaluates migrated curved and composite constraints without JS evaluation ca
 		'circular_pattern',
 		'rectangular_pattern',
 		'offset',
-		'origin_distance',
-		'line_to_axis_distance',
+		'coincident',
+		'distance',
 	]);
 	const previous = getGeometryKernel();
 	try {

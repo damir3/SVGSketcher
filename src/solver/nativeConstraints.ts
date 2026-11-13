@@ -27,8 +27,6 @@ import {
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
 	OffsetConstraint,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 	PointOnSplineConstraint,
 } from './constraints';
 import type { IConstraint } from './types';
@@ -76,8 +74,6 @@ const classes = new Set<Function>([
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
 	OffsetConstraint,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 	PointOnSplineConstraint,
 	AutomaticSplineHandlesConstraint,
 ]);
@@ -111,6 +107,15 @@ function describe(c: IConstraint): Description | Description[] | null {
 		return { kind: 4, refs: [scalar(`${c.circleId}.r`, c.targetRadius)], a: c.targetRadius, b: 0 };
 	if (c instanceof EqualRadiusConstraint)
 		return { kind: 5, refs: [scalar(`${c.circle1Id}.r`), scalar(`${c.circle2Id}.r`)], a: 0, b: 0 };
+	if (c instanceof DistanceConstraint && c.side !== undefined && c.orientation !== 'aligned') {
+		if (c.p1Id !== 'origin') return null;
+		return {
+			kind: 27,
+			refs: [...point(c.p2Id), constant(c.side)],
+			a: c.targetDistance,
+			b: c.orientation === 'horizontal' ? 1 : 2,
+		};
+	}
 	if (c instanceof DistanceConstraint)
 		return {
 			kind: 6,
@@ -133,6 +138,15 @@ function describe(c: IConstraint): Description | Description[] | null {
 			refs: [...point(c.pointId), ...point(c.circleCenterId), scalar(`${c.circleId}.r`, 10)],
 			a: 0,
 			b: 0,
+		};
+	if (c instanceof PointOnLineConstraint && c.axisCoordinate)
+		return { kind: 27, refs: [...point(c.pointId), constant(1)], a: 0, b: c.axisCoordinate === 'x' ? 1 : 2 };
+	if (c instanceof CollinearConstraint && c.axisCoordinate)
+		return {
+			kind: 28,
+			refs: [scalar(`${c.l2P1}.${c.axisCoordinate}`), scalar(`${c.l2P2}.${c.axisCoordinate}`), constant(1)],
+			a: 0,
+			b: 1,
 		};
 	if (c instanceof PointOnLineConstraint)
 		return {
@@ -235,6 +249,26 @@ function describe(c: IConstraint): Description | Description[] | null {
 			a: 0,
 			b: 0,
 		};
+	if (c instanceof PointToLineDistanceConstraint && c.axisCoordinate)
+		return {
+			kind: 28,
+			refs: [
+				scalar(`${c.pointId}.${c.axisCoordinate}`),
+				scalar(`${c.secondPointId}.${c.axisCoordinate}`),
+				constant(c.axisCoordinate === 'y' ? -c.side : c.side),
+			],
+			a: c.targetDistance,
+			b: 0,
+		};
+	if (c instanceof PointToLineDistanceConstraint && c.secondPointId)
+		return [c.pointId, c.secondPointId].map(id => ({
+			kind: 20,
+			refs: [...point(id), ...point(c.lineP1Id), ...point(c.lineP2Id)],
+			a: c.targetDistance,
+			b: c.side,
+			numeric: true,
+			equations: 1,
+		}));
 	if (c instanceof PointToLineDistanceConstraint)
 		return {
 			kind: 20,
@@ -243,24 +277,6 @@ function describe(c: IConstraint): Description | Description[] | null {
 			b: c.side,
 			numeric: true,
 		};
-	if (c instanceof OriginDistanceConstraint) {
-		const mode = c.isCoincident ? 3 : c.orientation === 'horizontal' ? 1 : c.orientation === 'vertical' ? 2 : 0;
-		return {
-			kind: 27,
-			refs: [...point(c.pointId), constant((mode === 1 || mode === 2) && c.targetDistance !== 0 ? c.side : 1)],
-			a: c.isCoincident ? 0 : c.targetDistance,
-			b: mode,
-		};
-	}
-	if (c instanceof LineToAxisDistanceConstraint) {
-		const axis = c.axis === 'x' ? 'y' : 'x';
-		return {
-			kind: 28,
-			refs: [scalar(`${c.lineP1Id}.${axis}`), scalar(`${c.lineP2Id}.${axis}`), constant(c.isCollinear ? 1 : c.side)],
-			a: c.isCollinear ? 0 : c.targetDistance,
-			b: c.isCollinear ? 1 : 0,
-		};
-	}
 	return describePatternConstraint(c) ?? describeSplineConstraint(c);
 }
 

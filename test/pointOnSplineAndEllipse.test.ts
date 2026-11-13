@@ -8,7 +8,7 @@ import { PointTool } from '../src/canvas/tools/primitives/point';
 import { LineTool } from '../src/canvas/tools/primitives/line';
 import { PointOnEllipseConstraint } from '../src/solver/constraints/pointOnEllipse';
 import { PointOnSplineConstraint } from '../src/solver/constraints/pointOnSpline';
-import { OriginDistanceConstraint } from '../src/solver/constraints/originAxis';
+import { CoincidentConstraint, PointOnLineConstraint } from '../src/solver/constraints';
 import { Vec2 } from '../src/math/vector';
 import { getSplineParamAtPoint } from '../src/math/spline';
 
@@ -789,11 +789,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const pt1 = [...sketch.points.values()].find(p => Math.abs(p.x - 150) < 1);
 			assert.ok(pt1);
 			const cX = [...sketch.constraints.values()].find(
-				c =>
-					c instanceof OriginDistanceConstraint &&
-					c.pointId === pt1.id &&
-					c.orientation === 'vertical' &&
-					c.targetDistance === 0
+				c => c instanceof PointOnLineConstraint && c.pointId === pt1.id && c.lineP2Id === 'axis_x'
 			);
 			assert.ok(cX, 'PointOnAxisConstraint applied for X-axis via PointTool');
 
@@ -810,11 +806,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			} as any);
 
 			const cY = [...sketch.constraints.values()].find(
-				c =>
-					c instanceof OriginDistanceConstraint &&
-					c.pointId === freePt.id &&
-					c.orientation === 'horizontal' &&
-					c.targetDistance === 0
+				c => c instanceof PointOnLineConstraint && c.pointId === freePt.id && c.lineP2Id === 'axis_y'
 			);
 			assert.ok(cY, 'PointOnAxisConstraint applied for Y-axis via drag drop');
 		} finally {
@@ -868,8 +860,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			const ptOrigin = [...sketch.points.values()].find(p => p.x === 0 && p.y === 0);
 			assert.ok(ptOrigin);
 			const cOrigin = [...sketch.constraints.values()].find(
-				c =>
-					c instanceof OriginDistanceConstraint && c.pointId === ptOrigin.id && c.isCoincident && c.targetDistance === 0
+				c => c instanceof CoincidentConstraint && c.p1Id === 'origin' && c.p2Id === ptOrigin.id
 			);
 			assert.ok(cOrigin, 'OriginCoincidentConstraint applied via PointTool');
 		} finally {
@@ -896,8 +887,7 @@ describe('Snapping with Ellipse and Spline', () => {
 			} as any);
 
 			const cDragOrigin = [...sketch.constraints.values()].find(
-				c =>
-					c instanceof OriginDistanceConstraint && c.pointId === freePt.id && c.isCoincident && c.targetDistance === 0
+				c => c instanceof CoincidentConstraint && c.p1Id === 'origin' && c.p2Id === freePt.id
 			);
 			assert.ok(cDragOrigin, 'OriginCoincidentConstraint applied via drag drop');
 		} finally {
@@ -944,7 +934,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			assert.equal(tool.isBusy(), false, 'LineTool terminates on origin snap');
 			const cOrigin = [...sketch.constraints.values()].find(
-				c => c instanceof OriginDistanceConstraint && c.isCoincident
+				c => c instanceof CoincidentConstraint && c.p1Id === 'origin'
 			);
 			assert.ok(cOrigin, 'Endpoint constrained to origin');
 
@@ -975,7 +965,7 @@ describe('Snapping with Ellipse and Spline', () => {
 
 			assert.equal(tool.isBusy(), false, 'LineTool terminates on axis snap');
 			const cAxis = [...sketch.constraints.values()].find(
-				c => c instanceof OriginDistanceConstraint && c.orientation === 'vertical' && c.targetDistance === 0
+				c => c instanceof PointOnLineConstraint && c.lineP2Id === 'axis_x'
 			);
 			assert.ok(cAxis, 'Endpoint constrained to X-axis');
 		} finally {

@@ -4,8 +4,6 @@ import type {
 	AngleConstraint,
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import type { SketchDocument } from '../model/sketch';
 import type { Vec2 } from '../math/vector';
@@ -16,9 +14,7 @@ export type EditableConstraint =
 	| RadiusConstraint
 	| AngleConstraint
 	| PointToLineDistanceConstraint
-	| OffsetConstraint
-	| OriginDistanceConstraint
-	| LineToAxisDistanceConstraint;
+	| OffsetConstraint;
 
 export class DimensionModal {
 	private modalEl: HTMLElement;

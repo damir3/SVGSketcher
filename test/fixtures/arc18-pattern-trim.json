@@ -458,20 +458,20 @@
   "constraints": [
     {
       "id": "c_pt_axis_on-1",
-      "type": "origin_distance",
+      "type": "point_on_line",
       "name": "Point on Y-Axis",
       "weight": 1,
       "isSoft": false,
       "isDimensional": false,
       "value": 0,
       "entityIds": [
-        "Point-21"
+        "Point-21",
+        "origin",
+        "axis_y"
       ],
       "pointId": "Point-21",
-      "targetDistance": 0,
-      "orientation": "horizontal",
-      "side": 1,
-      "isCoincident": false
+      "lineP1Id": "origin",
+      "lineP2Id": "axis_y"
     },
     {
       "id": "c_arcept-14",
@@ -507,20 +507,20 @@
     },
     {
       "id": "c_pt_axis_on-2",
-      "type": "origin_distance",
+      "type": "point_on_line",
       "name": "Point on Y-Axis",
       "weight": 1,
       "isSoft": false,
       "isDimensional": false,
       "value": 0,
       "entityIds": [
-        "Point-26"
+        "Point-26",
+        "origin",
+        "axis_y"
       ],
       "pointId": "Point-26",
-      "targetDistance": 0,
-      "orientation": "horizontal",
-      "side": 1,
-      "isCoincident": false
+      "lineP1Id": "origin",
+      "lineP2Id": "axis_y"
     },
     {
       "id": "c_arcept-16",
@@ -797,20 +797,18 @@
     },
     {
       "id": "c_origin_coinc-2",
-      "type": "origin_distance",
+      "type": "coincident",
       "name": "Coincident with (0,0)",
       "weight": 1,
       "isSoft": false,
       "isDimensional": false,
       "value": 0,
       "entityIds": [
+        "origin",
         "Point-8"
       ],
-      "pointId": "Point-8",
-      "targetDistance": 0,
-      "orientation": "aligned",
-      "side": 1,
-      "isCoincident": true
+      "p1Id": "origin",
+      "p2Id": "Point-8"
     },
     {
       "id": "c_ptcirc-1",

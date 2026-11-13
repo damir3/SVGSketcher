@@ -7,6 +7,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
+import { PointToLineDistanceConstraint } from './pointToLineDistance';
 import { DEFAULT_DISTANCE_OFFSET } from '../../canvas/distances';
 
 export { DEFAULT_DISTANCE_OFFSET };
@@ -21,6 +22,8 @@ export class DistanceConstraint extends BaseConstraint {
 	offset?: number;
 	orientation: 'aligned' | 'horizontal' | 'vertical';
 	labelPosition?: number;
+	/** Fixed direction for projected distances; omitted means unsigned distance. */
+	side?: number;
 
 	constructor(
 		id: string,
@@ -30,7 +33,8 @@ export class DistanceConstraint extends BaseConstraint {
 		weight = 1.0,
 		offset?: number,
 		orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned',
-		labelPosition?: number
+		labelPosition?: number,
+		side?: number
 	) {
 		const prefix =
 			orientation === 'horizontal'
@@ -45,6 +49,22 @@ export class DistanceConstraint extends BaseConstraint {
 		this.offset = offset;
 		this.orientation = orientation;
 		this.labelPosition = labelPosition;
+		this.side = side === undefined ? undefined : side >= 0 ? 1 : -1;
+		this.name = this.displayName;
+	}
+
+	get displayName(): string {
+		if (this.p1Id === 'origin')
+			return this.orientation === 'horizontal'
+				? 'Distance to Y-Axis'
+				: this.orientation === 'vertical'
+					? 'Distance to X-Axis'
+					: 'Distance to (0,0)';
+		return this.orientation === 'horizontal'
+			? 'Horizontal Distance'
+			: this.orientation === 'vertical'
+				? 'Vertical Distance'
+				: 'Distance';
 	}
 
 	override getEquationsCount(): number {
@@ -57,14 +77,14 @@ export class DistanceConstraint extends BaseConstraint {
 
 		if (this.orientation === 'horizontal') {
 			const dx = p2.x - p1.x;
-			const sign = dx >= 0 ? 1 : -1;
-			return [(dx * sign - this.targetDistance) * this.weight];
+			const sign = this.side === undefined ? (dx >= 0 ? 1 : -1) : 1;
+			return [(dx * sign - (this.side ?? 1) * this.targetDistance) * this.weight];
 		}
 
 		if (this.orientation === 'vertical') {
 			const dy = p2.y - p1.y;
-			const sign = dy >= 0 ? 1 : -1;
-			return [(dy * sign - this.targetDistance) * this.weight];
+			const sign = this.side === undefined ? (dy >= 0 ? 1 : -1) : 1;
+			return [(dy * sign - (this.side ?? 1) * this.targetDistance) * this.weight];
 		}
 
 		const dir = new Vec2().subVectors(p2, p1);
@@ -84,7 +104,7 @@ export class DistanceConstraint extends BaseConstraint {
 
 		if (this.orientation === 'horizontal') {
 			const dx = p2.x - p1.x;
-			const sign = dx >= 0 ? 1 : -1;
+			const sign = this.side === undefined ? (dx >= 0 ? 1 : -1) : 1;
 			this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow, -sign * this.weight);
 			this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow, sign * this.weight);
 			return res;
@@ -92,7 +112,7 @@ export class DistanceConstraint extends BaseConstraint {
 
 		if (this.orientation === 'vertical') {
 			const dy = p2.y - p1.y;
-			const sign = dy >= 0 ? 1 : -1;
+			const sign = this.side === undefined ? (dy >= 0 ? 1 : -1) : 1;
 			this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow, -sign * this.weight);
 			this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow, sign * this.weight);
 			return res;
@@ -111,7 +131,31 @@ export class DistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
+	private axisDimension(): PointToLineDistanceConstraint | undefined {
+		if (this.p1Id !== 'origin' || this.orientation === 'aligned') return undefined;
+		const axis = this.orientation === 'vertical' ? 'axis_x' : 'axis_y';
+		return new PointToLineDistanceConstraint(
+			this.id,
+			this.p2Id,
+			axis,
+			'origin',
+			axis,
+			this.targetDistance,
+			this.side,
+			this.weight,
+			this.offset,
+			this.labelPosition
+		);
+	}
+
 	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		const axis = this.axisDimension();
+		if (axis) {
+			axis.moveLabelTo(screen, sketch, viewport);
+			this.offset = axis.offset;
+			this.labelPosition = axis.labelPosition;
+			return;
+		}
 		const p1 = sketch.points.get(this.p1Id);
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return;
@@ -152,6 +196,12 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
+		const axis = this.axisDimension();
+		if (axis) {
+			axis.expression = this.expression;
+			axis.render(ctx);
+			return;
+		}
 		const p1 = ctx.sketch.points.get(this.p1Id);
 		const p2 = ctx.sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return;
@@ -176,6 +226,8 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const axis = this.axisDimension();
+		if (axis) return axis.distanceTo(screen, sketch, viewport);
 		const p1 = sketch.points.get(this.p1Id);
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return null;
@@ -205,12 +257,7 @@ export class DistanceConstraint extends BaseConstraint {
 	protected override createSidebarPanel(): ConstraintPanel {
 		return new ConstraintPanel({
 			constraint: this,
-			title: () =>
-				this.orientation === 'horizontal'
-					? 'Horizontal Distance'
-					: this.orientation === 'vertical'
-						? 'Vertical Distance'
-						: 'Distance',
+			title: () => this.displayName,
 			dimension: {
 				label: 'Distance',
 				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,

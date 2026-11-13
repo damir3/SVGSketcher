@@ -138,37 +138,37 @@
   "constraints": [
     {
       "id": "c_pt_axis_on-1",
-      "type": "origin_distance",
+      "type": "point_on_line",
       "name": "Point on X-Axis",
       "weight": 1,
       "isSoft": false,
       "isDimensional": false,
       "value": 0,
       "entityIds": [
-        "Point-98"
+        "Point-98",
+        "origin",
+        "axis_x"
       ],
       "pointId": "Point-98",
-      "targetDistance": 0,
-      "orientation": "vertical",
-      "side": 1,
-      "isCoincident": false
+      "lineP1Id": "origin",
+      "lineP2Id": "axis_x"
     },
     {
       "id": "c_pt_axis_on-2",
-      "type": "origin_distance",
+      "type": "point_on_line",
       "name": "Point on X-Axis",
       "weight": 1,
       "isSoft": false,
       "isDimensional": false,
       "value": 0,
       "entityIds": [
-        "Point-99"
+        "Point-99",
+        "origin",
+        "axis_x"
       ],
       "pointId": "Point-99",
-      "targetDistance": 0,
-      "orientation": "vertical",
-      "side": 1,
-      "isCoincident": false
+      "lineP1Id": "origin",
+      "lineP2Id": "axis_x"
     },
     {
       "id": "c_midpoint-40",

@@ -5,6 +5,9 @@ import { Vec2 } from '../../math/vector';
 export * from './renderContext';
 
 export function readParamPoint(paramMap: ReadonlyMap<string, number>, pointId: string): Vec2 {
+	if (pointId === 'origin') return new Vec2(0, 0);
+	if (pointId === 'axis_x') return new Vec2(1, 0);
+	if (pointId === 'axis_y') return new Vec2(0, 1);
 	return new Vec2(paramMap.get(`${pointId}.x`) ?? 0, paramMap.get(`${pointId}.y`) ?? 0);
 }
 
@@ -84,6 +87,7 @@ export class BaseConstraint implements IConstraint {
 		row: number,
 		val: number
 	): void {
+		if (/^(origin|axis_x|axis_y)\.[xy]$/.test(paramId)) return;
 		const col = paramIndices.get(paramId);
 		if (col !== undefined && Math.abs(val) > 1e-12) {
 			entries.push({ row, col, val });

@@ -33,8 +33,6 @@ import {
 	type PatternCopyData,
 	RectangularPatternConstraint,
 	type RectangularPatternCopyData,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import {
 	generateCircularPatternCopy,
@@ -1120,15 +1118,14 @@ export class SketchDocument {
 	getOriginConstraint(
 		pointId: string,
 		orientation?: 'aligned' | 'horizontal' | 'vertical'
-	): OriginDistanceConstraint | undefined {
-		for (const c of this.constraints.values()) {
-			if (c instanceof OriginDistanceConstraint && c.pointId === pointId) {
-				if (orientation === undefined || c.orientation === orientation) {
-					return c;
-				}
-			}
-		}
-		return undefined;
+	): DistanceConstraint | CoincidentConstraint | undefined {
+		return [...this.constraints.values()].find(
+			(c): c is DistanceConstraint | CoincidentConstraint =>
+				(c instanceof DistanceConstraint || c instanceof CoincidentConstraint) &&
+				((c.p1Id === 'origin' && c.p2Id === pointId) || (c.p2Id === 'origin' && c.p1Id === pointId)) &&
+				(orientation === undefined ||
+					(c instanceof DistanceConstraint ? c.orientation === orientation : orientation === 'aligned'))
+		);
 	}
 
 	hasOriginConstraint(pointId: string, orientation?: 'aligned' | 'horizontal' | 'vertical'): boolean {
@@ -1140,73 +1137,51 @@ export class SketchDocument {
 		targetDist?: number,
 		orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned',
 		offset?: number
-	): OriginDistanceConstraint | null {
+	): DistanceConstraint | null {
 		const pt = this.points.get(pointId);
 		if (!pt) return null;
-
-		const existing = this.getOriginConstraint(pointId, orientation);
-		if (existing && !existing.isCoincident) {
-			let changed = false;
-			if (offset !== undefined && existing.offset !== offset) {
-				existing.offset = offset;
-			}
-			if (orientation !== undefined && existing.orientation !== orientation) {
-				existing.orientation = orientation;
-				changed = true;
-			}
-			if (targetDist !== undefined && existing.targetDistance !== targetDist) {
-				this.pushHistory();
-				existing.targetDistance = targetDist;
-				existing.value = targetDist;
-				changed = true;
-			}
-			if (changed) {
-				this.solve();
-			}
-			return existing;
-		}
-
-		let measured = pt.length();
-		let side = 1;
-		if (orientation === 'horizontal') {
-			measured = Math.abs(pt.x);
-			side = pt.x >= 0 ? 1 : -1;
-		} else if (orientation === 'vertical') {
-			measured = Math.abs(pt.y);
-			side = pt.y >= 0 ? 1 : -1;
-		}
-
-		const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
-		const c = new OriginDistanceConstraint(
-			this.nextId('c_origin_dist'),
+		const existing = this.getDistanceConstraint('origin', pointId, orientation);
+		if (existing) return this.addDistanceConstraint('origin', pointId, targetDist, offset, orientation);
+		const measured = orientation === 'horizontal' ? pt.x : orientation === 'vertical' ? pt.y : pt.length();
+		const c = new DistanceConstraint(
+			this.nextId('c_dist'),
+			'origin',
 			pointId,
-			currentDist,
-			orientation,
+			targetDist ?? Math.max(0.01, Number(Math.abs(measured).toFixed(2))),
+			1,
 			offset,
-			false,
-			side
+			orientation,
+			undefined,
+			orientation === 'aligned' ? undefined : measured >= 0 ? 1 : -1
 		);
 		this.addConstraint(c);
 		return c;
 	}
 
-	addOriginCoincidentConstraint(pointId: string): OriginDistanceConstraint | null {
-		const pt = this.points.get(pointId);
-		if (!pt) return null;
-
-		const existing = this.getOriginConstraint(pointId, 'aligned');
-		if (existing && existing.isCoincident) {
-			return existing;
-		}
-
-		const c = new OriginDistanceConstraint(this.nextId('c_origin_coinc'), pointId, 0, 'aligned', undefined, true);
+	addOriginCoincidentConstraint(pointId: string): CoincidentConstraint | null {
+		if (!this.points.get(pointId) || pointId === 'origin') return null;
+		const existing = [...this.constraints.values()].find(
+			(c): c is CoincidentConstraint =>
+				c instanceof CoincidentConstraint && this.matchesEndpoints(c.p1Id, c.p2Id, 'origin', pointId)
+		);
+		if (existing) return existing;
+		const c = new CoincidentConstraint(this.nextId('c_coinc'), 'origin', pointId);
 		this.addConstraint(c);
 		return c;
 	}
 
-	getPointToAxisConstraint(pointId: string, axis: 'x' | 'y'): OriginDistanceConstraint | undefined {
-		const orientation = axis === 'x' ? 'vertical' : 'horizontal';
-		return this.getOriginConstraint(pointId, orientation);
+	getPointToAxisConstraint(pointId: string, axis: 'x' | 'y'): DistanceConstraint | PointOnLineConstraint | undefined {
+		const axisId = `axis_${axis}`;
+		return [...this.constraints.values()].find(
+			(c): c is DistanceConstraint | PointOnLineConstraint =>
+				(c instanceof DistanceConstraint &&
+					this.matchesEndpoints(c.p1Id, c.p2Id, 'origin', pointId) &&
+					c.orientation === (axis === 'x' ? 'vertical' : 'horizontal')) ||
+				(c instanceof PointOnLineConstraint &&
+					c.pointId === pointId &&
+					c.lineP1Id === 'origin' &&
+					c.lineP2Id === axisId)
+		);
 	}
 
 	hasPointToAxisConstraint(pointId: string, axis: 'x' | 'y'): boolean {
@@ -1218,32 +1193,39 @@ export class SketchDocument {
 		axis: 'x' | 'y',
 		targetDist?: number,
 		offset?: number
-	): OriginDistanceConstraint | null {
+	): DistanceConstraint | null {
 		return this.addOriginDistanceConstraint(pointId, targetDist, axis === 'x' ? 'vertical' : 'horizontal', offset);
 	}
 
-	addPointOnAxisConstraint(pointId: string, axis: 'x' | 'y'): OriginDistanceConstraint | null {
-		const pt = this.points.get(pointId);
-		if (!pt) return null;
-
-		const existing = this.getPointToAxisConstraint(pointId, axis);
-		if (existing && existing.targetDistance === 0) {
-			return existing;
-		}
-
-		const orientation = axis === 'x' ? 'vertical' : 'horizontal';
-		const c = new OriginDistanceConstraint(this.nextId('c_pt_axis_on'), pointId, 0, orientation, undefined, false, 1);
+	addPointOnAxisConstraint(pointId: string, axis: 'x' | 'y'): PointOnLineConstraint | null {
+		if (!this.points.get(pointId)) return null;
+		const existing = [...this.constraints.values()].find(
+			(c): c is PointOnLineConstraint =>
+				c instanceof PointOnLineConstraint &&
+				c.pointId === pointId &&
+				c.lineP1Id === 'origin' &&
+				c.lineP2Id === `axis_${axis}`
+		);
+		if (existing) return existing;
+		const c = new PointOnLineConstraint(this.nextId('c_ptline'), pointId, 'origin', `axis_${axis}`);
 		this.addConstraint(c);
 		return c;
 	}
 
-	getLineToAxisConstraint(lineId: string, axis: 'x' | 'y'): LineToAxisDistanceConstraint | undefined {
-		for (const c of this.constraints.values()) {
-			if (c instanceof LineToAxisDistanceConstraint && c.lineId === lineId && c.axis === axis) {
-				return c;
-			}
-		}
-		return undefined;
+	getLineToAxisConstraint(
+		lineId: string,
+		axis: 'x' | 'y'
+	): PointToLineDistanceConstraint | CollinearConstraint | undefined {
+		const line = this.lines.get(lineId);
+		if (!line) return undefined;
+		return [...this.constraints.values()].find(
+			(c): c is PointToLineDistanceConstraint | CollinearConstraint =>
+				(c instanceof PointToLineDistanceConstraint && c.constrainedLineId === lineId && c.lineId === `axis_${axis}`) ||
+				(c instanceof CollinearConstraint &&
+					c.l1P1 === 'origin' &&
+					c.l1P2 === `axis_${axis}` &&
+					this.matchesEndpoints(c.l2P1, c.l2P2, line.p1Id, line.p2Id))
+		);
 	}
 
 	hasLineToAxisConstraint(lineId: string, axis: 'x' | 'y'): boolean {
@@ -1255,74 +1237,48 @@ export class SketchDocument {
 		axis: 'x' | 'y',
 		targetDist?: number,
 		offset?: number
-	): LineToAxisDistanceConstraint | null {
+	): PointToLineDistanceConstraint | null {
 		const line = this.lines.get(lineId);
 		if (!line) return null;
-		const p1 = this.points.get(line.p1Id);
-		const p2 = this.points.get(line.p2Id);
+		const p1 = this.points.get(line.p1Id),
+			p2 = this.points.get(line.p2Id);
 		if (!p1 || !p2) return null;
-
 		const existing = this.getLineToAxisConstraint(lineId, axis);
-		if (existing && !existing.isCollinear) {
-			let changed = false;
-			if (offset !== undefined && existing.offset !== offset) {
-				existing.offset = offset;
-			}
-			if (targetDist !== undefined && existing.targetDistance !== targetDist) {
+		if (existing instanceof PointToLineDistanceConstraint) {
+			if (targetDist !== undefined && targetDist !== existing.targetDistance) {
 				this.pushHistory();
 				existing.targetDistance = targetDist;
 				existing.value = targetDist;
-				changed = true;
-			}
-			if (changed) {
 				this.solve();
 			}
+			if (offset !== undefined) existing.offset = offset;
 			return existing;
 		}
-
-		const midVal = axis === 'x' ? (p1.y + p2.y) * 0.5 : (p1.x + p2.x) * 0.5;
-		const side = midVal >= 0 ? 1 : -1;
-		const measured = Math.abs(midVal);
-		const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
-
-		const c = new LineToAxisDistanceConstraint(
-			this.nextId('c_line_axis_dist'),
-			lineId,
+		const mid = axis === 'x' ? (p1.y + p2.y) / 2 : (p1.x + p2.x) / 2;
+		const c = new PointToLineDistanceConstraint(
+			this.nextId('c_pt_line_dist'),
 			line.p1Id,
-			line.p2Id,
-			axis,
-			currentDist,
-			side,
+			`axis_${axis}`,
+			'origin',
+			`axis_${axis}`,
+			targetDist ?? Math.max(0.01, Number(Math.abs(mid).toFixed(2))),
+			(mid >= 0 ? 1 : -1) * (axis === 'x' ? -1 : 1),
+			1,
 			offset,
-			false
+			undefined,
+			line.p2Id,
+			lineId
 		);
 		this.addConstraint(c);
 		return c;
 	}
 
-	addLineCollinearWithAxisConstraint(lineId: string, axis: 'x' | 'y'): LineToAxisDistanceConstraint | null {
+	addLineCollinearWithAxisConstraint(lineId: string, axis: 'x' | 'y'): CollinearConstraint | null {
 		const line = this.lines.get(lineId);
 		if (!line) return null;
-		const p1 = this.points.get(line.p1Id);
-		const p2 = this.points.get(line.p2Id);
-		if (!p1 || !p2) return null;
-
 		const existing = this.getLineToAxisConstraint(lineId, axis);
-		if (existing && existing.isCollinear) {
-			return existing;
-		}
-
-		const c = new LineToAxisDistanceConstraint(
-			this.nextId('c_line_axis_collinear'),
-			lineId,
-			line.p1Id,
-			line.p2Id,
-			axis,
-			0,
-			1,
-			undefined,
-			true
-		);
+		if (existing instanceof CollinearConstraint) return existing;
+		const c = new CollinearConstraint(this.nextId('c_collin'), 'origin', `axis_${axis}`, line.p1Id, line.p2Id);
 		this.addConstraint(c);
 		return c;
 	}
@@ -1758,11 +1714,7 @@ export class SketchDocument {
 		return c;
 	}
 
-	addCollinearConstraint(
-		line1Id: string,
-		line2Id: string,
-		p3Id?: string
-	): CollinearConstraint | LineToAxisDistanceConstraint | null {
+	addCollinearConstraint(line1Id: string, line2Id: string, p3Id?: string): CollinearConstraint | null {
 		if (p3Id !== undefined) {
 			return this.addThreePointCollinearConstraint(line1Id, line2Id, p3Id);
 		}
@@ -3338,10 +3290,11 @@ export class SketchDocument {
 	}
 
 	getPointDragTarget(pointId: string, target: Vec2): Vec2 {
-		return new Vec2(
-			this.getPointToAxisConstraint(pointId, 'y')?.targetDistance === 0 ? 0 : target.x,
-			this.getPointToAxisConstraint(pointId, 'x')?.targetDistance === 0 ? 0 : target.y
-		);
+		const onAxis = (axis: 'x' | 'y') => {
+			const c = this.getPointToAxisConstraint(pointId, axis);
+			return c instanceof PointOnLineConstraint || (c instanceof DistanceConstraint && c.targetDistance === 0);
+		};
+		return new Vec2(onAxis('y') ? 0 : target.x, onAxis('x') ? 0 : target.y);
 	}
 
 	dragPoint(pointId: string, targetX: number, targetY: number): SolverResult {
@@ -3416,31 +3369,14 @@ export class SketchDocument {
 		if (c instanceof DistanceConstraint) {
 			c.targetDistance = newValue;
 			c.value = newValue;
-			c.name =
-				c.orientation === 'horizontal'
-					? 'Horizontal Distance'
-					: c.orientation === 'vertical'
-						? 'Vertical Distance'
-						: 'Distance';
+			c.name = c.displayName;
 			return true;
 		}
 
 		if (c instanceof PointToLineDistanceConstraint) {
 			c.targetDistance = newValue;
 			c.value = newValue;
-			c.name = 'Point-to-Line Distance';
-			return true;
-		}
-
-		if (c instanceof OriginDistanceConstraint && !c.isCoincident) {
-			c.targetDistance = newValue;
-			c.value = newValue;
-			return true;
-		}
-
-		if (c instanceof LineToAxisDistanceConstraint && !c.isCollinear) {
-			c.targetDistance = newValue;
-			c.value = newValue;
+			c.name = c.displayName;
 			return true;
 		}
 

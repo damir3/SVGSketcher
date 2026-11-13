@@ -11,8 +11,6 @@ import {
 	OffsetConstraint,
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
-	OriginDistanceConstraint,
-	LineToAxisDistanceConstraint,
 } from '../solver/constraints';
 import { ICONS } from './icons';
 import { type Vec2 } from '../math/vector';
@@ -29,9 +27,7 @@ export class Sidebar {
 			| RadiusConstraint
 			| AngleConstraint
 			| PointToLineDistanceConstraint
-			| OffsetConstraint
-			| OriginDistanceConstraint
-			| LineToAxisDistanceConstraint,
+			| OffsetConstraint,
 		screenPos?: Vec2
 	) => void;
 
@@ -470,15 +466,10 @@ export class Sidebar {
 
 		if (c instanceof DistanceConstraint) {
 			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
-			name =
-				c.orientation === 'horizontal'
-					? 'Horizontal Distance'
-					: c.orientation === 'vertical'
-						? 'Vertical Distance'
-						: 'Distance';
+			name = c.displayName;
 		} else if (c instanceof PointToLineDistanceConstraint) {
 			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
-			name = 'Point-Line Distance';
+			name = c.displayName;
 		} else if (c instanceof OffsetConstraint) {
 			valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
 			name = 'Offset';
@@ -503,29 +494,6 @@ export class Sidebar {
 			const columns = Math.abs(c.distance1) > 1e-6 ? c.quantity1 : 1;
 			const rows = Math.abs(c.distance2) > 1e-6 ? c.quantity2 : 1;
 			valBadge = `<span class="val-badge">${columns}x${rows}</span>`;
-		} else if (c instanceof OriginDistanceConstraint) {
-			if (c.isCoincident) {
-				name = 'Coincident with (0,0)';
-			} else if (c.targetDistance === 0) {
-				const axisName = c.orientation === 'vertical' ? 'X-Axis' : 'Y-Axis';
-				name = `Point on ${axisName}`;
-			} else {
-				valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
-				name =
-					c.orientation === 'horizontal'
-						? 'Distance to Y-Axis'
-						: c.orientation === 'vertical'
-							? 'Distance to X-Axis'
-							: 'Distance to (0,0)';
-			}
-		} else if (c instanceof LineToAxisDistanceConstraint) {
-			const axisName = c.axis === 'x' ? 'X-Axis' : 'Y-Axis';
-			if (c.isCollinear) {
-				name = `Collinear with ${axisName}`;
-			} else {
-				valBadge = `<span class="val-badge">${c.targetDistance.toFixed(1)} mm</span>`;
-				name = `Distance to ${axisName}`;
-			}
 		}
 
 		const hideLinkedEntities = (c.type === 'circular_pattern' && !c.isReadOnly) || c.type === 'rectangular_pattern';
@@ -634,10 +602,6 @@ export class Sidebar {
 				return ICONS.circular_pattern;
 			case 'rectangular_pattern':
 				return ICONS.rectangular_pattern;
-			case 'origin_distance':
-				return ICONS.distance;
-			case 'line_to_axis_distance':
-				return ICONS.distance;
 			default:
 				return ICONS.coincident;
 		}
