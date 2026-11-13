@@ -2,6 +2,7 @@ import type { OffsetKernelItem, KernelOffsetResult, KernelOffsetPrimitive } from
 import { Vec2 } from './vector';
 import { fitOffsetNodes, OFFSET_FIT_TOLERANCE } from './offsetFit';
 import { splitOffsetContours } from './offsetContours';
+import { isOffsetCollapsed } from './offsetCollapse';
 import {
 	getSplinePointAtParam,
 	getSplineTangentAtParam,
@@ -476,6 +477,15 @@ export function refineSplineOffsets(
 	closed: boolean
 ): KernelOffsetResult {
 	for (const side of result.sides) {
+		const signedDistance = side.isValid ? side.side * side.distance : side.distance;
+		if (closed && signedDistance < 0 && isOffsetCollapsed(items, -signedDistance)) {
+			side.primitives = [];
+			side.side = -1;
+			side.distance = -signedDistance;
+			side.isValid = true;
+			delete side.errorMessage;
+			continue;
+		}
 		if (!side.isValid) continue;
 		const d = side.side * side.distance;
 		if (items.length === 1 && items[0].kind === 'ellipse') {
@@ -485,14 +495,15 @@ export function refineSplineOffsets(
 			const nodes = Array.from({ length: count + 1 }, (_, i) => {
 				const t = i / count,
 					tangent = getSplineTangentAtParam(curves, t).normalizeOrUnitX();
-				return { p: getSplinePointAtParam(curves, t), t: tangent, n: tangent.clone().perpendicular(), corner: false };
+				return {
+					p: getSplinePointAtParam(curves, t),
+					t: tangent,
+					n: tangent.clone().perpendicular().negate(),
+					corner: false,
+				};
 			});
 			prim.isSplineClosed = true;
-			writeFitted(prim, nodes, 0);
-			delete prim.fitNormals;
-			delete prim.fitBases;
-			delete prim.startTangent;
-			delete prim.endTangent;
+			writeFitted(prim, nodes, d);
 			continue;
 		}
 
@@ -600,6 +611,11 @@ export function refineSplineOffsets(
 			writeFitted(prim, Math.abs(d) > 1e-12 ? removeLoops(path.nodes) : path.nodes, d);
 		}
 		side.primitives = active.map(i => side.primitives[i]);
+	}
+	if (result.sides.length) {
+		const invalid = result.sides.find(side => !side.isValid);
+		result.isValid = !invalid;
+		result.errorMessage = invalid?.errorMessage;
 	}
 	return result;
 }

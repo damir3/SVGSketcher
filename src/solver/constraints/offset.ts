@@ -63,6 +63,8 @@ export class OffsetConstraint extends BaseConstraint {
 	flip?: boolean;
 	cornerPointIds?: string[];
 	junctionConstraintIds?: string[];
+	/** Keeps the distance editable while an inward contour has no surviving geometry. */
+	declare emptyDimension?: { anchor: XY; normal: XY };
 
 	constructor(
 		id: string,
@@ -198,7 +200,11 @@ export class OffsetConstraint extends BaseConstraint {
 	/** World-space endpoints of the visual dimension (on original and on offset curve) */
 	getDimensionWorldPoints(sketch: any): { a: Vec2; b: Vec2 } | null {
 		const p = this.pairs[this.dimPairIndex] ?? this.pairs[0];
-		if (!p) return null;
+		if (!p) {
+			if (!this.emptyDimension) return null;
+			const a = Vec2.from(this.emptyDimension.anchor);
+			return { a, b: a.clone().addScaledVector(this.emptyDimension.normal, this.targetDistance) };
+		}
 		if (p.kind === 'line') {
 			const o1 = sketch.points.get(p.origP1Id);
 			const o2 = sketch.points.get(p.origP2Id);

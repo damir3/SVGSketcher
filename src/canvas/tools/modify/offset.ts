@@ -188,6 +188,8 @@ export class OffsetTool extends BaseTool {
 				hint = `Open chain (${count} items). Click connected curve or press Enter to commit.`;
 			}
 		}
+		if (this.geomResult?.isValid && this.geomResult.sides.some(side => side.primitives.length === 0))
+			hint += ' Inner contour has collapsed; its distance remains editable.';
 		return hint;
 	}
 
@@ -349,7 +351,7 @@ export class OffsetTool extends BaseTool {
 		);
 
 		if (res) {
-			this.ctx.showToast('Offset created');
+			this.ctx.showToast(res.createdIds.length ? 'Offset created' : 'Offset contour is empty. Distance saved.');
 		}
 
 		this.ctx?.highlightManager?.clear();

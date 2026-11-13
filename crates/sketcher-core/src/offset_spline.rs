@@ -770,7 +770,7 @@ fn fitted(nodes: &[Node], d: f64, closed: bool, with_basis: bool) -> SplineOffse
     }
 }
 
-pub(super) fn simplify_closed(points: &[Point2]) -> SplineOffset {
+pub(super) fn simplify_closed(points: &[Point2], d: f64) -> SplineOffset {
     let handles = spline::natural_handles(points);
     let curves: Vec<_> = (0..points.len() - 1)
         .map(|i| [points[i], handles[i][1], handles[i + 1][0], points[i + 1]])
@@ -783,10 +783,10 @@ pub(super) fn simplify_closed(points: &[Point2]) -> SplineOffset {
             Node {
                 p: spline::point_at(&curves, t),
                 t: tangent,
-                n: perp(tangent),
+                n: scale(perp(tangent), -1.0),
                 corner: false,
             }
         })
         .collect();
-    fitted(&nodes, 0.0, true, false)
+    fitted(&nodes, d, true, true)
 }

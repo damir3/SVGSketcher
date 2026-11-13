@@ -16,6 +16,7 @@ import {
 import * as reference from '../src/math/offsetReference';
 import { Vec2 } from '../src/math/vector';
 import { mixedOffsetScene, offsetContourGroups } from './helpers/mixedOffsetScene';
+import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelOffset.json', import.meta.url), 'utf8')) as {
 	sourceHashes: Record<string, string>;
@@ -95,6 +96,7 @@ for (const scene of fixture.scenes)
 			const result = calculateOffsetGeometry(sketch, scene.chain, q.direction, q.d1, q.d2, q.flip);
 			let target = expected(scene, q);
 			if (
+				scene.chain?.isClosed ||
 				scene.chain?.items.some(
 					item => item.type === 'spline' || item.type === 'elliptical_arc' || item.type === 'ellipse'
 				)
@@ -465,5 +467,53 @@ test('offset adapter rejects malformed component numbers, order, sources and clo
 		const bad = [...data];
 		bad[index] = value;
 		assert.throws(() => query(bad), /WASM offset result/, `index ${index} = ${value}`);
+	}
+});
+
+for (const kind of collapseKinds)
+	test(`fully eroded closed offset is empty and agrees with TypeScript: ${kind}`, () => {
+		const { sketch, chain, small, empty } = collapseOffsetScene(kind),
+			previous = getGeometryKernel(),
+			before = sketch.takeSnapshot();
+		for (const distance of [small, empty, empty * 1.1, empty * 5])
+			for (const direction of ['one_side', 'two_sides', 'symmetric'] as const)
+				for (const flip of [false, true]) {
+					const actual = calculateOffsetGeometry(sketch, chain, direction, -distance, distance, flip);
+					assert.ok(actual.isValid, `${kind} ${distance} ${direction} flip=${flip}`);
+					for (const side of actual.sides) {
+						assert.equal(side.primitives.length === 0, side.side < 0 && side.distance >= empty);
+						assert.ok(side.distance >= 0);
+					}
+					try {
+						setGeometryKernel(typescriptGeometryKernel);
+						compare(actual, calculateOffsetGeometry(sketch, chain, direction, -distance, distance, flip));
+					} finally {
+						setGeometryKernel(previous);
+					}
+				}
+		assert.deepEqual(sketch.takeSnapshot(), before);
+	});
+
+test('offset adapter accepts empty inward sides only on a closed chain', () => {
+	const item = {
+		sourceId: 'circle',
+		kind: 'circle' as const,
+		curve: { id: 'circle', type: 'circle' as const, center: { x: 0, y: 0 }, radius: 5 },
+	};
+	const data = [0, 5, 0, 1, 0, 1, 0, -1, 5, 0];
+	const query = (buffer: number[], closed = true) =>
+		createWasmOffsetKernel(() => new Float64Array(buffer)).calculate([item], closed, 0, 'one_side', -5, 0, false);
+	assert.deepEqual(query(data).sides[0].primitives, []);
+	assert.ok(query(data).isValid);
+	assert.throws(() => query(data, false), /WASM offset result/);
+	for (const [i, value] of [
+		[7, 1],
+		[8, -5],
+		[8, 0],
+		[6, 2],
+	]) {
+		const bad = [...data];
+		bad[i] = value;
+		assert.throws(() => query(bad), /WASM offset result/);
 	}
 });

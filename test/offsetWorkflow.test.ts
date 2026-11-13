@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { assertSameCubicGeometry } from './helpers/offsetGeometry';
 import { mixedOffsetScene, offsetContourGroups, openSplineLoopScene } from './helpers/mixedOffsetScene';
+import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
 import { fitPointsToBezier } from '../src/math/splineReference';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
@@ -797,4 +798,119 @@ test('a split mixed chain can create an independent closed child from an open so
 		assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(after));
 		sketch.restoreSnapshot(JSON.parse(JSON.stringify(after)));
 	}
+});
+
+for (const kind of collapseKinds)
+	for (const initiallyEmpty of [false, true])
+		test(`empty offsets keep editable dimensions, restore geometry and history: ${kind}, empty=${initiallyEmpty}`, () => {
+			const { sketch, chain, small, empty } = collapseOffsetScene(kind),
+				source = sketch.takeSnapshot();
+			const initial = initiallyEmpty ? empty * 1.1 : small,
+				geometry = calculateOffsetGeometry(sketch, chain, 'two_sides', 0.5, initial, false);
+			assert.ok(geometry.isValid);
+			const preview = render(sketch, chain, geometry, 'two_sides').previews;
+			const created = sketch.withDeferredSolve(() =>
+				commitOffsetToSketch(sketch, chain, geometry, 'two_sides', 0.5, initial, false)
+			)!;
+			assert.deepEqual(
+				created.createdIds.map(id => render(sketch).entity(id)),
+				preview
+			);
+			assert.equal(created.constraintIds.length, 2);
+			const innerId = created.constraintIds[1],
+				outer = (sketch.constraints.get(created.constraintIds[0]) as OffsetConstraint).pairs.map(offsetPairChild),
+				outerRender = outer.map(id => render(sketch).entity(id));
+			const committed = sketch.takeSnapshot();
+			assert.equal(sketch.undo(), true);
+			assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(source));
+			assert.equal(sketch.redo(), true);
+			assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(committed));
+			for (const distance of initiallyEmpty
+				? [small, empty, empty * 1.1, small, empty * 2, small]
+				: [empty, empty * 1.1, small, empty * 2, small]) {
+				const before = sketch.takeSnapshot(),
+					old = (sketch.constraints.get(innerId) as OffsetConstraint).pairs.map(offsetPairChild);
+				assert.equal(sketch.updateDimensionalConstraint(innerId, distance), true);
+				const c = sketch.constraints.get(innerId) as OffsetConstraint,
+					expected = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true),
+					isEmpty = distance >= empty;
+				assert.ok(c);
+				assert.equal(c.targetDistance, distance);
+				assert.equal(c.pairs.length === 0, isEmpty);
+				const dimension = c.getDimensionWorldPoints(sketch)!;
+				assert.ok(dimension);
+				assert.ok(Math.abs(dimension.a.distanceTo(dimension.b) - distance) < 1e-6);
+				if (isEmpty) {
+					assert.ok(c.emptyDimension);
+					assert.equal(c.getEquationsCount(), 0);
+					assert.deepEqual(c.evaluate(new Map()), []);
+					assert.deepEqual(c.jacobian(new Map(), 0, new Map()), []);
+					for (const id of old)
+						assert.ok(
+							!sketch.lines.has(id) && !sketch.arcs.has(id) && !sketch.circles.has(id) && !sketch.splines.has(id),
+							'collapsed child remains in the scene'
+						);
+				} else assert.equal(c.emptyDimension, undefined);
+				assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+				assert.deepEqual(
+					outer.map(id => render(sketch).entity(id)),
+					outerRender,
+					'the other side changed'
+				);
+				for (const p of source.points)
+					assert.ok(sketch.points.get(p.id)!.distanceTo(p) < 1e-7, 'source geometry moved');
+				assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+				const after = sketch.takeSnapshot();
+				assert.equal(sketch.undo(), true);
+				assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(before));
+				assert.equal(sketch.redo(), true);
+				assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(after));
+				sketch.restoreSnapshot(JSON.parse(JSON.stringify(after)));
+				assert.ok((sketch.constraints.get(innerId) as OffsetConstraint).getDimensionWorldPoints(sketch));
+			}
+		});
+
+test('parameter edits collapse and restore offsets in one undo step', () => {
+	const { sketch, chain, small, empty } = collapseOffsetScene('split-spline');
+	assert.ok(sketch.addParameter('inset', String(small)).success);
+	const geometry = calculateOffsetGeometry(sketch, chain, 'one_side', small, 0, true);
+	const created = sketch.withDeferredSolve(() =>
+		commitOffsetToSketch(sketch, chain, geometry, 'one_side', small, 0, true, { dist1: 'inset' })
+	)!;
+	const id = created.constraintIds[0];
+	sketch.clearHistory();
+	for (const distance of [empty, empty * 1.1, small, empty, small]) {
+		const before = sketch.takeSnapshot();
+		assert.ok(sketch.updateParameter('inset', 'inset', String(distance)).success);
+		const c = sketch.constraints.get(id) as OffsetConstraint;
+		assert.equal(c.expression, 'inset');
+		assert.equal(c.targetDistance, distance);
+		assert.equal(c.pairs.length === 0, distance >= empty);
+		assertAppliedOffset(
+			sketch,
+			c.pairs.map(offsetPairChild),
+			chain,
+			calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true)
+		);
+		const after = sketch.takeSnapshot();
+		assert.equal(sketch.undo(), true);
+		assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(before));
+		assert.equal(sketch.redo(), true);
+		assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(after));
+		sketch.restoreSnapshot(JSON.parse(JSON.stringify(after)));
+	}
+});
+
+test('invalid open-arc offsets leave the distance, expression and geometry unchanged', () => {
+	const scene = fixture.scenes.find(s => s.name === 'arc')!,
+		sketch = new SketchDocument();
+	sketch.restoreSnapshot(scene.snapshot);
+	const geometry = calculateOffsetGeometry(sketch, scene.chain, 'one_side', 1, 0, false);
+	const created = sketch.withDeferredSolve(() =>
+		commitOffsetToSketch(sketch, scene.chain, geometry, 'one_side', 1, 0, false, { dist1: '1 + 0' })
+	)!;
+	const c = sketch.constraints.get(created.constraintIds[0]) as OffsetConstraint,
+		before = sketch.takeSnapshot();
+	assert.equal(sketch.updateDimensionalConstraint(c.id, 10000), false);
+	assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(before));
 });

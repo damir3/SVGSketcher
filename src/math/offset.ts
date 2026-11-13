@@ -840,7 +840,7 @@ export function commitOffsetToSketch(
 		const { createdIds: sideIds, offsetPairs, cornerPointIds } = createOffsetSideGeometry(sketch, chain, side);
 		createdIds.push(...sideIds);
 		// Create OffsetConstraint for this side if offset pairs exist
-		if (offsetPairs.length > 0) {
+		if (offsetPairs.length > 0 || (chain.isClosed && side.primitives.length === 0)) {
 			const offC = new OffsetConstraint(
 				sketch.nextId('c_offset'),
 				offsetPairs,
@@ -853,6 +853,11 @@ export function commitOffsetToSketch(
 				side.side < 0,
 				cornerPointIds
 			);
+			if (side.primitives.length === 0)
+				offC.emptyDimension = {
+					anchor: Vec2.from(geomResult.gizmoAnchor),
+					normal: Vec2.from(geomResult.gizmoNormal).multiplyScalar(side.side),
+				};
 			if (expressions) {
 				const expr =
 					sideIdx === 0 || _direction === 'symmetric' ? expressions.dist1 : (expressions.dist2 ?? expressions.dist1);

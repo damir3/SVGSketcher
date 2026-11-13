@@ -1,6 +1,8 @@
 //! Numeric offset chains, retaining the editor's sampling, join order and tolerances.
 use crate::{regions::Geometry, spline, Point2};
 use std::f64::consts::TAU;
+#[path = "offset_collapse.rs"]
+mod collapse;
 #[path = "offset_spline.rs"]
 mod refined_spline;
 fn p(x: f64, y: f64) -> Point2 {
@@ -319,6 +321,14 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
     if items.is_empty() {
         return invalid(1);
     }
+    if closed && d < 0.0 && collapse::collapsed(items, -d) {
+        return Side {
+            primitives: vec![],
+            side: -1.0,
+            distance: -d,
+            error: 0,
+        };
+    }
     if items.len() == 1 && items[0].kind == 3 {
         let Some(Geometry::Circle(c, r)) = &items[0].geometry else {
             return invalid(1);
@@ -359,7 +369,7 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
             primitives: vec![Primitive {
                 source: 0,
                 contour: 0,
-                shape: Shape::Spline(refined_spline::simplify_closed(&points)),
+                shape: Shape::Spline(refined_spline::simplify_closed(&points, d)),
             }],
             side: if d < 0.0 { -1.0 } else { 1.0 },
             distance: d.abs(),
@@ -611,7 +621,7 @@ mod tests {
         assert_eq!(r.sides[1].primitives[0].shape.start(), p(2.0, 2.0));
     }
     #[test]
-    fn circle_radius_collapse_keeps_the_valid_other_side_and_error_metadata() {
+    fn circle_radius_collapse_is_empty_and_keeps_the_valid_other_side() {
         let circle = Item {
             geometry: Some(Geometry::Circle(p(0.0, 0.0), 5.0)),
             kind: 3,
@@ -620,10 +630,11 @@ mod tests {
             gizmo_clockwise: false,
         };
         let r = calculate(&[circle], true, 0, 1, 2.0, 5.0, false);
-        assert_eq!(r.error, 2);
+        assert_eq!(r.error, 0);
         assert_eq!(r.sides[0].error, 0);
-        assert_eq!(r.sides[1].error, 2);
-        assert_eq!(r.sides[1].distance, -5.0);
+        assert_eq!(r.sides[1].error, 0);
+        assert_eq!(r.sides[1].side, -1.0);
+        assert_eq!(r.sides[1].distance, 5.0);
         assert!(r.sides[1].primitives.is_empty());
     }
     #[test]

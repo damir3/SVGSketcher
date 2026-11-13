@@ -3449,6 +3449,7 @@ export class SketchDocument {
 			const geom = c.sourceChain
 				? calculateOffsetGeometry(this, c.sourceChain, c.direction || 'one_side', value, value, c.flip || false)
 				: undefined;
+			if (geom && !geom.isValid) return false;
 			const topologyChanged = !!(geom?.isValid && geom.sides.length && !this.offsetTopologyMatches(c, geom.sides[0]));
 			const layoutChanged = !!(
 				geom?.isValid &&
@@ -3582,9 +3583,9 @@ export class SketchDocument {
 		const offsetTransaction = c instanceof OffsetConstraint;
 		if (offsetTransaction) this.beginTransaction();
 		try {
-			c.expression = expr;
 			const applied = this.applyConstraintValueDirectly(c, val, displayMode);
 			if (applied) {
+				c.expression = expr;
 				this.solve();
 				return true;
 			}
@@ -3639,17 +3640,21 @@ export class SketchDocument {
 		if (this.parameters.has(name)) {
 			return { success: false, error: `Parameter '${name}' already exists` };
 		}
-		this.pushHistory();
-		const p: SketchParameter = {
-			id: this.nextId('Param'),
-			name,
-			expression,
-			value: 0,
-			comment,
-		};
-		this.parameters.set(name, p);
-		this.recomputeParametersAndConstraints(false);
-		return { success: true, parameter: p };
+		this.beginTransaction();
+		try {
+			const p: SketchParameter = {
+				id: this.nextId('Param'),
+				name,
+				expression,
+				value: 0,
+				comment,
+			};
+			this.parameters.set(name, p);
+			this.recomputeParametersAndConstraints(false);
+			return { success: true, parameter: p };
+		} finally {
+			this.commitTransaction(false);
+		}
 	}
 
 	updateParameter(
@@ -3671,49 +3676,57 @@ export class SketchDocument {
 				return { success: false, error: `Parameter '${newName}' already exists` };
 			}
 		}
-		this.pushHistory();
-		existing.expression = newExpr;
-		existing.comment = comment;
-		if (newName !== name) {
-			this.parameters.delete(name);
-			existing.name = newName;
-			this.parameters.set(newName, existing);
+		this.beginTransaction();
+		try {
+			existing.expression = newExpr;
+			existing.comment = comment;
+			if (newName !== name) {
+				this.parameters.delete(name);
+				existing.name = newName;
+				this.parameters.set(newName, existing);
 
-			// Rename in other parameters and constraint expressions
-			for (const other of this.parameters.values()) {
-				if (other.name !== newName) {
-					other.expression = renameParameterInExpression(other.expression, name, newName);
-				}
-			}
-			for (const c of this.constraints.values()) {
-				if (c.expression) {
-					c.expression = renameParameterInExpression(c.expression, name, newName);
-				}
-				if (c instanceof RectangularPatternConstraint) {
-					if (c.distance1Expression) {
-						c.distance1Expression = renameParameterInExpression(c.distance1Expression, name, newName);
-					}
-					if (c.distance2Expression) {
-						c.distance2Expression = renameParameterInExpression(c.distance2Expression, name, newName);
+				// Rename in other parameters and constraint expressions
+				for (const other of this.parameters.values()) {
+					if (other.name !== newName) {
+						other.expression = renameParameterInExpression(other.expression, name, newName);
 					}
 				}
-				if (c instanceof CircularPatternConstraint && c.totalAngleExpression) {
-					c.totalAngleExpression = renameParameterInExpression(c.totalAngleExpression, name, newName);
+				for (const c of this.constraints.values()) {
+					if (c.expression) {
+						c.expression = renameParameterInExpression(c.expression, name, newName);
+					}
+					if (c instanceof RectangularPatternConstraint) {
+						if (c.distance1Expression) {
+							c.distance1Expression = renameParameterInExpression(c.distance1Expression, name, newName);
+						}
+						if (c.distance2Expression) {
+							c.distance2Expression = renameParameterInExpression(c.distance2Expression, name, newName);
+						}
+					}
+					if (c instanceof CircularPatternConstraint && c.totalAngleExpression) {
+						c.totalAngleExpression = renameParameterInExpression(c.totalAngleExpression, name, newName);
+					}
 				}
 			}
+			this.recomputeParametersAndConstraints(false);
+			return { success: true };
+		} finally {
+			this.commitTransaction(false);
 		}
-		this.recomputeParametersAndConstraints(false);
-		return { success: true };
 	}
 
 	deleteParameter(name: string): { success: boolean; error?: string } {
 		if (!this.parameters.has(name)) {
 			return { success: false, error: `Parameter '${name}' not found` };
 		}
-		this.pushHistory();
-		this.parameters.delete(name);
-		this.recomputeParametersAndConstraints(false);
-		return { success: true };
+		this.beginTransaction();
+		try {
+			this.parameters.delete(name);
+			this.recomputeParametersAndConstraints(false);
+			return { success: true };
+		} finally {
+			this.commitTransaction(false);
+		}
 	}
 
 	recomputeParametersAndConstraints(pushHistory = false): {
@@ -3779,7 +3792,7 @@ export class SketchDocument {
 		}
 
 		this.solve();
-		this.notify();
+		if (this.batchDepth === 0) this.notify();
 		return { success: graphRes.errors.size === 0, errors: graphRes.errors };
 	}
 
@@ -4013,6 +4026,12 @@ export class SketchDocument {
 		if (!geom.sides || !geom.sides.length) return;
 		const side = geom.sides[0];
 		const numPrims = side.primitives.length;
+		if (!numPrims)
+			c.emptyDimension = {
+				anchor: Vec2.from(geom.gizmoAnchor),
+				normal: Vec2.from(geom.gizmoNormal).multiplyScalar(side.side),
+			};
+		else delete c.emptyDimension;
 
 		// Every primitive updates its own endpoints, including shared vertices within a contour.
 		for (let i = 0; i < numPrims; i++) {
@@ -4056,7 +4075,9 @@ export class SketchDocument {
 					if (prim.fitPoints.length > spline.pointIds.length) this.growOffsetSpline(c, pair, prim);
 					const ptsCount = spline.pointIds.length;
 					resizeOffsetSpline(prim, ptsCount, side.side * side.distance);
-					const sampleById = new Map(spline.pointIds.map((id, k) => [id, k]));
+					// Closed seams share one point ID; creation stores the first branch's basis.
+					const sampleById = new Map<string, number>();
+					for (const [k, id] of spline.pointIds.entries()) if (!sampleById.has(id)) sampleById.set(id, k);
 					for (const sp of pair.points) {
 						const k = sampleById.get(sp.pointId);
 						if (k !== undefined && prim.fitBases?.[k] && prim.fitNormals?.[k]) {

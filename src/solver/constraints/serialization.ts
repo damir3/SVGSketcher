@@ -216,6 +216,7 @@ type ConstraintSnapshotData =
 			flip?: boolean;
 			cornerPointIds?: string[];
 			junctionConstraintIds?: string[];
+			emptyDimension?: { anchor: { x: number; y: number }; normal: { x: number; y: number } };
 	  }
 	| {
 			type: 'origin_distance';

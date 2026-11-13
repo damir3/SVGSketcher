@@ -69,7 +69,11 @@ export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
 					side = read(),
 					distance = read(),
 					n = count();
-				if ((side !== 1 && side !== -1) || (error === 0 && (distance < 0 || n === 0)) || (error !== 0 && n !== 0))
+				if (
+					(side !== 1 && side !== -1) ||
+					(error === 0 && (distance < 0 || (n === 0 && (!closed || side !== -1 || distance === 0)))) ||
+					(error !== 0 && n !== 0)
+				)
 					fail();
 				const primitives: KernelOffsetPrimitive[] = [];
 				let previousContour = 0;

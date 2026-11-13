@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { OffsetTool } from '../src/canvas/tools/modify/offset';
+import { collapseOffsetScene } from './helpers/collapseOffsetScene';
 
 function addConstrainedTriangle(sketch: SketchDocument): void {
 	sketch.beginTransaction();
@@ -29,6 +30,34 @@ function addConstrainedTriangle(sketch: SketchDocument): void {
 	sketch.solve();
 	sketch.commitTransaction();
 }
+
+it('an empty inward preview stays valid and keeps its distance gizmo usable', () => {
+	const { sketch, chain } = collapseOffsetScene('circle');
+	let error = true;
+	const tool = Object.assign(Object.create(OffsetTool.prototype), {
+		chain,
+		direction: 'one_side',
+		dist1: 10,
+		dist2: 10,
+		flip: true,
+		ctx: {
+			sketch,
+			viewport: { worldToScreen: (p: { x: number; y: number }) => Vec2.from(p) },
+			renderer: { offsetGizmoHandles: [] },
+		},
+		popup: {
+			setError: (value: boolean) => {
+				error = value;
+			},
+		},
+	}) as OffsetTool;
+	tool.recalculate();
+	assert.ok(tool.geomResult?.isValid);
+	assert.equal(tool.geomResult.sides[0].primitives.length, 0);
+	assert.equal(error, false);
+	assert.match(tool.getStepHint(), /collapsed.*editable/);
+	assert.ok(tool.getGizmoBoundingBox());
+});
 
 function setupMockDocument() {
 	const origDoc = (globalThis as any).document;
