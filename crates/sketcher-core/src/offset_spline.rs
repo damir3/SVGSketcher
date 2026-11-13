@@ -13,19 +13,19 @@ struct Node {
 }
 fn between(a: &Node, b: &Node, t: f64) -> Node {
     Node {
-        p: step(a.p, sub(b.p, a.p), t),
-        n: unit(step(a.n, sub(b.n, a.n), t)),
-        t: unit(step(a.t, sub(b.t, a.t), t)),
+        p: a.p.lerp(b.p, t),
+        n: a.n.lerp(b.n, t).unit(),
+        t: a.t.lerp(b.t, t).unit(),
         corner: false,
     }
 }
 fn intersection(a: Point2, b: Point2, c: Point2, d: Point2) -> Option<f64> {
-    let (u, v, delta) = (sub(b, a), sub(d, c), sub(c, a));
-    let det = cross(u, v);
+    let (u, v, delta) = (b - a, d - c, c - a);
+    let det = u.cross(v);
     if det.abs() < 1e-12 {
         return None;
     }
-    let (t, s) = (cross(delta, v) / det, cross(delta, u) / det);
+    let (t, s) = (delta.cross(v) / det, delta.cross(u) / det);
     if (-1e-9..=1.0 + 1e-9).contains(&t) && (-1e-9..=1.0 + 1e-9).contains(&s) {
         Some(t.clamp(0.0, 1.0))
     } else {
@@ -250,16 +250,16 @@ fn join_analytic(path: &mut Path, shape: &mut Shape, start: bool, d: f64) {
     for k in 0..nodes.len() - 1 {
         let i = if start { k } else { nodes.len() - 2 - k };
         let a = nodes[i].p;
-        let delta = sub(nodes[i + 1].p, a);
-        let length = spline::length(delta);
+        let delta = nodes[i + 1].p - a;
+        let length = delta.length();
         let ts = match shape {
             Shape::Line([p1, p2], _) => {
-                let dir = sub(*p2, *p1);
-                let det = cross(delta, dir);
+                let dir = *p2 - *p1;
+                let det = delta.cross(dir);
                 if det.abs() < 1e-12 {
                     vec![]
                 } else {
-                    vec![cross(sub(*p1, a), dir) / det]
+                    vec![(*p1 - a).cross(dir) / det]
                 }
             }
             Shape::Arc(c, r, ..) => roots(a, delta, *c, *r),
@@ -330,17 +330,17 @@ fn join_paths(a: &mut Path, b: &mut Path, d: f64) {
     let mut along_a = 0.0;
     for i in (0..a.nodes.len() - 1).rev() {
         let aa = a.nodes[i].p;
-        let da = sub(a.nodes[i + 1].p, aa);
-        let la = spline::length(da);
+        let da = a.nodes[i + 1].p - aa;
+        let la = da.length();
         let mut along_b = 0.0;
         for j in 0..b.nodes.len() - 1 {
             let bb = b.nodes[j].p;
-            let db = sub(b.nodes[j + 1].p, bb);
-            let lb = spline::length(db);
+            let db = b.nodes[j + 1].p - bb;
+            let lb = db.length();
             if let Some(t) = intersection(aa, a.nodes[i + 1].p, bb, b.nodes[j + 1].p) {
-                let pt = step(aa, da, t);
+                let pt = aa + da * t;
                 let u = if lb > 1e-12 {
-                    dot(sub(pt, bb), db) / (lb * lb)
+                    (pt - bb).dot(db) / (lb * lb)
                 } else {
                     0.0
                 };
@@ -403,15 +403,13 @@ fn parallel(item: &Item, raw: &SplineOffset, d: f64, single: bool, clean: bool) 
                 Geometry::Spline(segments, _) => {
                     let param = if item.reversed { 1.0 - v } else { v };
                     let mut t = spline::tangent_at(segments, param);
-                    if spline::length(t) < 1e-12 {
-                        t = sub(
-                            spline::point_at(segments, (param + 1e-5).min(1.0)),
-                            spline::point_at(segments, (param - 1e-5).max(0.0)),
-                        );
+                    if t.length() < 1e-12 {
+                        t = spline::point_at(segments, (param + 1e-5).min(1.0))
+                            - spline::point_at(segments, (param - 1e-5).max(0.0));
                     }
                     (
                         spline::point_at(segments, param),
-                        scale(unit(t), if item.reversed { -1.0 } else { 1.0 }),
+                        t.unit() * if item.reversed { -1.0 } else { 1.0 },
                     )
                 }
                 Geometry::EllipticalArc(c, major, minor, start, end, cw) => {

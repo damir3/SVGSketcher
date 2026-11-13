@@ -8,17 +8,17 @@ mod ellipse;
 pub mod fillet;
 mod matrix;
 pub mod offset;
+pub mod point;
 pub mod regions;
 pub mod solver;
 pub mod spline;
 
-pub type CubicBezier = [Point2; 4];
+pub use point::{
+    add, add_scaled, angle, cross, distance, dot, middle, p, perp, polar, scale, step, sub, unit,
+    Point2,
+};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Point2 {
-    pub x: f64,
-    pub y: f64,
-}
+pub type CubicBezier = [Point2; 4];
 
 #[derive(Clone, Copy, Debug)]
 pub enum Curve {
@@ -38,13 +38,6 @@ pub enum Curve {
     Bezier {
         points: CubicBezier,
     },
-}
-
-fn offset(p: Point2, dx: f64, dy: f64, scale: f64) -> Point2 {
-    Point2 {
-        x: p.x + dx * scale,
-        y: p.y + dy * scale,
-    }
 }
 
 pub fn intersect(a: Curve, b: Curve) -> Vec<Point2> {
@@ -78,31 +71,31 @@ pub fn intersect(a: Curve, b: Curve) -> Vec<Point2> {
 }
 
 fn segment_segment(a1: Point2, a2: Point2, b1: Point2, b2: Point2) -> Vec<Point2> {
-    let (dx, dy) = (a2.x - a1.x, a2.y - a1.y);
-    let (ex, ey) = (b2.x - b1.x, b2.y - b1.y);
-    let det = dx * ey - dy * ex;
+    let d = a2 - a1;
+    let e = b2 - b1;
+    let det = d.cross(e);
     if det.abs() < 1e-10 {
         return vec![];
     }
-    let (wx, wy) = (b1.x - a1.x, b1.y - a1.y);
-    let t = (wx * ey - wy * ex) / det;
-    let u = (wx * dy - wy * dx) / det;
+    let w = b1 - a1;
+    let t = w.cross(e) / det;
+    let u = w.cross(d) / det;
     if !(-1e-5..=1.0 + 1e-5).contains(&t) || !(-1e-5..=1.0 + 1e-5).contains(&u) {
         return vec![];
     }
-    vec![offset(a1, dx, dy, t.clamp(0.0, 1.0))]
+    vec![a1 + d * t.clamp(0.0, 1.0)]
 }
 
 fn segment_circle(p1: Point2, p2: Point2, center: Point2, radius: f64) -> Vec<Point2> {
-    let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
-    let (wx, wy) = (p1.x - center.x, p1.y - center.y);
-    let length_sq = dx * dx + dy * dy;
+    let d = p2 - p1;
+    let w = p1 - center;
+    let length_sq = d.length_squared();
     if length_sq < 1e-12 {
         return vec![];
     }
-    let closest_t = -(wx * dx + wy * dy) / length_sq;
-    let closest = offset(p1, dx, dy, closest_t);
-    let distance = (closest.x - center.x).hypot(closest.y - center.y);
+    let closest_t = -w.dot(d) / length_sq;
+    let closest = p1 + d * closest_t;
+    let distance = closest.distance(center);
     let tangent = (distance - radius).abs() <= 1e-5;
     if !tangent && distance > radius {
         return vec![];
@@ -116,39 +109,32 @@ fn segment_circle(p1: Point2, p2: Point2, center: Point2, radius: f64) -> Vec<Po
     let mut points: Vec<Point2> = vec![];
     for t in &candidates[..if tangent { 1 } else { 2 }] {
         if (-1e-5..=1.0 + 1e-5).contains(t) {
-            let point = offset(p1, dx, dy, t.clamp(0.0, 1.0));
-            points.push(point);
+            points.push(p1 + d * t.clamp(0.0, 1.0));
         }
     }
     points
 }
 
 fn circle_circle(a: Point2, ar: f64, b: Point2, br: f64) -> Vec<Point2> {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let distance = dx.hypot(dy);
+    let delta = b - a;
+    let distance = delta.length();
     if distance < 1e-9 || distance > ar + br + 1e-5 || distance < (ar - br).abs() - 1e-5 {
         return vec![];
     }
     let along = (ar * ar - br * br + distance * distance) / (2.0 * distance);
     let height = (ar * ar - along * along).max(0.0).sqrt();
-    let base = offset(a, dx, dy, along / distance);
+    let base = a + delta * (along / distance);
     if height < 1e-7 {
         return vec![base];
     }
     // Keep both candidates until the caller has applied arc-span filtering.
-    vec![
-        offset(base, -dy * (1.0 / distance), dx * (1.0 / distance), height),
-        offset(base, -dy * (1.0 / distance), dx * (1.0 / distance), -height),
-    ]
+    let n = delta.perp() * (1.0 / distance);
+    vec![base + n * height, base - n * height]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn p(x: f64, y: f64) -> Point2 {
-        Point2 { x, y }
-    }
 
     #[test]
     fn crossing_and_disjoint_segments() {

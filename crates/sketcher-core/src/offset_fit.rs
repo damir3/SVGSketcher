@@ -16,31 +16,29 @@ struct Candidate {
     split: usize,
 }
 fn second(b: &CubicBezier, u: f64) -> Point2 {
-    step(
-        scale(add(step(b[2], b[1], -2.0), b[0]), 6.0 * (1.0 - u)),
-        add(step(b[3], b[2], -2.0), b[1]),
-        6.0 * u,
-    )
+    let p0 = (b[0] - b[1] * 2.0 + b[2]) * (6.0 * (1.0 - u));
+    let p1 = (b[1] - b[2] * 2.0 + b[3]) * (6.0 * u);
+    p0 + p1
 }
 fn generate(nodes: &[Node], start: usize, end: usize, params: &[f64], length: f64) -> CubicBezier {
     let a = &nodes[start];
     let b = &nodes[end];
-    let chord = sub(b.p, a.p);
-    let fixed_a = a.corner || dot(a.t, sub(nodes[start + 1].p, a.p)) < 0.0;
-    let fixed_b = b.corner || dot(b.t, sub(b.p, nodes[end - 1].p)) < 0.0;
+    let chord = b.p - a.p;
+    let fixed_a = a.corner || a.t.dot(nodes[start + 1].p - a.p) < 0.0;
+    let fixed_b = b.corner || b.t.dot(b.p - nodes[end - 1].p) < 0.0;
     let (mut c00, mut c01, mut c11, mut x0, mut x1) = (0.0, 0.0, 0.0, 0.0, 0.0);
     for (j, &u) in params.iter().enumerate() {
         let v = 1.0 - u;
         let b1 = 3.0 * v * v * u;
         let b2 = 3.0 * v * u * u;
-        let aa = scale(a.t, b1);
-        let bb = scale(b.t, -b2);
-        let rhs = step(sub(nodes[start + j].p, a.p), chord, -(b2 + u * u * u));
-        c00 += dot(aa, aa);
-        c01 += dot(aa, bb);
-        c11 += dot(bb, bb);
-        x0 += dot(aa, rhs);
-        x1 += dot(bb, rhs);
+        let aa = a.t * b1;
+        let bb = b.t * (-b2);
+        let rhs = (nodes[start + j].p - a.p) - chord * (b2 + u * u * u);
+        c00 += aa.dot(aa);
+        c01 += aa.dot(bb);
+        c11 += bb.dot(bb);
+        x0 += aa.dot(rhs);
+        x1 += bb.dot(rhs);
     }
     let det = c00 * c11 - c01 * c01;
     let mut alpha = if fixed_a {
@@ -57,7 +55,7 @@ fn generate(nodes: &[Node], start: usize, end: usize, params: &[f64], length: f6
     } else {
         (x1 * c00 - x0 * c01) / det
     };
-    let fallback = spline::length(chord) / 3.0;
+    let fallback = chord.length() / 3.0;
     if !fixed_a && (!alpha.is_finite() || alpha <= 1e-12) {
         alpha = fallback;
     }
@@ -66,7 +64,7 @@ fn generate(nodes: &[Node], start: usize, end: usize, params: &[f64], length: f6
     }
     alpha = alpha.min(length * 0.75);
     beta = beta.min(length * 0.75);
-    [a.p, step(a.p, a.t, alpha), step(b.p, b.t, -beta), b.p]
+    [a.p, a.p + a.t * alpha, b.p - b.t * beta, b.p]
 }
 // Each restricted cubic is compared with a straight cubic on its reference chord.
 // Convex-hull containment bounds the Hausdorff deviation in both directions.

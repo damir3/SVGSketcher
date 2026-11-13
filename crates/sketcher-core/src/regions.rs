@@ -1,6 +1,6 @@
 //! Region arrangement, graph traversal and exact boundary commands. Order and tolerances
 //! follow math/regionsReference.ts; hash tables are used only for lookup, never traversal.
-use crate::{bezier, intersect, spline, CubicBezier, Curve, Point2};
+use crate::{angle, bezier, distance, intersect, p, spline, CubicBezier, Curve, Point2};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::f64::consts::{PI, TAU};
@@ -30,17 +30,8 @@ pub struct Region {
     pub rings: Vec<Ring>,
 }
 
-fn p(x: f64, y: f64) -> Point2 {
-    Point2 { x, y }
-}
-fn distance(a: Point2, b: Point2) -> f64 {
-    spline::length(p(a.x - b.x, a.y - b.y))
-}
-fn angle(a: Point2, b: Point2) -> f64 {
-    (b.y - a.y).atan2(b.x - a.x)
-}
 fn svg_angle(a: Point2, b: Point2) -> f64 {
-    (-b.y - (-a.y)).atan2(b.x - a.x)
+    a.flip_y().angle_to(b.flip_y())
 }
 fn positive(value: f64) -> f64 {
     if value < 0.0 {
@@ -65,36 +56,30 @@ struct Ellipse {
     center: Point2,
     rx: f64,
     ry: f64,
-    ux: f64,
-    uy: f64,
-    vx: f64,
-    vy: f64,
+    u: Point2,
+    v: Point2,
 }
 impl Ellipse {
     fn new(center: Point2, major: Point2, minor: Point2) -> Self {
         let a = svg_angle(center, major);
-        let (ux, uy) = (a.cos(), a.sin());
+        let u = Point2::from_polar(1.0, a);
         Self {
             center,
-            rx: distance(center, major),
-            ry: distance(center, minor),
-            ux,
-            uy,
-            vx: -uy,
-            vy: ux,
+            rx: center.distance(major),
+            ry: center.distance(minor),
+            u,
+            v: u.perp(),
         }
     }
     fn param(self, point: Point2) -> f64 {
-        let (x, y) = (point.x - self.center.x, -point.y - (-self.center.y));
-        ((x * self.vx + y * self.vy) / self.ry.max(1e-6))
-            .atan2((x * self.ux + y * self.uy) / self.rx.max(1e-6))
+        let d = (point - self.center).flip_y();
+        (d.dot(self.v) / self.ry.max(1e-6)).atan2(d.dot(self.u) / self.rx.max(1e-6))
     }
     fn point(self, t: f64) -> Point2 {
-        let (u, v) = (self.rx * t.cos(), self.ry * t.sin());
-        p(
-            (self.center.x + self.ux * u) + self.vx * v,
-            -((-self.center.y + self.uy * u) + self.vy * v),
-        )
+        (self.center.flip_y()
+            + self.u * (self.rx * t.cos())
+            + self.v * (self.ry * t.sin()))
+        .flip_y()
     }
 }
 impl Geometry {
@@ -148,10 +133,7 @@ impl Geometry {
     }
     pub(crate) fn point(&self, t: f64) -> Point2 {
         match *self {
-            Self::Segment(a, b) => {
-                let u = t.clamp(0.0, 1.0);
-                p(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u)
-            }
+            Self::Segment(a, b) => a.lerp(b, t.clamp(0.0, 1.0)),
             Self::Circle(c, r) => p(r * t.cos() + c.x, -(r * t.sin() + (-c.y))),
             Self::Ellipse(..) => self.ellipse().unwrap().point(t),
             Self::Arc(c, r, ..) => {
@@ -187,12 +169,12 @@ impl Geometry {
     pub(crate) fn param(&self, point: Point2) -> f64 {
         match *self {
             Self::Segment(a, b) => {
-                let (dx, dy) = (b.x - a.x, b.y - a.y);
-                let l = dx * dx + dy * dy;
+                let d = b - a;
+                let l = d.length_squared();
                 if l < 1e-12 {
                     0.0
                 } else {
-                    (((point.x - a.x) * dx + (point.y - a.y) * dy) / l).clamp(0.0, 1.0)
+                    ((point - a).dot(d) / l).clamp(0.0, 1.0)
                 }
             }
             Self::Circle(c, _) => positive(svg_angle(c, point)),
@@ -297,15 +279,17 @@ impl Geometry {
                 }
             }
             Self::Circle(c, r) | Self::Arc(c, r, ..) => {
-                add(p(c.x - r, c.y - r));
-                add(p(c.x + r, c.y + r))
+                let d = Point2::new(r, r);
+                add(c - d);
+                add(c + d);
             }
             _ => {
                 let e = self.ellipse().unwrap();
-                let x = (e.rx * e.ux).hypot(e.ry * e.vx);
-                let y = (e.rx * e.uy).hypot(e.ry * e.vy);
-                add(p(e.center.x - x, e.center.y - y));
-                add(p(e.center.x + x, e.center.y + y));
+                let x = (e.rx * e.u.x).hypot(e.ry * e.v.x);
+                let y = (e.rx * e.u.y).hypot(e.ry * e.v.y);
+                let d = Point2::new(x, y);
+                add(e.center - d);
+                add(e.center + d);
             }
         }
         if let Some((a, c)) = self.endpoints() {
@@ -504,7 +488,7 @@ fn area(points: &[Point2]) -> f64 {
     let mut a = 0.0;
     for i in 0..points.len() {
         let (x, y) = (points[i], points[(i + 1) % points.len()]);
-        a += x.x * y.y - x.y * y.x;
+        a += x.cross(y);
     }
     a / 2.0
 }
@@ -717,19 +701,16 @@ fn segment_bounds(segment: &CubicBezier) -> [f64; 4] {
 
 fn cubic_self_intersection(segment: &CubicBezier) -> Option<(Point2, f64, f64)> {
     let [p0, p1, p2, p3] = *segment;
-    let ax = -p0.x + 3.0 * p1.x - 3.0 * p2.x + p3.x;
-    let ay = -p0.y + 3.0 * p1.y - 3.0 * p2.y + p3.y;
-    let bx = 3.0 * p0.x - 6.0 * p1.x + 3.0 * p2.x;
-    let by = 3.0 * p0.y - 6.0 * p1.y + 3.0 * p2.y;
-    let cx = -3.0 * p0.x + 3.0 * p1.x;
-    let cy = -3.0 * p0.y + 3.0 * p1.y;
-    let denom = ax * by - ay * bx;
-    let aa = ax * ax + ay * ay;
+    let a = -p0 + p1 * 3.0 - p2 * 3.0 + p3;
+    let b = p0 * 3.0 - p1 * 6.0 + p2 * 3.0;
+    let c = (p1 - p0) * 3.0;
+    let denom = a.cross(b);
+    let aa = a.length_squared();
     if denom.abs() < 1e-12 || aa < 1e-12 {
         return None;
     }
-    let s = -(ax * cy - ay * cx) / denom;
-    let p_val = s * s + ((ax * bx + ay * by) * s + (ax * cx + ay * cy)) / aa;
+    let s = -a.cross(c) / denom;
+    let p_val = s * s + (a.dot(b) * s + a.dot(c)) / aa;
     let disc = s * s - 4.0 * p_val;
     if disc <= 1e-12 {
         return None;
@@ -747,14 +728,7 @@ fn cubic_self_intersection(segment: &CubicBezier) -> Option<(Point2, f64, f64)> 
     if distance(q1, q2) >= 1e-5 {
         return None;
     }
-    Some((
-        Point2 {
-            x: (q1.x + q2.x) * 0.5,
-            y: (q1.y + q2.y) * 0.5,
-        },
-        u1,
-        u2,
-    ))
+    Some((q1.middle(q2), u1, u2))
 }
 
 pub(crate) fn spline_self_intersections(
@@ -800,10 +774,7 @@ pub(crate) fn spline_self_intersections(
                     continue;
                 }
                 hits.push((
-                    Point2 {
-                        x: (pa.x + pb.x) * 0.5,
-                        y: (pa.y + pb.y) * 0.5,
-                    },
+                    pa.middle(pb),
                     (a as f64 + ta) / nf,
                     (b as f64 + tb) / nf,
                 ));
@@ -1068,7 +1039,7 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
                     other
                         .points
                         .iter()
-                        .any(|q| (p.x - q.x).abs() < 1e-4 && distance(*p, *q) < 1e-4)
+                        .any(|q| p.distance(*q) < 1e-4)
                 });
                 if !shared {
                     parent = Some(j)

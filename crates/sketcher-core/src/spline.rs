@@ -1,43 +1,6 @@
 //! Spline construction and projection, preserving the TypeScript reference arithmetic and tolerances.
 use crate::{bezier, CubicBezier, Point2};
 
-fn p(x: f64, y: f64) -> Point2 {
-    Point2 { x, y }
-}
-fn sub(a: Point2, b: Point2) -> Point2 {
-    p(a.x - b.x, a.y - b.y)
-}
-fn scale(a: Point2, s: f64) -> Point2 {
-    p(a.x * s, a.y * s)
-}
-fn add(a: Point2, b: Point2) -> Point2 {
-    p(a.x + b.x, a.y + b.y)
-}
-pub(crate) fn length(a: Point2) -> f64 {
-    // Match the reference's scaled two-coordinate norm. A single ULP can change
-    // which equally close branch the projection search chooses on a retraced curve.
-    let (x, y) = (a.x.abs(), a.y.abs());
-    if x.is_infinite() || y.is_infinite() {
-        return f64::INFINITY;
-    }
-    if x.is_nan() || y.is_nan() {
-        return f64::NAN;
-    }
-    let maximum = x.max(y);
-    if maximum == 0.0 {
-        return 0.0;
-    }
-    let (x, y) = (x / maximum, y / maximum);
-    (x * x + y * y).sqrt() * maximum
-}
-fn distance(a: Point2, b: Point2) -> f64 {
-    length(sub(b, a))
-}
-fn lerp(a: Point2, b: Point2, t: f64) -> Point2 {
-    let d = sub(b, a);
-    p(a.x + d.x * t, a.y + d.y * t)
-}
-
 pub fn evaluate_bezier(curve: &CubicBezier, t: f64) -> Point2 {
     bezier::evaluate(curve, t)
 }
@@ -45,12 +8,12 @@ pub fn derivative_bezier(curve: &CubicBezier, t: f64) -> Point2 {
     bezier::derivative(curve, t)
 }
 pub fn split_at(b: &CubicBezier, t: f64) -> [CubicBezier; 2] {
-    let p01 = lerp(b[0], b[1], t);
-    let p12 = lerp(b[1], b[2], t);
-    let p23 = lerp(b[2], b[3], t);
-    let p012 = lerp(p01, p12, t);
-    let p123 = lerp(p12, p23, t);
-    let middle = lerp(p012, p123, t);
+    let p01 = b[0].lerp(b[1], t);
+    let p12 = b[1].lerp(b[2], t);
+    let p23 = b[2].lerp(b[3], t);
+    let p012 = p01.lerp(p12, t);
+    let p123 = p12.lerp(p23, t);
+    let middle = p012.lerp(p123, t);
     [[b[0], p01, p012, middle], [middle, p123, p23, b[3]]]
 }
 
@@ -59,37 +22,36 @@ pub fn natural_handles(points: &[Point2]) -> Vec<[Point2; 2]> {
         return vec![];
     }
     let n = points.len() - 1;
-    let closed = n >= 2 && distance(points[n], points[0]) < 1e-4;
+    let closed = n >= 2 && points[n].distance(points[0]) < 1e-4;
     (0..=n)
         .map(|i| {
             let h = if n == 1 || (!closed && i == 0) {
-                scale(sub(points[1], points[0]), 1.0 / 3.0)
+                (points[1] - points[0]) * (1.0 / 3.0)
             } else if !closed && i == n {
-                scale(sub(points[n], points[n - 1]), 1.0 / 3.0)
+                (points[n] - points[n - 1]) * (1.0 / 3.0)
             } else {
                 let (prev, next) = if closed && (i == 0 || i == n) {
                     (points[n - 1], points[1])
                 } else {
                     (points[i - 1], points[i + 1])
                 };
-                let dir = sub(next, prev);
-                let dir_length = length(dir);
-                let (incoming, outgoing) = (sub(points[i], prev), sub(next, points[i]));
-                let (d1, d2) = (length(incoming), length(outgoing));
+                let dir = next - prev;
+                let dir_length = dir.length();
+                let (incoming, outgoing) = (points[i] - prev, next - points[i]);
+                let (d1, d2) = (incoming.length(), outgoing.length());
                 let mut handle_length = (d1 + d2) / 6.0;
                 if d1 > 1e-6 && d2 > 1e-6 {
-                    let cos = ((incoming.x * outgoing.x + incoming.y * outgoing.y) / (d1 * d2))
-                        .clamp(-0.999, 1.0);
+                    let cos = (incoming.dot(outgoing) / (d1 * d2)).clamp(-0.999, 1.0);
                     let factor = 1.0 / (3.0 * (1.0 + ((1.0 + cos) * 0.5).max(0.0).sqrt()));
                     handle_length = (d1 + d2) * factor;
                 }
                 if dir_length > 1e-6 {
-                    scale(scale(dir, 1.0 / dir_length), handle_length)
+                    (dir / dir_length) * handle_length
                 } else {
-                    scale(dir, 1.0 / 6.0)
+                    dir * (1.0 / 6.0)
                 }
             };
-            [sub(points[i], h), add(points[i], h)]
+            [points[i] - h, points[i] + h]
         })
         .collect()
 }
@@ -131,19 +93,19 @@ pub fn control_to_bezier(points: &[Point2], explicit: &[f64]) -> Vec<CubicBezier
     match points.len() {
         0 | 1 => return vec![],
         2 => {
-            let delta = sub(points[1], points[0]);
+            let delta = points[1] - points[0];
             return vec![[
                 points[0],
-                add(points[0], scale(delta, 1.0 / 3.0)),
-                add(points[1], scale(delta, -1.0 / 3.0)),
+                points[0] + delta * (1.0 / 3.0),
+                points[1] - delta * (1.0 / 3.0),
                 points[1],
             ]];
         }
         3 => {
             return vec![[
                 points[0],
-                lerp(points[0], points[1], 2.0 / 3.0),
-                lerp(points[2], points[1], 2.0 / 3.0),
+                points[0].lerp(points[1], 2.0 / 3.0),
+                points[2].lerp(points[1], 2.0 / 3.0),
                 points[2],
             ]]
         }
@@ -180,10 +142,7 @@ pub fn control_to_bezier(points: &[Point2], explicit: &[f64]) -> Vec<CubicBezier
                 } else {
                     (u - knots[i]) / denominator
                 };
-                next.push(add(
-                    scale(current[i - 1], 1.0 - alpha),
-                    scale(current[i], alpha),
-                ));
+                next.push(current[i - 1] * (1.0 - alpha) + current[i] * alpha);
             }
             next.extend_from_slice(&current[k..]);
             knots.insert(k + 1, u);
@@ -205,7 +164,7 @@ pub fn control_to_bezier(points: &[Point2], explicit: &[f64]) -> Vec<CubicBezier
 
 pub fn point_at(segments: &[CubicBezier], param: f64) -> Point2 {
     if segments.is_empty() {
-        return p(0.0, 0.0);
+        return Point2::ZERO;
     }
     let value = param.clamp(0.0, 1.0) * segments.len() as f64;
     let index = (value.floor() as usize).min(segments.len() - 1);
@@ -213,7 +172,7 @@ pub fn point_at(segments: &[CubicBezier], param: f64) -> Point2 {
 }
 pub fn tangent_at(segments: &[CubicBezier], param: f64) -> Point2 {
     if segments.is_empty() {
-        return p(1.0, 0.0);
+        return Point2::UNIT_X;
     }
     let value = param.clamp(0.0, 1.0) * segments.len() as f64;
     let index = (value.floor() as usize).min(segments.len() - 1);
@@ -226,7 +185,7 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
         let (mut local_t, mut local_distance) = (0.0_f64, f64::INFINITY);
         for i in 0..=12 {
             let t = i as f64 / 12.0;
-            let d = distance(bezier::evaluate(segment, t), target);
+            let d = bezier::evaluate(segment, t).distance(target);
             if d < local_distance {
                 local_distance = d;
                 local_t = t;
@@ -239,8 +198,8 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
         for _ in 0..10 {
             let t1 = a + (b - a) * 0.382;
             let t2 = a + (b - a) * 0.618;
-            let d1 = distance(bezier::evaluate(segment, t1), target);
-            let d2 = distance(bezier::evaluate(segment, t2), target);
+            let d1 = bezier::evaluate(segment, t1).distance(target);
+            let d2 = bezier::evaluate(segment, t2).distance(target);
             if d1 < d2 {
                 b = t2;
             } else {
@@ -249,7 +208,7 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
         }
         let t = (a + b) * 0.5;
         let point = bezier::evaluate(segment, t);
-        let d = distance(point, target);
+        let d = point.distance(target);
         if d < best_distance {
             best_distance = d;
             best_param = (s as f64 + t) / segments.len() as f64;
@@ -265,14 +224,14 @@ pub fn signed_distance(segments: &[CubicBezier], target: Point2) -> f64 {
     }
     let (param, _, point) = project(segments, target);
     let tangent = tangent_at(segments, param);
-    let inverse = 1.0 / length(tangent).max(1e-7);
-    let delta = sub(target, point);
-    delta.x * (-tangent.y * inverse) + delta.y * (tangent.x * inverse)
+    let normal = tangent.perp() / tangent.length().max(1e-7);
+    (target - point).dot(normal)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::p;
     #[test]
     fn splitting_at_arbitrary_parameters_preserves_the_curve() {
         let b = [p(0.0, 1.0), p(4.0, 9.0), p(12.0, -3.0), p(17.0, 5.0)];
@@ -282,7 +241,7 @@ mod tests {
             assert_eq!(left[0], b[0]);
             assert_eq!(right[3], b[3]);
             assert_eq!(left[3], right[0]);
-            assert!(distance(left[3], middle) < 1e-12);
+            assert!(left[3].distance(middle) < 1e-12);
         }
     }
     #[test]
@@ -295,8 +254,7 @@ mod tests {
         let handles = natural_handles(&closed);
         assert_eq!(handles[0], handles[3]);
         for (point, handles) in closed.iter().zip(handles) {
-            assert!(((handles[0].x + handles[1].x) * 0.5 - point.x).abs() < 1e-12);
-            assert!(((handles[0].y + handles[1].y) * 0.5 - point.y).abs() < 1e-12);
+            assert!(handles[0].middle(handles[1]).distance(*point) < 1e-12);
         }
     }
     #[test]

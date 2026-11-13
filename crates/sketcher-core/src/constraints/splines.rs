@@ -60,7 +60,7 @@ fn points(p: &[f64]) -> Vec<Point2> {
     p.as_chunks::<2>()
         .0
         .iter()
-        .map(|v| Point2 { x: v[0], y: v[1] })
+        .map(|v| Point2::new(v[0], v[1]))
         .collect()
 }
 
@@ -84,20 +84,22 @@ impl Constraint {
                         if h[0] == 0.0 {
                             None
                         } else {
-                            Some([Point2 { x: h[1], y: h[2] }, Point2 { x: h[3], y: h[4] }])
+                            Some([Point2::new(h[1], h[2]), Point2::new(h[3], h[4])])
                         }
                     })
                     .collect();
                 spline::fit_to_bezier(&pts, &handles)
             };
-            vec![spline::signed_distance(&segments, Point2 { x: p[0], y: p[1] }) * self.weight]
+            vec![spline::signed_distance(&segments, Point2::new(p[0], p[1])) * self.weight]
         } else {
             let base = self.a as usize * 2;
             let natural = spline::natural_handles(&points(&p[..base]));
             let mut values = Vec::with_capacity(self.b as usize * 4);
             for h in p[base..].as_chunks::<5>().0 {
                 let [h1, h2] = natural[h[0] as usize];
-                values.extend([h[1] - h1.x, h[2] - h1.y, h[3] - h2.x, h[4] - h2.y]);
+                let d1 = Point2::new(h[1], h[2]) - h1;
+                let d2 = Point2::new(h[3], h[4]) - h2;
+                values.extend([d1.x, d1.y, d2.x, d2.y]);
             }
             values
         }

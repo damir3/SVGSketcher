@@ -1,4 +1,4 @@
-use super::{CubicBezier, Curve, Point2};
+use super::{cross, CubicBezier, Curve, Point2};
 
 pub(crate) fn evaluate(b: &CubicBezier, t: f64) -> Point2 {
     let u = 1.0 - t;
@@ -6,10 +6,7 @@ pub(crate) fn evaluate(b: &CubicBezier, t: f64) -> Point2 {
     let uu = u * u;
     let uuu = uu * u;
     let ttt = tt * t;
-    Point2 {
-        x: b[0].x * uuu + b[1].x * (3.0 * uu * t) + b[2].x * (3.0 * u * tt) + b[3].x * ttt,
-        y: b[0].y * uuu + b[1].y * (3.0 * uu * t) + b[2].y * (3.0 * u * tt) + b[3].y * ttt,
-    }
+    b[0] * uuu + b[1] * (3.0 * uu * t) + b[2] * (3.0 * u * tt) + b[3] * ttt
 }
 
 pub(crate) fn derivative(b: &CubicBezier, t: f64) -> Point2 {
@@ -17,14 +14,11 @@ pub(crate) fn derivative(b: &CubicBezier, t: f64) -> Point2 {
     let c0 = 3.0 * u * u;
     let c1 = 6.0 * u * t;
     let c2 = 3.0 * t * t;
-    Point2 {
-        x: 0.0 + (b[1].x - b[0].x) * c0 + (b[2].x - b[1].x) * c1 + (b[3].x - b[2].x) * c2,
-        y: 0.0 + (b[1].y - b[0].y) * c0 + (b[2].y - b[1].y) * c1 + (b[3].y - b[2].y) * c2,
-    }
+    (b[1] - b[0]) * c0 + (b[2] - b[1]) * c1 + (b[3] - b[2]) * c2
 }
 
 fn lerp(a: Point2, b: Point2, t: f64) -> Point2 {
-    super::offset(a, b.x - a.x, b.y - a.y, t)
+    a.lerp(b, t)
 }
 
 fn split(b: &CubicBezier) -> (CubicBezier, CubicBezier) {
@@ -55,7 +49,7 @@ fn bernstein_degree3(b: &CubicBezier, f: &impl Fn(Point2) -> f64) -> [f64; 7] {
 }
 
 fn bernstein_degree6(d: [Point2; 4], offset: f64) -> [f64; 7] {
-    let m = |i: usize, j: usize| d[i].x * d[j].x + d[i].y * d[j].y;
+    let m = |i: usize, j: usize| d[i].dot(d[j]);
     [
         m(0, 0) - offset,
         m(0, 1) - offset,
@@ -307,7 +301,7 @@ fn implicit_roots(
     let has_close_root = |p: Point2| {
         root_points
             .iter()
-            .any(|rp| (rp.x - p.x).hypot(rp.y - p.y) < NEAR_ROOT_TOLERANCE)
+            .any(|rp| rp.distance(p) < NEAR_ROOT_TOLERANCE)
     };
 
     let include_start = f(b[0]).abs() < NEAR_ROOT_TOLERANCE && !has_close_root(b[0]);
@@ -329,7 +323,7 @@ fn implicit_roots(
         }
         if !unique
             .iter()
-            .any(|u| (u.x - p.x).hypot(u.y - p.y) < NEAR_ROOT_TOLERANCE)
+            .any(|u| u.distance(p) < NEAR_ROOT_TOLERANCE)
         {
             unique.push(p);
         }
@@ -341,15 +335,14 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
     match other {
         Curve::Bezier { points } => intersect_beziers(b, points),
         Curve::Segment { p1, p2 } => {
-            let (a, coefficient_b) = (-(p2.y - p1.y), p2.x - p1.x);
-            let c = -(a * p1.x + coefficient_b * p1.y);
-            let length = a.hypot(coefficient_b);
+            let d = p2 - p1;
+            let n = d.perp();
+            let length = n.length();
             if length < 1e-12 {
                 return vec![];
             }
-            let (dx, dy) = (p2.x - p1.x, p2.y - p1.y);
-            let length_sq = dx * dx + dy * dy;
-            let f = |p: Point2| (a * p.x + coefficient_b * p.y + c) / length;
+            let length_sq = d.length_squared();
+            let f = |p: Point2| (p - p1).dot(n) / length;
             let coeffs = bernstein_degree3(&b, &f);
             implicit_roots(&b, coeffs, 3, -NEAR_ROOT_TOLERANCE, NEAR_ROOT_TOLERANCE, f)
                 .into_iter()
@@ -357,10 +350,10 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
                     let t = if length_sq < 1e-12 {
                         0.0
                     } else {
-                        (((p.x - p1.x) * dx + (p.y - p1.y) * dy) / length_sq).clamp(0.0, 1.0)
+                        ((*p - p1).dot(d) / length_sq).clamp(0.0, 1.0)
                     };
-                    let projected = super::offset(p1, dx, dy, t);
-                    (projected.x - p.x).hypot(projected.y - p.y) < SEGMENT_PROJECTION_TOLERANCE
+                    let projected = p1 + d * t;
+                    projected.distance(*p) < SEGMENT_PROJECTION_TOLERANCE
                         && (-1e-4..=1.0 + 1e-4).contains(&t)
                 })
                 .collect()
@@ -371,22 +364,10 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
             }
             let r_sq = radius * radius;
             let d = [
-                Point2 {
-                    x: b[0].x - center.x,
-                    y: b[0].y - center.y,
-                },
-                Point2 {
-                    x: b[1].x - center.x,
-                    y: b[1].y - center.y,
-                },
-                Point2 {
-                    x: b[2].x - center.x,
-                    y: b[2].y - center.y,
-                },
-                Point2 {
-                    x: b[3].x - center.x,
-                    y: b[3].y - center.y,
-                },
+                b[0] - center,
+                b[1] - center,
+                b[2] - center,
+                b[3] - center,
             ];
             let r_min = (radius - NEAR_ROOT_TOLERANCE).max(0.0);
             let r_max = radius + NEAR_ROOT_TOLERANCE;
@@ -394,9 +375,7 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
             let g_high = r_max * r_max - r_sq;
             let coeffs = bernstein_degree6(d, r_sq);
             implicit_roots(&b, coeffs, 6, g_low, g_high, |p| {
-                let dx = p.x - center.x;
-                let dy = p.y - center.y;
-                (dx * dx + dy * dy).sqrt() - radius
+                p.distance(center) - radius
             })
         }
         ellipse @ Curve::Ellipse { .. } => {
@@ -424,17 +403,11 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
 
 fn bounds(b: &CubicBezier) -> (Point2, Point2) {
     let (mut min, mut max) = (b[0], b[0]);
-    for p in &b[1..] {
-        min.x = min.x.min(p.x);
-        min.y = min.y.min(p.y);
-        max.x = max.x.max(p.x);
-        max.y = max.y.max(p.y);
+    for &p in &b[1..] {
+        min = min.min(p);
+        max = max.max(p);
     }
     (min, max)
-}
-
-fn cross(a: Point2, b: Point2) -> f64 {
-    a.x * b.y - a.y * b.x
 }
 
 pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2> {
@@ -450,7 +423,7 @@ pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2>
     let mut hits: Vec<(Point2, f64)> = Vec::new();
     let record_hit = |hits: &mut Vec<(Point2, f64)>, point: Point2, residual: f64| {
         for hit in hits.iter_mut() {
-            if (hit.0.x - point.x).hypot(hit.0.y - point.y) < 1e-3 {
+            if hit.0.distance(point) < 1e-3 {
                 if hit.1 > 1e-9 && residual < hit.1 {
                     *hit = (point, residual);
                 }
@@ -461,16 +434,9 @@ pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2>
     };
     for p1 in [b1[0], b1[3]] {
         for p2 in [b2[0], b2[3]] {
-            let dist = (p1.x - p2.x).hypot(p1.y - p2.y);
+            let dist = p1.distance(p2);
             if dist < 1e-9 {
-                record_hit(
-                    &mut hits,
-                    Point2 {
-                        x: (p1.x + p2.x) * 0.5,
-                        y: (p1.y + p2.y) * 0.5,
-                    },
-                    dist,
-                );
+                record_hit(&mut hits, p1.middle(p2), dist);
             }
         }
     }
@@ -510,11 +476,8 @@ pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2>
             let (mut t, mut u) = ((t0 + t1) * 0.5, (u0 + u1) * 0.5);
             for _ in 0..4 {
                 let (p1, p2) = (evaluate(&b1, t), evaluate(&b2, u));
-                let f = Point2 {
-                    x: p1.x - p2.x,
-                    y: p1.y - p2.y,
-                };
-                if f.x.hypot(f.y) < 1e-11 {
+                let f = p1 - p2;
+                if f.length() < 1e-11 {
                     break;
                 }
                 let (d1, d2) = (derivative(&b1, t), derivative(&b2, u));
@@ -527,16 +490,9 @@ pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2>
                 u = (u - du).clamp(0.0, 1.0);
             }
             let (p1, p2) = (evaluate(&b1, t), evaluate(&b2, u));
-            let dist = (p1.x - p2.x).hypot(p1.y - p2.y);
+            let dist = p1.distance(p2);
             if dist < 1e-3 {
-                record_hit(
-                    &mut hits,
-                    Point2 {
-                        x: (p1.x + p2.x) * 0.5,
-                        y: (p1.y + p2.y) * 0.5,
-                    },
-                    dist,
-                );
+                record_hit(&mut hits, p1.middle(p2), dist);
             }
             continue;
         }
@@ -631,9 +587,7 @@ pub(crate) fn intersect_beziers(b1: CubicBezier, b2: CubicBezier) -> Vec<Point2>
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn p(x: f64, y: f64) -> Point2 {
-        Point2 { x, y }
-    }
+    use crate::p;
     fn line(a: Point2, b: Point2) -> CubicBezier {
         [a, lerp(a, b, 1.0 / 3.0), lerp(a, b, 2.0 / 3.0), b]
     }
@@ -748,6 +702,6 @@ mod tests {
         ];
         let hits = intersect_beziers(b1, b2);
         assert_eq!(hits.len(), 1);
-        assert!((hits[0].x - shared.x).hypot(hits[0].y - shared.y) < 1e-9);
+        assert!(hits[0].distance(shared) < 1e-9);
     }
 }

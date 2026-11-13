@@ -26,26 +26,6 @@ pub struct Extend {
     pub source: Option<usize>,
     pub full: bool,
 }
-fn p(x: f64, y: f64) -> Point2 {
-    Point2 { x, y }
-}
-fn length(v: Point2) -> f64 {
-    spline::length(v)
-}
-fn distance(a: Point2, b: Point2) -> f64 {
-    length(p(a.x - b.x, a.y - b.y))
-}
-fn angle(c: Point2, v: Point2) -> f64 {
-    (v.y - c.y).atan2(v.x - c.x)
-}
-fn normalized(v: Point2) -> Point2 {
-    let l = length(v);
-    if l < 1e-12 {
-        p(1.0, 0.0)
-    } else {
-        p(v.x * (1.0 / l), v.y * (1.0 / l))
-    }
-}
 fn angular(mut value: f64) -> f64 {
     while value < 0.0 {
         value += TAU
@@ -197,21 +177,17 @@ pub fn extend(
         Geometry::Spline(..) => (g.point(0.0), g.point(1.0)),
         _ => return None,
     };
-    let end = distance(cursor, finish) <= distance(cursor, start);
+    let end = cursor.distance(finish) <= cursor.distance(start);
     let from = if end { finish } else { start };
     if matches!(g, Geometry::Segment(..) | Geometry::Spline(..)) {
         let dir = if let Geometry::Spline(segments, _) = g {
             let tangent = spline::tangent_at(segments, if end { 1.0 } else { 0.0 });
-            normalized(if end {
-                tangent
-            } else {
-                p(-tangent.x, -tangent.y)
-            })
+            (if end { tangent } else { -tangent }).unit()
         } else {
             let other = if end { start } else { finish };
-            normalized(p(from.x - other.x, from.y - other.y))
+            (from - other).unit()
         };
-        let ray = Geometry::Segment(from, p(from.x + dir.x * 50000.0, from.y + dir.y * 50000.0));
+        let ray = Geometry::Segment(from, from + dir * 50000.0);
         let primitives = ray.primitives();
         let mut best = f64::INFINITY;
         let mut hit = None;
@@ -225,7 +201,7 @@ pub fn extend(
                 &primitives,
                 &other.geometry.primitives(),
             ) {
-                let t = (point.x - from.x) * dir.x + (point.y - from.y) * dir.y;
+                let t = (point - from).dot(dir);
                 if t > 1e-3 && t < best {
                     best = t;
                     hit = Some((point, index));
@@ -238,7 +214,7 @@ pub fn extend(
                 .position(|other| other.id == target.id)
                 .unwrap_or(others.len());
             for point in intersections(&ray, g, &primitives, &g.primitives()) {
-                let t = (point.x - from.x) * dir.x + (point.y - from.y) * dir.y;
+                let t = (point - from).dot(dir);
                 if t > 1e-3 && t < best {
                     best = t;
                     hit = Some((point, self_source));
@@ -248,7 +224,7 @@ pub fn extend(
         let (to, source) = if let Some((q, i)) = hit {
             (q, Some(i))
         } else {
-            (p(from.x + dir.x * 50.0, from.y + dir.y * 50.0), None)
+            (from + dir * 50.0, None)
         };
         return Some(Extend {
             end,
@@ -259,7 +235,9 @@ pub fn extend(
         });
     }
     let (full, theta_start, theta_end, cw) = match *g {
-        Geometry::Arc(c, r, a, b, cw) => (Geometry::Circle(c, r), angle(c, a), angle(c, b), cw),
+        Geometry::Arc(c, r, a, b, cw) => {
+            (Geometry::Circle(c, r), c.angle_to(a), c.angle_to(b), cw)
+        }
         Geometry::EllipticalArc(c, major, minor, a, b, cw) => {
             let parameter = |v| ellipse_param(c, major, minor, v);
             (
@@ -294,7 +272,7 @@ pub fn extend(
             &other.geometry.primitives(),
         ) {
             let theta = match *g {
-                Geometry::Arc(c, ..) => angle(c, point),
+                Geometry::Arc(c, ..) => c.angle_to(point),
                 Geometry::EllipticalArc(c, a, b, ..) => ellipse_param(c, a, b, point),
                 _ => unreachable!(),
             };
@@ -334,16 +312,17 @@ pub fn extend(
     })
 }
 fn ellipse_param(c: Point2, major: Point2, minor: Point2, v: Point2) -> f64 {
-    let a = angle(c, major);
-    let (ux, uy) = (a.cos(), a.sin());
-    let (vx, vy) = (-uy, ux);
-    let (x, y) = (v.x - c.x, v.y - c.y);
-    ((x * vx + y * vy) / distance(c, minor)).atan2((x * ux + y * uy) / distance(c, major))
+    let a = c.angle_to(major);
+    let u = Point2::from_polar(1.0, a);
+    let v_axis = u.perp();
+    let d = v - c;
+    (d.dot(v_axis) / c.distance(minor)).atan2(d.dot(u) / c.distance(major))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::p;
     fn line(id: usize, a: Point2, b: Point2) -> RegionCurve {
         RegionCurve {
             id,

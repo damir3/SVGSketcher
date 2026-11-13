@@ -54,20 +54,20 @@ fn clearance(pt: Point2, polygon: &[Point2]) -> f64 {
 fn band_covers(a: &Geometry, b: &Geometry, cell: Cell, radius: f64, tolerance: f64) -> bool {
     match (a, b) {
         (Geometry::Segment(a0, a1), Geometry::Segment(b0, b1)) => {
-            let av = sub(*a1, *a0);
-            let bv = sub(*b1, *b0);
-            let al = spline::length(av);
-            let bl = spline::length(bv);
+            let av = *a1 - *a0;
+            let bv = *b1 - *b0;
+            let al = av.length();
+            let bl = bv.length();
             if al < 1e-9 || bl < 1e-9 {
                 return false;
             }
-            let u = scale(av, 1.0 / al);
-            let v = scale(bv, 1.0 / bl);
-            let n = perp(u);
-            if cross(u, v).abs() > 1e-10 || dot(u, v) > -1.0 + 1e-10 {
+            let u = av * (1.0 / al);
+            let v = bv * (1.0 / bl);
+            let n = u.perp();
+            if u.cross(v).abs() > 1e-10 || u.dot(v) > -1.0 + 1e-10 {
                 return false;
             }
-            let offset = dot(sub(*b0, *a0), n);
+            let offset = (*b0 - *a0).dot(n);
             let lo = offset.min(0.0);
             let hi = offset.max(0.0);
             if (hi - lo) / 2.0 > radius + tolerance {

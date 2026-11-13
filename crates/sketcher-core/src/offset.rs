@@ -1,57 +1,17 @@
 //! Numeric offset chains, retaining the editor's sampling, join order and tolerances.
-use crate::{regions::Geometry, spline, Point2};
+use crate::{
+    add, angle, cross, distance as dist, dot, middle, p, perp, polar, regions::Geometry, scale,
+    spline, step, sub, unit, Point2,
+};
 use std::f64::consts::TAU;
 #[path = "offset_collapse.rs"]
 mod collapse;
 #[path = "offset_spline.rs"]
 mod refined_spline;
-fn p(x: f64, y: f64) -> Point2 {
-    Point2 { x, y }
-}
-fn sub(a: Point2, b: Point2) -> Point2 {
-    p(a.x - b.x, a.y - b.y)
-}
-fn scale(a: Point2, s: f64) -> Point2 {
-    p(a.x * s, a.y * s)
-}
-fn add(a: Point2, b: Point2) -> Point2 {
-    p(a.x + b.x, a.y + b.y)
-}
-fn step(a: Point2, b: Point2, s: f64) -> Point2 {
-    p(a.x + b.x * s, a.y + b.y * s)
-}
-fn dot(a: Point2, b: Point2) -> f64 {
-    a.x * b.x + a.y * b.y
-}
-fn cross(a: Point2, b: Point2) -> f64 {
-    a.x * b.y - a.y * b.x
-}
-fn dist(a: Point2, b: Point2) -> f64 {
-    spline::length(sub(a, b))
-}
+
+#[inline]
 fn squared(a: Point2, b: Point2) -> f64 {
-    let d = sub(a, b);
-    dot(d, d)
-}
-fn unit(a: Point2) -> Point2 {
-    let n = spline::length(a);
-    if n < 1e-12 {
-        p(1.0, 0.0)
-    } else {
-        scale(a, 1.0 / n)
-    }
-}
-fn perp(a: Point2) -> Point2 {
-    p(-a.y, a.x)
-}
-fn middle(a: Point2, b: Point2) -> Point2 {
-    p((a.x + b.x) * 0.5, (a.y + b.y) * 0.5)
-}
-fn angle(c: Point2, a: Point2) -> f64 {
-    (a.y - c.y).atan2(a.x - c.x)
-}
-fn polar(r: f64, a: f64) -> Point2 {
-    p(r * a.cos(), r * a.sin())
+    a.distance_squared(b)
 }
 fn sweep(a: f64, b: f64, cw: bool) -> f64 {
     let mut s = if cw { a - b } else { b - a };
@@ -134,13 +94,13 @@ pub struct Offset {
     pub error: u8,
 }
 fn ellipse(c: Point2, major: Point2, minor: Point2) -> (f64, f64, Point2, Point2) {
-    let a = dist(c, major);
-    let b = dist(c, minor);
-    let u = polar(1.0, angle(c, major));
-    (a, b, u, perp(u))
+    let a = c.distance(major);
+    let b = c.distance(minor);
+    let u = Point2::from_polar(1.0, c.angle_to(major));
+    (a, b, u, u.perp())
 }
 fn ellipse_point(c: Point2, a: f64, b: f64, u: Point2, v: Point2, t: f64) -> Point2 {
-    step(step(c, u, a * t.cos()), v, b * t.sin())
+    c + u * (a * t.cos()) + v * (b * t.sin())
 }
 fn sample(item: &Item, count: usize) -> Vec<Point2> {
     let Some(g) = &item.geometry else {
@@ -151,10 +111,7 @@ fn sample(item: &Item, count: usize) -> Vec<Point2> {
         Geometry::Circle(c, r) => {
             let mut out: Vec<_> = (0..count)
                 .map(|i| {
-                    add(
-                        polar(*r, (i as f64 / count as f64) * std::f64::consts::PI * 2.0),
-                        *c,
-                    )
+                    *c + Point2::from_polar(*r, (i as f64 / count as f64) * std::f64::consts::PI * 2.0)
                 })
                 .collect();
             out.push(out[0]);
@@ -250,33 +207,32 @@ fn inside(pt: Point2, poly: &[Point2]) -> bool {
     result
 }
 fn normal(tangent: Point2, closed: bool, ccw: bool) -> Point2 {
-    let n = perp(tangent);
+    let n = tangent.perp();
     if closed && ccw {
-        scale(n, -1.0)
+        -n
     } else {
         n
     }
 }
 pub fn intersect_lines(a: Point2, d1: Point2, b: Point2, d2: Point2) -> Option<Point2> {
-    let det = cross(d1, d2);
+    let det = d1.cross(d2);
     if det.abs() < 1e-7 {
         None
     } else {
-        Some(step(a, d1, cross(sub(b, a), d2) / det))
+        Some(a + d1 * ((b - a).cross(d2) / det))
     }
 }
 fn line_circle(origin: Point2, dir: Point2, c: Point2, r: f64, near: Point2) -> Option<Point2> {
-    let t = dot(sub(c, origin), dir);
-    let x = origin.x + t * dir.x - c.x;
-    let y = origin.y + t * dir.y - c.y;
-    let d = x * x + y * y;
+    let t = (c - origin).dot(dir);
+    let p = origin + dir * t;
+    let d = p.distance_squared(c);
     if d > r * r {
         return None;
     }
     let dt = (r * r - d).max(0.0).sqrt();
-    let a = step(origin, dir, t - dt);
-    let b = step(origin, dir, t + dt);
-    Some(if dist(a, near) < dist(b, near) { a } else { b })
+    let a = origin + dir * (t - dt);
+    let b = origin + dir * (t + dt);
+    Some(if a.distance(near) < b.distance(near) { a } else { b })
 }
 fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
     match (cur, next) {
@@ -285,8 +241,8 @@ fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
         (Shape::Arc(c, r, a, _), Shape::Line(b, dir)) => line_circle(b[0], *dir, *c, *r, a[1]),
         (Shape::Line(a, dir), Shape::Spline(s)) => {
             intersect_lines(a[0], *dir, s.points[0], s.tangents.unwrap()[0])
-                .filter(|p| dist(*p, a[1]) <= 4.0 * d.abs())
-                .or_else(|| Some(middle(a[1], s.points[0])))
+                .filter(|p| p.distance(a[1]) <= 4.0 * d.abs())
+                .or_else(|| Some(a[1].middle(s.points[0])))
         }
         (Shape::Spline(s), Shape::Line(b, dir)) => intersect_lines(
             b[0],
@@ -294,11 +250,11 @@ fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
             *s.points.last().unwrap(),
             s.tangents.unwrap()[1],
         )
-        .filter(|p| dist(*p, b[0]) <= 4.0 * d.abs())
-        .or_else(|| Some(middle(*s.points.last().unwrap(), b[0]))),
+        .filter(|p| p.distance(b[0]) <= 4.0 * d.abs())
+        .or_else(|| Some(s.points.last().unwrap().middle(b[0]))),
         (Shape::Arc(c, r, a, _), Shape::Spline(s)) => {
             line_circle(s.points[0], s.tangents.unwrap()[0], *c, *r, a[1])
-                .or_else(|| Some(middle(a[1], s.points[0])))
+                .or_else(|| Some(a[1].middle(s.points[0])))
         }
         (Shape::Spline(s), Shape::Arc(c, r, b, _)) => line_circle(
             *s.points.last().unwrap(),
@@ -307,8 +263,8 @@ fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
             *r,
             b[0],
         )
-        .or_else(|| Some(middle(*s.points.last().unwrap(), b[0]))),
-        _ => Some(middle(cur.end(), next.start())),
+        .or_else(|| Some(s.points.last().unwrap().middle(b[0]))),
+        _ => Some(cur.end().middle(next.start())),
     }
 }
 fn side(items: &[Item], closed: bool, d: f64) -> Side {

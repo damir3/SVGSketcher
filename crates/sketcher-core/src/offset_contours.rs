@@ -78,8 +78,8 @@ fn crossings(a: &Edge, b: &Edge, primitives: &[Primitive]) -> Vec<Point2> {
     let mut candidates = vec![];
     match (aa, bb) {
         (Shape::Arc(c, r, ..), Shape::Arc(q, s, ..)) => {
-            let delta = sub(*q, *c);
-            let d = spline::length(delta);
+            let delta = *q - *c;
+            let d = delta.length();
             if d < 1e-12 {
                 if (r - s).abs() < 1e-8 {
                     candidates.extend([a.a.p, a.b.p, b.a.p, b.b.p]);
@@ -87,9 +87,10 @@ fn crossings(a: &Edge, b: &Edge, primitives: &[Primitive]) -> Vec<Point2> {
             } else if d <= r + s + 1e-8 && d >= (r - s).abs() - 1e-8 {
                 let x = (r * r - s * s + d * d) / (2.0 * d);
                 let h = (r * r - x * x).max(0.0).sqrt();
-                let u = scale(delta, 1.0 / d);
-                let mid = step(*c, u, x);
-                candidates.extend([step(mid, perp(u), h), step(mid, perp(u), -h)]);
+                let u = delta * (1.0 / d);
+                let mid = *c + u * x;
+                let n = u.perp();
+                candidates.extend([mid + n * h, mid - n * h]);
             }
         }
         (Shape::Arc(..), _) | (_, Shape::Arc(..)) => {
@@ -101,25 +102,25 @@ fn crossings(a: &Edge, b: &Edge, primitives: &[Primitive]) -> Vec<Point2> {
             let Shape::Arc(c, r, ..) = circle else {
                 unreachable!()
             };
-            let delta = sub(line.b.p, line.a.p);
+            let delta = line.b.p - line.a.p;
             for t in roots(line.a.p, delta, *c, *r) {
-                candidates.push(step(line.a.p, delta, t));
+                candidates.push(line.a.p + delta * t);
             }
         }
         _ => {
-            let u = sub(a.b.p, a.a.p);
-            let v = sub(b.b.p, b.a.p);
-            let delta = sub(b.a.p, a.a.p);
-            let det = cross(u, v);
+            let u = a.b.p - a.a.p;
+            let v = b.b.p - b.a.p;
+            let delta = b.a.p - a.a.p;
+            let det = u.cross(v);
             if det.abs() >= 1e-12 {
-                candidates.push(step(a.a.p, u, cross(delta, v) / det));
-            } else if dot(u, u) > 1e-20 && cross(delta, u).abs() <= 1e-9 * spline::length(u) {
-                let t0 = dot(delta, u) / dot(u, u);
-                let t1 = dot(sub(b.b.p, a.a.p), u) / dot(u, u);
+                candidates.push(a.a.p + u * (delta.cross(v) / det));
+            } else if u.length_squared() > 1e-20 && delta.cross(u).abs() <= 1e-9 * u.length() {
+                let t0 = delta.dot(u) / u.length_squared();
+                let t1 = (b.b.p - a.a.p).dot(u) / u.length_squared();
                 let lo = t0.min(t1).max(0.0);
                 let hi = t0.max(t1).min(1.0);
                 if lo <= hi + 1e-9 {
-                    candidates.extend([step(a.a.p, u, lo), step(a.a.p, u, hi)]);
+                    candidates.extend([a.a.p + u * lo, a.a.p + u * hi]);
                 }
             }
         }

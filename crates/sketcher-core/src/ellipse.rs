@@ -14,31 +14,20 @@ pub(super) struct Frame {
 impl Frame {
     pub(super) fn from_curve(curve: Curve) -> Option<Self> {
         let (center, rx, ry, angle) = match curve {
-            Curve::Circle { center, radius } => (
-                Point2 {
-                    x: center.x,
-                    y: -center.y,
-                },
-                radius,
-                radius,
-                0.0,
-            ),
+            Curve::Circle { center, radius } => (center.flip_y(), radius, radius, 0.0),
             Curve::Ellipse {
                 center,
                 major_axis_point: major,
                 minor_axis_point: minor,
             } => {
-                let center = Point2 {
-                    x: center.x,
-                    y: -center.y,
-                };
-                let dx = major.x - center.x;
-                let dy = -major.y - center.y;
+                let center = center.flip_y();
+                let d_major = major.flip_y() - center;
+                let d_minor = minor.flip_y() - center;
                 (
                     center,
-                    dx.hypot(dy),
-                    (minor.x - center.x).hypot(-minor.y - center.y),
-                    dy.atan2(dx),
+                    d_major.length(),
+                    d_minor.length(),
+                    d_major.y.atan2(d_major.x),
                 )
             }
             Curve::Segment { .. } | Curve::Bezier { .. } => return None,
@@ -46,54 +35,35 @@ impl Frame {
         if rx < 1e-6 || ry < 1e-6 {
             return None;
         }
-        let u = Point2 {
-            x: angle.cos(),
-            y: angle.sin(),
-        };
+        let u = Point2::from_polar(1.0, angle);
         Some(Self {
             center,
             rx,
             ry,
             u,
-            v: Point2 { x: -u.y, y: u.x },
+            v: u.perp(),
         })
     }
 
     fn local(&self, p: Point2) -> Point2 {
-        let dx = p.x - self.center.x;
-        let dy = p.y - self.center.y;
-        Point2 {
-            x: dx * self.u.x + dy * self.u.y,
-            y: dx * self.v.x + dy * self.v.y,
-        }
+        let d = p - self.center;
+        Point2::new(d.dot(self.u), d.dot(self.v))
     }
 
     pub(super) fn normalized_world(&self, point: Point2) -> Point2 {
-        let p = self.local(Point2 {
-            x: point.x,
-            y: -point.y,
-        });
-        Point2 {
-            x: p.x / self.rx,
-            y: p.y / self.ry,
-        }
+        let p = self.local(point.flip_y());
+        Point2::new(p.x / self.rx, p.y / self.ry)
     }
 
     pub(super) fn implicit_world(&self, point: Point2) -> f64 {
-        let p = self.local(Point2 {
-            x: point.x,
-            y: -point.y,
-        });
-        (p.x * p.x) / (self.rx * self.rx) + (p.y * p.y) / (self.ry * self.ry) - 1.0
+        let p = self.local(point.flip_y());
+        let nx = p.x / self.rx;
+        let ny = p.y / self.ry;
+        nx * nx + ny * ny - 1.0
     }
 
     fn point_at(&self, t: f64) -> Point2 {
-        let u = self.rx * t.cos();
-        let v = self.ry * t.sin();
-        Point2 {
-            x: self.center.x + self.u.x * u + self.v.x * v,
-            y: self.center.y + self.u.y * u + self.v.y * v,
-        }
+        self.center + self.u * (self.rx * t.cos()) + self.v * (self.ry * t.sin())
     }
 }
 
@@ -101,15 +71,14 @@ pub(super) fn segment_ellipse(p1: Point2, p2: Point2, ellipse: Curve) -> Vec<Poi
     let Some(e) = Frame::from_curve(ellipse) else {
         return vec![];
     };
-    let local1 = e.local(Point2 { x: p1.x, y: -p1.y });
-    let local2 = e.local(Point2 { x: p2.x, y: -p2.y });
-    let du = local2.x - local1.x;
-    let dv = local2.y - local1.y;
-    let a = e.ry * e.ry * du * du + e.rx * e.rx * dv * dv;
+    let local1 = e.local(p1.flip_y());
+    let local2 = e.local(p2.flip_y());
+    let d = local2 - local1;
+    let a = e.ry * e.ry * d.x * d.x + e.rx * e.rx * d.y * d.y;
     if a < 1e-12 {
         return vec![];
     }
-    let b = 2.0 * (e.ry * e.ry * local1.x * du + e.rx * e.rx * local1.y * dv);
+    let b = 2.0 * (e.ry * e.ry * local1.x * d.x + e.rx * e.rx * local1.y * d.y);
     let c = e.ry * e.ry * local1.x * local1.x + e.rx * e.rx * local1.y * local1.y
         - e.rx * e.rx * e.ry * e.ry;
     let discriminant = b * b - 4.0 * a * c;
@@ -120,7 +89,7 @@ pub(super) fn segment_ellipse(p1: Point2, p2: Point2, ellipse: Curve) -> Vec<Poi
     [(-b - sqrt_d) / (2.0 * a), (-b + sqrt_d) / (2.0 * a)]
         .into_iter()
         .filter(|t| (-1e-5..=1.0 + 1e-5).contains(t))
-        .map(|t| super::offset(p1, p2.x - p1.x, p2.y - p1.y, t.clamp(0.0, 1.0)))
+        .map(|t| p1.lerp(p2, t.clamp(0.0, 1.0)))
         .collect()
 }
 
@@ -166,20 +135,14 @@ pub(super) fn conic_conic(a: Curve, b: Curve) -> Vec<Point2> {
     }
     roots
         .into_iter()
-        .map(|t| {
-            let p = e1.point_at(t);
-            Point2 { x: p.x, y: -p.y }
-        })
+        .map(|t| e1.point_at(t).flip_y())
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn p(x: f64, y: f64) -> Point2 {
-        Point2 { x, y }
-    }
+    use crate::p;
     fn ellipse(rx: f64, ry: f64) -> Curve {
         Curve::Ellipse {
             center: p(0.0, 0.0),

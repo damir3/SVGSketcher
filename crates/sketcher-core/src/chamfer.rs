@@ -1,21 +1,7 @@
 //! Chamfer corner preparation and the three distance/angle modes.
-use crate::{spline::length, Point2};
+use crate::Point2;
 use std::f64::consts::PI;
-fn p(x: f64, y: f64) -> Point2 {
-    Point2 { x, y }
-}
-fn sub(a: Point2, b: Point2) -> Point2 {
-    p(a.x - b.x, a.y - b.y)
-}
-fn scale(a: Point2, s: f64) -> Point2 {
-    p(a.x * s, a.y * s)
-}
-fn add_scaled(a: Point2, b: Point2, s: f64) -> Point2 {
-    p(a.x + b.x * s, a.y + b.y * s)
-}
-fn dot(a: Point2, b: Point2) -> f64 {
-    a.x * b.x + a.y * b.y
-}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Corner {
     pub vertex: Point2,
@@ -26,16 +12,16 @@ pub struct Corner {
     pub angle: f64,
 }
 pub fn corner(vertex: Point2, other1: Point2, other2: Point2) -> Option<Corner> {
-    let v1 = sub(other1, vertex);
-    let v2 = sub(other2, vertex);
-    let len1 = length(v1);
-    let len2 = length(v2);
+    let v1 = other1 - vertex;
+    let v2 = other2 - vertex;
+    let len1 = v1.length();
+    let len2 = v2.length();
     if len1 < 1e-4 || len2 < 1e-4 {
         return None;
     }
-    let dir1 = scale(v1, 1.0 / len1);
-    let dir2 = scale(v2, 1.0 / len2);
-    let cos = dot(dir1, dir2).clamp(-1.0, 1.0);
+    let dir1 = v1 / len1;
+    let dir2 = v2 / len2;
+    let cos = dir1.dot(dir2).clamp(-1.0, 1.0);
     if cos.abs() > 0.9999 {
         return None;
     }
@@ -95,12 +81,9 @@ pub fn calculate(
             let d1 = d1_input.max(0.1);
             let d2 = d2_input.max(0.1);
             let (a, b) = if flip { (d2, d1) } else { (d1, d2) };
-            let ab = sub(
-                add_scaled(c.vertex, c.dir2, b),
-                add_scaled(c.vertex, c.dir1, a),
-            );
-            let norm = length(ab);
-            let cos = (dot(ab, scale(c.dir1, -1.0)) / if norm == 0.0 { 1.0 } else { norm })
+            let ab = (c.vertex + c.dir2 * b) - (c.vertex + c.dir1 * a);
+            let norm = ab.length();
+            let cos = (ab.dot(-c.dir1) / if norm == 0.0 { 1.0 } else { norm })
                 .clamp(-1.0, 1.0);
             (a, b, cos.acos() * (180.0 / PI))
         }
@@ -128,23 +111,17 @@ pub fn calculate(
     if (dist1 > max1 || dist2 > max2) && error == Error::None {
         error = Error::LargeDistance;
     }
-    let t1 = add_scaled(c.vertex, c.dir1, dist1);
-    let t2 = add_scaled(c.vertex, c.dir2, dist2);
-    let sum = p(c.dir1.x + c.dir2.x, c.dir1.y + c.dir2.y);
-    let norm = length(sum);
-    let bisector = if norm < 1e-12 {
-        p(1.0, 0.0)
-    } else {
-        scale(sum, 1.0 / norm)
-    };
+    let t1 = c.vertex + c.dir1 * dist1;
+    let t2 = c.vertex + c.dir2 * dist2;
+    let bisector = (c.dir1 + c.dir2).unit();
     Chamfer {
         t1,
         t2,
         dist1,
         dist2,
         angle,
-        length: length(sub(t1, t2)),
-        midpoint: p((t1.x + t2.x) / 2.0, (t1.y + t2.y) / 2.0),
+        length: t1.distance(t2),
+        midpoint: t1.middle(t2),
         bisector,
         max1,
         max2,
@@ -154,6 +131,7 @@ pub fn calculate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::p;
     #[test]
     fn orthogonal_chamfer_obeys_triangle_distances_and_flip() {
         let c = corner(p(0.0, 0.0), p(100.0, 0.0), p(0.0, 80.0)).unwrap();
