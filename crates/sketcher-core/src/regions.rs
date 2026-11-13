@@ -124,7 +124,15 @@ impl Geometry {
     }
     fn endpoints(&self) -> Option<(Point2, Point2)> {
         match *self {
+            Self::Segment(a, b) => Some((a, b)),
             Self::Arc(_, _, a, b, _) | Self::EllipticalArc(_, _, _, a, b, _) => Some((a, b)),
+            Self::Spline(ref segments, false) => {
+                if let (Some(first), Some(last)) = (segments.first(), segments.last()) {
+                    Some((first[0], last[3]))
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
@@ -218,20 +226,10 @@ impl Geometry {
                 2e-3
             };
             if distance(a, point) < tol {
-                return (0.0, a);
+                return (0.0, point);
             }
             if distance(b, point) < tol {
-                return (1.0, b);
-            }
-        }
-        if let Self::Spline(segments, false) = self {
-            if let (Some(a), Some(b)) = (segments.first(), segments.last()) {
-                if distance(a[0], point) <= 1e-5 {
-                    return (0.0, a[0]);
-                }
-                if distance(b[3], point) <= 1e-5 {
-                    return (1.0, b[3]);
-                }
+                return (1.0, point);
             }
         }
         (self.param(point), point)
@@ -876,6 +874,28 @@ fn split_self_intersecting_splines(curves: &[RegionCurve]) -> Cow<'_, [RegionCur
     }
 }
 
+fn snap_intersection(a: &Geometry, b: &Geometry, q: Point2) -> Point2 {
+    let mut best_dist = f64::INFINITY;
+    let mut best_pt = q;
+    for geom in [a, b] {
+        if let Some((p1, p2)) = geom.endpoints() {
+            let tol = if let Geometry::Arc(_, r, ..) = *geom {
+                1e-3_f64.max(r * 2e-4)
+            } else {
+                2e-3
+            };
+            for pt in [p1, p2] {
+                let d = distance(pt, q);
+                if d < tol && d < best_dist {
+                    best_dist = d;
+                    best_pt = pt;
+                }
+            }
+        }
+    }
+    best_pt
+}
+
 pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
     let curves_storage = split_self_intersecting_splines(curves);
     let curves: &[RegionCurve] = &curves_storage;
@@ -900,6 +920,7 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
                 &primitives[i],
                 &primitives[j],
             ) {
+                let q = snap_intersection(&curves[i].geometry, &curves[j].geometry, q);
                 cuts[i].push(curves[i].geometry.cut(q));
                 cuts[j].push(curves[j].geometry.cut(q));
             }
@@ -1122,5 +1143,65 @@ mod tests {
         let r = find_regions(&c);
         assert_eq!(r.len(), 1);
         assert_eq!(r[0].area, 100.0);
+    }
+    #[test]
+    fn region_issue_four_regions() {
+        let pts = [
+            p(-70.71325976904807, -48.951669519098786), // Point-27
+            p(-17.100982328552572, -21.52799891578571), // Point-28
+            p(74.04047285091734, 25.072922657761502),   // Point-55
+            p(-70.71378470916424, -48.95193749047031),  // Point-29
+            p(74.04047285089842, 25.072922657919527),   // Point-30
+        ];
+        let curves = vec![
+            RegionCurve {
+                id: 11,
+                geometry: Geometry::Segment(pts[0], pts[1]),
+            },
+            RegionCurve {
+                id: 25,
+                geometry: Geometry::Segment(pts[1], pts[2]),
+            },
+            RegionCurve {
+                id: 2,
+                geometry: Geometry::Spline(
+                    vec![[
+                        pts[3],
+                        p(-76.38805459910975, 31.402809214636047),
+                        p(9.555917968086924, 72.31449478600706),
+                        pts[4],
+                    ]],
+                    false,
+                ),
+            },
+            RegionCurve {
+                id: 3,
+                geometry: Geometry::Spline(
+                    vec![
+                        [
+                            pts[4],
+                            p(81.29440434316525, -32.13563250820586),
+                            p(33.23648165578342, -7.10041044590254),
+                            p(-6.055887911150573e-14, -6.999998057749547),
+                        ],
+                        [
+                            p(-6.055887911150573e-14, -6.999998057749547),
+                            p(-33.23648161240703, -6.899585669729027),
+                            p(-6.924328501645778, -74.75038210919845),
+                            p(-41.7499107971143, -71.49998309632444),
+                        ],
+                        [
+                            p(-41.7499107971143, -71.49998309632444),
+                            p(-57.663650372955594, -70.01469555772024),
+                            p(-66.22093107343193, -61.04675276832995),
+                            pts[3],
+                        ],
+                    ],
+                    false,
+                ),
+            },
+        ];
+        let r = find_regions(&curves);
+        assert_eq!(r.len(), 4);
     }
 }
