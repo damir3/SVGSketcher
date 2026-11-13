@@ -1,5 +1,7 @@
 //! Trimmed parallel curves and compact, error-bounded cubic fitting.
 use super::*;
+#[path = "offset_contours.rs"]
+mod contours;
 #[path = "offset_fit.rs"]
 mod fit;
 #[derive(Clone)]
@@ -168,6 +170,7 @@ fn closed_contours(nodes: &[Node], d: f64) -> Vec<Vec<Node>> {
     });
     loops
 }
+#[derive(Clone)]
 struct Path {
     nodes: Vec<Node>,
     closed: bool,
@@ -378,7 +381,7 @@ fn join_paths(a: &mut Path, b: &mut Path, d: f64) {
     extend(a, pt, false);
     extend(b, pt, true);
 }
-fn parallel(item: &Item, raw: &SplineOffset, d: f64, single: bool) -> Option<Path> {
+fn parallel(item: &Item, raw: &SplineOffset, d: f64, single: bool, clean: bool) -> Option<Path> {
     let (Some((_, normals)), Some(tangents)) = (&raw.basis, raw.tangents) else {
         return None;
     };
@@ -443,7 +446,7 @@ fn parallel(item: &Item, raw: &SplineOffset, d: f64, single: bool) -> Option<Pat
     if closed {
         *nodes.last_mut().unwrap() = nodes[0].clone();
     }
-    if d.abs() > 1e-12 && !closed {
+    if d.abs() > 1e-12 && !closed && clean {
         nodes = remove_loops(nodes);
     }
     Some(Path { nodes, closed })
@@ -601,33 +604,13 @@ fn trim_collapsed_sections(
         };
     }
 }
-pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bool, d: f64) {
-    let mut paths: Vec<_> = items
-        .iter()
-        .enumerate()
-        .map(|(i, item)| match &primitives[i].shape {
-            Shape::Spline(raw) => parallel(item, raw, d, items.len() == 1),
-            _ => None,
-        })
-        .collect();
-    if closed && paths.len() == 1 && d.abs() > 1e-12 {
-        if let Some(path) = &mut paths[0] {
-            if path.closed {
-                let contours = closed_contours(&path.nodes, d);
-                if !contours.is_empty() {
-                    *primitives = contours
-                        .into_iter()
-                        .map(|nodes| Primitive {
-                            source: primitives[0].source,
-                            shape: Shape::Spline(fitted(&nodes, d, true, true)),
-                        })
-                        .collect();
-                    return;
-                }
-                path.nodes = remove_loops(std::mem::take(&mut path.nodes));
-            }
-        }
-    }
+fn join_chain(
+    items: &[Item],
+    paths: &mut [Option<Path>],
+    primitives: &mut [Primitive],
+    closed: bool,
+    d: f64,
+) {
     for (i, item) in items.iter().enumerate() {
         let Some(Geometry::Arc(_, _, a, b, _)) = &item.geometry else {
             continue;
@@ -676,6 +659,53 @@ pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bo
         paths[i] = a;
         paths[j] = b;
     }
+}
+pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bool, d: f64) {
+    let mut paths: Vec<_> = items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| match &primitives[i].shape {
+            Shape::Spline(raw) => {
+                parallel(item, raw, d, items.len() == 1, !(closed && items.len() > 1))
+            }
+            _ => None,
+        })
+        .collect();
+    if closed && items.len() > 1 && d.abs() > 1e-12 {
+        let mut candidates = primitives.clone();
+        let mut candidate_paths = paths.clone();
+        join_chain(items, &mut candidate_paths, &mut candidates, closed, d);
+        if let Some(contours) = contours::split(items, &candidates, &paths, &candidate_paths, d) {
+            *primitives = contours;
+            return;
+        }
+        for path in paths.iter_mut().flatten() {
+            if !path.closed {
+                path.nodes = remove_loops(std::mem::take(&mut path.nodes));
+            }
+        }
+    }
+    if closed && paths.len() == 1 && d.abs() > 1e-12 {
+        if let Some(path) = &mut paths[0] {
+            if path.closed {
+                let contours = closed_contours(&path.nodes, d);
+                if !contours.is_empty() {
+                    *primitives = contours
+                        .into_iter()
+                        .enumerate()
+                        .map(|(contour, nodes)| Primitive {
+                            source: primitives[0].source,
+                            contour,
+                            shape: Shape::Spline(fitted(&nodes, d, true, true)),
+                        })
+                        .collect();
+                    return;
+                }
+                path.nodes = remove_loops(std::mem::take(&mut path.nodes));
+            }
+        }
+    }
+    join_chain(items, &mut paths, primitives, closed, d);
     let active = if d.abs() > 1e-12 {
         trim_collapsed_sections(&mut paths, primitives, closed)
     } else {

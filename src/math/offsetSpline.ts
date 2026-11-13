@@ -1,6 +1,7 @@
 import type { OffsetKernelItem, KernelOffsetResult, KernelOffsetPrimitive } from '../kernel/offsetTypes';
 import { Vec2 } from './vector';
 import { fitOffsetNodes, OFFSET_FIT_TOLERANCE } from './offsetFit';
+import { splitOffsetContours } from './offsetContours';
 import {
 	getSplinePointAtParam,
 	getSplineTangentAtParam,
@@ -437,6 +438,37 @@ function trimCollapsedSections(
 		if (!found) return active;
 	}
 }
+function joinChain(
+	items: readonly OffsetKernelItem[],
+	paths: (Path | undefined)[],
+	primitives: KernelOffsetPrimitive[],
+	closed: boolean,
+	d: number
+): void {
+	// Restore arc endpoints adjacent to sampled curves before evaluating finite intersections.
+	for (let i = 0; i < items.length; i++) {
+		const curve = items[i].curve,
+			prim = primitives[i];
+		if (curve?.type !== 'arc' || prim.type !== 'arc') continue;
+		const prev = i > 0 ? i - 1 : closed ? items.length - 1 : -1,
+			next = i + 1 < items.length ? i + 1 : closed ? 0 : -1,
+			center = Vec2.from(prim.center!);
+		if (paths[prev])
+			prim.start = center.clone().addScaledVector(Vec2.from(curve.start).sub(center).normalizeOrUnitX(), prim.radius!);
+		if (paths[next])
+			prim.end = center.clone().addScaledVector(Vec2.from(curve.end).sub(center).normalizeOrUnitX(), prim.radius!);
+	}
+	const n = closed ? items.length : items.length - 1;
+	for (let i = 0; i < n; i++) {
+		const j = (i + 1) % items.length,
+			a = paths[i],
+			b = paths[j];
+		if (i === j) continue;
+		if (a && b) joinPaths(a, b, d);
+		else if (a) joinAnalytic(a, primitives[j], false, d);
+		else if (b) joinAnalytic(b, primitives[i], true, d);
+	}
+}
 /** Native counterpart: build every parallel curve before coordinating shared endpoints. */
 export function refineSplineOffsets(
 	items: readonly OffsetKernelItem[],
@@ -532,14 +564,25 @@ export function refineSplineOffsets(
 			});
 			const isClosed = curve.type === 'spline' && !!curve.isClosed && items.length === 1;
 			if (isClosed) nodes[nodes.length - 1] = { ...nodes[0] };
-			if (Math.abs(d) > 1e-12 && !isClosed) nodes = removeLoops(nodes);
+			if (Math.abs(d) > 1e-12 && !isClosed && !(closed && items.length > 1)) nodes = removeLoops(nodes);
 			return { nodes, closed: isClosed };
 		});
+		if (closed && items.length > 1 && Math.abs(d) > 1e-12) {
+			const candidates = side.primitives.map(p => ({ ...p }));
+			const candidatePaths = paths.map(path => path && { ...path, nodes: path.nodes.map(n => ({ ...n })) });
+			joinChain(items, candidatePaths, candidates, closed, d);
+			const contours = splitOffsetContours(items, candidates, paths, candidatePaths, d, writeFitted);
+			if (contours) {
+				side.primitives = contours;
+				continue;
+			}
+			for (const path of paths) if (path && !path.closed) path.nodes = removeLoops(path.nodes);
+		}
 		if (closed && paths.length === 1 && paths[0]?.closed && Math.abs(d) > 1e-12) {
 			const contours = closedContours(paths[0].nodes, d);
 			if (contours.length > 0) {
-				side.primitives = contours.map(nodes => {
-					const prim = { ...side.primitives[0], isSplineClosed: true };
+				side.primitives = contours.map((nodes, contourIndex) => {
+					const prim = { ...side.primitives[0], isSplineClosed: true, ...(contourIndex ? { contourIndex } : {}) };
 					writeFitted(prim, nodes, d);
 					return prim;
 				});
@@ -547,31 +590,7 @@ export function refineSplineOffsets(
 			}
 			paths[0].nodes = removeLoops(paths[0].nodes);
 		}
-		// Restore arc endpoints adjacent to sampled curves before evaluating finite intersections.
-		for (let i = 0; i < items.length; i++) {
-			const curve = items[i].curve,
-				prim = side.primitives[i];
-			if (curve?.type !== 'arc' || prim.type !== 'arc') continue;
-			const prev = i > 0 ? i - 1 : closed ? items.length - 1 : -1,
-				next = i + 1 < items.length ? i + 1 : closed ? 0 : -1,
-				center = Vec2.from(prim.center!);
-			if (paths[prev])
-				prim.start = center
-					.clone()
-					.addScaledVector(Vec2.from(curve.start).sub(center).normalizeOrUnitX(), prim.radius!);
-			if (paths[next])
-				prim.end = center.clone().addScaledVector(Vec2.from(curve.end).sub(center).normalizeOrUnitX(), prim.radius!);
-		}
-		const n = closed ? items.length : items.length - 1;
-		for (let i = 0; i < n; i++) {
-			const j = (i + 1) % items.length,
-				a = paths[i],
-				b = paths[j];
-			if (i === j) continue;
-			if (a && b) joinPaths(a, b, d);
-			else if (a) joinAnalytic(a, side.primitives[j], false, d);
-			else if (b) joinAnalytic(b, side.primitives[i], true, d);
-		}
+		joinChain(items, paths, side.primitives, closed, d);
 		const active = Math.abs(d) > 1e-12 ? trimCollapsedSections(paths, side.primitives, closed) : items.map((_, i) => i);
 		for (let i = 0; i < paths.length; i++) {
 			const path = paths[i];

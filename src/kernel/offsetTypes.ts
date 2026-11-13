@@ -11,6 +11,8 @@ export interface OffsetKernelItem {
 }
 export interface KernelOffsetPrimitive {
 	sourceId: string;
+	/** Independent closed boundary within this offset side; omitted for the first contour. */
+	contourIndex?: number;
 	type: 'line' | 'arc' | 'circle' | 'spline';
 	p1?: Point2;
 	p2?: Point2;

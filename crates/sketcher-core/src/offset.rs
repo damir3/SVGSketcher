@@ -43,7 +43,7 @@ fn perp(a: Point2) -> Point2 {
     p(-a.y, a.x)
 }
 fn middle(a: Point2, b: Point2) -> Point2 {
-    p((a.x + b.x) / 2.0, (a.y + b.y) / 2.0)
+    p((a.x + b.x) * 0.5, (a.y + b.y) * 0.5)
 }
 fn angle(c: Point2, a: Point2) -> f64 {
     (a.y - c.y).atan2(a.x - c.x)
@@ -114,6 +114,7 @@ impl Shape {
 #[derive(Clone, Debug)]
 pub struct Primitive {
     pub source: usize,
+    pub contour: usize,
     pub shape: Shape,
 }
 #[derive(Clone, Debug)]
@@ -329,6 +330,7 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
         return Side {
             primitives: vec![Primitive {
                 source: 0,
+                contour: 0,
                 shape: Shape::Circle(*c, radius),
             }],
             side: if d < 0.0 { -1.0 } else { 1.0 },
@@ -356,6 +358,7 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
         return Side {
             primitives: vec![Primitive {
                 source: 0,
+                contour: 0,
                 shape: Shape::Spline(refined_spline::simplify_closed(&points)),
             }],
             side: if d < 0.0 { -1.0 } else { 1.0 },
@@ -444,7 +447,11 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
                 })
             }
         };
-        primitives.push(Primitive { source, shape });
+        primitives.push(Primitive {
+            source,
+            contour: 0,
+            shape,
+        });
     }
     let count = if closed { items.len() } else { items.len() - 1 };
     for i in 0..count {
@@ -671,6 +678,85 @@ mod tests {
                             p.x > 10.0
                         }));
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn mixed_closed_boundaries_keep_both_components_and_exact_circular_cuts() {
+        let vertices = [
+            p(-30.0, -15.0),
+            p(-10.0, -15.0),
+            p(-10.0, -3.0),
+            p(10.0, -3.0),
+            p(10.0, -15.0),
+            p(30.0, -15.0),
+            p(30.0, 15.0),
+            p(10.0, 15.0),
+            p(10.0, 3.0),
+            p(-10.0, 3.0),
+            p(-10.0, 15.0),
+            p(-30.0, 15.0),
+        ];
+        for curved in [false, true] {
+            let mut items: Vec<_> = (0..vertices.len())
+                .map(|i| line(vertices[i], vertices[(i + 1) % vertices.len()]))
+                .collect();
+            if curved {
+                for (i, center, cw) in [
+                    (2, p(0.0, -20.0), true),
+                    (5, p(30.0, 0.0), false),
+                    (8, p(0.0, 20.0), true),
+                    (11, p(-30.0, 0.0), false),
+                ] {
+                    items[i].geometry = Some(Geometry::Arc(
+                        center,
+                        dist(center, vertices[i]),
+                        vertices[i],
+                        vertices[(i + 1) % vertices.len()],
+                        cw,
+                    ));
+                    items[i].kind = 1;
+                }
+                items[0].geometry = Some(Geometry::Spline(
+                    vec![[vertices[0], p(-24.0, -19.0), p(-16.0, -19.0), vertices[1]]],
+                    false,
+                ));
+                items[0].kind = 2;
+            }
+            let result = calculate(&items, true, 0, 0, -4.0, 0.0, false);
+            assert_eq!(result.error, 0);
+            assert_eq!(result.sides[0].primitives.last().unwrap().contour, 1);
+            for contour in 0..2 {
+                let boundary: Vec<_> = result.sides[0]
+                    .primitives
+                    .iter()
+                    .filter(|p| p.contour == contour)
+                    .collect();
+                for (i, prim) in boundary.iter().enumerate() {
+                    assert!(
+                        dist(
+                            prim.shape.end(),
+                            boundary[(i + 1) % boundary.len()].shape.start()
+                        ) < 1e-7
+                    );
+                    if let Shape::Arc(c, r, [a, b], _) = prim.shape {
+                        assert!((dist(a, c) - r).abs() < 1e-8);
+                        assert!((dist(b, c) - r).abs() < 1e-8);
+                    }
+                }
+            }
+            if curved {
+                for source in [2, 8] {
+                    assert_eq!(
+                        result.sides[0]
+                            .primitives
+                            .iter()
+                            .filter(|p| p.source == source)
+                            .count(),
+                        2
+                    );
                 }
             }
         }

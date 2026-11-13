@@ -64,31 +64,31 @@ export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
 				total = count();
 			if (total !== (items.length ? (direction === 'one_side' ? 1 : 2) : 0)) fail();
 			const sides: KernelOffsetSide[] = [];
-			const splitSpline =
-				closed && items.length === 1 && items[0].curve?.type === 'spline' && !!items[0].curve.isClosed;
 			for (let s = 0; s < total; s++) {
 				const error = code(3),
 					side = read(),
 					distance = read(),
 					n = count();
-				if (
-					(side !== 1 && side !== -1) ||
-					(error === 0 && (distance < 0 || n === 0 || (!splitSpline && n > items.length))) ||
-					(error !== 0 && n !== 0)
-				)
+				if ((side !== 1 && side !== -1) || (error === 0 && (distance < 0 || n === 0)) || (error !== 0 && n !== 0))
 					fail();
 				const primitives: KernelOffsetPrimitive[] = [];
+				let previousContour = 0;
 				let previousSource = -1;
 				for (let i = 0; i < n; i++) {
 					const source = read(),
+						contour = read(),
 						tag = read(),
 						slots = count(),
 						end = cursor + slots;
 					if (
 						!Number.isInteger(source) ||
 						source < 0 ||
-						source < previousSource ||
-						(source === previousSource && !splitSpline) ||
+						(contour === previousContour && source <= previousSource) ||
+						!Number.isInteger(contour) ||
+						contour < previousContour ||
+						contour > previousContour + 1 ||
+						contour > i ||
+						(!closed && contour !== 0) ||
 						source >= items.length ||
 						!Number.isInteger(tag) ||
 						tag < 0 ||
@@ -96,6 +96,7 @@ export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
 						end > data.length
 					)
 						fail();
+					previousContour = contour;
 					previousSource = source;
 					const sourceId = items[source].sourceId;
 					let p: KernelOffsetPrimitive;
@@ -138,8 +139,38 @@ export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
 						}
 						if (handles) p.handles = Array.from({ length }, () => ({ h1: point(), h2: point() }));
 					}
-					if (cursor !== end || (n > items.length && (p.type !== 'spline' || !p.isSplineClosed))) fail();
+					if (cursor !== end) fail();
+					if (contour) p.contourIndex = contour;
 					primitives.push(p);
+				}
+				if (previousContour === 0) {
+					if (n > items.length) fail();
+				} else {
+					const ends = (p: KernelOffsetPrimitive) =>
+						p.type === 'line'
+							? [p.p1!, p.p2!]
+							: p.type === 'arc'
+								? [p.start!, p.end!]
+								: p.type === 'spline'
+									? [p.fitPoints![0], p.fitPoints!.at(-1)!]
+									: undefined;
+					for (let start = 0; start < n; ) {
+						let end = start + 1;
+						while (end < n && (primitives[end].contourIndex ?? 0) === (primitives[start].contourIndex ?? 0)) end++;
+						if (end - start === 1 && (primitives[start].type !== 'spline' || !primitives[start].isSplineClosed)) fail();
+						for (let i = start; i < end; i++) {
+							const a = ends(primitives[i]),
+								b = ends(primitives[i + 1 < end ? i + 1 : start]);
+							if (
+								!a ||
+								!b ||
+								Math.hypot(a[1].x - b[0].x, a[1].y - b[0].y) > 1e-6 ||
+								(end - start > 1 && primitives[i].isSplineClosed)
+							)
+								fail();
+						}
+						start = end;
+					}
 				}
 				sides.push({
 					primitives,

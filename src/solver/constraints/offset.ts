@@ -47,7 +47,7 @@ export interface OffsetSplinePair {
 	points: OffsetSplinePoint[];
 }
 
-export type OffsetPair = OffsetLinePair | OffsetCirclePair | OffsetSplinePair;
+export type OffsetPair = (OffsetLinePair | OffsetCirclePair | OffsetSplinePair) & { contourIndex?: number };
 
 /**
  * Dimensional offset constraint: ties a chain of offset lines / arcs / circles / splines to their

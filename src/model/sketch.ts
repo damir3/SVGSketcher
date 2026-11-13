@@ -98,12 +98,7 @@ import { Vec2, type XY } from '../math/vector';
 import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { AutomaticSplineHandlesConstraint } from '../solver/constraints/automaticSplineHandles';
-import {
-	calculateOffsetGeometry,
-	createOffsetSideGeometry,
-	getOffsetCornerPoint,
-	type OffsetSideGeometry,
-} from '../math/offset';
+import { calculateOffsetGeometry, createOffsetSideGeometry, type OffsetSideGeometry } from '../math/offset';
 import type { OffsetPair } from '../solver/constraints/offset';
 import { resizeOffsetSpline } from '../math/offsetSpline';
 import { serializePrimitive } from './primitives/serialization';
@@ -233,12 +228,12 @@ export class SketchDocument {
 		}
 	}
 
-	commitTransaction(): void {
+	commitTransaction(coalesce = true): void {
 		if (this.batchDepth <= 0) return;
 		this.batchDepth--;
 		if (this.batchDepth === 0) {
 			if (this.batchSnapshot) {
-				this.history.pushState(this.batchSnapshot);
+				this.history.pushState(this.batchSnapshot, coalesce);
 				this.batchSnapshot = null;
 			}
 			this.notify();
@@ -3595,7 +3590,7 @@ export class SketchDocument {
 			}
 			return false;
 		} finally {
-			if (offsetTransaction) this.commitTransaction();
+			if (offsetTransaction) this.commitTransaction(false);
 		}
 	}
 
@@ -3806,7 +3801,13 @@ export class SketchDocument {
 	private offsetTopologyMatches(c: OffsetConstraint, side: OffsetSideGeometry): boolean {
 		return (
 			c.pairs.length === side.primitives.length &&
-			c.pairs.every((pair, i) => this.offsetPairSource(pair) === side.primitives[i].sourceId)
+			c.pairs.every(
+				(pair, i) =>
+					this.offsetPairSource(pair) === side.primitives[i].sourceId &&
+					(pair.contourIndex ?? 0) === (side.primitives[i].contourIndex ?? 0) &&
+					(pair.kind !== 'spline' ||
+						this.splines.get(pair.offSplineId)?.isClosed === !!side.primitives[i].isSplineClosed)
+			)
 		);
 	}
 	private splitOffsetEndpoint(pair: OffsetPair, start: boolean, pos: Vec2): void {
@@ -3882,8 +3883,19 @@ export class SketchDocument {
 		this.constraints.delete(c.id);
 		try {
 			c.pairs = side.primitives.map(prim => {
-				const existing = oldPairs.get(prim.sourceId)?.shift();
-				if (existing) return existing;
+				const candidates = oldPairs.get(prim.sourceId) ?? [];
+				const compatible = (pair: OffsetPair) =>
+					pair.kind !== 'spline' || this.splines.get(pair.offSplineId)?.isClosed === !!prim.isSplineClosed;
+				let index = candidates.findIndex(
+					pair => compatible(pair) && (pair.contourIndex ?? 0) === (prim.contourIndex ?? 0)
+				);
+				if (index < 0) index = candidates.findIndex(compatible);
+				if (index >= 0) {
+					const existing = candidates.splice(index, 1)[0];
+					if (prim.contourIndex) existing.contourIndex = prim.contourIndex;
+					else delete existing.contourIndex;
+					return existing;
+				}
 				const built = createOffsetSideGeometry(
 					this,
 					{ ...c.sourceChain, isClosed: false },
@@ -3913,15 +3925,24 @@ export class SketchDocument {
 				}
 			}
 			const endpoints = c.pairs.map(pair => this.offsetPairEndpoints(pair));
-			const count = c.sourceChain?.isClosed ? endpoints.length : endpoints.length - 1;
-			for (let i = 0; i < count; i++) {
-				if (side.primitives[i].isSplineClosed) continue;
-				const a = endpoints[i]?.[1],
-					b = endpoints[(i + 1) % endpoints.length]?.[0];
-				if (!a || !b || a === b) continue;
-				const join = new CoincidentConstraint(this.nextId('c_coinc'), a, b);
-				this.constraints.set(join.id, join);
-				c.junctionConstraintIds.push(join.id);
+			for (let start = 0; start < endpoints.length; ) {
+				let end = start + 1;
+				while (
+					end < endpoints.length &&
+					(side.primitives[end].contourIndex ?? 0) === (side.primitives[start].contourIndex ?? 0)
+				)
+					end++;
+				const count = c.sourceChain?.isClosed ? end : end - 1;
+				for (let i = start; i < count; i++) {
+					if (side.primitives[i].isSplineClosed) continue;
+					const a = endpoints[i]?.[1],
+						b = endpoints[i + 1 < end ? i + 1 : start]?.[0];
+					if (!a || !b || a === b) continue;
+					const join = new CoincidentConstraint(this.nextId('c_coinc'), a, b);
+					this.constraints.set(join.id, join);
+					c.junctionConstraintIds.push(join.id);
+				}
+				start = end;
 			}
 			c.cornerPointIds = endpoints.flatMap((p, i) => (p && !side.primitives[i].isSplineClosed ? [p[0]] : []));
 			if (!c.sourceChain?.isClosed && endpoints.at(-1)) c.cornerPointIds.push(endpoints.at(-1)![1]);
@@ -3993,20 +4014,7 @@ export class SketchDocument {
 		const side = geom.sides[0];
 		const numPrims = side.primitives.length;
 
-		// 1. Update corner points if present
-		if (c.cornerPointIds && c.cornerPointIds.length > 0) {
-			for (let i = 0; i < c.cornerPointIds.length; i++) {
-				const pt = this.points.get(c.cornerPointIds[i]);
-				if (!pt || this.isPointFixed(pt.id)) continue;
-				const pos = getOffsetCornerPoint(side.primitives, i);
-				if (pos) {
-					pt.x = pos.x;
-					pt.y = pos.y;
-				}
-			}
-		}
-
-		// 2. Update primitives
+		// Every primitive updates its own endpoints, including shared vertices within a contour.
 		for (let i = 0; i < numPrims; i++) {
 			const prim = side.primitives[i];
 			const pair = c.pairs[i];

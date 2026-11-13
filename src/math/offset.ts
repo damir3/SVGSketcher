@@ -26,6 +26,7 @@ export interface OffsetChain {
 
 export interface OffsetPrimitiveGeom {
 	sourceId: string;
+	contourIndex?: number;
 	type: 'line' | 'arc' | 'circle' | 'spline';
 	// Line
 	p1?: Vec2;
@@ -634,7 +635,24 @@ export function getOffsetCornerPoint(primitives: OffsetPrimitiveGeom[], index: n
 }
 
 /** Build a side without opening a transaction or solving; also used to restore collapsed features. */
-export function createOffsetSideGeometry(sketch: SketchDocument, chain: OffsetChain, side: OffsetSideGeometry) {
+export function createOffsetSideGeometry(
+	sketch: SketchDocument,
+	chain: OffsetChain,
+	side: OffsetSideGeometry
+): { createdIds: string[]; offsetPairs: OffsetPair[]; cornerPointIds: string[] } {
+	const groups: OffsetPrimitiveGeom[][] = [];
+	for (const p of side.primitives) {
+		if (groups.at(-1) && (groups.at(-1)![0].contourIndex ?? 0) === (p.contourIndex ?? 0)) groups.at(-1)!.push(p);
+		else groups.push([p]);
+	}
+	if (groups.length > 1) {
+		const contours = groups.map(primitives => createOffsetSideGeometry(sketch, chain, { ...side, primitives }));
+		return {
+			createdIds: contours.flatMap(c => c.createdIds),
+			offsetPairs: contours.flatMap(c => c.offsetPairs),
+			cornerPointIds: contours.flatMap(c => c.cornerPointIds),
+		};
+	}
 	// A split closed spline yields independent loops, each with its own seam and handles.
 	if (side.primitives.length > 1 && side.primitives.every(p => p.type === 'spline' && p.isSplineClosed)) {
 		const contours = side.primitives.map(prim =>
@@ -662,6 +680,7 @@ export function createOffsetSideGeometry(sketch: SketchDocument, chain: OffsetCh
 
 	for (let i = 0; i < numPrims; i++) {
 		const prim = side.primitives[i];
+		const pairCount = offsetPairs.length;
 
 		if (prim.type === 'circle') {
 			const centerPt = sketch.addPoint(prim.circleCenter!);
@@ -791,6 +810,7 @@ export function createOffsetSideGeometry(sketch: SketchDocument, chain: OffsetCh
 				});
 			}
 		}
+		if (prim.contourIndex && offsetPairs.length > pairCount) offsetPairs.at(-1)!.contourIndex = prim.contourIndex;
 	}
 	return { createdIds, offsetPairs, cornerPointIds: cornerPoints.map(p => p.id) };
 }

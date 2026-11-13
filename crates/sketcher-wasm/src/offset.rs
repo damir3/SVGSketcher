@@ -151,7 +151,7 @@ fn query(curves: &[f64], records: &[f64], settings: &[f64]) -> Result<Vec<f64>, 
                     3.0
                 }
             };
-            out.extend([prim.source as f64, tag, v.len() as f64]);
+            out.extend([prim.source as f64, prim.contour as f64, tag, v.len() as f64]);
             out.extend(v);
         }
     }

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { assertSameCubicGeometry } from './helpers/offsetGeometry';
+import { mixedOffsetScene, offsetContourGroups, openSplineLoopScene } from './helpers/mixedOffsetScene';
 import { fitPointsToBezier } from '../src/math/splineReference';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
@@ -660,3 +661,140 @@ for (const initial of [5, 10])
 			sketch.restoreSnapshot(JSON.parse(JSON.stringify(after)));
 		}
 	});
+
+for (const kind of ['lines', 'arcs', 'mixed', 'arc-neck'] as const)
+	for (const reversed of [false, true])
+		test(`mixed offset components preview, commit, split and merge: ${kind}, reversed=${reversed}`, () => {
+			const { sketch, chain } = mixedOffsetScene(kind, reversed, reversed ? 3 : 0);
+			const source = sketch.takeSnapshot();
+			const geometry = calculateOffsetGeometry(sketch, chain, 'two_sides', 0.1, 4, false);
+			assert.ok(geometry.isValid);
+			const groups = offsetContourGroups(geometry.sides[1].primitives);
+			assert.equal(groups.length, 2);
+			const boundaries = groups.map(primitives =>
+				sampledOffsetBoundary({ ...geometry, sides: [{ ...geometry.sides[1], primitives }] })
+			);
+			for (const boundary of boundaries) assertNoCrossings(boundary);
+			assert.ok(Math.max(...boundaries[0].map(p => p.x)) < -10);
+			assert.ok(Math.min(...boundaries[1].map(p => p.x)) > 10);
+			if (kind === 'mixed')
+				assert.ok(
+					groups.every(g => g.some(p => p.type === 'spline')),
+					'a retained spline disappeared'
+				);
+			if (kind === 'arc-neck') {
+				const shared = groups[0].filter(p => groups[1].some(q => q.sourceId === p.sourceId));
+				assert.equal(shared.length, 2, 'both neck arcs must survive in both components');
+			}
+			const previews = render(sketch, chain, geometry, 'two_sides').previews;
+			const created = sketch.withDeferredSolve(() =>
+				commitOffsetToSketch(sketch, chain, geometry, 'two_sides', 0.1, 4, false)
+			)!;
+			assert.deepEqual(
+				created.createdIds.map(id => render(sketch).entity(id)),
+				previews
+			);
+			const initial = sketch.takeSnapshot();
+			assert.equal(sketch.undo(), true);
+			assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(source));
+			assert.equal(sketch.redo(), true);
+			assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(initial));
+			const innerId = created.constraintIds[1],
+				outerId = created.constraintIds[0];
+			const outer = (sketch.constraints.get(outerId) as OffsetConstraint).pairs.map(offsetPairChild);
+			const outerRender = outer.map(id => render(sketch).entity(id));
+			for (const distance of [0.1, 4, 1, 4, 0.1, 4]) {
+				const before = sketch.takeSnapshot(),
+					oldPairs = [...(sketch.constraints.get(innerId) as OffsetConstraint).pairs];
+				assert.equal(sketch.updateDimensionalConstraint(innerId, distance), true);
+				const c = sketch.constraints.get(innerId) as OffsetConstraint;
+				const expected = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+				const components = offsetContourGroups(expected.sides[0].primitives);
+				assert.equal(components.length, distance === 4 || (kind === 'arc-neck' && distance === 1) ? 2 : 1);
+				for (const primitives of components)
+					assertNoCrossings(sampledOffsetBoundary({ ...expected, sides: [{ ...expected.sides[0], primitives }] }));
+				assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+				assert.deepEqual(
+					outer.map(id => render(sketch).entity(id)),
+					outerRender
+				);
+				for (const p of source.points)
+					assert.ok(sketch.points.get(p.id)!.distanceTo(p) < 1e-7, 'source geometry moved');
+				// Unique surviving sources retain their curve IDs even when their component number changes.
+				const pairSource = (p: OffsetConstraint['pairs'][number]) =>
+					p.kind === 'line' ? p.origLineId : p.kind === 'circle' ? p.origId : p.origSplineId;
+				for (const pair of c.pairs) {
+					const previous = oldPairs.filter(p => pairSource(p) === pairSource(pair));
+					if (previous.length === 1 && c.pairs.filter(p => pairSource(p) === pairSource(pair)).length === 1)
+						assert.equal(offsetPairChild(pair), offsetPairChild(previous[0]));
+				}
+				for (const id of c.junctionConstraintIds ?? []) {
+					const constraint = sketch.constraints.get(id)!;
+					const owners = constraint.entityIds
+						.map(pointId =>
+							c.pairs
+								.filter(p => {
+									const ids =
+										p.kind === 'line'
+											? [p.offP1Id, p.offP2Id]
+											: p.kind === 'spline'
+												? sketch.splines.get(p.offSplineId)!.pointIds
+												: (() => {
+														const arc = sketch.arcs.get(p.offId)!;
+														return [arc.startPointId, arc.endPointId];
+													})();
+									return ids.includes(pointId);
+								})
+								.map(p => p.contourIndex ?? 0)
+						)
+						.flat();
+					assert.equal(new Set(owners).size, 1, 'independent components were joined');
+				}
+				assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+				const after = sketch.takeSnapshot();
+				assert.equal(sketch.undo(), true);
+				assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(before));
+				assert.equal(sketch.redo(), true);
+				assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(after));
+				sketch.restoreSnapshot(JSON.parse(JSON.stringify(after)));
+			}
+		});
+
+test('a split mixed chain can create an independent closed child from an open source spline', () => {
+	const { sketch, chain } = openSplineLoopScene();
+	const before = sketch.takeSnapshot(),
+		geometry = calculateOffsetGeometry(sketch, chain, 'one_side', -10, 0, false);
+	assert.deepEqual(
+		offsetContourGroups(geometry.sides[0].primitives).map(g => g.length),
+		[2, 1]
+	);
+	const previews = render(sketch, chain, geometry).previews;
+	const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, geometry))!;
+	assert.deepEqual(
+		created.createdIds.map(id => render(sketch).entity(id)),
+		previews
+	);
+	const constraintId = created.constraintIds[0];
+	for (const distance of [5, 10, 15, 5, 10]) {
+		const old = sketch.takeSnapshot();
+		assert.equal(sketch.updateDimensionalConstraint(constraintId, distance), true);
+		const c = sketch.constraints.get(constraintId) as OffsetConstraint;
+		const expected = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+		assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+		if (distance > 5) {
+			const pair = c.pairs.find(p => p.contourIndex === 1)!;
+			assert.equal(pair.kind, 'spline');
+			const child = sketch.splines.get(offsetPairChild(pair))!;
+			assert.ok(child.isClosed);
+			assert.equal(child.pointIds[0], child.pointIds.at(-1));
+		}
+		for (const p of before.points) assert.ok(sketch.points.get(p.id)!.distanceTo(p) < 1e-7);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+		const after = sketch.takeSnapshot();
+		assert.equal(sketch.undo(), true);
+		assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(old));
+		assert.equal(sketch.redo(), true);
+		assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(after));
+		sketch.restoreSnapshot(JSON.parse(JSON.stringify(after)));
+	}
+});
