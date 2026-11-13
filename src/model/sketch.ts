@@ -98,7 +98,14 @@ import { Vec2, type XY } from '../math/vector';
 import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { AutomaticSplineHandlesConstraint } from '../solver/constraints/automaticSplineHandles';
-import { calculateOffsetGeometry } from '../math/offset';
+import {
+	calculateOffsetGeometry,
+	createOffsetSideGeometry,
+	getOffsetCornerPoint,
+	type OffsetSideGeometry,
+} from '../math/offset';
+import type { OffsetPair } from '../solver/constraints/offset';
+import { resizeOffsetSpline } from '../math/offsetSpline';
 import { serializePrimitive } from './primitives/serialization';
 import { HistoryManager, type SketchSnapshot } from './history';
 import { serializeConstraint, deserializeConstraint } from '../solver/constraints/serialization';
@@ -3443,34 +3450,51 @@ export class SketchDocument {
 		}
 
 		if (c instanceof OffsetConstraint) {
-			c.targetDistance = Math.abs(newValue);
-			c.value = Math.abs(newValue);
-			c.name = 'Offset';
-
-			if (c.sourceChain) {
-				const newGeom = calculateOffsetGeometry(
-					this,
-					c.sourceChain,
-					c.direction || 'one_side',
-					c.targetDistance,
-					c.targetDistance,
-					c.flip || false
-				);
-				if (newGeom.isValid && newGeom.sides.length > 0) {
-					this.applyOffsetGeometryUpdate(c, newGeom);
-				}
-			} else {
-				for (const pair of c.pairs) {
-					if (pair.kind === 'spline') {
-						for (const sp of pair.points) {
-							const pt = this.points.get(sp.pointId);
-							if (pt && !this.isPointFixed(sp.pointId)) {
-								pt.x = sp.basePos.x + sp.side * c.targetDistance * sp.normal.x;
-								pt.y = sp.basePos.y + sp.side * c.targetDistance * sp.normal.y;
+			const value = Math.abs(newValue);
+			const geom = c.sourceChain
+				? calculateOffsetGeometry(this, c.sourceChain, c.direction || 'one_side', value, value, c.flip || false)
+				: undefined;
+			const topologyChanged = !!(geom?.isValid && geom.sides.length && !this.offsetTopologyMatches(c, geom.sides[0]));
+			const layoutChanged = !!(
+				geom?.isValid &&
+				geom.sides.length &&
+				geom.sides[0].primitives.some((prim, i) => {
+					const pair = c.pairs[i];
+					return (
+						pair?.kind === 'spline' &&
+						prim.fitPoints &&
+						prim.fitPoints.length > (this.splines.get(pair.offSplineId)?.pointIds.length ?? 0)
+					);
+				})
+			);
+			const structureChanged = topologyChanged || layoutChanged;
+			if (structureChanged) this.beginTransaction();
+			try {
+				c.targetDistance = value;
+				c.value = value;
+				c.name = 'Offset';
+				if (geom?.isValid && geom.sides.length) {
+					if (structureChanged)
+						this.withDeferredSolve(() => {
+							if (topologyChanged) this.reconcileOffsetTopology(c, geom.sides[0]);
+							this.applyOffsetGeometryUpdate(c, geom);
+						});
+					else this.applyOffsetGeometryUpdate(c, geom);
+				} else if (!c.sourceChain) {
+					for (const pair of c.pairs) {
+						if (pair.kind === 'spline') {
+							for (const sp of pair.points) {
+								const pt = this.points.get(sp.pointId);
+								if (pt && !this.isPointFixed(sp.pointId)) {
+									pt.x = sp.basePos.x + sp.side * c.targetDistance * sp.normal.x;
+									pt.y = sp.basePos.y + sp.side * c.targetDistance * sp.normal.y;
+								}
 							}
 						}
 					}
 				}
+			} finally {
+				if (structureChanged) this.commitTransaction();
 			}
 			return true;
 		}
@@ -3560,13 +3584,19 @@ export class SketchDocument {
 			expr = undefined;
 		}
 
-		c.expression = expr;
-		const applied = this.applyConstraintValueDirectly(c, val, displayMode);
-		if (applied) {
-			this.solve();
-			return true;
+		const offsetTransaction = c instanceof OffsetConstraint;
+		if (offsetTransaction) this.beginTransaction();
+		try {
+			c.expression = expr;
+			const applied = this.applyConstraintValueDirectly(c, val, displayMode);
+			if (applied) {
+				this.solve();
+				return true;
+			}
+			return false;
+		} finally {
+			if (offsetTransaction) this.commitTransaction();
 		}
-		return false;
 	}
 
 	getParameterValuesMap(): Map<string, number> {
@@ -3758,6 +3788,206 @@ export class SketchDocument {
 		return { success: graphRes.errors.size === 0, errors: graphRes.errors };
 	}
 
+	private offsetPairSource(pair: OffsetPair): string {
+		return pair.kind === 'line' ? pair.origLineId : pair.kind === 'circle' ? pair.origId : pair.origSplineId;
+	}
+	private offsetPairEntity(pair: OffsetPair): string {
+		return pair.kind === 'line' ? pair.offLineId : pair.kind === 'circle' ? pair.offId : pair.offSplineId;
+	}
+	private offsetPairEndpoints(pair: OffsetPair): [string, string] | undefined {
+		if (pair.kind === 'line') return [pair.offP1Id, pair.offP2Id];
+		if (pair.kind === 'circle') {
+			const arc = this.arcs.get(pair.offId);
+			return arc ? [arc.startPointId, arc.endPointId] : undefined;
+		}
+		const spline = this.splines.get(pair.offSplineId);
+		return spline ? [spline.pointIds[0], spline.pointIds.at(-1)!] : undefined;
+	}
+	private offsetTopologyMatches(c: OffsetConstraint, side: OffsetSideGeometry): boolean {
+		return (
+			c.pairs.length === side.primitives.length &&
+			c.pairs.every((pair, i) => this.offsetPairSource(pair) === side.primitives[i].sourceId)
+		);
+	}
+	private splitOffsetEndpoint(pair: OffsetPair, start: boolean, pos: Vec2): void {
+		const endpoints = this.offsetPairEndpoints(pair);
+		if (!endpoints) return;
+		const old = endpoints[start ? 0 : 1],
+			point = this.addPoint(pos);
+		if (pair.kind === 'line') {
+			const line = this.lines.get(pair.offLineId)!;
+			if (start) {
+				line.p1Id = point.id;
+				pair.offP1Id = point.id;
+			} else {
+				line.p2Id = point.id;
+				pair.offP2Id = point.id;
+			}
+		} else if (pair.kind === 'circle') {
+			const arc = this.arcs.get(pair.offId)!;
+			if (start) arc.startPointId = point.id;
+			else arc.endPointId = point.id;
+			for (const constraint of this.constraints.values())
+				if (constraint instanceof ArcEndpointsConstraint && constraint.arcId === arc.id) {
+					this.constraints.set(
+						constraint.id,
+						new ArcEndpointsConstraint(
+							constraint.id,
+							arc.id,
+							arc.centerId,
+							arc.startPointId,
+							arc.endPointId,
+							constraint.weight
+						)
+					);
+				}
+		} else {
+			const spline = this.splines.get(pair.offSplineId)!,
+				index = start ? 0 : spline.pointIds.length - 1;
+			spline.pointIds[index] = point.id;
+			for (const sp of pair.points) if (sp.pointId === old) sp.pointId = point.id;
+			const handle = this.lines.get(spline.tangentLineIds?.[index] ?? '');
+			if (handle)
+				for (const constraint of this.constraints.values())
+					if (
+						constraint instanceof MidpointConstraint &&
+						constraint.midId === old &&
+						constraint.p1Id === handle.p1Id &&
+						constraint.p2Id === handle.p2Id
+					) {
+						this.constraints.set(
+							constraint.id,
+							new MidpointConstraint(
+								constraint.id,
+								point.id,
+								constraint.p1Id,
+								constraint.p2Id,
+								constraint.weight,
+								constraint.ratio
+							)
+						);
+					}
+		}
+	}
+	private reconcileOffsetTopology(c: OffsetConstraint, side: OffsetSideGeometry): void {
+		const oldPairs = new Map<string, OffsetPair[]>();
+		for (const pair of c.pairs) {
+			const source = this.offsetPairSource(pair);
+			oldPairs.set(source, [...(oldPairs.get(source) ?? []), pair]);
+		}
+		const dimPair = c.pairs[c.dimPairIndex];
+		for (const id of c.junctionConstraintIds ?? []) this.constraints.delete(id);
+		c.junctionConstraintIds = [];
+		// Deleting a vanished child must not remove its own dimension or its surviving siblings.
+		this.constraints.delete(c.id);
+		try {
+			c.pairs = side.primitives.map(prim => {
+				const existing = oldPairs.get(prim.sourceId)?.shift();
+				if (existing) return existing;
+				const built = createOffsetSideGeometry(
+					this,
+					{ ...c.sourceChain, isClosed: false },
+					{ ...side, primitives: [prim] }
+				);
+				if (!built.offsetPairs[0]) throw new Error('Cannot restore an offset primitive');
+				return built.offsetPairs[0];
+			});
+			for (const pairs of oldPairs.values()) for (const pair of pairs) this.removeEntity(this.offsetPairEntity(pair));
+			// A restored feature can separate two endpoints that used to be one shared vertex.
+			const assigned = new Map<string, Vec2>();
+			for (let i = 0; i < c.pairs.length; i++) {
+				const prim = side.primitives[i],
+					pair = c.pairs[i],
+					ends = this.offsetPairEndpoints(pair);
+				if (!ends) continue;
+				const positions =
+					prim.type === 'line'
+						? [prim.p1!, prim.p2!]
+						: prim.type === 'arc'
+							? [prim.start!, prim.end!]
+							: [prim.fitPoints![0], prim.fitPoints!.at(-1)!];
+				for (let end = 0; end < 2; end++) {
+					const prev = assigned.get(ends[end]);
+					if (prev && prev.distanceTo(positions[end]) > 1e-7) this.splitOffsetEndpoint(pair, end === 0, positions[end]);
+					else assigned.set(ends[end], positions[end]);
+				}
+			}
+			const endpoints = c.pairs.map(pair => this.offsetPairEndpoints(pair));
+			const count = c.sourceChain?.isClosed ? endpoints.length : endpoints.length - 1;
+			for (let i = 0; i < count; i++) {
+				if (side.primitives[i].isSplineClosed) continue;
+				const a = endpoints[i]?.[1],
+					b = endpoints[(i + 1) % endpoints.length]?.[0];
+				if (!a || !b || a === b) continue;
+				const join = new CoincidentConstraint(this.nextId('c_coinc'), a, b);
+				this.constraints.set(join.id, join);
+				c.junctionConstraintIds.push(join.id);
+			}
+			c.cornerPointIds = endpoints.flatMap((p, i) => (p && !side.primitives[i].isSplineClosed ? [p[0]] : []));
+			if (!c.sourceChain?.isClosed && endpoints.at(-1)) c.cornerPointIds.push(endpoints.at(-1)![1]);
+			c.dimPairIndex = Math.max(0, c.pairs.indexOf(dimPair));
+			c.entityIds = [
+				...new Set([
+					...new OffsetConstraint(c.id, c.pairs, c.targetDistance).entityIds,
+					...(c.sourceChain?.items ?? []).map((item: { id: string }) => item.id),
+				]),
+			];
+		} finally {
+			this.constraints.set(c.id, c);
+		}
+		this.rebuildParamManager();
+	}
+
+	private growOffsetSpline(
+		c: OffsetConstraint,
+		pair: Extract<OffsetPair, { kind: 'spline' }>,
+		prim: OffsetSideGeometry['primitives'][number]
+	): void {
+		const spline = this.splines.get(pair.offSplineId)!;
+		while (spline.pointIds.length < prim.fitPoints!.length) {
+			const index = spline.pointIds.length - 1,
+				p = prim.fitPoints![index],
+				h = prim.handles![index];
+			const point = new SketchPoint(this.nextId('Point'), p.x, p.y, false),
+				h1 = new SketchPoint(this.nextId('Point'), h.h1.x, h.h1.y, false),
+				h2 = new SketchPoint(this.nextId('Point'), h.h2.x, h.h2.y, false);
+			this.points.set(point.id, point);
+			this.points.set(h1.id, h1);
+			this.points.set(h2.id, h2);
+			const line = new SketchLine({
+				id: this.nextId('Line'),
+				p1Id: h1.id,
+				p2Id: h2.id,
+				isConstruction: true,
+				isSplineHandle: true,
+				parentSplineId: spline.id,
+				isAutomaticSplineHandle: false,
+			});
+			this.lines.set(line.id, line);
+			spline.pointIds.splice(index, 0, point.id);
+			spline.tangentLineIds!.splice(index, 0, line.id);
+			const a = p.distanceTo(h.h1),
+				b = p.distanceTo(h.h2),
+				mid = new MidpointConstraint(
+					this.nextId('c_midpoint'),
+					point.id,
+					h1.id,
+					h2.id,
+					1,
+					a + b > 1e-12 ? a / (a + b) : 0.5
+				);
+			this.constraints.set(mid.id, mid);
+			pair.points.push({
+				pointId: point.id,
+				basePos: prim.fitBases![index],
+				normal: prim.fitNormals![index],
+				side: c.flip ? -1 : 1,
+			});
+		}
+		c.entityIds = new OffsetConstraint(c.id, c.pairs, c.targetDistance, 0, 1, c.sourceChain).entityIds;
+		this.rebuildParamManager();
+	}
+
 	private applyOffsetGeometryUpdate(c: OffsetConstraint, geom: any): void {
 		if (!geom.sides || !geom.sides.length) return;
 		const side = geom.sides[0];
@@ -3768,8 +3998,7 @@ export class SketchDocument {
 			for (let i = 0; i < c.cornerPointIds.length; i++) {
 				const pt = this.points.get(c.cornerPointIds[i]);
 				if (!pt || this.isPointFixed(pt.id)) continue;
-				const prim = side.primitives[i % numPrims];
-				const pos = prim.type === 'line' ? prim.p1 : prim.type === 'arc' ? prim.start : prim.fitPoints?.[0];
+				const pos = getOffsetCornerPoint(side.primitives, i);
 				if (pos) {
 					pt.x = pos.x;
 					pt.y = pos.y;
@@ -3784,7 +4013,7 @@ export class SketchDocument {
 			if (!pair) continue;
 
 			if (pair.kind === 'line') {
-				if (numPrims === 1 && prim.p1 && prim.p2) {
+				if (prim.p1 && prim.p2) {
 					const p1 = this.points.get(pair.offP1Id);
 					const p2 = this.points.get(pair.offP2Id);
 					if (p1 && !this.isPointFixed(p1.id)) {
@@ -3801,12 +4030,35 @@ export class SketchDocument {
 				if (circ && prim.circleRadius) circ.radius = prim.circleRadius;
 				const arc = this.arcs.get(pair.offId);
 				if (arc && prim.radius) arc.radius = prim.radius;
+				if (arc && prim.start && prim.end) {
+					for (const [id, pos] of [
+						[arc.startPointId, prim.start],
+						[arc.endPointId, prim.end],
+					] as const) {
+						const pt = this.points.get(id);
+						if (pt && !this.isPointFixed(id)) {
+							pt.x = pos.x;
+							pt.y = pos.y;
+						}
+					}
+				}
 			} else if (pair.kind === 'spline') {
 				const spline = this.splines.get(pair.offSplineId);
 				if (spline && prim.fitPoints) {
+					if (prim.fitPoints.length > spline.pointIds.length) this.growOffsetSpline(c, pair, prim);
 					const ptsCount = spline.pointIds.length;
-					const startIdx = numPrims > 1 ? 1 : 0;
-					const endIdx = numPrims > 1 ? ptsCount - 1 : ptsCount;
+					resizeOffsetSpline(prim, ptsCount, side.side * side.distance);
+					const sampleById = new Map(spline.pointIds.map((id, k) => [id, k]));
+					for (const sp of pair.points) {
+						const k = sampleById.get(sp.pointId);
+						if (k !== undefined && prim.fitBases?.[k] && prim.fitNormals?.[k]) {
+							sp.basePos = prim.fitBases[k];
+							sp.normal = prim.fitNormals[k];
+							sp.side = side.side;
+						}
+					}
+					const startIdx = 0;
+					const endIdx = ptsCount;
 					for (let k = startIdx; k < endIdx; k++) {
 						const pt = this.points.get(spline.pointIds[k]);
 						if (pt && !this.isPointFixed(pt.id) && prim.fitPoints[k]) {
@@ -3818,9 +4070,23 @@ export class SketchDocument {
 					const fitPts = spline.pointIds.map(pid => this.points.get(pid)).filter((p): p is SketchPoint => !!p);
 					if (fitPts.length >= 2 && spline.tangentLineIds && spline.tangentLineIds.length > 0) {
 						const handles = prim.handles || computeNaturalFitHandles(fitPts);
+						const midpoints = new Map(
+							[...this.constraints.values()]
+								.filter((c): c is MidpointConstraint => c instanceof MidpointConstraint)
+								.map(c => [`${c.p1Id}:${c.p2Id}`, c])
+						);
 						for (let h = 0; h < spline.tangentLineIds.length; h++) {
 							const tLine = this.lines.get(spline.tangentLineIds[h]);
 							if (tLine && handles[h]) {
+								const mid = midpoints.get(`${tLine.p1Id}:${tLine.p2Id}`),
+									a = fitPts[h].distanceTo(handles[h].h1),
+									b = fitPts[h].distanceTo(handles[h].h2),
+									ratio = a + b > 1e-12 ? a / (a + b) : 0.5;
+								if (mid && Math.abs(mid.ratio - ratio) > 1e-12)
+									this.constraints.set(
+										mid.id,
+										new MidpointConstraint(mid.id, mid.midId, mid.p1Id, mid.p2Id, mid.weight, ratio)
+									);
 								const h1 = this.points.get(tLine.p1Id);
 								const h2 = this.points.get(tLine.p2Id);
 								if (h1 && !this.isPointFixed(h1.id)) {

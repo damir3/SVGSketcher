@@ -8,6 +8,8 @@ import {
 	commitOffsetToSketch,
 } from '../src/math/offset';
 import { Vec2 } from '../src/math/vector';
+import { fitPointsToBezier, getSplineParamAtPoint, getSplinePointAtParam } from '../src/math/spline';
+import { distanceToCubics } from './helpers/offsetGeometry';
 import { OffsetConstraint } from '../src/solver/constraints/offset';
 
 describe('Offset Chain Building and Continuation', () => {
@@ -243,8 +245,10 @@ describe('Offset Geometry Calculation', () => {
 		assert.ok(Math.abs(pt1.y - -10) < 1e-4);
 		assert.ok(Math.abs(pt2.y - -10) < 1e-4);
 
-		const midPtId = createdSpline.pointIds[Math.floor(createdSpline.pointIds.length / 2)];
-		const initialSplineMidY = sketch.points.get(midPtId)!.y;
+		const sourceMid = getSplinePointAtParam(spline.toGeoCurve(sketch)!.bezierSegments!, 0.5);
+		assert.ok(
+			distanceToCubics(createdSpline.toGeoCurve(sketch)!.bezierSegments!, sourceMid.clone().add(new Vec2(0, 10))) < 0.1
+		);
 
 		// Update offset constraint distance from 10 to 30
 		sketch.updateDimensionalConstraint(res.constraintIds[0], 30);
@@ -254,8 +258,9 @@ describe('Offset Geometry Calculation', () => {
 		assert.ok(Math.abs(sketch.points.get(createdLine.p2Id)!.y - -30) < 1e-4);
 
 		// Created spline expands along its normal by +20 distance
-		const updatedSplineMidY = sketch.points.get(midPtId)!.y;
-		assert.ok(Math.abs(updatedSplineMidY - (initialSplineMidY + 20)) < 0.1);
+		assert.ok(
+			distanceToCubics(createdSpline.toGeoCurve(sketch)!.bezierSegments!, sourceMid.clone().add(new Vec2(0, 30))) < 0.1
+		);
 
 		// Endpoints remain shared
 		assert.equal(createdLine.p2Id, createdSpline.pointIds[0]);
@@ -299,10 +304,11 @@ describe('Offset Geometry Calculation', () => {
 		assert.ok(geom.isValid);
 		const sGeom = geom.sides[0].primitives[1];
 
-		// True midpoint of B-spline is at y = 75, so offset at distance 10 should be at y = 85 (not 130)
-		const midFitPt = sGeom.fitPoints![Math.floor(sGeom.fitPoints!.length / 2)];
-		assert.ok(Math.abs(midFitPt.x - 0) < 1e-4);
-		assert.ok(Math.abs(midFitPt.y - 85) < 0.5, `midFitPt.y was ${midFitPt.y}, expected 85`);
+		// Check the actual curve: preserved miter anchors can make the middle array entry
+		// differ from the geometric midpoint. The B-spline peaks at 75, so its offset reaches 85, not 130.
+		const offsetSegments = fitPointsToBezier(sGeom.fitPoints!, sGeom.handles);
+		const midpoint = getSplineParamAtPoint(offsetSegments, new Vec2(0, 85));
+		assert.ok(midpoint.distance < 0.5, `offset misses the B-spline's expected midpoint by ${midpoint.distance}`);
 
 		const res = commitOffsetToSketch(sketch, chain, geom, 'one_side', 10, 10, false)!;
 		assert.ok(res);
@@ -322,7 +328,6 @@ describe('Offset Geometry Calculation', () => {
 
 		// At distance 3, midpoint should be at y = 78
 		const createdSpline = sketch.splines.get(res.createdIds[1])!;
-		const splineMidPt = sketch.points.get(createdSpline.pointIds[Math.floor(createdSpline.pointIds.length / 2)])!;
-		assert.ok(Math.abs(splineMidPt.y - 78) < 0.5, `splineMidPt.y was ${splineMidPt.y}, expected 78`);
+		assert.ok(distanceToCubics(createdSpline.toGeoCurve(sketch)!.bezierSegments!, new Vec2(0, 78)) < 0.1);
 	});
 });

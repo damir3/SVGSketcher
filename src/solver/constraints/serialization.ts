@@ -215,6 +215,7 @@ type ConstraintSnapshotData =
 			direction?: any;
 			flip?: boolean;
 			cornerPointIds?: string[];
+			junctionConstraintIds?: string[];
 	  }
 	| {
 			type: 'origin_distance';

@@ -7,6 +7,7 @@ pub mod editing;
 mod ellipse;
 pub mod fillet;
 mod matrix;
+pub mod offset;
 pub mod regions;
 pub mod solver;
 pub mod spline;

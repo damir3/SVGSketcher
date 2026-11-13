@@ -62,6 +62,7 @@ export class OffsetConstraint extends BaseConstraint {
 	direction?: any;
 	flip?: boolean;
 	cornerPointIds?: string[];
+	junctionConstraintIds?: string[];
 
 	constructor(
 		id: string,
@@ -75,6 +76,7 @@ export class OffsetConstraint extends BaseConstraint {
 		cornerPointIds?: string[]
 	) {
 		const ids = new Set<string>();
+		for (const item of sourceChain?.items ?? []) ids.add(item.id);
 		for (const p of pairs) {
 			if (p.kind === 'line') {
 				[p.origLineId, p.origP1Id, p.origP2Id, p.offLineId, p.offP1Id, p.offP2Id].forEach(i => ids.add(i));

@@ -1,0 +1,862 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-415.77 -415.77 832.05 724.46">
+  <metadata id="sketcher-metadata">
+    <![CDATA[
+{
+  "format": "svg-sketcher",
+  "version": 1,
+  "generator": "SVG Sketcher",
+  "createdAt": "2026-11-12T20:30:52.394Z",
+  "viewport": {
+    "panX": 647,
+    "panY": 458,
+    "zoom": 4
+  },
+  "snapshot": {
+    "points": [
+      {
+        "x": -100,
+        "y": -25,
+        "type": "point",
+        "id": "Point-1",
+        "fixed": false
+      },
+      {
+        "x": -100,
+        "y": 50,
+        "type": "point",
+        "id": "Point-2",
+        "fixed": false
+      },
+      {
+        "x": -75,
+        "y": 75,
+        "type": "point",
+        "id": "Point-3",
+        "fixed": false
+      },
+      {
+        "x": -50,
+        "y": 50,
+        "type": "point",
+        "id": "Point-4",
+        "fixed": false
+      },
+      {
+        "x": -25,
+        "y": 75,
+        "type": "point",
+        "id": "Point-5",
+        "fixed": false
+      },
+      {
+        "x": 0,
+        "y": 50,
+        "type": "point",
+        "id": "Point-6",
+        "fixed": false
+      },
+      {
+        "x": -83.33333333333333,
+        "y": 83.33333333333333,
+        "type": "point",
+        "id": "Point-7",
+        "fixed": false
+      },
+      {
+        "x": -66.66666666666667,
+        "y": 66.66666666666667,
+        "type": "point",
+        "id": "Point-8",
+        "fixed": false
+      },
+      {
+        "x": -63.80711874576984,
+        "y": 50,
+        "type": "point",
+        "id": "Point-9",
+        "fixed": false
+      },
+      {
+        "x": -36.19288125423016,
+        "y": 50,
+        "type": "point",
+        "id": "Point-10",
+        "fixed": false
+      },
+      {
+        "x": -38.80711874576984,
+        "y": 75,
+        "type": "point",
+        "id": "Point-11",
+        "fixed": false
+      },
+      {
+        "x": -11.192881254230162,
+        "y": 75,
+        "type": "point",
+        "id": "Point-12",
+        "fixed": false
+      },
+      {
+        "x": -8.333333333333332,
+        "y": 58.33333333333333,
+        "type": "point",
+        "id": "Point-13",
+        "fixed": false
+      },
+      {
+        "x": 8.333333333333332,
+        "y": 41.66666666666667,
+        "type": "point",
+        "id": "Point-14",
+        "fixed": false
+      },
+      {
+        "x": 25,
+        "y": 100,
+        "type": "point",
+        "id": "Point-15",
+        "fixed": false
+      },
+      {
+        "x": 50,
+        "y": 25,
+        "type": "point",
+        "id": "Point-16",
+        "fixed": false
+      },
+      {
+        "x": 75.00000095460379,
+        "y": 74.99982103133685,
+        "type": "point",
+        "id": "Point-17",
+        "fixed": false
+      },
+      {
+        "x": 75.1337806600397,
+        "y": 50.000178974095526,
+        "type": "point",
+        "id": "Point-18",
+        "fixed": false
+      },
+      {
+        "x": 100.13378065492685,
+        "y": 49.99999999456762,
+        "type": "point",
+        "id": "Point-19",
+        "fixed": false
+      },
+      {
+        "x": 100.13378064187576,
+        "y": 4.6457988891242946e-7,
+        "type": "point",
+        "id": "Point-20",
+        "fixed": false
+      },
+      {
+        "x": 50.038385068400544,
+        "y": -3.8855192236331345e-8,
+        "type": "point",
+        "id": "Point-21",
+        "fixed": false
+      },
+      {
+        "x": 100.13378040983527,
+        "y": 6.021164608994013e-7,
+        "type": "point",
+        "id": "Point-22",
+        "fixed": false
+      },
+      {
+        "x": 50.03838539280555,
+        "y": -22.987673004300063,
+        "type": "point",
+        "id": "Point-23",
+        "fixed": false
+      },
+      {
+        "x": 100.13378084964106,
+        "y": 5.99068812374092e-7,
+        "type": "point",
+        "id": "Point-24",
+        "fixed": false
+      },
+      {
+        "x": 25.446275640701913,
+        "y": -20.027154751566282,
+        "type": "point",
+        "id": "Point-25",
+        "fixed": false
+      },
+      {
+        "x": -75,
+        "y": -25,
+        "type": "point",
+        "id": "Point-28",
+        "fixed": false
+      },
+      {
+        "x": -75,
+        "y": -50,
+        "type": "point",
+        "id": "Point-29",
+        "fixed": false
+      },
+      {
+        "x": -50,
+        "y": 15,
+        "type": "point",
+        "id": "Point-30",
+        "fixed": false
+      },
+      {
+        "x": 0,
+        "y": -35,
+        "type": "point",
+        "id": "Point-31",
+        "fixed": false
+      },
+      {
+        "x": -83.33333333333333,
+        "y": -71.66666666666666,
+        "type": "point",
+        "id": "Point-32",
+        "fixed": false
+      },
+      {
+        "x": -66.66666666666667,
+        "y": -28.333333333333336,
+        "type": "point",
+        "id": "Point-33",
+        "fixed": false
+      },
+      {
+        "x": -79.69466420655658,
+        "y": 9.061067158688683,
+        "type": "point",
+        "id": "Point-34",
+        "fixed": false
+      },
+      {
+        "x": -20.30533579344342,
+        "y": 20.938932841311317,
+        "type": "point",
+        "id": "Point-35",
+        "fixed": false
+      },
+      {
+        "x": -16.922270951449246,
+        "y": -27.14356178180152,
+        "type": "point",
+        "id": "Point-36",
+        "fixed": false
+      },
+      {
+        "x": 16.922270951449246,
+        "y": -42.85643821819848,
+        "type": "point",
+        "id": "Point-37",
+        "fixed": false
+      },
+      {
+        "x": 16.964183760467943,
+        "y": -25.018103167710855,
+        "type": "point",
+        "id": "Point-38",
+        "fixed": false
+      },
+      {
+        "x": 33.92836752093588,
+        "y": -15.03620633542171,
+        "type": "point",
+        "id": "Point-39",
+        "fixed": false
+      }
+    ],
+    "lines": [
+      {
+        "type": "line",
+        "id": "Line-1",
+        "p1Id": "Point-1",
+        "p2Id": "Point-2",
+        "isConstruction": false
+      },
+      {
+        "type": "line",
+        "id": "Line-2",
+        "p1Id": "Point-2",
+        "p2Id": "Point-3",
+        "isConstruction": false
+      },
+      {
+        "type": "line",
+        "id": "Line-3",
+        "p1Id": "Point-7",
+        "p2Id": "Point-8",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-1",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-4",
+        "p1Id": "Point-9",
+        "p2Id": "Point-10",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-1",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-5",
+        "p1Id": "Point-11",
+        "p2Id": "Point-12",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-1",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-6",
+        "p1Id": "Point-13",
+        "p2Id": "Point-14",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-1",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-7",
+        "p1Id": "Point-6",
+        "p2Id": "Point-15",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-2"
+      },
+      {
+        "type": "line",
+        "id": "Line-8",
+        "p1Id": "Point-15",
+        "p2Id": "Point-16",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-2"
+      },
+      {
+        "type": "line",
+        "id": "Line-9",
+        "p1Id": "Point-16",
+        "p2Id": "Point-17",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-2"
+      },
+      {
+        "type": "line",
+        "id": "Line-10",
+        "p1Id": "Point-19",
+        "p2Id": "Point-20",
+        "isConstruction": false
+      },
+      {
+        "type": "line",
+        "id": "Line-13",
+        "p1Id": "Point-32",
+        "p2Id": "Point-33",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-3",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-14",
+        "p1Id": "Point-34",
+        "p2Id": "Point-35",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-3",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-15",
+        "p1Id": "Point-36",
+        "p2Id": "Point-37",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-3",
+        "isAutomaticSplineHandle": true
+      },
+      {
+        "type": "line",
+        "id": "Line-16",
+        "p1Id": "Point-38",
+        "p2Id": "Point-39",
+        "isConstruction": true,
+        "isSplineHandle": true,
+        "parentSplineId": "Spline-3",
+        "isAutomaticSplineHandle": true
+      }
+    ],
+    "circles": [],
+    "arcs": [
+      {
+        "type": "arc",
+        "id": "Arc-1",
+        "centerId": "Point-18",
+        "startPointId": "Point-17",
+        "endPointId": "Point-19",
+        "radius": 25,
+        "clockwise": true,
+        "isConstruction": false
+      },
+      {
+        "type": "arc",
+        "id": "Arc-2",
+        "centerId": "Point-28",
+        "startPointId": "Point-1",
+        "endPointId": "Point-29",
+        "radius": 25,
+        "clockwise": false,
+        "isConstruction": false
+      }
+    ],
+    "ellipses": [],
+    "ellipticalArcs": [
+      {
+        "type": "elliptical_arc",
+        "id": "EllipticalArc-1",
+        "centerId": "Point-21",
+        "majorAxisPointId": "Point-22",
+        "minorAxisPointId": "Point-23",
+        "startPointId": "Point-24",
+        "endPointId": "Point-25",
+        "clockwise": true,
+        "isConstruction": false
+      }
+    ],
+    "splines": [
+      {
+        "type": "spline",
+        "id": "Spline-1",
+        "splineType": "fit",
+        "pointIds": [
+          "Point-3",
+          "Point-4",
+          "Point-5",
+          "Point-6"
+        ],
+        "tangentLineIds": [
+          "Line-3",
+          "Line-4",
+          "Line-5",
+          "Line-6"
+        ],
+        "isClosed": false,
+        "isConstruction": false
+      },
+      {
+        "type": "spline",
+        "id": "Spline-2",
+        "splineType": "control",
+        "pointIds": [
+          "Point-6",
+          "Point-15",
+          "Point-16",
+          "Point-17"
+        ],
+        "tangentLineIds": [
+          "Line-7",
+          "Line-8",
+          "Line-9"
+        ],
+        "isClosed": false,
+        "isConstruction": false
+      },
+      {
+        "type": "spline",
+        "id": "Spline-3",
+        "splineType": "fit",
+        "pointIds": [
+          "Point-29",
+          "Point-30",
+          "Point-31",
+          "Point-25"
+        ],
+        "tangentLineIds": [
+          "Line-13",
+          "Line-14",
+          "Line-15",
+          "Line-16"
+        ],
+        "isClosed": false,
+        "isConstruction": false
+      }
+    ],
+    "texts": [],
+    "images": [],
+    "constraints": [
+      {
+        "id": "c_vert-1",
+        "type": "vertical",
+        "name": "Vertical",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-1",
+          "Point-2"
+        ],
+        "p1Id": "Point-1",
+        "p2Id": "Point-2"
+      },
+      {
+        "id": "c_pt_axis_on-1",
+        "type": "origin_distance",
+        "name": "Point on Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "Point-6"
+        ],
+        "pointId": "Point-6",
+        "targetDistance": 0,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": false
+      },
+      {
+        "id": "c_midpoint-1",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-3",
+          "Point-7",
+          "Point-8"
+        ],
+        "midId": "Point-3",
+        "p1Id": "Point-7",
+        "p2Id": "Point-8",
+        "ratio": 0.5
+      },
+      {
+        "id": "c_midpoint-2",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-4",
+          "Point-9",
+          "Point-10"
+        ],
+        "midId": "Point-4",
+        "p1Id": "Point-9",
+        "p2Id": "Point-10",
+        "ratio": 0.5
+      },
+      {
+        "id": "c_midpoint-3",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-5",
+          "Point-11",
+          "Point-12"
+        ],
+        "midId": "Point-5",
+        "p1Id": "Point-11",
+        "p2Id": "Point-12",
+        "ratio": 0.5
+      },
+      {
+        "id": "c_midpoint-4",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-6",
+          "Point-13",
+          "Point-14"
+        ],
+        "midId": "Point-6",
+        "p1Id": "Point-13",
+        "p2Id": "Point-14",
+        "ratio": 0.5
+      },
+      {
+        "id": "c_arcept-1",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Arc-1",
+          "Point-18",
+          "Point-17",
+          "Point-19"
+        ],
+        "arcId": "Arc-1",
+        "centerId": "Point-18",
+        "startPointId": "Point-17",
+        "endPointId": "Point-19"
+      },
+      {
+        "id": "c_pt_axis_on-2",
+        "type": "origin_distance",
+        "name": "Point on X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "Point-20"
+        ],
+        "pointId": "Point-20",
+        "targetDistance": 0,
+        "orientation": "vertical",
+        "side": 1,
+        "isCoincident": false
+      },
+      {
+        "id": "c_vert-2",
+        "type": "vertical",
+        "name": "Vertical",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-19",
+          "Point-20"
+        ],
+        "p1Id": "Point-19",
+        "p2Id": "Point-20"
+      },
+      {
+        "id": "c_pt_axis_on-3",
+        "type": "origin_distance",
+        "name": "Point on X-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "Point-21"
+        ],
+        "pointId": "Point-21",
+        "targetDistance": 0,
+        "orientation": "vertical",
+        "side": 1,
+        "isCoincident": false
+      },
+      {
+        "id": "c_elaxis-1",
+        "type": "ellipse_axis",
+        "name": "Ellipse Axis Perpendicularity",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-21",
+          "Point-22",
+          "Point-23"
+        ],
+        "ellipseId": "EllipticalArc-1",
+        "centerId": "Point-21",
+        "majorAxisPointId": "Point-22",
+        "minorAxisPointId": "Point-23"
+      },
+      {
+        "id": "c_elarcept-1",
+        "type": "elliptical_arc_endpoints",
+        "name": "Elliptical Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-21",
+          "Point-22",
+          "Point-23",
+          "Point-24",
+          "Point-25"
+        ],
+        "arcId": "EllipticalArc-1",
+        "centerId": "Point-21",
+        "majorAxisPointId": "Point-22",
+        "minorAxisPointId": "Point-23",
+        "startPointId": "Point-24",
+        "endPointId": "Point-25"
+      },
+      {
+        "id": "c_coinc-1",
+        "type": "coincident",
+        "name": "Coincident",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-20",
+          "Point-22"
+        ],
+        "p1Id": "Point-20",
+        "p2Id": "Point-22"
+      },
+      {
+        "id": "c_coinc-2",
+        "type": "coincident",
+        "name": "Coincident",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-20",
+          "Point-24"
+        ],
+        "p1Id": "Point-20",
+        "p2Id": "Point-24"
+      },
+      {
+        "id": "c_arcept-2",
+        "type": "arc_endpoints",
+        "name": "Arc Endpoints",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Arc-2",
+          "Point-28",
+          "Point-1",
+          "Point-29"
+        ],
+        "arcId": "Arc-2",
+        "centerId": "Point-28",
+        "startPointId": "Point-1",
+        "endPointId": "Point-29"
+      },
+      {
+        "id": "c_pt_axis_on-5",
+        "type": "origin_distance",
+        "name": "Point on Y-Axis",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "value": 0,
+        "entityIds": [
+          "Point-31"
+        ],
+        "pointId": "Point-31",
+        "targetDistance": 0,
+        "orientation": "horizontal",
+        "side": 1,
+        "isCoincident": false
+      },
+      {
+        "id": "c_midpoint-5",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-29",
+          "Point-32",
+          "Point-33"
+        ],
+        "midId": "Point-29",
+        "p1Id": "Point-32",
+        "p2Id": "Point-33",
+        "ratio": 0.49999999999999994
+      },
+      {
+        "id": "c_midpoint-6",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-30",
+          "Point-34",
+          "Point-35"
+        ],
+        "midId": "Point-30",
+        "p1Id": "Point-34",
+        "p2Id": "Point-35",
+        "ratio": 0.5
+      },
+      {
+        "id": "c_midpoint-7",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-31",
+          "Point-36",
+          "Point-37"
+        ],
+        "midId": "Point-31",
+        "p1Id": "Point-36",
+        "p2Id": "Point-37",
+        "ratio": 0.5000000000000001
+      },
+      {
+        "id": "c_midpoint-8",
+        "type": "midpoint",
+        "name": "Midpoint",
+        "weight": 1,
+        "isSoft": false,
+        "isDimensional": false,
+        "entityIds": [
+          "Point-25",
+          "Point-38",
+          "Point-39"
+        ],
+        "midId": "Point-25",
+        "p1Id": "Point-38",
+        "p2Id": "Point-39",
+        "ratio": 0.5000000000000001
+      }
+    ],
+    "parameters": [],
+    "idCounter": 85
+  }
+}
+    ]]>
+  </metadata>
+  <g id="regions" transform="scale(3.7795275590551185)">
+    <path d="M -100.00000 25.00000 A 25.00000 25.00000 0.00000 0 0 -75.00000 50.00000 C -66.66667 28.33333 -79.69466 -9.06107 -50.00000 -15.00000 C -20.30534 -20.93893 -16.92227 27.14356 0.00000 35.00000 C 16.92227 42.85644 16.96418 25.01810 25.44628 20.02715 A 50.09540 22.98767 -0.00000 0 0 100.13378 -0.00000 L 100.13378 -50.00000 A 25.00000 25.00000 0.00000 0 0 75.00000 -74.99982 C 50.00000 -25.00000 25.00000 -100.00000 0.00000 -50.00000 C -8.33333 -58.33333 -11.19288 -75.00000 -25.00000 -75.00000 C -38.80712 -75.00000 -36.19288 -50.00000 -50.00000 -50.00000 C -63.80712 -50.00000 -66.66667 -66.66667 -75.00000 -75.00000 L -100.00000 -50.00000 L -100.00000 25.00000 Z" fill="#bae6fd" fill-opacity="0.5" fill-rule="evenodd" stroke="none" />
+  </g>
+  <g id="solid" transform="scale(3.7795275590551185)">
+    <line x1="-100.00" y1="25.00" x2="-100.00" y2="-50.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" />
+    <line x1="-100.00" y1="-50.00" x2="-75.00" y2="-75.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" />
+    <line x1="100.13" y1="-50.00" x2="100.13" y2="-0.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" />
+    <path d="M 75.00 -75.00 A 25.00 25.00 0 0 1 100.13 -50.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" fill="none" />
+    <path d="M -100.00 25.00 A 25.00 25.00 0 0 0 -75.00 50.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" fill="none" />
+    <path d="M 100.13 -0.00 A 50.10 22.99 -0.00 0 1 25.45 20.03" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" fill="none" />
+    <path d="M -75.00 -75.00 C -66.67 -66.67, -63.81 -50.00, -50.00 -50.00 C -36.19 -50.00, -38.81 -75.00, -25.00 -75.00 C -11.19 -75.00, -8.33 -58.33, 0.00 -50.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" fill="none" />
+    <path d="M 0.00 -50.00 C 25.00 -100.00, 50.00 -25.00, 75.00 -75.00" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" fill="none" />
+    <path d="M -75.00 50.00 C -66.67 28.33, -79.69 -9.06, -50.00 -15.00 C -20.31 -20.94, -16.92 27.14, 0.00 35.00 C 16.92 42.86, 16.96 25.02, 25.45 20.03" stroke="#0f172a" stroke-width="0.1" stroke-linecap="round" fill="none" />
+  </g>
+  <g id="construction" transform="scale(3.7795275590551185)">
+  </g>
+</svg>
