@@ -3,6 +3,7 @@ import { Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
+import { POINT_TOLERANCE } from '../constants';
 import { createSvgElement, createSvgLine, createSvgCircle, createSvgEllipse, createSvgPath } from './svg';
 import {
 	COLORS,
@@ -351,11 +352,11 @@ export function renderBreakPreviewVisual(parent: SVGElement, candidate: TrimCand
 		renderCutMarkerVisual(parent, sStart);
 		renderCutMarkerVisual(parent, sEnd);
 	} else {
-		if (interval[0] > 1e-4) {
+		if (interval[0] > POINT_TOLERANCE) {
 			const sStart = viewport.worldToScreen(cutStartWorld);
 			renderCutMarkerVisual(parent, sStart);
 		}
-		if (interval[1] < 1 - 1e-4) {
+		if (interval[1] < 1 - POINT_TOLERANCE) {
 			const sEnd = viewport.worldToScreen(cutEndWorld);
 			renderCutMarkerVisual(parent, sEnd);
 		}

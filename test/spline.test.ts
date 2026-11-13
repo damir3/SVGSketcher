@@ -602,6 +602,41 @@ describe('Spline Intersections, Trim, and Break', () => {
 		assert.equal(sketch.splines.size, 2);
 	});
 
+	it('executeBreak does not create degenerate spline when cutting curve connects near endpoint', () => {
+		const sketch = new SketchDocument();
+		const p30 = sketch.addPoint({ x: 74.04047285089842, y: 25.072922657919527 });
+		const p7 = sketch.addPoint({ x: 0, y: -7 });
+		const p8 = sketch.addPoint({ x: -41.7499107971143, y: -71.49998309632444 });
+		const p29 = sketch.addPoint({ x: -70.71378470916424, y: -48.95193749047031 });
+		const spline = sketch.addFitSpline([p30.id, p7.id, p8.id, p29.id]);
+
+		const p27 = sketch.addPoint({ x: -70.71325976904807, y: -48.951669519098786 });
+		const p28 = sketch.addPoint({ x: -17.100982328552572, y: -21.52799891578571 });
+		sketch.addLine(p27.id, p28.id);
+
+		const p55 = sketch.addPoint({ x: 74.04047285091734, y: 25.072922657761502 });
+		sketch.addLine(p28.id, p55.id);
+
+		const allCurves = getAllGeoCurves(sketch);
+		const spCurve = allCurves.find(c => c.id === spline.id) as GeoSpline;
+		assert.ok(spCurve);
+
+		const candidate = getTrimCandidate(spCurve, allCurves, new Vec2(-60, -64.6));
+		assert.ok(candidate);
+		assert.equal(candidate.isWholeEntity, false);
+
+		executeBreak(sketch, candidate);
+
+		// Spline should be split into exactly 2 splines (no degenerate endpoint spline)
+		assert.equal(sketch.splines.size, 2);
+		for (const s of sketch.splines.values()) {
+			assert.ok(s.pointIds.length >= 2);
+			const ptA = sketch.points.get(s.pointIds[0])!;
+			const ptB = sketch.points.get(s.pointIds[s.pointIds.length - 1])!;
+			assert.ok(ptA.distanceTo(ptB) > 1);
+		}
+	});
+
 	it('executeTrim trims the end of a spline intersected by a line', () => {
 		const sketch = new SketchDocument();
 		const p1 = sketch.addPoint({ x: 0, y: 0 });

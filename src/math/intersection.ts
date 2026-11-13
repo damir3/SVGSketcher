@@ -28,6 +28,9 @@ import {
 import type { IConstraint } from '../solver/types';
 import { getGeometryKernel } from '../kernel';
 import type { IntersectionPair, KernelCurve, Point2 } from '../kernel/types';
+import { POINT_TOLERANCE } from '../constants';
+
+export { POINT_TOLERANCE };
 
 const TWO_PI = 2 * Math.PI;
 
@@ -284,7 +287,7 @@ export function getParamAtPoint(curve: GeoCurve, pt: Vec2): number {
 /**
  * Checks if point pt (in world coords) lies on an arc within tolerance.
  */
-function isPointOnArc(pt: Vec2, arc: GeoArc, tol = 1e-3): boolean {
+function isPointOnArc(pt: Vec2, arc: GeoArc, tol = POINT_TOLERANCE): boolean {
 	const sc = new Vec2(arc.center.x, -arc.center.y);
 	const ss = new Vec2(arc.start.x, -arc.start.y);
 	const se = new Vec2(arc.end.x, -arc.end.y);
@@ -303,7 +306,7 @@ function isPointOnArc(pt: Vec2, arc: GeoArc, tol = 1e-3): boolean {
 /**
  * Checks if point pt (in world coords) lies on an elliptical arc within tolerance.
  */
-function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = 1e-3): boolean {
+function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = POINT_TOLERANCE): boolean {
 	const sc = new Vec2(arc.center.x, -arc.center.y);
 	const smaj = new Vec2(arc.majorAxisPoint.x, -arc.majorAxisPoint.y);
 	const smin = new Vec2(arc.minorAxisPoint.x, -arc.minorAxisPoint.y);
@@ -902,11 +905,11 @@ function replaceSplineWithInterval(
 		}
 	}
 
-	// Filter any degenerate segments (points closer than 1e-3)
+	// Filter any degenerate segments (points closer than POINT_TOLERANCE)
 	const points: Vec2[] = [];
 	const handles: Array<{ h1: Vec2; h2: Vec2 }> = [];
 	for (let k = 0; k < rawPoints.length; k++) {
-		if (points.length === 0 || points[points.length - 1].distanceTo(rawPoints[k]) >= 1e-3) {
+		if (points.length === 0 || points[points.length - 1].distanceTo(rawPoints[k]) >= POINT_TOLERANCE) {
 			points.push(rawPoints[k]);
 			handles.push(rawHandles[k]);
 		}
@@ -1001,8 +1004,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 		if (!line) return;
 		const [uA, uB] = interval;
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) {
 			sketch.removeEntity(line.id);
@@ -1108,8 +1111,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 		if (!arc) return;
 		const [uA, uB] = interval;
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) {
 			sketch.removeEntity(arc.id);
@@ -1208,8 +1211,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 		if (!arc) return;
 		const [uA, uB] = interval;
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) {
 			sketch.removeEntity(arc.id);
@@ -1307,8 +1310,8 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
 			return;
 		}
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) {
 			sketch.removeEntity(spline.id);
@@ -1350,8 +1353,8 @@ export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): 
 		if (!line) return;
 		const [uA, uB] = interval;
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) {
 			return;
@@ -1452,8 +1455,8 @@ export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): 
 		if (!arc) return;
 		const [uA, uB] = interval;
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) return;
 
@@ -1552,8 +1555,8 @@ export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): 
 		if (!arc) return;
 		const [uA, uB] = interval;
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) return;
 
@@ -1673,8 +1676,8 @@ export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): 
 			return;
 		}
 
-		const isStart = uA <= 1e-4;
-		const isEnd = uB >= 1 - 1e-4;
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
 
 		if (isStart && isEnd) return;
 
