@@ -3,9 +3,9 @@ import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
-import { createSvgElement, createSvgLine, renderDimensionLabel } from '../../canvas/svg';
+import { createSvgElement, createSvgLine, createSvgPath, getArcSvgPath, renderDimensionLabel } from '../../canvas/svg';
 import type { Viewport } from '../../canvas/viewport';
-import { distanceToSegment } from '../../math/hitTest';
+import { distanceToArc, distanceToSegment } from '../../math/hitTest';
 import { Vec2 } from '../../math/vector';
 import type { SketchDocument } from '../../model/sketch';
 
@@ -70,12 +70,11 @@ export class RadiusConstraint extends BaseConstraint {
 		const screenRadius = entity.radius * viewport.zoom;
 		const targetDistance = labelTarget && screenCenter.distanceTo(labelTarget);
 		let angle = this.leaderAngle;
-		let edgeAngle;
+		let arcExtension: { from: Vec2; to: Vec2; clockwise: boolean } | undefined;
 		if (labelTarget && targetDistance) {
 			angle = screenCenter.angleToPoint(labelTarget);
 		}
 
-		edgeAngle = angle;
 		if (arc) {
 			const start = sketch.points.get(arc.startPointId);
 			const end = sketch.points.get(arc.endPointId);
@@ -89,9 +88,16 @@ export class RadiusConstraint extends BaseConstraint {
 				if (sweep < 0) sweep += TWO_PI;
 				let rel = angle === undefined ? sweep / 2 : ((angle - startAngle) * sign) % TWO_PI;
 				if (rel < 0) rel += TWO_PI;
-				if (rel > sweep) rel = rel - sweep < TWO_PI - rel ? sweep : 0;
-				edgeAngle = startAngle + sign * rel;
-				angle ??= edgeAngle;
+				angle ??= startAngle + sign * rel;
+				if (rel > sweep + 1e-8) {
+					const extendEnd = rel - sweep < TWO_PI - rel;
+					const extensionSign = extendEnd ? sign : -sign;
+					arcExtension = {
+						from: extendEnd ? se : ss,
+						to: Vec2.fromPolar(screenRadius, angle + (extensionSign * 4) / Math.max(screenRadius, 1)).add(screenCenter),
+						clockwise: extensionSign > 0,
+					};
+				}
 			}
 		}
 
@@ -117,8 +123,7 @@ export class RadiusConstraint extends BaseConstraint {
 		if (isInside) anchorDistance = Math.min(anchorDistance, maxInsideDistance);
 		else if (offset < 0) anchorDistance = screenRadius + 8;
 		offset = (anchorDistance - screenRadius) / viewport.zoom;
-		const edgeDir = Vec2.fromPolar(1, edgeAngle ?? angle);
-		const edge = screenCenter.clone().addScaledVector(edgeDir, screenRadius);
+		const edge = screenCenter.clone().addScaledVector(dir, screenRadius);
 		const anchor = screenCenter.clone().addScaledVector(dir, anchorDistance);
 		let textAngle = angle;
 		if (textAngle > Math.PI / 2 - 1e-4) textAngle -= Math.PI;
@@ -128,7 +133,11 @@ export class RadiusConstraint extends BaseConstraint {
 			? anchor.clone().addScaledVector(textUp, LABEL_LINE_OFFSET)
 			: new Vec2(anchor.x + ((dir.x >= 0 ? 1 : -1) * labelSize.x) / 2, anchor.y - LABEL_LINE_OFFSET);
 		return {
-			start: isDiameter ? screenCenter.clone().addScaledVector(edgeDir, -screenRadius) : screenCenter,
+			screenCenter,
+			screenRadius,
+			arcExtension,
+			isArc: !!arc,
+			start: isDiameter ? screenCenter.clone().addScaledVector(dir, -screenRadius) : screenCenter,
 			edge,
 			anchor,
 			isInside,
@@ -196,17 +205,26 @@ export class RadiusConstraint extends BaseConstraint {
 			stroke: color,
 			'stroke-width': STROKE_WIDTH.dimension,
 		};
-		createSvgLine(
-			start,
-			edge,
-			{
-				...radialAttrs,
-				...(isDiameter ? { 'marker-start': arrowUrl, 'marker-end': arrowUrl } : { 'marker-end': arrowUrl }),
-			},
-			g
-		);
-		if (isInside && distanceToSegment(anchor, start, edge) > 1e-4) {
-			createSvgLine(edge, anchor, radialAttrs, g);
+		if (layout.arcExtension) {
+			const { from, to, clockwise } = layout.arcExtension;
+			createSvgPath(
+				getArcSvgPath(layout.screenCenter, from, to, layout.screenRadius, clockwise),
+				{ ...radialAttrs, fill: 'none' },
+				g
+			);
+		}
+		const externalArrow = layout.isArc && !isInside && !isDiameter;
+		if (!externalArrow) {
+			createSvgLine(
+				start,
+				edge,
+				{
+					...radialAttrs,
+					...(isDiameter ? { 'marker-start': arrowUrl } : {}),
+					'marker-end': arrowUrl,
+				},
+				g
+			);
 		}
 
 		if (isInside) {
@@ -215,7 +233,7 @@ export class RadiusConstraint extends BaseConstraint {
 			});
 		} else {
 			// 2. Leader line extending to anchor (when outside)
-			createSvgLine(edge, anchor, { stroke: color, 'stroke-width': STROKE_WIDTH.dimension }, g);
+			createSvgLine(anchor, edge, { ...radialAttrs, ...(externalArrow ? { 'marker-end': arrowUrl } : {}) }, g);
 
 			// 3. Horizontal shelf at anchor (Engineering CAD style)
 			const dirX = dir.x >= 0 ? 1 : -1;
@@ -253,13 +271,29 @@ export class RadiusConstraint extends BaseConstraint {
 			Math.max(0, -local.x, local.x - labelSize.x),
 			Math.max(0, -local.y, local.y - labelSize.y)
 		);
+		const extension = layout.arcExtension;
+		const extensionDistance = extension
+			? Math.min(
+					distanceToArc(
+						screen,
+						layout.screenCenter,
+						layout.screenRadius,
+						extension.from,
+						extension.to,
+						extension.clockwise
+					) ?? Infinity,
+					screen.distanceTo(extension.from),
+					screen.distanceTo(extension.to)
+				)
+			: Infinity;
 		if (isInside) {
-			return Math.min(labelDistance, distanceToSegment(screen, start, edge), distanceToSegment(screen, edge, anchor));
+			return Math.min(labelDistance, extensionDistance, distanceToSegment(screen, start, edge));
 		}
 		const dirX = dir.x >= 0 ? 1 : -1;
 		const shelfEnd = new Vec2(anchor.x + dirX * labelSize.x, anchor.y);
 		const leaderDistance = Math.min(
-			distanceToSegment(screen, start, edge),
+			extensionDistance,
+			layout.isArc && !layout.isDiameter ? Infinity : distanceToSegment(screen, start, edge),
 			distanceToSegment(screen, edge, anchor),
 			distanceToSegment(screen, anchor, shelfEnd)
 		);

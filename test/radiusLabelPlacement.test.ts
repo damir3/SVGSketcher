@@ -106,21 +106,74 @@ test('new labels stay inside near the cursor, fit at the rim, and retain their p
 	assert.ok(anchor.x < 99 && anchor.x > 50, 'label clamps inward when its center alone would fit');
 });
 
-test('arc labels follow the cursor outside the sweep while the arrow stays on the arc', () => {
+for (const clockwise of [false, true]) {
+	for (const startAngle of [0, Math.PI * 0.75]) {
+		for (const beyondEnd of [false, true]) {
+			test(`arc extension follows the nearest endpoint: clockwise=${clockwise}, start=${startAngle}, end=${beyondEnd}`, () => {
+				const sketch = new SketchDocument();
+				const center = sketch.addPoint(new Vec2(0, 0));
+				const sign = clockwise ? 1 : -1;
+				const endAngle = startAngle + (sign * Math.PI) / 2;
+				const start = sketch.addPoint(Vec2.fromPolar(100, -startAngle));
+				const end = sketch.addPoint(Vec2.fromPolar(100, -endAngle));
+				const arc = sketch.addArc(center.id, start.id, end.id, 100, clockwise);
+				const viewport = Object.assign(new Viewport(800, 600), { zoom: 1, panX: 0, panY: 0 });
+				const constraint = sketch.addRadiusConstraint(arc.id, 100)!;
+				const angle = beyondEnd ? endAngle + (sign * Math.PI) / 4 : startAngle - (sign * Math.PI) / 4;
+				for (const distance of [40, 200]) {
+					const cursor = Vec2.fromPolar(distance, angle);
+					constraint.moveLabelTo(cursor, sketch, viewport);
+					assert.ok(constraint.getLabelAnchor(sketch, viewport)!.distanceTo(cursor) < 1e-8);
+					const elements = render(constraint, sketch, viewport);
+					const arrow = elements.find(el => el.attributes['marker-end'])!;
+					const edge = Vec2.fromPolar(100, angle);
+					assert.ok(new Vec2(Number(arrow.attributes.x2), Number(arrow.attributes.y2)).distanceTo(edge) < 0.1);
+					const arrowStart = new Vec2(Number(arrow.attributes.x1), Number(arrow.attributes.y1));
+					assert.ok(
+						arrowStart.distanceTo(distance > 100 ? cursor : new Vec2()) < 0.1,
+						'outside arrow points inward from the leader, inside arrow points outward from the center'
+					);
+					const extension = elements.find(el => el.tag === 'path')!;
+					assert.ok(extension, 'extends the arc instead of clamping the arrow to an endpoint');
+					const [x, y] = extension.attributes.d
+						.match(/^M ([^ ]+) ([^ ]+)/)!
+						.slice(1)
+						.map(Number);
+					const endpointAngle = beyondEnd ? endAngle : startAngle;
+					assert.ok(new Vec2(x, y).distanceTo(Vec2.fromPolar(100, endpointAngle)) < 0.01);
+					const midpoint = Vec2.fromPolar(100, (angle + endpointAngle) / 2);
+					assert.ok(constraint.distanceTo(midpoint, sketch, viewport)! < 1e-8, 'curved extension can be selected');
+				}
+				constraint.moveLabelTo(Vec2.fromPolar(200, startAngle + (sign * Math.PI) / 4), sketch, viewport);
+				assert.ok(
+					!render(constraint, sketch, viewport).some(el => el.tag === 'path'),
+					'no extension within the arc sweep'
+				);
+			});
+		}
+	}
+}
+
+test('arc diameter arrows stay inside even when the label is outside the arc and its sweep', () => {
 	const sketch = new SketchDocument();
-	const center = sketch.addPoint(new Vec2(0, 0));
+	const center = sketch.addPoint(new Vec2());
 	const start = sketch.addPoint(new Vec2(100, 0));
 	const end = sketch.addPoint(new Vec2(0, 100));
 	const arc = sketch.addArc(center.id, start.id, end.id, 100, false);
 	const viewport = Object.assign(new Viewport(800, 600), { zoom: 1, panX: 0, panY: 0 });
-	const constraint = sketch.addRadiusConstraint(arc.id, 100)!;
-	for (const cursor of [new Vec2(-30, -20), new Vec2(-200, -80)]) {
+	const constraint = sketch.addRadiusConstraint(arc.id, 100, 'diameter')!;
+	for (const cursor of [new Vec2(30, -20), new Vec2(200, -80), new Vec2(-200, -80)]) {
 		constraint.moveLabelTo(cursor, sketch, viewport);
-		assert.ok(constraint.getLabelAnchor(sketch, viewport)!.distanceTo(cursor) < 1e-8);
-		const elements = render(constraint, sketch, viewport);
-		const radial = elements.find(el => el.attributes['marker-end'])!;
-		assert.equal(Number(radial.attributes.x2), 0);
-		assert.equal(Number(radial.attributes.y2), -100);
-		assert.ok(constraint.distanceTo(cursor, sketch, viewport)! < 1e-8);
+		const lines = render(constraint, sketch, viewport).filter(el => el.tag === 'line');
+		const diameter = lines.find(el => el.attributes['marker-start'])!;
+		assert.ok(diameter.attributes['marker-end'], 'both arrowheads belong to the diameter line');
+		const a = new Vec2(Number(diameter.attributes.x1), Number(diameter.attributes.y1));
+		const b = new Vec2(Number(diameter.attributes.x2), Number(diameter.attributes.y2));
+		assert.ok(a.clone().add(b).length() < 0.1, 'diameter line joins opposite sides through the center');
+		assert.ok(Math.abs(a.length() - 100) < 0.1);
+		assert.ok(
+			lines.filter(el => el !== diameter).every(el => !el.attributes['marker-start'] && !el.attributes['marker-end']),
+			'leader and shelf have no external arrows'
+		);
 	}
 });
