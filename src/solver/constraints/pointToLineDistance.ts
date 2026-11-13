@@ -1,3 +1,5 @@
+import type { SketchDocument } from '../../model/sketch';
+import type { Viewport } from '../../canvas/viewport';
 import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
@@ -17,6 +19,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	targetDistance: number;
 	side: number;
 	offset?: number;
+	labelPosition?: number;
 
 	constructor(
 		id: string,
@@ -27,7 +30,8 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		targetDistance: number,
 		side = 1,
 		weight = 1.0,
-		offset?: number
+		offset?: number,
+		labelPosition?: number
 	) {
 		super(
 			id,
@@ -46,6 +50,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		this.targetDistance = targetDistance;
 		this.side = side >= 0 ? 1 : -1;
 		this.offset = offset;
+		this.labelPosition = labelPosition;
 	}
 
 	override getEquationsCount(): number {
@@ -74,6 +79,33 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		const pt = sketch.points.get(this.pointId);
+		const p1 = sketch.points.get(this.lineP1Id);
+		const p2 = sketch.points.get(this.lineP2Id);
+		if (!pt || !p1 || !p2) return;
+		const sp = viewport.worldToScreen(pt);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
+		const delta = new Vec2().subVectors(s2, s1);
+		const lineLen = delta.length();
+		if (lineLen > 1e-4) {
+			const dir = delta.clone().multiplyScalar(1.0 / lineLen);
+			const tProj = new Vec2().subVectors(sp, s1).dot(dir);
+			const tCursor = new Vec2().subVectors(screen, s1).dot(dir);
+			this.offset = (tCursor - tProj) / viewport.zoom;
+			const normal = dir.clone().perpendicular();
+			const pFoot = s1.clone().addScaledVector(dir, tCursor);
+			const distToFoot = new Vec2().subVectors(screen, pFoot).dot(normal);
+			const totalDist = new Vec2().subVectors(sp, pFoot).dot(normal);
+			if (Math.abs(totalDist) > 1e-4) {
+				let t = distToFoot / totalDist;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		}
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const pt = ctx.sketch.points.get(this.pointId);
 		const p1 = ctx.sketch.points.get(this.lineP1Id);
@@ -95,6 +127,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
+			labelPosition: this.labelPosition,
 		});
 	}
 
@@ -111,7 +144,19 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
 		if (!geom) return null;
 
-		return distanceToLinearDimension(screen, geom.d1, geom.d2);
+		const d1 = geom.d1;
+		const d2 = geom.d2;
+		const t = this.labelPosition ?? 0.5;
+		const basePos = d1.clone().lerp(d2, t);
+		const distToLabel = screen.distanceTo(basePos);
+		const distToSeg = distanceToLinearDimension(screen, d1, d2);
+		let minDist = Math.min(distToLabel, distToSeg);
+		if (t < 0) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, basePos, d1));
+		} else if (t > 1) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, d2, basePos));
+		}
+		return minDist;
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

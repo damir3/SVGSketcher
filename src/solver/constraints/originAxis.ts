@@ -1,9 +1,12 @@
+import type { SketchDocument } from '../../model/sketch';
+import type { Viewport } from '../../canvas/viewport';
 import { Vec2, ORIGIN } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS } from '../../canvas/styles';
+import { DEFAULT_DISTANCE_OFFSET } from '../../canvas/distances';
 import {
 	computeDistanceDimensionGeometry,
 	computePointToLineDimensionGeometry,
@@ -25,6 +28,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 	side: number;
 	offset?: number;
 	isCoincident?: boolean;
+	labelPosition?: number;
 
 	constructor(
 		id: string,
@@ -34,7 +38,8 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		offset?: number,
 		isCoincident = false,
 		side = 1,
-		weight = 1.0
+		weight = 1.0,
+		labelPosition?: number
 	) {
 		const isDim = !isCoincident && targetDistance > 0;
 		const name = isCoincident
@@ -58,6 +63,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		this.side = side >= 0 ? 1 : -1;
 		this.offset = offset;
 		this.isCoincident = isCoincident;
+		this.labelPosition = labelPosition;
 	}
 
 	override getEquationsCount(): number {
@@ -120,6 +126,50 @@ export class OriginDistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		if (this.isCoincident) return;
+		const pt = sketch.points.get(this.pointId);
+		if (!pt) return;
+		const sp = viewport.worldToScreen(pt);
+		const sOrigin = viewport.worldToScreen(ORIGIN);
+		if (this.orientation === 'vertical') {
+			const screenOffset = screen.x - sp.x;
+			this.offset = screenOffset / viewport.zoom;
+			const dy = sOrigin.y - sp.y;
+			if (Math.abs(dy) > 1e-4) {
+				let t = (screen.y - sp.y) / dy;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		} else if (this.orientation === 'horizontal') {
+			const sAxisY = viewport.worldToScreen(new Vec2(0, 100));
+			const dy = sAxisY.y - sOrigin.y;
+			const lineLen = Math.hypot(0, dy);
+			const uy = lineLen > 1e-4 ? dy / lineLen : -1;
+			const screenOffset = (screen.y - sp.y) * uy;
+			this.offset = screenOffset / viewport.zoom;
+			const dx = sOrigin.x - sp.x;
+			if (Math.abs(dx) > 1e-4) {
+				let t = (screen.x - sp.x) / dx;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		} else {
+			const midPoint = new Vec2().midpoint(sOrigin, sp);
+			const delta = new Vec2().subVectors(sp, sOrigin);
+			const len = delta.length();
+			if (len > 1e-4) {
+				const dir = delta.clone().multiplyScalar(1 / len);
+				const normal = dir.clone().perpendicular();
+				const screenOffset = new Vec2().subVectors(screen, midPoint).dot(normal);
+				this.offset = screenOffset / viewport.zoom;
+				let t = new Vec2().subVectors(screen, sOrigin).dot(dir) / len;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		}
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const pt = ctx.sketch.points.get(this.pointId);
 		if (!pt) return;
@@ -150,6 +200,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 				parent: ctx.targetGroup,
 				isSelected: ctx.isSelected,
 				constraintId: this.id,
+				labelPosition: this.labelPosition,
 			});
 			return;
 		}
@@ -167,12 +218,14 @@ export class OriginDistanceConstraint extends BaseConstraint {
 				parent: ctx.targetGroup,
 				isSelected: ctx.isSelected,
 				constraintId: this.id,
+				labelPosition: this.labelPosition,
 			});
 			return;
 		}
 
 		// Aligned:
-		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 32;
+		const offsetMm = this.offset ?? DEFAULT_DISTANCE_OFFSET;
+		const offsetScreen = offsetMm * ctx.viewport.zoom;
 		const geom = computeDistanceDimensionGeometry(sOrigin, sp, 'aligned', offsetScreen);
 		if (!geom) return;
 
@@ -184,6 +237,7 @@ export class OriginDistanceConstraint extends BaseConstraint {
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
+			labelPosition: this.labelPosition,
 		});
 	}
 
@@ -202,26 +256,35 @@ export class OriginDistanceConstraint extends BaseConstraint {
 			return distanceToPoint(screen, new Vec2(sp.x, sp.y + 14));
 		}
 
+		let geom: { d1: Vec2; d2: Vec2 } | null = null;
 		if (this.orientation === 'vertical') {
 			const sAxisX = viewport.worldToScreen(new Vec2(100, 0));
 			const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
-			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisX, offsetScreen);
-			if (!geom) return null;
-			return distanceToLinearDimension(screen, geom.d1, geom.d2);
-		}
-
-		if (this.orientation === 'horizontal') {
+			geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisX, offsetScreen);
+		} else if (this.orientation === 'horizontal') {
 			const sAxisY = viewport.worldToScreen(new Vec2(0, 100));
 			const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 0;
-			const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisY, offsetScreen);
-			if (!geom) return null;
-			return distanceToLinearDimension(screen, geom.d1, geom.d2);
+			geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxisY, offsetScreen);
+		} else {
+			const offsetMm = this.offset ?? DEFAULT_DISTANCE_OFFSET;
+			const offsetScreen = offsetMm * viewport.zoom;
+			geom = computeDistanceDimensionGeometry(sOrigin, sp, 'aligned', offsetScreen);
 		}
-
-		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 32;
-		const geom = computeDistanceDimensionGeometry(sOrigin, sp, 'aligned', offsetScreen);
 		if (!geom) return null;
-		return distanceToLinearDimension(screen, geom.d1, geom.d2);
+
+		const d1 = geom.d1;
+		const d2 = geom.d2;
+		const t = this.labelPosition ?? 0.5;
+		const basePos = d1.clone().lerp(d2, t);
+		const distToLabel = screen.distanceTo(basePos);
+		const distToSeg = distanceToLinearDimension(screen, d1, d2);
+		let minDist = Math.min(distToLabel, distToSeg);
+		if (t < 0) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, basePos, d1));
+		} else if (t > 1) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, d2, basePos));
+		}
+		return minDist;
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {
@@ -279,6 +342,7 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 	side: number;
 	offset?: number;
 	isCollinear?: boolean;
+	labelPosition?: number;
 
 	constructor(
 		id: string,
@@ -290,7 +354,8 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		side = 1,
 		offset?: number,
 		isCollinear = false,
-		weight = 1.0
+		weight = 1.0,
+		labelPosition?: number
 	) {
 		super(
 			id,
@@ -310,6 +375,7 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		this.side = side >= 0 ? 1 : -1;
 		this.offset = offset;
 		this.isCollinear = isCollinear;
+		this.labelPosition = labelPosition;
 	}
 
 	override getEquationsCount(): number {
@@ -355,6 +421,40 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		if (this.isCollinear) return;
+		const p1 = sketch.points.get(this.lineP1Id);
+		const p2 = sketch.points.get(this.lineP2Id);
+		if (!p1 || !p2) return;
+		const midPt = new Vec2().midpoint(p1, p2);
+		const sp = viewport.worldToScreen(midPt);
+		if (this.axis === 'x') {
+			const screenOffset = screen.x - sp.x;
+			this.offset = screenOffset / viewport.zoom;
+			const sOrigin = viewport.worldToScreen(ORIGIN);
+			const dy = sOrigin.y - sp.y;
+			if (Math.abs(dy) > 1e-4) {
+				let t = (screen.y - sp.y) / dy;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		} else {
+			const sOrigin = viewport.worldToScreen(ORIGIN);
+			const sAxisY = viewport.worldToScreen(new Vec2(0, 100));
+			const dy = sAxisY.y - sOrigin.y;
+			const lineLen = Math.hypot(0, dy);
+			const uy = lineLen > 1e-4 ? dy / lineLen : -1;
+			const screenOffset = (screen.y - sp.y) * uy;
+			this.offset = screenOffset / viewport.zoom;
+			const dx = sOrigin.x - sp.x;
+			if (Math.abs(dx) > 1e-4) {
+				let t = (screen.x - sp.x) / dx;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		}
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const p1 = ctx.sketch.points.get(this.lineP1Id);
 		const p2 = ctx.sketch.points.get(this.lineP2Id);
@@ -386,6 +486,7 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
+			labelPosition: this.labelPosition,
 		});
 	}
 
@@ -411,7 +512,19 @@ export class LineToAxisDistanceConstraint extends BaseConstraint {
 		const geom = computePointToLineDimensionGeometry(sp, sOrigin, sAxis2, offsetScreen);
 		if (!geom) return null;
 
-		return distanceToLinearDimension(screen, geom.d1, geom.d2);
+		const d1 = geom.d1;
+		const d2 = geom.d2;
+		const t = this.labelPosition ?? 0.5;
+		const basePos = d1.clone().lerp(d2, t);
+		const distToLabel = screen.distanceTo(basePos);
+		const distToSeg = distanceToLinearDimension(screen, d1, d2);
+		let minDist = Math.min(distToLabel, distToSeg);
+		if (t < 0) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, basePos, d1));
+		} else if (t > 1) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, d2, basePos));
+		}
+		return minDist;
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

@@ -174,7 +174,14 @@ export class CircleTool extends BaseTool {
 		if (dimensionMode) {
 			const constraint = sketch.addRadiusConstraint(circle.id, radius, dimensionMode);
 			const expression = this.popup.getExpression('radius');
-			if (constraint && expression) constraint.expression = expression;
+			if (constraint) {
+				if (expression) constraint.expression = expression;
+				constraint.placeLabelInsideNear(
+					this.ctx.viewport.worldToScreen(this.lastCursorWorld),
+					sketch,
+					this.ctx.viewport
+				);
+			}
 		}
 
 		sketch.commitTransaction();

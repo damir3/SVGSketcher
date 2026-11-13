@@ -617,6 +617,30 @@ export class DimensionTool extends BaseTool {
 				const existed = this.ctx.sketch.hasDistanceConstraint(l1.p1Id, l1.p2Id, orientation);
 				const c = this.ctx.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld, orientation);
 				if (c) {
+					if (orientation === 'horizontal') {
+						const dx = s2.x - s1.x;
+						if (Math.abs(dx) > 1e-4) {
+							let t = (screen.x - s1.x) / dx;
+							if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+							c.labelPosition = t;
+						}
+					} else if (orientation === 'vertical') {
+						const dy = s2.y - s1.y;
+						if (Math.abs(dy) > 1e-4) {
+							let t = (screen.y - s1.y) / dy;
+							if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+							c.labelPosition = t;
+						}
+					} else {
+						const delta = new Vec2().subVectors(s2, s1);
+						const len = delta.length();
+						if (len > 1e-4) {
+							const dir = delta.clone().multiplyScalar(1 / len);
+							let t = new Vec2().subVectors(screen, s1).dot(dir) / len;
+							if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+							c.labelPosition = t;
+						}
+					}
 					const toastMsg = existed
 						? 'Editing distance constraint'
 						: orientation === 'horizontal'
@@ -768,6 +792,30 @@ export class DimensionTool extends BaseTool {
 						orientation
 					);
 					if (c) {
+						if (orientation === 'horizontal') {
+							const dx = s2.x - s1.x;
+							if (Math.abs(dx) > 1e-4) {
+								let t = (screen.x - s1.x) / dx;
+								if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+								c.labelPosition = t;
+							}
+						} else if (orientation === 'vertical') {
+							const dy = s2.y - s1.y;
+							if (Math.abs(dy) > 1e-4) {
+								let t = (screen.y - s1.y) / dy;
+								if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+								c.labelPosition = t;
+							}
+						} else {
+							const delta = new Vec2().subVectors(s2, s1);
+							const len = delta.length();
+							if (len > 1e-4) {
+								const dir = delta.clone().multiplyScalar(1 / len);
+								let t = new Vec2().subVectors(screen, s1).dot(dir) / len;
+								if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+								c.labelPosition = t;
+							}
+						}
 						const toastMsg = existed
 							? 'Editing distance constraint'
 							: orientation === 'horizontal'

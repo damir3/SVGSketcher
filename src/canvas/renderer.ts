@@ -1666,19 +1666,61 @@ export class SVGRenderer {
 			);
 		}
 
-		// 4. Dimension line with arrowheads
+		// 4. Dimension line with arrowheads (Engineering CAD style)
 		const screenDist = d1.distanceTo(d2);
 		const lineAttrs: SvgAttrs = {
 			stroke: color,
 			'stroke-width': STROKE_WIDTH.dimension,
 		};
-		if (screenDist >= 32) {
-			lineAttrs['marker-start'] = arrowUrl;
-			lineAttrs['marker-end'] = arrowUrl;
+		const minInsideDist = 40;
+		if (screenDist >= minInsideDist) {
+			createSvgLine(d1, d2, { ...lineAttrs, 'marker-start': arrowUrl, 'marker-end': arrowUrl }, g);
+		} else if (screenDist > 1e-4) {
+			// Flipped arrows outside pointing inward (GOST 2.307)
+			createSvgLine(d1, d2, lineAttrs, g);
+			const u = new Vec2().subVectors(d2, d1).multiplyScalar(1 / screenDist);
+			const tailLen = 18;
+			createSvgLine(d1.clone().addScaledVector(u, -tailLen), d1, { ...lineAttrs, 'marker-end': arrowUrl }, g);
+			createSvgLine(d2.clone().addScaledVector(u, tailLen), d2, { ...lineAttrs, 'marker-end': arrowUrl }, g);
+		} else {
+			createSvgLine(d1, d2, lineAttrs, g);
 		}
-		createSvgLine(d1, d2, lineAttrs, g);
 
-		renderDimensionLabel(g, new Vec2().midpoint(d1, d2), label, color);
+		// Option B: Dimension number placed above the dimension line
+		let angle = 0;
+		if (screenDist > 1e-4) {
+			angle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
+		}
+		// Normalize angle so text reads from left to right (or bottom to top from the right side, GOST 2.307)
+		if (angle > Math.PI / 2 - 1e-4) {
+			angle -= Math.PI;
+		} else if (angle <= -Math.PI / 2) {
+			angle += Math.PI;
+		}
+		const uText = Vec2.fromPolar(1, angle);
+		const up = new Vec2(uText.y, -uText.x);
+
+		// Position along the dimension line (can be moved anywhere, default is midpoint t = 0.5)
+		const t = opts.labelPosition ?? 0.5;
+		const basePos = d1.clone().lerp(d2, t);
+
+		// Extend dimension line if text moved outside extension lines
+		if (screenDist > 1e-4 && (t < 0 || t > 1)) {
+			const u = new Vec2().subVectors(d2, d1).multiplyScalar(1 / screenDist);
+			const overhang = Math.max(12, (label.length * 7.5) / 2) + 6;
+			if (t < 0) {
+				createSvgLine(basePos.clone().addScaledVector(u, -overhang), d1, lineAttrs, g);
+			} else if (t > 1) {
+				createSvgLine(d2, basePos.clone().addScaledVector(u, overhang), lineAttrs, g);
+			}
+		}
+
+		const textPos = basePos.addScaledVector(up, 8.5);
+		const angleDeg = (angle * 180) / Math.PI;
+
+		renderDimensionLabel(g, textPos, label, color, 'linear', {
+			angleDeg,
+		});
 	}
 
 	private renderDashedExtensionLines(
@@ -2388,6 +2430,25 @@ export class SVGRenderer {
 		const geom = computeDistanceDimensionGeometry(s1, s2, orientation, 0, cursor);
 		if (!geom) return;
 
+		let labelPosition: number | undefined;
+		if (cursor && orientation !== 'direct') {
+			if (orientation === 'horizontal') {
+				const dx = s2.x - s1.x;
+				if (Math.abs(dx) > 1e-4) labelPosition = (cursor.x - s1.x) / dx;
+			} else if (orientation === 'vertical') {
+				const dy = s2.y - s1.y;
+				if (Math.abs(dy) > 1e-4) labelPosition = (cursor.y - s1.y) / dy;
+			} else {
+				const dir = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4);
+				if (dir) {
+					const totalLen = s1.distanceTo(s2);
+					if (totalLen > 1e-4) {
+						labelPosition = new Vec2().subVectors(cursor, s1).dot(dir) / totalLen;
+					}
+				}
+			}
+		}
+
 		const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
 		this.renderLinearDimensionVisual({
 			d1: geom.d1,
@@ -2398,6 +2459,7 @@ export class SVGRenderer {
 			isPreview: true,
 			startPointHighlight: orientation === 'direct' ? s1 : undefined,
 			targetPointSnapped: isTargetSnapped,
+			labelPosition,
 		});
 	}
 
@@ -2457,19 +2519,86 @@ export class SVGRenderer {
 		const midAngle = a1 + delta * 0.5;
 		const midpoint = Vec2.fromPolar(rScreen, midAngle).add(sCenter);
 
-		createSvgPath(
-			`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-			{
-				fill: 'none',
-				stroke: COLORS.primary,
-				'stroke-width': STROKE_WIDTH.dimension,
-				'marker-start': DIM_ARROWS.default,
-				'marker-end': DIM_ARROWS.default,
-			},
-			this.previewGroup
-		);
+		const arcLen = rScreen * Math.abs(delta);
+		const arrowUrl = DIM_ARROWS.default;
+		const lineAttrs: SvgAttrs = {
+			fill: 'none',
+			stroke: COLORS.primary,
+			'stroke-width': STROKE_WIDTH.dimension,
+		};
 
-		renderDimensionLabel(this.previewGroup, midpoint, `${angleDeg.toFixed(1)}°`, COLORS.primary, 'angle');
+		if (arcLen >= 40) {
+			createSvgPath(
+				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
+				{
+					...lineAttrs,
+					'marker-start': arrowUrl,
+					'marker-end': arrowUrl,
+				},
+				this.previewGroup
+			);
+		} else {
+			// Flipped tangential arrows outside for sharp angles
+			createSvgPath(
+				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
+				lineAttrs,
+				this.previewGroup
+			);
+			const uA = Vec2.fromPolar(1, a1);
+			const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
+			createSvgLine(
+				a.clone().addScaledVector(tanA, -18),
+				a,
+				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
+				this.previewGroup
+			);
+			const uB = Vec2.fromPolar(1, a2);
+			const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
+			createSvgLine(
+				b.clone().addScaledVector(tanB, 18),
+				b,
+				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
+				this.previewGroup
+			);
+		}
+
+		const labelText = `${angleDeg.toFixed(1)}°`;
+		if (arcLen < 26) {
+			const uRad = Vec2.fromPolar(1, midAngle);
+			const anchor = midpoint.clone().addScaledVector(uRad, 14);
+			createSvgLine(
+				midpoint,
+				anchor,
+				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension },
+				this.previewGroup
+			);
+			const dirX = uRad.x >= 0 ? 1 : -1;
+			const shelfLen = labelText.length * 7.5 + 10;
+			const shelfEnd = new Vec2(anchor.x + dirX * shelfLen, anchor.y);
+			createSvgLine(
+				anchor,
+				shelfEnd,
+				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension },
+				this.previewGroup
+			);
+			renderDimensionLabel(
+				this.previewGroup,
+				new Vec2(anchor.x + dirX * (shelfLen * 0.5), anchor.y - 8.5),
+				labelText,
+				COLORS.primary,
+				'angle'
+			);
+		} else {
+			const uRad = Vec2.fromPolar(1, midAngle);
+			const textPos = midpoint.clone().addScaledVector(uRad, 8.5);
+			const uTan = uRad.perpendicular();
+			let textAngle = Math.atan2(uTan.y, uTan.x);
+			if (textAngle > Math.PI / 2 - 1e-4) textAngle -= Math.PI;
+			else if (textAngle <= -Math.PI / 2) textAngle += Math.PI;
+			renderDimensionLabel(this.previewGroup, textPos, labelText, COLORS.primary, 'angle', {
+				angleDeg: (textAngle * 180) / Math.PI,
+			});
+		}
 	}
 
 	renderSnapIndicator(

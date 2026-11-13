@@ -844,7 +844,11 @@ export class ArcTool extends BaseTool {
 		if (this.popup.isLocked('radius')) {
 			const constraint = sketch.addRadiusConstraint(arc.id, arc.radius);
 			const expression = this.popup.getExpression('radius');
-			if (constraint && expression) constraint.expression = expression;
+			if (constraint) {
+				if (expression) constraint.expression = expression;
+				const cursor = this.lastPointer?.screen ?? this.ctx.viewport.worldToScreen(sketch.points.get(arc.endPointId)!);
+				constraint.placeLabelInsideNear(cursor, sketch, this.ctx.viewport);
+			}
 		}
 		if (this.popup.isLocked('angle')) {
 			const center = sketch.points.get(arc.centerId)!;

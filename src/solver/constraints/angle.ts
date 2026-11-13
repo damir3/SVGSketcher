@@ -1,9 +1,11 @@
+import type { SketchDocument } from '../../model/sketch';
+import type { Viewport } from '../../canvas/viewport';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
-import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
-import { createSvgElement, createSvgPath, renderDimensionLabel } from '../../canvas/svg';
+import { COLORS, STROKE_WIDTH, DIM_ARROWS, type SvgAttrs } from '../../canvas/styles';
+import { createSvgElement, createSvgLine, createSvgPath, renderDimensionLabel } from '../../canvas/svg';
 import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
 import { ORIGIN, Vec2 } from '../../math/vector';
 
@@ -106,6 +108,31 @@ export class AngleConstraint extends BaseConstraint {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		const world = viewport.screenToWorld(screen);
+		const l1 = sketch.getLine(this.line1Id);
+		const l2 = sketch.getLine(this.line2Id);
+		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		if (!p1 || !p2 || !p3 || !p4) return;
+		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, this.line1Id, this.line2Id);
+		const arcRadiusWorld = Math.max(10, world.distanceTo(geom.pInt));
+		this.arcRadius = arcRadiusWorld;
+
+		if (l1 && l2 && (geom.s1 !== this.s1 || geom.s2 !== this.s2)) {
+			this.s1 = geom.s1;
+			this.s2 = geom.s2;
+			this.sign = geom.sign;
+			const newAngle = Math.round(geom.initialAngleDeg * 10) / 10;
+			this.targetAngle = newAngle;
+			this.value = newAngle;
+			this.name = 'Angle';
+			sketch.solve();
+		}
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const l1 = ctx.sketch.getLine(this.line1Id);
 		const l2 = ctx.sketch.getLine(this.line2Id);
@@ -183,22 +210,75 @@ export class AngleConstraint extends BaseConstraint {
 			}
 		}
 
-		// Arc path with arrowheads
+		// Arc path with arrowheads (Engineering CAD style)
+		const arcLen = rScreen * Math.abs(delta);
 		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
-		createSvgPath(
-			`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-			{
-				fill: 'none',
-				stroke: color,
-				'stroke-width': STROKE_WIDTH.dimension,
-				'marker-start': arrowUrl,
-				'marker-end': arrowUrl,
-			},
-			g
-		);
+		const lineAttrs: SvgAttrs = {
+			fill: 'none',
+			stroke: color,
+			'stroke-width': STROKE_WIDTH.dimension,
+		};
+
+		if (arcLen >= 40) {
+			createSvgPath(
+				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
+				{
+					...lineAttrs,
+					'marker-start': arrowUrl,
+					'marker-end': arrowUrl,
+				},
+				g
+			);
+		} else {
+			// Flipped tangential arrows outside for sharp angles (GOST 2.307)
+			createSvgPath(
+				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
+				lineAttrs,
+				g
+			);
+			const uA = Vec2.fromPolar(1, a1);
+			const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
+			createSvgLine(
+				a.clone().addScaledVector(tanA, -18),
+				a,
+				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
+				g
+			);
+			const uB = Vec2.fromPolar(1, a2);
+			const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
+			createSvgLine(
+				b.clone().addScaledVector(tanB, 18),
+				b,
+				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
+				g
+			);
+		}
 
 		const prefix = this.expression ? 'fx: ' : '';
-		renderDimensionLabel(g, midPoint, `${prefix}${this.targetAngle.toFixed(1)}°`, color, 'angle');
+		const labelText = `${prefix}${this.targetAngle.toFixed(1)}°`;
+
+		if (arcLen < 26) {
+			// Leader shelf for small angle
+			const uRad = Vec2.fromPolar(1, midAngle);
+			const anchor = midPoint.clone().addScaledVector(uRad, 14);
+			createSvgLine(midPoint, anchor, { stroke: color, 'stroke-width': STROKE_WIDTH.dimension }, g);
+			const dirX = uRad.x >= 0 ? 1 : -1;
+			const shelfLen = labelText.length * 7.5 + 10;
+			const shelfEnd = new Vec2(anchor.x + dirX * shelfLen, anchor.y);
+			createSvgLine(anchor, shelfEnd, { stroke: color, 'stroke-width': STROKE_WIDTH.dimension }, g);
+			renderDimensionLabel(g, new Vec2(anchor.x + dirX * (shelfLen * 0.5), anchor.y - 8.5), labelText, color, 'angle');
+		} else {
+			// Above arc on convex side
+			const uRad = Vec2.fromPolar(1, midAngle);
+			const textPos = midPoint.clone().addScaledVector(uRad, 8.5);
+			const uTan = uRad.perpendicular();
+			let textAngle = Math.atan2(uTan.y, uTan.x);
+			if (textAngle > Math.PI / 2 - 1e-4) textAngle -= Math.PI;
+			else if (textAngle <= -Math.PI / 2) textAngle += Math.PI;
+			renderDimensionLabel(g, textPos, labelText, color, 'angle', {
+				angleDeg: (textAngle * 180) / Math.PI,
+			});
+		}
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {

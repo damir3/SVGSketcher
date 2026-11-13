@@ -56,6 +56,7 @@ type ConstraintSnapshotData =
 			targetDistance: number;
 			offset?: number;
 			orientation: 'aligned' | 'horizontal' | 'vertical';
+			labelPosition?: number;
 	  }
 	| {
 			type: 'point_to_line_distance';
@@ -66,6 +67,7 @@ type ConstraintSnapshotData =
 			targetDistance: number;
 			side: number;
 			offset?: number;
+			labelPosition?: number;
 	  }
 	| {
 			type: 'angle';
@@ -226,6 +228,7 @@ type ConstraintSnapshotData =
 			side: number;
 			offset?: number;
 			isCoincident: boolean;
+			labelPosition?: number;
 	  }
 	| {
 			type: 'line_to_axis_distance';
@@ -237,6 +240,7 @@ type ConstraintSnapshotData =
 			side: number;
 			offset?: number;
 			isCollinear: boolean;
+			labelPosition?: number;
 	  };
 
 export type ConstraintSnapshot = ConstraintSnapshotBase & ConstraintSnapshotData;

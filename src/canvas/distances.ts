@@ -10,3 +10,6 @@ export const GIZMO_DISTANCE_PX = 20;
 
 /** Distance in screen pixels from the top edge of text rectangle to rotation circle gizmo handle */
 export const TEXT_ROTATION_HANDLE_DISTANCE_PX = 36;
+
+/** Default offset distance in millimeters (sketch model units) for linear dimension lines */
+export const DEFAULT_DISTANCE_OFFSET = 10;

@@ -133,6 +133,16 @@ export const DIM_ARROWS = {
 	delete: 'url(#dim-arrow-delete)',
 } as const;
 
+export const DIMENSION_FONT_SIZE = 12;
+
+export const DIMENSION_TEXT_ATTRS: SvgAttrs = {
+	'text-anchor': 'middle',
+	'dominant-baseline': 'central',
+	'font-size': DIMENSION_FONT_SIZE,
+	'font-weight': 600,
+	'font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+};
+
 export type SvgAttrs = Record<string, string | number | boolean | undefined | null>;
 
 // ==========================================

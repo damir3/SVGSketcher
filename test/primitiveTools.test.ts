@@ -345,6 +345,27 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(c.radius, 30);
 	});
 
+	for (const kind of ['circle', 'arc'] as const) {
+		it(`places a new ${kind} dimension inside toward the final cursor position`, () => {
+			const sketch = new SketchDocument();
+			const { ctx } = createMockContext(sketch);
+			const tool = kind === 'circle' ? new CircleTool() : new ArcTool();
+			tool.activate(ctx);
+			tool.onMouseDown(makeMouseEvent(0, 0));
+			tool.popup.setValue('radius', kind === 'circle' ? 200 : 100);
+			tool.popup.setLocked('radius', true);
+			if (kind === 'arc') tool.onMouseDown(makeMouseEvent(100, 0));
+			tool.onMouseMove(makeMouseEvent(0, 150));
+			tool.onMouseDown(makeMouseEvent(0, 150));
+			const constraint = [...sketch.constraints.values()].find(c => c instanceof RadiusConstraint)!;
+			assert.ok(constraint instanceof RadiusConstraint);
+			const anchor = constraint.getLabelAnchor(sketch, ctx.viewport)!;
+			assert.ok(Math.abs(anchor.x) < 1e-8);
+			assert.ok(anchor.y > 50 && anchor.y < 100);
+			assert.ok(constraint.leaderOffset! < 0);
+		});
+	}
+
 	it('RectangleTool defaults to corner mode and creates 4 points and 4 lines', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);

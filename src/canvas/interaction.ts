@@ -151,7 +151,6 @@ export class CanvasInteraction {
 	private isDraggingConstraint = false;
 	private draggedConstraintId: string | null = null;
 	private dragConstraintStartScreen: Vec2 | null = null;
-	private radiusLabelGrabOffset: Vec2 | null = null;
 
 	// Box selection state
 	private isBoxSelecting = false;
@@ -553,7 +552,6 @@ export class CanvasInteraction {
 		this.isDraggingConstraint = false;
 		this.draggedConstraintId = null;
 		this.dragConstraintStartScreen = null;
-		this.radiusLabelGrabOffset = null;
 
 		this.preDragSnapshot = null;
 		this.hasDragged = false;
@@ -1306,9 +1304,9 @@ export class CanvasInteraction {
 		const nearestScreen = this.viewport.worldToScreen(nearestWorld);
 
 		if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
-			const snapX = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestWorld.x : world.x;
-			const snapScreenX =
-				Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX ? nearestScreen.x : screenPos.x;
+			const snapToGrid = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX;
+			const snapX = snapToGrid ? nearestWorld.x : world.x;
+			const snapScreenX = snapToGrid ? nearestScreen.x : screenPos.x;
 			return {
 				type: 'line',
 				id: 'axis_x',
@@ -1318,9 +1316,9 @@ export class CanvasInteraction {
 		}
 
 		if (dAxisY < geomSnapDistPx) {
-			const snapY = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestWorld.y : world.y;
-			const snapScreenY =
-				Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX ? nearestScreen.y : screenPos.y;
+			const snapToGrid = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX;
+			const snapY = snapToGrid ? nearestWorld.y : world.y;
+			const snapScreenY = snapToGrid ? nearestScreen.y : screenPos.y;
 			return {
 				type: 'line',
 				id: 'axis_y',
@@ -2161,10 +2159,6 @@ export class CanvasInteraction {
 						this.preDragSnapshot = this.sketch.takeSnapshot();
 						this.hasDragged = false;
 						this.dragConstraintStartScreen = screen;
-						if (constraint instanceof RadiusConstraint) {
-							const anchor = constraint.getLabelAnchor(this.sketch, this.viewport);
-							this.radiusLabelGrabOffset = anchor ? new Vec2().subVectors(anchor, screen) : null;
-						}
 					}
 				}
 
@@ -2269,14 +2263,10 @@ export class CanvasInteraction {
 						const np2 = p2.clone().rotateAround(c, deltaAngle);
 						const np3 = p3.clone().rotateAround(c, deltaAngle);
 
-						pt0.x = np0.x;
-						pt0.y = np0.y;
-						pt1.x = np1.x;
-						pt1.y = np1.y;
-						pt2.x = np2.x;
-						pt2.y = np2.y;
-						pt3.x = np3.x;
-						pt3.y = np3.y;
+						pt0.copy(np0);
+						pt1.copy(np1);
+						pt2.copy(np2);
+						pt3.copy(np3);
 
 						this.sketch.solve();
 						this.render();
@@ -2293,8 +2283,7 @@ export class CanvasInteraction {
 			for (const [pid, initPos] of this.textDragState.initialPoints) {
 				const pt = this.sketch.points.get(pid);
 				if (pt) {
-					pt.x = initPos.x + dir.x;
-					pt.y = initPos.y + dir.y;
+					pt.addVectors(initPos, dir);
 				}
 			}
 			this.sketch.solve();
@@ -2309,141 +2298,15 @@ export class CanvasInteraction {
 			return;
 		}
 
-		// Drag constraint handling (Distance offset & Angle radius/quadrant)
+		// Constraint label dragging
 		if (this.isDraggingConstraint && this.draggedConstraintId) {
 			if (this.dragConstraintStartScreen && screen.distanceTo(this.dragConstraintStartScreen) > 3) {
 				this.hasDragged = true;
 			}
 			if (this.hasDragged) {
 				const constraint = this.sketch.constraints.get(this.draggedConstraintId);
-				if (constraint instanceof DistanceConstraint) {
-					const p1 = this.sketch.points.get(constraint.p1Id);
-					const p2 = this.sketch.points.get(constraint.p2Id);
-					if (p1 && p2) {
-						const s1 = this.viewport.worldToScreen(p1);
-						const s2 = this.viewport.worldToScreen(p2);
-						const midPoint = new Vec2().midpoint(s1, s2);
-						if (constraint.orientation === 'horizontal') {
-							const screenOffset = screen.y - midPoint.y;
-							constraint.offset = screenOffset / this.viewport.zoom;
-							this.render();
-						} else if (constraint.orientation === 'vertical') {
-							const screenOffset = screen.x - midPoint.x;
-							constraint.offset = screenOffset / this.viewport.zoom;
-							this.render();
-						} else {
-							const dir = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4);
-							if (dir) {
-								const normal = dir.clone().perpendicular();
-								const screenOffset = new Vec2().subVectors(screen, midPoint).dot(normal);
-								constraint.offset = screenOffset / this.viewport.zoom;
-								this.render();
-							}
-						}
-					}
-				} else if (constraint instanceof PointToLineDistanceConstraint) {
-					const pt = this.sketch.points.get(constraint.pointId);
-					const p1 = this.sketch.points.get(constraint.lineP1Id);
-					const p2 = this.sketch.points.get(constraint.lineP2Id);
-					if (pt && p1 && p2) {
-						const sp = this.viewport.worldToScreen(pt);
-						const s1 = this.viewport.worldToScreen(p1);
-						const s2 = this.viewport.worldToScreen(p2);
-						const dir = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4);
-						if (dir) {
-							const tProj = new Vec2().subVectors(sp, s1).dot(dir);
-							const tCursor = new Vec2().subVectors(screen, s1).dot(dir);
-							constraint.offset = (tCursor - tProj) / this.viewport.zoom;
-							this.render();
-						}
-					}
-				} else if (constraint instanceof OriginDistanceConstraint && !constraint.isCoincident) {
-					const pt = this.sketch.points.get(constraint.pointId);
-					if (pt) {
-						const sp = this.viewport.worldToScreen(pt);
-						const sOrigin = this.viewport.worldToScreen(ORIGIN);
-						if (constraint.orientation === 'vertical') {
-							const screenOffset = screen.x - sp.x;
-							constraint.offset = screenOffset / this.viewport.zoom;
-							this.render();
-						} else if (constraint.orientation === 'horizontal') {
-							const sAxisY = this.viewport.worldToScreen(new Vec2(0, 100));
-							const dy = sAxisY.y - sOrigin.y;
-							const lineLen = Math.hypot(0, dy);
-							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
-							const screenOffset = (screen.y - sp.y) * uy;
-							constraint.offset = screenOffset / this.viewport.zoom;
-							this.render();
-						} else {
-							const midPoint = new Vec2().midpoint(sOrigin, sp);
-							const dir = new Vec2().subVectors(sp, sOrigin).normalizeOrNull(1e-4);
-							if (dir) {
-								const normal = dir.clone().perpendicular();
-								const screenOffset = new Vec2().subVectors(screen, midPoint).dot(normal);
-								constraint.offset = screenOffset / this.viewport.zoom;
-								this.render();
-							}
-						}
-					}
-				} else if (constraint instanceof LineToAxisDistanceConstraint && !constraint.isCollinear) {
-					const p1 = this.sketch.points.get(constraint.lineP1Id);
-					const p2 = this.sketch.points.get(constraint.lineP2Id);
-					if (p1 && p2) {
-						const midPt = new Vec2().midpoint(p1, p2);
-						const sp = this.viewport.worldToScreen(midPt);
-						if (constraint.axis === 'x') {
-							const screenOffset = screen.x - sp.x;
-							constraint.offset = screenOffset / this.viewport.zoom;
-							this.render();
-						} else {
-							const sOrigin = this.viewport.worldToScreen(ORIGIN);
-							const sAxisY = this.viewport.worldToScreen(new Vec2(0, 100));
-							const dy = sAxisY.y - sOrigin.y;
-							const lineLen = Math.hypot(0, dy);
-							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
-							const screenOffset = (screen.y - sp.y) * uy;
-							constraint.offset = screenOffset / this.viewport.zoom;
-							this.render();
-						}
-					}
-				} else if (constraint instanceof AngleConstraint) {
-					const l1 = this.sketch.getLine(constraint.line1Id);
-					const l2 = this.sketch.getLine(constraint.line2Id);
-					const p1 = this.sketch.points.get(l1 ? l1.p1Id : constraint.l1P1);
-					const p2 = this.sketch.points.get(l1 ? l1.p2Id : constraint.l1P2);
-					const p3 = this.sketch.points.get(l2 ? l2.p1Id : constraint.l2P1);
-					const p4 = this.sketch.points.get(l2 ? l2.p2Id : constraint.l2P2);
-					if (p1 && p2 && p3 && p4) {
-						const geom = this.sketch.calculateLinesAngleGeometry(
-							p1,
-							p2,
-							p3,
-							p4,
-							world,
-							constraint.line1Id,
-							constraint.line2Id
-						);
-						const arcRadiusWorld = Math.max(10, world.distanceTo(geom.pInt));
-						constraint.arcRadius = arcRadiusWorld;
-
-						if (l1 && l2 && (geom.s1 !== constraint.s1 || geom.s2 !== constraint.s2)) {
-							constraint.s1 = geom.s1;
-							constraint.s2 = geom.s2;
-							constraint.sign = geom.sign;
-							const newAngle = Math.round(geom.initialAngleDeg * 10) / 10;
-							constraint.targetAngle = newAngle;
-							constraint.value = newAngle;
-							constraint.name = 'Angle';
-							this.sketch.solve();
-						}
-						this.render();
-					}
-				} else if (constraint instanceof RadiusConstraint && this.radiusLabelGrabOffset) {
-					constraint.moveLabelTo(
-						screen.clone().addScaledVector(this.radiusLabelGrabOffset, 1),
-						this.sketch,
-						this.viewport
-					);
+				if (constraint?.moveLabelTo) {
+					constraint.moveLabelTo(screen, this.sketch, this.viewport);
 					this.render();
 				}
 			}
@@ -2457,7 +2320,7 @@ export class CanvasInteraction {
 			const targetWorld = this.sketch.getPointDragTarget(this.draggedPointId, snap?.worldPos ?? world);
 			this.sketch.dragPoint(this.draggedPointId, targetWorld.x, targetWorld.y);
 			this.render();
-			if (snap && targetWorld.x === snap.worldPos.x && targetWorld.y === snap.worldPos.y) {
+			if (snap && targetWorld.equals(snap.worldPos)) {
 				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, true);
 			} else {
 				this.renderer.clearPreviews();
@@ -2521,16 +2384,13 @@ export class CanvasInteraction {
 				const start = this.sketch.points.get(arc.startPointId);
 				const end = this.sketch.points.get(arc.endPointId);
 				if (center && !center.fixed) {
-					center.x = this.arcCenterStart.x + dir.x;
-					center.y = this.arcCenterStart.y + dir.y;
+					center.addVectors(this.arcCenterStart, dir);
 				}
 				if (start && !start.fixed) {
-					start.x = this.arcStartPointStart.x + dir.x;
-					start.y = this.arcStartPointStart.y + dir.y;
+					start.addVectors(this.arcStartPointStart, dir);
 				}
 				if (end && !end.fixed) {
-					end.x = this.arcEndPointStart.x + dir.x;
-					end.y = this.arcEndPointStart.y + dir.y;
+					end.addVectors(this.arcEndPointStart, dir);
 				}
 				this.sketch.solve();
 				this.render();
@@ -2556,16 +2416,13 @@ export class CanvasInteraction {
 				const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
 				const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
 				if (center && !center.fixed) {
-					center.x = this.ellipseCenterStart.x + dir.x;
-					center.y = this.ellipseCenterStart.y + dir.y;
+					center.addVectors(this.ellipseCenterStart, dir);
 				}
 				if (majorPt && !majorPt.fixed) {
-					majorPt.x = this.ellipseMajorPointStart.x + dir.x;
-					majorPt.y = this.ellipseMajorPointStart.y + dir.y;
+					majorPt.addVectors(this.ellipseMajorPointStart, dir);
 				}
 				if (minorPt && !minorPt.fixed) {
-					minorPt.x = this.ellipseMinorPointStart.x + dir.x;
-					minorPt.y = this.ellipseMinorPointStart.y + dir.y;
+					minorPt.addVectors(this.ellipseMinorPointStart, dir);
 				}
 				this.sketch.solve();
 				this.render();
@@ -2595,24 +2452,19 @@ export class CanvasInteraction {
 				const start = this.sketch.points.get(arc.startPointId);
 				const end = this.sketch.points.get(arc.endPointId);
 				if (center && !center.fixed) {
-					center.x = this.ellipticalArcCenterStart.x + dir.x;
-					center.y = this.ellipticalArcCenterStart.y + dir.y;
+					center.addVectors(this.ellipticalArcCenterStart, dir);
 				}
 				if (majorPt && !majorPt.fixed) {
-					majorPt.x = this.ellipticalArcMajorPointStart.x + dir.x;
-					majorPt.y = this.ellipticalArcMajorPointStart.y + dir.y;
+					majorPt.addVectors(this.ellipticalArcMajorPointStart, dir);
 				}
 				if (minorPt && !minorPt.fixed) {
-					minorPt.x = this.ellipticalArcMinorPointStart.x + dir.x;
-					minorPt.y = this.ellipticalArcMinorPointStart.y + dir.y;
+					minorPt.addVectors(this.ellipticalArcMinorPointStart, dir);
 				}
 				if (start && !start.fixed) {
-					start.x = this.ellipticalArcStartPointStart.x + dir.x;
-					start.y = this.ellipticalArcStartPointStart.y + dir.y;
+					start.addVectors(this.ellipticalArcStartPointStart, dir);
 				}
 				if (end && !end.fixed) {
-					end.x = this.ellipticalArcEndPointStart.x + dir.x;
-					end.y = this.ellipticalArcEndPointStart.y + dir.y;
+					end.addVectors(this.ellipticalArcEndPointStart, dir);
 				}
 				this.sketch.solve();
 				this.render();
@@ -2628,8 +2480,7 @@ export class CanvasInteraction {
 			for (const [pid, startPos] of this.splinePointsStart.entries()) {
 				const pt = this.sketch.points.get(pid);
 				if (pt && !pt.fixed) {
-					pt.x = startPos.x + dir.x;
-					pt.y = startPos.y + dir.y;
+					pt.addVectors(startPos, dir);
 				}
 			}
 			this.sketch.solve();
@@ -2745,19 +2596,12 @@ export class CanvasInteraction {
 					const screen = e ? this.getScreenPos(e) : this.lastMouseScreen;
 					const snap = this.findSnap(screen, draggedPtId);
 					const target = snap && this.sketch.getPointDragTarget(draggedPtId, snap.worldPos);
-					if (
-						snap &&
-						target &&
-						(this.sketch.isSplineHandlePoint(draggedPtId) ||
-							target.x !== snap.worldPos.x ||
-							target.y !== snap.worldPos.y)
-					) {
+					if (snap && target && (this.sketch.isSplineHandlePoint(draggedPtId) || !target.equals(snap.worldPos))) {
 						this.sketch.dragPoint(draggedPtId, target.x, target.y);
 					} else if (snap && snap.id && (snap.type !== 'point' || snap.id !== draggedPtId)) {
 						const pt = this.sketch.getPoint(draggedPtId);
 						if (pt) {
-							pt.x = snap.worldPos.x;
-							pt.y = snap.worldPos.y;
+							pt.copy(snap.worldPos);
 						}
 						if (this.preDragSnapshot) {
 							this.sketch.beginTransactionWithSnapshot(this.preDragSnapshot);
@@ -2770,8 +2614,7 @@ export class CanvasInteraction {
 					} else if (snap && snap.type === 'grid') {
 						const pt = this.sketch.getPoint(draggedPtId);
 						if (pt && !this.sketch.isPointFixed(draggedPtId)) {
-							pt.x = snap.worldPos.x;
-							pt.y = snap.worldPos.y;
+							pt.copy(snap.worldPos);
 						}
 					}
 				}
@@ -2896,7 +2739,6 @@ export class CanvasInteraction {
 			this.isDraggingConstraint = false;
 			this.draggedConstraintId = null;
 			this.dragConstraintStartScreen = null;
-			this.radiusLabelGrabOffset = null;
 
 			if (hadDragged) {
 				if (this.preDragSnapshot) {
@@ -3797,11 +3639,8 @@ export class CanvasInteraction {
 	}
 
 	private finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {
-		const minScreen = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
-		const maxScreen = new Vec2(Math.max(s1.x, s2.x), Math.max(s1.y, s2.y));
-
-		const w1 = this.viewport.screenToWorld(minScreen);
-		const w2 = this.viewport.screenToWorld(maxScreen);
+		const w1 = this.viewport.screenToWorld(s1);
+		const w2 = this.viewport.screenToWorld(s2);
 
 		const bounds = AABB.fromPoints([w1, w2])!;
 		const { min, max } = bounds;

@@ -1,3 +1,6 @@
+import type { Vec2 } from '../math/vector';
+import type { SketchDocument } from '../model/sketch';
+import type { Viewport } from '../canvas/viewport';
 import type { IInspectable } from '../ui/panels/inspector/types';
 
 export type ConstraintType =
@@ -75,6 +78,8 @@ export interface IConstraint extends IInspectable {
 	getEquationsCount(): number;
 	evaluate(paramMap: Map<string, number>): number[];
 	jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[];
+	/** Move a dimension label using a canvas position in screen pixels. */
+	moveLabelTo?(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void;
 	render?(context: any): void;
 	distanceTo?(screen: any, sketch: any, viewport: any, thresholdPx?: number): number | null;
 }

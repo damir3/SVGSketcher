@@ -488,8 +488,8 @@ export class Sidebar {
 		} else if (c instanceof RadiusConstraint) {
 			valBadge =
 				c.displayMode === 'diameter'
-					? `<span class="val-badge">Ø ${(c.targetRadius * 2).toFixed(1)} mm</span>`
-					: `<span class="val-badge">R ${c.targetRadius.toFixed(1)} mm</span>`;
+					? `<span class="val-badge">Ø${(c.targetRadius * 2).toFixed(1)} mm</span>`
+					: `<span class="val-badge">R${c.targetRadius.toFixed(1)} mm</span>`;
 			name = c.displayMode === 'diameter' ? 'Diameter' : 'Radius';
 		} else if (c instanceof CircularPatternConstraint) {
 			const label = c.isReadOnly

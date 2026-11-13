@@ -1,3 +1,5 @@
+import type { SketchDocument } from '../../model/sketch';
+import type { Viewport } from '../../canvas/viewport';
 import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
@@ -5,6 +7,9 @@ import type { ConstraintRenderContext } from './renderContext';
 import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import { distanceToLinearDimension } from '../../math/hitTest';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
+import { DEFAULT_DISTANCE_OFFSET } from '../../canvas/distances';
+
+export { DEFAULT_DISTANCE_OFFSET };
 
 /**
  * Dimensional constraint: distance between two points equals value
@@ -15,6 +20,7 @@ export class DistanceConstraint extends BaseConstraint {
 	targetDistance: number;
 	offset?: number;
 	orientation: 'aligned' | 'horizontal' | 'vertical';
+	labelPosition?: number;
 
 	constructor(
 		id: string,
@@ -23,7 +29,8 @@ export class DistanceConstraint extends BaseConstraint {
 		targetDistance: number,
 		weight = 1.0,
 		offset?: number,
-		orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned'
+		orientation: 'aligned' | 'horizontal' | 'vertical' = 'aligned',
+		labelPosition?: number
 	) {
 		const prefix =
 			orientation === 'horizontal'
@@ -37,6 +44,7 @@ export class DistanceConstraint extends BaseConstraint {
 		this.targetDistance = targetDistance;
 		this.offset = offset;
 		this.orientation = orientation;
+		this.labelPosition = labelPosition;
 	}
 
 	override getEquationsCount(): number {
@@ -103,6 +111,46 @@ export class DistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
+		if (!p1 || !p2) return;
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
+		const midPoint = new Vec2().midpoint(s1, s2);
+		if (this.orientation === 'horizontal') {
+			const screenOffset = screen.y - midPoint.y;
+			this.offset = screenOffset / viewport.zoom;
+			const dx = s2.x - s1.x;
+			if (Math.abs(dx) > 1e-4) {
+				let t = (screen.x - s1.x) / dx;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		} else if (this.orientation === 'vertical') {
+			const screenOffset = screen.x - midPoint.x;
+			this.offset = screenOffset / viewport.zoom;
+			const dy = s2.y - s1.y;
+			if (Math.abs(dy) > 1e-4) {
+				let t = (screen.y - s1.y) / dy;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		} else {
+			const delta = new Vec2().subVectors(s2, s1);
+			const len = delta.length();
+			if (len > 1e-4) {
+				const dir = delta.clone().multiplyScalar(1 / len);
+				const normal = dir.clone().perpendicular();
+				const screenOffset = new Vec2().subVectors(screen, midPoint).dot(normal);
+				this.offset = screenOffset / viewport.zoom;
+				let t = new Vec2().subVectors(screen, s1).dot(dir) / len;
+				if (Math.abs(t - 0.5) < 0.04) t = 0.5;
+				this.labelPosition = t;
+			}
+		}
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const p1 = ctx.sketch.points.get(this.p1Id);
 		const p2 = ctx.sketch.points.get(this.p2Id);
@@ -110,7 +158,8 @@ export class DistanceConstraint extends BaseConstraint {
 
 		const s1 = ctx.viewport.worldToScreen(p1);
 		const s2 = ctx.viewport.worldToScreen(p2);
-		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 32;
+		const offsetMm = this.offset ?? DEFAULT_DISTANCE_OFFSET;
+		const offsetScreen = offsetMm * ctx.viewport.zoom;
 		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
 		if (!geom) return;
 
@@ -122,6 +171,7 @@ export class DistanceConstraint extends BaseConstraint {
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
+			labelPosition: this.labelPosition,
 		});
 	}
 
@@ -132,11 +182,24 @@ export class DistanceConstraint extends BaseConstraint {
 
 		const s1 = viewport.worldToScreen(p1);
 		const s2 = viewport.worldToScreen(p2);
-		const offsetScreen = this.offset !== undefined ? this.offset * viewport.zoom : 32;
+		const offsetMm = this.offset ?? DEFAULT_DISTANCE_OFFSET;
+		const offsetScreen = offsetMm * viewport.zoom;
 		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
 		if (!geom) return null;
 
-		return distanceToLinearDimension(screen, geom.d1, geom.d2);
+		const d1 = geom.d1;
+		const d2 = geom.d2;
+		const t = this.labelPosition ?? 0.5;
+		const basePos = d1.clone().lerp(d2, t);
+		const distToLabel = screen.distanceTo(basePos);
+		const distToSeg = distanceToLinearDimension(screen, d1, d2);
+		let minDist = Math.min(distToLabel, distToSeg);
+		if (t < 0) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, basePos, d1));
+		} else if (t > 1) {
+			minDist = Math.min(minDist, distanceToLinearDimension(screen, d2, basePos));
+		}
+		return minDist;
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

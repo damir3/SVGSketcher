@@ -1,5 +1,5 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
-import { COLORS, SVG_NS, STROKE_WIDTH, type SvgAttrs } from './styles';
+import { SVG_NS, DIMENSION_TEXT_ATTRS, type SvgAttrs } from './styles';
 import { Vec2, type XY } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
@@ -120,32 +120,41 @@ export function createSvgText(position: Vec2, text: string, attrs?: SvgAttrs, pa
 	);
 }
 
+export interface DimensionLabelOptions {
+	angleDeg?: number;
+}
+
 export function renderDimensionLabel(
 	parent: SVGElement,
 	center: Vec2,
 	label: string,
 	color: string,
-	kind: 'linear' | 'angle' = 'linear'
+	_kind: 'linear' | 'angle' = 'linear',
+	options?: DimensionLabelOptions
 ): void {
-	const width = label.length * 8 + 14;
-	const isAngle = kind === 'angle';
-	createSvgRect(
-		new Vec2(center.x - width * 0.5, center.y - 10),
-		new Vec2(width, 20),
-		{ rx: 4, fill: COLORS.white, stroke: color, 'stroke-width': isAngle ? STROKE_WIDTH.dimension : STROKE_WIDTH.thin },
-		parent
-	);
-	createSvgText(
-		new Vec2(center.x, center.y + 4),
-		label,
+	const angleDeg = options?.angleDeg ?? 0;
+
+	const labelG = createSvgElement(
+		'g',
 		{
-			'text-anchor': 'middle',
-			fill: color,
-			'font-size': isAngle ? 11 : 12,
-			'font-weight': isAngle ? 700 : 600,
-			'font-family': isAngle ? 'ui-monospace, monospace' : 'monospace',
+			class: 'dimension-label',
+			transform:
+				Math.abs(angleDeg) > 1e-2
+					? `translate(${fmtCoord(center.x)}, ${fmtCoord(center.y)}) rotate(${fmtCoord(angleDeg)})`
+					: `translate(${fmtCoord(center.x)}, ${fmtCoord(center.y)})`,
+			'pointer-events': 'none',
 		},
 		parent
+	);
+
+	createSvgText(
+		new Vec2(0, 0),
+		label,
+		{
+			...DIMENSION_TEXT_ATTRS,
+			fill: color,
+		},
+		labelG
 	);
 }
 

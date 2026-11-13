@@ -5,7 +5,7 @@ import { DeleteTool } from '../src/canvas/tools/modify/delete';
 import { HighlightManager } from '../src/canvas/highlightManager';
 import type { ToolContext, ToolMouseEvent } from '../src/canvas/tools/types';
 import { Vec2 } from '../src/math/vector';
-import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../src/canvas/distances';
+import { DEFAULT_DISTANCE_OFFSET, LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../src/canvas/distances';
 
 function createMockSvgElement(tagName = 'g', attrs: Record<string, string> = {}): any {
 	const children: any[] = [];
@@ -311,12 +311,12 @@ describe('Delete Tool', () => {
 		const tool = new DeleteTool();
 		tool.activate(ctx);
 
-		// Distance constraint dimension line is offset (by default offsetScreen = 32px, ny = 1)
-		const target = ctx.highlightManager!.update(tool, new Vec2(50, 32));
+		// Distance constraint dimension line is offset (by default offsetScreen = DEFAULT_DISTANCE_OFFSET * zoom, ny = 1)
+		const target = ctx.highlightManager!.update(tool, new Vec2(50, DEFAULT_DISTANCE_OFFSET));
 		assert.ok(target);
 		assert.equal(target.id, distConstraint!.id);
 
-		tool.onMouseDown(createToolMouseEvent(new Vec2(50, 32)));
+		tool.onMouseDown(createToolMouseEvent(new Vec2(50, DEFAULT_DISTANCE_OFFSET)));
 		assert.equal(sketch.constraints.has(distConstraint!.id), false);
 	});
 

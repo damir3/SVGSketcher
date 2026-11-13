@@ -17,6 +17,7 @@ export interface LinearDimensionVisualOptions {
 	isPreview?: boolean;
 	startPointHighlight?: Vec2;
 	targetPointSnapped?: boolean;
+	labelPosition?: number;
 }
 
 export function formatDimensionValue(val: number): string {

@@ -286,7 +286,7 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		const label = restored.getLabelAnchor(sketch, viewport);
 		assert.ok(label);
 		assert.ok(Math.hypot(label.x - 60, label.y - 80) < 1e-9);
-		assert.equal(restored.distanceTo(new Vec2(75, 85), sketch, viewport), 0);
+		assert.equal(restored.distanceTo(new Vec2(75, 75), sketch, viewport), 0);
 		assert.ok(restored.distanceTo(new Vec2(45, 85), sketch, viewport)! > 10);
 		assert.ok(restored.distanceTo(new Vec2(30, 40), sketch, viewport)! < 1e-9);
 		assert.ok(restored.distanceTo(new Vec2(-12, -16), sketch, viewport)! < 1e-9);
@@ -294,7 +294,7 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		assert.equal(restored.distanceTo(new Vec2(-12, -16), sketch, viewport), 20);
 
 		restored.moveLabelTo(new Vec2(-60, 80), sketch, viewport);
-		assert.equal(restored.distanceTo(new Vec2(-75, 85), sketch, viewport), 0);
+		assert.equal(restored.distanceTo(new Vec2(-75, 75), sketch, viewport), 0);
 		assert.ok(restored.distanceTo(new Vec2(-45, 85), sketch, viewport)! > 10);
 	});
 
@@ -344,12 +344,12 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		assert.equal(opened[0].client, client);
 		const anchor = constraint.getLabelAnchor(sketch, viewport);
 		assert.ok(anchor && Math.hypot(anchor.x - position.x, anchor.y - position.y) < 1e-9);
-		assert.equal(constraint.distanceTo(new Vec2(25, 35), sketch, viewport), 0);
+		assert.equal(constraint.distanceTo(new Vec2(32, 24), sketch, viewport), 0);
 		assert.equal(sketch.undo(), true);
 		assert.equal(sketch.constraints.size, 0);
 	});
 
-	it('clamps a dragged arc dimension to its sweep and keeps the leader radial', () => {
+	it('keeps a dragged arc label at the cursor outside its sweep', () => {
 		const sketch = new SketchDocument();
 		const center = sketch.addPoint(new Vec2(0, 0));
 		const start = sketch.addPoint(new Vec2(25, 0));
@@ -359,12 +359,13 @@ describe('Polymorphic Primitive and Constraint Hit Testing', () => {
 		assert.ok(dimension);
 
 		dimension.moveLabelTo(new Vec2(-60, 80), sketch, viewport);
-		assert.equal(dimension.leaderAngle, Math.PI / 2);
-		assert.ok(dimension.distanceTo(new Vec2(0, 60), sketch, viewport)! < 1e-9);
-		assert.ok(dimension.distanceTo(new Vec2(0, 100), sketch, viewport)! < 1e-9);
-		dimension.moveLabelTo(new Vec2(0, 12), sketch, viewport);
-		assert.equal(dimension.leaderOffset, -13);
-		assert.equal(dimension.distanceTo(new Vec2(0, 12), sketch, viewport), 0);
+		assert.ok(Math.abs(dimension.leaderAngle! - Math.atan2(80, -60)) < 1e-9);
+		const anchor = dimension.getLabelAnchor(sketch, viewport)!;
+		assert.ok(anchor.distanceTo(new Vec2(-60, 80)) < 1e-9);
+		const enlarged = Object.assign(new Viewport(800, 600), { zoom: 4, panX: 0, panY: 0 });
+		dimension.moveLabelTo(new Vec2(0, 12), sketch, enlarged);
+		assert.equal(dimension.leaderOffset, -22);
+		assert.equal(dimension.distanceTo(new Vec2(0, 12), sketch, enlarged), 0);
 	});
 
 	it('primitives and SketchDocument implement toGeoCurve polymorphically', () => {
