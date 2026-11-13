@@ -6,6 +6,7 @@ import { evaluateBezier, evaluateBezierDerivative, splitBezier, type BezierSegme
 import { ellipseAxes } from '../math/ellipse';
 
 const NEAR_ROOT_TOLERANCE = 1e-4;
+const SEGMENT_PROJECTION_TOLERANCE = 1e-2;
 const MAX_IMPLICIT_SUBDIV_DEPTH = 24;
 const MAX_IMPLICIT_SUBDIV_ITERS = 4096;
 
@@ -24,7 +25,7 @@ export function bezierCurve(points: CubicBezier, other: KernelCurve): Point2[] {
 		return findBezierImplicitRoots(b, bernsteinDegree3(b, f), -NEAR_ROOT_TOLERANCE, NEAR_ROOT_TOLERANCE, f).filter(
 			p => {
 				const projected = projectPointOntoSegment(p, p1, p2);
-				return projected.dist < 1e-3 && projected.t >= -1e-4 && projected.t <= 1 + 1e-4;
+				return projected.dist < SEGMENT_PROJECTION_TOLERANCE && projected.t >= -1e-4 && projected.t <= 1 + 1e-4;
 			}
 		);
 	}

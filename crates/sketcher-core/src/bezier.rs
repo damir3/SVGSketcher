@@ -38,6 +38,7 @@ fn split(b: &CubicBezier) -> (CubicBezier, CubicBezier) {
 }
 
 const NEAR_ROOT_TOLERANCE: f64 = 1e-4;
+const SEGMENT_PROJECTION_TOLERANCE: f64 = 1e-2;
 const MAX_IMPLICIT_SUBDIV_DEPTH: usize = 24;
 const MAX_IMPLICIT_SUBDIV_ITERS: usize = 4096;
 const MAX_IMPLICIT_CANDIDATES: usize = 17;
@@ -359,7 +360,7 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
                         (((p.x - p1.x) * dx + (p.y - p1.y) * dy) / length_sq).clamp(0.0, 1.0)
                     };
                     let projected = super::offset(p1, dx, dy, t);
-                    (projected.x - p.x).hypot(projected.y - p.y) < 1e-3
+                    (projected.x - p.x).hypot(projected.y - p.y) < SEGMENT_PROJECTION_TOLERANCE
                         && (-1e-4..=1.0 + 1e-4).contains(&t)
                 })
                 .collect()

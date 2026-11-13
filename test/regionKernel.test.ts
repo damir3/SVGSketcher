@@ -235,3 +235,45 @@ test('finds all 4 regions in sketch with near-vertex spline crossings', {
 	assert.equal(regions.length, 4);
 });
 
+test('finds region enclosed by line and spline in region-issue3 sketch', {
+	skip: !getGeometryKernel().findRegions,
+}, () => {
+	const curves: GeoCurve[] = [
+		{
+			type: 'segment',
+			id: 'Line-11',
+			p1: new Vec2(-70.71325927281734, -48.951670489171605),
+			p2: new Vec2(-17.10397210470489, -21.522154268869784),
+		},
+		{
+			type: 'spline',
+			id: 'Spline-4',
+			points: [
+				new Vec2(-17.09658295979887, -21.51837356748017),
+				new Vec2(-41.74991079711482, -71.49998309632997),
+				new Vec2(-70.71378470912933, -48.95193749045716),
+			],
+			bezierSegments: [
+				[
+					new Vec2(-17.09658295979887, -21.51837356748017),
+					new Vec2(-22.9479743699381, -41.22489824814197),
+					new Vec2(-17.37699860943317, -73.77479616458997),
+					new Vec2(-41.74991079711482, -71.49998309632997),
+				],
+				[
+					new Vec2(-41.74991079711482, -71.49998309632997),
+					new Vec2(-57.66365037295553, -70.01469555771958),
+					new Vec2(-66.22093107339695, -61.046752768316956),
+					new Vec2(-70.71378470912933, -48.95193749045716),
+				],
+			],
+			isClosed: false,
+		},
+	];
+	const regions = findCurveRegions(curves);
+	assert.equal(regions.length, 1);
+	const refRegions = reference(curves);
+	assert.equal(refRegions.length, 1);
+});
+
+
