@@ -22,7 +22,7 @@ pub fn natural_handles(points: &[Point2]) -> Vec<[Point2; 2]> {
         return vec![];
     }
     let n = points.len() - 1;
-    let closed = n >= 2 && points[n].distance(points[0]) < 1e-4;
+    let closed = n >= 2 && points[n].scaled_distance(points[0]) < 1e-4;
     (0..=n)
         .map(|i| {
             let h = if n == 1 || (!closed && i == 0) {
@@ -36,9 +36,9 @@ pub fn natural_handles(points: &[Point2]) -> Vec<[Point2; 2]> {
                     (points[i - 1], points[i + 1])
                 };
                 let dir = next - prev;
-                let dir_length = dir.length();
+                let dir_length = dir.scaled_length();
                 let (incoming, outgoing) = (points[i] - prev, next - points[i]);
-                let (d1, d2) = (incoming.length(), outgoing.length());
+                let (d1, d2) = (incoming.scaled_length(), outgoing.scaled_length());
                 let mut handle_length = (d1 + d2) / 6.0;
                 if d1 > 1e-6 && d2 > 1e-6 {
                     let cos = (incoming.dot(outgoing) / (d1 * d2)).clamp(-0.999, 1.0);
@@ -185,7 +185,7 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
         let (mut local_t, mut local_distance) = (0.0_f64, f64::INFINITY);
         for i in 0..=12 {
             let t = i as f64 / 12.0;
-            let d = bezier::evaluate(segment, t).distance(target);
+            let d = bezier::evaluate(segment, t).scaled_distance(target);
             if d < local_distance {
                 local_distance = d;
                 local_t = t;
@@ -198,8 +198,8 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
         for _ in 0..10 {
             let t1 = a + (b - a) * 0.382;
             let t2 = a + (b - a) * 0.618;
-            let d1 = bezier::evaluate(segment, t1).distance(target);
-            let d2 = bezier::evaluate(segment, t2).distance(target);
+            let d1 = bezier::evaluate(segment, t1).scaled_distance(target);
+            let d2 = bezier::evaluate(segment, t2).scaled_distance(target);
             if d1 < d2 {
                 b = t2;
             } else {
@@ -208,7 +208,7 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
         }
         let t = (a + b) * 0.5;
         let point = bezier::evaluate(segment, t);
-        let d = point.distance(target);
+        let d = point.scaled_distance(target);
         if d < best_distance {
             best_distance = d;
             best_param = (s as f64 + t) / segments.len() as f64;
@@ -224,7 +224,7 @@ pub fn signed_distance(segments: &[CubicBezier], target: Point2) -> f64 {
     }
     let (param, _, point) = project(segments, target);
     let tangent = tangent_at(segments, param);
-    let normal = tangent.perp() / tangent.length().max(1e-7);
+    let normal = tangent.perp() / tangent.scaled_length().max(1e-7);
     (target - point).dot(normal)
 }
 

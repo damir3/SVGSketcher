@@ -55,7 +55,7 @@ fn generate(nodes: &[Node], start: usize, end: usize, params: &[f64], length: f6
     } else {
         (x1 * c00 - x0 * c01) / det
     };
-    let fallback = chord.length() / 3.0;
+    let fallback = chord.scaled_length() / 3.0;
     if !fixed_a && (!alpha.is_finite() || alpha <= 1e-12) {
         alpha = fallback;
     }

@@ -321,10 +321,7 @@ fn implicit_roots(
         if unique.len() >= MAX_IMPLICIT_CANDIDATES {
             break;
         }
-        if !unique
-            .iter()
-            .any(|u| u.distance(p) < NEAR_ROOT_TOLERANCE)
-        {
+        if !unique.iter().any(|u| u.distance(p) < NEAR_ROOT_TOLERANCE) {
             unique.push(p);
         }
     }
@@ -363,12 +360,7 @@ pub(super) fn intersect(b: CubicBezier, other: Curve) -> Vec<Point2> {
                 return vec![];
             }
             let r_sq = radius * radius;
-            let d = [
-                b[0] - center,
-                b[1] - center,
-                b[2] - center,
-                b[3] - center,
-            ];
+            let d = [b[0] - center, b[1] - center, b[2] - center, b[3] - center];
             let r_min = (radius - NEAR_ROOT_TOLERANCE).max(0.0);
             let r_max = radius + NEAR_ROOT_TOLERANCE;
             let g_low = r_min * r_min - r_sq;

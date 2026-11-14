@@ -133,10 +133,7 @@ pub(super) fn conic_conic(a: Curve, b: Curve) -> Vec<Point2> {
             roots.push(ta);
         }
     }
-    roots
-        .into_iter()
-        .map(|t| e1.point_at(t).flip_y())
-        .collect()
+    roots.into_iter().map(|t| e1.point_at(t).flip_y()).collect()
 }
 
 #[cfg(test)]

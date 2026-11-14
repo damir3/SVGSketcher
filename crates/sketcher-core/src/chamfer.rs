@@ -83,8 +83,7 @@ pub fn calculate(
             let (a, b) = if flip { (d2, d1) } else { (d1, d2) };
             let ab = (c.vertex + c.dir2 * b) - (c.vertex + c.dir1 * a);
             let norm = ab.length();
-            let cos = (ab.dot(-c.dir1) / if norm == 0.0 { 1.0 } else { norm })
-                .clamp(-1.0, 1.0);
+            let cos = (ab.dot(-c.dir1) / if norm == 0.0 { 1.0 } else { norm }).clamp(-1.0, 1.0);
             (a, b, cos.acos() * (180.0 / PI))
         }
         Mode::DistanceAngle => {

@@ -235,9 +235,7 @@ pub fn extend(
         });
     }
     let (full, theta_start, theta_end, cw) = match *g {
-        Geometry::Arc(c, r, a, b, cw) => {
-            (Geometry::Circle(c, r), c.angle_to(a), c.angle_to(b), cw)
-        }
+        Geometry::Arc(c, r, a, b, cw) => (Geometry::Circle(c, r), c.angle_to(a), c.angle_to(b), cw),
         Geometry::EllipticalArc(c, major, minor, a, b, cw) => {
             let parameter = |v| ellipse_param(c, major, minor, v);
             (

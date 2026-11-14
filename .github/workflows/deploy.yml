@@ -32,14 +32,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install Rust target and bindings tool
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.105 --locked
+
       - name: Run tests
         run: npm test
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Build
-        run: npm run build
+      - name: Build WASM application
+        run: npm run build:wasm
+
+      - name: Test WASM backend
+        run: npm run test:wasm
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

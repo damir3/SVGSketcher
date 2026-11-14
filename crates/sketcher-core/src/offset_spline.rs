@@ -14,8 +14,8 @@ struct Node {
 fn between(a: &Node, b: &Node, t: f64) -> Node {
     Node {
         p: a.p.lerp(b.p, t),
-        n: a.n.lerp(b.n, t).unit(),
-        t: a.t.lerp(b.t, t).unit(),
+        n: unit(a.n.lerp(b.n, t)),
+        t: unit(a.t.lerp(b.t, t)),
         corner: false,
     }
 }
@@ -409,7 +409,7 @@ fn parallel(item: &Item, raw: &SplineOffset, d: f64, single: bool, clean: bool) 
                     }
                     (
                         spline::point_at(segments, param),
-                        t.unit() * if item.reversed { -1.0 } else { 1.0 },
+                        unit(t) * if item.reversed { -1.0 } else { 1.0 },
                     )
                 }
                 Geometry::EllipticalArc(c, major, minor, start, end, cw) => {

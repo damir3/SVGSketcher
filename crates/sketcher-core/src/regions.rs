@@ -76,10 +76,8 @@ impl Ellipse {
         (d.dot(self.v) / self.ry.max(1e-6)).atan2(d.dot(self.u) / self.rx.max(1e-6))
     }
     fn point(self, t: f64) -> Point2 {
-        (self.center.flip_y()
-            + self.u * (self.rx * t.cos())
-            + self.v * (self.ry * t.sin()))
-        .flip_y()
+        (self.center.flip_y() + self.u * (self.rx * t.cos()) + self.v * (self.ry * t.sin()))
+            .flip_y()
     }
 }
 impl Geometry {
@@ -773,11 +771,7 @@ pub(crate) fn spline_self_intersections(
                 if distance(pa, pb) >= 1e-5 {
                     continue;
                 }
-                hits.push((
-                    pa.middle(pb),
-                    (a as f64 + ta) / nf,
-                    (b as f64 + tb) / nf,
-                ));
+                hits.push((pa.middle(pb), (a as f64 + ta) / nf, (b as f64 + tb) / nf));
             }
         }
     }
@@ -1035,12 +1029,10 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
                 if !inside(ring.points[0], &other.points) {
                     continue;
                 }
-                let shared = ring.points.iter().any(|p| {
-                    other
-                        .points
-                        .iter()
-                        .any(|q| p.distance(*q) < 1e-4)
-                });
+                let shared = ring
+                    .points
+                    .iter()
+                    .any(|p| other.points.iter().any(|q| p.distance(*q) < 1e-4));
                 if !shared {
                     parent = Some(j)
                 }

@@ -142,7 +142,7 @@ export function renderDimensionLabel(
 				Math.abs(angleDeg) > 1e-2
 					? `translate(${fmtCoord(center.x)}, ${fmtCoord(center.y)}) rotate(${fmtCoord(angleDeg)})`
 					: `translate(${fmtCoord(center.x)}, ${fmtCoord(center.y)})`,
-			'pointer-events': 'none',
+			'pointer-events': 'all',
 		},
 		parent
 	);

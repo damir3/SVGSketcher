@@ -44,11 +44,15 @@ impl Point2 {
     }
 
     /// Euclidean length (norm) of the vector.
-    ///
-    /// Matches the TypeScript reference's scaled two-coordinate norm.
-    /// A single ULP can change branch decisions in projection searches.
     #[inline]
     pub fn length(self) -> f64 {
+        self.length_squared().sqrt()
+    }
+
+    /// Scaled norm matching the TypeScript reference's rounding.
+    /// Use in iterative spline calculations where rounding changes search branches.
+    #[inline]
+    pub fn scaled_length(self) -> f64 {
         let (x, y) = (self.x.abs(), self.y.abs());
         if x.is_infinite() || y.is_infinite() {
             return f64::INFINITY;
@@ -62,6 +66,12 @@ impl Point2 {
         }
         let (x, y) = (x / maximum, y / maximum);
         (x * x + y * y).sqrt() * maximum
+    }
+
+    /// Distance using the scaled norm for TypeScript-compatible spline searches.
+    #[inline]
+    pub fn scaled_distance(self, other: Self) -> f64 {
+        (self - other).scaled_length()
     }
 
     /// Euclidean distance between two points.
@@ -322,4 +332,20 @@ pub fn angle(c: Point2, a: Point2) -> f64 {
 #[inline]
 pub fn polar(r: f64, theta: f64) -> Point2 {
     Point2::from_polar(r, theta)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scaled_norm_handles_extreme_coordinates_without_squaring_them() {
+        assert_eq!(p(3.0, 4.0).length(), 5.0);
+        assert_eq!(Point2::ZERO.scaled_length(), 0.0);
+        assert!((p(3e200, 4e200).scaled_length() / 5e200 - 1.0).abs() < 1e-15);
+        assert!((p(3e-200, 4e-200).scaled_length() / 5e-200 - 1.0).abs() < 1e-15);
+        assert_eq!(p(f64::INFINITY, f64::NAN).scaled_length(), f64::INFINITY);
+        assert!(p(f64::NAN, 1.0).scaled_length().is_nan());
+        assert_eq!(p(3.0, 4.0).scaled_distance(Point2::ZERO), 5.0);
+    }
 }

@@ -63,11 +63,7 @@ pub fn project(curve: &Geometry, target: Point2) -> Projection {
             } else {
                 (target - *a).dot(delta) / len_sq
             };
-            let point = if len_sq < 1e-12 {
-                *a
-            } else {
-                *a + delta * t
-            };
+            let point = if len_sq < 1e-12 { *a } else { *a + delta * t };
             Projection {
                 t,
                 point,
@@ -287,12 +283,7 @@ impl Branch<'_> {
         let (endpoint2, start2) = endpoint(curve2);
         let side = |normal: Point2, other: Point2| {
             let d = normal.dot(bisector);
-            if (if d.abs() > 1e-4 {
-                d
-            } else {
-                normal.dot(other)
-            }) > 0.0
-            {
+            if (if d.abs() > 1e-4 { d } else { normal.dot(other) }) > 0.0 {
                 1.0
             } else {
                 -1.0

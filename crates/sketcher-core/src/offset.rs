@@ -1,13 +1,26 @@
 //! Numeric offset chains, retaining the editor's sampling, join order and tolerances.
 use crate::{
-    add, angle, cross, distance as dist, dot, middle, p, perp, polar, regions::Geometry, scale,
-    spline, step, sub, unit, Point2,
+    add, angle, cross, dot, middle, p, perp, polar, regions::Geometry, scale, spline, step, sub,
+    Point2,
 };
 use std::f64::consts::TAU;
 #[path = "offset_collapse.rs"]
 mod collapse;
 #[path = "offset_spline.rs"]
 mod refined_spline;
+
+// Keep reference rounding throughout iterative contour fitting and normalization.
+fn dist(a: Point2, b: Point2) -> f64 {
+    a.scaled_distance(b)
+}
+fn unit(v: Point2) -> Point2 {
+    let length = v.scaled_length();
+    if length < 1e-12 {
+        Point2::UNIT_X
+    } else {
+        v * (1.0 / length)
+    }
+}
 
 #[inline]
 fn squared(a: Point2, b: Point2) -> f64 {
@@ -111,7 +124,10 @@ fn sample(item: &Item, count: usize) -> Vec<Point2> {
         Geometry::Circle(c, r) => {
             let mut out: Vec<_> = (0..count)
                 .map(|i| {
-                    *c + Point2::from_polar(*r, (i as f64 / count as f64) * std::f64::consts::PI * 2.0)
+                    *c + Point2::from_polar(
+                        *r,
+                        (i as f64 / count as f64) * std::f64::consts::PI * 2.0,
+                    )
                 })
                 .collect();
             out.push(out[0]);
@@ -232,7 +248,11 @@ fn line_circle(origin: Point2, dir: Point2, c: Point2, r: f64, near: Point2) -> 
     let dt = (r * r - d).max(0.0).sqrt();
     let a = origin + dir * (t - dt);
     let b = origin + dir * (t + dt);
-    Some(if a.distance(near) < b.distance(near) { a } else { b })
+    Some(if a.distance(near) < b.distance(near) {
+        a
+    } else {
+        b
+    })
 }
 fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
     match (cur, next) {
