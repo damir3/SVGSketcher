@@ -483,6 +483,15 @@ export class SketchDocument {
 		return prim ? prim.toGeoCurve(this) : null;
 	}
 
+	*getCurvePrimitives(): IterableIterator<ISketchPrimitive> {
+		yield* this.lines.values();
+		yield* this.circles.values();
+		yield* this.arcs.values();
+		yield* this.ellipses.values();
+		yield* this.ellipticalArcs.values();
+		yield* this.splines.values();
+	}
+
 	// --- Line methods ---
 	addLine(p1Id: string, p2Id: string, isConstruction = false): SketchLine {
 		this.pushHistory();
@@ -827,9 +836,14 @@ export class SketchDocument {
 	removeConstraint(id: string): void {
 		const c = this.constraints.get(id);
 		if (!c) return;
-		if (this.isSplineInternalConstraint(c)) return;
-		if (c instanceof ArcEndpointsConstraint || c.type === 'arc_endpoints') return;
-		if (c instanceof EllipticalArcEndpointsConstraint || c.type === 'elliptical_arc_endpoints') return;
+		if (
+			c.isInternalConstraint?.(this) ||
+			this.isSplineInternalConstraint(c) ||
+			c.type === 'arc_endpoints' ||
+			c.type === 'elliptical_arc_endpoints'
+		) {
+			return;
+		}
 		this.pushHistory();
 		if (c instanceof FixedConstraint) {
 			const pt = this.points.get(c.pointId);
@@ -2470,7 +2484,10 @@ export class SketchDocument {
 	}
 
 	isSplineInternalConstraint(c: IConstraint): boolean {
-		if (c instanceof MidpointConstraint || c.type === 'midpoint') {
+		if (c instanceof MidpointConstraint) {
+			return c.isInternalConstraint(this);
+		}
+		if (c.type === 'midpoint') {
 			const anyC = c as any;
 			for (const line of this.lines.values()) {
 				if (
@@ -2485,35 +2502,14 @@ export class SketchDocument {
 	}
 
 	getPrimitivePointIds(primitiveId: string): string[] {
-		const line = this.lines.get(primitiveId);
-		if (line) return [line.p1Id, line.p2Id];
-
-		const circle = this.circles.get(primitiveId);
-		if (circle) return [circle.centerId];
-
-		const arc = this.arcs.get(primitiveId);
-		if (arc) return [arc.centerId, arc.startPointId, arc.endPointId];
-
-		const el = this.ellipses.get(primitiveId);
-		if (el) return [el.centerId, el.majorAxisPointId, el.minorAxisPointId];
-
-		const elarc = this.ellipticalArcs.get(primitiveId);
-		if (elarc)
-			return [elarc.centerId, elarc.majorAxisPointId, elarc.minorAxisPointId, elarc.startPointId, elarc.endPointId];
-
-		const spline = this.splines.get(primitiveId);
-		if (spline) {
-			const pts = [...spline.pointIds];
-			if (spline.tangentLineIds) {
-				for (const lid of spline.tangentLineIds) {
-					const l = this.lines.get(lid);
-					if (l) pts.push(l.p1Id, l.p2Id);
-				}
-			}
-			return pts;
-		}
-
-		return [];
+		const prim =
+			this.lines.get(primitiveId) ??
+			this.circles.get(primitiveId) ??
+			this.arcs.get(primitiveId) ??
+			this.ellipses.get(primitiveId) ??
+			this.ellipticalArcs.get(primitiveId) ??
+			this.splines.get(primitiveId);
+		return prim ? prim.getPointIds(this) : [];
 	}
 
 	cleanOrphanConstraints(): void {

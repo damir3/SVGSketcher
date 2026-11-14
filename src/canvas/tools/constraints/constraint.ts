@@ -1,7 +1,9 @@
 import { Vec2, ORIGIN } from '../../../math/vector';
+import type { SketchDocument } from '../../../model/sketch';
+import type { Viewport } from '../../viewport';
 import { LINE_DISTANCE_PX } from '../../distances';
 import { BaseTool } from '../base';
-import type { ConstraintToolType, ToolContext, ToolMouseEvent } from '../types';
+import type { ConstraintToolType, ToolContext, ToolMouseEvent, ToolType } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 
 export class ConstraintTool extends BaseTool {
@@ -418,38 +420,102 @@ export class ConstraintTool extends BaseTool {
 	}
 
 	private pruneIncompatibleSelection(): void {
-		const sel = this.ctx.sketch.selection;
-		for (const pid of [...sel.pointIds]) {
-			if (!this.isEntityCompatibleWithConstraint('point')) sel.pointIds.delete(pid);
+		ConstraintTool.pruneIncompatibleSelection(this.ctx.sketch, this.id);
+	}
+
+	static pruneIncompatibleSelection(sketch: SketchDocument, type: string): void {
+		const sel = sketch.selection;
+		switch (type) {
+			case 'fixed': {
+				sel.lineIds.clear();
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'coincident': {
+				if (sel.lineIds.size > 0 && sel.circleIds.size + sel.arcIds.size > 0) {
+					sel.circleIds.clear();
+					sel.arcIds.clear();
+				}
+				break;
+			}
+			case 'parallel':
+			case 'perpendicular': {
+				sel.pointIds.clear();
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'collinear': {
+				if (sel.lineIds.size > 0) {
+					sel.pointIds.clear();
+				}
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'concentric': {
+				sel.pointIds.clear();
+				sel.lineIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'tangent': {
+				sel.pointIds.clear();
+				if (sel.lineIds.size > 1) sel.lineIds.clear();
+				if (sel.circleIds.size + sel.arcIds.size > 2) {
+					sel.circleIds.clear();
+					sel.arcIds.clear();
+				}
+				break;
+			}
+			case 'point_on_line':
+			case 'midpoint': {
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'horizontal_vertical':
+			case 'horizontal':
+			case 'vertical': {
+				if (sel.lineIds.size > 0) {
+					sel.pointIds.clear();
+				}
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'equal': {
+				if (sel.lineIds.size > 0) {
+					sel.circleIds.clear();
+				} else if (sel.circleIds.size > 0) {
+					sel.lineIds.clear();
+				}
+				sel.pointIds.clear();
+				sel.arcIds.clear();
+				break;
+			}
+			case 'dimension':
+			case 'distance': {
+				sel.arcIds.clear();
+				break;
+			}
 		}
-		for (const lid of [...sel.lineIds]) {
-			if (!this.isEntityCompatibleWithConstraint('line')) sel.lineIds.delete(lid);
-		}
-		for (const cid of [...sel.circleIds]) {
-			if (!this.isEntityCompatibleWithConstraint('circle')) sel.circleIds.delete(cid);
-		}
-		for (const aid of [...sel.arcIds]) {
-			if (!this.isEntityCompatibleWithConstraint('arc')) sel.arcIds.delete(aid);
-		}
-		for (const eid of [...sel.ellipseIds]) {
-			if (!this.isEntityCompatibleWithConstraint('ellipse')) sel.ellipseIds.delete(eid);
-		}
-		for (const eaid of [...sel.ellipticalArcIds]) {
-			if (!this.isEntityCompatibleWithConstraint('elliptical_arc')) sel.ellipticalArcIds.delete(eaid);
-		}
-		for (const sid of [...sel.splineIds]) {
-			if (!this.isEntityCompatibleWithConstraint('spline')) sel.splineIds.delete(sid);
-		}
-		// Strip endpoints of selected lines that were also included by box-selection
 		if (sel.lineIds.size > 0 && sel.pointIds.size > 0) {
 			for (const lid of sel.lineIds) {
-				const l = this.ctx.sketch.lines.get(lid);
+				const l = sketch.lines.get(lid);
 				if (l) {
 					sel.pointIds.delete(l.p1Id);
 					sel.pointIds.delete(l.p2Id);
 				}
 			}
 		}
+		if (type !== 'coincident') {
+			sel.ellipseIds.clear();
+			sel.ellipticalArcIds.clear();
+			sel.splineIds.clear();
+		}
+		sel.constraintIds.clear();
 	}
 
 	private isEntityCompatibleWithConstraint(
@@ -497,7 +563,11 @@ export class ConstraintTool extends BaseTool {
 	}
 
 	private canApplyConstraint(type: string): boolean {
-		const sel = this.ctx.sketch.selection;
+		return ConstraintTool.canApplyConstraint(this.ctx.sketch, type);
+	}
+
+	static canApplyConstraint(sketch: SketchDocument, type: string): boolean {
+		const sel = sketch.selection;
 		const pCount = sel.pointIds.size;
 		const lCount = sel.lineIds.size;
 		const cCount = sel.circleIds.size + sel.arcIds.size;
@@ -519,6 +589,16 @@ export class ConstraintTool extends BaseTool {
 			case 'horizontal':
 			case 'vertical':
 				return (lCount === 1 && pCount === 0 && cCount === 0) || (pCount === 2 && lCount === 0 && cCount === 0);
+			case 'dimension':
+			case 'distance':
+				return (
+					(lCount === 1 && pCount === 0 && cCount === 0) ||
+					(lCount === 2 && pCount === 0 && cCount === 0) ||
+					(pCount === 2 && lCount === 0 && cCount === 0) ||
+					(pCount === 3 && lCount === 0 && cCount === 0) ||
+					(cCount === 1 && pCount === 0 && lCount === 0) ||
+					(lCount === 1 && pCount === 1 && cCount === 0)
+				);
 			case 'equal':
 				return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
 			case 'parallel':
@@ -554,7 +634,29 @@ export class ConstraintTool extends BaseTool {
 	}
 
 	private applyConstraint(type: string): boolean {
-		const sel = this.ctx.sketch.selection;
+		return ConstraintTool.applyConstraintToSelection(type, {
+			sketch: this.ctx.sketch,
+			viewport: this.ctx.viewport,
+			svg: this.ctx.svg,
+			showToast: this.ctx.showToast,
+			setTool: this.ctx.setTool,
+		});
+	}
+
+	static applyConstraintToSelection(
+		type: string,
+		opts: {
+			sketch: SketchDocument;
+			viewport?: Viewport;
+			svg?: SVGSVGElement;
+			showToast: (msg: string) => void;
+			requestRender?: () => void;
+			setTool?: (tool: ToolType) => void;
+			onEditDimension?: (constraint: any, screenPos: Vec2) => void;
+		}
+	): boolean {
+		const { sketch } = opts;
+		const sel = sketch.selection;
 		const pIds = [...sel.pointIds];
 		const lIds = [...sel.lineIds];
 		const cIds = [...sel.circleIds, ...sel.arcIds];
@@ -564,10 +666,20 @@ export class ConstraintTool extends BaseTool {
 		let applied = false;
 		let toastMsg = '';
 
+		const openDimensionEditor = (
+			c: { getLabelScreenPos?(sketch: SketchDocument, viewport: Viewport): Vec2 | null } | null
+		) => {
+			if (!c || !opts.onEditDimension || !opts.viewport || !opts.svg) return;
+			const s = c.getLabelScreenPos?.(sketch, opts.viewport);
+			if (!s) return;
+			const rect = opts.svg.getBoundingClientRect();
+			opts.onEditDimension(c, new Vec2(rect.left + s.x, rect.top + s.y));
+		};
+
 		switch (type) {
 			case 'fixed': {
 				if (pIds.length >= 1) {
-					const appliedNow = this.ctx.sketch.toggleFixedConstraints(pIds);
+					const appliedNow = sketch.toggleFixedConstraints(pIds);
 					applied = true;
 					toastMsg = appliedNow ? 'Fixed constraint applied' : 'Fixed constraint removed';
 				}
@@ -575,11 +687,11 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'coincident': {
 				if (pIds.length >= 2) {
-					applied = this.ctx.sketch.addCoincidentConstraints(pIds);
+					applied = sketch.addCoincidentConstraints(pIds);
 					if (applied) {
 						toastMsg = pIds.includes('origin') ? 'Coincident with (0,0) applied' : 'Coincident constraint applied';
 					} else {
-						this.ctx.showToast('Cannot make these points coincident');
+						opts.showToast('Cannot make these points coincident');
 					}
 				} else if (
 					pIds.length === 1 &&
@@ -590,18 +702,18 @@ export class ConstraintTool extends BaseTool {
 				) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
-						const c = this.ctx.sketch.addPointOnAxisConstraint(pIds[0], axis);
+						const c = sketch.addPointOnAxisConstraint(pIds[0], axis);
 						if (c) {
 							applied = true;
 							toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
 						}
 					} else {
-						const c = this.ctx.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+						const c = sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
 						if (c) {
 							applied = true;
 							toastMsg = 'Point on line constraint applied';
 						} else {
-							this.ctx.showToast('Cannot constrain point to this line');
+							opts.showToast('Cannot constrain point to this line');
 						}
 					}
 				} else if (
@@ -611,12 +723,12 @@ export class ConstraintTool extends BaseTool {
 					eIds.length === 0 &&
 					sIds.length === 0
 				) {
-					const c = this.ctx.sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
+					const c = sketch.addPointOnCircleConstraint(pIds[0], cIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Point on circle constraint applied';
 					} else {
-						this.ctx.showToast('Cannot constrain point to this circle/arc');
+						opts.showToast('Cannot constrain point to this circle/arc');
 					}
 				} else if (
 					pIds.length === 1 &&
@@ -625,12 +737,12 @@ export class ConstraintTool extends BaseTool {
 					cIds.length === 0 &&
 					sIds.length === 0
 				) {
-					const c = this.ctx.sketch.addPointOnEllipseConstraint(pIds[0], eIds[0]);
+					const c = sketch.addPointOnEllipseConstraint(pIds[0], eIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Point on ellipse constraint applied';
 					} else {
-						this.ctx.showToast('Cannot constrain point to this ellipse');
+						opts.showToast('Cannot constrain point to this ellipse');
 					}
 				} else if (
 					pIds.length === 1 &&
@@ -639,44 +751,44 @@ export class ConstraintTool extends BaseTool {
 					cIds.length === 0 &&
 					eIds.length === 0
 				) {
-					const c = this.ctx.sketch.addPointOnSplineConstraint(pIds[0], sIds[0]);
+					const c = sketch.addPointOnSplineConstraint(pIds[0], sIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Point on spline constraint applied';
 					} else {
-						this.ctx.showToast('Cannot constrain point to this spline');
+						opts.showToast('Cannot constrain point to this spline');
 					}
 				}
 				break;
 			}
 			case 'horizontal_vertical': {
 				if (lIds.length === 1) {
-					const l = this.ctx.sketch.lines.get(lIds[0])!;
-					const p1 = this.ctx.sketch.points.get(l.p1Id);
-					const p2 = this.ctx.sketch.points.get(l.p2Id);
+					const l = sketch.lines.get(lIds[0])!;
+					const p1 = sketch.points.get(l.p1Id);
+					const p2 = sketch.points.get(l.p2Id);
 					if (p1 && p2) {
 						const dir = new Vec2().subVectors(p2, p1);
 						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
-							this.ctx.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
+							sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
 							applied = true;
 							toastMsg = 'Horizontal constraint applied';
 						} else {
-							this.ctx.sketch.addVerticalConstraint(l.p1Id, l.p2Id);
+							sketch.addVerticalConstraint(l.p1Id, l.p2Id);
 							applied = true;
 							toastMsg = 'Vertical constraint applied';
 						}
 					}
 				} else if (pIds.length === 2) {
-					const p1 = this.ctx.sketch.points.get(pIds[0]);
-					const p2 = this.ctx.sketch.points.get(pIds[1]);
+					const p1 = sketch.points.get(pIds[0]);
+					const p2 = sketch.points.get(pIds[1]);
 					if (p1 && p2) {
 						const dir = new Vec2().subVectors(p2, p1);
 						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
-							this.ctx.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
+							sketch.addHorizontalConstraint(pIds[0], pIds[1]);
 							applied = true;
 							toastMsg = 'Horizontal constraint applied';
 						} else {
-							this.ctx.sketch.addVerticalConstraint(pIds[0], pIds[1]);
+							sketch.addVerticalConstraint(pIds[0], pIds[1]);
 							applied = true;
 							toastMsg = 'Vertical constraint applied';
 						}
@@ -686,12 +798,12 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'horizontal': {
 				if (lIds.length === 1) {
-					const l = this.ctx.sketch.lines.get(lIds[0])!;
-					this.ctx.sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
+					const l = sketch.lines.get(lIds[0])!;
+					sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
 					applied = true;
 					toastMsg = 'Horizontal constraint applied';
 				} else if (pIds.length === 2) {
-					this.ctx.sketch.addHorizontalConstraint(pIds[0], pIds[1]);
+					sketch.addHorizontalConstraint(pIds[0], pIds[1]);
 					applied = true;
 					toastMsg = 'Horizontal constraint applied';
 				}
@@ -699,24 +811,98 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'vertical': {
 				if (lIds.length === 1) {
-					const l = this.ctx.sketch.lines.get(lIds[0])!;
-					this.ctx.sketch.addVerticalConstraint(l.p1Id, l.p2Id);
+					const l = sketch.lines.get(lIds[0])!;
+					sketch.addVerticalConstraint(l.p1Id, l.p2Id);
 					applied = true;
 					toastMsg = 'Vertical constraint applied';
 				} else if (pIds.length === 2) {
-					this.ctx.sketch.addVerticalConstraint(pIds[0], pIds[1]);
+					sketch.addVerticalConstraint(pIds[0], pIds[1]);
 					applied = true;
 					toastMsg = 'Vertical constraint applied';
 				}
 				break;
 			}
+			case 'dimension':
+			case 'distance': {
+				if (lIds.length === 1 && pIds.length === 1) {
+					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
+						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
+						const existed = sketch.hasPointToAxisConstraint(pIds[0], axis);
+						const c = sketch.addPointToAxisDistanceConstraint(pIds[0], axis);
+						applied = true;
+						toastMsg = existed
+							? `Editing distance to ${axis.toUpperCase()}-axis`
+							: `Distance to ${axis.toUpperCase()}-axis applied`;
+						openDimensionEditor(c);
+					} else {
+						const l = sketch.lines.get(lIds[0])!;
+						if (pIds[0] !== l.p1Id && pIds[0] !== l.p2Id) {
+							const existed = sketch.hasPointToLineDistanceConstraint(pIds[0], lIds[0]);
+							const c = sketch.addPointToLineDistanceConstraint(pIds[0], lIds[0]);
+							applied = true;
+							toastMsg = existed
+								? 'Editing point-to-line distance constraint'
+								: 'Point-to-line distance constraint applied';
+							openDimensionEditor(c);
+						}
+					}
+				} else if (lIds.length === 1 && pIds.length === 0) {
+					const l = sketch.lines.get(lIds[0])!;
+					const existed = sketch.hasDistanceConstraint(l.p1Id, l.p2Id);
+					const c = sketch.addDistanceConstraint(l.p1Id, l.p2Id);
+					applied = true;
+					toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
+					openDimensionEditor(c);
+				} else if (lIds.length === 2) {
+					const existed = sketch.hasAngleConstraint(lIds[0], lIds[1]);
+					const c = sketch.addAngleConstraint(lIds[0], lIds[1]);
+					if (c) {
+						applied = true;
+						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
+						openDimensionEditor(c);
+					}
+				} else if (pIds.length === 3 && lIds.length === 0) {
+					const existed = sketch.hasThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]);
+					const c = sketch.addThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]);
+					if (c) {
+						applied = true;
+						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
+						openDimensionEditor(c);
+					}
+				} else if (pIds.length === 2) {
+					if (pIds.includes('origin')) {
+						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
+						const existed = sketch.hasOriginConstraint(userPtId);
+						const c = sketch.addOriginDistanceConstraint(userPtId);
+						applied = true;
+						toastMsg = existed ? 'Editing distance to (0,0)' : 'Distance to (0,0) applied';
+						openDimensionEditor(c);
+					} else {
+						const existed = sketch.hasDistanceConstraint(pIds[0], pIds[1]);
+						const c = sketch.addDistanceConstraint(pIds[0], pIds[1]);
+						applied = true;
+						toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
+						openDimensionEditor(c);
+					}
+				} else if (cIds.length === 1) {
+					if (!sketch.hasRadiusConstraint(cIds[0])) {
+						opts.setTool?.('dimension');
+						return true;
+					}
+					const c = sketch.addRadiusConstraint(cIds[0]);
+					applied = true;
+					toastMsg = 'Editing radius constraint';
+					openDimensionEditor(c);
+				}
+				break;
+			}
 			case 'equal': {
 				if (lIds.length === 2) {
-					this.ctx.sketch.addEqualLengthConstraint(lIds[0], lIds[1]);
+					sketch.addEqualLengthConstraint(lIds[0], lIds[1]);
 					applied = true;
 					toastMsg = 'Equal length constraint applied';
 				} else if (cIds.length === 2) {
-					this.ctx.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
+					sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
 					applied = true;
 					toastMsg = 'Equal radius constraint applied';
 				}
@@ -728,18 +914,18 @@ export class ConstraintTool extends BaseTool {
 						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
 						const axis = lIds.includes('axis_x') ? 'x' : 'y';
 						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
-						const line = this.ctx.sketch.lines.get(userLineId);
+						const line = sketch.lines.get(userLineId);
 						if (line) {
 							if (axis === 'x') {
-								this.ctx.sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
+								sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
 							} else {
-								this.ctx.sketch.addVerticalConstraint(line.p1Id, line.p2Id);
+								sketch.addVerticalConstraint(line.p1Id, line.p2Id);
 							}
 							applied = true;
 							toastMsg = `Parallel to ${axis.toUpperCase()}-axis applied`;
 						}
 					} else {
-						this.ctx.sketch.addParallelConstraint(lIds[0], lIds[1]);
+						sketch.addParallelConstraint(lIds[0], lIds[1]);
 						applied = true;
 						toastMsg = 'Parallel constraint applied';
 					}
@@ -752,18 +938,18 @@ export class ConstraintTool extends BaseTool {
 						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
 						const axis = lIds.includes('axis_x') ? 'x' : 'y';
 						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
-						const line = this.ctx.sketch.lines.get(userLineId);
+						const line = sketch.lines.get(userLineId);
 						if (line) {
 							if (axis === 'x') {
-								this.ctx.sketch.addVerticalConstraint(line.p1Id, line.p2Id);
+								sketch.addVerticalConstraint(line.p1Id, line.p2Id);
 							} else {
-								this.ctx.sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
+								sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
 							}
 							applied = true;
 							toastMsg = `Perpendicular to ${axis.toUpperCase()}-axis applied`;
 						}
 					} else {
-						this.ctx.sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
+						sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
 						applied = true;
 						toastMsg = 'Perpendicular constraint applied';
 					}
@@ -776,18 +962,18 @@ export class ConstraintTool extends BaseTool {
 						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
 						const axis = lIds.includes('axis_x') ? 'x' : 'y';
 						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
-						const c = this.ctx.sketch.addLineCollinearWithAxisConstraint(userLineId, axis);
+						const c = sketch.addLineCollinearWithAxisConstraint(userLineId, axis);
 						if (c) {
 							applied = true;
-							toastMsg = `Line collinear with ${axis.toUpperCase()}-axis`;
+							toastMsg = `Collinear with ${axis.toUpperCase()}-axis applied`;
 						}
 					} else {
-						this.ctx.sketch.addCollinearConstraint(lIds[0], lIds[1]);
+						sketch.addCollinearConstraint(lIds[0], lIds[1]);
 						applied = true;
 						toastMsg = 'Collinear constraint applied';
 					}
 				} else if (pIds.length === 3 && lIds.length === 0) {
-					const c = this.ctx.sketch.addThreePointCollinearConstraint(pIds[0], pIds[1], pIds[2]);
+					const c = sketch.addThreePointCollinearConstraint(pIds[0], pIds[1], pIds[2]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Collinear constraint applied';
@@ -797,7 +983,7 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'concentric': {
 				if (cIds.length === 2) {
-					this.ctx.sketch.addConcentricConstraint(cIds[0], cIds[1]);
+					sketch.addConcentricConstraint(cIds[0], cIds[1]);
 					applied = true;
 					toastMsg = 'Concentric constraint applied';
 				}
@@ -805,13 +991,13 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'tangent': {
 				if (lIds.length === 1 && cIds.length === 1) {
-					const c = this.ctx.sketch.addTangentConstraint(lIds[0], cIds[0]);
+					const c = sketch.addTangentConstraint(lIds[0], cIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Tangent constraint applied';
 					}
 				} else if (cIds.length === 2 && lIds.length === 0) {
-					const c = this.ctx.sketch.addTangentConstraint(cIds[0], cIds[1]);
+					const c = sketch.addTangentConstraint(cIds[0], cIds[1]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Tangent constraint applied';
@@ -823,18 +1009,18 @@ export class ConstraintTool extends BaseTool {
 				if (pIds.length === 1 && lIds.length === 1) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
-						const c = this.ctx.sketch.addPointOnAxisConstraint(pIds[0], axis);
+						const c = sketch.addPointOnAxisConstraint(pIds[0], axis);
 						if (c) {
 							applied = true;
 							toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
 						}
 					} else {
-						const c = this.ctx.sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
+						const c = sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
 						if (c) {
 							applied = true;
 							toastMsg = 'Point on line constraint applied';
 						} else {
-							this.ctx.showToast('Cannot constrain point to this line');
+							opts.showToast('Cannot constrain point to this line');
 						}
 					}
 				}
@@ -842,15 +1028,15 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'midpoint': {
 				if (pIds.length === 1 && lIds.length === 1) {
-					const c = this.ctx.sketch.addMidpointConstraint(pIds[0], lIds[0]);
+					const c = sketch.addMidpointConstraint(pIds[0], lIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Midpoint constraint applied';
 					} else {
-						this.ctx.showToast('Cannot constrain midpoint to this line');
+						opts.showToast('Cannot constrain midpoint to this line');
 					}
 				} else if (pIds.length === 3 && lIds.length === 0) {
-					const c = this.ctx.sketch.addThreePointMidpointConstraint(pIds[0], pIds[1], pIds[2]);
+					const c = sketch.addThreePointMidpointConstraint(pIds[0], pIds[1], pIds[2]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Midpoint constraint applied';
@@ -860,46 +1046,46 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'symmetry': {
 				if (pIds.length === 2 && lIds.length === 1) {
-					const c = this.ctx.sketch.addSymmetryConstraint(pIds[0], pIds[1], lIds[0]);
+					const c = sketch.addSymmetryConstraint(pIds[0], pIds[1], lIds[0]);
 					if (c) {
 						applied = true;
 						toastMsg = 'Symmetry constraint applied';
 					} else {
-						this.ctx.showToast('Cannot apply symmetry to these entities');
+						opts.showToast('Cannot apply symmetry to these entities');
 					}
 				} else if (pIds.length === 3 && pIds.includes('origin') && lIds.length === 0) {
 					const userPts = pIds.filter(id => id !== 'origin');
-					const c = this.ctx.sketch.addSymmetryConstraint(userPts[0], userPts[1], 'origin');
+					const c = sketch.addSymmetryConstraint(userPts[0], userPts[1], 'origin');
 					if (c) {
 						applied = true;
 						toastMsg = 'Symmetry constraint applied';
 					}
 				} else if (cIds.length === 2 && (lIds.length === 1 || (pIds.length === 1 && pIds[0] === 'origin'))) {
 					const symAxisId = lIds.length === 1 ? lIds[0] : 'origin';
-					const c1 = this.ctx.sketch.circles.get(cIds[0]) ?? this.ctx.sketch.arcs.get(cIds[0]);
-					const c2 = this.ctx.sketch.circles.get(cIds[1]) ?? this.ctx.sketch.arcs.get(cIds[1]);
+					const c1 = sketch.circles.get(cIds[0]) ?? sketch.arcs.get(cIds[0]);
+					const c2 = sketch.circles.get(cIds[1]) ?? sketch.arcs.get(cIds[1]);
 					if (c1 && c2) {
-						this.ctx.sketch.beginTransaction();
-						this.ctx.sketch.addSymmetryConstraint(c1.centerId, c2.centerId, symAxisId);
-						this.ctx.sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
-						this.ctx.sketch.commitTransaction();
+						sketch.beginTransaction();
+						sketch.addSymmetryConstraint(c1.centerId, c2.centerId, symAxisId);
+						sketch.addEqualRadiusConstraint(cIds[0], cIds[1]);
+						sketch.commitTransaction();
 						applied = true;
 						toastMsg = 'Symmetry & equal radius applied';
 					}
 				} else if (lIds.length === 3) {
 					const builtinAxisIdx = lIds.findIndex(id => id === 'axis_x' || id === 'axis_y');
-					const constrIdx = lIds.findIndex(id => this.ctx.sketch.lines.get(id)?.isConstruction);
+					const constrIdx = lIds.findIndex(id => sketch.lines.get(id)?.isConstruction);
 					const axisId = builtinAxisIdx !== -1 ? lIds[builtinAxisIdx] : constrIdx !== -1 ? lIds[constrIdx] : lIds[2];
 					const otherLines = lIds.filter(id => id !== axisId);
 					if (otherLines.length === 2) {
-						const created = this.ctx.sketch.addLineSymmetryConstraints(otherLines[0], otherLines[1], axisId);
+						const created = sketch.addLineSymmetryConstraints(otherLines[0], otherLines[1], axisId);
 						if (created.length > 0) {
 							applied = true;
 							toastMsg = 'Line symmetry constraints applied';
 						}
 					}
 				} else if (lIds.length === 2 && pIds.length === 1 && pIds[0] === 'origin') {
-					const created = this.ctx.sketch.addLineSymmetryConstraints(lIds[0], lIds[1], 'origin');
+					const created = sketch.addLineSymmetryConstraints(lIds[0], lIds[1], 'origin');
 					if (created.length > 0) {
 						applied = true;
 						toastMsg = 'Line symmetry constraints applied';
@@ -910,10 +1096,9 @@ export class ConstraintTool extends BaseTool {
 		}
 
 		if (applied) {
-			this.ctx.sketch.solve();
-			if (toastMsg) {
-				this.ctx.showToast(toastMsg);
-			}
+			if (toastMsg) opts.showToast(toastMsg);
+			sketch.solve();
+			opts.requestRender?.();
 		}
 
 		return applied;

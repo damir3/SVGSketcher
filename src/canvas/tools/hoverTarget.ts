@@ -41,12 +41,7 @@ export function findHoverTarget(
 			}
 			if (type === 'constraint' && id && ctx.sketch.constraints.has(id)) {
 				const c = ctx.sketch.constraints.get(id);
-				if (
-					c &&
-					!ctx.sketch.isSplineInternalConstraint(c) &&
-					c.type !== 'arc_endpoints' &&
-					c.type !== 'elliptical_arc_endpoints'
-				) {
+				if (c && !c.isInternalConstraint?.(ctx.sketch)) {
 					return { type: 'constraint', id };
 				}
 			}
@@ -65,12 +60,7 @@ export function findHoverTarget(
 				const cid = badge.getAttribute('data-id');
 				if (cid && ctx.sketch.constraints.has(cid)) {
 					const c = ctx.sketch.constraints.get(cid);
-					if (
-						c &&
-						!ctx.sketch.isSplineInternalConstraint(c) &&
-						c.type !== 'arc_endpoints' &&
-						c.type !== 'elliptical_arc_endpoints'
-					) {
+					if (c && !c.isInternalConstraint?.(ctx.sketch)) {
 						return { type: 'constraint', id: cid };
 					}
 				}
@@ -93,12 +83,7 @@ export function findHoverTarget(
 	let bestTarget: HoverTarget | null = null;
 
 	const c = ctx.findConstraintNear?.(screen);
-	if (
-		c &&
-		!ctx.sketch.isSplineInternalConstraint(c) &&
-		c.type !== 'arc_endpoints' &&
-		c.type !== 'elliptical_arc_endpoints'
-	) {
+	if (c && !c.isInternalConstraint?.(ctx.sketch)) {
 		const d = c.distanceTo ? c.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist) : null;
 		if (d !== null && d < bestDist) {
 			bestDist = d;

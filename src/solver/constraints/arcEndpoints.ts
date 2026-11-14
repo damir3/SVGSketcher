@@ -22,6 +22,10 @@ export class ArcEndpointsConstraint extends BaseConstraint {
 		return 2;
 	}
 
+	override isInternalConstraint(): boolean {
+		return true;
+	}
+
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const center = readParamPoint(paramMap, this.centerId);
 		const s = readParamPoint(paramMap, this.startPointId);

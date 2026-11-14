@@ -78,6 +78,12 @@ export interface IConstraint extends IInspectable {
 	jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[];
 	/** Move a dimension label using a canvas position in screen pixels. */
 	moveLabelTo?(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void;
+	/** Screen position for opening the dimension editor on this constraint. */
+	getLabelScreenPos?(sketch: SketchDocument, viewport: Viewport): Vec2 | null;
+	/** Whether this constraint is an internal structural helper not selectable by the user. */
+	isInternalConstraint?(sketch: SketchDocument): boolean;
+	/** Toggle suppression of a pattern copy index, returning true if handled. */
+	toggleSuppressedCopy?(sketch: SketchDocument, copyIndex: number): boolean;
 	render?(context: any): void;
 	distanceTo?(screen: any, sketch: any, viewport: any, thresholdPx?: number): number | null;
 }

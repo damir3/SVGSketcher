@@ -1,5 +1,5 @@
 import { Vec2 } from './vector';
-import { evaluateBezier, evaluateBezierDerivative, type BezierSegment } from './splineReference';
+import type { BezierSegment } from './splineReference';
 
 export interface OffsetFitNode {
 	p: Vec2;
@@ -13,13 +13,11 @@ export interface OffsetFitPiece {
 }
 export const OFFSET_FIT_TOLERANCE = 0.05;
 
-function second(b: BezierSegment, u: number): Vec2 {
-	return b[2]
-		.clone()
-		.addScaledVector(b[1], -2)
-		.add(b[0])
-		.multiplyScalar(6 * (1 - u))
-		.addScaledVector(b[3].clone().addScaledVector(b[2], -2).add(b[1]), 6 * u);
+function secondX(b: BezierSegment, u: number): number {
+	return (b[2].x + b[1].x * -2 + b[0].x) * (6 * (1 - u)) + (b[3].x + b[2].x * -2 + b[1].x) * (6 * u);
+}
+function secondY(b: BezierSegment, u: number): number {
+	return (b[2].y + b[1].y * -2 + b[0].y) * (6 * (1 - u)) + (b[3].y + b[2].y * -2 + b[1].y) * (6 * u);
 }
 function generate(
 	nodes: readonly OffsetFitNode[],
@@ -30,9 +28,16 @@ function generate(
 ): BezierSegment {
 	const a = nodes[start],
 		b = nodes[end],
-		chord = b.p.clone().sub(a.p);
-	const fixedA = a.corner || a.t.dot(nodes[start + 1].p.clone().sub(a.p)) < 0;
-	const fixedB = b.corner || b.t.dot(b.p.clone().sub(nodes[end - 1].p)) < 0;
+		apx = a.p.x,
+		apy = a.p.y,
+		cx = b.p.x - apx,
+		cy = b.p.y - apy,
+		atx = a.t.x,
+		aty = a.t.y,
+		btx = b.t.x,
+		bty = b.t.y;
+	const fixedA = a.corner || atx * (nodes[start + 1].p.x - apx) + aty * (nodes[start + 1].p.y - apy) < 0;
+	const fixedB = b.corner || btx * (b.p.x - nodes[end - 1].p.x) + bty * (b.p.y - nodes[end - 1].p.y) < 0;
 	let c00 = 0,
 		c01 = 0,
 		c11 = 0,
@@ -42,23 +47,25 @@ function generate(
 		const u = params[j],
 			v = 1 - u,
 			b1 = 3 * v * v * u,
-			b2 = 3 * v * u * u;
-		const aa = a.t.clone().multiplyScalar(b1),
-			bb = b.t.clone().multiplyScalar(-b2);
-		const rhs = nodes[start + j].p
-			.clone()
-			.sub(a.p)
-			.addScaledVector(chord, -(b2 + u * u * u));
-		c00 += aa.dot(aa);
-		c01 += aa.dot(bb);
-		c11 += bb.dot(bb);
-		x0 += aa.dot(rhs);
-		x1 += bb.dot(rhs);
+			b2 = 3 * v * u * u,
+			aax = atx * b1,
+			aay = aty * b1,
+			bbx = btx * -b2,
+			bby = bty * -b2,
+			scale = -(b2 + u * u * u),
+			np = nodes[start + j].p,
+			rhsx = np.x - apx + cx * scale,
+			rhsy = np.y - apy + cy * scale;
+		c00 += aax * aax + aay * aay;
+		c01 += aax * bbx + aay * bby;
+		c11 += bbx * bbx + bby * bby;
+		x0 += aax * rhsx + aay * rhsy;
+		x1 += bbx * rhsx + bby * rhsy;
 	}
 	const det = c00 * c11 - c01 * c01;
 	let alpha = fixedA ? 0 : fixedB ? x0 / c00 : (x0 * c11 - x1 * c01) / det;
 	let beta = fixedB ? 0 : fixedA ? x1 / c11 : (x1 * c00 - x0 * c01) / det;
-	const fallback = chord.length() / 3;
+	const fallback = Math.hypot(cx, cy) / 3;
 	if (!fixedA && (!Number.isFinite(alpha) || alpha <= 1e-12)) alpha = fallback;
 	if (!fixedB && (!Number.isFinite(beta) || beta <= 1e-12)) beta = fallback;
 	alpha = Math.min(alpha, length * 0.75);
@@ -69,34 +76,63 @@ function generate(
 function deviation(curve: BezierSegment, nodes: readonly OffsetFitNode[], start: number, params: number[]) {
 	let error = 0,
 		split = Math.floor((params.length - 1) / 2);
+	const b0x = curve[0].x,
+		b0y = curve[0].y,
+		b1x = curve[1].x,
+		b1y = curve[1].y,
+		b2x = curve[2].x,
+		b2y = curve[2].y,
+		b3x = curve[3].x,
+		b3y = curve[3].y,
+		d0x = b1x - b0x,
+		d0y = b1y - b0y,
+		d1x = b2x - b1x,
+		d1y = b2y - b1y,
+		d2x = b3x - b2x,
+		d2y = b3y - b2y;
+	let u = params[0],
+		mu = 1 - u,
+		uu = u * u,
+		muu = mu * mu,
+		px = b0x * muu * mu + b1x * (3 * muu * u) + b2x * (3 * mu * uu) + b3x * uu * u,
+		py = b0y * muu * mu + b1y * (3 * muu * u) + b2y * (3 * mu * uu) + b3y * uu * u,
+		dpx = d0x * (3 * muu) + d1x * (6 * mu * u) + d2x * (3 * uu),
+		dpy = d0y * (3 * muu) + d1y * (6 * mu * u) + d2y * (3 * uu);
 	for (let j = 0; j + 1 < params.length; j++) {
-		const u = params[j],
-			v = params[j + 1],
+		const v = params[j + 1],
+			mv = 1 - v,
+			vv = v * v,
+			mvv = mv * mv,
 			du = (v - u) / 3,
 			a = nodes[start + j].p,
-			b = nodes[start + j + 1].p;
-		const p = evaluateBezier(curve, u),
-			q = evaluateBezier(curve, v),
-			delta = b.clone().sub(a);
-		const controls = [
-			p,
-			p.clone().addScaledVector(evaluateBezierDerivative(curve, u), du),
-			q.clone().addScaledVector(evaluateBezierDerivative(curve, v), -du),
-			q,
-		];
+			b = nodes[start + j + 1].p,
+			qx = b0x * mvv * mv + b1x * (3 * mvv * v) + b2x * (3 * mv * vv) + b3x * vv * v,
+			qy = b0y * mvv * mv + b1y * (3 * mvv * v) + b2y * (3 * mv * vv) + b3y * vv * v,
+			dqx = d0x * (3 * mvv) + d1x * (6 * mv * v) + d2x * (3 * vv),
+			dqy = d0y * (3 * mvv) + d1y * (6 * mv * v) + d2y * (3 * vv),
+			dx = b.x - a.x,
+			dy = b.y - a.y,
+			lenSq = Math.max(dx * dx + dy * dy, 1e-24),
+			c1x = px + dpx * du,
+			c1y = py + dpy * du,
+			c2x = qx + dqx * -du,
+			c2y = qy + dqy * -du;
 		for (let k = 0; k < 4; k++) {
+			const cx = k === 0 ? px : k === 1 ? c1x : k === 2 ? c2x : qx;
+			const cy = k === 0 ? py : k === 1 ? c1y : k === 2 ? c2y : qy;
 			const fraction =
-				k === 0
-					? 0
-					: k === 3
-						? 1
-						: Math.max(0, Math.min(1, controls[k].clone().sub(a).dot(delta) / Math.max(delta.lengthSq(), 1e-24)));
-			const d = controls[k].distanceTo(a.clone().addScaledVector(delta, fraction));
+				k === 0 ? 0 : k === 3 ? 1 : Math.max(0, Math.min(1, ((cx - a.x) * dx + (cy - a.y) * dy) / lenSq));
+			const d = Math.hypot(cx - (a.x + dx * fraction), cy - (a.y + dy * fraction));
 			if (d > error) {
 				error = d;
 				split = j + (k > 1 ? 1 : 0);
 			}
 		}
+		u = v;
+		px = qx;
+		py = qy;
+		dpx = dqx;
+		dpy = dqy;
 	}
 	return { error, split };
 }
@@ -169,13 +205,33 @@ export function fitOffsetNodes(
 			else stalled = 0;
 			previousError = bestError;
 			if (stalled >= 3 || end - start === 1) break;
-			const next = [0];
+			const next = [0],
+				b0x = curve[0].x,
+				b0y = curve[0].y,
+				b1x = curve[1].x,
+				b1y = curve[1].y,
+				b2x = curve[2].x,
+				b2y = curve[2].y,
+				b3x = curve[3].x,
+				b3y = curve[3].y,
+				d0x = b1x - b0x,
+				d0y = b1y - b0y,
+				d1x = b2x - b1x,
+				d1y = b2y - b1y,
+				d2x = b3x - b2x,
+				d2y = b3y - b2y;
 			for (let j = 1; j + 1 < params.length; j++) {
 				const u = params[j],
-					p = evaluateBezier(curve, u).sub(nodes[start + j].p),
-					d = evaluateBezierDerivative(curve, u),
-					den = d.lengthSq() + p.dot(second(curve, u));
-				const candidate = Math.abs(den) > 1e-20 ? u - p.dot(d) / den : u;
+					mu = 1 - u,
+					uu = u * u,
+					muu = mu * mu,
+					np = nodes[start + j].p,
+					px = b0x * muu * mu + b1x * (3 * muu * u) + b2x * (3 * mu * uu) + b3x * uu * u - np.x,
+					py = b0y * muu * mu + b1y * (3 * muu * u) + b2y * (3 * mu * uu) + b3y * uu * u - np.y,
+					dx = d0x * (3 * muu) + d1x * (6 * mu * u) + d2x * (3 * uu),
+					dy = d0y * (3 * muu) + d1y * (6 * mu * u) + d2y * (3 * uu),
+					den = dx * dx + dy * dy + (px * secondX(curve, u) + py * secondY(curve, u));
+				const candidate = Math.abs(den) > 1e-20 ? u - (px * dx + py * dy) / den : u;
 				next.push(Math.max((params[j - 1] + u) / 2, Math.min((u + params[j + 1]) / 2, candidate)));
 			}
 			next.push(1);

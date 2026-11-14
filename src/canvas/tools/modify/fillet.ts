@@ -250,6 +250,15 @@ export class FilletTool extends BaseTool {
 		return AABB.fromPoints(pts);
 	}
 
+	updatePopupPosition(): void {
+		if (this.popup.isOpen() && this.pendingFillets.length > 0) {
+			const bbox = this.getGizmoBoundingBox();
+			if (bbox) {
+				this.popup.updatePosition(bbox);
+			}
+		}
+	}
+
 	override onMouseMove(e: ToolMouseEvent): void {
 		const screen = e.screen;
 		const world = e.world;

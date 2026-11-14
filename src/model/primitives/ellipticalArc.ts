@@ -1,8 +1,9 @@
 import { Vec2 } from '../../math/vector';
+import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../../math/ellipse';
 import { distanceToEllipticalArc } from '../../math/hitTest';
 import { ellipticalArcIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipticalArc } from '../../math/intersection';
-import type { ISketchPrimitive } from './base';
+import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchEllipticalArc implements ISketchPrimitive {
@@ -108,6 +109,72 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 			clockwise: !!this.clockwise,
 			isConstruction: this.isConstruction,
 		};
+	}
+
+	getPointIds(_sketch?: any): string[] {
+		return [this.centerId, this.majorAxisPointId, this.minorAxisPointId, this.startPointId, this.endPointId];
+	}
+
+	snapTo(
+		screenPos: Vec2,
+		sketch: any,
+		viewport: any,
+		maxDistPx: number,
+		tolerancePx = maxDistPx
+	): PrimitiveSnapCandidate | null {
+		const center = sketch.points.get(this.centerId);
+		const majorPt = sketch.points.get(this.majorAxisPointId);
+		const minorPt = sketch.points.get(this.minorAxisPointId);
+		const startPt = sketch.points.get(this.startPointId);
+		const endPt = sketch.points.get(this.endPointId);
+		if (!center || !majorPt || !minorPt || !startPt || !endPt) return null;
+
+		const sc = viewport.worldToScreen(center);
+		const smaj = viewport.worldToScreen(majorPt);
+		const smin = viewport.worldToScreen(minorPt);
+
+		const r = sc.distancesTo(smaj, smin);
+		if (r.x < 1 || r.y < 1) return null;
+
+		const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
+
+		const t = ellipseParameterAtPoint(screenPos, sc, r, axisU, axisV);
+
+		const ss = viewport.worldToScreen(startPt);
+		const se = viewport.worldToScreen(endPt);
+
+		const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
+		const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
+		const clockwise = !!this.clockwise;
+		const TWO_PI = 2 * Math.PI;
+
+		let sweepAngle = clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
+		if (sweepAngle < 0) sweepAngle += TWO_PI;
+		let pAngle = clockwise ? (t - ts) % TWO_PI : (ts - t) % TWO_PI;
+		if (pAngle < 0) pAngle += TWO_PI;
+
+		const angTolerance = tolerancePx / Math.max(Math.min(r.x, r.y), 1);
+		if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
+			const clampedPAngle = pAngle >= TWO_PI - angTolerance ? 0 : Math.min(sweepAngle, Math.max(0, pAngle));
+			const actualT = clockwise ? ts + clampedPAngle : ts - clampedPAngle;
+			const snappedScreen = ellipsePointAtParameter(actualT, sc, r, axisU, axisV);
+			const dToPerimeter = screenPos.distanceTo(snappedScreen);
+
+			if (dToPerimeter < maxDistPx) {
+				return {
+					type: 'ellipse',
+					id: this.id,
+					dist: dToPerimeter,
+					worldPos: viewport.screenToWorld(snappedScreen),
+					screenPos: snappedScreen,
+				};
+			}
+		}
+		return null;
+	}
+
+	drag(sketch: any, startWorld: Vec2, currentWorld: Vec2, initialPoints: ReadonlyMap<string, Vec2>): void {
+		translatePrimitivePoints(sketch, startWorld, currentWorld, initialPoints);
 	}
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({

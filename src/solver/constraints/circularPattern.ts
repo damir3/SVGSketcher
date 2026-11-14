@@ -107,6 +107,21 @@ export class CircularPatternConstraint extends BaseConstraint {
 		this.totalAngleExpression = totalAngleExpression;
 	}
 
+	toggleSuppressedCopy(sketch: any, copyIndex: number): boolean {
+		if (!this.suppression) return false;
+		sketch.selectEntity(this.id, 'constraint', false);
+		const currentSuppressed = new Set(this.suppressedIndices);
+		if (currentSuppressed.has(copyIndex)) {
+			currentSuppressed.delete(copyIndex);
+		} else {
+			currentSuppressed.add(copyIndex);
+		}
+		sketch.updateCircularPattern(this.id, {
+			suppressedIndices: Array.from(currentSuppressed),
+		});
+		return true;
+	}
+
 	override getEquationsCount(): number {
 		let count = 0;
 		const suppressedSet = new Set(this.suppressedIndices);

@@ -2,7 +2,7 @@ import { Vec2 } from '../../math/vector';
 import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
 import type { GeoArc } from '../../math/intersection';
-import type { ISketchPrimitive } from './base';
+import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchArc implements ISketchPrimitive {
@@ -93,6 +93,71 @@ export class SketchArc implements ISketchPrimitive {
 			clockwise: !!this.clockwise,
 			isConstruction: this.isConstruction,
 		};
+	}
+
+	getPointIds(_sketch?: any): string[] {
+		return [this.centerId, this.startPointId, this.endPointId];
+	}
+
+	snapTo(
+		screenPos: Vec2,
+		sketch: any,
+		viewport: any,
+		maxDistPx: number,
+		tolerancePx = maxDistPx
+	): PrimitiveSnapCandidate | null {
+		const center = sketch.points.get(this.centerId);
+		const start = sketch.points.get(this.startPointId);
+		const end = sketch.points.get(this.endPointId);
+		if (!center || !start || !end) return null;
+
+		const sc = viewport.worldToScreen(center);
+		const ss = viewport.worldToScreen(start);
+		const se = viewport.worldToScreen(end);
+		const sr = this.radius * viewport.zoom;
+
+		const dToCenter = screenPos.distanceTo(sc);
+		const dToPerimeter = Math.abs(dToCenter - sr);
+		if (dToPerimeter >= maxDistPx) return null;
+
+		const as = sc.angleToPoint(ss);
+		const ae = sc.angleToPoint(se);
+		const ap = sc.angleToPoint(screenPos);
+		const clockwise = !!this.clockwise;
+		const TWO_PI = 2 * Math.PI;
+
+		let sweepAngle = 0;
+		let pAngle = 0;
+		if (clockwise) {
+			sweepAngle = (ae - as) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
+			pAngle = (ap - as) % TWO_PI;
+			if (pAngle < 0) pAngle += TWO_PI;
+		} else {
+			sweepAngle = (as - ae) % TWO_PI;
+			if (sweepAngle < 0) sweepAngle += TWO_PI;
+			pAngle = (as - ap) % TWO_PI;
+			if (pAngle < 0) pAngle += TWO_PI;
+		}
+
+		const angTolerance = tolerancePx / Math.max(sr, 1);
+		if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
+			const clampedPAngle = Math.max(0, Math.min(sweepAngle, pAngle));
+			const actualAng = clockwise ? as + clampedPAngle : as - clampedPAngle;
+			const snappedScreen = Vec2.fromPolar(sr, actualAng).add(sc);
+			return {
+				type: 'circle',
+				id: this.id,
+				dist: dToPerimeter,
+				worldPos: viewport.screenToWorld(snappedScreen),
+				screenPos: snappedScreen,
+			};
+		}
+		return null;
+	}
+
+	drag(sketch: any, startWorld: Vec2, currentWorld: Vec2, initialPoints: ReadonlyMap<string, Vec2>): void {
+		translatePrimitivePoints(sketch, startWorld, currentWorld, initialPoints);
 	}
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({

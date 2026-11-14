@@ -333,6 +333,15 @@ export class OffsetTool extends BaseTool {
 		return AABB.fromPoints(pts);
 	}
 
+	updatePopupPosition(): void {
+		if (this.popup.isOpen() && this.geomResult) {
+			const bbox = this.getGizmoBoundingBox();
+			if (bbox) {
+				this.popup.updatePosition(bbox);
+			}
+		}
+	}
+
 	commit(): void {
 		if (!this.chain || !this.geomResult || !this.geomResult.isValid) {
 			this.ctx?.showToast('Cannot commit offset with invalid parameters');

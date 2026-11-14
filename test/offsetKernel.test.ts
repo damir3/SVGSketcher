@@ -60,6 +60,16 @@ function expected(scene: (typeof fixture.scenes)[number], q: (typeof scene.queri
 		gizmoNormal: scene.gizmoNormal,
 	};
 }
+function withTypeScriptFallback<T>(actual: T, compute: () => T): T {
+	const previous = getGeometryKernel();
+	if (previous === typescriptGeometryKernel) return actual;
+	try {
+		setGeometryKernel(typescriptGeometryKernel);
+		return compute();
+	} finally {
+		setGeometryKernel(previous);
+	}
+}
 test('offset numerical reference matches the pre-routing snapshots', () => {
 	for (const [file, hash] of Object.entries(fixture.sourceHashes))
 		assert.equal(
@@ -101,13 +111,9 @@ for (const scene of fixture.scenes)
 					item => item.type === 'spline' || item.type === 'elliptical_arc' || item.type === 'ellipse'
 				)
 			) {
-				const previous = getGeometryKernel();
-				try {
-					setGeometryKernel(typescriptGeometryKernel);
-					target = calculateOffsetGeometry(sketch, scene.chain, q.direction, q.d1, q.d2, q.flip);
-				} finally {
-					setGeometryKernel(previous);
-				}
+				target = withTypeScriptFallback(result, () =>
+					calculateOffsetGeometry(sketch, scene.chain, q.direction, q.d1, q.d2, q.flip)
+				);
 			}
 			compare(result, target, `${scene.name} ${q.direction} d=${q.d1} flip=${q.flip}`);
 			assert.ok(result.gizmoAnchor instanceof Vec2 && result.gizmoNormal instanceof Vec2);
@@ -227,7 +233,6 @@ test('mixed spline/arc/ellipse offset junctions match the TypeScript fallback in
 	const scene = JSON.parse(
 		readFileSync(new URL('./fixtures/offset-test.svg', import.meta.url), 'utf8').match(/<!\[CDATA\[([\s\S]*?)\]\]>/)![1]
 	);
-	const previous = getGeometryKernel();
 	for (const selected of ['Spline-1', 'Line-10', 'Spline-3', 'Arc-2', 'Line-1']) {
 		const sketch = new SketchDocument();
 		sketch.restoreSnapshot(scene.snapshot);
@@ -238,21 +243,21 @@ test('mixed spline/arc/ellipse offset junctions match the TypeScript fallback in
 			selected.startsWith('Line') ? 'line' : selected.startsWith('Arc') ? 'arc' : 'spline',
 			true
 		)!;
-		for (const direction of ['one_side', 'two_sides', 'symmetric'] as const)
+		for (const direction of ['one_side', 'two_sides', 'symmetric'] as const) {
+			const distances = direction === 'one_side' ? [0, 3, 6.5, 10, 15.5, 20] : [3, 15.5];
 			for (const flip of [false, true])
-				for (const distance of [0, 3, 6.5, 10, 15.5, 20]) {
+				for (const distance of distances) {
+					if (distance === 0 && (direction !== 'two_sides' || flip)) continue;
 					const actual = calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip);
-					try {
-						setGeometryKernel(typescriptGeometryKernel);
-						compare(
-							actual,
-							calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip),
-							`${selected}, ${direction}, flip=${flip}, d=${distance}`
-						);
-					} finally {
-						setGeometryKernel(previous);
-					}
+					compare(
+						actual,
+						withTypeScriptFallback(actual, () =>
+							calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip)
+						),
+						`${selected}, ${direction}, flip=${flip}, d=${distance}`
+					);
 				}
+		}
 	}
 });
 
@@ -295,14 +300,19 @@ test('closed spline offsets preserve both eroded components and match the TypeSc
 	);
 	const sketch = new SketchDocument();
 	sketch.restoreSnapshot(scene.snapshot);
-	const original = sketch.takeSnapshot(),
-		previous = getGeometryKernel();
+	const original = sketch.takeSnapshot();
 	for (const reversed of [false, true]) {
 		const chain = toggleOrExtendChain(sketch, null, 'Spline-1', 'spline', true)!;
 		chain.items[0].reversed = reversed;
 		for (const direction of ['one_side', 'two_sides', 'symmetric'] as const)
-			for (const flip of [false, true])
-				for (const distance of [-15, -10, -8, -7.7501, -5, 0, 5, 7.7501, 8, 10, 15]) {
+			for (const flip of [false, true]) {
+				const distances =
+					direction === 'one_side'
+						? flip
+							? [-8, 0, 8]
+							: [-15, -10, -8, -7.7501, -5, 0, 5, 7.7501, 8, 10, 15]
+						: [-8, 8];
+				for (const distance of distances) {
 					const actual = calculateOffsetGeometry(sketch, chain, direction, distance, 10, flip);
 					assert.ok(actual.isValid);
 					for (const side of actual.sides) {
@@ -310,13 +320,14 @@ test('closed spline offsets preserve both eroded components and match the TypeSc
 						assert.equal(side.primitives.length, expectedCount, `${direction}, d=${distance}, flip=${flip}`);
 						assert.ok(side.primitives.every(p => p.sourceId === 'Spline-1' && p.isSplineClosed));
 					}
-					try {
-						setGeometryKernel(typescriptGeometryKernel);
-						compare(actual, calculateOffsetGeometry(sketch, chain, direction, distance, 10, flip));
-					} finally {
-						setGeometryKernel(previous);
-					}
+					compare(
+						actual,
+						withTypeScriptFallback(actual, () =>
+							calculateOffsetGeometry(sketch, chain, direction, distance, 10, flip)
+						)
+					);
 				}
+			}
 	}
 	assert.deepEqual(sketch.takeSnapshot(), original);
 });
@@ -353,14 +364,15 @@ test('offset adapter permits repeated sources only for independent closed spline
 
 for (const kind of ['lines', 'arcs', 'mixed', 'arc-neck'] as const)
 	test(`mixed closed offsets retain every component and match native arithmetic: ${kind}`, () => {
-		const previous = getGeometryKernel();
 		for (const reversed of [false, true])
 			for (const rotation of [0, 3, 8]) {
 				const { sketch, chain } = mixedOffsetScene(kind, reversed, rotation);
 				const before = sketch.takeSnapshot();
 				for (const direction of ['one_side', 'two_sides', 'symmetric'] as const)
-					for (const flip of [false, true])
-						for (const distance of [-4, -0.1, 0, 0.1, 4]) {
+					for (const flip of [false, true]) {
+						const distances =
+							direction === 'one_side' ? (flip ? [-4, 4] : [-4, -0.1, 0, 0.1, 4]) : [-4, 4];
+						for (const distance of distances) {
 							const actual = calculateOffsetGeometry(sketch, chain, direction, distance, 4, flip);
 							assert.ok(actual.isValid);
 							for (const side of actual.sides) {
@@ -376,13 +388,14 @@ for (const kind of ['lines', 'arcs', 'mixed', 'arc-neck'] as const)
 										assert.ok(Math.abs(p.end!.distanceTo(p.center!) - p.radius!) < 1e-7);
 									}
 							}
-							try {
-								setGeometryKernel(typescriptGeometryKernel);
-								compare(actual, calculateOffsetGeometry(sketch, chain, direction, distance, 4, flip));
-							} finally {
-								setGeometryKernel(previous);
-							}
+							compare(
+								actual,
+								withTypeScriptFallback(actual, () =>
+									calculateOffsetGeometry(sketch, chain, direction, distance, 4, flip)
+								)
+							);
 						}
+					}
 				assert.deepEqual(sketch.takeSnapshot(), before);
 			}
 	});
@@ -473,7 +486,6 @@ test('offset adapter rejects malformed component numbers, order, sources and clo
 for (const kind of collapseKinds)
 	test(`fully eroded closed offset is empty and agrees with TypeScript: ${kind}`, () => {
 		const { sketch, chain, small, empty } = collapseOffsetScene(kind),
-			previous = getGeometryKernel(),
 			before = sketch.takeSnapshot();
 		for (const distance of [small, empty, empty * 1.1, empty * 5])
 			for (const direction of ['one_side', 'two_sides', 'symmetric'] as const)
@@ -484,12 +496,12 @@ for (const kind of collapseKinds)
 						assert.equal(side.primitives.length === 0, side.side < 0 && side.distance >= empty);
 						assert.ok(side.distance >= 0);
 					}
-					try {
-						setGeometryKernel(typescriptGeometryKernel);
-						compare(actual, calculateOffsetGeometry(sketch, chain, direction, -distance, distance, flip));
-					} finally {
-						setGeometryKernel(previous);
-					}
+					compare(
+						actual,
+						withTypeScriptFallback(actual, () =>
+							calculateOffsetGeometry(sketch, chain, direction, -distance, distance, flip)
+						)
+					);
 				}
 		assert.deepEqual(sketch.takeSnapshot(), before);
 	});

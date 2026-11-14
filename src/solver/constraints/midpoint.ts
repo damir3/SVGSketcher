@@ -55,15 +55,21 @@ export class MidpointConstraint extends BaseConstraint {
 		return res;
 	}
 
-	override render(ctx: ConstraintRenderContext): void {
-		for (const line of ctx.sketch.lines.values()) {
+	override isInternalConstraint(sketch: any): boolean {
+		if (!sketch?.lines) return false;
+		for (const line of sketch.lines.values()) {
 			if (
 				line.isSplineHandle &&
 				((line.p1Id === this.p1Id && line.p2Id === this.p2Id) || (line.p1Id === this.p2Id && line.p2Id === this.p1Id))
 			) {
-				return;
+				return true;
 			}
 		}
+		return false;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		if (this.isInternalConstraint(ctx.sketch)) return;
 		const pt = ctx.sketch.points.get(this.midId);
 		if (!pt) return;
 		const s = ctx.viewport.worldToScreen(pt);

@@ -388,6 +388,15 @@ export class ChamferTool extends BaseTool {
 		return AABB.fromPoints(pts);
 	}
 
+	updatePopupPosition(): void {
+		if (this.popup.isOpen() && this.candidate) {
+			const bbox = this.getGizmoBoundingBox();
+			if (bbox) {
+				this.popup.updatePosition(bbox);
+			}
+		}
+	}
+
 	private selectCandidate(cand: ChamferCandidate): void {
 		this.candidate = cand;
 		this.firstLine = null;

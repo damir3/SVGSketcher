@@ -27,13 +27,23 @@ function between(a: Node, b: Node, t: number): Node {
 	};
 }
 function intersection(a: Vec2, b: Vec2, c: Vec2, d: Vec2): number | null {
-	const u = b.clone().sub(a),
-		v = d.clone().sub(c),
-		delta = c.clone().sub(a);
-	const det = u.cross(v);
+	if (
+		(a.x < b.x ? b.x : a.x) < (c.x < d.x ? c.x : d.x) - 1e-6 ||
+		(c.x < d.x ? d.x : c.x) < (a.x < b.x ? a.x : b.x) - 1e-6 ||
+		(a.y < b.y ? b.y : a.y) < (c.y < d.y ? c.y : d.y) - 1e-6 ||
+		(c.y < d.y ? d.y : c.y) < (a.y < b.y ? a.y : b.y) - 1e-6
+	)
+		return null;
+	const ux = b.x - a.x,
+		uy = b.y - a.y,
+		vx = d.x - c.x,
+		vy = d.y - c.y,
+		det = ux * vy - uy * vx;
 	if (Math.abs(det) < 1e-12) return null;
-	const t = delta.cross(v) / det,
-		s = delta.cross(u) / det;
+	const dx = c.x - a.x,
+		dy = c.y - a.y,
+		t = (dx * vy - dy * vx) / det,
+		s = (dx * uy - dy * ux) / det;
 	return t >= -1e-9 && t <= 1 + 1e-9 && s >= -1e-9 && s <= 1 + 1e-9 ? Math.max(0, Math.min(1, t)) : null;
 }
 function removeLoops(nodes: Node[]): Node[] {
@@ -116,16 +126,25 @@ function closedContours(nodes: Node[], d: number): Node[][] {
 	const valid = loops.filter(loop => {
 		const loopArea = area(loop.map(n => n.p));
 		if (Math.abs(loopArea) < 1e-10 || (inward && loopArea * sourceArea <= 0)) return false;
-		const stride = Math.max(1, Math.floor((loop.length - 1) / 64));
+		const stride = Math.max(1, Math.floor((loop.length - 1) / 64)),
+			minDist = Math.abs(d) - OFFSET_FIT_TOLERANCE;
 		for (let i = 0; i + 1 < loop.length; i += stride) {
 			const p = loop[i].p.clone().lerp(loop[i + 1].p, 0.5);
 			if (inside(p) !== inward) return false;
 			for (let j = 0; j + 1 < source.length; j++) {
 				const a = source[j],
-					delta = source[j + 1].clone().sub(a),
+					b = source[j + 1];
+				if (
+					(a.x < b.x ? b.x : a.x) < p.x - minDist ||
+					(a.x < b.x ? a.x : b.x) > p.x + minDist ||
+					(a.y < b.y ? b.y : a.y) < p.y - minDist ||
+					(a.y < b.y ? a.y : b.y) > p.y + minDist
+				)
+					continue;
+				const delta = b.clone().sub(a),
 					len = delta.lengthSq();
 				const t = len > 1e-20 ? Math.max(0, Math.min(1, p.clone().sub(a).dot(delta) / len)) : 0;
-				if (p.distanceTo(a.clone().addScaledVector(delta, t)) < Math.abs(d) - OFFSET_FIT_TOLERANCE) return false;
+				if (p.distanceTo(a.clone().addScaledVector(delta, t)) < minDist) return false;
 			}
 		}
 		return true;

@@ -134,16 +134,16 @@ export class AngleConstraint extends BaseConstraint {
 		}
 	}
 
-	override render(ctx: ConstraintRenderContext): void {
-		const l1 = ctx.sketch.getLine(this.line1Id);
-		const l2 = ctx.sketch.getLine(this.line2Id);
-		const p1 = ctx.sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = ctx.sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = ctx.sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = ctx.sketch.points.get(l2 ? l2.p2Id : this.l2P2);
-		if (!p1 || !p2 || !p3 || !p4) return;
+	private computeScreenArcLayout(sketch: SketchDocument, viewport: Viewport) {
+		const l1 = sketch.getLine(this.line1Id);
+		const l2 = sketch.getLine(this.line2Id);
+		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
+		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
+		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
+		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
+		if (!p1 || !p2 || !p3 || !p4) return null;
 
-		const geom = ctx.sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
+		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
 
 		const v1 = new Vec2().subVectors(p2, p1);
 		const v2 = new Vec2().subVectors(p4, p3);
@@ -156,27 +156,38 @@ export class AngleConstraint extends BaseConstraint {
 		const u1 = v1.clone().multiplyScalar(s1Factor / l1Len);
 		const u2 = v2.clone().multiplyScalar(s2Factor / l2Len);
 
-		const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-		const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(u1, 20));
-		const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(u2, 20));
+		const sCenter = viewport.worldToScreen(geom.pInt);
+		const sRay1 = viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(u1, 20));
+		const sRay2 = viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(u2, 20));
 
-		const a1 = sCenter.angleToPoint(sRay1);
-		const a2 = sCenter.angleToPoint(sRay2);
+		const a1 = Vec2.from(sCenter).angleToPoint(sRay1);
+		const a2 = Vec2.from(sCenter).angleToPoint(sRay2);
 
 		const TWO_PI = 2 * Math.PI;
 		let delta = a2 - a1;
 		while (delta > Math.PI) delta -= TWO_PI;
 		while (delta < -Math.PI) delta += TWO_PI;
 
-		const sweepFlag = delta > 0 ? 1 : 0;
 		const rWorld = this.arcRadius ?? 40;
-		const rScreen = Math.max(28, rWorld * ctx.viewport.zoom);
-
-		const a = Vec2.fromPolar(rScreen, a1).add(sCenter);
-		const b = Vec2.fromPolar(rScreen, a2).add(sCenter);
-
+		const rScreen = Math.max(28, rWorld * viewport.zoom);
 		const midAngle = a1 + delta * 0.5;
 		const midPoint = Vec2.fromPolar(rScreen, midAngle).add(sCenter);
+
+		return { p1, p2, p3, p4, sCenter, a1, a2, delta, rScreen, midAngle, midPoint };
+	}
+
+	getLabelScreenPos(sketch: SketchDocument, viewport: Viewport): Vec2 | null {
+		return this.computeScreenArcLayout(sketch, viewport)?.midPoint ?? null;
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const layout = this.computeScreenArcLayout(ctx.sketch, ctx.viewport);
+		if (!layout) return;
+		const { p1, p2, p3, p4, sCenter, a1, a2, delta, rScreen, midAngle, midPoint } = layout;
+
+		const sweepFlag = delta > 0 ? 1 : 0;
+		const a = Vec2.fromPolar(rScreen, a1).add(sCenter);
+		const b = Vec2.fromPolar(rScreen, a2).add(sCenter);
 
 		const g = createSvgElement(
 			'g',
@@ -283,43 +294,10 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {
-		const l1 = sketch.getLine(this.line1Id);
-		const l2 = sketch.getLine(this.line2Id);
-		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
-		if (!p1 || !p2 || !p3 || !p4) return null;
-
-		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
-		const v1 = new Vec2().subVectors(p2, p1);
-		const v2 = new Vec2().subVectors(p4, p3);
-		const l1Len = Math.max(v1.length(), 1e-7);
-		const l2Len = Math.max(v2.length(), 1e-7);
-
-		const s1Factor = this.s1 ?? geom.s1;
-		const s2Factor = this.s2 ?? geom.s2;
-
-		const u1 = v1.clone().multiplyScalar(s1Factor / l1Len);
-		const u2 = v2.clone().multiplyScalar(s2Factor / l2Len);
-
-		const sCenter = viewport.worldToScreen(geom.pInt);
-		const sRay1 = viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(u1, 20));
-		const sRay2 = viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(u2, 20));
-
-		const a1 = Vec2.from(sCenter).angleToPoint(sRay1);
-		const a2 = Vec2.from(sCenter).angleToPoint(sRay2);
-
+		const layout = this.computeScreenArcLayout(sketch, viewport);
+		if (!layout) return null;
+		const { sCenter, a1, delta, rScreen, midPoint } = layout;
 		const TWO_PI = 2 * Math.PI;
-		let delta = a2 - a1;
-		while (delta > Math.PI) delta -= TWO_PI;
-		while (delta < -Math.PI) delta += TWO_PI;
-
-		const rWorld = this.arcRadius ?? 40;
-		const rScreen = Math.max(28, rWorld * viewport.zoom);
-
-		const midAngle = a1 + delta * 0.5;
-		const midPoint = Vec2.fromPolar(rScreen, midAngle).add(sCenter);
 
 		// 1. Check distance to badge / text box
 		const dLabel = midPoint.distanceTo(screen);

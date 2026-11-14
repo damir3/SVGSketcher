@@ -271,6 +271,12 @@ export class RadiusConstraint extends BaseConstraint {
 		}
 	}
 
+	getLabelScreenPos(sketch: SketchDocument, viewport: Viewport): Vec2 {
+		const circ = sketch.circles.get(this.circleId) ?? sketch.arcs.get(this.circleId);
+		const center = circ ? sketch.points.get(circ.centerId) : null;
+		return center ? viewport.worldToScreen(center) : new Vec2(100, 100);
+	}
+
 	override distanceTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): number | null {
 		const layout = this.getLayout(sketch, viewport);
 		if (!layout) return null;

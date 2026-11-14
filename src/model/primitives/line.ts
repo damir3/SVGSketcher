@@ -1,8 +1,8 @@
-import { Vec2 } from '../../math/vector';
+import { projectPointOntoSegment, Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
 import type { GeoSegment } from '../../math/intersection';
-import type { ISketchPrimitive } from './base';
+import type { ISketchPrimitive, PrimitiveSnapCandidate } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchLine implements ISketchPrimitive {
@@ -74,6 +74,37 @@ export class SketchLine implements ISketchPrimitive {
 			p2: new Vec2(p2.x, p2.y),
 			isConstruction: this.isConstruction,
 		};
+	}
+
+	getPointIds(_sketch?: any): string[] {
+		return [this.p1Id, this.p2Id];
+	}
+
+	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
+		if (!p1 || !p2) return null;
+
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
+		const proj = projectPointOntoSegment(screenPos, s1, s2);
+		if (proj.dist >= maxDistPx) return null;
+
+		return {
+			type: 'line',
+			id: this.id,
+			dist: proj.dist,
+			worldPos: p1.clone().lerp(p2, proj.t),
+			screenPos: proj.point,
+		};
+	}
+
+	drag(sketch: any, startWorld: Vec2, currentWorld: Vec2, initialPoints: ReadonlyMap<string, Vec2>): void {
+		const p1Start = initialPoints.get(this.p1Id);
+		const p2Start = initialPoints.get(this.p2Id);
+		if (!p1Start || !p2Start) return;
+		const dir = new Vec2().subVectors(currentWorld, startWorld);
+		sketch.dragLine(this.id, p1Start.x + dir.x, p1Start.y + dir.y, p2Start.x + dir.x, p2Start.y + dir.y);
 	}
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({

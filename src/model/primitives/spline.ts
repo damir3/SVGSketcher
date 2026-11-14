@@ -1,9 +1,9 @@
 import { Vec2 } from '../../math/vector';
-import { bsplineToBezier, fitPointsToBezier, type BezierSegment } from '../../math/spline';
+import { bsplineToBezier, fitPointsToBezier, getSplineParamAtPoint, type BezierSegment } from '../../math/spline';
 import { distanceToSpline } from '../../math/hitTest';
 import { intersectSplineCurve, type GeoSpline } from '../../math/intersection';
 import { pointIntersectsAABB } from '../../math/aabb';
-import type { ISketchPrimitive } from './base';
+import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchSpline implements ISketchPrimitive {
@@ -102,6 +102,37 @@ export class SketchSpline implements ISketchPrimitive {
 		const segments = this.getScreenSegments(sketch, viewport);
 		if (!segments) return null;
 		return distanceToSpline(screen, segments);
+	}
+
+	getPointIds(sketch?: any): string[] {
+		const pts = [...this.pointIds];
+		if (sketch && this.tangentLineIds) {
+			for (const lid of this.tangentLineIds) {
+				const l = sketch.lines.get(lid);
+				if (l) pts.push(l.p1Id, l.p2Id);
+			}
+		}
+		return pts;
+	}
+
+	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {
+		const screenSegments = this.getScreenSegments(sketch, viewport);
+		if (!screenSegments) return null;
+
+		const proj = getSplineParamAtPoint(screenSegments, screenPos);
+		if (proj.distance >= maxDistPx) return null;
+
+		return {
+			type: 'spline',
+			id: this.id,
+			dist: proj.distance,
+			worldPos: viewport.screenToWorld(proj.point),
+			screenPos: proj.point,
+		};
+	}
+
+	drag(sketch: any, startWorld: Vec2, currentWorld: Vec2, initialPoints: ReadonlyMap<string, Vec2>): void {
+		translatePrimitivePoints(sketch, startWorld, currentWorld, initialPoints);
 	}
 
 	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {

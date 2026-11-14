@@ -253,6 +253,14 @@ export class OffsetConstraint extends BaseConstraint {
 		};
 	}
 
+	getLabelScreenPos(sketch: any, viewport: any): Vec2 | null {
+		const pts = this.getDimensionWorldPoints(sketch);
+		if (!pts) return null;
+		const d1 = viewport.worldToScreen(pts.a);
+		const d2 = viewport.worldToScreen(pts.b);
+		return d1.clone().lerp(d2, 0.5);
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const pts = this.getDimensionWorldPoints(ctx.sketch);
 		if (!pts) return;

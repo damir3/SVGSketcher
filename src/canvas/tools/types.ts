@@ -194,6 +194,9 @@ export interface ITool {
 	/** Optional sidebar panel rendered when this tool is active */
 	readonly sidebarPanel?: IToolPanel;
 
+	/** Optional floating popup owned by this tool */
+	readonly popup?: { isOpen(): boolean };
+
 	// --- Lifecycle ---
 	/** Called when tool is selected and becomes active */
 	activate(ctx: ToolContext): void;
@@ -251,4 +254,15 @@ export interface ITool {
 
 	/** Tool-specific point redo (e.g. spline point redo) */
 	redoPoint?(): boolean;
+
+	/** Reposition tool popup when canvas re-renders (e.g. on zoom/pan) */
+	updatePopupPosition?(): void;
+
+	/** Handle rectangular box selection items when tool is active */
+	handleBoxSelect?(
+		itemsToSelect: Array<{
+			id: string;
+			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
+		}>
+	): void;
 }

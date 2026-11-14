@@ -18,6 +18,11 @@ interface Edge {
 	b: Node;
 	t0: number;
 	t1: number;
+	len: number;
+	minX: number;
+	maxX: number;
+	minY: number;
+	maxY: number;
 }
 const tau = 2 * Math.PI;
 function sweep(a: number, b: number, cw: boolean): number {
@@ -65,15 +70,24 @@ function fraction(e: Edge, p: Vec2, primitives: KernelOffsetPrimitive[]): number
 	const delta = e.b.p.clone().sub(e.a.p);
 	return p.clone().sub(e.a.p).dot(delta) / delta.lengthSq();
 }
-function bounds(e: Edge, primitives: KernelOffsetPrimitive[]): number[] {
-	const p = primitives[e.source];
-	const pad = p.type === 'arc' ? (p.radius! * (arcSpan(p) * (e.t1 - e.t0)) ** 2) / 8 + 1e-8 : 1e-8;
-	return [
-		Math.min(e.a.p.x, e.b.p.x) - pad,
-		Math.max(e.a.p.x, e.b.p.x) + pad,
-		Math.min(e.a.p.y, e.b.p.y) - pad,
-		Math.max(e.a.p.y, e.b.p.y) + pad,
-	];
+function makeEdge(source: number, a: Node, b: Node, t0: number, t1: number, primitives: KernelOffsetPrimitive[]): Edge {
+	const p = primitives[source],
+		isArc = p.type === 'arc',
+		span = isArc ? arcSpan(p) * (t1 - t0) : 0,
+		len = isArc ? p.radius! * span : a.p.distanceTo(b.p),
+		pad = isArc ? (p.radius! * span * span) / 8 + 1e-8 : 1e-8;
+	return {
+		source,
+		a,
+		b,
+		t0,
+		t1,
+		len,
+		minX: Math.min(a.p.x, b.p.x) - pad,
+		maxX: Math.max(a.p.x, b.p.x) + pad,
+		minY: Math.min(a.p.y, b.p.y) - pad,
+		maxY: Math.max(a.p.y, b.p.y) + pad,
+	};
 }
 function crossings(a: Edge, b: Edge, primitives: KernelOffsetPrimitive[]): Vec2[] {
 	const aa = primitives[a.source],
@@ -132,13 +146,9 @@ function cut(e: Edge, p: Vec2, primitives: KernelOffsetPrimitive[]): [Edge, Edge
 	node.corner = true;
 	const param = e.t0 + (e.t1 - e.t0) * t;
 	return [
-		{ ...e, b: node, t1: param },
-		{ ...e, a: node, t0: param },
+		makeEdge(e.source, e.a, node, e.t0, param, primitives),
+		makeEdge(e.source, node, e.b, param, e.t1, primitives),
 	];
-}
-function length(e: Edge, primitives: KernelOffsetPrimitive[]): number {
-	const p = primitives[e.source];
-	return p.type === 'arc' ? p.radius! * arcSpan(p) * (e.t1 - e.t0) : e.a.p.distanceTo(e.b.p);
 }
 function area(edges: Edge[], primitives: KernelOffsetPrimitive[]): number {
 	return edges.reduce((sum, e) => {
@@ -192,39 +202,35 @@ export function splitOffsetContours(
 			}
 			if (!nodes && p.type === 'arc') nodes = Array.from({ length: 65 }, (_, j) => arcNode(p, j / 64));
 			return (
-				nodes?.slice(1).map((b, j) => ({
-					source,
-					a: nodes![j],
-					b,
-					t0: j / (nodes!.length - 1),
-					t1: (j + 1) / (nodes!.length - 1),
-				})) ?? []
+				nodes
+					?.slice(1)
+					.map((b, j) =>
+						makeEdge(source, nodes![j], b, j / (nodes!.length - 1), (j + 1) / (nodes!.length - 1), primitives)
+					) ?? []
 			);
 		})
-		.filter(e => length(e, primitives) > 1e-8);
+		.filter(e => e.len > 1e-8);
 	if (edges.length < 3 || edges.some((e, i) => e.b.p.distanceTo(edges[(i + 1) % edges.length].a.p) > 1e-6)) return;
 	const pending = [edges],
 		loops: Edge[][] = [];
 	while (pending.length) {
 		const ring = pending.pop()!,
-			boxes = ring.map(e => bounds(e, primitives)),
-			total = ring.reduce((s, e) => s + length(e, primitives), 0);
+			total = ring.reduce((s, e) => s + e.len, 0);
 		let pieces: Edge[][] | undefined;
-		search: for (let i = 0; i < ring.length; i++)
+		search: for (let i = 0; i < ring.length; i++) {
+			const a = ring[i];
 			for (let j = i + 2; j < ring.length; j++) {
 				if (i === 0 && j === ring.length - 1) continue;
-				const a = boxes[i],
-					b = boxes[j];
-				if (a[1] < b[0] || b[1] < a[0] || a[3] < b[2] || b[3] < a[2]) continue;
-				for (const p of crossings(ring[i], ring[j], primitives)) {
-					const [al, ar] = cut(ring[i], p, primitives),
-						[bl, br] = cut(ring[j], p, primitives);
+				const b = ring[j];
+				if (a.maxX < b.minX || b.maxX < a.minX || a.maxY < b.minY || b.maxY < a.minY) continue;
+				for (const p of crossings(a, b, primitives)) {
+					const [al, ar] = cut(a, p, primitives),
+						[bl, br] = cut(b, p, primitives);
 					const parts = [
 						[ar, ...ring.slice(i + 1, j), bl],
 						[br, ...ring.slice(j + 1), ...ring.slice(0, i), al],
-					].map(v => v.filter(e => length(e, primitives) > 1e-8));
-					if (parts.some(v => v.length < 2 || v.reduce((s, e) => s + length(e, primitives), 0) >= total - 1e-8))
-						continue;
+					].map(v => v.filter(e => e.len > 1e-8));
+					if (parts.some(v => v.length < 2 || v.reduce((s, e) => s + e.len, 0) >= total - 1e-8)) continue;
 					for (const part of parts) {
 						part[0] = { ...part[0], a: { ...part[0].a, corner: true } };
 						const last = part.length - 1;
@@ -234,6 +240,7 @@ export function splitOffsetContours(
 					break search;
 				}
 			}
+		}
 		if (pieces) pending.push(...pieces);
 		else loops.push(ring);
 	}
@@ -249,6 +256,7 @@ export function splitOffsetContours(
 		}
 		return odd;
 	};
+	const minDist = Math.abs(d) - OFFSET_FIT_TOLERANCE;
 	let valid = loops.filter(ring => {
 		const a = area(ring, primitives);
 		if (Math.abs(a) < 1e-10 || (d < 0 && a * sourceArea <= 0)) return false;
@@ -256,12 +264,18 @@ export function splitOffsetContours(
 		for (let i = 0; i < ring.length; i += stride) {
 			const p = at(ring[i], 0.5, primitives).p;
 			if (inside(p) !== d < 0) return false;
-			for (let j = 0; j < source.length; j++)
+			for (let j = 0; j < source.length; j++) {
+				const sa = source[j],
+					sb = source[(j + 1) % source.length];
 				if (
-					projectPointOntoSegment(p, source[j], source[(j + 1) % source.length]).dist <
-					Math.abs(d) - OFFSET_FIT_TOLERANCE
+					(sa.x < sb.x ? sb.x : sa.x) < p.x - minDist ||
+					(sa.x < sb.x ? sa.x : sb.x) > p.x + minDist ||
+					(sa.y < sb.y ? sb.y : sa.y) < p.y - minDist ||
+					(sa.y < sb.y ? sa.y : sb.y) > p.y + minDist
 				)
-					return false;
+					continue;
+				if (projectPointOntoSegment(p, sa, sb).dist < minDist) return false;
+			}
 		}
 		return true;
 	});

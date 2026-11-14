@@ -1,8 +1,9 @@
 import { Vec2 } from '../../math/vector';
+import { ellipseParameterAtPoint, ellipsePointAtParameter } from '../../math/ellipse';
 import { distanceToEllipse } from '../../math/hitTest';
 import { ellipseIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipse } from '../../math/intersection';
-import type { ISketchPrimitive } from './base';
+import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 
 export class SketchEllipse implements ISketchPrimitive {
@@ -80,6 +81,47 @@ export class SketchEllipse implements ISketchPrimitive {
 			minorAxisPoint: new Vec2(min.x, min.y),
 			isConstruction: this.isConstruction,
 		};
+	}
+
+	getPointIds(_sketch?: any): string[] {
+		return [this.centerId, this.majorAxisPointId, this.minorAxisPointId];
+	}
+
+	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {
+		const center = sketch.points.get(this.centerId);
+		const majorPt = sketch.points.get(this.majorAxisPointId);
+		const minorPt = sketch.points.get(this.minorAxisPointId);
+		if (!center || !majorPt || !minorPt) return null;
+
+		const sc = viewport.worldToScreen(center);
+		const smaj = viewport.worldToScreen(majorPt);
+		const smin = viewport.worldToScreen(minorPt);
+
+		const axisU = new Vec2().subVectors(smaj, sc);
+		const axisV = new Vec2().subVectors(smin, sc);
+
+		const r = sc.distancesTo(smaj, smin);
+		if (r.x < 1 || r.y < 1) return null;
+
+		const uHat = axisU.clone().multiplyScalar(1 / r.x);
+		const vHat = axisV.clone().multiplyScalar(1 / r.y);
+
+		const t = ellipseParameterAtPoint(screenPos, sc, r, uHat, vHat);
+		const snappedScreen = ellipsePointAtParameter(t, sc, r, uHat, vHat);
+		const dToPerimeter = screenPos.distanceTo(snappedScreen);
+		if (dToPerimeter >= maxDistPx) return null;
+
+		return {
+			type: 'ellipse',
+			id: this.id,
+			dist: dToPerimeter,
+			worldPos: viewport.screenToWorld(snappedScreen),
+			screenPos: snappedScreen,
+		};
+	}
+
+	drag(sketch: any, startWorld: Vec2, currentWorld: Vec2, initialPoints: ReadonlyMap<string, Vec2>): void {
+		translatePrimitivePoints(sketch, startWorld, currentWorld, initialPoints);
 	}
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({

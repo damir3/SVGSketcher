@@ -42,6 +42,10 @@ export class EllipticalArcEndpointsConstraint extends BaseConstraint {
 		return 2;
 	}
 
+	override isInternalConstraint(): boolean {
+		return true;
+	}
+
 	override evaluate(paramMap: Map<string, number>): number[] {
 		const center = readParamPoint(paramMap, this.centerId);
 		const p1 = readParamPoint(paramMap, this.majorAxisPointId);

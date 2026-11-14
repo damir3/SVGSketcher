@@ -62,6 +62,10 @@ export class BaseConstraint implements IConstraint {
 		return null;
 	}
 
+	isInternalConstraint(_sketch?: any): boolean {
+		return false;
+	}
+
 	get sidebarPanel(): ConstraintPanel {
 		const panel = this.createSidebarPanel();
 		Object.defineProperty(this, 'sidebarPanel', { value: panel });

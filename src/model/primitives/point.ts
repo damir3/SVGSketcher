@@ -35,6 +35,18 @@ export class SketchPoint extends Vec2 implements ISketchPrimitive {
 		return null;
 	}
 
+	getPointIds(_sketch?: any): string[] {
+		return [this.id];
+	}
+
+	snapTo(): null {
+		return null;
+	}
+
+	drag(sketch: any, _startWorld: Vec2, currentWorld: Vec2): void {
+		sketch.dragPoint(this.id, currentWorld.x, currentWorld.y);
+	}
+
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
 		title: () => this.id,
 		fields: [

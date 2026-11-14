@@ -195,6 +195,18 @@ export class DistanceConstraint extends BaseConstraint {
 		}
 	}
 
+	getLabelScreenPos(sketch: SketchDocument, viewport: Viewport): Vec2 | null {
+		if (this.p1Id === 'origin' || this.p2Id === 'origin') {
+			const userPtId = this.p1Id === 'origin' ? this.p2Id : this.p1Id;
+			const pt = sketch.points.get(userPtId);
+			return pt ? viewport.worldToScreen(pt) : null;
+		}
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
+		const midPoint = p1 && p2 ? new Vec2().midpoint(p1, p2) : new Vec2(0, 0);
+		return viewport.worldToScreen(midPoint);
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const axis = this.axisDimension();
 		if (axis) {

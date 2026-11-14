@@ -163,6 +163,11 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		}
 	}
 
+	getLabelScreenPos(sketch: SketchDocument, viewport: Viewport): Vec2 | null {
+		const pt = sketch.points.get(this.pointId);
+		return pt ? viewport.worldToScreen(pt) : null;
+	}
+
 	override render(ctx: ConstraintRenderContext): void {
 		const pt = this.displayPoint(ctx.sketch);
 		const p1 = ctx.sketch.points.get(this.lineP1Id);
