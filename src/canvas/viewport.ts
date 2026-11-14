@@ -10,11 +10,68 @@ export class Viewport {
 	zoom = DEFAULT_ZOOM; // Screen pixels per world unit
 
 	private resizeFrame?: { width: number; height: number; panX: number; panY: number; zoom: number };
+	private animationFrameId: number | null = null;
 
 	constructor(width = 800, height = 600) {
 		this.width = width;
 		this.height = height;
 		this.centerOrigin();
+	}
+
+	cancelAnimation(): void {
+		if (this.animationFrameId !== null) {
+			if (typeof cancelAnimationFrame !== 'undefined') {
+				cancelAnimationFrame(this.animationFrameId);
+			}
+			this.animationFrameId = null;
+		}
+	}
+
+	animateTo(targetPanX: number, targetPanY: number, targetZoom: number, duration = 700, onUpdate?: () => void): void {
+		this.cancelAnimation();
+
+		const startPan = new Vec2(this.panX, this.panY);
+		const startZoom = this.zoom;
+		const dPan = new Vec2(Math.abs(startPan.x - targetPanX), Math.abs(startPan.y - targetPanY));
+		const dZoom = Math.abs(startZoom - targetZoom);
+
+		if (
+			(dPan.x < 0.5 && dPan.y < 0.5 && dZoom < 0.001) ||
+			typeof requestAnimationFrame === 'undefined' ||
+			typeof performance === 'undefined'
+		) {
+			this.panX = targetPanX;
+			this.panY = targetPanY;
+			this.zoom = targetZoom;
+			onUpdate?.();
+			return;
+		}
+
+		const startTime = performance.now();
+		const easeInOut = (t: number, power: number) =>
+			t < 0.5 ? Math.pow(2 * t, power) / 2 : 1 - Math.pow(-2 * t + 2, power) / 2;
+
+		const step = (now: number) => {
+			const elapsed = now - startTime;
+			const progress = Math.min(1, Math.max(0, elapsed / duration));
+			const eased = easeInOut(progress, 3);
+
+			if (progress < 1) {
+				this.panX = startPan.x + (targetPanX - startPan.x) * eased;
+				this.panY = startPan.y + (targetPanY - startPan.y) * eased;
+				this.zoom = startZoom + (targetZoom - startZoom) * eased;
+				onUpdate?.();
+				this.animationFrameId = requestAnimationFrame(step);
+			} else {
+				this.panX = targetPanX;
+				this.panY = targetPanY;
+				this.zoom = targetZoom;
+				onUpdate?.();
+				this.animationFrameId = null;
+			}
+		};
+
+		this.animationFrameId = requestAnimationFrame(step);
 	}
 
 	resize(width: number, height: number): boolean {

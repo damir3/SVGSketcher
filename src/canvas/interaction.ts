@@ -3,28 +3,16 @@ import type { SketchSnapshot } from '../model/history';
 import { DEFAULT_ZOOM } from '../constants';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
-import {
-	LINE_DISTANCE_PX,
-	LABEL_DISTANCE_PX,
-	GIZMO_DISTANCE_PX,
-	POINT_DISTANCE_PX,
-	SNAP_GEOMETRY_DISTANCE_PX,
-	SNAP_GRID_DISTANCE_PX,
-	SNAP_POINT_DISTANCE_PX,
-} from './distances';
+import { LINE_DISTANCE_PX, LABEL_DISTANCE_PX, GIZMO_DISTANCE_PX, POINT_DISTANCE_PX } from './distances';
 import { ORIGIN, Vec2 } from '../math/vector';
-import { AABB, curveContainedInAABB } from '../math/aabb';
 import type { IConstraint } from '../solver/types';
 import {
 	DistanceConstraint,
 	RadiusConstraint,
 	AngleConstraint,
-	HorizontalConstraint,
-	VerticalConstraint,
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 	RectangularPatternConstraint,
-	computeRectangularPatternDirections,
 } from '../solver/constraints';
 import type {
 	ISketchPrimitive,
@@ -39,10 +27,16 @@ import type {
 } from '../model/types';
 import { showToast } from '../ui/toast';
 import type { GeoCurve } from '../math/intersection';
-import { calculateObjectsCentroid } from './tools/modify/utils';
 import { ImageTool } from './tools/modify/image';
 import { TransformTool } from './tools/modify/transform';
 import { HighlightManager } from './highlightManager';
+import {
+	applyAutoOrientation,
+	applySnapConstraint,
+	computeAxisSnappedWorldPos,
+	findSnapTarget,
+	isSplineHandleLineVisible,
+} from './snapping';
 
 import {
 	type ToolType,
@@ -531,88 +525,26 @@ export class CanvasInteraction {
 		this.updateToolPreview();
 	}
 
-	private animationFrameId: number | null = null;
-
 	cancelAnimation(): void {
-		if (this.animationFrameId !== null) {
-			if (typeof cancelAnimationFrame !== 'undefined') {
-				cancelAnimationFrame(this.animationFrameId);
-			}
-			this.animationFrameId = null;
-		}
+		this.viewport?.cancelAnimation?.();
 	}
 
 	animateViewportTo(targetPanX: number, targetPanY: number, targetZoom: number, duration = 700): void {
-		this.cancelAnimation();
-
-		const startPan = new Vec2(this.viewport.panX, this.viewport.panY);
-		const startZoom = this.viewport.zoom;
-
-		const dPan = new Vec2(Math.abs(startPan.x - targetPanX), Math.abs(startPan.y - targetPanY));
-		const dZoom = Math.abs(startZoom - targetZoom);
-
-		if (dPan.x < 0.5 && dPan.y < 0.5 && dZoom < 0.001) {
-			this.viewport.panX = targetPanX;
-			this.viewport.panY = targetPanY;
-			this.viewport.zoom = targetZoom;
+		this.viewport.animateTo(targetPanX, targetPanY, targetZoom, duration, () => {
 			this.render();
 			this.onViewportChange?.();
-			return;
-		}
-
-		if (typeof requestAnimationFrame === 'undefined' || typeof performance === 'undefined') {
-			this.viewport.panX = targetPanX;
-			this.viewport.panY = targetPanY;
-			this.viewport.zoom = targetZoom;
-			this.render();
-			this.onViewportChange?.();
-			return;
-		}
-
-		const startTime = performance.now();
-		const easeInOut = (t: number, power: number) => {
-			return t < 0.5 ? Math.pow(2 * t, power) / 2 : 1 - Math.pow(-2 * t + 2, power) / 2;
-		};
-
-		const step = (now: number) => {
-			const elapsed = now - startTime;
-			const progress = Math.min(1, Math.max(0, elapsed / duration));
-			const eased = easeInOut(progress, 3); // cubic ease-in-out
-
-			this.viewport.panX = startPan.x + (targetPanX - startPan.x) * eased;
-			this.viewport.panY = startPan.y + (targetPanY - startPan.y) * eased;
-			this.viewport.zoom = startZoom + (targetZoom - startZoom) * eased;
-
-			this.render();
-			this.onViewportChange?.();
-
-			if (progress < 1) {
-				this.animationFrameId = requestAnimationFrame(step);
-			} else {
-				this.viewport.panX = targetPanX;
-				this.viewport.panY = targetPanY;
-				this.viewport.zoom = targetZoom;
-				this.render();
-				this.onViewportChange?.();
-				this.animationFrameId = null;
-			}
-		};
-
-		this.animationFrameId = requestAnimationFrame(step);
+		});
 	}
 
 	fitToView(smooth = true): void {
 		const bbox = this.sketch.getSelectionBoundingBox() ?? this.sketch.getBoundingBox();
-		let target: { panX: number; panY: number; zoom: number };
-		if (bbox) {
-			target = this.viewport.getTargetFit(bbox);
-		} else {
-			target = {
-				panX: this.viewport.width / 2,
-				panY: this.viewport.height / 2,
-				zoom: DEFAULT_ZOOM,
-			};
-		}
+		const target = bbox
+			? this.viewport.getTargetFit(bbox)
+			: {
+					panX: this.viewport.width / 2,
+					panY: this.viewport.height / 2,
+					zoom: DEFAULT_ZOOM,
+				};
 
 		if (!smooth || typeof requestAnimationFrame === 'undefined') {
 			this.cancelAnimation();
@@ -727,17 +659,7 @@ export class CanvasInteraction {
 				return;
 			case 'Enter':
 			case 'NumpadEnter':
-				if (
-					(this.activeTool === 'fillet' ||
-						this.activeTool === 'chamfer' ||
-						this.activeTool === 'polygon' ||
-						this.activeTool === 'arc' ||
-						this.activeTool === 'ellipse' ||
-						this.activeTool === 'line' ||
-						this.activeTool === 'spline' ||
-						this.activeTool === 'text') &&
-					tool?.onKeyDown?.(e)
-				) {
+				if (tool?.onKeyDown?.(e)) {
 					return;
 				}
 				if (this.activeToolInstance?.isBusy?.()) {
@@ -773,302 +695,21 @@ export class CanvasInteraction {
 	}
 
 	findSnap(screenPos: Vec2, excludePointId?: string, allowGrid = true): SnapResult | null {
-		// Suppress all snapping if snap modifier is held (metaKey on Mac, ctrlKey on Windows)
-		if (this.isSnapModifierPressed) {
-			return null;
-		}
-
-		// Priority 1: Point snapping (Always active, highest priority)
-		const pointSnapDistPx = SNAP_POINT_DISTANCE_PX;
-		let closestPointDist = pointSnapDistPx;
-		let foundPoint: { id: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
-
-		// A dragged spline point can move its own handles, so they cannot be snap targets.
-		const excludedSplineIds = new Set<string>();
-		const excludedHandleLineIds = new Set<string>();
-		const excludedHandlePointIds = new Set<string>();
-		if (excludePointId) {
-			for (const spline of this.sketch.splines.values()) {
-				const handles = (spline.tangentLineIds ?? []).map(id => this.sketch.lines.get(id));
-				if (
-					!spline.pointIds.includes(excludePointId) &&
-					!handles.some(line => line?.p1Id === excludePointId || line?.p2Id === excludePointId)
-				) {
-					continue;
-				}
-				excludedSplineIds.add(spline.id);
-				for (const line of handles) {
-					if (!line) continue;
-					excludedHandleLineIds.add(line.id);
-					if (spline.splineType === 'fit') {
-						excludedHandlePointIds.add(line.p1Id);
-						excludedHandlePointIds.add(line.p2Id);
-					}
-				}
-			}
-		}
-
-		const selectedSplineIds = new Set<string>(this.sketch.selection.splineIds);
-		for (const spline of this.sketch.splines.values()) {
-			if (spline.pointIds.some(pid => this.sketch.selection.pointIds.has(pid))) {
-				selectedSplineIds.add(spline.id);
-			}
-			if (spline.tangentLineIds) {
-				for (const lid of spline.tangentLineIds) {
-					const line = this.sketch.lines.get(lid);
-					if (
-						line &&
-						(this.sketch.selection.lineIds.has(lid) ||
-							this.sketch.selection.pointIds.has(line.p1Id) ||
-							this.sketch.selection.pointIds.has(line.p2Id))
-					) {
-						selectedSplineIds.add(spline.id);
-					}
-				}
-			}
-		}
-
-		for (const pt of this.sketch.points.values()) {
-			if (pt.id === excludePointId || excludedHandlePointIds.has(pt.id)) continue;
-			// If point belongs to a spline handle or control polygon, only snap if spline is selected or constraint tool active
-			let isHiddenSplinePoint = false;
-			for (const spline of this.sketch.splines.values()) {
-				if (!selectedSplineIds.has(spline.id) && !isConstraintTool(this.activeTool)) {
-					if (spline.splineType === 'control') {
-						const isEndpoint = pt.id === spline.pointIds[0] || pt.id === spline.pointIds[spline.pointIds.length - 1];
-						if (!isEndpoint && spline.pointIds.includes(pt.id)) {
-							isHiddenSplinePoint = true;
-							break;
-						}
-					}
-					if (spline.tangentLineIds && spline.splineType !== 'control') {
-						for (const lid of spline.tangentLineIds) {
-							const l = this.sketch.lines.get(lid);
-							if (l && (l.p1Id === pt.id || l.p2Id === pt.id)) {
-								isHiddenSplinePoint = true;
-								break;
-							}
-						}
-					}
-				}
-				if (isHiddenSplinePoint) break;
-			}
-			if (isHiddenSplinePoint) continue;
-
-			const s = this.viewport.worldToScreen(pt);
-			const d = screenPos.distanceTo(s);
-			if (d < closestPointDist) {
-				closestPointDist = d;
-				foundPoint = { id: pt.id, worldPos: pt.clone(), screenPos: s };
-			}
-		}
-
-		if (excludePointId !== 'origin') {
-			const sOrigin = this.viewport.worldToScreen(ORIGIN);
-			const dOrigin = screenPos.distanceTo(sOrigin);
-			if (dOrigin < closestPointDist) {
-				closestPointDist = dOrigin;
-				foundPoint = { id: 'origin', worldPos: new Vec2(0, 0), screenPos: sOrigin };
-			}
-		}
-
-		if (foundPoint) {
-			return {
-				type: 'point',
-				id: foundPoint.id,
-				worldPos: foundPoint.worldPos,
-				screenPos: foundPoint.screenPos,
-			};
-		}
-
-		// Priority 2: Line, Circle/Arc, Ellipse & Spline snapping
-		const geomSnapDistPx = SNAP_GEOMETRY_DISTANCE_PX;
-		let closestGeomDist = geomSnapDistPx;
-		let foundGeom: {
-			type: 'line' | 'circle' | 'ellipse' | 'spline';
-			id: string;
-			worldPos: Vec2;
-			screenPos: Vec2;
-		} | null = null;
-
-		for (const prim of this.sketch.getCurvePrimitives()) {
-			if (prim.type === 'spline') {
-				if (excludedSplineIds.has(prim.id)) continue;
-			} else if (excludePointId && prim.getPointIds().includes(excludePointId)) {
-				continue;
-			}
-			if (prim.type === 'line') {
-				const line = prim as SketchLine;
-				if (excludedHandleLineIds.has(line.id)) continue;
-				if (line.isSplineHandle) {
-					const parentSpline = line.parentSplineId ? this.sketch.splines.get(line.parentSplineId) : undefined;
-					const isParentSelected = parentSpline && selectedSplineIds.has(parentSpline.id);
-					if (!isParentSelected && !this.sketch.selection.lineIds.has(line.id) && !isConstraintTool(this.activeTool)) {
-						continue;
-					}
-				}
-			}
-
-			const snap = prim.snapTo(screenPos, this.sketch, this.viewport, closestGeomDist, geomSnapDistPx);
-			if (snap && snap.dist < closestGeomDist) {
-				closestGeomDist = snap.dist;
-				foundGeom = snap;
-			}
-		}
-
-		if (foundGeom) {
-			return {
-				type: foundGeom.type,
-				id: foundGeom.id,
-				worldPos: foundGeom.worldPos,
-				screenPos: foundGeom.screenPos,
-			};
-		}
-
-		// Priority 3: Coordinate axes & grid snapping
-		if (!this.isSnappingEnabled || !allowGrid) {
-			return null;
-		}
-
-		const sOrigin = this.viewport.worldToScreen(ORIGIN);
-		const dAxisX = Math.abs(screenPos.y - sOrigin.y);
-		const dAxisY = Math.abs(screenPos.x - sOrigin.x);
-
-		const world = this.viewport.screenToWorld(screenPos);
-		const { step, subStep } = this.viewport.getGridStep();
-		const subStepPx = subStep * this.viewport.zoom;
-		const gridStep = subStepPx >= 6 ? subStep : step;
-		const nearestWorld = new Vec2(
-			this.cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep),
-			this.cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep)
-		);
-		const nearestScreen = this.viewport.worldToScreen(nearestWorld);
-
-		if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
-			const snapToGrid = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX;
-			const snapX = snapToGrid ? nearestWorld.x : world.x;
-			const snapScreenX = snapToGrid ? nearestScreen.x : screenPos.x;
-			return {
-				type: 'line',
-				id: 'axis_x',
-				worldPos: new Vec2(snapX, 0),
-				screenPos: new Vec2(snapScreenX, sOrigin.y),
-			};
-		}
-
-		if (dAxisY < geomSnapDistPx) {
-			const snapToGrid = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX;
-			const snapY = snapToGrid ? nearestWorld.y : world.y;
-			const snapScreenY = snapToGrid ? nearestScreen.y : screenPos.y;
-			return {
-				type: 'line',
-				id: 'axis_y',
-				worldPos: new Vec2(0, snapY),
-				screenPos: new Vec2(sOrigin.x, snapScreenY),
-			};
-		}
-
-		if (screenPos.distanceTo(nearestScreen) <= SNAP_GRID_DISTANCE_PX) {
-			return {
-				type: 'grid',
-				worldPos: nearestWorld,
-				screenPos: nearestScreen,
-			};
-		}
-
-		return null;
-	}
-
-	private cleanGridCoordinate(val: number, step: number): number {
-		const stepStr = step.toString();
-		const decimalIdx = stepStr.indexOf('.');
-		const decimals = decimalIdx >= 0 ? Math.min(stepStr.length - decimalIdx - 1 + 4, 10) : 4;
-		return parseFloat(val.toFixed(decimals));
+		return findSnapTarget(this.sketch, this.viewport, screenPos, {
+			activeTool: this.activeTool,
+			isSnapModifierPressed: this.isSnapModifierPressed,
+			isSnappingEnabled: this.isSnappingEnabled,
+			excludePointId,
+			allowGrid,
+		});
 	}
 
 	private applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void {
-		if (!snap || !snap.id) return;
-		if (snap.type === 'point' && snap.id !== pointId) {
-			if (snap.id === 'origin') {
-				const c = this.sketch.addOriginCoincidentConstraint(pointId);
-				if (c) {
-					showToast('Coincident with origin applied');
-				}
-			} else {
-				const c = this.sketch.addCoincidentConstraint(pointId, snap.id);
-				if (c) {
-					showToast('Coincident constraint applied');
-				}
-			}
-		} else if (snap.type === 'line') {
-			if (snap.id === 'axis_x' || snap.id === 'axis_y') {
-				const axis = snap.id === 'axis_x' ? 'x' : 'y';
-				const c = this.sketch.addPointOnAxisConstraint(pointId, axis);
-				if (c) {
-					showToast(`Point constrained to ${axis.toUpperCase()}-axis`);
-				}
-			} else {
-				const c = this.sketch.addPointOnLineConstraint(pointId, snap.id);
-				if (c) {
-					showToast('Point constrained to line');
-				}
-			}
-		} else if (snap.type === 'circle') {
-			const c = this.sketch.addPointOnCircleConstraint(pointId, snap.id);
-			if (c) {
-				showToast('Point constrained to circle');
-			}
-		} else if (snap.type === 'ellipse') {
-			const isArc = this.sketch.ellipticalArcs.has(snap.id);
-			const c = this.sketch.addPointOnEllipseConstraint(pointId, snap.id);
-			if (c) {
-				showToast(isArc ? 'Point constrained to elliptical arc' : 'Point constrained to ellipse');
-			}
-		} else if (snap.type === 'spline') {
-			const c = this.sketch.addPointOnSplineConstraint(pointId, snap.id);
-			if (c) {
-				showToast('Point constrained to spline');
-			}
-		}
+		applySnapConstraint(this.sketch, pointId, snap);
 	}
 
 	private applyAutoOrientationConstraint(p1Id: string, p2Id: string): void {
-		const p1 = this.sketch.getPoint(p1Id);
-		const p2 = this.sketch.getPoint(p2Id);
-		if (!p1 || !p2) return;
-
-		const dir = new Vec2().subVectors(p2, p1);
-		if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) return;
-
-		const angleDeg = dir.angleToXAxisDeg();
-
-		// Horizontal check
-		if (angleDeg < 1.0) {
-			const alreadyHoriz = [...this.sketch.constraints.values()].some(
-				c =>
-					c instanceof HorizontalConstraint &&
-					((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
-			);
-			if (!alreadyHoriz) {
-				this.sketch.addHorizontalConstraint(p1Id, p2Id);
-				showToast('Horizontal constraint applied');
-			}
-			return;
-		}
-
-		// Vertical check
-		if (90 - angleDeg < 1.0) {
-			const alreadyVert = [...this.sketch.constraints.values()].some(
-				c =>
-					c instanceof VerticalConstraint &&
-					((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
-			);
-			if (!alreadyVert) {
-				this.sketch.addVerticalConstraint(p1Id, p2Id);
-				showToast('Vertical constraint applied');
-			}
-			return;
-		}
+		applyAutoOrientation(this.sketch, p1Id, p2Id);
 	}
 
 	private getAxisSnappedWorldPos(
@@ -1076,35 +717,7 @@ export class CanvasInteraction {
 		targetPos: Vec2,
 		snap: SnapResult | null
 	): { pos: Vec2; axis: 'horizontal' | 'vertical' | null } {
-		if (this.isSnapModifierPressed) {
-			return { pos: targetPos, axis: null };
-		}
-		if (snap) {
-			return { pos: targetPos, axis: null };
-		}
-
-		const dir = new Vec2().subVectors(targetPos, startPos);
-		if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) {
-			return { pos: targetPos, axis: null };
-		}
-
-		const angleDeg = dir.angleToXAxisDeg();
-
-		if (angleDeg < 1.0) {
-			return {
-				pos: new Vec2(targetPos.x, startPos.y),
-				axis: 'horizontal',
-			};
-		}
-
-		if (90 - angleDeg < 1.0) {
-			return {
-				pos: new Vec2(startPos.x, targetPos.y),
-				axis: 'vertical',
-			};
-		}
-
-		return { pos: targetPos, axis: null };
+		return computeAxisSnappedWorldPos(startPos, targetPos, snap, this.isSnapModifierPressed);
 	}
 
 	findPointNear(screen: Vec2, thresholdPx = POINT_DISTANCE_PX, excludePointId?: string): SketchPoint | null {
@@ -1137,21 +750,9 @@ export class CanvasInteraction {
 		let foundLine: SketchLine | null = null;
 
 		for (const line of this.sketch.lines.values()) {
-			if (line.isSplineHandle) {
-				const parentSpline = line.parentSplineId ? this.sketch.splines.get(line.parentSplineId) : undefined;
-				const isParentSelected =
-					parentSpline &&
-					(this.sketch.selection.splineIds.has(parentSpline.id) ||
-						parentSpline.pointIds.some(pid => this.sketch.selection.pointIds.has(pid)));
-				const isHandleActive =
-					this.sketch.selection.lineIds.has(line.id) ||
-					this.sketch.selection.pointIds.has(line.p1Id) ||
-					this.sketch.selection.pointIds.has(line.p2Id);
-				if (!isParentSelected && !isHandleActive && !isConstraintTool(this.activeTool)) {
-					continue;
-				}
+			if (!isSplineHandleLineVisible(this.sketch, line, this.activeTool)) {
+				continue;
 			}
-
 			const d = line.distanceTo(screen, this.sketch, this.viewport, closestDist);
 			if (d !== null && d < closestDist) {
 				closestDist = d;
@@ -1334,17 +935,10 @@ export class CanvasInteraction {
 		const textDragGizmo = this.renderer.textDragGizmo;
 		if (textDragGizmo && screen.distanceTo(textDragGizmo.centerScreen) <= 15) {
 			const text = this.sketch.texts.get(textDragGizmo.textId);
-			const initialPoints = new Map<string, Vec2>();
-			if (text?.rectanglePointIds) {
-				for (const pid of text.rectanglePointIds) {
-					const pt = this.sketch.points.get(pid);
-					if (pt) initialPoints.set(pid, pt.clone());
-				}
-			}
 			this.textDragState = {
 				textId: textDragGizmo.textId,
 				startWorld: world,
-				initialPoints,
+				initialPoints: text ? text.captureRectanglePoints(this.sketch) : new Map(),
 			};
 			this.sketch.beginTransaction();
 			return;
@@ -1352,46 +946,15 @@ export class CanvasInteraction {
 
 		// Check for Rectangular Pattern Gizmo handle dragging (in select mode on selected pattern constraint)
 		for (const handle of this.renderer.rectangularGizmoHandles.values()) {
-			if (screen.distanceTo(handle) <= GIZMO_DISTANCE_PX) {
-				let centroidWorld: Vec2 | null = null;
-				let u: Vec2 | null = null;
-				let startDistance = 0;
-				if (handle.constraintId) {
-					const constraint = this.sketch.constraints.get(handle.constraintId) as
-						| RectangularPatternConstraint
-						| undefined;
-					if (constraint && constraint.type === 'rectangular_pattern') {
-						startDistance = handle.axis === 1 ? constraint.distance1 : constraint.distance2;
-						const paramMap = new Map<string, number>();
-						for (const [pid, pt] of this.sketch.points.entries()) {
-							paramMap.set(`${pid}.x`, pt.x);
-							paramMap.set(`${pid}.y`, pt.y);
-						}
-						const line1 = constraint.line1Id ? this.sketch.lines.get(constraint.line1Id) : null;
-						const line2 = constraint.line2Id ? this.sketch.lines.get(constraint.line2Id) : null;
-						const dirs = computeRectangularPatternDirections(
-							paramMap,
-							line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-							line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-						);
-						u = handle.axis === 1 ? dirs.u1 : dirs.u2;
-						centroidWorld = calculateObjectsCentroid(this.sketch, constraint.sourceObjectIds);
-					}
-				}
-
-				if (centroidWorld && u) {
-					if (handle.constraintId) {
+			if (screen.distanceTo(handle) <= GIZMO_DISTANCE_PX && handle.constraintId) {
+				const constraint = this.sketch.constraints.get(handle.constraintId);
+				if (constraint instanceof RectangularPatternConstraint) {
+					const dragState = constraint.createGizmoDragState(this.sketch, handle.axis, world);
+					if (dragState) {
 						this.sketch.selectEntity(handle.constraintId, 'constraint', false);
+						this.gizmoDragState = dragState;
+						return;
 					}
-					this.gizmoDragState = {
-						axis: handle.axis,
-						startMouseWorld: world,
-						centroidWorld,
-						u,
-						startDistance,
-						constraintId: handle.constraintId,
-					};
-					return;
 				}
 			}
 		}
@@ -1565,35 +1128,13 @@ export class CanvasInteraction {
 
 		// Gizmo drag handling (Rectangular pattern distance1 / distance2 in select mode)
 		if (this.gizmoDragState) {
-			const { axis, centroidWorld, u, startMouseWorld, startDistance, constraintId } = this.gizmoDragState;
-			const startProj = new Vec2().subVectors(startMouseWorld, centroidWorld).dot(u);
-			const currentProj = new Vec2().subVectors(world, centroidWorld).dot(u);
-			const delta = currentProj - startProj;
-			let newDist = startDistance + delta;
-			if (Math.abs(newDist) < 0.25) {
-				newDist = 0;
-			} else {
-				newDist = Math.round(newDist * 2) / 2;
-			}
-
-			if (constraintId) {
-				const constraint = this.sketch.constraints.get(constraintId) as RectangularPatternConstraint | undefined;
-				if (constraint && constraint.type === 'rectangular_pattern') {
-					if (axis === 1) {
-						if (constraint.distance1 !== newDist) {
-							this.sketch.updateRectangularPattern(constraintId, {
-								distance1: newDist,
-							});
-						}
-					} else {
-						if (constraint.distance2 !== newDist) {
-							this.sketch.updateRectangularPattern(constraintId, {
-								distance2: newDist,
-							});
-						}
-					}
-					this.render();
-				}
+			const { constraintId } = this.gizmoDragState;
+			const constraint = constraintId ? this.sketch.constraints.get(constraintId) : undefined;
+			if (
+				constraint instanceof RectangularPatternConstraint &&
+				constraint.applyGizmoDrag(this.sketch, this.gizmoDragState, world)
+			) {
+				this.render();
 			}
 			return;
 		}
@@ -1601,52 +1142,24 @@ export class CanvasInteraction {
 		// Text Rotation Gizmo drag handling
 		if (this.textRotationDragState) {
 			const text = this.sketch.texts.get(this.textRotationDragState.textId);
-			if (text && text.rectanglePointIds) {
-				const c = this.textRotationDragState.centerWorld;
-				const mouseAngle = c.angleToPoint(world);
-				const targetAngle = mouseAngle - Math.PI / 2;
-
-				const corners = text.getRectangleCorners(this.sketch);
-				if (corners) {
-					const [p0, p1, p2, p3] = corners;
-					const currentAngle = p0.angleToPoint(p1);
-					const deltaAngle = targetAngle - currentAngle;
-
-					const pt0 = this.sketch.points.get(text.rectanglePointIds[0]);
-					const pt1 = this.sketch.points.get(text.rectanglePointIds[1]);
-					const pt2 = this.sketch.points.get(text.rectanglePointIds[2]);
-					const pt3 = this.sketch.points.get(text.rectanglePointIds[3]);
-
-					if (pt0 && pt1 && pt2 && pt3) {
-						const np0 = p0.clone().rotateAround(c, deltaAngle);
-						const np1 = p1.clone().rotateAround(c, deltaAngle);
-						const np2 = p2.clone().rotateAround(c, deltaAngle);
-						const np3 = p3.clone().rotateAround(c, deltaAngle);
-
-						pt0.copy(np0);
-						pt1.copy(np1);
-						pt2.copy(np2);
-						pt3.copy(np3);
-
-						this.sketch.solve();
-						this.render();
-						return;
-					}
-				}
+			if (text?.rotateRectangleTo(this.sketch, this.textRotationDragState.centerWorld, world)) {
+				this.render();
 			}
 			return;
 		}
 
 		// Text Center Drag Gizmo handling
 		if (this.textDragState) {
-			const dir = new Vec2().subVectors(world, this.textDragState.startWorld);
-			for (const [pid, initPos] of this.textDragState.initialPoints) {
-				const pt = this.sketch.points.get(pid);
-				if (pt) {
-					pt.addVectors(initPos, dir);
+			const text = this.sketch.texts.get(this.textDragState.textId);
+			if (text) {
+				text.translateRectangle(this.sketch, this.textDragState.startWorld, world, this.textDragState.initialPoints);
+			} else {
+				const dir = new Vec2().subVectors(world, this.textDragState.startWorld);
+				for (const [pid, initPos] of this.textDragState.initialPoints) {
+					this.sketch.points.get(pid)?.addVectors(initPos, dir);
 				}
+				this.sketch.solve();
 			}
-			this.sketch.solve();
 			this.render();
 			return;
 		}
@@ -1915,94 +1428,17 @@ export class CanvasInteraction {
 	}
 
 	private triggerDimensionEditAt(e: MouseEvent, screen: Vec2, clientPos: Vec2): boolean {
-		const target = e.target as SVGElement;
-		const targetG = target.closest('[data-id]') as SVGElement | null;
-		let id = targetG?.getAttribute('data-id');
-		let type = targetG?.getAttribute('data-type');
-
-		// If target didn't resolve to a line, circle, arc, or constraint, use geometric hit test
-		if (!type || (type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'constraint')) {
-			const hitConstraint = this.findConstraintNear(screen);
-			if (hitConstraint) {
-				id = hitConstraint.id;
-				type = 'constraint';
-			} else {
-				const hitLine = this.findLineNear(screen);
-				if (hitLine) {
-					id = hitLine.id;
-					type = 'line';
-				} else {
-					const hitCircle = this.findCircleNear(screen);
-					if (hitCircle) {
-						id = hitCircle.id;
-						type = 'circle';
-					} else {
-						const hitArc = this.findArcNear(screen);
-						if (hitArc) {
-							id = hitArc.id;
-							type = 'arc';
-						}
-					}
-				}
-			}
-		}
-
-		if (!id || !type) return false;
-
-		if (type === 'constraint') {
-			const constraint = this.sketch.constraints.get(id);
-			if (constraint?.moveLabelTo && this.onEditDimension) {
-				this.sketch.selectEntity(constraint.id, 'constraint', false);
-				this.render();
-				this.onEditDimension(constraint as any, clientPos);
-				return true;
-			}
-		} else if (type === 'line') {
-			const line = this.sketch.lines.get(id);
-			if (line) {
-				let distConstraint = [...this.sketch.constraints.values()].find(
-					c =>
-						c instanceof DistanceConstraint &&
-						((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
-				) as DistanceConstraint | undefined;
-
-				if (!distConstraint) {
-					distConstraint = this.sketch.addDistanceConstraint(line.p1Id, line.p2Id) ?? undefined;
-				}
-
-				if (distConstraint && this.onEditDimension) {
-					this.sketch.selectEntity(distConstraint.id, 'constraint', false);
-					this.render();
-					this.onEditDimension(distConstraint, clientPos);
-					return true;
-				}
-			}
-		} else if (type === 'circle' || type === 'arc') {
-			const entity = this.sketch.circles.get(id) ?? this.sketch.arcs.get(id);
-			if (entity) {
-				const radConstraint = [...this.sketch.constraints.values()].find(
-					(c): c is RadiusConstraint => c instanceof RadiusConstraint && c.circleId === entity.id
-				);
-
-				if (!radConstraint) {
-					this.sketch.clearSelection();
-					this.setTool('dimension');
-					if (this.activeToolInstance instanceof DimensionTool) {
-						this.activeToolInstance.beginRadiusPlacement(entity.id, true);
-						return true;
-					}
-				}
-
-				if (radConstraint && this.onEditDimension) {
-					this.sketch.selectEntity(radConstraint.id, 'constraint', false);
-					this.render();
-					this.onEditDimension(radConstraint, clientPos);
-					return true;
-				}
-			}
-		}
-
-		return false;
+		return SelectTool.triggerDimensionEditAt(e, screen, clientPos, {
+			sketch: this.sketch,
+			findConstraintNear: s => this.findConstraintNear(s),
+			findLineNear: s => this.findLineNear(s),
+			findCircleNear: s => this.findCircleNear(s),
+			findArcNear: s => this.findArcNear(s),
+			onEditDimension: this.onEditDimension,
+			setTool: tool => this.setTool(tool),
+			getActiveToolInstance: () => this.activeToolInstance,
+			render: () => this.render(),
+		});
 	}
 
 	private tryHandleDoubleClickAt(e: MouseEvent, screen: Vec2, clientPos: Vec2, now: number): boolean {
@@ -2093,54 +1529,7 @@ export class CanvasInteraction {
 	}
 
 	private finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {
-		const w1 = this.viewport.screenToWorld(s1);
-		const w2 = this.viewport.screenToWorld(s2);
-
-		const bounds = AABB.fromPoints([w1, w2])!;
-		const { min, max } = bounds;
-		const crossing = s2.x < s1.x;
-		const matches = (entity: {
-			intersectsAABB(min: Vec2, max: Vec2, sketch: SketchDocument): boolean;
-			toGeoCurve(sketch: SketchDocument): GeoCurve | null;
-		}): boolean => {
-			if (crossing) return entity.intersectsAABB(min, max, this.sketch);
-			const curve = entity.toGeoCurve(this.sketch);
-			return curve !== null && curveContainedInAABB(curve, min, max);
-		};
-
-		const itemsToSelect: Array<{
-			id: string;
-			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
-		}> = [];
-
 		const tool = this.activeToolInstance ?? this.tools?.get(this.activeTool);
-		const hasToolBoxSelect =
-			Boolean(tool?.handleBoxSelect) ||
-			this.activeTool === 'mirror' ||
-			this.activeTool === 'circular_pattern' ||
-			this.activeTool === 'rectangular_pattern';
-
-		// 1. Points
-		for (const pt of this.sketch.points.values()) {
-			if (hasToolBoxSelect && this.sketch.isSplineHandlePoint(pt.id)) continue;
-			if (pt.intersectsAABB(min, max, this.sketch)) {
-				itemsToSelect.push({ id: pt.id, type: 'point' });
-			}
-		}
-
-		// 2. Curves
-		for (const prim of this.sketch.getCurvePrimitives()) {
-			if (hasToolBoxSelect && prim.type === 'line' && (prim as SketchLine).isSplineHandle) continue;
-			if (matches(prim)) {
-				itemsToSelect.push({ id: prim.id, type: prim.type });
-			}
-		}
-
-		if (tool?.handleBoxSelect) {
-			tool.handleBoxSelect(itemsToSelect);
-			return;
-		}
-
-		this.sketch.selectEntities(itemsToSelect, this.activeTool === 'transform' ? 'toggle' : shiftKey);
+		SelectTool.performBoxSelection(this.sketch, this.viewport, s1, s2, shiftKey, this.activeTool, tool);
 	}
 }

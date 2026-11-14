@@ -263,59 +263,24 @@ export class TextTool extends BaseTool {
 
 	private handleCenterDragMove(currentWorld: Vec2): void {
 		if (!this.dragStartWorld || this.dragInitialPoints.size === 0) return;
-		const dir = new Vec2().subVectors(currentWorld, this.dragStartWorld);
-
-		for (const [pid, initPos] of this.dragInitialPoints) {
-			const pt = this.ctx.sketch.points.get(pid);
-			if (pt) {
-				pt.x = initPos.x + dir.x;
-				pt.y = initPos.y + dir.y;
+		const text = this.dragTextId ? this.ctx.sketch.texts.get(this.dragTextId) : undefined;
+		if (text) {
+			text.translateRectangle(this.ctx.sketch, this.dragStartWorld, currentWorld, this.dragInitialPoints);
+		} else {
+			const dir = new Vec2().subVectors(currentWorld, this.dragStartWorld);
+			for (const [pid, initPos] of this.dragInitialPoints) {
+				const pt = this.ctx.sketch.points.get(pid);
+				if (pt) pt.addVectors(initPos, dir);
 			}
+			this.ctx.sketch.solve();
 		}
-
-		this.ctx.sketch.solve();
 		this.ctx.requestRender();
 	}
 
 	private handleRotationMove(mouseWorld: Vec2): void {
 		if (!this.rotationTextId || !this.rotationCenter) return;
 		const text = this.ctx.sketch.texts.get(this.rotationTextId);
-		if (!text || !text.rectanglePointIds) return;
-
-		const corners = text.getRectangleCorners(this.ctx.sketch);
-		if (!corners) return;
-		const [p0, p1, p2, p3] = corners;
-
-		const c = this.rotationCenter;
-		// Target angle of mouse relative to center
-		const mouseAngle = c.angleToPoint(mouseWorld);
-		// In unrotated rectangle, top center handle is at angle +PI/2
-		const targetAngle = mouseAngle - Math.PI / 2;
-
-		const currentAngle = p0.angleToPoint(p1);
-		const deltaAngle = targetAngle - currentAngle;
-
-		const pt0 = this.ctx.sketch.points.get(text.rectanglePointIds[0]);
-		const pt1 = this.ctx.sketch.points.get(text.rectanglePointIds[1]);
-		const pt2 = this.ctx.sketch.points.get(text.rectanglePointIds[2]);
-		const pt3 = this.ctx.sketch.points.get(text.rectanglePointIds[3]);
-
-		if (pt0 && pt1 && pt2 && pt3) {
-			const np0 = p0.clone().rotateAround(c, deltaAngle);
-			const np1 = p1.clone().rotateAround(c, deltaAngle);
-			const np2 = p2.clone().rotateAround(c, deltaAngle);
-			const np3 = p3.clone().rotateAround(c, deltaAngle);
-
-			pt0.x = np0.x;
-			pt0.y = np0.y;
-			pt1.x = np1.x;
-			pt1.y = np1.y;
-			pt2.x = np2.x;
-			pt2.y = np2.y;
-			pt3.x = np3.x;
-			pt3.y = np3.y;
-
-			this.ctx.sketch.solve();
+		if (text?.rotateRectangleTo(this.ctx.sketch, this.rotationCenter, mouseWorld)) {
 			this.ctx.requestRender();
 		}
 	}

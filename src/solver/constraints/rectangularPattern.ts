@@ -615,4 +615,70 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			],
 		});
 	}
+
+	createGizmoDragState(
+		sketch: import('../../model/sketch').SketchDocument,
+		axis: 1 | 2,
+		startMouseWorld: Vec2
+	): {
+		axis: 1 | 2;
+		startMouseWorld: Vec2;
+		centroidWorld: Vec2;
+		u: Vec2;
+		startDistance: number;
+		constraintId: string;
+	} | null {
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of sketch.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const line1 = this.line1Id ? sketch.lines.get(this.line1Id) : null;
+		const line2 = this.line2Id ? sketch.lines.get(this.line2Id) : null;
+		const dirs = computeRectangularPatternDirections(
+			paramMap,
+			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+		);
+		const u = axis === 1 ? dirs.u1 : dirs.u2;
+		const centroidWorld = calculateObjectsCentroid(sketch, this.sourceObjectIds);
+		if (!centroidWorld || !u) return null;
+		return {
+			axis,
+			startMouseWorld,
+			centroidWorld,
+			u,
+			startDistance: axis === 1 ? this.distance1 : this.distance2,
+			constraintId: this.id,
+		};
+	}
+
+	applyGizmoDrag(
+		sketch: import('../../model/sketch').SketchDocument,
+		state: {
+			axis: 1 | 2;
+			startMouseWorld: Vec2;
+			centroidWorld: Vec2;
+			u: Vec2;
+			startDistance: number;
+		},
+		world: Vec2
+	): boolean {
+		const { axis, centroidWorld, u, startMouseWorld, startDistance } = state;
+		const startProj = new Vec2().subVectors(startMouseWorld, centroidWorld).dot(u);
+		const currentProj = new Vec2().subVectors(world, centroidWorld).dot(u);
+		let newDist = startDistance + (currentProj - startProj);
+		newDist = Math.abs(newDist) < 0.25 ? 0 : Math.round(newDist * 2) / 2;
+
+		if (axis === 1) {
+			if (this.distance1 !== newDist) {
+				sketch.updateRectangularPattern(this.id, { distance1: newDist });
+			}
+		} else {
+			if (this.distance2 !== newDist) {
+				sketch.updateRectangularPattern(this.id, { distance2: newDist });
+			}
+		}
+		return true;
+	}
 }

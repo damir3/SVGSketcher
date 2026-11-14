@@ -115,6 +115,54 @@ export class SketchText implements IInspectable {
 		return [p0.clone(), p1.clone(), p2.clone(), p3.clone()];
 	}
 
+	captureRectanglePoints(sketch: SketchDocument): Map<string, Vec2> {
+		const initialPoints = new Map<string, Vec2>();
+		if (this.rectanglePointIds) {
+			for (const pid of this.rectanglePointIds) {
+				const pt = sketch.points.get(pid);
+				if (pt) initialPoints.set(pid, pt.clone());
+			}
+		}
+		return initialPoints;
+	}
+
+	translateRectangle(
+		sketch: SketchDocument,
+		startWorld: Vec2,
+		currentWorld: Vec2,
+		initialPoints: ReadonlyMap<string, Vec2>
+	): void {
+		const dir = new Vec2().subVectors(currentWorld, startWorld);
+		for (const [pid, initPos] of initialPoints) {
+			const pt = sketch.points.get(pid);
+			if (pt) {
+				pt.addVectors(initPos, dir);
+			}
+		}
+		sketch.solve();
+	}
+
+	rotateRectangleTo(sketch: SketchDocument, centerWorld: Vec2, mouseWorld: Vec2): boolean {
+		if (!this.rectanglePointIds) return false;
+		const corners = this.getRectangleCorners(sketch);
+		if (!corners) return false;
+		const [p0, p1, p2, p3] = corners;
+		const pt0 = sketch.points.get(this.rectanglePointIds[0]);
+		const pt1 = sketch.points.get(this.rectanglePointIds[1]);
+		const pt2 = sketch.points.get(this.rectanglePointIds[2]);
+		const pt3 = sketch.points.get(this.rectanglePointIds[3]);
+		if (!pt0 || !pt1 || !pt2 || !pt3) return false;
+
+		const targetAngle = centerWorld.angleToPoint(mouseWorld) - Math.PI / 2;
+		const deltaAngle = targetAngle - p0.angleToPoint(p1);
+		pt0.copy(p0.clone().rotateAround(centerWorld, deltaAngle));
+		pt1.copy(p1.clone().rotateAround(centerWorld, deltaAngle));
+		pt2.copy(p2.clone().rotateAround(centerWorld, deltaAngle));
+		pt3.copy(p3.clone().rotateAround(centerWorld, deltaAngle));
+		sketch.solve();
+		return true;
+	}
+
 	/**
 	 * Returns distance in screen pixels to this text object.
 	 */
