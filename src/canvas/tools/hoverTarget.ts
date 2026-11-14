@@ -83,65 +83,32 @@ export function findHoverTarget(
 	let bestTarget: HoverTarget | null = null;
 
 	const c = ctx.findConstraintNear?.(screen);
-	if (c && !c.isInternalConstraint?.(ctx.sketch)) {
-		const d = c.distanceTo ? c.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist) : null;
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestTarget = { type: 'constraint', id: c.id };
-		}
-	}
-
 	const line = ctx.findLineNear(screen);
-	if (line && (allowSplineHandles || (!line.isSplineHandle && !ctx.sketch.isSplineHandleLine(line.id)))) {
-		const d = line.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestTarget = { type: 'line', id: line.id };
-		}
-	}
+	const validLine =
+		line && (allowSplineHandles || (!line.isSplineHandle && !ctx.sketch.isSplineHandleLine(line.id))) ? line : null;
 
-	const circle = ctx.findCircleNear(screen);
-	if (circle) {
-		const d = circle.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestTarget = { type: 'circle', id: circle.id };
-		}
-	}
+	const candidates: Array<{
+		type: HoverTarget['type'];
+		item:
+			| { id: string; distanceTo?(screen: Vec2, sketch: any, viewport: any, thresholdPx?: number): number | null }
+			| null
+			| undefined;
+	}> = [
+		{ type: 'constraint', item: c && !c.isInternalConstraint?.(ctx.sketch) ? c : null },
+		{ type: 'line', item: validLine },
+		{ type: 'circle', item: ctx.findCircleNear(screen) },
+		{ type: 'arc', item: ctx.findArcNear(screen) },
+		{ type: 'ellipse', item: ctx.findEllipseNear?.(screen) },
+		{ type: 'elliptical_arc', item: ctx.findEllipticalArcNear?.(screen) },
+		{ type: 'spline', item: ctx.findSplineNear(screen) },
+	];
 
-	const arc = ctx.findArcNear(screen);
-	if (arc) {
-		const d = arc.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
+	for (const { type, item } of candidates) {
+		if (!item?.distanceTo) continue;
+		const d = item.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
 		if (d !== null && d < bestDist) {
 			bestDist = d;
-			bestTarget = { type: 'arc', id: arc.id };
-		}
-	}
-
-	const ellipse = ctx.findEllipseNear?.(screen);
-	if (ellipse) {
-		const d = ellipse.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestTarget = { type: 'ellipse', id: ellipse.id };
-		}
-	}
-
-	const earc = ctx.findEllipticalArcNear?.(screen);
-	if (earc) {
-		const d = earc.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestTarget = { type: 'elliptical_arc', id: earc.id };
-		}
-	}
-
-	const spline = ctx.findSplineNear(screen);
-	if (spline) {
-		const d = spline.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestTarget = { type: 'spline', id: spline.id };
+			bestTarget = { type, id: item.id };
 		}
 	}
 
@@ -158,9 +125,5 @@ export function findHoverTarget(
 		}
 	}
 
-	if (bestTarget) {
-		return bestTarget;
-	}
-
-	return null;
+	return bestTarget;
 }

@@ -250,9 +250,11 @@ export interface ITool {
 	commit?(): void;
 
 	/** Tool-specific point undo (e.g. spline point undo) */
+	canUndoPoint?(): boolean;
 	undoPoint?(): boolean;
 
 	/** Tool-specific point redo (e.g. spline point redo) */
+	canRedoPoint?(): boolean;
 	redoPoint?(): boolean;
 
 	/** Reposition tool popup when canvas re-renders (e.g. on zoom/pan) */

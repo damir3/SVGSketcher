@@ -3,16 +3,15 @@ import type { SketchSnapshot } from '../model/history';
 import { DEFAULT_ZOOM } from '../constants';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
-import { LINE_DISTANCE_PX, LABEL_DISTANCE_PX, GIZMO_DISTANCE_PX, POINT_DISTANCE_PX } from './distances';
+import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from './distances';
 import { ORIGIN, Vec2 } from '../math/vector';
 import type { IConstraint } from '../solver/types';
-import {
+import type {
 	DistanceConstraint,
 	RadiusConstraint,
 	AngleConstraint,
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
-	RectangularPatternConstraint,
 } from '../solver/constraints';
 import type {
 	ISketchPrimitive,
@@ -30,13 +29,19 @@ import type { GeoCurve } from '../math/intersection';
 import { ImageTool } from './tools/modify/image';
 import { TransformTool } from './tools/modify/transform';
 import { HighlightManager } from './highlightManager';
+import { applyAutoOrientation, applySnapConstraint, computeAxisSnappedWorldPos, findSnapTarget } from './snapping';
 import {
-	applyAutoOrientation,
-	applySnapConstraint,
-	computeAxisSnappedWorldPos,
-	findSnapTarget,
-	isSplineHandleLineVisible,
-} from './snapping';
+	findArcNear,
+	findCircleNear,
+	findConstraintNear,
+	findEllipseNear,
+	findEllipticalArcNear,
+	findLineNear,
+	findPointNear,
+	findSplineNear,
+	findTextNear,
+	findTrimTargetNear,
+} from './hitTesting';
 
 import {
 	type ToolType,
@@ -70,6 +75,7 @@ import {
 	DimensionTool,
 	ConstraintTool,
 	SelectTool,
+	type SelectInteractionHost,
 	PanTool,
 	CONSTRAINT_TOOLS,
 } from './tools';
@@ -95,47 +101,59 @@ const TOOL_KEY_SHORTCUTS: Readonly<Record<string, ToolType>> = {
 	KeyF: 'fixed',
 };
 
-export class CanvasInteraction {
-	private svg: SVGSVGElement;
-	private sketch: SketchDocument;
-	private viewport: Viewport;
-	private renderer: SVGRenderer;
+function isEditableElement(el: HTMLElement | null | undefined): boolean {
+	if (!el) return false;
+	return Boolean(
+		(typeof HTMLInputElement !== 'undefined' && el instanceof HTMLInputElement) ||
+			(typeof HTMLTextAreaElement !== 'undefined' && el instanceof HTMLTextAreaElement) ||
+			el.tagName === 'INPUT' ||
+			el.tagName === 'TEXTAREA' ||
+			el.tagName === 'SELECT' ||
+			el.isContentEditable
+	);
+}
+
+export class CanvasInteraction implements SelectInteractionHost {
+	svg: SVGSVGElement;
+	sketch: SketchDocument;
+	viewport: Viewport;
+	renderer: SVGRenderer;
 	readonly highlightManager: HighlightManager;
 
 	activeTool: ToolType = 'select';
 	isConstructionMode = false;
 
 	// Dragging point state
-	private isDraggingPoint = false;
-	private draggedPointId: string | null = null;
-	private dragPointStartWorld: Vec2 | null = null;
+	isDraggingPoint = false;
+	draggedPointId: string | null = null;
+	dragPointStartWorld: Vec2 | null = null;
 
 	// Dragging curve primitive state (line, circle, arc, ellipse, elliptical_arc, spline)
-	private curveDragState: {
+	curveDragState: {
 		primitive: ISketchPrimitive;
 		startWorld: Vec2;
 		initialPoints: Map<string, Vec2>;
 	} | null = null;
 
 	// Dragging constraint state
-	private isDraggingConstraint = false;
-	private draggedConstraintId: string | null = null;
-	private dragConstraintStartScreen: Vec2 | null = null;
+	isDraggingConstraint = false;
+	draggedConstraintId: string | null = null;
+	dragConstraintStartScreen: Vec2 | null = null;
 
 	// Box selection state
-	private isBoxSelecting = false;
-	private boxSelectStartScreen: Vec2 | null = null;
-	private boxSelectCurrentScreen: Vec2 | null = null;
-	private boxSelectShift = false;
-	private boxSelectImageId: string | null = null;
-	private pendingExclusiveSelection: {
+	isBoxSelecting = false;
+	boxSelectStartScreen: Vec2 | null = null;
+	boxSelectCurrentScreen: Vec2 | null = null;
+	boxSelectShift = false;
+	boxSelectImageId: string | null = null;
+	pendingExclusiveSelection: {
 		id: string;
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'text' | 'constraint';
 	} | null = null;
 
 	// Dragging history snapshot
-	private preDragSnapshot: SketchSnapshot | null = null;
-	private hasDragged = false;
+	preDragSnapshot: SketchSnapshot | null = null;
+	hasDragged = false;
 
 	// Viewport panning state
 	private isPanning = false;
@@ -146,7 +164,7 @@ export class CanvasInteraction {
 			/Mac|iPod|iPhone|iPad/.test(navigator.platform) ||
 			/Macintosh/.test(navigator.userAgent));
 	private isSnapModifierPressed = false;
-	private lastMouseScreen: Vec2 = ORIGIN;
+	lastMouseScreen: Vec2 = ORIGIN;
 	private regionHoverPoint: Vec2 | null = null;
 
 	private isSnapModifier(e: MouseEvent | KeyboardEvent): boolean {
@@ -175,8 +193,8 @@ export class CanvasInteraction {
 	onSnappingChange?: (active: boolean) => void;
 	onViewportChange?: () => void;
 	sidebar?: any;
-	private textRotationDragState: { textId: string; centerWorld: Vec2 } | null = null;
-	private textDragState: { textId: string; startWorld: Vec2; initialPoints: Map<string, Vec2> } | null = null;
+	textRotationDragState: { textId: string; centerWorld: Vec2 } | null = null;
+	textDragState: { textId: string; startWorld: Vec2; initialPoints: Map<string, Vec2> } | null = null;
 
 	gizmoDragState: {
 		axis: 1 | 2;
@@ -192,23 +210,19 @@ export class CanvasInteraction {
 	private isSettingTool = false;
 
 	isDrawingSpline(): boolean {
-		const tool = this.activeToolInstance;
-		return tool instanceof SplineTool && tool.isBusy();
+		return this.activeTool === 'spline' && Boolean(this.activeToolInstance?.isBusy?.());
 	}
 
 	canUndoSplinePoint(): boolean {
-		const tool = this.activeToolInstance;
-		return tool instanceof SplineTool && tool.pointCount > 0;
+		return this.activeToolInstance?.canUndoPoint?.() ?? false;
 	}
 
 	canRedoSplinePoint(): boolean {
-		const tool = this.activeToolInstance;
-		return tool instanceof SplineTool && tool.hasUndonePoints;
+		return this.activeToolInstance?.canRedoPoint?.() ?? false;
 	}
 
 	undoSplinePoint(): boolean {
-		const tool = this.activeToolInstance;
-		return tool instanceof SplineTool ? tool.undoPoint() : false;
+		return this.activeToolInstance?.undoPoint?.() ?? false;
 	}
 
 	undoSketch(): boolean {
@@ -226,8 +240,7 @@ export class CanvasInteraction {
 	}
 
 	redoSplinePoint(): boolean {
-		const tool = this.activeToolInstance;
-		return tool instanceof SplineTool ? tool.redoPoint() : false;
+		return this.activeToolInstance?.redoPoint?.() ?? false;
 	}
 
 	private initTools(): void {
@@ -312,23 +325,24 @@ export class CanvasInteraction {
 		};
 	}
 
+	private computeToolSnap(screen: Vec2): SnapResult | null {
+		const snapMode = this.activeToolInstance?.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
+		if (snapMode === false) return null;
+		return this.findSnap(screen, undefined, snapMode !== 'no-grid');
+	}
+
 	createToolMouseEvent(e: MouseEvent): ToolMouseEvent {
 		const screen = this.getScreenPos(e);
 		const world = this.viewport.screenToWorld(screen);
-		const snapMode = this.activeToolInstance?.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
-		const allowGrid = snapMode !== 'no-grid';
-		const allowSnap = snapMode !== false;
-		const snap = allowSnap ? this.findSnap(screen, undefined, allowGrid) : null;
-		const effectiveWorld = snap ? snap.worldPos : world;
-		const effectiveScreen = snap ? snap.screenPos : screen;
+		const snap = this.computeToolSnap(screen);
 		return {
 			raw: e,
 			screen,
 			client: new Vec2(e.clientX, e.clientY),
 			world,
 			snap,
-			effectiveWorld,
-			effectiveScreen,
+			effectiveWorld: snap ? snap.worldPos : world,
+			effectiveScreen: snap ? snap.screenPos : screen,
 		};
 	}
 
@@ -349,16 +363,11 @@ export class CanvasInteraction {
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
 			const screen = this.lastMouseScreen;
 			const world = this.viewport.screenToWorld(screen);
-			const snapMode = this.activeToolInstance.shouldSnap ? this.activeToolInstance.shouldSnap() : true;
-			const allowGrid = snapMode !== 'no-grid';
-			const allowSnap = snapMode !== false;
-			const snap =
-				isDrawingPrimitiveTool(this.activeTool) && allowSnap ? this.findSnap(screen, undefined, allowGrid) : null;
+			const snap = isDrawingPrimitiveTool(this.activeTool) ? this.computeToolSnap(screen) : null;
 			if (snap) {
 				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, false);
 			}
-			const renderCtx = this.createToolRenderContext(screen, world, snap);
-			this.activeToolInstance.renderPreview?.(renderCtx);
+			this.activeToolInstance.renderPreview?.(this.createToolRenderContext(screen, world, snap));
 		}
 	}
 
@@ -478,30 +487,7 @@ export class CanvasInteraction {
 	cancelDrawing(): void {
 		this.activeToolInstance?.cancel?.();
 		this.highlightManager.clear();
-
-		this.isDraggingPoint = false;
-		this.draggedPointId = null;
-		this.dragPointStartWorld = null;
-
-		this.curveDragState = null;
-
-		this.isDraggingConstraint = false;
-		this.draggedConstraintId = null;
-		this.dragConstraintStartScreen = null;
-
-		this.preDragSnapshot = null;
-		this.hasDragged = false;
-		this.svg.classList.remove('is-dragging');
-
-		this.isBoxSelecting = false;
-		this.boxSelectStartScreen = null;
-		this.boxSelectCurrentScreen = null;
-		this.boxSelectShift = false;
-		this.boxSelectImageId = null;
-		this.pendingExclusiveSelection = null;
-
-		this.renderer.deferRegionSolve = false;
-		this.renderer.clearPreviews();
+		SelectTool.resetDragState(this);
 	}
 
 	private get isDraggingPrimitive(): boolean {
@@ -594,26 +580,8 @@ export class CanvasInteraction {
 	}
 
 	public handleKeyDown(e: KeyboardEvent): void {
-		const target = e.target as HTMLElement | null;
 		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
-		const isInputTarget = Boolean(
-			(target &&
-				((typeof HTMLInputElement !== 'undefined' && target instanceof HTMLInputElement) ||
-					(typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
-					target.tagName === 'INPUT' ||
-					target.tagName === 'TEXTAREA' ||
-					target.tagName === 'SELECT' ||
-					target.isContentEditable)) ||
-				(activeEl &&
-					((typeof HTMLInputElement !== 'undefined' && activeEl instanceof HTMLInputElement) ||
-						(typeof HTMLTextAreaElement !== 'undefined' && activeEl instanceof HTMLTextAreaElement) ||
-						activeEl.tagName === 'INPUT' ||
-						activeEl.tagName === 'TEXTAREA' ||
-						activeEl.tagName === 'SELECT' ||
-						activeEl.isContentEditable))
-		);
-
-		if (isInputTarget) {
+		if (isEditableElement(e.target as HTMLElement | null) || isEditableElement(activeEl)) {
 			return;
 		}
 
@@ -689,7 +657,7 @@ export class CanvasInteraction {
 		}
 	}
 
-	private getScreenPos(e: MouseEvent): Vec2 {
+	getScreenPos(e: MouseEvent): Vec2 {
 		const rect = this.svg.getBoundingClientRect();
 		return new Vec2(e.clientX - rect.left, e.clientY - rect.top);
 	}
@@ -704,7 +672,7 @@ export class CanvasInteraction {
 		});
 	}
 
-	private applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void {
+	applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void {
 		applySnapConstraint(this.sketch, pointId, snap);
 	}
 
@@ -721,140 +689,43 @@ export class CanvasInteraction {
 	}
 
 	findPointNear(screen: Vec2, thresholdPx = POINT_DISTANCE_PX, excludePointId?: string): SketchPoint | null {
-		let closestDist = thresholdPx;
-		let foundPoint: SketchPoint | null = null;
-
-		for (const pt of this.sketch.points.values()) {
-			if (excludePointId && pt.id === excludePointId) continue;
-			const d = pt.distanceTo(screen, this.sketch, this.viewport, closestDist);
-			if (d !== null && d < closestDist) {
-				closestDist = d;
-				foundPoint = pt;
-			}
-		}
-
-		if (excludePointId !== 'origin') {
-			const sOrigin = this.viewport.worldToScreen(ORIGIN);
-			const dOrigin = sOrigin.distanceTo(screen);
-			if (dOrigin < closestDist) {
-				closestDist = dOrigin;
-				foundPoint = { id: 'origin', x: 0, y: 0 } as SketchPoint;
-			}
-		}
-
-		return foundPoint;
+		return findPointNear(this.sketch, this.viewport, screen, thresholdPx, excludePointId);
 	}
 
 	findLineNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchLine | null {
-		let closestDist = thresholdPx;
-		let foundLine: SketchLine | null = null;
-
-		for (const line of this.sketch.lines.values()) {
-			if (!isSplineHandleLineVisible(this.sketch, line, this.activeTool)) {
-				continue;
-			}
-			const d = line.distanceTo(screen, this.sketch, this.viewport, closestDist);
-			if (d !== null && d < closestDist) {
-				closestDist = d;
-				foundLine = line;
-			}
-		}
-
-		return foundLine;
-	}
-
-	private findClosest<
-		T extends {
-			distanceTo?(screen: Vec2, sketch: SketchDocument, viewport: Viewport, thresholdPx?: number): number | null;
-		},
-	>(items: Iterable<T>, screen: Vec2, thresholdPx: number): T | null {
-		let closestDist = thresholdPx;
-		let found: T | null = null;
-		for (const item of items) {
-			if (!item.distanceTo) continue;
-			const d = item.distanceTo(screen, this.sketch, this.viewport, closestDist);
-			if (d !== null && d < closestDist) {
-				closestDist = d;
-				found = item;
-			}
-		}
-		return found;
+		return findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx);
 	}
 
 	findCircleNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchCircle | null {
-		return this.findClosest(this.sketch.circles.values(), screen, thresholdPx);
+		return findCircleNear(this.sketch, this.viewport, screen, thresholdPx);
 	}
 
 	findArcNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchArc | null {
-		return this.findClosest(this.sketch.arcs.values(), screen, thresholdPx);
+		return findArcNear(this.sketch, this.viewport, screen, thresholdPx);
 	}
 
 	findConstraintNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): IConstraint | null {
-		return this.findClosest(this.sketch.constraints.values(), screen, thresholdPx);
+		return findConstraintNear(this.sketch, this.viewport, screen, thresholdPx);
 	}
 
 	findEllipseNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchEllipse | null {
-		return this.findClosest(this.sketch.ellipses.values(), screen, thresholdPx);
+		return findEllipseNear(this.sketch, this.viewport, screen, thresholdPx);
 	}
 
 	findEllipticalArcNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchEllipticalArc | null {
-		return this.findClosest(this.sketch.ellipticalArcs.values(), screen, thresholdPx);
+		return findEllipticalArcNear(this.sketch, this.viewport, screen, thresholdPx);
 	}
 
 	findSplineNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchSpline | null {
-		return this.findClosest(this.sketch.splines.values(), screen, thresholdPx);
-	}
-
-	private findSelectableEntityNear(
-		screen: Vec2,
-		target: SVGElement
-	): {
-		id: string;
-		type: 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'text' | 'constraint';
-	} | null {
-		const hitConstraint = this.activeTool === 'select' ? this.findConstraintNear(screen) : null;
-		if (hitConstraint && !hitConstraint.isInternalConstraint?.(this.sketch)) {
-			return { id: hitConstraint.id, type: 'constraint' };
-		}
-		const hitLine = this.findLineNear(screen);
-		if (hitLine) return { id: hitLine.id, type: 'line' };
-		const hitCircle = this.findCircleNear(screen);
-		if (hitCircle) return { id: hitCircle.id, type: 'circle' };
-		const hitArc = this.findArcNear(screen);
-		if (hitArc) return { id: hitArc.id, type: 'arc' };
-		const hitEllipse = this.findEllipseNear(screen);
-		if (hitEllipse) return { id: hitEllipse.id, type: 'ellipse' };
-		const hitEllipticalArc = this.findEllipticalArcNear(screen, LINE_DISTANCE_PX);
-		if (hitEllipticalArc) return { id: hitEllipticalArc.id, type: 'elliptical_arc' };
-		const hitSpline = this.findSplineNear(screen);
-		if (hitSpline) return { id: hitSpline.id, type: 'spline' };
-		const hitText = this.findTextNear(screen, target);
-		if (hitText) return { id: hitText.id, type: 'text' };
-
-		const sOrigin = this.viewport.worldToScreen(ORIGIN);
-		if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
-			return { id: 'axis_x', type: 'line' };
-		}
-		if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
-			return { id: 'axis_y', type: 'line' };
-		}
-		return null;
+		return findSplineNear(this.sketch, this.viewport, screen, thresholdPx);
 	}
 
 	findTrimTargetNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): GeoCurve | null {
-		let bestDist = thresholdPx;
-		let bestCurve: GeoCurve | null = null;
+		return findTrimTargetNear(this.sketch, this.viewport, screen, thresholdPx);
+	}
 
-		for (const prim of this.sketch.getCurvePrimitives()) {
-			if (prim.type === 'line' && (prim as SketchLine).isSplineHandle) continue;
-			const d = prim.distanceTo(screen, this.sketch, this.viewport, bestDist);
-			if (d !== null && d < bestDist) {
-				bestDist = d;
-				bestCurve = prim.toGeoCurve(this.sketch);
-			}
-		}
-
-		return bestCurve;
+	findTextNear(screen: Vec2, targetEl?: SVGElement | null): SketchText | null {
+		return findTextNear(this.sketch, this.viewport, screen, targetEl);
 	}
 
 	private handleMouseDown(e: MouseEvent): void {
@@ -909,203 +780,7 @@ export class CanvasInteraction {
 			}
 		}
 
-		if (this.activeTool === 'select' || this.activeTool === 'image') {
-			if (imageId && this.sketch.images.has(imageId)) {
-				this.beginBoxSelection(screen, e.shiftKey, imageId);
-				return;
-			}
-			if (this.activeTool === 'image') this.setTool('select');
-		}
-
-		const world = this.viewport.screenToWorld(screen);
-		const snap = this.findSnap(screen);
-
-		// Check for Text rotation gizmo handle dragging
-		const textGizmo = this.renderer.textRotationGizmo;
-		if (textGizmo && screen.distanceTo(textGizmo.handleScreen) <= 15) {
-			this.textRotationDragState = {
-				textId: textGizmo.textId,
-				centerWorld: textGizmo.centerWorld,
-			};
-			this.sketch.beginTransaction();
-			return;
-		}
-
-		// Check for Text center drag gizmo handle dragging
-		const textDragGizmo = this.renderer.textDragGizmo;
-		if (textDragGizmo && screen.distanceTo(textDragGizmo.centerScreen) <= 15) {
-			const text = this.sketch.texts.get(textDragGizmo.textId);
-			this.textDragState = {
-				textId: textDragGizmo.textId,
-				startWorld: world,
-				initialPoints: text ? text.captureRectanglePoints(this.sketch) : new Map(),
-			};
-			this.sketch.beginTransaction();
-			return;
-		}
-
-		// Check for Rectangular Pattern Gizmo handle dragging (in select mode on selected pattern constraint)
-		for (const handle of this.renderer.rectangularGizmoHandles.values()) {
-			if (screen.distanceTo(handle) <= GIZMO_DISTANCE_PX && handle.constraintId) {
-				const constraint = this.sketch.constraints.get(handle.constraintId);
-				if (constraint instanceof RectangularPatternConstraint) {
-					const dragState = constraint.createGizmoDragState(this.sketch, handle.axis, world);
-					if (dragState) {
-						this.sketch.selectEntity(handle.constraintId, 'constraint', false);
-						this.gizmoDragState = dragState;
-						return;
-					}
-				}
-			}
-		}
-
-		if (this.activeTool === 'select') {
-			// Check if clicking on a circular or rectangular pattern suppression checkbox on canvas
-			for (const entry of this.renderer.patternCheckboxPositions.values()) {
-				if (
-					entry.constraintId &&
-					Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX &&
-					Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX
-				) {
-					const c = this.sketch.constraints.get(entry.constraintId);
-					if (c?.toggleSuppressedCopy?.(this.sketch, entry.copyIndex)) {
-						this.render();
-						return;
-					}
-				}
-			}
-		}
-
-		if (this.activeTool === 'select' || this.activeTool === 'transform') {
-			const target = e.target as SVGElement;
-			const targetG = target.closest('[data-id]') as SVGElement | null;
-			let id = targetG?.getAttribute('data-id');
-			let type = targetG?.getAttribute('data-type') as
-				| 'point'
-				| 'line'
-				| 'circle'
-				| 'arc'
-				| 'ellipse'
-				| 'elliptical_arc'
-				| 'spline'
-				| 'text'
-				| 'constraint'
-				| undefined;
-
-			// Priority 1: Points have top priority over primitives (unless user explicitly clicked a constraint badge/dimension)
-			const nearPoint = type !== 'constraint' ? this.findPointNear(screen) : null;
-			if (nearPoint) {
-				id = nearPoint.id;
-				type = 'point';
-			} else if (!type) {
-				if (snap && snap.type === 'point' && snap.id) {
-					id = snap.id;
-					type = 'point';
-				} else {
-					const fallback = this.findSelectableEntityNear(screen, target);
-					if (fallback) {
-						id = fallback.id;
-						type = fallback.type;
-					}
-				}
-			}
-
-			// A visible primitive can be the raw SVG target even when the pointer is
-			// within the wider tolerance of a nearby dimension line.
-			if (this.activeTool === 'select' && type && type !== 'constraint' && type !== 'point') {
-				const hitConstraint = this.findConstraintNear(screen);
-				if (hitConstraint && !hitConstraint.isInternalConstraint?.(this.sketch)) {
-					id = hitConstraint.id;
-					type = 'constraint';
-				}
-			}
-
-			if (this.activeTool === 'transform' && type === 'constraint') return;
-			if (id && type) {
-				const isToggle = this.activeTool === 'transform' || e.metaKey || e.ctrlKey;
-				if (isToggle) {
-					this.sketch.toggleEntitySelection(id, type);
-					this.render();
-					return;
-				}
-
-				const wasAlreadySelected = this.sketch.isEntitySelected(id, type);
-				if (e.shiftKey) {
-					this.sketch.selectEntity(id, type, true);
-				} else if (!wasAlreadySelected) {
-					this.sketch.selectEntity(id, type, false);
-				} else {
-					this.pendingExclusiveSelection = { id, type };
-				}
-
-				if (type === 'point' && id !== 'origin') {
-					this.renderer.clearPreviews();
-					this.isDraggingPoint = true;
-					this.draggedPointId = id;
-					this.preDragSnapshot = this.sketch.takeSnapshot();
-					this.hasDragged = false;
-					const pt = this.sketch.points.get(id);
-					if (pt) {
-						this.dragPointStartWorld = pt.clone();
-					}
-				} else if (
-					type === 'line' ||
-					type === 'circle' ||
-					type === 'arc' ||
-					type === 'ellipse' ||
-					type === 'elliptical_arc' ||
-					type === 'spline'
-				) {
-					const prim = this.sketch.getPrimitive(id, type);
-					if (prim) {
-						const pointIds = prim.getPointIds(this.sketch);
-						const initialPoints = new Map<string, Vec2>();
-						for (const pid of pointIds) {
-							const pt = this.sketch.points.get(pid);
-							if (pt) initialPoints.set(pid, pt.clone());
-						}
-						if (type === 'spline' || initialPoints.size === pointIds.length) {
-							this.curveDragState = {
-								primitive: prim,
-								startWorld: world,
-								initialPoints,
-							};
-							this.preDragSnapshot = this.sketch.takeSnapshot();
-							this.hasDragged = false;
-						}
-					}
-				} else if (type === 'constraint') {
-					const constraint = this.sketch.constraints.get(id);
-					if (constraint?.moveLabelTo) {
-						this.isDraggingConstraint = true;
-						this.draggedConstraintId = id;
-						this.preDragSnapshot = this.sketch.takeSnapshot();
-						this.hasDragged = false;
-						this.dragConstraintStartScreen = screen;
-					}
-				}
-
-				this.renderer.deferRegionSolve = this.isDraggingPrimitive;
-				this.svg.classList.add('is-dragging');
-				this.render();
-			} else {
-				// Clicked background -> start rectangular box selection
-				this.beginBoxSelection(screen, e.shiftKey);
-				if (this.activeTool === 'select' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
-					this.sketch.clearSelection();
-					this.render();
-				}
-			}
-			return;
-		}
-	}
-
-	private beginBoxSelection(screen: Vec2, shiftKey: boolean, imageId: string | null = null): void {
-		this.isBoxSelecting = true;
-		this.boxSelectStartScreen = screen;
-		this.boxSelectCurrentScreen = screen;
-		this.boxSelectShift = shiftKey;
-		this.boxSelectImageId = imageId;
+		SelectTool.handleMouseDown(this, e, screen, imageId ?? null);
 	}
 
 	private handleMouseMove(e: MouseEvent): void {
@@ -1126,87 +801,7 @@ export class CanvasInteraction {
 
 		this.lastMouseScreen = screen;
 
-		// Gizmo drag handling (Rectangular pattern distance1 / distance2 in select mode)
-		if (this.gizmoDragState) {
-			const { constraintId } = this.gizmoDragState;
-			const constraint = constraintId ? this.sketch.constraints.get(constraintId) : undefined;
-			if (
-				constraint instanceof RectangularPatternConstraint &&
-				constraint.applyGizmoDrag(this.sketch, this.gizmoDragState, world)
-			) {
-				this.render();
-			}
-			return;
-		}
-
-		// Text Rotation Gizmo drag handling
-		if (this.textRotationDragState) {
-			const text = this.sketch.texts.get(this.textRotationDragState.textId);
-			if (text?.rotateRectangleTo(this.sketch, this.textRotationDragState.centerWorld, world)) {
-				this.render();
-			}
-			return;
-		}
-
-		// Text Center Drag Gizmo handling
-		if (this.textDragState) {
-			const text = this.sketch.texts.get(this.textDragState.textId);
-			if (text) {
-				text.translateRectangle(this.sketch, this.textDragState.startWorld, world, this.textDragState.initialPoints);
-			} else {
-				const dir = new Vec2().subVectors(world, this.textDragState.startWorld);
-				for (const [pid, initPos] of this.textDragState.initialPoints) {
-					this.sketch.points.get(pid)?.addVectors(initPos, dir);
-				}
-				this.sketch.solve();
-			}
-			this.render();
-			return;
-		}
-
-		// Box selection handling
-		if (this.isBoxSelecting && this.boxSelectStartScreen) {
-			this.boxSelectCurrentScreen = screen;
-			this.renderer.renderSelectionBox(this.boxSelectStartScreen, this.boxSelectCurrentScreen);
-			return;
-		}
-
-		// Constraint label dragging
-		if (this.isDraggingConstraint && this.draggedConstraintId) {
-			if (this.dragConstraintStartScreen && screen.distanceTo(this.dragConstraintStartScreen) > 3) {
-				this.hasDragged = true;
-			}
-			if (this.hasDragged) {
-				const constraint = this.sketch.constraints.get(this.draggedConstraintId);
-				if (constraint?.moveLabelTo) {
-					constraint.moveLabelTo(screen, this.sketch, this.viewport);
-					this.render();
-				}
-			}
-			return;
-		}
-
-		// Drag point handling (Live solver calculation!)
-		if (this.isDraggingPoint && this.draggedPointId && this.dragPointStartWorld) {
-			this.hasDragged = true;
-			const snap = this.findSnap(screen, this.draggedPointId);
-			const targetWorld = this.sketch.getPointDragTarget(this.draggedPointId, snap?.worldPos ?? world);
-			this.sketch.dragPoint(this.draggedPointId, targetWorld.x, targetWorld.y);
-			this.render();
-			if (snap && targetWorld.equals(snap.worldPos)) {
-				this.renderer.renderSnapIndicator(snap.screenPos, snap.type, true);
-			} else {
-				this.renderer.clearPreviews();
-			}
-			return;
-		}
-
-		// Drag curve primitive handling
-		if (this.curveDragState) {
-			this.hasDragged = true;
-			const { primitive, startWorld, initialPoints } = this.curveDragState;
-			primitive.drag(this.sketch, startWorld, world, initialPoints, e);
-			this.render();
+		if (SelectTool.handleDragMouseMove(this, e, screen, world)) {
 			return;
 		}
 
@@ -1231,54 +826,33 @@ export class CanvasInteraction {
 		}
 
 		// Centralized hover highlight
-		let hoveredTarget = null;
-		if (
-			this.isPanning ||
-			this.isDraggingPoint ||
-			this.isBoxSelecting ||
-			this.gizmoDragState ||
-			this.textRotationDragState ||
-			this.textDragState
-		) {
-			this.highlightManager.clear();
-		} else {
-			hoveredTarget = this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
-		}
-		const allowRegionHover =
-			this.activeTool === 'select' &&
-			!hoveredTarget &&
-			!this.isPanning &&
-			!this.isDraggingPoint &&
-			!this.isBoxSelecting &&
-			!this.gizmoDragState &&
-			!this.textRotationDragState &&
-			!this.textDragState;
-		this.regionHoverPoint = allowRegionHover ? world : null;
+		const isDraggingOrSelecting = this.isPanning || SelectTool.isInteracting(this);
+		const hoveredTarget = isDraggingOrSelecting
+			? (this.highlightManager.clear(), null)
+			: this.highlightManager.update(this.activeToolInstance, screen, e.target as SVGElement);
+
+		this.regionHoverPoint = this.activeTool === 'select' && !hoveredTarget && !isDraggingOrSelecting ? world : null;
 		this.renderer.updateRegionHover(this.regionHoverPoint);
 
 		// Delegate to active tool if not select
 		if (this.activeTool !== 'select' && this.activeToolInstance) {
-			const toolEvent = this.createToolMouseEvent(e);
-			this.activeToolInstance.onMouseMove?.(toolEvent);
+			this.activeToolInstance.onMouseMove?.(this.createToolMouseEvent(e));
 			this.updateToolPreview();
 			return;
 		}
 
 		if (this.activeTool === 'select' && this.activeToolInstance) {
-			const toolEvent = this.createToolMouseEvent(e);
-			this.activeToolInstance.onMouseMove?.(toolEvent);
+			this.activeToolInstance.onMouseMove?.(this.createToolMouseEvent(e));
 		}
 
 		this.svg.style.cursor = 'default';
 	}
 
 	private handleMouseUp(e?: MouseEvent): void {
-		const primitiveMoved = this.isDraggingPrimitive && this.hasDragged;
 		if (e) {
 			this.isSnapModifierPressed = this.isSnapModifier(e);
 			if (this.activeTool !== 'select' && this.activeToolInstance?.onMouseUp) {
-				const toolEvent = this.createToolMouseEvent(e);
-				this.activeToolInstance.onMouseUp(toolEvent);
+				this.activeToolInstance.onMouseUp(this.createToolMouseEvent(e));
 				this.updateToolPreview();
 			}
 		}
@@ -1288,132 +862,12 @@ export class CanvasInteraction {
 			);
 			this.activeToolInstance.onMouseMove?.(toolEvent);
 		}
-		this.svg.classList.remove('is-dragging');
-		if (this.gizmoDragState) {
-			this.gizmoDragState = null;
-			this.render();
-		}
-		if (this.textRotationDragState) {
-			this.textRotationDragState = null;
-			this.sketch.commitTransaction();
-			this.render();
-		}
-		if (this.textDragState) {
-			this.textDragState = null;
-			this.sketch.commitTransaction();
-			this.render();
-		}
 		if (this.isPanning) {
 			this.isPanning = false;
 			this.updateCursor();
 		}
-		if (this.isDraggingPoint) {
-			const draggedPtId = this.draggedPointId;
-			this.isDraggingPoint = false;
-			this.draggedPointId = null;
-			this.dragPointStartWorld = null;
-			this.renderer.clearPreviews();
-			if (this.hasDragged) {
-				if (draggedPtId) {
-					const screen = e ? this.getScreenPos(e) : this.lastMouseScreen;
-					const snap = this.findSnap(screen, draggedPtId);
-					const target = snap && this.sketch.getPointDragTarget(draggedPtId, snap.worldPos);
-					if (snap && target && (this.sketch.isSplineHandlePoint(draggedPtId) || !target.equals(snap.worldPos))) {
-						this.sketch.dragPoint(draggedPtId, target.x, target.y);
-					} else if (snap && snap.id && (snap.type !== 'point' || snap.id !== draggedPtId)) {
-						const pt = this.sketch.getPoint(draggedPtId);
-						if (pt) {
-							pt.copy(snap.worldPos);
-						}
-						if (this.preDragSnapshot) {
-							this.sketch.beginTransactionWithSnapshot(this.preDragSnapshot);
-							this.preDragSnapshot = null;
-						} else {
-							this.sketch.beginTransaction();
-						}
-						this.applySnapConstraintIfNeeded(draggedPtId, snap);
-						this.sketch.commitTransaction();
-					} else if (snap && snap.type === 'grid') {
-						const pt = this.sketch.getPoint(draggedPtId);
-						if (pt && !this.sketch.isPointFixed(draggedPtId)) {
-							pt.copy(snap.worldPos);
-						}
-					}
-				}
-				// Final solve without soft drag constraint to ensure exact convergence
-				this.sketch.solve();
-				if (this.preDragSnapshot) {
-					this.sketch.pushSnapshot(this.preDragSnapshot);
-				}
-			}
-			this.preDragSnapshot = null;
-			this.hasDragged = false;
-			this.updateCursor();
-		}
-		if (this.curveDragState) {
-			this.curveDragState = null;
-			this.renderer.clearPreviews();
-			if (this.hasDragged) {
-				this.sketch.solve();
-				if (this.preDragSnapshot) {
-					this.sketch.pushSnapshot(this.preDragSnapshot);
-				}
-			}
-			this.preDragSnapshot = null;
-			this.hasDragged = false;
-			this.updateCursor();
-		}
-		if (this.isDraggingConstraint) {
-			const hadDragged = this.hasDragged;
-
-			this.isDraggingConstraint = false;
-			this.draggedConstraintId = null;
-			this.dragConstraintStartScreen = null;
-
-			if (hadDragged) {
-				if (this.preDragSnapshot) {
-					this.sketch.pushSnapshot(this.preDragSnapshot);
-				}
-				this.preDragSnapshot = null;
-				this.hasDragged = false;
-				this.render();
-			} else {
-				this.preDragSnapshot = null;
-				this.hasDragged = false;
-			}
-			this.updateCursor();
-		}
-
-		if (this.isBoxSelecting) {
-			const startScreen = this.boxSelectStartScreen;
-			const endScreen = e ? this.getScreenPos(e) : (this.boxSelectCurrentScreen ?? startScreen);
-			const isShift = this.boxSelectShift || (e ? e.shiftKey : false);
-			const imageId = this.boxSelectImageId;
-
-			this.isBoxSelecting = false;
-			this.boxSelectStartScreen = null;
-			this.boxSelectCurrentScreen = null;
-			this.boxSelectShift = false;
-			this.boxSelectImageId = null;
-			this.renderer.clearPreviews();
-
-			if (startScreen && endScreen && startScreen.distanceTo(endScreen) > 4) {
-				if (this.activeTool === 'image') this.setTool('select');
-				this.finishBoxSelection(startScreen, endScreen, isShift);
-			} else if (imageId && imageId !== this.selectedImageId) {
-				this.selectImage(imageId);
-			}
-			this.render();
-		}
-
-		if (!this.hasDragged && this.pendingExclusiveSelection) {
-			this.sketch.selectEntity(this.pendingExclusiveSelection.id, this.pendingExclusiveSelection.type, false);
-			this.render();
-		}
-		this.pendingExclusiveSelection = null;
-		this.renderer.deferRegionSolve = false;
-		if (primitiveMoved) this.render();
-		this.highlightManager.update(this.activeToolInstance, this.lastMouseScreen);
+		SelectTool.handleMouseUp(this, e);
+		this.highlightManager?.update(this.activeToolInstance, this.lastMouseScreen);
 	}
 
 	private handleWheel(e: WheelEvent): void {
@@ -1478,25 +932,7 @@ export class CanvasInteraction {
 		this.tryHandleDoubleClickAt(e, screen, clientPos, now);
 	}
 
-	findTextNear(screen: Vec2, targetEl?: SVGElement | null): SketchText | null {
-		const textIdFromAttr =
-			targetEl?.getAttribute('data-text-id') || targetEl?.closest('[data-text-id]')?.getAttribute('data-text-id');
-		if (textIdFromAttr) {
-			const t = this.sketch.texts.get(textIdFromAttr);
-			if (t) return t;
-		}
-
-		for (const t of this.sketch.texts.values()) {
-			const d = t.distanceTo(screen, this.sketch, this.viewport);
-			if (d !== null && d <= 15) {
-				return t;
-			}
-		}
-
-		return null;
-	}
-
-	private updateCursor(): void {
+	updateCursor(): void {
 		if (this.activeToolInstance) {
 			this.svg.style.cursor = this.activeToolInstance.defaultCursor;
 		} else if (this.activeTool === 'select') {
@@ -1528,7 +964,7 @@ export class CanvasInteraction {
 		});
 	}
 
-	private finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {
+	finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void {
 		const tool = this.activeToolInstance ?? this.tools?.get(this.activeTool);
 		SelectTool.performBoxSelection(this.sketch, this.viewport, s1, s2, shiftKey, this.activeTool, tool);
 	}

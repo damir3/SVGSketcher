@@ -86,6 +86,14 @@ export class SplineTool extends BaseTool {
 		return this.undonePoints.length > 0;
 	}
 
+	canUndoPoint(): boolean {
+		return this.points.length > 0;
+	}
+
+	canRedoPoint(): boolean {
+		return this.undonePoints.length > 0;
+	}
+
 	setMode(newMode: SplineMode): void {
 		if (this._mode === newMode) return;
 		if (this.isBusy()) {
