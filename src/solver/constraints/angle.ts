@@ -1,3 +1,4 @@
+import { formatDimensionValue } from '../../canvas/dimensionGeometry';
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
 import type { JacobianEntry } from '../types';
@@ -6,7 +7,7 @@ import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS, type SvgAttrs } from '../../canvas/styles';
 import { createSvgElement, createSvgLine, createSvgPath, renderDimensionLabel } from '../../canvas/svg';
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, DIMENSION_EXTERNAL_ARROW_TAIL_PX } from '../../canvas/distances';
 import { ORIGIN, Vec2 } from '../../math/vector';
 
 /**
@@ -189,13 +190,13 @@ export class AngleConstraint extends BaseConstraint {
 
 		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
 
-		// Dashed extension lines if arc points extend beyond the physical line segments
+		// Extension lines if arc points extend beyond the physical line segments
 		const sp1 = ctx.viewport.worldToScreen(p1);
 		const sp2 = ctx.viewport.worldToScreen(p2);
 		const sp3 = ctx.viewport.worldToScreen(p3);
 		const sp4 = ctx.viewport.worldToScreen(p4);
 
-		if (ctx.renderDashedExtensionLines) {
+		if (ctx.renderAngleExtensionLines) {
 			const isUserLine1 = Boolean(this.line1Id && ctx.sketch.lines.has(this.line1Id));
 			const isUserLine2 = Boolean(this.line2Id && ctx.sketch.lines.has(this.line2Id));
 			const isArc1 = Boolean(this.line1Id && ctx.sketch.arcs.has(this.line1Id));
@@ -203,10 +204,10 @@ export class AngleConstraint extends BaseConstraint {
 			const hasSeg1 = Boolean(isUserLine1 || isArc1 || ctx.sketch.getLineBetween(this.l1P1, this.l1P2));
 			const hasSeg2 = Boolean(isUserLine2 || isArc2 || ctx.sketch.getLineBetween(this.l2P1, this.l2P2));
 			if (!this.line1Id || isUserLine1 || isArc1) {
-				ctx.renderDashedExtensionLines(g, sCenter, a1, rScreen, sp1, hasSeg1 ? sp2 : sp1, color);
+				ctx.renderAngleExtensionLines(g, sCenter, a1, rScreen, sp1, hasSeg1 ? sp2 : sp1, color);
 			}
 			if (!this.line2Id || isUserLine2 || isArc2) {
-				ctx.renderDashedExtensionLines(g, sCenter, a2, rScreen, sp3, hasSeg2 ? sp4 : sp3, color);
+				ctx.renderAngleExtensionLines(g, sCenter, a2, rScreen, sp3, hasSeg2 ? sp4 : sp3, color);
 			}
 		}
 
@@ -239,7 +240,7 @@ export class AngleConstraint extends BaseConstraint {
 			const uA = Vec2.fromPolar(1, a1);
 			const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
 			createSvgLine(
-				a.clone().addScaledVector(tanA, -18),
+				a.clone().addScaledVector(tanA, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
 				a,
 				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
 				g
@@ -247,7 +248,7 @@ export class AngleConstraint extends BaseConstraint {
 			const uB = Vec2.fromPolar(1, a2);
 			const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
 			createSvgLine(
-				b.clone().addScaledVector(tanB, 18),
+				b.clone().addScaledVector(tanB, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
 				b,
 				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
 				g
@@ -255,7 +256,7 @@ export class AngleConstraint extends BaseConstraint {
 		}
 
 		const prefix = this.expression ? 'fx: ' : '';
-		const labelText = `${prefix}${this.targetAngle.toFixed(1)}°`;
+		const labelText = `${prefix}${formatDimensionValue(this.targetAngle, 1)}°`;
 
 		if (arcLen < 26) {
 			// Leader shelf for small angle

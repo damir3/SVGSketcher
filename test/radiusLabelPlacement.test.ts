@@ -177,3 +177,43 @@ test('arc diameter arrows stay inside even when the label is outside the arc and
 		);
 	}
 });
+
+for (const kind of ['circle', 'arc'] as const) {
+	for (const zoom of [1, 2, 4]) {
+		test(`${kind} diameter arrows flip only when the screen diameter is below 40px, zoom=${zoom}`, () => {
+			const sketch = new SketchDocument();
+			const radius = 10;
+			const center = sketch.addPoint(new Vec2());
+			const start = sketch.addPoint(new Vec2(radius, 0));
+			const end = sketch.addPoint(new Vec2(0, radius));
+			const entity =
+				kind === 'circle'
+					? sketch.addCircle(center.id, radius)
+					: sketch.addArc(center.id, start.id, end.id, radius, false);
+			const constraint = sketch.addRadiusConstraint(entity.id, radius, 'diameter')!;
+			const viewport = Object.assign(new Viewport(800, 600), { zoom, panX: 0, panY: 0 });
+			for (const angle of [0, Math.PI / 4, Math.PI]) {
+				constraint.leaderAngle = angle;
+				constraint.leaderOffset = 50;
+				const lines = render(constraint, sketch, viewport).filter(el => el.tag === 'line');
+				const arrows = lines.filter(el => el.attributes['marker-start'] || el.attributes['marker-end']);
+				const outside = radius * zoom * 2 < 40;
+				assert.equal(arrows.length, outside ? 2 : 1);
+				if (outside) {
+					for (const arrow of arrows) {
+						const from = new Vec2(Number(arrow.attributes.x1), Number(arrow.attributes.y1));
+						const to = new Vec2(Number(arrow.attributes.x2), Number(arrow.attributes.y2));
+						assert.ok(from.length() > radius * zoom);
+						assert.ok(Math.abs(to.length() - radius * zoom) < 0.1);
+						assert.ok(Math.abs(from.distanceTo(to) - 24) < 0.1);
+						assert.ok(!arrow.attributes['marker-start']);
+					}
+					const tail = Vec2.fromPolar(radius * zoom + 22, angle + Math.PI);
+					assert.ok(constraint.distanceTo(tail, sketch, viewport)! < 1e-8, 'outside arrow tails can be selected');
+				} else {
+					assert.ok(arrows[0].attributes['marker-start'] && arrows[0].attributes['marker-end']);
+				}
+			}
+		});
+	}
+}

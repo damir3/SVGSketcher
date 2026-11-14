@@ -1,3 +1,5 @@
+import { DIMENSION_EXTERNAL_ARROW_TAIL_PX } from '../../canvas/distances';
+import { formatDimensionValue } from '../../canvas/dimensionGeometry';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -105,7 +107,7 @@ export class RadiusConstraint extends BaseConstraint {
 		const dir = Vec2.fromPolar(1, angle);
 		const isDiameter = this.displayMode === 'diameter';
 		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
-		const numStr = Number.isInteger(num) ? num.toFixed(1) : Number(num.toFixed(2)).toString();
+		const numStr = formatDimensionValue(num);
 		const prefix = this.expression ? 'fx: ' : '';
 		const text = `${prefix}${isDiameter ? 'Ø' : 'R'}${numStr}`;
 		const labelSize = new Vec2(text.length * 8 + 14, LABEL_HEIGHT);
@@ -142,6 +144,7 @@ export class RadiusConstraint extends BaseConstraint {
 			anchor,
 			isInside,
 			isDiameter,
+			diameterArrowsOutside: isDiameter && screenRadius * 2 < 40,
 			angle,
 			dir,
 			offset,
@@ -220,9 +223,23 @@ export class RadiusConstraint extends BaseConstraint {
 				edge,
 				{
 					...radialAttrs,
-					...(isDiameter ? { 'marker-start': arrowUrl } : {}),
-					'marker-end': arrowUrl,
+					...(isDiameter && !layout.diameterArrowsOutside ? { 'marker-start': arrowUrl } : {}),
+					...(!layout.diameterArrowsOutside ? { 'marker-end': arrowUrl } : {}),
 				},
+				g
+			);
+		}
+		if (layout.diameterArrowsOutside) {
+			createSvgLine(
+				start.clone().addScaledVector(dir, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
+				start,
+				{ ...radialAttrs, 'marker-end': arrowUrl },
+				g
+			);
+			createSvgLine(
+				edge.clone().addScaledVector(dir, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
+				edge,
+				{ ...radialAttrs, 'marker-end': arrowUrl },
 				g
 			);
 		}
@@ -272,6 +289,12 @@ export class RadiusConstraint extends BaseConstraint {
 			Math.max(0, -local.y, local.y - labelSize.y)
 		);
 		const extension = layout.arcExtension;
+		const arrowTailDistance = layout.diameterArrowsOutside
+			? Math.min(
+					distanceToSegment(screen, start.clone().addScaledVector(dir, -DIMENSION_EXTERNAL_ARROW_TAIL_PX), start),
+					distanceToSegment(screen, edge.clone().addScaledVector(dir, DIMENSION_EXTERNAL_ARROW_TAIL_PX), edge)
+				)
+			: Infinity;
 		const extensionDistance = extension
 			? Math.min(
 					distanceToArc(
@@ -287,12 +310,13 @@ export class RadiusConstraint extends BaseConstraint {
 				)
 			: Infinity;
 		if (isInside) {
-			return Math.min(labelDistance, extensionDistance, distanceToSegment(screen, start, edge));
+			return Math.min(labelDistance, extensionDistance, arrowTailDistance, distanceToSegment(screen, start, edge));
 		}
 		const dirX = dir.x >= 0 ? 1 : -1;
 		const shelfEnd = new Vec2(anchor.x + dirX * labelSize.x, anchor.y);
 		const leaderDistance = Math.min(
 			extensionDistance,
+			arrowTailDistance,
 			layout.isArc && !layout.isDiameter ? Infinity : distanceToSegment(screen, start, edge),
 			distanceToSegment(screen, edge, anchor),
 			distanceToSegment(screen, anchor, shelfEnd)

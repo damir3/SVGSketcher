@@ -1,3 +1,5 @@
+import type { SvgExportDimensions } from '../model/io/svgIO';
+import { AABB } from '../math/aabb';
 import type { SketchImage } from '../model/image';
 import { createTransform, type TransformValues } from '../model/transform';
 import { calculateObjectsCentroid } from './tools/modify/utils';
@@ -25,7 +27,11 @@ export * from './svg';
 export * from './dimensionGeometry';
 export { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
 
-import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
+import {
+	TEXT_ROTATION_HANDLE_DISTANCE_PX,
+	DIMENSION_EXTERNAL_ARROW_TAIL_PX,
+	DIMENSION_EXTENSION_OVERRUN_PX,
+} from './distances';
 
 import {
 	createSvgElement,
@@ -41,6 +47,7 @@ import {
 } from './svg';
 import {
 	type LinearDimensionVisualOptions,
+	formatDimensionValue,
 	computeDistanceDimensionGeometry,
 	computePointToLineDimensionGeometry,
 } from './dimensionGeometry';
@@ -49,6 +56,7 @@ import {
 	REGION_STYLE,
 	DASH_ARRAY,
 	STROKE_WIDTH,
+	SVG_EXPORT_STYLE,
 	DIM_ARROWS,
 	FILTERS,
 	type SvgAttrs,
@@ -1544,14 +1552,47 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderConstraints(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
-		this.constraintGroup.innerHTML = '';
+	exportDimensions(sketch: SketchDocument, viewport: Viewport): SvgExportDimensions | undefined {
+		const group = createSvgElement('g', { visibility: 'hidden' }, this.svg);
+		try {
+			this.renderConstraints(sketch, viewport, {}, group, true);
+			if (!group.children.length) return undefined;
+			group.querySelectorAll('text').forEach(text => {
+				text.textContent = text.textContent?.replace(/^fx:\s*/, '') ?? '';
+			});
+			group.querySelectorAll('[stroke-width]').forEach(element => {
+				element.setAttribute('stroke-width', String(SVG_EXPORT_STYLE.dimensionStrokeWidth * viewport.zoom));
+			});
+			const box = group.getBBox();
+			// SVG bounding boxes omit arrow markers and strokes.
+			const padding = 16;
+			const bounds = new AABB(viewport.screenToWorld(new Vec2(box.x - padding, box.y - padding))).addPoint(
+				viewport.screenToWorld(new Vec2(box.x + box.width + padding, box.y + box.height + padding))
+			);
+			const transform = `translate(${-viewport.panX / viewport.zoom} ${-viewport.panY / viewport.zoom}) scale(${1 / viewport.zoom})`;
+			return {
+				svg: `${this.defsEl.outerHTML}<g transform="${transform}">${group.innerHTML}</g>`,
+				bounds,
+			};
+		} finally {
+			group.remove();
+		}
+	}
+
+	private renderConstraints(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		options: RenderOptions = {},
+		targetGroup = this.constraintGroup,
+		dimensionsOnly = false
+	): void {
+		targetGroup.innerHTML = '';
 		const lineBadgeCounts = new Map<string, number>();
 
 		const ctx: ConstraintRenderContext = {
 			sketch,
 			viewport,
-			targetGroup: this.constraintGroup,
+			targetGroup,
 			isSelected: false,
 			lineBadgeCounts,
 			renderBadge: (id, position, label, color) => {
@@ -1566,8 +1607,8 @@ export class SVGRenderer {
 			renderLinearDimensionVisual: opts => {
 				this.renderLinearDimensionVisual(opts);
 			},
-			renderDashedExtensionLines: (g, sCenter, angle, rScreen, sp1, sp2, color) => {
-				this.renderDashedExtensionLines(g, sCenter, angle, rScreen, sp1, sp2, color);
+			renderAngleExtensionLines: (g, sCenter, angle, rScreen, sp1, sp2, color) => {
+				this.renderAngleExtensionLines(g, sCenter, angle, rScreen, sp1, sp2, color);
 			},
 			patternCheckboxGroup: this.patternCheckboxGroup,
 			patternCheckboxPositions: this.patternCheckboxPositions,
@@ -1588,13 +1629,16 @@ export class SVGRenderer {
 		};
 
 		for (const constraint of sketch.constraints.values()) {
+			if (dimensionsOnly && !constraint.isDimensional) continue;
 			if (sketch.isSplineInternalConstraint(constraint)) continue;
 			if (options.hiddenEntityIds && constraint.entityIds?.some(id => options.hiddenEntityIds!.has(id))) continue;
-			ctx.isSelected = sketch.selection.constraintIds.has(constraint.id);
+			ctx.isSelected = !dimensionsOnly && sketch.selection.constraintIds.has(constraint.id);
 			constraint.render?.(ctx);
 		}
-		this.setDimensionsVisible(this.dimensionsVisible);
-		this.setConstraintBadgesVisible(this.constraintBadgesVisible);
+		if (!dimensionsOnly) {
+			this.setDimensionsVisible(this.dimensionsVisible);
+			this.setConstraintBadgesVisible(this.constraintBadgesVisible);
+		}
 	}
 
 	private renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void {
@@ -1679,9 +1723,18 @@ export class SVGRenderer {
 			// Flipped arrows outside pointing inward (GOST 2.307)
 			createSvgLine(d1, d2, lineAttrs, g);
 			const u = new Vec2().subVectors(d2, d1).multiplyScalar(1 / screenDist);
-			const tailLen = 18;
-			createSvgLine(d1.clone().addScaledVector(u, -tailLen), d1, { ...lineAttrs, 'marker-end': arrowUrl }, g);
-			createSvgLine(d2.clone().addScaledVector(u, tailLen), d2, { ...lineAttrs, 'marker-end': arrowUrl }, g);
+			createSvgLine(
+				d1.clone().addScaledVector(u, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
+				d1,
+				{ ...lineAttrs, 'marker-end': arrowUrl },
+				g
+			);
+			createSvgLine(
+				d2.clone().addScaledVector(u, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
+				d2,
+				{ ...lineAttrs, 'marker-end': arrowUrl },
+				g
+			);
 		} else {
 			createSvgLine(d1, d2, lineAttrs, g);
 		}
@@ -1723,7 +1776,7 @@ export class SVGRenderer {
 		});
 	}
 
-	private renderDashedExtensionLines(
+	private renderAngleExtensionLines(
 		parentG: SVGElement,
 		sCenter: Vec2,
 		angleRad: number,
@@ -1739,7 +1792,7 @@ export class SVGRenderer {
 		const kMin = Math.min(k1, k2);
 		const kMax = Math.max(k1, k2);
 
-		const kEnd = rScreen + 6;
+		const kEnd = rScreen + DIMENSION_EXTENSION_OVERRUN_PX;
 		if (kEnd <= 0) return;
 
 		const intervals: Array<[number, number]> = [];
@@ -1765,10 +1818,8 @@ export class SVGRenderer {
 				p1,
 				p2,
 				{
+					...EXTENSION_LINE_ATTRS,
 					stroke: color,
-					'stroke-width': STROKE_WIDTH.majorGrid,
-					'stroke-dasharray': DASH_ARRAY.angleExtension,
-					'pointer-events': 'none',
 				},
 				parentG
 			);
@@ -2024,7 +2075,7 @@ export class SVGRenderer {
 			);
 
 			// Distance label pill: without "d1:", "d2:", only the value
-			const labelText = `${distVal.toFixed(1)} mm`;
+			const labelText = `${formatDimensionValue(distVal, 1)} mm`;
 			const pillWidth = labelText.length * 6.8 + 14;
 			const isHorizontal = Math.abs(arrowDir.x) >= Math.abs(arrowDir.y);
 
@@ -2453,7 +2504,7 @@ export class SVGRenderer {
 		this.renderLinearDimensionVisual({
 			d1: geom.d1,
 			d2: geom.d2,
-			label: `${labelPrefix}${distVal.toFixed(1)} mm`,
+			label: `${labelPrefix}${formatDimensionValue(distVal, 1)} mm`,
 			extensionLines: geom.extensionLines,
 			parent: this.previewGroup,
 			isPreview: true,
@@ -2475,7 +2526,7 @@ export class SVGRenderer {
 		this.renderLinearDimensionVisual({
 			d1: geom.d1,
 			d2: geom.d2,
-			label: `${distVal.toFixed(1)} mm`,
+			label: `${formatDimensionValue(distVal, 1)} mm`,
 			extensionLines: geom.extensionLines,
 			parent: this.previewGroup,
 			isPreview: true,
@@ -2507,10 +2558,10 @@ export class SVGRenderer {
 		const rScreen = Math.max(28, sCenter.distanceTo(cursor));
 
 		if (sp1 && sp2) {
-			this.renderDashedExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, COLORS.primary);
+			this.renderAngleExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, COLORS.primary);
 		}
 		if (sp3 && sp4) {
-			this.renderDashedExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, COLORS.primary);
+			this.renderAngleExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, COLORS.primary);
 		}
 
 		const a = Vec2.fromPolar(rScreen, a1).add(sCenter);
@@ -2547,7 +2598,7 @@ export class SVGRenderer {
 			const uA = Vec2.fromPolar(1, a1);
 			const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
 			createSvgLine(
-				a.clone().addScaledVector(tanA, -18),
+				a.clone().addScaledVector(tanA, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
 				a,
 				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
 				this.previewGroup
@@ -2555,14 +2606,14 @@ export class SVGRenderer {
 			const uB = Vec2.fromPolar(1, a2);
 			const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
 			createSvgLine(
-				b.clone().addScaledVector(tanB, 18),
+				b.clone().addScaledVector(tanB, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
 				b,
 				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
 				this.previewGroup
 			);
 		}
 
-		const labelText = `${angleDeg.toFixed(1)}°`;
+		const labelText = `${formatDimensionValue(angleDeg, 1)}°`;
 		if (arcLen < 26) {
 			const uRad = Vec2.fromPolar(1, midAngle);
 			const anchor = midpoint.clone().addScaledVector(uRad, 14);

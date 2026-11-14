@@ -1,3 +1,4 @@
+import { AABB } from '../../math/aabb';
 import { isValidImage } from '../image';
 import { ellipseAxes, ellipseParameterAtPoint } from '../../math/ellipse';
 import type { SketchDocument } from '../sketch';
@@ -691,13 +692,20 @@ function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
 	};
 }
 
-export type SvgExportLayers = Partial<Record<'regions' | 'solid' | 'construction' | 'images', boolean>>;
+export type SvgExportLayers = Partial<Record<'regions' | 'solid' | 'construction' | 'images' | 'dimensions', boolean>>;
+
+export interface SvgExportDimensions {
+	svg: string;
+	/** Annotation bounds in sketch coordinates (Y-up), before export scaling. */
+	bounds: AABB;
+}
 
 export function exportSketchToSVG(
 	sketch: SketchDocument,
 	viewportState?: { panX: number; panY: number; zoom: number },
 	scale = 1,
-	layers: SvgExportLayers = {}
+	layers: SvgExportLayers = {},
+	dimensions?: SvgExportDimensions
 ): string {
 	if (!Number.isFinite(scale) || scale <= 0) {
 		throw new RangeError('SVG export scale must be finite and positive');
@@ -991,11 +999,17 @@ export function exportSketchToSVG(
 	for (const pt of sketch.points.values()) {
 		if (!usedPoints.has(pt.id) && !textRectPointIds.has(pt.id)) {
 			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
-			solid.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="2" fill="${fill}" />`);
+			solid.push(
+				`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="${SVG_EXPORT_STYLE.strokeWidth}" fill="${fill}" />`
+			);
 		}
 	}
 
-	const bbox = sketch.getBoundingBox();
+	let bbox = sketch.getBoundingBox();
+	if (layers.dimensions && dimensions) {
+		bbox ??= new AABB();
+		bbox.addPoint(dimensions.bounds.min).addPoint(dimensions.bounds.max);
+	}
 	let bounds = [-100, -100, 200, 200];
 
 	if (bbox) {
@@ -1018,6 +1032,10 @@ export function exportSketchToSVG(
 			const content = geometry[id].map(element => `    ${element}\n`).join('');
 			return `<g id="${id}" transform="${scaleTransform}">\n${content}  </g>`;
 		});
+
+	if (layers.dimensions && dimensions) {
+		groups.push(`<g id="dimensions" transform="${scaleTransform}">${dimensions.svg}</g>`);
+	}
 
 	return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">\n  <metadata id="sketcher-metadata">\n    <![CDATA[\n${jsonString}\n    ]]>\n  </metadata>\n  ${[...images, ...groups].join('\n  ')}\n</svg>`;
 }

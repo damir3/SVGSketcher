@@ -16,7 +16,7 @@ export interface ConstraintRenderContext {
 	renderBadgeOnSegment(id: string, p1Id: string, p2Id: string, label: string): void;
 	renderBadgeOnCircle(id: string, circleId: string, label: string): void;
 	renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void;
-	renderDashedExtensionLines?(
+	renderAngleExtensionLines?(
 		g: SVGGElement,
 		sCenter: Vec2,
 		angle: number,

@@ -1,3 +1,4 @@
+import { DIMENSION_EXTENSION_OVERRUN_PX } from './distances';
 import { Vec2 } from '../math/vector';
 
 export interface LinearDimensionGeometry {
@@ -20,8 +21,8 @@ export interface LinearDimensionVisualOptions {
 	labelPosition?: number;
 }
 
-export function formatDimensionValue(val: number): string {
-	return Number.isInteger(val) ? val.toFixed(1) : Number(val.toFixed(2)).toString();
+export function formatDimensionValue(val: number, fractionDigits = 2): string {
+	return Number(val.toFixed(fractionDigits)).toString();
 }
 
 export function computeDistanceDimensionGeometry(
@@ -50,16 +51,16 @@ export function computeDistanceDimensionGeometry(
 		d1 = new Vec2(s1.x, dimY);
 		d2 = new Vec2(s2.x, dimY);
 		const extDir = dimY >= midPoint.y ? 1 : -1;
-		extEnd1 = new Vec2(s1.x, dimY + extDir * 4);
-		extEnd2 = new Vec2(s2.x, dimY + extDir * 4);
+		extEnd1 = new Vec2(s1.x, dimY + extDir * DIMENSION_EXTENSION_OVERRUN_PX);
+		extEnd2 = new Vec2(s2.x, dimY + extDir * DIMENSION_EXTENSION_OVERRUN_PX);
 	} else if (orientation === 'vertical') {
 		const midPoint = new Vec2().midpoint(s1, s2);
 		const dimX = cursor ? cursor.x : midPoint.x + screenOffset;
 		d1 = new Vec2(dimX, s1.y);
 		d2 = new Vec2(dimX, s2.y);
 		const extDir = dimX >= midPoint.x ? 1 : -1;
-		extEnd1 = new Vec2(dimX + extDir * 4, s1.y);
-		extEnd2 = new Vec2(dimX + extDir * 4, s2.y);
+		extEnd1 = new Vec2(dimX + extDir * DIMENSION_EXTENSION_OVERRUN_PX, s1.y);
+		extEnd2 = new Vec2(dimX + extDir * DIMENSION_EXTENSION_OVERRUN_PX, s2.y);
 	} else {
 		const dir = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4);
 		if (!dir) return null;
@@ -69,7 +70,7 @@ export function computeDistanceDimensionGeometry(
 
 		d1 = s1.clone().addScaledVector(normal, offset);
 		d2 = s2.clone().addScaledVector(normal, offset);
-		const extDir = offset >= 0 ? 4 : -4;
+		const extDir = offset >= 0 ? DIMENSION_EXTENSION_OVERRUN_PX : -DIMENSION_EXTENSION_OVERRUN_PX;
 		extEnd1 = d1.clone().addScaledVector(normal, extDir);
 		extEnd2 = d2.clone().addScaledVector(normal, extDir);
 	}
@@ -118,7 +119,7 @@ export function computePointToLineDimensionGeometry(
 		const extDir = tDim >= tProj ? 1 : -1;
 		extensionLines.push({
 			from: sp,
-			to: dTop.clone().addScaledVector(dir, 4 * extDir),
+			to: dTop.clone().addScaledVector(dir, DIMENSION_EXTENSION_OVERRUN_PX * extDir),
 		});
 	}
 
@@ -126,12 +127,12 @@ export function computePointToLineDimensionGeometry(
 	if (tDim < 0) {
 		extensionLines.push({
 			from: s1,
-			to: dBase.clone().addScaledVector(dir, -4),
+			to: dBase.clone().addScaledVector(dir, -DIMENSION_EXTENSION_OVERRUN_PX),
 		});
 	} else if (tDim > lineLen) {
 		extensionLines.push({
 			from: s2,
-			to: dBase.clone().addScaledVector(dir, 4),
+			to: dBase.clone().addScaledVector(dir, DIMENSION_EXTENSION_OVERRUN_PX),
 		});
 	}
 

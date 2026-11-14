@@ -146,6 +146,7 @@ function initApp(): void {
 					<label><input type="checkbox" name="layers" value="construction" checked /> Construction geometry</label>
 					<label><input type="checkbox" name="layers" value="regions" checked /> Region fills</label>
 					<label><input type="checkbox" name="layers" value="images" checked /> Reference images</label>
+					<label><input type="checkbox" name="layers" value="dimensions" /> Dimensions and angles</label>
 				</fieldset>
 				<p>The editable Sketcher data is saved with the SVG.</p>
 				<div class="svg-export-actions">
@@ -418,6 +419,31 @@ function initApp(): void {
 
 	const exportDialog = document.getElementById('svg-export-dialog') as HTMLDialogElement;
 	const exportForm = exportDialog.querySelector('form')!;
+	const exportSettingsKey = 'sketcher.svgExportSettings';
+	const exportUnits = exportForm.querySelector<HTMLSelectElement>('[name="units"]')!;
+	const exportLayers = exportForm.querySelectorAll<HTMLInputElement>('[name="layers"]');
+	try {
+		const saved = JSON.parse(localStorage.getItem(exportSettingsKey) ?? 'null');
+		if (saved && typeof saved === 'object') {
+			if (SVG_EXPORT_UNITS.some(({ id }) => id === saved.units)) exportUnits.value = saved.units;
+			exportLayers.forEach(input => {
+				if (typeof saved.layers?.[input.value] === 'boolean') input.checked = saved.layers[input.value];
+			});
+		}
+	} catch {
+		// Keep the defaults when stored settings are invalid or storage is unavailable.
+	}
+	exportForm.addEventListener('change', () => {
+		const layers: Record<string, boolean> = {};
+		exportLayers.forEach(input => {
+			layers[input.value] = input.checked;
+		});
+		try {
+			localStorage.setItem(exportSettingsKey, JSON.stringify({ units: exportUnits.value, layers }));
+		} catch {
+			// Export remains available when browser storage is unavailable.
+		}
+	});
 	btnExport.addEventListener('click', () => exportDialog.showModal());
 	exportDialog.querySelector('#btn-cancel-svg-export')?.addEventListener('click', () => exportDialog.close());
 	exportDialog.addEventListener('keydown', e => e.stopPropagation());
@@ -428,12 +454,18 @@ function initApp(): void {
 		const unit = settings.get('units');
 		const scale = SVG_EXPORT_UNITS.find(({ id }) => id === unit)?.scale ?? PIXELS_PER_MILLIMETER;
 		const layers = settings.getAll('layers');
-		const svgData = sketch.exportSVG({ panX: viewport.panX, panY: viewport.panY, zoom: viewport.zoom }, scale, {
-			regions: layers.includes('regions'),
-			solid: layers.includes('solid'),
-			construction: layers.includes('construction'),
-			images: layers.includes('images'),
-		});
+		const svgData = sketch.exportSVG(
+			{ panX: viewport.panX, panY: viewport.panY, zoom: viewport.zoom },
+			scale,
+			{
+				regions: layers.includes('regions'),
+				solid: layers.includes('solid'),
+				construction: layers.includes('construction'),
+				images: layers.includes('images'),
+				dimensions: layers.includes('dimensions'),
+			},
+			layers.includes('dimensions') ? renderer.exportDimensions(sketch, viewport) : undefined
+		);
 		const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
