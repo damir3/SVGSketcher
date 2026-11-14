@@ -73,9 +73,7 @@ export const REGION_STYLE = {
 export const SVG_EXPORT_STYLE = {
 	geometryStroke: '#0f172a',
 	constructionStroke: '#64748b',
-	constructionDashArray: '2,2',
 	strokeWidth: 0.2,
-	dimensionStrokeWidth: 0.1,
 	fill: 'none',
 	isolatedPointFill: '#0f172a',
 	regionFill: '#bae6fd',

@@ -115,7 +115,8 @@ import {
 	exportSketchToSVG,
 	importSketchFromSVG,
 	type SketchFileMetadata,
-	type SvgExportLayers,
+	type SvgExportOptions,
+	type SvgExportSettings,
 	type SvgExportDimensions,
 } from './io/svgIO';
 
@@ -4356,7 +4357,7 @@ export class SketchDocument {
 	exportSVG(
 		viewportState?: { panX: number; panY: number; zoom: number },
 		scale = 1,
-		layers?: SvgExportLayers,
+		layers?: SvgExportOptions,
 		dimensions?: SvgExportDimensions
 	): string {
 		return exportSketchToSVG(this, viewportState, scale, layers, dimensions);
@@ -4365,6 +4366,7 @@ export class SketchDocument {
 	importSVG(svgString: string): {
 		success: boolean;
 		viewport?: { panX: number; panY: number; zoom: number };
+		exportSettings?: SvgExportSettings;
 		error?: string;
 	} {
 		return importSketchFromSVG(this, svgString);

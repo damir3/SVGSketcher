@@ -1552,7 +1552,11 @@ export class SVGRenderer {
 		}
 	}
 
-	exportDimensions(sketch: SketchDocument, viewport: Viewport): SvgExportDimensions | undefined {
+	exportDimensions(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		strokeWidth: number = SVG_EXPORT_STYLE.strokeWidth
+	): SvgExportDimensions | undefined {
 		const group = createSvgElement('g', { visibility: 'hidden' }, this.svg);
 		try {
 			this.renderConstraints(sketch, viewport, {}, group, true);
@@ -1561,7 +1565,7 @@ export class SVGRenderer {
 				text.textContent = text.textContent?.replace(/^fx:\s*/, '') ?? '';
 			});
 			group.querySelectorAll('[stroke-width]').forEach(element => {
-				element.setAttribute('stroke-width', String(SVG_EXPORT_STYLE.dimensionStrokeWidth * viewport.zoom));
+				element.setAttribute('stroke-width', String((strokeWidth / 2) * viewport.zoom));
 			});
 			const box = group.getBBox();
 			// SVG bounding boxes omit arrow markers and strokes.

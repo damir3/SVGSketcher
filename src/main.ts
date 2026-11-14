@@ -5,6 +5,7 @@ import { SketchDocument } from './model/sketch';
 import { getImageBounds } from './model/image';
 import { Viewport } from './canvas/viewport';
 import { SVGRenderer } from './canvas/renderer';
+import { SVG_EXPORT_STYLE } from './canvas/styles';
 import { CanvasInteraction } from './canvas/interaction';
 import { Toolbar, showToast } from './ui/toolbar';
 import { Sidebar } from './ui/sidebar';
@@ -139,6 +140,10 @@ function initApp(): void {
 							({ id, label }) => `<option value="${id}"${id === 'mm' ? ' selected' : ''}>${label}</option>`
 						).join('')}
 					</select>
+				</label>
+				<label class="svg-export-units">
+					Line width (mm)
+					<input type="number" name="strokeWidth" min="0.001" step="any" value="${SVG_EXPORT_STYLE.strokeWidth}" required />
 				</label>
 				<fieldset>
 					<legend>Include in SVG</legend>
@@ -421,11 +426,15 @@ function initApp(): void {
 	const exportForm = exportDialog.querySelector('form')!;
 	const exportSettingsKey = 'sketcher.svgExportSettings';
 	const exportUnits = exportForm.querySelector<HTMLSelectElement>('[name="units"]')!;
+	const exportStrokeWidth = exportForm.querySelector<HTMLInputElement>('[name="strokeWidth"]')!;
 	const exportLayers = exportForm.querySelectorAll<HTMLInputElement>('[name="layers"]');
 	try {
 		const saved = JSON.parse(localStorage.getItem(exportSettingsKey) ?? 'null');
 		if (saved && typeof saved === 'object') {
 			if (SVG_EXPORT_UNITS.some(({ id }) => id === saved.units)) exportUnits.value = saved.units;
+			if (Number.isFinite(saved.strokeWidth) && saved.strokeWidth >= Number(exportStrokeWidth.min)) {
+				exportStrokeWidth.value = String(saved.strokeWidth);
+			}
 			exportLayers.forEach(input => {
 				if (typeof saved.layers?.[input.value] === 'boolean') input.checked = saved.layers[input.value];
 			});
@@ -433,17 +442,22 @@ function initApp(): void {
 	} catch {
 		// Keep the defaults when stored settings are invalid or storage is unavailable.
 	}
-	exportForm.addEventListener('change', () => {
+	function saveExportSettings(): void {
+		if (!exportStrokeWidth.validity.valid) return;
 		const layers: Record<string, boolean> = {};
 		exportLayers.forEach(input => {
 			layers[input.value] = input.checked;
 		});
 		try {
-			localStorage.setItem(exportSettingsKey, JSON.stringify({ units: exportUnits.value, layers }));
+			localStorage.setItem(
+				exportSettingsKey,
+				JSON.stringify({ units: exportUnits.value, strokeWidth: exportStrokeWidth.valueAsNumber, layers })
+			);
 		} catch {
 			// Export remains available when browser storage is unavailable.
 		}
-	});
+	}
+	exportForm.addEventListener('change', saveExportSettings);
 	btnExport.addEventListener('click', () => exportDialog.showModal());
 	exportDialog.querySelector('#btn-cancel-svg-export')?.addEventListener('click', () => exportDialog.close());
 	exportDialog.addEventListener('keydown', e => e.stopPropagation());
@@ -454,17 +468,19 @@ function initApp(): void {
 		const unit = settings.get('units');
 		const scale = SVG_EXPORT_UNITS.find(({ id }) => id === unit)?.scale ?? PIXELS_PER_MILLIMETER;
 		const layers = settings.getAll('layers');
+		const strokeWidth = exportStrokeWidth.valueAsNumber;
 		const svgData = sketch.exportSVG(
 			{ panX: viewport.panX, panY: viewport.panY, zoom: viewport.zoom },
 			scale,
 			{
+				strokeWidth,
 				regions: layers.includes('regions'),
 				solid: layers.includes('solid'),
 				construction: layers.includes('construction'),
 				images: layers.includes('images'),
 				dimensions: layers.includes('dimensions'),
 			},
-			layers.includes('dimensions') ? renderer.exportDimensions(sketch, viewport) : undefined
+			layers.includes('dimensions') ? renderer.exportDimensions(sketch, viewport, strokeWidth) : undefined
 		);
 		const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
 		const url = URL.createObjectURL(blob);
@@ -492,6 +508,10 @@ function initApp(): void {
 
 			const result = sketch.importSVG(content);
 			if (result.success) {
+				if (result.exportSettings) {
+					exportStrokeWidth.value = String(result.exportSettings.strokeWidth);
+					saveExportSettings();
+				}
 				imageRequest++;
 				if (interaction.activeTool === 'image') interaction.setTool('select');
 				if (result.viewport) {

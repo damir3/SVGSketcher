@@ -17,6 +17,7 @@ export interface SketchFileMetadata {
 	version: number;
 	generator?: string;
 	createdAt?: string;
+	exportSettings?: SvgExportSettings;
 	viewport?: {
 		panX: number;
 		panY: number;
@@ -694,6 +695,19 @@ function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
 
 export type SvgExportLayers = Partial<Record<'regions' | 'solid' | 'construction' | 'images' | 'dimensions', boolean>>;
 
+export interface SvgExportSettings {
+	/** Primitive line width in sketch millimeters, before export scaling. */
+	strokeWidth: number;
+}
+
+export type SvgExportOptions = SvgExportLayers & Partial<SvgExportSettings>;
+
+function readExportSettings(settings?: SvgExportSettings): SvgExportSettings | undefined {
+	return settings && Number.isFinite(settings.strokeWidth) && settings.strokeWidth > 0
+		? { strokeWidth: settings.strokeWidth }
+		: undefined;
+}
+
 export interface SvgExportDimensions {
 	svg: string;
 	/** Annotation bounds in sketch coordinates (Y-up), before export scaling. */
@@ -704,12 +718,17 @@ export function exportSketchToSVG(
 	sketch: SketchDocument,
 	viewportState?: { panX: number; panY: number; zoom: number },
 	scale = 1,
-	layers: SvgExportLayers = {},
+	layers: SvgExportOptions = {},
 	dimensions?: SvgExportDimensions
 ): string {
 	if (!Number.isFinite(scale) || scale <= 0) {
 		throw new RangeError('SVG export scale must be finite and positive');
 	}
+	const strokeWidth = layers.strokeWidth ?? SVG_EXPORT_STYLE.strokeWidth;
+	if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) {
+		throw new RangeError('SVG export line width must be finite and positive');
+	}
+	const constructionDashArray = `${strokeWidth * 5},${strokeWidth * 5}`;
 
 	const metadataPayload: SketchFileMetadata = {
 		format: 'svg-sketcher',
@@ -717,6 +736,7 @@ export function exportSketchToSVG(
 		generator: 'SVG Sketcher',
 		createdAt: new Date().toISOString(),
 		viewport: viewportState,
+		exportSettings: { strokeWidth },
 		snapshot: withoutImageObjectUrls(sketch.takeSnapshot()),
 	};
 
@@ -770,11 +790,11 @@ export function exportSketchToSVG(
 		const p2 = sketch.points.get(line.p2Id);
 		if (p1 && p2) {
 			const dash = line.isConstruction
-				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
+				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			const group = line.isConstruction ? construction : solid;
 			group.push(
-				`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" />`
+				`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" />`
 			);
 		}
 	}
@@ -784,11 +804,11 @@ export function exportSketchToSVG(
 		const center = sketch.points.get(circ.centerId);
 		if (center) {
 			const dash = circ.isConstruction
-				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
+				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			const group = circ.isConstruction ? construction : solid;
 			group.push(
-				`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -823,11 +843,11 @@ export function exportSketchToSVG(
 			}
 			const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
 			const dash = arc.isConstruction
-				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
+				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			const group = arc.isConstruction ? construction : solid;
 			group.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -846,11 +866,11 @@ export function exportSketchToSVG(
 			const r = Vec2.from(sc).distancesTo(smaj, smin);
 			const deg = Vec2.from(sc).angleToPointDeg(smaj);
 			const dash = el.isConstruction
-				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
+				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			const group = el.isConstruction ? construction : solid;
 			group.push(
-				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -896,11 +916,11 @@ export function exportSketchToSVG(
 			}
 			const largeArc = sweepAngle > Math.PI ? 1 : 0;
 			const dash = elarc.isConstruction
-				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
+				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			const group = elarc.isConstruction ? construction : solid;
 			group.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -943,11 +963,11 @@ export function exportSketchToSVG(
 			}
 			const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
 			const dash = spline.isConstruction
-				? ` stroke-dasharray="${SVG_EXPORT_STYLE.constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
+				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
 				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
 			const group = spline.isConstruction ? construction : solid;
 			group.push(
-				`<path d="${d}"${dash} stroke-width="${SVG_EXPORT_STYLE.strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+				`<path d="${d}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -999,9 +1019,7 @@ export function exportSketchToSVG(
 	for (const pt of sketch.points.values()) {
 		if (!usedPoints.has(pt.id) && !textRectPointIds.has(pt.id)) {
 			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
-			solid.push(
-				`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="${SVG_EXPORT_STYLE.strokeWidth}" fill="${fill}" />`
-			);
+			solid.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="${strokeWidth}" fill="${fill}" />`);
 		}
 	}
 
@@ -1046,6 +1064,7 @@ export function importSketchFromSVG(
 ): {
 	success: boolean;
 	viewport?: { panX: number; panY: number; zoom: number };
+	exportSettings?: SvgExportSettings;
 	error?: string;
 } {
 	try {
@@ -1088,6 +1107,7 @@ export function importSketchFromSVG(
 			return {
 				success: true,
 				viewport: data.viewport,
+				exportSettings: readExportSettings(data.exportSettings),
 			};
 		}
 
@@ -1105,7 +1125,7 @@ export function importSketchFromSVG(
 			if (data.format === 'svg-sketcher' && data.snapshot) {
 				sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
 				sketch.clearHistory();
-				return { success: true, viewport: data.viewport };
+				return { success: true, viewport: data.viewport, exportSettings: readExportSettings(data.exportSettings) };
 			}
 		}
 		return { success: false, error: 'No parametric CAD metadata found in SVG' };

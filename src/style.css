@@ -1909,13 +1909,18 @@ body {
 	gap: 12px;
 }
 
-.svg-export-units select {
+.svg-export-units select,
+.svg-export-units input {
 	padding: 6px 8px;
 	border: 1px solid var(--border-color);
 	border-radius: 6px;
 	background: var(--bg-surface);
 	color: inherit;
 	font: inherit;
+}
+
+.svg-export-units input {
+	width: 100px;
 }
 
 .svg-export-dialog fieldset {

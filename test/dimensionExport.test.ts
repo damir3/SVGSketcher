@@ -94,6 +94,52 @@ test('exported point diameter is twice the primitive stroke width in every unit 
 	}
 });
 
+test('custom line width controls geometry, construction dashes and points and survives SVG reopening', () => {
+	const sketch = scene();
+	const a = sketch.addPoint(new Vec2(0, 50));
+	const b = sketch.addPoint(new Vec2(70, 50));
+	sketch.addLine(a.id, b.id, true);
+	sketch.addCircle(a.id, 10, true);
+	sketch.addPoint(new Vec2(100, 50));
+	for (const strokeWidth of [0.1, 0.35, 0.8]) {
+		for (const scale of [1, 96 / 25.4]) {
+			const svg = sketch.exportSVG(undefined, scale, { strokeWidth });
+			for (const match of svg.matchAll(/stroke-width="([^"]+)"/g)) {
+				assert.equal(Number(match[1]), strokeWidth);
+			}
+			const dashes = [...svg.matchAll(/stroke-dasharray="([^"]+)"/g)];
+			assert.equal(dashes.length, 2);
+			for (const match of dashes) {
+				assert.deepEqual(match[1].split(',').map(Number), [strokeWidth * 5, strokeWidth * 5]);
+			}
+			assert.equal(Number(svg.match(/<circle cx="100.00" cy="-50.00" r="([^"]+)"/)![1]), strokeWidth);
+			const reopened = new SketchDocument();
+			const result = reopened.importSVG(svg);
+			assert.equal(result.success, true);
+			assert.deepEqual(result.exportSettings, { strokeWidth });
+			const exportedAgain = reopened.exportSVG(undefined, scale, result.exportSettings);
+			assert.match(exportedAgain, new RegExp(`stroke-width="${strokeWidth}"`));
+		}
+	}
+});
+
+test('line width validation rejects invalid exports and ignores invalid or missing saved settings', () => {
+	const sketch = scene();
+	for (const strokeWidth of [0, -1, NaN, Infinity]) {
+		assert.throws(() => sketch.exportSVG(undefined, 1, { strokeWidth }), RangeError);
+	}
+	const svg = sketch.exportSVG();
+	for (const settings of [undefined, { strokeWidth: 0 }, { strokeWidth: -1 }, { strokeWidth: '0.2' }]) {
+		const withoutSettings = svg.replace(/"exportSettings":\s*\{[^}]+\},/, '');
+		const content = settings
+			? withoutSettings.replace('"version": 1,', `"version": 1, "exportSettings": ${JSON.stringify(settings)},`)
+			: withoutSettings;
+		const result = new SketchDocument().importSVG(content);
+		assert.equal(result.success, true);
+		assert.equal(result.exportSettings, undefined);
+	}
+});
+
 test('angle extension lines use the solid dimension style and the same 8px overhang', () => {
 	const previous = globalThis.document;
 	try {
@@ -188,11 +234,13 @@ test('renderer exports only dimensions without selection styling or changing can
 		assert.equal(sketch.selection.constraintIds.has(dimension.id), true);
 		for (const zoom of [1, 2, 4]) {
 			viewport.zoom = zoom;
-			const annotations = renderer.exportDimensions(sketch, viewport)!;
-			const output = sketch.exportSVG(undefined, 1, { dimensions: true }, annotations);
-			const primitiveWidth = Number(output.match(/<line[^>]*stroke-width="([^"]+)"/)![1]);
-			for (const match of annotations.svg.matchAll(/stroke-width="([^"]+)"/g)) {
-				assert.equal(primitiveWidth / (Number(match[1]) / zoom), 2, 'export stroke ratio stays 2:1 at every zoom');
+			for (const strokeWidth of [0.2, 0.5, 1]) {
+				const annotations = renderer.exportDimensions(sketch, viewport, strokeWidth)!;
+				const output = sketch.exportSVG(undefined, 1, { dimensions: true, strokeWidth }, annotations);
+				const primitiveWidth = Number(output.match(/<line[^>]*stroke-width="([^"]+)"/)![1]);
+				for (const match of annotations.svg.matchAll(/stroke-width="([^"]+)"/g)) {
+					assert.equal(primitiveWidth / (Number(match[1]) / zoom), 2, 'export stroke ratio stays 2:1 at every zoom');
+				}
 			}
 		}
 		assert.equal(renderer.exportDimensions(new SketchDocument(), viewport), undefined);
