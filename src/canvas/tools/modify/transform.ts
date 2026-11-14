@@ -23,6 +23,7 @@ type Drag =
 export class TransformTool extends BaseTool {
 	readonly id = 'transform' as const;
 	override readonly defaultCursor = 'default';
+	readonly keepPreviewOutsideCanvas = true;
 	private values = { ...DEFAULT_VALUES };
 	private copy = false;
 	private drag: Drag | null = null;

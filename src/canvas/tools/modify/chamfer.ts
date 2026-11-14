@@ -21,6 +21,10 @@ import { dispatchToolModeChange } from '../modeChangeEvent';
 export class ChamferTool extends BaseTool {
 	readonly id = 'chamfer' as const;
 
+	shouldExitOnUndo(): boolean {
+		return true;
+	}
+
 	readonly popup: ToolPopup<'dist1' | 'dist2' | 'angle' | 'flip'>;
 
 	// Persistent settings

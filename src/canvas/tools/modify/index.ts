@@ -8,4 +8,6 @@ export * from './offset';
 export * from './mirror';
 export * from './circularPattern';
 export * from './rectangularPattern';
+export * from './transform';
+export * from './image';
 export * from './utils';

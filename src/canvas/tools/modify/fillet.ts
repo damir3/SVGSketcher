@@ -17,6 +17,10 @@ import {
 export class FilletTool extends BaseTool {
 	readonly id = 'fillet' as const;
 
+	shouldExitOnUndo(): boolean {
+		return true;
+	}
+
 	readonly popup: ToolPopup<'radius'>;
 	filletRadius = 10.0;
 	pendingFillets: FilletCandidate[] = [];

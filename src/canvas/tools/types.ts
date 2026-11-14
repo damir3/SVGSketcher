@@ -197,6 +197,12 @@ export interface ITool {
 	/** Optional floating popup owned by this tool */
 	readonly popup?: { isOpen(): boolean };
 
+	/** Whether this tool keeps its gizmo/preview visible and continues active drags when the cursor leaves the canvas SVG */
+	readonly keepPreviewOutsideCanvas?: boolean;
+
+	/** Whether undoing a sketch change while this tool is active should switch back to the Select tool */
+	shouldExitOnUndo?(sketch: SketchDocument): boolean;
+
 	// --- Lifecycle ---
 	/** Called when tool is selected and becomes active */
 	activate(ctx: ToolContext): void;

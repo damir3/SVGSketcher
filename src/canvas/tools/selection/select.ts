@@ -5,25 +5,34 @@ import type { SketchDocument } from '../../../model/sketch';
 import type { SketchSnapshot } from '../../../model/history';
 import type { Viewport } from '../../viewport';
 import type { SVGRenderer } from '../../renderer';
-import type { ISketchPrimitive, SketchPoint, SketchLine, SketchCircle, SketchArc } from '../../../model/types';
-import type { IConstraint } from '../../../solver/types';
+import type { ISketchPrimitive, SketchLine } from '../../../model/types';
 import { DistanceConstraint, RadiusConstraint, RectangularPatternConstraint } from '../../../solver/constraints';
 import { DimensionTool } from '../constraints/dimension';
 import { AABB, curveContainedInAABB } from '../../../math/aabb';
 import type { GeoCurve } from '../../../math/intersection';
 import { Vec2 } from '../../../math/vector';
 import { GIZMO_DISTANCE_PX, LABEL_DISTANCE_PX } from '../../distances';
-import { findSelectableEntityNear } from '../../hitTesting';
+import {
+	findArcNear,
+	findCircleNear,
+	findConstraintNear,
+	findLineNear,
+	findPointNear,
+	findSelectableEntityNear,
+	findTextNear,
+} from '../../hitTesting';
 
 export interface SelectInteractionHost {
 	sketch: SketchDocument;
 	viewport: Viewport;
 	renderer?: SVGRenderer;
 	svg?: SVGSVGElement;
+	sidebar?: any;
 	activeTool: ToolType;
 	activeToolInstance: ITool | null;
 	selectedImageId: string | null;
 	lastMouseScreen: Vec2;
+	onEditDimension?: (constraint: any, screenPos: Vec2) => void;
 	isDraggingPoint: boolean;
 	draggedPointId: string | null;
 	dragPointStartWorld: Vec2 | null;
@@ -58,12 +67,11 @@ export interface SelectInteractionHost {
 	} | null;
 	setTool(tool: ToolType): void;
 	selectImage(id: string): void;
+	cancelDrawing(): void;
 	render(): void;
 	updateCursor?(): void;
 	getScreenPos(e: MouseEvent): Vec2;
 	findSnap(screen: Vec2, excludePointId?: string, allowGrid?: boolean): SnapResult | null;
-	findPointNear(screen: Vec2, thresholdPx?: number, excludePointId?: string): SketchPoint | null;
-	findConstraintNear(screen: Vec2, thresholdPx?: number): IConstraint | null;
 	applySnapConstraintIfNeeded(pointId: string, snap: SnapResult | null): void;
 	finishBoxSelection(s1: Vec2, s2: Vec2, shiftKey: boolean): void;
 }
@@ -153,44 +161,30 @@ export class SelectTool extends BaseTool {
 		sketch.selectEntities(itemsToSelect, activeTool === 'transform' ? 'toggle' : shiftKey);
 	}
 
-	static triggerDimensionEditAt(
-		e: MouseEvent,
-		screen: Vec2,
-		clientPos: Vec2,
-		deps: {
-			sketch: SketchDocument;
-			findConstraintNear: (screen: Vec2) => IConstraint | null;
-			findLineNear: (screen: Vec2) => SketchLine | null;
-			findCircleNear: (screen: Vec2) => SketchCircle | null;
-			findArcNear: (screen: Vec2) => SketchArc | null;
-			onEditDimension?: (constraint: any, screenPos: Vec2) => void;
-			setTool: (tool: ToolType) => void;
-			getActiveToolInstance: () => ITool | null;
-			render: () => void;
-		}
-	): boolean {
+	static triggerDimensionEditAt(host: SelectInteractionHost, e: MouseEvent, screen: Vec2, clientPos: Vec2): boolean {
+		const { sketch, viewport, onEditDimension } = host;
 		const target = e.target as SVGElement;
 		const targetG = target.closest('[data-id]') as SVGElement | null;
 		let id = targetG?.getAttribute('data-id');
 		let type = targetG?.getAttribute('data-type');
 
 		if (!type || (type !== 'line' && type !== 'circle' && type !== 'arc' && type !== 'constraint')) {
-			const hitConstraint = deps.findConstraintNear(screen);
+			const hitConstraint = findConstraintNear(sketch, viewport, screen);
 			if (hitConstraint) {
 				id = hitConstraint.id;
 				type = 'constraint';
 			} else {
-				const hitLine = deps.findLineNear(screen);
+				const hitLine = findLineNear(sketch, viewport, screen, host.activeTool);
 				if (hitLine) {
 					id = hitLine.id;
 					type = 'line';
 				} else {
-					const hitCircle = deps.findCircleNear(screen);
+					const hitCircle = findCircleNear(sketch, viewport, screen);
 					if (hitCircle) {
 						id = hitCircle.id;
 						type = 'circle';
 					} else {
-						const hitArc = deps.findArcNear(screen);
+						const hitArc = findArcNear(sketch, viewport, screen);
 						if (hitArc) {
 							id = hitArc.id;
 							type = 'arc';
@@ -201,13 +195,12 @@ export class SelectTool extends BaseTool {
 		}
 
 		if (!id || !type) return false;
-		const { sketch, onEditDimension, setTool, getActiveToolInstance, render } = deps;
 
 		if (type === 'constraint') {
 			const constraint = sketch.constraints.get(id);
 			if (constraint?.moveLabelTo && onEditDimension) {
 				sketch.selectEntity(constraint.id, 'constraint', false);
-				render();
+				host.render();
 				onEditDimension(constraint, clientPos);
 				return true;
 			}
@@ -224,7 +217,7 @@ export class SelectTool extends BaseTool {
 				}
 				if (distConstraint && onEditDimension) {
 					sketch.selectEntity(distConstraint.id, 'constraint', false);
-					render();
+					host.render();
 					onEditDimension(distConstraint, clientPos);
 					return true;
 				}
@@ -237,20 +230,42 @@ export class SelectTool extends BaseTool {
 				);
 				if (!radConstraint) {
 					sketch.clearSelection();
-					setTool('dimension');
-					const activeInstance = getActiveToolInstance();
-					if (activeInstance instanceof DimensionTool) {
-						activeInstance.beginRadiusPlacement(entity.id, true);
+					host.setTool('dimension');
+					if (host.activeToolInstance instanceof DimensionTool) {
+						host.activeToolInstance.beginRadiusPlacement(entity.id, true);
 						return true;
 					}
 				}
 				if (radConstraint && onEditDimension) {
 					sketch.selectEntity(radConstraint.id, 'constraint', false);
-					render();
+					host.render();
 					onEditDimension(radConstraint, clientPos);
 					return true;
 				}
 			}
+		}
+		return false;
+	}
+
+	static tryHandleDoubleClickAt(host: SelectInteractionHost, e: MouseEvent, screen: Vec2, clientPos: Vec2): boolean {
+		const targetEl = e.target as SVGElement | null;
+		const clickedText = findTextNear(host.sketch, host.viewport, screen, targetEl);
+		if (clickedText) {
+			e.preventDefault();
+			e.stopPropagation();
+			host.cancelDrawing();
+			host.sketch.selectEntity(clickedText.id, 'text', false);
+			host.sidebar?.render();
+			const textarea = host.sidebar?.container?.querySelector('#text-tool-input-text') as HTMLTextAreaElement | null;
+			textarea?.focus();
+			return true;
+		}
+
+		if (SelectTool.triggerDimensionEditAt(host, e, screen, clientPos)) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (host.activeTool === 'select') host.cancelDrawing();
+			return true;
 		}
 		return false;
 	}
@@ -383,7 +398,7 @@ export class SelectTool extends BaseTool {
 				| 'constraint'
 				| undefined;
 
-			const nearPoint = type !== 'constraint' ? host.findPointNear(screen) : null;
+			const nearPoint = type !== 'constraint' ? findPointNear(host.sketch, host.viewport, screen) : null;
 			if (nearPoint) {
 				id = nearPoint.id;
 				type = 'point';
@@ -401,7 +416,7 @@ export class SelectTool extends BaseTool {
 			}
 
 			if (host.activeTool === 'select' && type && type !== 'constraint' && type !== 'point') {
-				const hitConstraint = host.findConstraintNear(screen);
+				const hitConstraint = findConstraintNear(host.sketch, host.viewport, screen);
 				if (hitConstraint && !hitConstraint.isInternalConstraint?.(host.sketch)) {
 					id = hitConstraint.id;
 					type = 'constraint';

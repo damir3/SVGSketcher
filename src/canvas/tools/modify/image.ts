@@ -35,6 +35,7 @@ function transformAboutPivot(image: SketchImage, changes: Partial<Pick<SketchIma
 export class ImageTool extends BaseTool {
 	readonly id = 'image' as const;
 	override readonly defaultCursor = 'default';
+	readonly keepPreviewOutsideCanvas = true;
 	imageId: string | null = null;
 	private drag: Drag | null = null;
 	private draft: SketchImage | null = null;
@@ -62,6 +63,10 @@ export class ImageTool extends BaseTool {
 
 	override isBusy(): boolean {
 		return this.drag !== null;
+	}
+
+	shouldExitOnUndo(sketch: { images: ReadonlyMap<string, unknown> }): boolean {
+		return Boolean(this.imageId && !sketch.images.has(this.imageId));
 	}
 
 	override deactivate(): void {

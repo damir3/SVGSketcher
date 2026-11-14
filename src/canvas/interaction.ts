@@ -3,9 +3,7 @@ import type { SketchSnapshot } from '../model/history';
 import { DEFAULT_ZOOM } from '../constants';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
-import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from './distances';
 import { ORIGIN, Vec2 } from '../math/vector';
-import type { IConstraint } from '../solver/types';
 import type {
 	DistanceConstraint,
 	RadiusConstraint,
@@ -13,21 +11,8 @@ import type {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 } from '../solver/constraints';
-import type {
-	ISketchPrimitive,
-	SketchPoint,
-	SketchLine,
-	SketchCircle,
-	SketchArc,
-	SketchEllipse,
-	SketchEllipticalArc,
-	SketchSpline,
-	SketchText,
-} from '../model/types';
+import type { ISketchPrimitive } from '../model/types';
 import { showToast } from '../ui/toast';
-import type { GeoCurve } from '../math/intersection';
-import { ImageTool } from './tools/modify/image';
-import { TransformTool } from './tools/modify/transform';
 import { HighlightManager } from './highlightManager';
 import { applyAutoOrientation, applySnapConstraint, computeAxisSnappedWorldPos, findSnapTarget } from './snapping';
 import {
@@ -39,7 +24,6 @@ import {
 	findLineNear,
 	findPointNear,
 	findSplineNear,
-	findTextNear,
 	findTrimTargetNear,
 } from './hitTesting';
 
@@ -52,32 +36,11 @@ import {
 	type ToolRenderContext,
 	isConstraintTool,
 	isDrawingPrimitiveTool,
-	PointTool,
-	LineTool,
-	CircleTool,
-	RectangleTool,
-	SlotTool,
-	ArcTool,
-	PolygonTool,
-	EllipseTool,
-	SplineTool,
-	TextTool,
-	TrimTool,
-	ExtendTool,
-	BreakTool,
-	DeleteTool,
-	FilletTool,
-	ChamferTool,
-	OffsetTool,
-	MirrorTool,
-	CircularPatternTool,
-	RectangularPatternTool,
-	DimensionTool,
+	createToolMap,
+	ImageTool,
 	ConstraintTool,
 	SelectTool,
 	type SelectInteractionHost,
-	PanTool,
-	CONSTRAINT_TOOLS,
 } from './tools';
 export * from './tools';
 
@@ -205,9 +168,10 @@ export class CanvasInteraction implements SelectInteractionHost {
 		constraintId?: string;
 	} | null = null;
 
-	readonly tools = new Map<ToolType, ITool>();
+	readonly tools: Map<ToolType, ITool>;
 	activeToolInstance: ITool | null = null;
 	private isSettingTool = false;
+	private toolContext?: ToolContext;
 
 	isDrawingSpline(): boolean {
 		return this.activeTool === 'spline' && Boolean(this.activeToolInstance?.isBusy?.());
@@ -227,11 +191,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 
 	undoSketch(): boolean {
 		if (!this.sketch.undo()) return false;
-		if (
-			this.activeTool === 'fillet' ||
-			this.activeTool === 'chamfer' ||
-			(this.selectedImageId && !this.sketch.images.has(this.selectedImageId))
-		) {
+		if (this.activeToolInstance?.shouldExitOnUndo?.(this.sketch)) {
 			this.setTool('select');
 		} else {
 			this.render();
@@ -243,53 +203,22 @@ export class CanvasInteraction implements SelectInteractionHost {
 		return this.activeToolInstance?.redoPoint?.() ?? false;
 	}
 
-	private initTools(): void {
-		// Primitives
-		this.tools.set('point', new PointTool());
-		this.tools.set('line', new LineTool());
-		this.tools.set('circle', new CircleTool());
-		this.tools.set('rectangle', new RectangleTool());
-		this.tools.set('slot', new SlotTool('center_to_center'));
-		this.tools.set('arc', new ArcTool('center'));
-		this.tools.set('polygon', new PolygonTool());
-		this.tools.set('ellipse', new EllipseTool('ellipse'));
-		this.tools.set('spline', new SplineTool('fit'));
-		this.tools.set('text', new TextTool());
-
-		// Modify
-		this.tools.set('trim', new TrimTool());
-		this.tools.set('extend', new ExtendTool());
-		this.tools.set('break', new BreakTool());
-		this.tools.set('delete', new DeleteTool());
-		this.tools.set('fillet', new FilletTool());
-		this.tools.set('chamfer', new ChamferTool());
-		this.tools.set('offset', new OffsetTool());
-		this.tools.set('transform', new TransformTool());
-		this.tools.set('image', new ImageTool(id => this.onReplaceImage?.(id)));
-		this.tools.set('mirror', new MirrorTool());
-		this.tools.set('circular_pattern', new CircularPatternTool());
-		this.tools.set('rectangular_pattern', new RectangularPatternTool());
-
-		// Constraints
-		this.tools.set('dimension', new DimensionTool());
-		for (const cTool of CONSTRAINT_TOOLS) {
-			if (cTool !== 'dimension') {
-				this.tools.set(cTool, new ConstraintTool(cTool));
-			}
-		}
-
-		// Selection & Pan
-		this.tools.set('select', new SelectTool());
-		this.tools.set('pan', new PanTool());
-	}
-
 	createToolContext(): ToolContext {
+		if (this.toolContext) return this.toolContext;
 		const self = this;
-		return {
-			sketch: this.sketch,
-			viewport: this.viewport,
-			renderer: this.renderer,
-			svg: this.svg,
+		this.toolContext = {
+			get sketch() {
+				return self.sketch;
+			},
+			get viewport() {
+				return self.viewport;
+			},
+			get renderer() {
+				return self.renderer;
+			},
+			get svg() {
+				return self.svg;
+			},
 			get isConstructionMode() {
 				return self.isConstructionMode;
 			},
@@ -302,16 +231,18 @@ export class CanvasInteraction implements SelectInteractionHost {
 			onEditDimension: (c, screenPos) => this.onEditDimension?.(c, screenPos),
 			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
 				this.findSnap(screen, excludePointId, allowGrid),
-			findPointNear: this.findPointNear.bind(this),
-			findLineNear: this.findLineNear.bind(this),
-			findCircleNear: this.findCircleNear.bind(this),
-			findArcNear: this.findArcNear.bind(this),
-			findEllipseNear: this.findEllipseNear.bind(this),
-			findEllipticalArcNear: this.findEllipticalArcNear.bind(this),
-			findSplineNear: this.findSplineNear.bind(this),
-			findConstraintNear: this.findConstraintNear.bind(this),
+			findPointNear: (screen, thresholdPx) => findPointNear(this.sketch, this.viewport, screen, thresholdPx),
+			findLineNear: (screen, thresholdPx) =>
+				findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx),
+			findCircleNear: (screen, thresholdPx) => findCircleNear(this.sketch, this.viewport, screen, thresholdPx),
+			findArcNear: (screen, thresholdPx) => findArcNear(this.sketch, this.viewport, screen, thresholdPx),
+			findEllipseNear: (screen, thresholdPx) => findEllipseNear(this.sketch, this.viewport, screen, thresholdPx),
+			findEllipticalArcNear: (screen, thresholdPx) =>
+				findEllipticalArcNear(this.sketch, this.viewport, screen, thresholdPx),
+			findSplineNear: (screen, thresholdPx) => findSplineNear(this.sketch, this.viewport, screen, thresholdPx),
+			findConstraintNear: (screen, thresholdPx) => findConstraintNear(this.sketch, this.viewport, screen, thresholdPx),
 			toGeoCurve: (type, id) => this.sketch.toGeoCurve(id, type),
-			findTrimTarget: this.findTrimTargetNear.bind(this),
+			findTrimTarget: (screen, thresholdPx) => findTrimTargetNear(this.sketch, this.viewport, screen, thresholdPx),
 			applySnapConstraintIfNeeded: (pointId: string, snap: SnapResult | null) =>
 				this.applySnapConstraintIfNeeded(pointId, snap),
 			applyAutoOrientationConstraint: (p1Id: string, p2Id: string) => this.applyAutoOrientationConstraint(p1Id, p2Id),
@@ -323,6 +254,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 				return self.highlightManager;
 			},
 		};
+		return this.toolContext;
 	}
 
 	private computeToolSnap(screen: Vec2): SnapResult | null {
@@ -377,8 +309,8 @@ export class CanvasInteraction implements SelectInteractionHost {
 		this.viewport = viewport;
 		this.renderer = renderer;
 		this.highlightManager = new HighlightManager(this.svg, () => this.createToolContext());
+		this.tools = createToolMap(id => this.onReplaceImage?.(id));
 
-		this.initTools();
 		this.bindEvents();
 		this.sketch.onChange(() => {
 			this.updateConstructionState();
@@ -688,46 +620,6 @@ export class CanvasInteraction implements SelectInteractionHost {
 		return computeAxisSnappedWorldPos(startPos, targetPos, snap, this.isSnapModifierPressed);
 	}
 
-	findPointNear(screen: Vec2, thresholdPx = POINT_DISTANCE_PX, excludePointId?: string): SketchPoint | null {
-		return findPointNear(this.sketch, this.viewport, screen, thresholdPx, excludePointId);
-	}
-
-	findLineNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchLine | null {
-		return findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx);
-	}
-
-	findCircleNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchCircle | null {
-		return findCircleNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findArcNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchArc | null {
-		return findArcNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findConstraintNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): IConstraint | null {
-		return findConstraintNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findEllipseNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchEllipse | null {
-		return findEllipseNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findEllipticalArcNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchEllipticalArc | null {
-		return findEllipticalArcNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findSplineNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): SketchSpline | null {
-		return findSplineNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findTrimTargetNear(screen: Vec2, thresholdPx = LINE_DISTANCE_PX): GeoCurve | null {
-		return findTrimTargetNear(this.sketch, this.viewport, screen, thresholdPx);
-	}
-
-	findTextNear(screen: Vec2, targetEl?: SVGElement | null): SketchText | null {
-		return findTextNear(this.sketch, this.viewport, screen, targetEl);
-	}
-
 	private handleMouseDown(e: MouseEvent): void {
 		this.cancelAnimation();
 		this.highlightManager.clear();
@@ -805,11 +697,8 @@ export class CanvasInteraction implements SelectInteractionHost {
 			return;
 		}
 
-		if (
-			(this.activeToolInstance instanceof TransformTool || this.activeToolInstance instanceof ImageTool) &&
-			this.activeToolInstance.isBusy()
-		) {
-			this.activeToolInstance.onMouseMove(this.createToolMouseEvent(e));
+		if (this.activeToolInstance?.keepPreviewOutsideCanvas && this.activeToolInstance.isBusy?.()) {
+			this.activeToolInstance.onMouseMove?.(this.createToolMouseEvent(e));
 			this.updateToolPreview();
 			return;
 		}
@@ -821,7 +710,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 			this.regionHoverPoint = null;
 			this.renderer.updateRegionHover(null);
 			this.highlightManager.clear();
-			if (this.activeTool !== 'transform' && this.activeTool !== 'image') this.renderer.clearPreviews();
+			if (!this.activeToolInstance?.keepPreviewOutsideCanvas) this.renderer.clearPreviews();
 			return;
 		}
 
@@ -881,43 +770,10 @@ export class CanvasInteraction implements SelectInteractionHost {
 		this.onViewportChange?.();
 	}
 
-	private triggerDimensionEditAt(e: MouseEvent, screen: Vec2, clientPos: Vec2): boolean {
-		return SelectTool.triggerDimensionEditAt(e, screen, clientPos, {
-			sketch: this.sketch,
-			findConstraintNear: s => this.findConstraintNear(s),
-			findLineNear: s => this.findLineNear(s),
-			findCircleNear: s => this.findCircleNear(s),
-			findArcNear: s => this.findArcNear(s),
-			onEditDimension: this.onEditDimension,
-			setTool: tool => this.setTool(tool),
-			getActiveToolInstance: () => this.activeToolInstance,
-			render: () => this.render(),
-		});
-	}
-
 	private tryHandleDoubleClickAt(e: MouseEvent, screen: Vec2, clientPos: Vec2, now: number): boolean {
-		const targetEl = e.target as SVGElement | null;
-		const clickedText = this.findTextNear(screen, targetEl);
-		if (clickedText) {
-			e.preventDefault();
-			e.stopPropagation();
-			this.lastDoubleClickedTime = now;
-			this.cancelDrawing();
-			this.sketch.selectEntity(clickedText.id, 'text', false);
-			this.sidebar?.render();
-			const textarea = this.sidebar?.container?.querySelector('#text-tool-input-text') as HTMLTextAreaElement | null;
-			textarea?.focus();
-			return true;
-		}
-
-		if (this.triggerDimensionEditAt(e, screen, clientPos)) {
-			e.preventDefault();
-			e.stopPropagation();
-			this.lastDoubleClickedTime = now;
-			if (this.activeTool === 'select') this.cancelDrawing();
-			return true;
-		}
-		return false;
+		if (!SelectTool.tryHandleDoubleClickAt(this, e, screen, clientPos)) return false;
+		this.lastDoubleClickedTime = now;
+		return true;
 	}
 
 	private handleDoubleClick(e: MouseEvent): void {
