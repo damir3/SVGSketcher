@@ -1,6 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
+import { isConstraintOnlySelected, type ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
@@ -231,7 +231,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		if (!pCtr) return;
 
 		const sCtr = ctx.viewport.worldToScreen(pCtr);
-		const isConstraintActive = ctx.isConstraintOnlySelected ? ctx.isConstraintOnlySelected(this.id) : false;
+		const isConstraintActive = isConstraintOnlySelected(this.id, ctx.sketch);
 
 		// Render suppression checkboxes and suppressed objects only when constraint itself is selected
 		if (this.suppression && isConstraintActive && !this.isReadOnly) {

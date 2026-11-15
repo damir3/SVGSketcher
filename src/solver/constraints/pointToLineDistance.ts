@@ -5,8 +5,11 @@ import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
-import { computePointToLineDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
-import { distanceToLinearDimension } from '../../math/hitTest';
+import {
+	computePointToLineDimensionGeometry,
+	distanceToLinearDimensionVisual,
+	formatDimensionValue,
+} from '../../canvas/dimensionGeometry';
 
 /**
  * Dimensional constraint: distance from a point to a line segment (infinite line extension) equals value
@@ -209,17 +212,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		const reverse = this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y');
 		const d1 = reverse ? geom.d2 : geom.d1;
 		const d2 = reverse ? geom.d1 : geom.d2;
-		const t = this.labelPosition ?? 0.5;
-		const basePos = d1.clone().lerp(d2, t);
-		const distToLabel = screen.distanceTo(basePos);
-		const distToSeg = distanceToLinearDimension(screen, d1, d2);
-		let minDist = Math.min(distToLabel, distToSeg);
-		if (t < 0) {
-			minDist = Math.min(minDist, distanceToLinearDimension(screen, basePos, d1));
-		} else if (t > 1) {
-			minDist = Math.min(minDist, distanceToLinearDimension(screen, d2, basePos));
-		}
-		return minDist;
+		return distanceToLinearDimensionVisual(screen, d1, d2, this.labelPosition ?? 0.5);
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

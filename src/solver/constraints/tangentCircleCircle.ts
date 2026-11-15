@@ -2,7 +2,7 @@ import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import { signedDistanceToLine } from './pointOnLine';
-import type { ConstraintRenderContext } from './renderContext';
+import { isAngleNearArc, type ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains two circles or arcs to be tangent to each other (either externally or internally)
@@ -115,14 +115,8 @@ export class TangentCircleCircleConstraint extends BaseConstraint {
 		const tan = new Vec2().midpoint(contact1, contact2);
 		const distBetweenContactPts = contact1.distanceTo(contact2);
 
-		let isNearArc1 = true;
-		if (arc1 && ctx.isAngleNearArc) {
-			isNearArc1 = ctx.isAngleNearArc(arc1, center1, tan, r1Screen);
-		}
-		let isNearArc2 = true;
-		if (arc2 && ctx.isAngleNearArc) {
-			isNearArc2 = ctx.isAngleNearArc(arc2, center2, tan, r2Screen);
-		}
+		const isNearArc1 = arc1 ? isAngleNearArc(arc1, center1, tan, ctx.sketch, ctx.viewport, r1Screen) : true;
+		const isNearArc2 = arc2 ? isAngleNearArc(arc2, center2, tan, ctx.sketch, ctx.viewport, r2Screen) : true;
 
 		const isNear = distBetweenContactPts < 60 && isNearArc1 && isNearArc2;
 

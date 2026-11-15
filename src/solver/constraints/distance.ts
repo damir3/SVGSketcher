@@ -4,8 +4,11 @@ import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
-import { computeDistanceDimensionGeometry, formatDimensionValue } from '../../canvas/dimensionGeometry';
-import { distanceToLinearDimension } from '../../math/hitTest';
+import {
+	computeDistanceDimensionGeometry,
+	distanceToLinearDimensionVisual,
+	formatDimensionValue,
+} from '../../canvas/dimensionGeometry';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { PointToLineDistanceConstraint } from './pointToLineDistance';
 import { DEFAULT_DISTANCE_OFFSET } from '../../canvas/distances';
@@ -251,19 +254,7 @@ export class DistanceConstraint extends BaseConstraint {
 		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
 		if (!geom) return null;
 
-		const d1 = geom.d1;
-		const d2 = geom.d2;
-		const t = this.labelPosition ?? 0.5;
-		const basePos = d1.clone().lerp(d2, t);
-		const distToLabel = screen.distanceTo(basePos);
-		const distToSeg = distanceToLinearDimension(screen, d1, d2);
-		let minDist = Math.min(distToLabel, distToSeg);
-		if (t < 0) {
-			minDist = Math.min(minDist, distanceToLinearDimension(screen, basePos, d1));
-		} else if (t > 1) {
-			minDist = Math.min(minDist, distanceToLinearDimension(screen, d2, basePos));
-		}
-		return minDist;
+		return distanceToLinearDimensionVisual(screen, geom.d1, geom.d2, this.labelPosition ?? 0.5);
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

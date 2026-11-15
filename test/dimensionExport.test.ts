@@ -8,7 +8,7 @@ import { register } from 'node:module';
 import { Viewport } from '../src/canvas/viewport';
 
 register('./helpers/rawSvgLoader.mjs', import.meta.url);
-const { SVGRenderer, COLORS } = await import('../src/canvas/renderer');
+const { SVGRenderer, COLORS, renderAngleExtensionLines } = await import('../src/canvas/renderer');
 
 class SvgElement {
 	attributes: Record<string, string> = {};
@@ -144,10 +144,9 @@ test('angle extension lines use the solid dimension style and the same 8px overh
 	const previous = globalThis.document;
 	try {
 		globalThis.document = { createElementNS: (_ns: string, tag: string) => new SvgElement(tag) } as unknown as Document;
-		const renderer = new SVGRenderer(new SvgElement('svg') as unknown as SVGSVGElement);
 		for (const color of [COLORS.primary, COLORS.selected]) {
 			const group = new SvgElement('g');
-			renderer['renderAngleExtensionLines'](
+			renderAngleExtensionLines(
 				group as unknown as SVGElement,
 				new Vec2(),
 				0,

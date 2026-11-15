@@ -2,7 +2,7 @@ import { calculateObjectsCentroid } from '../../canvas/tools/modify/utils';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { PatternCopyData, PatternPointPair, PatternRadiusPair } from './circularPattern';
-import type { ConstraintRenderContext } from './renderContext';
+import { isConstraintOnlySelected, type ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
@@ -372,7 +372,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		const line1 = this.line1P1Id && this.line1P2Id ? { p1Id: this.line1P1Id, p2Id: this.line1P2Id } : null;
 		const line2 = this.line2P1Id && this.line2P2Id ? { p1Id: this.line2P1Id, p2Id: this.line2P2Id } : null;
 		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
-		const isConstraintActive = ctx.isConstraintOnlySelected ? ctx.isConstraintOnlySelected(this.id) : false;
+		const isConstraintActive = isConstraintOnlySelected(this.id, ctx.sketch);
 
 		if (isConstraintActive) {
 			if (ctx.renderRectangularPatternGizmos) {

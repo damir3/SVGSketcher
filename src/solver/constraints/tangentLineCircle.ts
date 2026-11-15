@@ -1,7 +1,7 @@
 import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
+import { isAngleNearArc, type ConstraintRenderContext } from './renderContext';
 
 /**
  * Constrains a line (or coordinate axis) to be tangent to a circle/arc
@@ -112,7 +112,7 @@ export class TangentLineCircleConstraint extends BaseConstraint {
 		const distToSeg = isAxis ? 0 : t < 0 ? -t : t > lineLen ? t - lineLen : 0;
 		const distToCirc = Math.abs(normDist - rScreen);
 
-		const isNearArc = arc && ctx.isAngleNearArc ? ctx.isAngleNearArc(arc, center, tan, rScreen) : true;
+		const isNearArc = arc ? isAngleNearArc(arc, center, tan, ctx.sketch, ctx.viewport, rScreen) : true;
 		const isNear = distToSeg < 60 && distToCirc < 60 && isNearArc;
 
 		if (isNear) {

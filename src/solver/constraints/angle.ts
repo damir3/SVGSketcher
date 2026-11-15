@@ -1,13 +1,11 @@
-import { formatDimensionValue } from '../../canvas/dimensionGeometry';
+import { formatDimensionValue, renderAngleDimensionVisual } from '../../canvas/dimensionGeometry';
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
-import { COLORS, STROKE_WIDTH, DIM_ARROWS, type SvgAttrs } from '../../canvas/styles';
-import { createSvgElement, createSvgLine, createSvgPath, renderDimensionLabel } from '../../canvas/svg';
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX, DIMENSION_EXTERNAL_ARROW_TAIL_PX } from '../../canvas/distances';
+import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
 import { ORIGIN, Vec2 } from '../../math/vector';
 
 /**
@@ -183,23 +181,7 @@ export class AngleConstraint extends BaseConstraint {
 	override render(ctx: ConstraintRenderContext): void {
 		const layout = this.computeScreenArcLayout(ctx.sketch, ctx.viewport);
 		if (!layout) return;
-		const { p1, p2, p3, p4, sCenter, a1, a2, delta, rScreen, midAngle, midPoint } = layout;
-
-		const sweepFlag = delta > 0 ? 1 : 0;
-		const a = Vec2.fromPolar(rScreen, a1).add(sCenter);
-		const b = Vec2.fromPolar(rScreen, a2).add(sCenter);
-
-		const g = createSvgElement(
-			'g',
-			{
-				class: 'dimension-item',
-				'data-id': this.id,
-				'data-type': 'constraint',
-			},
-			ctx.targetGroup
-		);
-
-		const color = ctx.isSelected ? COLORS.selected : COLORS.primary;
+		const { p1, p2, p3, p4, sCenter, a1, a2, delta, rScreen } = layout;
 
 		// Extension lines if arc points extend beyond the physical line segments
 		const sp1 = ctx.viewport.worldToScreen(p1);
@@ -207,90 +189,34 @@ export class AngleConstraint extends BaseConstraint {
 		const sp3 = ctx.viewport.worldToScreen(p3);
 		const sp4 = ctx.viewport.worldToScreen(p4);
 
-		if (ctx.renderAngleExtensionLines) {
-			const isUserLine1 = Boolean(this.line1Id && ctx.sketch.lines.has(this.line1Id));
-			const isUserLine2 = Boolean(this.line2Id && ctx.sketch.lines.has(this.line2Id));
-			const isArc1 = Boolean(this.line1Id && ctx.sketch.arcs.has(this.line1Id));
-			const isArc2 = Boolean(this.line2Id && ctx.sketch.arcs.has(this.line2Id));
-			const hasSeg1 = Boolean(isUserLine1 || isArc1 || ctx.sketch.getLineBetween(this.l1P1, this.l1P2));
-			const hasSeg2 = Boolean(isUserLine2 || isArc2 || ctx.sketch.getLineBetween(this.l2P1, this.l2P2));
-			if (!this.line1Id || isUserLine1 || isArc1) {
-				ctx.renderAngleExtensionLines(g, sCenter, a1, rScreen, sp1, hasSeg1 ? sp2 : sp1, color);
-			}
-			if (!this.line2Id || isUserLine2 || isArc2) {
-				ctx.renderAngleExtensionLines(g, sCenter, a2, rScreen, sp3, hasSeg2 ? sp4 : sp3, color);
-			}
+		const isUserLine1 = Boolean(this.line1Id && ctx.sketch.lines.has(this.line1Id));
+		const isUserLine2 = Boolean(this.line2Id && ctx.sketch.lines.has(this.line2Id));
+		const isArc1 = Boolean(this.line1Id && ctx.sketch.arcs.has(this.line1Id));
+		const isArc2 = Boolean(this.line2Id && ctx.sketch.arcs.has(this.line2Id));
+		const hasSeg1 = Boolean(isUserLine1 || isArc1 || ctx.sketch.getLineBetween(this.l1P1, this.l1P2));
+		const hasSeg2 = Boolean(isUserLine2 || isArc2 || ctx.sketch.getLineBetween(this.l2P1, this.l2P2));
+
+		const extensionLines: Array<{ angle: number; pA: Vec2; pB: Vec2 }> = [];
+		if (!this.line1Id || isUserLine1 || isArc1) {
+			extensionLines.push({ angle: a1, pA: sp1, pB: hasSeg1 ? sp2 : sp1 });
 		}
-
-		// Arc path with arrowheads (Engineering CAD style)
-		const arcLen = rScreen * Math.abs(delta);
-		const arrowUrl = ctx.isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
-		const lineAttrs: SvgAttrs = {
-			fill: 'none',
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-		};
-
-		if (arcLen >= 40) {
-			createSvgPath(
-				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-				{
-					...lineAttrs,
-					'marker-start': arrowUrl,
-					'marker-end': arrowUrl,
-				},
-				g
-			);
-		} else {
-			// Flipped tangential arrows outside for sharp angles (GOST 2.307)
-			createSvgPath(
-				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-				lineAttrs,
-				g
-			);
-			const uA = Vec2.fromPolar(1, a1);
-			const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
-			createSvgLine(
-				a.clone().addScaledVector(tanA, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-				a,
-				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
-				g
-			);
-			const uB = Vec2.fromPolar(1, a2);
-			const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
-			createSvgLine(
-				b.clone().addScaledVector(tanB, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-				b,
-				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
-				g
-			);
+		if (!this.line2Id || isUserLine2 || isArc2) {
+			extensionLines.push({ angle: a2, pA: sp3, pB: hasSeg2 ? sp4 : sp3 });
 		}
 
 		const prefix = this.expression ? 'fx: ' : '';
-		const labelText = `${prefix}${formatDimensionValue(this.targetAngle, 1)}°`;
-
-		if (arcLen < 26) {
-			// Leader shelf for small angle
-			const uRad = Vec2.fromPolar(1, midAngle);
-			const anchor = midPoint.clone().addScaledVector(uRad, 14);
-			createSvgLine(midPoint, anchor, { stroke: color, 'stroke-width': STROKE_WIDTH.dimension }, g);
-			const dirX = uRad.x >= 0 ? 1 : -1;
-			const shelfLen = labelText.length * 7.5 + 10;
-			const shelfEnd = new Vec2(anchor.x + dirX * shelfLen, anchor.y);
-			createSvgLine(anchor, shelfEnd, { stroke: color, 'stroke-width': STROKE_WIDTH.dimension }, g);
-			renderDimensionLabel(g, new Vec2(anchor.x + dirX * (shelfLen * 0.5), anchor.y - 8.5), labelText, color, 'angle');
-		} else {
-			// Above arc on convex side
-			const uRad = Vec2.fromPolar(1, midAngle);
-			const textPos = midPoint.clone().addScaledVector(uRad, 8.5);
-			const uTan = uRad.perpendicular();
-			let textAngle = Math.atan2(uTan.y, uTan.x);
-			if (textAngle > Math.PI / 2 - 1e-4) textAngle -= Math.PI;
-			else if (textAngle <= -Math.PI / 2) textAngle += Math.PI;
-			renderDimensionLabel(g, textPos, labelText, color, 'angle', {
-				angleDeg: (textAngle * 180) / Math.PI,
-			});
-		}
+		renderAngleDimensionVisual({
+			parent: ctx.targetGroup,
+			sCenter,
+			a1,
+			a2,
+			delta,
+			rScreen,
+			label: `${prefix}${formatDimensionValue(this.targetAngle, 1)}°`,
+			isSelected: ctx.isSelected,
+			constraintId: this.id,
+			extensionLines,
+		});
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx = LINE_DISTANCE_PX): number | null {

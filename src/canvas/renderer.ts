@@ -17,15 +17,13 @@ import {
 	type ConstraintRenderContext,
 } from '../solver/constraints';
 import { ORIGIN, Vec2 } from '../math/vector';
-import { getBadgeIcon } from './badgeIcons';
+import { renderConstraintBadge, renderBadgeOnSegment, renderBadgeOnCircle } from './badgeIcons';
 import { fitPointsToBezier, getSplineSvgPath } from '../math/spline';
 
 export * from './styles';
 export * from './svg';
 export * from './dimensionGeometry';
 export { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
-
-import { DIMENSION_EXTERNAL_ARROW_TAIL_PX, DIMENSION_EXTENSION_OVERRUN_PX } from './distances';
 
 import {
 	createSvgElement,
@@ -34,14 +32,14 @@ import {
 	createSvgRect,
 	createSvgPath,
 	createSvgText,
-	renderDimensionLabel,
 	getArcSvgPath,
 } from './svg';
 import {
-	type LinearDimensionVisualOptions,
 	formatDimensionValue,
 	computeDistanceDimensionGeometry,
 	computePointToLineDimensionGeometry,
+	renderLinearDimensionVisual,
+	renderAngleDimensionVisual,
 } from './dimensionGeometry';
 import {
 	COLORS,
@@ -49,12 +47,9 @@ import {
 	DASH_ARRAY,
 	STROKE_WIDTH,
 	SVG_EXPORT_STYLE,
-	DIM_ARROWS,
 	FILTERS,
 	type SvgAttrs,
 	HIT_AREA_STROKE_ATTRS,
-	EXTENSION_LINE_ATTRS,
-	PREVIEW_EXTENSION_LINE_ATTRS,
 	SELECTION_BOX_ATTRS,
 	CROSSING_SELECTION_BOX_ATTRS,
 	MIRROR_PREVIEW_LINE_ATTRS,
@@ -904,24 +899,46 @@ export class SVGRenderer {
 			isSelected: false,
 			lineBadgeCounts,
 			renderBadge: (id, position, label, color) => {
-				this.renderConstraintBadge(id, position, label, ctx.isSelected, color);
+				renderConstraintBadge(
+					this.constraintGroup,
+					id,
+					position,
+					label,
+					ctx.isSelected,
+					this.constraintBadgesVisible,
+					color
+				);
 			},
 			renderBadgeOnSegment: (id, p1Id, p2Id, label) => {
-				this.renderBadgeOnSegment(id, p1Id, p2Id, sketch, viewport, label, ctx.isSelected, lineBadgeCounts);
+				renderBadgeOnSegment(
+					this.constraintGroup,
+					id,
+					p1Id,
+					p2Id,
+					sketch,
+					viewport,
+					label,
+					ctx.isSelected,
+					this.constraintBadgesVisible,
+					lineBadgeCounts
+				);
 			},
 			renderBadgeOnCircle: (id, circleId, label) => {
-				this.renderBadgeOnCircle(id, circleId, sketch, viewport, label, ctx.isSelected);
+				renderBadgeOnCircle(
+					this.constraintGroup,
+					id,
+					circleId,
+					sketch,
+					viewport,
+					label,
+					ctx.isSelected,
+					this.constraintBadgesVisible
+				);
 			},
-			renderLinearDimensionVisual: opts => {
-				this.renderLinearDimensionVisual(opts);
-			},
-			renderAngleExtensionLines: (g, sCenter, angle, rScreen, sp1, sp2, color) => {
-				this.renderAngleExtensionLines(g, sCenter, angle, rScreen, sp1, sp2, color);
-			},
+			renderLinearDimensionVisual,
 			patternCheckboxGroup: this.patternCheckboxGroup,
 			patternCheckboxPositions: this.patternCheckboxPositions,
 			rectangularGizmoHandles: this.rectangularGizmoHandles,
-			isConstraintOnlySelected: constraintId => this.isConstraintOnlySelected(constraintId, sketch),
 			renderTransformedObjects: (objectIds, transform, options) => {
 				return this.renderTransformedObjects(sketch, viewport, objectIds, transform, options);
 			},
@@ -930,9 +947,6 @@ export class SVGRenderer {
 			},
 			renderRectangularPatternGizmos: (v, centroidWorld, u1, u2, distance1, distance2, options) => {
 				this.renderRectangularPatternGizmos(v, centroidWorld, u1, u2, distance1, distance2, options);
-			},
-			isAngleNearArc: (arc, center, point, rScreen) => {
-				return this.isAngleNearArc(arc, center, point, sketch, viewport, rScreen);
 			},
 		};
 
@@ -947,340 +961,6 @@ export class SVGRenderer {
 			this.setDimensionsVisible(this.dimensionsVisible);
 			this.setConstraintBadgesVisible(this.constraintBadgesVisible);
 		}
-	}
-
-	private renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void {
-		const {
-			d1,
-			d2,
-			label,
-			extensionLines,
-			parent,
-			isSelected = false,
-			constraintId,
-			isPreview = false,
-			startPointHighlight,
-			targetPointSnapped = false,
-		} = opts;
-
-		const g = constraintId
-			? createSvgElement(
-					'g',
-					{
-						class: 'dimension-item',
-						'data-id': constraintId,
-						'data-type': 'constraint',
-					},
-					parent
-				)
-			: parent;
-
-		const color = isSelected ? COLORS.selected : COLORS.primary;
-		const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
-
-		// 1. Extension lines
-		if (extensionLines && extensionLines.length > 0) {
-			const extAttrs = isPreview
-				? PREVIEW_EXTENSION_LINE_ATTRS
-				: isSelected
-					? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
-					: EXTENSION_LINE_ATTRS;
-			for (const ext of extensionLines) {
-				createSvgLine(ext.from, ext.to, extAttrs, g);
-			}
-		}
-
-		// 2. Start point highlight (origin anchor)
-		if (startPointHighlight) {
-			createSvgCircle(
-				startPointHighlight,
-				4,
-				{
-					fill: COLORS.primary,
-					stroke: COLORS.white,
-					'stroke-width': 1.5,
-				},
-				g
-			);
-		}
-
-		// 3. Target point snap ring
-		if (targetPointSnapped) {
-			createSvgCircle(
-				d2,
-				6,
-				{
-					fill: COLORS.guideFaint,
-					stroke: COLORS.primary,
-					'stroke-width': 1.5,
-				},
-				g
-			);
-		}
-
-		// 4. Dimension line with arrowheads (Engineering CAD style)
-		const screenDist = d1.distanceTo(d2);
-		const lineAttrs: SvgAttrs = {
-			stroke: color,
-			'stroke-width': STROKE_WIDTH.dimension,
-		};
-		const minInsideDist = 40;
-		if (screenDist >= minInsideDist) {
-			createSvgLine(d1, d2, { ...lineAttrs, 'marker-start': arrowUrl, 'marker-end': arrowUrl }, g);
-		} else if (screenDist > 1e-4) {
-			// Flipped arrows outside pointing inward (GOST 2.307)
-			createSvgLine(d1, d2, lineAttrs, g);
-			const u = new Vec2().subVectors(d2, d1).multiplyScalar(1 / screenDist);
-			createSvgLine(
-				d1.clone().addScaledVector(u, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-				d1,
-				{ ...lineAttrs, 'marker-end': arrowUrl },
-				g
-			);
-			createSvgLine(
-				d2.clone().addScaledVector(u, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-				d2,
-				{ ...lineAttrs, 'marker-end': arrowUrl },
-				g
-			);
-		} else {
-			createSvgLine(d1, d2, lineAttrs, g);
-		}
-
-		// Option B: Dimension number placed above the dimension line
-		let angle = 0;
-		if (screenDist > 1e-4) {
-			angle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
-		}
-		// Normalize angle so text reads from left to right (or bottom to top from the right side, GOST 2.307)
-		if (angle > Math.PI / 2 - 1e-4) {
-			angle -= Math.PI;
-		} else if (angle <= -Math.PI / 2) {
-			angle += Math.PI;
-		}
-		const uText = Vec2.fromPolar(1, angle);
-		const up = new Vec2(uText.y, -uText.x);
-
-		// Position along the dimension line (can be moved anywhere, default is midpoint t = 0.5)
-		const t = opts.labelPosition ?? 0.5;
-		const basePos = d1.clone().lerp(d2, t);
-
-		// Extend dimension line if text moved outside extension lines
-		if (screenDist > 1e-4 && (t < 0 || t > 1)) {
-			const u = new Vec2().subVectors(d2, d1).multiplyScalar(1 / screenDist);
-			const overhang = Math.max(12, (label.length * 7.5) / 2) + 6;
-			if (t < 0) {
-				createSvgLine(basePos.clone().addScaledVector(u, -overhang), d1, lineAttrs, g);
-			} else if (t > 1) {
-				createSvgLine(d2, basePos.clone().addScaledVector(u, overhang), lineAttrs, g);
-			}
-		}
-
-		const textPos = basePos.addScaledVector(up, 8.5);
-		const angleDeg = (angle * 180) / Math.PI;
-
-		renderDimensionLabel(g, textPos, label, color, 'linear', {
-			angleDeg,
-		});
-	}
-
-	private renderAngleExtensionLines(
-		parentG: SVGElement,
-		sCenter: Vec2,
-		angleRad: number,
-		rScreen: number,
-		pA: Vec2,
-		pB: Vec2,
-		color: string
-	): void {
-		const v = Vec2.fromPolar(1, angleRad);
-
-		const k1 = new Vec2().subVectors(pA, sCenter).dot(v);
-		const k2 = new Vec2().subVectors(pB, sCenter).dot(v);
-		const kMin = Math.min(k1, k2);
-		const kMax = Math.max(k1, k2);
-
-		const kEnd = rScreen + DIMENSION_EXTENSION_OVERRUN_PX;
-		if (kEnd <= 0) return;
-
-		const intervals: Array<[number, number]> = [];
-		if (kMax <= 0) {
-			intervals.push([0, kEnd]);
-		} else if (kMin <= 0) {
-			if (kEnd > kMax) {
-				intervals.push([kMax, kEnd]);
-			}
-		} else {
-			intervals.push([0, Math.min(kMin, kEnd)]);
-			if (kEnd > kMax) {
-				intervals.push([kMax, kEnd]);
-			}
-		}
-
-		for (const [startK, endK] of intervals) {
-			if (endK - startK < 1) continue;
-			const p1 = sCenter.clone().addScaledVector(v, startK);
-			const p2 = sCenter.clone().addScaledVector(v, endK);
-
-			createSvgLine(
-				p1,
-				p2,
-				{
-					...EXTENSION_LINE_ATTRS,
-					stroke: color,
-				},
-				parentG
-			);
-		}
-	}
-
-	private isAngleNearArc(
-		arc: { startPointId: string; endPointId: string; clockwise?: boolean },
-		center: Vec2,
-		point: Vec2,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		rScreen: number
-	): boolean {
-		const start = sketch.points.get(arc.startPointId);
-		const end = sketch.points.get(arc.endPointId);
-		if (!start || !end) return true;
-
-		const sCenter = viewport.worldToScreen(center);
-		const ss = viewport.worldToScreen(start);
-		const se = viewport.worldToScreen(end);
-		const as = sCenter.angleToPoint(ss);
-		const ae = sCenter.angleToPoint(se);
-		const aPt = sCenter.angleToPoint(point);
-		const clockwise = !!arc.clockwise;
-
-		let totalSweep = 0;
-		let ptSweep = 0;
-		if (clockwise) {
-			totalSweep = (ae - as) % TWO_PI;
-			if (totalSweep < 0) totalSweep += TWO_PI;
-			ptSweep = (aPt - as) % TWO_PI;
-			if (ptSweep < 0) ptSweep += TWO_PI;
-		} else {
-			totalSweep = (as - ae) % TWO_PI;
-			if (totalSweep < 0) totalSweep += TWO_PI;
-			ptSweep = (as - aPt) % TWO_PI;
-			if (ptSweep < 0) ptSweep += TWO_PI;
-		}
-
-		if (ptSweep > totalSweep) {
-			const excessAngle = Math.min(ptSweep - totalSweep, TWO_PI - ptSweep);
-			if (excessAngle * rScreen > 60) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private renderBadgeOnSegment(
-		constraintId: string,
-		p1Id: string,
-		p2Id: string,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		label: string,
-		isSelected: boolean,
-		lineBadgeCounts?: Map<string, number>
-	): void {
-		const p1 = sketch.points.get(p1Id);
-		const p2 = sketch.points.get(p2Id);
-		if (!p1 || !p2) return;
-
-		const s1 = viewport.worldToScreen(p1);
-		const s2 = viewport.worldToScreen(p2);
-
-		const dir = new Vec2().subVectors(s2, s1);
-		const len = Math.max(dir.length(), 1);
-		const u = dir.clone().multiplyScalar(1 / len);
-
-		const normal = u.clone().perpendicular();
-		if (normal.y > 0 || (Math.abs(normal.y) < 1e-4 && normal.x < 0)) {
-			normal.negate();
-		}
-
-		let badgeIndex = 0;
-		if (lineBadgeCounts) {
-			const lineKey = p1Id < p2Id ? `${p1Id}_${p2Id}` : `${p2Id}_${p1Id}`;
-			badgeIndex = lineBadgeCounts.get(lineKey) ?? 0;
-			lineBadgeCounts.set(lineKey, badgeIndex + 1);
-		}
-
-		const offsetAlong =
-			badgeIndex === 0
-				? 0
-				: (badgeIndex % 2 === 1 ? Math.floor((badgeIndex + 1) / 2) : -Math.floor(badgeIndex / 2)) * 22;
-
-		const midpoint = new Vec2().midpoint(s1, s2).addScaledVector(normal, 14).addScaledVector(u, offsetAlong);
-
-		this.renderConstraintBadge(constraintId, midpoint, label, isSelected);
-	}
-
-	private renderBadgeOnCircle(
-		constraintId: string,
-		circleId: string,
-		sketch: SketchDocument,
-		viewport: Viewport,
-		label: string,
-		isSelected: boolean
-	): void {
-		const circle = sketch.circles.get(circleId);
-		const arc = sketch.arcs.get(circleId);
-		const entity = circle ?? arc;
-		if (!entity) return;
-		const center = sketch.points.get(entity.centerId);
-		if (!center) return;
-
-		const sc = viewport.worldToScreen(center);
-		const rScreen = entity.radius * viewport.zoom;
-		let bx = sc.x + rScreen * 0.7071;
-		let by = sc.y - rScreen * 0.7071;
-
-		if (arc) {
-			const start = sketch.points.get(arc.startPointId);
-			const end = sketch.points.get(arc.endPointId);
-			if (start && end) {
-				const ss = viewport.worldToScreen(start);
-				const se = viewport.worldToScreen(end);
-				const as = sc.angleToPoint(ss);
-				const ae = sc.angleToPoint(se);
-				const clockwise = !!arc.clockwise;
-
-				let sweepAngle = 0;
-				if (clockwise) {
-					sweepAngle = (ae - as) % TWO_PI;
-					if (sweepAngle < 0) sweepAngle += TWO_PI;
-					const midAngle = as + sweepAngle / 2;
-					bx = sc.x + Math.cos(midAngle) * rScreen;
-					by = sc.y + Math.sin(midAngle) * rScreen;
-				} else {
-					sweepAngle = (as - ae) % TWO_PI;
-					if (sweepAngle < 0) sweepAngle += TWO_PI;
-					const midAngle = as - sweepAngle / 2;
-					bx = sc.x + Math.cos(midAngle) * rScreen;
-					by = sc.y + Math.sin(midAngle) * rScreen;
-				}
-			}
-		}
-
-		this.renderConstraintBadge(constraintId, new Vec2(bx, by), label, isSelected);
-	}
-
-	private isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
-		const sel = sketch.selection;
-		return (
-			sel.constraintIds.has(constraintId) &&
-			sel.pointIds.size === 0 &&
-			sel.lineIds.size === 0 &&
-			sel.circleIds.size === 0 &&
-			sel.arcIds.size === 0 &&
-			sel.ellipseIds.size === 0 &&
-			sel.ellipticalArcIds.size === 0
-		);
 	}
 
 	private renderRectangularPatternGizmos(
@@ -1578,57 +1258,6 @@ export class SVGRenderer {
 
 		return copyWorldPoints;
 	}
-	private renderConstraintBadge(
-		id: string,
-		position: Vec2,
-		label: string,
-		isSelected: boolean,
-		customColor?: string
-	): void {
-		const g = createSvgElement(
-			'g',
-			{
-				class: 'constraint-badge',
-				'data-id': id,
-				'data-type': 'constraint',
-			},
-			this.constraintGroup
-		);
-		g.style.display = this.constraintBadgesVisible ? '' : 'none';
-
-		const color = isSelected ? COLORS.primary : (customColor ?? COLORS.badgeText);
-		const icon = getBadgeIcon(label, position, color);
-		const width = icon ? 18 : Math.max(18, label.length * 8 + 8);
-
-		createSvgRect(
-			new Vec2(position.x - width * 0.5, position.y - 9),
-			new Vec2(width, 18),
-			{
-				rx: 3,
-				fill: isSelected ? COLORS.selectedBg : COLORS.white,
-				stroke: isSelected ? COLORS.primary : COLORS.badgeBorder,
-				'stroke-width': STROKE_WIDTH.thin,
-			},
-			g
-		);
-
-		if (icon) {
-			g.appendChild(icon);
-		} else {
-			createSvgText(
-				new Vec2(position.x, position.y + 4),
-				label,
-				{
-					'text-anchor': 'middle',
-					fill: color,
-					'font-size': 10,
-					'font-weight': 700,
-					'font-family': 'sans-serif',
-				},
-				g
-			);
-		}
-	}
 
 	renderDistancePreview(
 		s1: Vec2,
@@ -1662,7 +1291,7 @@ export class SVGRenderer {
 		}
 
 		const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
-		this.renderLinearDimensionVisual({
+		renderLinearDimensionVisual({
 			d1: geom.d1,
 			d2: geom.d2,
 			label: `${labelPrefix}${formatDimensionValue(distVal, 1)} mm`,
@@ -1684,7 +1313,7 @@ export class SVGRenderer {
 		const geom = computePointToLineDimensionGeometry(sp, s1, s2, 0, cursor);
 		if (!geom) return;
 
-		this.renderLinearDimensionVisual({
+		renderLinearDimensionVisual({
 			d1: geom.d1,
 			d2: geom.d2,
 			label: `${formatDimensionValue(distVal, 1)} mm`,
@@ -1715,102 +1344,21 @@ export class SVGRenderer {
 		while (delta > Math.PI) delta -= TWO_PI;
 		while (delta < -Math.PI) delta += TWO_PI;
 
-		const sweepFlag = delta > 0 ? 1 : 0;
 		const rScreen = Math.max(28, sCenter.distanceTo(cursor));
+		const extensionLines: Array<{ angle: number; pA: Vec2; pB: Vec2 }> = [];
+		if (sp1 && sp2) extensionLines.push({ angle: a1, pA: sp1, pB: sp2 });
+		if (sp3 && sp4) extensionLines.push({ angle: a2, pA: sp3, pB: sp4 });
 
-		if (sp1 && sp2) {
-			this.renderAngleExtensionLines(this.previewGroup, sCenter, a1, rScreen, sp1, sp2, COLORS.primary);
-		}
-		if (sp3 && sp4) {
-			this.renderAngleExtensionLines(this.previewGroup, sCenter, a2, rScreen, sp3, sp4, COLORS.primary);
-		}
-
-		const a = Vec2.fromPolar(rScreen, a1).add(sCenter);
-		const b = Vec2.fromPolar(rScreen, a2).add(sCenter);
-
-		const midAngle = a1 + delta * 0.5;
-		const midpoint = Vec2.fromPolar(rScreen, midAngle).add(sCenter);
-
-		const arcLen = rScreen * Math.abs(delta);
-		const arrowUrl = DIM_ARROWS.default;
-		const lineAttrs: SvgAttrs = {
-			fill: 'none',
-			stroke: COLORS.primary,
-			'stroke-width': STROKE_WIDTH.dimension,
-		};
-
-		if (arcLen >= 40) {
-			createSvgPath(
-				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-				{
-					...lineAttrs,
-					'marker-start': arrowUrl,
-					'marker-end': arrowUrl,
-				},
-				this.previewGroup
-			);
-		} else {
-			// Flipped tangential arrows outside for sharp angles
-			createSvgPath(
-				`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} A ${rScreen.toFixed(1)} ${rScreen.toFixed(1)} 0 0 ${sweepFlag} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`,
-				lineAttrs,
-				this.previewGroup
-			);
-			const uA = Vec2.fromPolar(1, a1);
-			const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
-			createSvgLine(
-				a.clone().addScaledVector(tanA, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-				a,
-				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
-				this.previewGroup
-			);
-			const uB = Vec2.fromPolar(1, a2);
-			const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
-			createSvgLine(
-				b.clone().addScaledVector(tanB, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-				b,
-				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
-				this.previewGroup
-			);
-		}
-
-		const labelText = `${formatDimensionValue(angleDeg, 1)}°`;
-		if (arcLen < 26) {
-			const uRad = Vec2.fromPolar(1, midAngle);
-			const anchor = midpoint.clone().addScaledVector(uRad, 14);
-			createSvgLine(
-				midpoint,
-				anchor,
-				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension },
-				this.previewGroup
-			);
-			const dirX = uRad.x >= 0 ? 1 : -1;
-			const shelfLen = labelText.length * 7.5 + 10;
-			const shelfEnd = new Vec2(anchor.x + dirX * shelfLen, anchor.y);
-			createSvgLine(
-				anchor,
-				shelfEnd,
-				{ stroke: COLORS.primary, 'stroke-width': STROKE_WIDTH.dimension },
-				this.previewGroup
-			);
-			renderDimensionLabel(
-				this.previewGroup,
-				new Vec2(anchor.x + dirX * (shelfLen * 0.5), anchor.y - 8.5),
-				labelText,
-				COLORS.primary,
-				'angle'
-			);
-		} else {
-			const uRad = Vec2.fromPolar(1, midAngle);
-			const textPos = midpoint.clone().addScaledVector(uRad, 8.5);
-			const uTan = uRad.perpendicular();
-			let textAngle = Math.atan2(uTan.y, uTan.x);
-			if (textAngle > Math.PI / 2 - 1e-4) textAngle -= Math.PI;
-			else if (textAngle <= -Math.PI / 2) textAngle += Math.PI;
-			renderDimensionLabel(this.previewGroup, textPos, labelText, COLORS.primary, 'angle', {
-				angleDeg: (textAngle * 180) / Math.PI,
-			});
-		}
+		renderAngleDimensionVisual({
+			parent: this.previewGroup,
+			sCenter,
+			a1,
+			a2,
+			delta,
+			rScreen,
+			label: `${formatDimensionValue(angleDeg, 1)}°`,
+			extensionLines,
+		});
 	}
 
 	renderSnapIndicator(
