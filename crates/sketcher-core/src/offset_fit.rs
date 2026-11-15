@@ -16,9 +16,23 @@ struct Candidate {
     split: usize,
 }
 fn second(b: &CubicBezier, u: f64) -> Point2 {
-    let p0 = (b[0] - b[1] * 2.0 + b[2]) * (6.0 * (1.0 - u));
-    let p1 = (b[1] - b[2] * 2.0 + b[3]) * (6.0 * u);
+    let p0 = (b[2] - b[1] * 2.0 + b[0]) * (6.0 * (1.0 - u));
+    let p1 = (b[3] - b[2] * 2.0 + b[1]) * (6.0 * u);
     p0 + p1
+}
+// Keep the reference's operation order: Newton refinement feeds rounding back into
+// subsequent iterations, so algebraic regrouping can change the fitted partition.
+fn evaluate(b: &CubicBezier, u: f64) -> Point2 {
+    let v = 1.0 - u;
+    let uu = u * u;
+    let vv = v * v;
+    b[0] * vv * v + b[1] * (3.0 * vv * u) + b[2] * (3.0 * v * uu) + b[3] * uu * u
+}
+fn derivative(b: &CubicBezier, u: f64) -> Point2 {
+    let v = 1.0 - u;
+    let uu = u * u;
+    let vv = v * v;
+    (b[1] - b[0]) * (3.0 * vv) + (b[2] - b[1]) * (6.0 * v * u) + (b[3] - b[2]) * (3.0 * uu)
 }
 fn generate(nodes: &[Node], start: usize, end: usize, params: &[f64], length: f64) -> CubicBezier {
     let a = &nodes[start];
@@ -77,13 +91,13 @@ fn deviation(curve: &CubicBezier, nodes: &[Node], start: usize, params: &[f64]) 
         let du = (v - u) / 3.0;
         let a = nodes[start + j].p;
         let b = nodes[start + j + 1].p;
-        let p = spline::evaluate_bezier(curve, u);
-        let q = spline::evaluate_bezier(curve, v);
+        let p = evaluate(curve, u);
+        let q = evaluate(curve, v);
         let delta = sub(b, a);
         let controls = [
             p,
-            step(p, spline::derivative_bezier(curve, u), du),
-            step(q, spline::derivative_bezier(curve, v), -du),
+            step(p, derivative(curve, u), du),
+            step(q, derivative(curve, v), -du),
             q,
         ];
         for (k, &pt) in controls.iter().enumerate() {
@@ -220,8 +234,8 @@ impl Fitter<'_> {
             let mut next = vec![0.0];
             for j in 1..params.len() - 1 {
                 let u = params[j];
-                let p = sub(spline::evaluate_bezier(&curve, u), nodes[start + j].p);
-                let d = spline::derivative_bezier(&curve, u);
+                let p = sub(evaluate(&curve, u), nodes[start + j].p);
+                let d = derivative(&curve, u);
                 let den = dot(d, d) + dot(p, second(&curve, u));
                 let candidate = if den.abs() > 1e-20 {
                     u - dot(p, d) / den

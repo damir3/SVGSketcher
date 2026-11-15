@@ -177,6 +177,8 @@ export class SketchDocument {
 	private batchDepth = 0;
 	private batchSnapshot: SketchSnapshot | null = null;
 	private solveDeferred = 0;
+	private updatingOffsets = false;
+	private offsetSourceStates = new WeakMap<OffsetConstraint, Array<string | number | boolean | undefined>>();
 
 	// Listeners for UI reactivity
 	private changeListeners: Array<() => void> = [];
@@ -189,6 +191,7 @@ export class SketchDocument {
 	}
 
 	notify(): void {
+		if (this.updatingOffsets) return;
 		for (const listener of this.changeListeners) {
 			listener();
 		}
@@ -3239,6 +3242,23 @@ export class SketchDocument {
 			);
 		}
 		const start = performance.now();
+		const offsets = [...this.constraints.values()].filter(
+			(c): c is OffsetConstraint => c instanceof OffsetConstraint && !!c.sourceChain
+		);
+		// New/restored constraints already describe their snapshot's source geometry.
+		for (const c of offsets)
+			if (!this.offsetSourceStates.has(c)) this.offsetSourceStates.set(c, this.offsetSourceState(c));
+		let res = this.solveConstraints(extraConstraints);
+		// Each pass also propagates offsets of offsets, regardless of constraint order.
+		for (let pass = 0; pass < offsets.length && this.refreshOffsetSources(offsets); pass++)
+			res = this.solveConstraints(extraConstraints);
+		this.lastSolverResult = res;
+		this.lastSolveTimeMs = performance.now() - start;
+		this.notify();
+		return res;
+	}
+
+	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = this.prepareSplineConstraints(extraConstraints, drivenRadii, editedHandles);
@@ -3246,13 +3266,9 @@ export class SketchDocument {
 
 		// Interactive drags keep the regular behaviour (radius may follow the drag)
 		if (extraConstraints.length > 0) {
-			const res = this.solver.solve(this.paramManager, activeConstraints, {
+			return this.solver.solve(this.paramManager, activeConstraints, {
 				lockedParams: drivenRadii,
 			});
-			this.lastSolverResult = res;
-			this.lastSolveTimeMs = performance.now() - start;
-			this.notify();
-			return res;
 		}
 
 		// Radii are changed only as a last resort:
@@ -3282,14 +3298,10 @@ export class SketchDocument {
 		// that the solver prefers moving geometry over resizing circles. When stage 1
 		// succeeded this is a no-op / polish step that also computes the DoF.
 		const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
-		const res = this.solver.solve(this.paramManager, activeConstraints, {
+		return this.solver.solve(this.paramManager, activeConstraints, {
 			lockedParams: drivenRadii,
 			paramStiffness: stiffness,
 		});
-		this.lastSolverResult = res;
-		this.lastSolveTimeMs = performance.now() - start;
-		this.notify();
-		return res;
 	}
 
 	getPointDragTarget(pointId: string, target: Vec2): Vec2 {
@@ -3733,6 +3745,70 @@ export class SketchDocument {
 		this.solve();
 		if (this.batchDepth === 0) this.notify();
 		return { success: graphRes.errors.size === 0, errors: graphRes.errors };
+	}
+
+	private offsetSourceState(c: OffsetConstraint): Array<string | number | boolean | undefined> {
+		const state: Array<string | number | boolean | undefined> = [JSON.stringify(c.sourceChain)];
+		for (const item of c.sourceChain.items) {
+			const primitive = this.getPrimitive(item.id, item.type);
+			state.push(primitive?.id);
+			if (!primitive) continue;
+			const pointIds = new Set<string>(primitive.getPointIds(this));
+			if (item.startPointId) pointIds.add(item.startPointId);
+			if (item.endPointId) pointIds.add(item.endPointId);
+			for (const id of pointIds) {
+				const point = this.points.get(id);
+				state.push(id, point?.x, point?.y);
+			}
+			if (primitive instanceof SketchCircle || primitive instanceof SketchArc) state.push(primitive.radius);
+			if (primitive instanceof SketchArc || primitive instanceof SketchEllipticalArc) state.push(primitive.clockwise);
+			if (primitive instanceof SketchSpline)
+				state.push(primitive.splineType, primitive.isClosed, ...(primitive.knots ?? []));
+		}
+		return state;
+	}
+
+	private refreshOffsetSources(offsets: OffsetConstraint[]): boolean {
+		let changed = false;
+		// Derived edits belong to the caller's history entry. Suppress nested solves,
+		// snapshots and notifications while topology is being reconciled.
+		this.updatingOffsets = true;
+		this.solveDeferred++;
+		this.batchDepth++;
+		try {
+			for (const c of offsets) {
+				if (this.constraints.get(c.id) !== c) continue;
+				const state = this.offsetSourceState(c),
+					previous = this.offsetSourceStates.get(c);
+				if (
+					previous?.length === state.length &&
+					state.every((v, i) =>
+						typeof v === 'number' && typeof previous[i] === 'number'
+							? Math.abs(v - previous[i]) <= 1e-8
+							: v === previous[i]
+					)
+				)
+					continue;
+				this.offsetSourceStates.set(c, state);
+				const geom = calculateOffsetGeometry(
+					this,
+					c.sourceChain,
+					c.direction || 'one_side',
+					c.targetDistance,
+					c.targetDistance,
+					c.flip || false
+				);
+				if (!geom.isValid || !geom.sides.length) continue;
+				if (!this.offsetTopologyMatches(c, geom.sides[0])) this.reconcileOffsetTopology(c, geom.sides[0]);
+				this.applyOffsetGeometryUpdate(c, geom);
+				changed = true;
+			}
+		} finally {
+			this.batchDepth--;
+			this.solveDeferred--;
+			this.updatingOffsets = false;
+		}
+		return changed;
 	}
 
 	private offsetPairSource(pair: OffsetPair): string {

@@ -3,6 +3,7 @@ import { assertSameCubicGeometry } from './helpers/offsetGeometry';
 import { mixedOffsetScene, offsetContourGroups, openSplineLoopScene } from './helpers/mixedOffsetScene';
 import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
 import { fitPointsToBezier } from '../src/math/splineReference';
+import { Vec2 } from '../src/math/vector';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 import { test } from 'node:test';
@@ -125,6 +126,14 @@ function canonical(s: ReturnType<SketchDocument['takeSnapshot']>) {
 			Array.isArray(v) && v.every(p => typeof p.id === 'string') ? [...v].sort((a, b) => a.id.localeCompare(b.id)) : v,
 		])
 	);
+}
+function assertSnapshotNear(actual: unknown, expected: unknown, path = 'snapshot'): void {
+	if (typeof actual === 'number' && typeof expected === 'number') {
+		assert.ok(Math.abs(actual - expected) < 1e-8, `${path}: ${actual} != ${expected}`);
+	} else if (actual && expected && typeof actual === 'object' && typeof expected === 'object') {
+		assert.deepEqual(Object.keys(actual), Object.keys(expected), path);
+		for (const key of Object.keys(expected)) assertSnapshotNear(actual[key], expected[key], `${path}.${key}`);
+	} else assert.deepEqual(actual, expected, path);
 }
 for (const name of [
 	'line',
@@ -913,4 +922,141 @@ test('invalid open-arc offsets leave the distance, expression and geometry uncha
 		before = sketch.takeSnapshot();
 	assert.equal(sketch.updateDimensionalConstraint(c.id, 10000), false);
 	assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(before));
+});
+
+for (const edit of ['fit point', 'handle', 'control point'] as const)
+	test(`offsets follow source spline edits and retain one undo step: ${edit}`, () => {
+		const sketch = new SketchDocument();
+		const source = sketch.withDeferredSolve(() => {
+			const ids = [
+				[0, 0],
+				[10, 10],
+				[20, 0],
+				[30, 5],
+			].map(([x, y]) => sketch.addPoint(new Vec2(x, y)).id);
+			return edit === 'control point' ? sketch.addControlSpline(ids) : sketch.addFitSpline(ids);
+		});
+		const sourceBefore = sketch.takeSnapshot();
+		const chain: OffsetChain = { items: [{ id: source.id, type: 'spline' }], isClosed: false };
+		const geometry = calculateOffsetGeometry(sketch, chain, 'one_side', 3, 0, false);
+		const created = sketch.withDeferredSolve(() =>
+			commitOffsetToSketch(sketch, chain, geometry, 'one_side', 3, 0, false, { dist1: '1 + 2' })
+		)!;
+		const constraintId = created.constraintIds[0];
+		sketch.clearHistory();
+		const before = sketch.takeSnapshot();
+		const pointId = edit === 'handle' ? sketch.lines.get(source.tangentLineIds![1])!.p2Id : source.pointIds[1];
+		const point = sketch.points.get(pointId)!;
+		sketch.beginTransaction();
+		sketch.dragPoint(pointId, point.x + 2, point.y + 10);
+		sketch.commitTransaction(false);
+		const sourceOnly = new SketchDocument();
+		sourceOnly.restoreSnapshot(sourceBefore);
+		const sourcePoint = sourceOnly.points.get(pointId)!;
+		sourceOnly.dragPoint(pointId, sourcePoint.x + 2, sourcePoint.y + 10);
+		for (const point of sourceOnly.points.values())
+			assert.ok(sketch.points.get(point.id)!.distanceTo(point) < 1e-8, 'offset recomputation distorted its source');
+		const c = sketch.constraints.get(constraintId) as OffsetConstraint;
+		assert.equal(c.expression, '1 + 2');
+		assert.equal(c.targetDistance, 3);
+		assert.deepEqual(c.pairs.map(offsetPairChild), created.createdIds, 'child IDs changed unnecessarily');
+		assertAppliedOffset(
+			sketch,
+			created.createdIds,
+			chain,
+			calculateOffsetGeometry(sketch, chain, 'one_side', 3, 0, false)
+		);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+		const after = sketch.takeSnapshot();
+		assert.equal(sketch.undo(), true);
+		assert.deepEqual(canonical(sketch.takeSnapshot()), canonical(before));
+		assert.equal(sketch.canUndo(), false, 'derived geometry added an extra history entry');
+		assert.equal(sketch.redo(), true);
+		assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(after));
+		sketch.clearHistory();
+		sketch.solve();
+		assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(after));
+		assert.equal(sketch.canUndo(), false);
+	});
+
+for (const kind of ['ellipse', 'split-spline'] as const)
+	test(`source edits update offset topology, empty dimensions and history: ${kind}`, () => {
+		const { sketch, chain, small } = collapseOffsetScene(kind);
+		const source = sketch.takeSnapshot();
+		const geometry = calculateOffsetGeometry(sketch, chain, 'one_side', small, 0, true);
+		const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, geometry))!;
+		const constraintId = created.constraintIds[0];
+		sketch.clearHistory();
+		const initialCount = geometry.sides[0].primitives.length;
+		let topologyChanged = false;
+		for (const scale of [2, 0.1, 1]) {
+			const before = sketch.takeSnapshot();
+			sketch.beginTransaction();
+			for (const point of source.points) sketch.points.get(point.id)!.copy(Vec2.from(point).multiplyScalar(scale));
+			sketch.solve();
+			sketch.commitTransaction(false);
+			const expected = calculateOffsetGeometry(sketch, chain, 'one_side', small, 0, true);
+			assert.ok(expected.isValid);
+			const c = sketch.constraints.get(constraintId) as OffsetConstraint;
+			assert.ok(c, 'source edit removed the offset dimension');
+			assert.equal(c.pairs.length, expected.sides[0].primitives.length);
+			if (c.pairs.length !== initialCount) topologyChanged = true;
+			assert.equal(!!c.emptyDimension, c.pairs.length === 0);
+			assert.ok(c.getDimensionWorldPoints(sketch));
+			assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+			assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+			const after = sketch.takeSnapshot();
+			assert.equal(sketch.undo(), true);
+			assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(before));
+			assert.equal(sketch.redo(), true);
+			assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(after));
+		}
+		assert.ok(topologyChanged);
+	});
+
+test('source edits propagate through offsets of offsets in any constraint order', () => {
+	const sketch = new SketchDocument();
+	const source = sketch.withDeferredSolve(() =>
+		sketch.addFitSpline(
+			[
+				[0, 0],
+				[10, 10],
+				[20, 0],
+			].map(([x, y]) => sketch.addPoint(new Vec2(x, y)).id)
+		)
+	);
+	const chains: OffsetChain[] = [{ items: [{ id: source.id, type: 'spline' }], isClosed: false }];
+	const constraints: string[] = [];
+	for (let i = 0; i < 3; i++) {
+		const chain = chains.at(-1)!;
+		const result = sketch.withDeferredSolve(() =>
+			commitOffsetToSketch(sketch, chain, calculateOffsetGeometry(sketch, chain, 'one_side', 2, 0, false))
+		)!;
+		constraints.push(result.constraintIds[0]);
+		chains.push({ items: [{ id: result.createdIds[0], type: 'spline' }], isClosed: false });
+	}
+	// Topology reconciliation and restored snapshots can reorder constraints.
+	for (const id of [...constraints].reverse()) {
+		const c = sketch.constraints.get(id)!;
+		sketch.constraints.delete(id);
+		sketch.constraints.set(id, c);
+	}
+	let notifications = 0;
+	const unsubscribe = sketch.onChange(() => notifications++);
+	try {
+		sketch.dragPoint(source.pointIds[1], 10, 20);
+	} finally {
+		unsubscribe();
+	}
+	assert.equal(notifications, 1, 'listeners observed intermediate derived geometry');
+	for (let i = 0; i < constraints.length; i++) {
+		const c = sketch.constraints.get(constraints[i]) as OffsetConstraint;
+		assertAppliedOffset(
+			sketch,
+			c.pairs.map(offsetPairChild),
+			chains[i],
+			calculateOffsetGeometry(sketch, chains[i], 'one_side', 2, 0, false)
+		);
+	}
+	assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
 });
