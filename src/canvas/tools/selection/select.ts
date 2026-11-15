@@ -11,7 +11,8 @@ import { DimensionTool } from '../constraints/dimension';
 import { AABB, curveContainedInAABB } from '../../../math/aabb';
 import type { GeoCurve } from '../../../math/intersection';
 import { Vec2 } from '../../../math/vector';
-import { GIZMO_DISTANCE_PX, LABEL_DISTANCE_PX } from '../../distances';
+import { LABEL_DISTANCE_PX } from '../../distances';
+import { hitGizmoHandle } from '../../modifyPreviews';
 import {
 	findArcNear,
 	findCircleNear,
@@ -350,18 +351,17 @@ export class SelectTool extends BaseTool {
 			return;
 		}
 
-		if (host.renderer?.rectangularGizmoHandles) {
-			for (const handle of host.renderer.rectangularGizmoHandles.values()) {
-				if (screen.distanceTo(handle) <= GIZMO_DISTANCE_PX && handle.constraintId) {
-					const constraint = host.sketch.constraints.get(handle.constraintId);
-					if (constraint instanceof RectangularPatternConstraint) {
-						const dragState = constraint.createGizmoDragState(host.sketch, handle.axis, world);
-						if (dragState) {
-							host.sketch.selectEntity(handle.constraintId, 'constraint', false);
-							host.gizmoDragState = dragState;
-							return;
-						}
-					}
+		const gizmoHandle = hitGizmoHandle(screen, host.renderer?.rectangularGizmoHandles?.values(), undefined, h =>
+			Boolean(h.constraintId)
+		);
+		if (gizmoHandle?.constraintId) {
+			const constraint = host.sketch.constraints.get(gizmoHandle.constraintId);
+			if (constraint instanceof RectangularPatternConstraint) {
+				const dragState = constraint.createGizmoDragState(host.sketch, gizmoHandle.axis, world);
+				if (dragState) {
+					host.sketch.selectEntity(gizmoHandle.constraintId, 'constraint', false);
+					host.gizmoDragState = dragState;
+					return;
 				}
 			}
 		}

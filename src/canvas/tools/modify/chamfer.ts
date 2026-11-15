@@ -1,4 +1,3 @@
-import { GIZMO_DISTANCE_PX } from '../../distances';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent } from '../types';
@@ -15,7 +14,7 @@ import {
 	commitChamferToSketch,
 	getConnectedLinesForPoint,
 } from '../../../math/chamfer';
-import type { ChamferGizmoHandle } from '../../renderer';
+import { type ChamferGizmoHandle, hitGizmoHandle } from '../../modifyPreviews';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 
 export class ChamferTool extends BaseTool {
@@ -302,19 +301,16 @@ export class ChamferTool extends BaseTool {
 		const world = e.world;
 
 		// 1. Check for Chamfer Gizmo handle click / drag
-		if (this.ctx.renderer.chamferGizmoHandles && this.ctx.renderer.chamferGizmoHandles.length > 0) {
-			for (const gh of this.ctx.renderer.chamferGizmoHandles) {
-				if (screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX) {
-					this.gizmoDragState = {
-						handle: gh,
-						startMouseWorld: world,
-						startValue: gh.currentValue,
-					};
-					e.raw.preventDefault();
-					e.raw.stopPropagation();
-					return;
-				}
-			}
+		const gh = hitGizmoHandle(screen, this.ctx.renderer.chamferGizmoHandles);
+		if (gh) {
+			this.gizmoDragState = {
+				handle: gh,
+				startMouseWorld: world,
+				startValue: gh.currentValue,
+			};
+			e.raw.preventDefault();
+			e.raw.stopPropagation();
+			return;
 		}
 
 		// 2. Point selection (vertex with exactly 2 lines)
@@ -506,9 +502,7 @@ export class ChamferTool extends BaseTool {
 		}
 
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
-		const isOverGizmo = this.ctx.renderer.chamferGizmoHandles?.some(
-			gh => screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX
-		);
+		const isOverGizmo = hitGizmoHandle(screen, this.ctx.renderer.chamferGizmoHandles) !== null;
 		if (this.gizmoDragState) {
 			this.ctx.setCursor('grabbing');
 		} else if (isOverGizmo) {

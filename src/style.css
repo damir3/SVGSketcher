@@ -1287,39 +1287,22 @@ body {
 	display: none;
 }
 
-.fillet-gizmo-arrow {
+.gizmo-arrow,
+.gizmo-circle {
 	cursor: grab;
 	transition:
 		transform 0.1s ease,
 		filter 0.15s ease;
 }
 
-.fillet-gizmo-arrow:hover {
+.gizmo-arrow:hover,
+.gizmo-circle:hover {
 	filter: drop-shadow(0 2px 8px rgba(2, 132, 199, 0.6)) brightness(1.15) !important;
 	cursor: grab;
 }
 
-.fillet-gizmo-arrow:active {
-	cursor: grabbing;
-}
-
-.chamfer-gizmo-arrow,
-.offset-gizmo-arrow,
-.chamfer-gizmo-circle {
-	cursor: grab;
-	transition:
-		transform 0.1s ease,
-		filter 0.15s ease;
-}
-
-.chamfer-gizmo-arrow:hover,
-.chamfer-gizmo-circle:hover {
-	filter: drop-shadow(0 2px 8px rgba(2, 132, 199, 0.6)) brightness(1.15) !important;
-	cursor: grab;
-}
-
-.chamfer-gizmo-arrow:active,
-.chamfer-gizmo-circle:active {
+.gizmo-arrow:active,
+.gizmo-circle:active {
 	cursor: grabbing;
 }
 
@@ -1817,16 +1800,6 @@ body {
 	font-family: monospace;
 }
 
-.rectangular-pattern-gizmo-arrow {
-	transition:
-		transform 0.1s ease,
-		filter 0.15s ease;
-}
-
-.rectangular-pattern-gizmo-arrow:hover {
-	filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.45)) brightness(1.15) !important;
-}
-
 /* --- DIMENSION POPUP CALCULATOR PREVIEW --- */
 .dim-popup-content {
 	display: flex;
@@ -2221,30 +2194,6 @@ body {
 .btn-param-action.primary:hover {
 	box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
 	background: linear-gradient(135deg, #0369a1, #0284c7);
-}
-
-.text-drag-handle {
-	cursor: move;
-	transition:
-		fill 0.15s ease,
-		stroke-width 0.15s ease;
-}
-
-.text-drag-handle:hover {
-	fill: #e0f2fe;
-	stroke-width: 2.5;
-}
-
-.text-rotation-handle {
-	cursor: grab;
-	transition:
-		fill 0.15s ease,
-		stroke-width 0.15s ease;
-}
-
-.text-rotation-handle:hover {
-	fill: #e0f2fe;
-	stroke-width: 2.5;
 }
 
 /* --- IMAGE TRACE MODAL --- */

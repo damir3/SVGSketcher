@@ -1,6 +1,6 @@
 import { BaseTool } from '../base';
 import { AABB } from '../../../math/aabb';
-import { GIZMO_DISTANCE_PX } from '../../distances';
+import { hitGizmoHandle } from '../../modifyPreviews';
 import type { ToolMouseEvent } from '../types';
 import { Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
@@ -158,26 +158,24 @@ export class FilletTool extends BaseTool {
 		const world = e.world;
 
 		// 1. Check for Fillet Gizmo handle dragging
-		if (this.ctx.renderer.filletGizmoHandle) {
-			const gh = this.ctx.renderer.filletGizmoHandle;
-			if (screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX) {
-				const active = this.pendingFillets.find(pf => pf.id === this.activeFilletId) ?? this.pendingFillets.at(-1);
-				const inward = gh.worldBisectorDir.clone().negate();
-				const travelPerRadius =
-					active?.result && active.primitive1.type === 'line' && active.primitive2.type === 'line'
-						? new Vec2().subVectors(gh.worldMidArc, active.result.cornerVertex).dot(inward) / gh.radius
-						: 1;
-				const gain = travelPerRadius > 1e-6 ? 1 / travelPerRadius : 1;
-				this.filletGizmoDragState = {
-					startMouseWorld: world,
-					startRadius: gh.radius,
-					radiusPerWorldUnit: inward.clone().multiplyScalar(gain),
-				};
-				this.ctx.setCursor('grabbing');
-				e.raw.preventDefault();
-				e.raw.stopPropagation();
-				return;
-			}
+		const gh = hitGizmoHandle(screen, [this.ctx.renderer.filletGizmoHandle]);
+		if (gh) {
+			const active = this.pendingFillets.find(pf => pf.id === this.activeFilletId) ?? this.pendingFillets.at(-1);
+			const inward = gh.worldBisectorDir.clone().negate();
+			const travelPerRadius =
+				active?.result && active.primitive1.type === 'line' && active.primitive2.type === 'line'
+					? new Vec2().subVectors(gh.worldMidArc, active.result.cornerVertex).dot(inward) / gh.radius
+					: 1;
+			const gain = travelPerRadius > 1e-6 ? 1 / travelPerRadius : 1;
+			this.filletGizmoDragState = {
+				startMouseWorld: world,
+				startRadius: gh.radius,
+				radiusPerWorldUnit: inward.clone().multiplyScalar(gain),
+			};
+			this.ctx.setCursor('grabbing');
+			e.raw.preventDefault();
+			e.raw.stopPropagation();
+			return;
 		}
 
 		// 2. Point or primitive selection
@@ -290,11 +288,7 @@ export class FilletTool extends BaseTool {
 		}
 
 		// Update cursor: crosshair in selection mode, default in other cases (grab/grabbing on gizmos)
-		const isOverGizmo =
-			this.ctx.renderer.filletGizmoHandle &&
-			screen.distanceTo(
-				new Vec2(this.ctx.renderer.filletGizmoHandle.screenX, this.ctx.renderer.filletGizmoHandle.screenY)
-			) <= GIZMO_DISTANCE_PX;
+		const isOverGizmo = hitGizmoHandle(screen, [this.ctx.renderer.filletGizmoHandle]) !== null;
 
 		if (isOverGizmo) {
 			this.ctx.setCursor('grab');

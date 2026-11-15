@@ -140,7 +140,7 @@ export interface ToolContext {
 
 	/** Entity query / hit-testing helpers */
 	findPointNear(screen: Vec2, thresholdPx?: number): SketchPoint | null;
-	findLineNear(screen: Vec2, thresholdPx?: number): SketchLine | null;
+	findLineNear(screen: Vec2, thresholdPx?: number, includeAxes?: boolean): SketchLine | null;
 	findCircleNear(screen: Vec2, thresholdPx?: number): SketchCircle | null;
 	findArcNear(screen: Vec2, thresholdPx?: number): SketchArc | null;
 	findEllipseNear?(screen: Vec2, thresholdPx?: number): SketchEllipse | null;

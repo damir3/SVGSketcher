@@ -232,8 +232,8 @@ export class CanvasInteraction implements SelectInteractionHost {
 			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
 				this.findSnap(screen, excludePointId, allowGrid),
 			findPointNear: (screen, thresholdPx) => findPointNear(this.sketch, this.viewport, screen, thresholdPx),
-			findLineNear: (screen, thresholdPx) =>
-				findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx),
+			findLineNear: (screen, thresholdPx, includeAxes) =>
+				findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx, includeAxes),
 			findCircleNear: (screen, thresholdPx) => findCircleNear(this.sketch, this.viewport, screen, thresholdPx),
 			findArcNear: (screen, thresholdPx) => findArcNear(this.sketch, this.viewport, screen, thresholdPx),
 			findEllipseNear: (screen, thresholdPx) => findEllipseNear(this.sketch, this.viewport, screen, thresholdPx),

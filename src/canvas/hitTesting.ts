@@ -66,12 +66,31 @@ export function findPointNear(
 	return foundPoint;
 }
 
+export function findAxisNear(
+	sketch: SketchDocument,
+	viewport: Viewport,
+	screen: Vec2,
+	thresholdPx = LINE_DISTANCE_PX
+): SketchLine | null {
+	const sOrigin = viewport.worldToScreen(ORIGIN);
+	const dAxisX = Math.abs(screen.y - sOrigin.y);
+	const dAxisY = Math.abs(screen.x - sOrigin.x);
+	if (dAxisX <= thresholdPx && dAxisX <= dAxisY) {
+		return sketch.getLine('axis_x') ?? null;
+	}
+	if (dAxisY <= thresholdPx) {
+		return sketch.getLine('axis_y') ?? null;
+	}
+	return null;
+}
+
 export function findLineNear(
 	sketch: SketchDocument,
 	viewport: Viewport,
 	screen: Vec2,
 	activeTool: ToolType,
-	thresholdPx = LINE_DISTANCE_PX
+	thresholdPx = LINE_DISTANCE_PX,
+	includeAxes = false
 ): SketchLine | null {
 	let closestDist = thresholdPx;
 	let foundLine: SketchLine | null = null;
@@ -85,6 +104,10 @@ export function findLineNear(
 			closestDist = d;
 			foundLine = line;
 		}
+	}
+
+	if (!foundLine && includeAxes) {
+		return findAxisNear(sketch, viewport, screen, thresholdPx);
 	}
 
 	return foundLine;
@@ -196,12 +219,9 @@ export function findSelectableEntityNear(
 	const hitText = findTextNear(sketch, viewport, screen, target);
 	if (hitText) return { id: hitText.id, type: 'text' };
 
-	const sOrigin = viewport.worldToScreen(ORIGIN);
-	if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
-		return { id: 'axis_x', type: 'line' };
-	}
-	if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
-		return { id: 'axis_y', type: 'line' };
+	const hitAxis = findAxisNear(sketch, viewport, screen);
+	if (hitAxis) {
+		return { id: hitAxis.id, type: 'line' };
 	}
 	return null;
 }

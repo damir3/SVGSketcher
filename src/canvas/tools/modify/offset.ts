@@ -1,6 +1,5 @@
 import { BaseTool } from '../base';
 import { AABB } from '../../../math/aabb';
-import { GIZMO_DISTANCE_PX } from '../../distances';
 import type { ToolMouseEvent } from '../types';
 import { Vec2 } from '../../../math/vector';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
@@ -16,7 +15,7 @@ import {
 	calculateOffsetGeometry,
 	commitOffsetToSketch,
 } from '../../../math/offset';
-import type { OffsetGizmoHandle } from '../../renderer';
+import { type OffsetGizmoHandle, hitGizmoHandle } from '../../modifyPreviews';
 
 export class OffsetTool extends BaseTool {
 	readonly id = 'offset' as const;
@@ -393,19 +392,16 @@ export class OffsetTool extends BaseTool {
 		const world = e.world;
 
 		// 1. Check for Offset Gizmo handle click / drag
-		if (this.ctx.renderer.offsetGizmoHandles && this.ctx.renderer.offsetGizmoHandles.length > 0) {
-			for (const gh of this.ctx.renderer.offsetGizmoHandles) {
-				if (screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX) {
-					this.gizmoDragState = {
-						handle: gh,
-						startMouseWorld: world,
-						startValue: gh.currentValue,
-					};
-					e.raw.preventDefault();
-					e.raw.stopPropagation();
-					return;
-				}
-			}
+		const gh = hitGizmoHandle(screen, this.ctx.renderer.offsetGizmoHandles);
+		if (gh) {
+			this.gizmoDragState = {
+				handle: gh,
+				startMouseWorld: world,
+				startValue: gh.currentValue,
+			};
+			e.raw.preventDefault();
+			e.raw.stopPropagation();
+			return;
 		}
 
 		// 2. Curve selection / chain extension
@@ -500,9 +496,7 @@ export class OffsetTool extends BaseTool {
 		}
 
 		// Update cursor
-		const isOverGizmo = this.ctx.renderer.offsetGizmoHandles?.some(
-			gh => screen.distanceTo(new Vec2(gh.screenX, gh.screenY)) <= GIZMO_DISTANCE_PX
-		);
+		const isOverGizmo = hitGizmoHandle(screen, this.ctx.renderer.offsetGizmoHandles) !== null;
 
 		if (this.gizmoDragState) {
 			this.ctx.setCursor('grabbing');

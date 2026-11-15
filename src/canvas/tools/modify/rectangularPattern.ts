@@ -1,4 +1,5 @@
 import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
+import { hitGizmoHandle } from '../../modifyPreviews';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
@@ -461,12 +462,16 @@ export class RectangularPatternTool extends BaseTool {
 
 	override isHighlightEnabled(screen?: Vec2): boolean {
 		if (this.gizmoDragState !== null) return false;
-		if (screen && this.ctx?.renderer?.rectangularGizmoHandles) {
-			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
-				if (!handle.constraintId && screen.distanceTo(handle) <= LINE_DISTANCE_PX) {
-					return false;
-				}
-			}
+		if (
+			screen &&
+			hitGizmoHandle(
+				screen,
+				this.ctx?.renderer?.rectangularGizmoHandles?.values(),
+				LINE_DISTANCE_PX,
+				h => !h.constraintId
+			)
+		) {
+			return false;
 		}
 		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
 			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
@@ -595,36 +600,38 @@ export class RectangularPatternTool extends BaseTool {
 		}
 
 		// 1. Gizmo handle dragging hit-test
-		if (this.ctx.renderer?.rectangularGizmoHandles) {
-			for (const handle of this.ctx.renderer.rectangularGizmoHandles.values()) {
-				if (!handle.constraintId && e.screen.distanceTo(handle) <= LINE_DISTANCE_PX) {
-					const startDistance = handle.axis === 1 ? this.state.distance1 : this.state.distance2;
-					const paramMap = new Map<string, number>();
-					for (const [pid, pt] of this.ctx.sketch.points.entries()) {
-						paramMap.set(`${pid}.x`, pt.x);
-						paramMap.set(`${pid}.y`, pt.y);
-					}
-					const line1 = this.state.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
-					const line2 = this.state.line2Id ? this.ctx.sketch.lines.get(this.state.line2Id) : null;
-					const dirs = computeRectangularPatternDirections(
-						paramMap,
-						line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-						line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-					);
-					const u = handle.axis === 1 ? dirs.u1 : dirs.u2;
-					const centroidWorld = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
+		const gizmoHandle = hitGizmoHandle(
+			e.screen,
+			this.ctx.renderer?.rectangularGizmoHandles?.values(),
+			LINE_DISTANCE_PX,
+			h => !h.constraintId
+		);
+		if (gizmoHandle) {
+			const startDistance = gizmoHandle.axis === 1 ? this.state.distance1 : this.state.distance2;
+			const paramMap = new Map<string, number>();
+			for (const [pid, pt] of this.ctx.sketch.points.entries()) {
+				paramMap.set(`${pid}.x`, pt.x);
+				paramMap.set(`${pid}.y`, pt.y);
+			}
+			const line1 = this.state.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
+			const line2 = this.state.line2Id ? this.ctx.sketch.lines.get(this.state.line2Id) : null;
+			const dirs = computeRectangularPatternDirections(
+				paramMap,
+				line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+				line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+			);
+			const u = gizmoHandle.axis === 1 ? dirs.u1 : dirs.u2;
+			const centroidWorld = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
 
-					if (centroidWorld && u) {
-						this.gizmoDragState = {
-							axis: handle.axis,
-							startMouseWorld: e.world,
-							centroidWorld,
-							u,
-							startDistance,
-						};
-						return true;
-					}
-				}
+			if (centroidWorld && u) {
+				this.gizmoDragState = {
+					axis: gizmoHandle.axis,
+					startMouseWorld: e.world,
+					centroidWorld,
+					u,
+					startDistance,
+				};
+				return true;
 			}
 		}
 

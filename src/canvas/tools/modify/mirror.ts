@@ -44,6 +44,8 @@ export class MirrorTool extends BaseTool {
 				title: 'Mirror Line',
 				getValue: () => {
 					const mirrorLineId = this.state?.mirrorLineId;
+					if (mirrorLineId === 'axis_x') return 'X-Axis';
+					if (mirrorLineId === 'axis_y') return 'Y-Axis';
 					if (mirrorLineId && this.ctx?.sketch) {
 						const line = this.ctx.sketch.lines.get(mirrorLineId);
 						if (line) {
@@ -54,7 +56,7 @@ export class MirrorTool extends BaseTool {
 						}
 						return mirrorLineId;
 					}
-					return 'Click a line in canvas';
+					return 'Click a line or axis in canvas';
 				},
 				isSelected: () => Boolean(this.state?.mirrorLineId),
 				isActive: () => this.state?.phase === 'mirror_line',
@@ -81,7 +83,7 @@ export class MirrorTool extends BaseTool {
 			const mirrorLineId = this.state?.mirrorLineId;
 			const objCount = this.state?.selectedObjectIds.size ?? 0;
 			if (!mirrorLineId && objCount === 0) return 'Select objects first, then pick a mirror line.';
-			if (!mirrorLineId) return 'Click a centerline in the canvas to reflect across.';
+			if (!mirrorLineId) return 'Click a centerline or axis in the canvas to reflect across.';
 			if (objCount === 0) return 'Pick geometry in the canvas to mirror.';
 			return 'Ready to apply! Press Enter or click Apply Mirror.';
 		},
@@ -97,11 +99,14 @@ export class MirrorTool extends BaseTool {
 		super.activate(ctx);
 
 		const initialObjects = new Set(ctx.sketch.getSelectedPrimitives().map(primitive => primitive.id));
+		const hasAxisX = ctx.sketch.selection.lineIds.has('axis_x');
+		const hasAxisY = ctx.sketch.selection.lineIds.has('axis_y');
+		const initialMirrorLineId = hasAxisX !== hasAxisY ? (hasAxisX ? 'axis_x' : 'axis_y') : null;
 
 		this.state = {
 			phase: initialObjects.size > 0 ? 'mirror_line' : 'objects',
 			selectedObjectIds: initialObjects,
-			mirrorLineId: null,
+			mirrorLineId: initialMirrorLineId,
 		};
 		this.onStateChange?.();
 	}
@@ -139,11 +144,15 @@ export class MirrorTool extends BaseTool {
 		if (this.state?.phase === 'mirror_line') {
 			return target.type === 'line';
 		}
-		return true;
+		return target.id !== 'origin' && target.id !== 'axis_x' && target.id !== 'axis_y';
 	}
 
 	override getHoverTargetOptions(): FindHoverTargetOptions {
-		return { allowSplineHandles: false };
+		return {
+			allowSplineHandles: false,
+			allowAxes: this.state?.phase === 'mirror_line',
+			allowOrigin: false,
+		};
 	}
 
 	override commit(): void {
@@ -163,7 +172,7 @@ export class MirrorTool extends BaseTool {
 		let hitType: string | null = null;
 
 		if (this.state.phase === 'mirror_line') {
-			const hitLine = this.ctx.findLineNear(e.screen);
+			const hitLine = this.ctx.findLineNear(e.screen, undefined, true);
 			if (hitLine && !hitLine.isSplineHandle) {
 				hitId = hitLine.id;
 				hitType = 'line';
@@ -219,7 +228,7 @@ export class MirrorTool extends BaseTool {
 			return false;
 		}
 
-		const mirrorLine = this.ctx.sketch.lines.get(mirrorLineId);
+		const mirrorLine = this.ctx.sketch.getLine(mirrorLineId);
 		if (!mirrorLine) {
 			this.ctx.showToast('Mirror line not found');
 			return false;
@@ -261,7 +270,13 @@ export class MirrorTool extends BaseTool {
 			) {
 				pointMap.set(origPtId, origPtId);
 				if (origPtId !== mirrorLine.p1Id && origPtId !== mirrorLine.p2Id) {
-					this.ctx.sketch.addPointOnLineConstraint(origPtId, mirrorLine.id);
+					if (mirrorLine.id === 'axis_x') {
+						this.ctx.sketch.addPointOnAxisConstraint(origPtId, 'x');
+					} else if (mirrorLine.id === 'axis_y') {
+						this.ctx.sketch.addPointOnAxisConstraint(origPtId, 'y');
+					} else {
+						this.ctx.sketch.addPointOnLineConstraint(origPtId, mirrorLine.id);
+					}
 				}
 				return origPtId;
 			}

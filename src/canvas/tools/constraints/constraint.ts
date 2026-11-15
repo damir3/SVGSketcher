@@ -1,7 +1,7 @@
-import { Vec2, ORIGIN } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import type { SketchDocument } from '../../../model/sketch';
 import type { Viewport } from '../../viewport';
-import { LINE_DISTANCE_PX } from '../../distances';
+import { findAxisNear } from '../../hitTesting';
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent, ToolType } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -123,12 +123,9 @@ export class ConstraintTool extends BaseTool {
 									id = hitSpline.id;
 									type = 'spline';
 								} else if (this.isEntityCompatibleWithConstraint('line')) {
-									const sOrigin = this.ctx.viewport.worldToScreen(ORIGIN);
-									if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
-										id = 'axis_x';
-										type = 'line';
-									} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
-										id = 'axis_y';
+									const hitAxis = findAxisNear(this.ctx.sketch, this.ctx.viewport, screen);
+									if (hitAxis) {
+										id = hitAxis.id;
 										type = 'line';
 									}
 								}

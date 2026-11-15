@@ -1,42 +1,24 @@
 import type { SvgExportDimensions } from '../model/io/svgIO';
 import { AABB } from '../math/aabb';
 import type { SketchImage } from '../model/image';
-import { createTransform, type TransformValues } from '../model/transform';
-import { calculateObjectsCentroid } from './tools/modify/utils';
+import type { TransformValues } from '../model/transform';
 import type { SketchDocument } from '../model/sketch';
 import { isPointIdConstrained, type ISketchPrimitive } from '../model/primitives';
 import type { Viewport } from './viewport';
 import { getAllGeoCurves } from '../math/intersection';
 import { findCurveRegions, pointInRegion, type SketchRegion } from '../math/regions';
-import type { FilletCandidate } from '../math/fillet';
 import { collectFilletPreviewTrims } from '../math/filletPreview';
-import {
-	computePatternCopyAngle,
-	computeRectangularPatternOffset,
-	computeRectangularPatternDirections,
-	getPatternBaseColor,
-	renderPatternSuppressionCheckbox,
-	type ConstraintRenderContext,
-} from '../solver/constraints';
+import type { ConstraintRenderContext } from '../solver/constraints';
 import { ORIGIN, Vec2 } from '../math/vector';
 import { renderConstraintBadge, renderBadgeOnSegment, renderBadgeOnCircle } from './badgeIcons';
-import { fitPointsToBezier, getSplineSvgPath } from '../math/spline';
 
 export * from './styles';
 export * from './svg';
 export * from './dimensionGeometry';
+export * from './modifyPreviews';
 export { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
 
-import {
-	createSvgElement,
-	createSvgLine,
-	createSvgCircle,
-	createSvgRect,
-	createSvgPath,
-	createSvgArrow,
-	createSvgText,
-	getArcSvgPath,
-} from './svg';
+import { createSvgElement, createSvgLine, createSvgCircle, createSvgRect, createSvgPath, createSvgText } from './svg';
 import {
 	formatDimensionValue,
 	computeDistanceDimensionGeometry,
@@ -45,41 +27,42 @@ import {
 	renderAngleDimensionVisual,
 } from './dimensionGeometry';
 import {
+	type ChamferGizmoHandle,
+	type ChamferPreviewState,
+	type FilletGizmoHandle,
+	type FilletPreviewState,
+	type MirrorHighlight,
+	type OffsetGizmoHandle,
+	type OffsetPreviewState,
+	type PatternAngleHandle,
+	type PatternCheckboxPosition,
+	type PatternHighlight,
+	type RectangularGizmoHandle,
+	type RectangularPatternHighlight,
+	renderChamferPreviews as renderChamferPreviewElements,
+	renderFilletPreviews as renderFilletPreviewElements,
+	renderMirrorPreview as renderMirrorPreviewElements,
+	renderOffsetPreviews as renderOffsetPreviewElements,
+	renderPatternPreview as renderPatternPreviewElements,
+	renderRectangularPatternGizmos as renderRectangularPatternGizmoElements,
+	renderRectangularPatternPreview as renderRectangularPatternPreviewElements,
+	renderTransformedObjects as renderTransformedPreviewObjects,
+	renderTransformPreview as renderTransformPreviewElements,
+} from './modifyPreviews';
+import {
 	COLORS,
 	REGION_STYLE,
 	DASH_ARRAY,
 	STROKE_WIDTH,
 	SVG_EXPORT_STYLE,
-	FILTERS,
 	type SvgAttrs,
 	HIT_AREA_STROKE_ATTRS,
 	SELECTION_BOX_ATTRS,
 	CROSSING_SELECTION_BOX_ATTRS,
-	MIRROR_PREVIEW_LINE_ATTRS,
-	MIRROR_PREVIEW_VERTEX_ATTRS,
-	PATTERN_CENTER_RING_ATTRS,
-	PATTERN_CENTER_CROSSHAIR_ATTRS,
-	PATTERN_CENTER_DOT_ATTRS,
-	RECT_PATTERN_PILL_ATTRS,
-	RECT_PATTERN_PILL_TEXT_ATTRS,
-	FILLET_WEDGE_ATTRS,
-	FILLET_ARC_ATTRS,
-	GIZMO_POINT_ATTRS,
-	FILLET_GIZMO_RADIAL_ATTRS,
-	FILLET_GIZMO_SQUARE_ATTRS,
-	FILLET_GIZMO_ARROW_ATTRS,
-	CHAMFER_HIGHLIGHT_ATTRS,
-	CHAMFER_CUT_LINE_ATTRS,
-	CHAMFER_GIZMO_ARROW_ATTRS,
-	CHAMFER_GIZMO_CIRCLE_ATTRS,
-	GIZMO_GUIDE_ATTRS,
-	OFFSET_CHAIN_ATTRS,
-	OFFSET_PREVIEW_ATTRS,
-	OFFSET_GIZMO_ARROW_ATTRS,
 	SNAP_POINT_ATTRS,
 	SNAP_GRID_ATTRS,
 	SNAP_OBJECT_ATTRS,
-	getCopyStrokeAttrs,
+	MIRROR_LINE_ATTRS,
 } from './styles';
 
 const TWO_PI = 2 * Math.PI;
@@ -94,72 +77,12 @@ export interface RenderOptions {
 	showConstraints?: boolean;
 	showDimensions?: boolean;
 	showSplineHandles?: boolean;
-	mirrorHighlight?: {
-		selectedObjectIds: Set<string>;
-		mirrorLineId: string | null;
-	};
-	patternHighlight?: {
-		selectedObjectIds: Set<string>;
-		centerPointId: string | null;
-		distribution: 'full' | 'partial' | 'symmetric';
-		angle: number;
-		angleHandleEnabled: boolean;
-		quantity: number;
-		suppression: boolean;
-		suppressedIndices: Set<number>;
-	};
-	rectangularPatternHighlight?: {
-		selectedObjectIds: Set<string>;
-		line1Id: string | null;
-		line2Id: string | null;
-		quantity1: number;
-		distance1: number;
-		direction1: 'one_direction' | 'symmetric';
-		quantity2: number;
-		distance2: number;
-		direction2: 'one_direction' | 'symmetric';
-		suppression: boolean;
-		suppressedIndices: Set<number>;
-	};
-	filletState?: {
-		pendingFillets: FilletCandidate[];
-		activeFilletId?: string | null;
-		selectedPrimitive1?: { type: 'line' | 'arc' | 'spline'; id: string } | null;
-		hoverPointId?: string | null;
-	};
-	chamferState?: {
-		candidate: import('../math/chamfer').ChamferCandidate | null;
-		firstLine: { id: string; clickPos: Vec2 } | null;
-		hoverPointId: string | null;
-		mode: import('../math/chamfer').ChamferMode;
-		flip: boolean;
-	};
-	offsetState?: {
-		chain: import('../math/offset').OffsetChain | null;
-		geomResult: import('../math/offset').OffsetGeometryResult | null;
-		direction: import('../math/offset').OffsetDirection;
-		dist1: number;
-		dist2: number;
-		flip: boolean;
-	};
-}
-
-export interface OffsetGizmoHandle {
-	type: 'dist1' | 'dist2';
-	screenX: number;
-	screenY: number;
-	worldPos: Vec2;
-	normal: Vec2;
-	currentValue: number;
-}
-
-export interface ChamferGizmoHandle {
-	type: 'dist1' | 'dist2' | 'angle';
-	screenX: number;
-	screenY: number;
-	worldPos: Vec2;
-	dir?: Vec2;
-	currentValue: number;
+	mirrorHighlight?: MirrorHighlight;
+	patternHighlight?: PatternHighlight;
+	rectangularPatternHighlight?: RectangularPatternHighlight;
+	filletState?: FilletPreviewState;
+	chamferState?: ChamferPreviewState;
+	offsetState?: OffsetPreviewState;
 }
 
 export class SVGRenderer {
@@ -183,27 +106,12 @@ export class SVGRenderer {
 	private mirrorGroup: SVGGElement;
 	private patternGroup: SVGGElement;
 	private patternCheckboxGroup: SVGGElement;
-	readonly patternCheckboxPositions = new Map<
-		string,
-		{ x: number; y: number; copyIndex: number; constraintId?: string }
-	>();
-	patternAngleHandle: {
-		x: number;
-		y: number;
-		worldX: number;
-		worldY: number;
-		copyIndex: number;
-	} | null = null;
-	readonly rectangularGizmoHandles = new Map<string, { x: number; y: number; axis: 1 | 2; constraintId?: string }>();
+	readonly patternCheckboxPositions = new Map<string, PatternCheckboxPosition>();
+	patternAngleHandle: PatternAngleHandle | null = null;
+	readonly rectangularGizmoHandles = new Map<string, RectangularGizmoHandle>();
 	readonly chamferGizmoHandles: ChamferGizmoHandle[] = [];
 	readonly offsetGizmoHandles: OffsetGizmoHandle[] = [];
-	filletGizmoHandle: {
-		screenX: number;
-		screenY: number;
-		worldMidArc: Vec2;
-		worldBisectorDir: Vec2;
-		radius: number;
-	} | null = null;
+	filletGizmoHandle: FilletGizmoHandle | null = null;
 	public previewGroup: SVGGElement;
 	public textGroup: SVGGElement;
 	public textRotationGizmo: {
@@ -605,8 +513,10 @@ export class SVGRenderer {
 		}
 
 		// Origin Axes & Marker
-		const isXSelected = sketch.selection.lineIds.has('axis_x');
-		const isYSelected = sketch.selection.lineIds.has('axis_y');
+		const isXMirror = options.mirrorHighlight?.mirrorLineId === 'axis_x';
+		const isYMirror = options.mirrorHighlight?.mirrorLineId === 'axis_y';
+		const isXSelected = !isXMirror && sketch.selection.lineIds.has('axis_x');
+		const isYSelected = !isYMirror && sketch.selection.lineIds.has('axis_y');
 		const isOriginSelected = sketch.selection.pointIds.has('origin');
 
 		// X Axis (Red)
@@ -624,10 +534,12 @@ export class SVGRenderer {
 		createSvgLine(
 			new Vec2(0, origin.y),
 			new Vec2(viewport.width, origin.y),
-			{
-				stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
-				'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-			},
+			isXMirror
+				? MIRROR_LINE_ATTRS
+				: {
+						stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
+						'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+					},
 			axisXG
 		);
 
@@ -646,10 +558,12 @@ export class SVGRenderer {
 		createSvgLine(
 			new Vec2(origin.x, 0),
 			new Vec2(origin.x, viewport.height),
-			{
-				stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
-				'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-			},
+			isYMirror
+				? MIRROR_LINE_ATTRS
+				: {
+						stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
+						'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
+					},
 			axisYG
 		);
 
@@ -938,10 +852,13 @@ export class SVGRenderer {
 			patternCheckboxPositions: this.patternCheckboxPositions,
 			rectangularGizmoHandles: this.rectangularGizmoHandles,
 			renderTransformedObjects: (objectIds, transform, options) => {
-				return this.renderTransformedObjects(sketch, viewport, objectIds, transform, options);
+				return renderTransformedPreviewObjects(sketch, viewport, objectIds, transform, options);
 			},
 			renderRectangularPatternGizmos: (v, centroidWorld, u1, u2, distance1, distance2, options) => {
-				this.renderRectangularPatternGizmos(v, centroidWorld, u1, u2, distance1, distance2, options);
+				renderRectangularPatternGizmoElements(v, centroidWorld, u1, u2, distance1, distance2, {
+					...options,
+					gizmoHandles: this.rectangularGizmoHandles,
+				});
 			},
 		};
 
@@ -958,143 +875,6 @@ export class SVGRenderer {
 		}
 	}
 
-	private renderRectangularPatternGizmos(
-		viewport: Viewport,
-		centroidWorld: { x: number; y: number },
-		u1: { x: number; y: number },
-		u2: { x: number; y: number },
-		distance1: number,
-		distance2: number,
-		options: {
-			targetGroup: SVGGElement;
-			constraintId?: string;
-		}
-	): void {
-		const sCtr = viewport.worldToScreen(centroidWorld);
-
-		const p1Screen = viewport.worldToScreen(new Vec2().addVectors(centroidWorld, u1));
-		const v1 = new Vec2().subVectors(p1Screen, sCtr);
-		const v1Len = Math.max(p1Screen.distanceTo(sCtr), 1e-6);
-		const u1Screen = v1.clone().multiplyScalar(1.0 / v1Len);
-
-		const p2Screen = viewport.worldToScreen(new Vec2().addVectors(centroidWorld, u2));
-		const v2 = new Vec2().subVectors(p2Screen, sCtr);
-		const v2Len = Math.max(p2Screen.distanceTo(sCtr), 1e-6);
-		const u2Screen = v2.clone().multiplyScalar(1.0 / v2Len);
-
-		const h1World = Vec2.from(centroidWorld).addScaledVector(u1, distance1);
-		const h1Screen = viewport.worldToScreen(h1World);
-
-		const h2World = Vec2.from(centroidWorld).addScaledVector(u2, distance2);
-		const h2Screen = viewport.worldToScreen(h2World);
-
-		const gizmoG = createSvgElement(
-			'g',
-			{
-				class: 'rectangular-pattern-gizmos',
-			},
-			options.targetGroup
-		);
-
-		const renderArrow = (
-			from: { x: number; y: number },
-			to: { x: number; y: number },
-			dirScreen: { x: number; y: number },
-			color: string,
-			axisNum: 1 | 2,
-			distVal: number
-		) => {
-			const isNegative = distVal < -1e-3;
-			const arrowDir = Vec2.from(dirScreen).multiplyScalar(isNegative ? -1 : 1);
-			const perp = arrowDir.clone().perpendicular();
-
-			const arrowLen = 18;
-			const arrowHalfWidth = 7.5;
-			const offsetDist = 48; // Offset equals initial line length at distance=0 (48px)
-
-			const tip = Vec2.from(to).addScaledVector(arrowDir, offsetDist);
-			const baseCenter = tip.clone().addScaledVector(arrowDir, -arrowLen);
-
-			// Register handle centered on the arrowhead for dragging
-			const key = options.constraintId ? `gizmo-${axisNum}-${options.constraintId}` : `gizmo-${axisNum}`;
-			this.rectangularGizmoHandles.set(key, {
-				x: tip.x - arrowLen * 0.5 * arrowDir.x,
-				y: tip.y - arrowLen * 0.5 * arrowDir.y,
-				axis: axisNum,
-				constraintId: options.constraintId,
-			});
-
-			// Shaft line connecting origin to base of arrowhead (always solid, no dashed lines)
-			createSvgLine(
-				from,
-				baseCenter,
-				{
-					stroke: color,
-					'stroke-width': 2.5,
-					'stroke-dasharray': 'none',
-					opacity: 0.9,
-					'pointer-events': 'none',
-				},
-				gizmoG
-			);
-
-			// Arrowhead as the draggable gizmo handle (replaces circle)
-			createSvgArrow(
-				tip,
-				arrowDir,
-				arrowLen,
-				arrowHalfWidth,
-				{
-					fill: color,
-					stroke: COLORS.white,
-					'stroke-width': 1.5,
-					'stroke-linejoin': 'round',
-					class: 'rectangular-pattern-gizmo-arrow',
-					filter: FILTERS.gizmoArrow,
-					'data-axis': String(axisNum),
-				},
-				gizmoG
-			);
-
-			// Distance label pill: without "d1:", "d2:", only the value
-			const labelText = `${formatDimensionValue(distVal, 1)} mm`;
-			const pillWidth = labelText.length * 6.8 + 14;
-			const isHorizontal = Math.abs(arrowDir.x) >= Math.abs(arrowDir.y);
-
-			let pillX: number;
-			let pillY: number;
-
-			if (isHorizontal) {
-				// Horizontal arrow -> place label below the arrow
-				const midX = tip.x - arrowLen * 0.5 * arrowDir.x;
-				const maxY = Math.max(from.y, tip.y, baseCenter.y + Math.abs(perp.y) * arrowHalfWidth);
-				pillX = midX;
-				pillY = maxY + 16;
-			} else {
-				// Vertical arrow -> place label to the right of the arrow
-				const midY = tip.y - arrowLen * 0.5 * arrowDir.y;
-				const maxX = Math.max(from.x, tip.x, baseCenter.x + Math.abs(perp.x) * arrowHalfWidth);
-				pillX = maxX + 10 + pillWidth * 0.5;
-				pillY = midY;
-			}
-
-			createSvgRect(
-				new Vec2(pillX - pillWidth * 0.5, pillY - 10),
-				new Vec2(pillWidth, 20),
-				{
-					...RECT_PATTERN_PILL_ATTRS,
-					stroke: color,
-				},
-				gizmoG
-			);
-
-			createSvgText(new Vec2(pillX, pillY + 3.5), labelText, RECT_PATTERN_PILL_TEXT_ATTRS, gizmoG);
-		};
-
-		renderArrow(sCtr, h1Screen, u1Screen, COLORS.patternAxis1, 1, distance1);
-		renderArrow(sCtr, h2Screen, u2Screen, COLORS.patternAxis2, 2, distance2);
-	}
-
 	renderTransformPreview(
 		sketch: SketchDocument,
 		viewport: Viewport,
@@ -1104,111 +884,9 @@ export class SVGRenderer {
 		targetGroup: SVGGElement,
 		color: string
 	): void {
-		const transform = createTransform(center, values);
-		this.renderTransformedObjects(sketch, viewport, ids, (x, y) => transform.point(new Vec2(x, y)), {
-			targetGroup,
-			baseColor: color,
-			transformScale: values.scale,
-			drawVertices: true,
+		renderTransformPreviewElements(sketch, viewport, ids, center, values, targetGroup, color, textPreview => {
+			this.renderTexts(sketch, viewport, {}, { ids, target: textPreview, color });
 		});
-
-		if (sketch.selection.textIds.size === 0) return;
-		const from = viewport.worldToScreen(center);
-		const to = viewport.worldToScreen(transform.point(center));
-		const textPreview = createSvgElement(
-			'g',
-			{
-				transform: `translate(${to.x}, ${to.y}) rotate(${-values.angle % 360}) scale(${values.scale}) translate(${-from.x}, ${-from.y})`,
-			},
-			targetGroup
-		);
-		this.renderTexts(sketch, viewport, {}, { ids, target: textPreview, color });
-	}
-
-	private renderTransformedObjects(
-		sketch: SketchDocument,
-		viewport: Viewport,
-		objectIds: Iterable<string>,
-		transform:
-			| { center: { x: number; y: number }; angleDeg: number }
-			| Vec2
-			| ((x: number, y: number) => { x: number; y: number }),
-		options: {
-			targetGroup?: SVGGElement;
-			baseColor?: string;
-			opacity?: number;
-			isSuppressed?: boolean;
-			drawVertices?: boolean;
-			strokeWidth?: number;
-			skipRender?: boolean;
-			transformScale?: number;
-			invertWinding?: boolean;
-			vertexRadius?: number;
-			vertexAttrs?: SvgAttrs;
-			deduplicateVertices?: boolean;
-		}
-	): Array<{ x: number; y: number }> {
-		let transformPoint: (x: number, y: number) => { x: number; y: number };
-		if (typeof transform === 'function') {
-			transformPoint = transform;
-		} else if ('angleDeg' in transform) {
-			const rad = (transform.angleDeg * Math.PI) / 180;
-			const center = transform.center;
-			transformPoint = (x, y) => new Vec2(x, y).rotateAround(center, rad);
-		} else {
-			transformPoint = (x, y) => new Vec2(x, y).add(transform);
-		}
-
-		const copyWorldPoints: Array<{ x: number; y: number }> = [];
-		const targetGroup = options.skipRender ? undefined : options.targetGroup;
-		const opacity = options.opacity ?? 1.0;
-		const baseColor = options.baseColor ?? COLORS.unconstrained;
-		const strokeWidth = options.strokeWidth ?? STROKE_WIDTH.normal;
-		const seenVertices = options.deduplicateVertices ? new Set<string>() : null;
-
-		const drawVertex = (screenPt: Vec2, worldPt: { x: number; y: number }) => {
-			if (!options.drawVertices || !targetGroup) return;
-			if (seenVertices) {
-				const key = `${Math.round(worldPt.x * 100)},${Math.round(worldPt.y * 100)}`;
-				if (seenVertices.has(key)) return;
-				seenVertices.add(key);
-			}
-			createSvgCircle(
-				screenPt,
-				options.vertexRadius ?? 3,
-				options.vertexAttrs ?? {
-					fill: options.transformScale !== undefined || baseColor === COLORS.constrained ? baseColor : COLORS.primary,
-					stroke: COLORS.white,
-					'stroke-width': STROKE_WIDTH.normal,
-					opacity,
-					'pointer-events': 'none',
-				},
-				targetGroup
-			);
-		};
-
-		const getAttrs = (isConstruction: boolean) => {
-			const attrs = getCopyStrokeAttrs(isConstruction, baseColor, opacity, strokeWidth);
-			return options.transformScale === undefined ? attrs : { ...attrs, stroke: baseColor };
-		};
-
-		for (const objId of objectIds) {
-			const prim = sketch.getPrimitive(objId);
-			if (!prim) continue;
-			const pts = prim.renderTransformed({
-				sketch,
-				viewport,
-				transformPoint,
-				targetGroup,
-				strokeAttrs: targetGroup ? getAttrs(!!prim.isConstruction) : undefined,
-				transformScale: options.transformScale,
-				invertWinding: options.invertWinding,
-				drawVertex,
-			});
-			copyWorldPoints.push(...pts);
-		}
-
-		return copyWorldPoints;
 	}
 
 	renderDistancePreview(
@@ -1372,50 +1050,7 @@ export class SVGRenderer {
 		selectedObjectIds: Set<string>,
 		mirrorLineId: string | null
 	): void {
-		this.mirrorGroup.innerHTML = '';
-		if (!mirrorLineId) return;
-
-		const line = sketch.lines.get(mirrorLineId);
-		if (!line) return;
-		const pA = sketch.points.get(line.p1Id);
-		const pB = sketch.points.get(line.p2Id);
-		if (!pA || !pB) return;
-
-		const sA = viewport.worldToScreen(pA);
-		const sB = viewport.worldToScreen(pB);
-
-		const dir = new Vec2().subVectors(pB, pA);
-		const lineLen = dir.length();
-		if (lineLen < 1e-6) return;
-
-		const normal = dir.clone().perpendicular().divideScalar(lineLen);
-
-		// Highlight mirror line: bright gold/amber centerline
-		createSvgLine(sA, sB, MIRROR_PREVIEW_LINE_ATTRS, this.mirrorGroup);
-
-		if (selectedObjectIds.size === 0) return;
-
-		const baseColor = getPatternBaseColor(sketch);
-		const idsToMirror = [...selectedObjectIds].filter(id => id !== mirrorLineId);
-		this.renderTransformedObjects(
-			sketch,
-			viewport,
-			idsToMirror,
-			(x, y) => new Vec2(x, y).reflectAcrossLine(pA, normal),
-			{
-				targetGroup: this.mirrorGroup,
-				baseColor,
-				opacity: 0.5,
-				drawVertices: true,
-				invertWinding: true,
-				vertexRadius: 3.5,
-				vertexAttrs: {
-					...MIRROR_PREVIEW_VERTEX_ATTRS,
-					opacity: 0.5,
-				},
-				deduplicateVertices: true,
-			}
-		);
+		renderMirrorPreviewElements(sketch, viewport, this.mirrorGroup, selectedObjectIds, mirrorLineId);
 	}
 
 	renderPatternPreview(
@@ -1430,477 +1065,45 @@ export class SVGRenderer {
 		suppressedIndices: Set<number>,
 		angleHandleEnabled = false
 	): void {
-		this.patternGroup.innerHTML = '';
-		if (!centerPointId) return;
-
-		const centerPt = sketch.points.get(centerPointId);
-		if (!centerPt) return;
-
-		const sCtr = viewport.worldToScreen(centerPt);
-
-		// Render center point marker: amber target crosshair & concentric ring
-		createSvgCircle(sCtr, 12, PATTERN_CENTER_RING_ATTRS, this.patternGroup);
-
-		createSvgLine(
-			new Vec2(sCtr.x - 16, sCtr.y),
-			new Vec2(sCtr.x + 16, sCtr.y),
-			PATTERN_CENTER_CROSSHAIR_ATTRS,
-			this.patternGroup
-		);
-
-		createSvgLine(
-			new Vec2(sCtr.x, sCtr.y - 16),
-			new Vec2(sCtr.x, sCtr.y + 16),
-			PATTERN_CENTER_CROSSHAIR_ATTRS,
-			this.patternGroup
-		);
-
-		createSvgCircle(sCtr, 4, PATTERN_CENTER_DOT_ATTRS, this.patternGroup);
-
-		if (selectedObjectIds.size === 0) return;
-
-		const N = Math.max(2, Math.round(quantity));
-		const baseColor = getPatternBaseColor(sketch);
-		let lastVisibleCopyIndex = N - 1;
-		if (suppression) {
-			while (lastVisibleCopyIndex > 0 && suppressedIndices.has(lastVisibleCopyIndex)) lastVisibleCopyIndex--;
-		}
-
-		// Calculate angle for each copy k (1 .. N-1)
-		for (let k = 1; k < N; k++) {
-			const aDeg = computePatternCopyAngle(k, N, distribution, angle);
-			const isSuppressed = suppressedIndices.has(k);
-			const copyOpacity = isSuppressed ? 0.15 : 0.5;
-
-			const copyWorldPoints = this.renderTransformedObjects(
-				sketch,
-				viewport,
-				selectedObjectIds,
-				{ center: centerPt, angleDeg: aDeg },
-				{
-					targetGroup: this.patternGroup,
-					baseColor,
-					opacity: copyOpacity,
-					isSuppressed,
-					drawVertices: true,
-					strokeWidth: STROKE_WIDTH.normal,
-				}
-			);
-
-			// Compute centroid of this copy to place suppression checkbox
-			const worldCentroid =
-				copyWorldPoints.length > 0
-					? Vec2.centroid(copyWorldPoints)
-					: Vec2.fromPolar(40, (aDeg * Math.PI) / 180).add(centerPt);
-			const copyCentroid =
-				copyWorldPoints.length > 0
-					? viewport.worldToScreen(worldCentroid)
-					: Vec2.fromPolar(40, (aDeg * Math.PI) / 180).add(sCtr);
-
-			// Register checkbox screen position for hit-testing
-			this.patternCheckboxPositions.set(`tool-${k}`, {
-				x: copyCentroid.x,
-				y: copyCentroid.y,
-				copyIndex: k,
-			});
-
-			// Render suppression checkbox over copy if suppression is enabled
-			if (suppression) {
-				renderPatternSuppressionCheckbox(this.patternCheckboxGroup, copyCentroid, k, isSuppressed);
-			}
-			if (angleHandleEnabled && k === lastVisibleCopyIndex) {
-				const dir = new Vec2().subVectors(copyCentroid, sCtr);
-				const len = dir.length() || 1;
-				// The arrow points back along the angle arc, toward the pattern center.
-				const direction = angle < 0 ? -1 : 1;
-				const dirVector = dir
-					.clone()
-					.perpendicular()
-					.multiplyScalar(-direction / len);
-				const tip = Vec2.from(copyCentroid).addScaledVector(dirVector, 30);
-				const arrowLen = 16;
-				const base = tip.clone().addScaledVector(dirVector, -arrowLen);
-				createSvgLine(
-					copyCentroid,
-					base,
-					{ stroke: COLORS.primary, 'stroke-width': 2, 'stroke-dasharray': '4 3' },
-					this.patternGroup
-				);
-				createSvgArrow(tip, dirVector, arrowLen, 6.5, OFFSET_GIZMO_ARROW_ATTRS, this.patternGroup);
-				this.patternAngleHandle = {
-					x: base.x,
-					y: base.y,
-					worldX: worldCentroid.x,
-					worldY: worldCentroid.y,
-					copyIndex: k,
-				};
-			}
-		}
+		this.patternAngleHandle = renderPatternPreviewElements(sketch, viewport, {
+			targetGroup: this.patternGroup,
+			checkboxGroup: this.patternCheckboxGroup,
+			checkboxPositions: this.patternCheckboxPositions,
+			selectedObjectIds,
+			centerPointId,
+			distribution,
+			angle,
+			quantity,
+			suppression,
+			suppressedIndices,
+			angleHandleEnabled,
+		});
 	}
 
 	renderRectangularPatternPreview(
 		sketch: SketchDocument,
 		viewport: Viewport,
-		highlight: {
-			selectedObjectIds: Set<string>;
-			line1Id: string | null;
-			line2Id: string | null;
-			quantity1: number;
-			distance1: number;
-			direction1: 'one_direction' | 'symmetric';
-			quantity2: number;
-			distance2: number;
-			direction2: 'one_direction' | 'symmetric';
-			suppression: boolean;
-			suppressedIndices: Set<number>;
-		}
+		highlight: RectangularPatternHighlight
 	): void {
-		this.patternGroup.innerHTML = '';
-		if (highlight.selectedObjectIds.size === 0) return;
-
-		const centroidWorld = calculateObjectsCentroid(sketch, highlight.selectedObjectIds);
-		if (!centroidWorld) return;
-
-		const paramMap = new Map<string, number>();
-		for (const [pid, pt] of sketch.points.entries()) {
-			paramMap.set(`${pid}.x`, pt.x);
-			paramMap.set(`${pid}.y`, pt.y);
-		}
-		const line1 = highlight.line1Id ? sketch.lines.get(highlight.line1Id) : null;
-		const line2 = highlight.line2Id ? sketch.lines.get(highlight.line2Id) : null;
-		const { u1, u2 } = computeRectangularPatternDirections(
-			paramMap,
-			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-		);
-
-		const maxI = Math.abs(highlight.distance1) > 1e-6 ? highlight.quantity1 : 1;
-		const maxJ = Math.abs(highlight.distance2) > 1e-6 ? highlight.quantity2 : 1;
-		const baseColor = getPatternBaseColor(sketch);
-
-		for (let i = 0; i < maxI; i++) {
-			for (let j = 0; j < maxJ; j++) {
-				if (i === 0 && j === 0) continue;
-				const copyIndex = i * 1000 + j;
-				const isSuppressed = highlight.suppressedIndices.has(copyIndex);
-				const copyOpacity = isSuppressed ? 0.15 : 0.5;
-				const offset = computeRectangularPatternOffset(
-					i,
-					j,
-					highlight.distance1,
-					highlight.direction1,
-					highlight.distance2,
-					highlight.direction2,
-					u1,
-					u2
-				);
-
-				const copyWorldPoints = this.renderTransformedObjects(sketch, viewport, highlight.selectedObjectIds, offset, {
-					targetGroup: this.patternGroup,
-					baseColor,
-					opacity: copyOpacity,
-					isSuppressed,
-					drawVertices: true,
-					strokeWidth: STROKE_WIDTH.normal,
-				});
-
-				const copyCentroid = viewport.worldToScreen(
-					copyWorldPoints.length > 0 ? Vec2.centroid(copyWorldPoints) : centroidWorld.clone().add(offset)
-				);
-
-				this.patternCheckboxPositions.set(`tool-${copyIndex}`, {
-					x: copyCentroid.x,
-					y: copyCentroid.y,
-					copyIndex,
-				});
-
-				if (highlight.suppression) {
-					renderPatternSuppressionCheckbox(this.patternCheckboxGroup, copyCentroid, copyIndex, isSuppressed);
-				}
-			}
-		}
-
-		this.renderRectangularPatternGizmos(viewport, centroidWorld, u1, u2, highlight.distance1, highlight.distance2, {
+		renderRectangularPatternPreviewElements(sketch, viewport, {
 			targetGroup: this.patternGroup,
+			checkboxGroup: this.patternCheckboxGroup,
+			checkboxPositions: this.patternCheckboxPositions,
+			gizmoHandles: this.rectangularGizmoHandles,
+			highlight,
 		});
 	}
 
-	renderFilletPreviews(
-		_sketch: SketchDocument,
-		viewport: Viewport,
-		state: NonNullable<RenderOptions['filletState']>
-	): void {
-		// 1. Highlight selected first primitive if any
-
-		// 3. Render all pending fillets
-		for (const pf of state.pendingFillets) {
-			const res = pf.result;
-			if (!res) continue;
-
-			const sV = viewport.worldToScreen(res.cornerVertex);
-			const sT1 = viewport.worldToScreen(res.t1);
-			const sT2 = viewport.worldToScreen(res.t2);
-			const sCenter = viewport.worldToScreen(res.center);
-			const sMid = viewport.worldToScreen(res.midArc);
-			const sRadius = res.radius * viewport.zoom;
-
-			// Shaded corner wedge
-			const sweepWedgeFlag = res.clockwise ? 0 : 1;
-			const wedgePath = `M ${sT1.x} ${sT1.y} L ${sV.x} ${sV.y} L ${sT2.x} ${sT2.y} A ${sRadius.toFixed(2)} ${sRadius.toFixed(2)} 0 0 ${sweepWedgeFlag} ${sT1.x} ${sT1.y} Z`;
-			createSvgPath(wedgePath, FILLET_WEDGE_ATTRS, this.filletGroup);
-
-			// Fillet arc
-			const arcD = getArcSvgPath(sCenter, sT1, sT2, sRadius, res.clockwise);
-			createSvgPath(arcD, FILLET_ARC_ATTRS, this.filletGroup);
-
-			// Check if this fillet is active for Gizmo
-			const isActive =
-				pf.id === state.activeFilletId ||
-				(!state.activeFilletId && pf === state.pendingFillets[state.pendingFillets.length - 1]);
-			if (isActive) {
-				// Center circle handle
-				createSvgCircle(sCenter, 4, GIZMO_POINT_ATTRS, this.filletGroup);
-
-				// Radial dashed line extending outward from center through midArc
-				const uDir = new Vec2().subVectors(sMid, sCenter).divideScalar(sCenter.distanceTo(sMid) || 1);
-				const lineLen = sRadius + 45;
-				const lineEnd = sCenter.clone().addScaledVector(uDir, lineLen);
-
-				createSvgLine(sCenter, lineEnd, FILLET_GIZMO_RADIAL_ATTRS, this.filletGroup);
-
-				// Small square at tip
-				const sqSize = 6;
-				createSvgRect(
-					new Vec2(lineEnd.x - sqSize * 0.5, lineEnd.y - sqSize * 0.5),
-					new Vec2(sqSize, sqSize),
-					FILLET_GIZMO_SQUARE_ATTRS,
-					this.filletGroup
-				);
-
-				// Inward arrow gizmo at sMid pointing towards sCenter
-				const arrowDir = uDir.clone().negate();
-				createSvgArrow(sMid, arrowDir, 18, 7.5, FILLET_GIZMO_ARROW_ATTRS, this.filletGroup);
-
-				this.filletGizmoHandle = {
-					screenX: sMid.x,
-					screenY: sMid.y,
-					worldMidArc: res.midArc,
-					worldBisectorDir: res.bisectorDir,
-					radius: res.radius,
-				};
-			}
-		}
+	renderFilletPreviews(_sketch: SketchDocument, viewport: Viewport, state: FilletPreviewState): void {
+		this.filletGizmoHandle = renderFilletPreviewElements(viewport, this.filletGroup, state);
 	}
 
-	renderChamferPreviews(viewport: Viewport, state: NonNullable<RenderOptions['chamferState']>): void {
-		// 1. Render candidate preview and gizmos
-		const cand = state.candidate;
-		if (!cand || !cand.result) return;
-		const res = cand.result;
-
-		const sV = viewport.worldToScreen(cand.vertexPos);
-		const sT1 = viewport.worldToScreen(res.t1);
-		const sT2 = viewport.worldToScreen(res.t2);
-
-		// Cut lines from T1 to V and T2 to V
-		createSvgLine(sT1, sV, CHAMFER_CUT_LINE_ATTRS, this.chamferGroup);
-		createSvgLine(sT2, sV, CHAMFER_CUT_LINE_ATTRS, this.chamferGroup);
-
-		// Vertex V point
-		createSvgCircle(sV, 3.5, GIZMO_POINT_ATTRS, this.chamferGroup);
-
-		// Chamfer line
-		createSvgLine(sT1, sT2, CHAMFER_HIGHLIGHT_ATTRS, this.chamferGroup);
-
-		// Cut points T1 and T2
-		createSvgCircle(sT1, 3, GIZMO_POINT_ATTRS, this.chamferGroup);
-		createSvgCircle(sT2, 3, GIZMO_POINT_ATTRS, this.chamferGroup);
-
-		// Unit screen directions for line 1 and line 2 (pointing away from V)
-		const screenScale = new Vec2(viewport.zoom, -viewport.zoom);
-		const uSDir1 = cand.dir1.clone().multiply(screenScale).normalize();
-		const uSDir2 = cand.dir2.clone().multiply(screenScale).normalize();
-
-		const pushDistArrow = (type: 'dist1' | 'dist2', sT: Vec2, uSDir: Vec2, worldPos: Vec2, dir: Vec2, val: number) => {
-			const tip = sT.clone().addScaledVector(uSDir, -3.5);
-			createSvgArrow(tip, uSDir, 16, 6.5, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
-			this.chamferGizmoHandles.push({
-				type,
-				screenX: tip.x - uSDir.x * 8,
-				screenY: tip.y - uSDir.y * 8,
-				worldPos,
-				dir,
-				currentValue: val,
-			});
-		};
-
-		if (state.mode === 'equal_distance') {
-			// Mode 1: 1 arrow gizmo along the angle bisector, shifted back so tip points at chamfer midpoint
-			const sMid = new Vec2().midpoint(sT1, sT2);
-			const vBis = new Vec2().subVectors(sMid, sV);
-			const lenBis = vBis.length() || 1;
-			const uSBis = vBis.clone().multiplyScalar(1.0 / lenBis);
-
-			// Arrow tip points towards sMid
-			const tip = Vec2.from(sMid).addScaledVector(uSBis, -2);
-			createSvgArrow(tip, uSBis, 16, 6.5, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
-
-			// Dashed guide line from vertex V to the base of the arrow along bisector
-			const baseCenter = tip.clone().addScaledVector(uSBis, -16);
-			if (sV.distanceTo(baseCenter) > 4) {
-				createSvgLine(sV, baseCenter, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-			}
-
-			const bisectorWorld = new Vec2().addVectors(cand.dir1, cand.dir2).normalizeOrUnitX();
-
-			this.chamferGizmoHandles.push({
-				type: 'dist1',
-				screenX: tip.x - uSBis.x * 8,
-				screenY: tip.y - uSBis.y * 8,
-				worldPos: res.midPoint,
-				dir: bisectorWorld,
-				currentValue: res.dist1,
-			});
-		} else if (state.mode === 'two_distance') {
-			// Mode 2: 2 arrow gizmos shifted back so their tips point directly at T1 and T2
-			pushDistArrow('dist1', sT1, uSDir1, res.t1, cand.dir1, res.dist1);
-			pushDistArrow('dist2', sT2, uSDir2, res.t2, cand.dir2, res.dist2);
-		} else if (state.mode === 'distance_angle') {
-			// Mode 3: 1 distance arrow on reference line + 1 angle circle at 100px from reference vertex
-			const [distType, sRef, uSDirRef, tRef, dirRef, distVal, sOther] = !state.flip
-				? (['dist1', sT1, uSDir1, res.t1, cand.dir1, res.dist1, sT2] as const)
-				: (['dist2', sT2, uSDir2, res.t2, cand.dir2, res.dist2, sT1] as const);
-
-			pushDistArrow(distType, sRef, uSDirRef, tRef, dirRef, distVal);
-
-			// Direction along chamfer line from reference vertex to opposite vertex
-			const vChamfer = new Vec2().subVectors(sOther, sRef);
-			const lenChamfer = vChamfer.length() || 1;
-			const uSChamfer = vChamfer.clone().multiplyScalar(1.0 / lenChamfer);
-
-			// Circle handle at exactly 100px from reference vertex
-			const arcR = 100;
-			const circle = sRef.clone().addScaledVector(uSChamfer, arcR);
-			createSvgLine(sRef, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-
-			// Visual arc showing the angle at reference vertex between ray towards V and chamfer ray
-			const vV = new Vec2().subVectors(sV, sRef);
-			if (vV.length() > 1e-4) {
-				const angV = vV.signedAngle();
-				let diff = uSChamfer.signedAngle() - angV;
-				while (diff > Math.PI) diff -= 2 * Math.PI;
-				while (diff < -Math.PI) diff += 2 * Math.PI;
-
-				const start = Vec2.fromPolar(arcR, angV).add(sRef);
-				createSvgLine(sRef, start, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-
-				if (Math.abs(diff) > 1e-3) {
-					const sweepFlag = diff > 0 ? 1 : 0;
-					createSvgPath(
-						`M ${start.x} ${start.y} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${circle.x} ${circle.y}`,
-						GIZMO_GUIDE_ATTRS,
-						this.chamferGroup
-					);
-				}
-			}
-
-			createSvgCircle(circle, 6, CHAMFER_GIZMO_CIRCLE_ATTRS, this.chamferGroup);
-			this.chamferGizmoHandles.push({
-				type: 'angle',
-				screenX: circle.x,
-				screenY: circle.y,
-				worldPos: tRef,
-				currentValue: res.angleDeg,
-			});
-		}
+	renderChamferPreviews(viewport: Viewport, state: ChamferPreviewState): void {
+		renderChamferPreviewElements(viewport, this.chamferGroup, state, this.chamferGizmoHandles);
 	}
 
-	renderOffsetPreviews(
-		sketch: SketchDocument,
-		viewport: Viewport,
-		state: NonNullable<RenderOptions['offsetState']>
-	): void {
-		const { chain, geomResult, direction, dist1, dist2, flip } = state;
-		if (!chain || !geomResult) return;
-
-		// 1. Highlight the selected chain primitives
-		for (const it of chain.items) {
-			sketch.getPrimitive(it.id, it.type)?.renderTransformed({
-				sketch,
-				viewport,
-				transformPoint: (x, y) => ({ x, y }),
-				targetGroup: this.offsetGroup,
-				strokeAttrs: OFFSET_CHAIN_ATTRS,
-			});
-		}
-
-		// 2. Render computed offset curves for each side
-		for (const side of geomResult.sides) {
-			for (const prim of side.primitives) {
-				if (prim.type === 'line' && prim.p1 && prim.p2) {
-					const s1 = viewport.worldToScreen(prim.p1);
-					const s2 = viewport.worldToScreen(prim.p2);
-					createSvgLine(s1, s2, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
-				} else if (prim.type === 'circle' && prim.circleCenter && prim.circleRadius) {
-					const sc = viewport.worldToScreen(prim.circleCenter);
-					createSvgCircle(sc, prim.circleRadius * viewport.zoom, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
-				} else if (prim.type === 'arc' && prim.center && prim.start && prim.end && prim.radius) {
-					const sc = viewport.worldToScreen(prim.center);
-					const ss = viewport.worldToScreen(prim.start);
-					const se = viewport.worldToScreen(prim.end);
-					const d = getArcSvgPath(sc, ss, se, prim.radius * viewport.zoom, !!prim.clockwise);
-					createSvgPath(d, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
-				} else if (prim.type === 'spline' && prim.fitPoints && prim.fitPoints.length >= 2) {
-					const beziers = fitPointsToBezier(prim.fitPoints, prim.handles);
-					const d = getSplineSvgPath(beziers, p => viewport.worldToScreen(p), !!prim.isSplineClosed);
-					createSvgPath(d, OFFSET_PREVIEW_ATTRS, this.offsetGroup);
-				}
-			}
-		}
-
-		// 3. Render gizmo arrow(s) at gizmoAnchor along gizmoNormal
-		const anchor = geomResult.gizmoAnchor;
-		const norm = geomResult.gizmoNormal;
-		const sAnchor = viewport.worldToScreen(anchor);
-
-		const renderGizmoArrowForSide = (type: 'dist1' | 'dist2', offsetVal: number, sign: number) => {
-			const targetWorld = anchor.clone().addScaledVector(norm, sign * offsetVal);
-			const sTarget = viewport.worldToScreen(targetWorld);
-
-			// Screen direction from anchor to target
-			const vDir = new Vec2().subVectors(sTarget, sAnchor);
-			const lenDir = vDir.length() || 1;
-			const uDir = vDir.clone().multiplyScalar(1.0 / lenDir);
-
-			// Dashed guide line from anchor to target
-			createSvgLine(sAnchor, sTarget, GIZMO_GUIDE_ATTRS, this.offsetGroup);
-
-			// Tip points towards sTarget
-			const tip = sTarget;
-			createSvgArrow(tip, uDir, 16, 6.5, OFFSET_GIZMO_ARROW_ATTRS, this.offsetGroup);
-
-			this.offsetGizmoHandles.push({
-				type,
-				screenX: tip.x - uDir.x * 8,
-				screenY: tip.y - uDir.y * 8,
-				worldPos: targetWorld,
-				normal: norm.clone().multiplyScalar(sign),
-				currentValue: offsetVal,
-			});
-		};
-
-		if (direction === 'one_side') {
-			const sign = flip ? -1 : 1;
-			renderGizmoArrowForSide('dist1', dist1, sign);
-		} else if (direction === 'two_sides') {
-			const sign1 = !flip ? 1 : -1;
-			const sign2 = !flip ? -1 : 1;
-			renderGizmoArrowForSide('dist1', dist1, sign1);
-			renderGizmoArrowForSide('dist2', dist2, sign2);
-		} else if (direction === 'symmetric') {
-			renderGizmoArrowForSide('dist1', dist1, 1);
-			renderGizmoArrowForSide('dist1', dist1, -1);
-		}
+	renderOffsetPreviews(sketch: SketchDocument, viewport: Viewport, state: OffsetPreviewState): void {
+		renderOffsetPreviewElements(sketch, viewport, this.offsetGroup, state, this.offsetGizmoHandles);
 	}
 
 	clearPreviews(): void {

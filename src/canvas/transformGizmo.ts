@@ -1,13 +1,7 @@
 import { ORIGIN, Vec2 } from '../math/vector';
 import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
-import { createSvgCircle, createSvgElement, createSvgLine } from './svg';
-import {
-	COLORS,
-	TRANSFORM_FRAME_ATTRS,
-	TRANSFORM_HANDLE_ATTRS,
-	TRANSFORM_HANDLE_RADIUS,
-	TRANSFORM_ROTATION_STEM_ATTRS,
-} from './styles';
+import { createSvgElement, createSvgGizmoCircle, createSvgGizmoDashedLine } from './svg';
+import { COLORS, TRANSFORM_FRAME_ATTRS } from './styles';
 
 const HANDLE_HIT_RADIUS = 9;
 const RESIZE_CURSORS = ['ew-resize', 'nwse-resize', 'ns-resize', 'nesw-resize'] as const;
@@ -76,9 +70,9 @@ export function renderTransformGizmo(
 		},
 		target
 	);
-	createSvgLine(rotationBase, rotation, { ...TRANSFORM_ROTATION_STEM_ATTRS, stroke }, target);
+	createSvgGizmoDashedLine(rotationBase, rotation, target, stroke);
 
 	for (const point of [...corners.map(corner => corner.point), center, rotation]) {
-		createSvgCircle(point, TRANSFORM_HANDLE_RADIUS, { ...TRANSFORM_HANDLE_ATTRS, stroke }, target);
+		createSvgGizmoCircle(point, target, stroke);
 	}
 }

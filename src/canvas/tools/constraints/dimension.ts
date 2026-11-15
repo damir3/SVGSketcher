@@ -1,4 +1,5 @@
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
+import { LABEL_DISTANCE_PX } from '../../distances';
+import { findAxisNear } from '../../hitTesting';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -287,12 +288,9 @@ export class DimensionTool extends BaseTool {
 							id = hitArc.id;
 							type = 'arc';
 						} else {
-							const sOrigin = this.ctx.viewport.worldToScreen(ORIGIN);
-							if (Math.abs(screen.y - sOrigin.y) <= LINE_DISTANCE_PX) {
-								id = 'axis_x';
-								type = 'line';
-							} else if (Math.abs(screen.x - sOrigin.x) <= LINE_DISTANCE_PX) {
-								id = 'axis_y';
+							const hitAxis = findAxisNear(this.ctx.sketch, this.ctx.viewport, screen);
+							if (hitAxis) {
+								id = hitAxis.id;
 								type = 'line';
 							}
 						}

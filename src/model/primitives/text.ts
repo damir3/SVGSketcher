@@ -2,8 +2,7 @@ import { ORIGIN, Vec2 } from '../../math/vector';
 import type { SketchDocument } from '../sketch';
 import type { IInspectable, ISidebarPanel } from '../../ui/panels/inspector/types';
 import { TextInspectorPanel } from '../../ui/panels/primitives/textPanel';
-import { createSvgElement } from '../../canvas/svg';
-import { COLORS } from '../../canvas/styles';
+import { createSvgElement, createSvgGizmoCircle, createSvgGizmoDashedLine } from '../../canvas/svg';
 import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from '../../canvas/distances';
 import { getFontSync, loadFontAsync } from '../../canvas/fonts';
 import { generateTextSvgPathData } from '../../math/textPath';
@@ -362,34 +361,9 @@ export class SketchText implements IInspectable {
 				const topEdgeY = -hBoxScreen / 2;
 				const handleY = topEdgeY - stemLen;
 
-				createSvgElement(
-					'line',
-					{
-						x1: 0,
-						y1: topEdgeY,
-						x2: 0,
-						y2: handleY,
-						stroke: COLORS.primary,
-						'stroke-width': 1.5,
-						'stroke-dasharray': '2,2',
-					},
-					textG
-				);
+				createSvgGizmoDashedLine(new Vec2(0, topEdgeY), new Vec2(0, handleY), textG);
 
-				createSvgElement(
-					'circle',
-					{
-						cx: 0,
-						cy: handleY,
-						r: 5.5,
-						fill: COLORS.white,
-						stroke: COLORS.primary,
-						'stroke-width': 2,
-						class: 'text-rotation-handle',
-						cursor: 'grab',
-					},
-					textG
-				);
+				createSvgGizmoCircle(new Vec2(0, handleY), textG);
 
 				const rad = (angleScreenDeg * Math.PI) / 180;
 				const handleScreen = new Vec2(0, handleY).rotateAround(ORIGIN, rad).add(sCenter);
@@ -400,20 +374,7 @@ export class SketchText implements IInspectable {
 					handleScreen,
 				};
 
-				createSvgElement(
-					'circle',
-					{
-						cx: 0,
-						cy: 0,
-						r: 5.5,
-						fill: COLORS.white,
-						stroke: COLORS.primary,
-						'stroke-width': 2,
-						class: 'text-drag-handle',
-						cursor: 'move',
-					},
-					textG
-				);
+				createSvgGizmoCircle(ORIGIN, textG);
 
 				gizmos.dragGizmo = {
 					textId: this.id,

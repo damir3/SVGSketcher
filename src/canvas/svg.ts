@@ -1,5 +1,13 @@
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
-import { SVG_NS, DIMENSION_TEXT_ATTRS, type SvgAttrs } from './styles';
+import {
+	COLORS,
+	DIMENSION_TEXT_ATTRS,
+	GIZMO_CIRCLE_ATTRS,
+	GIZMO_CIRCLE_RADIUS,
+	GIZMO_GUIDE_ATTRS,
+	SVG_NS,
+	type SvgAttrs,
+} from './styles';
 import { Vec2, type XY } from '../math/vector';
 
 export function fmtCoord(v: number | string): string {
@@ -121,6 +129,43 @@ export function createSvgArrow(
 	const b1 = base.clone().addScaledVector(perp, halfWidth);
 	const b2 = base.clone().addScaledVector(perp, -halfWidth);
 	return createSvgPath(`M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`, attrs, parent);
+}
+
+export function createSvgGizmoCircle(
+	center: XY,
+	parent?: SVGElement,
+	color: string = COLORS.primary,
+	attrs?: SvgAttrs
+): SVGCircleElement {
+	return createSvgCircle(
+		center,
+		GIZMO_CIRCLE_RADIUS,
+		{
+			...GIZMO_CIRCLE_ATTRS,
+			stroke: color,
+			...attrs,
+		},
+		parent
+	);
+}
+
+export function createSvgGizmoDashedLine(
+	start: XY,
+	end: XY,
+	parent?: SVGElement,
+	color: string = COLORS.primary,
+	attrs?: SvgAttrs
+): SVGLineElement {
+	return createSvgLine(
+		start,
+		end,
+		{
+			...GIZMO_GUIDE_ATTRS,
+			stroke: color,
+			...attrs,
+		},
+		parent
+	);
 }
 
 export function createSvgText(position: Vec2, text: string, attrs?: SvgAttrs, parent?: SVGElement): SVGTextElement {

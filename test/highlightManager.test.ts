@@ -415,6 +415,37 @@ describe('Constraint and Transform tools hovering', () => {
 		assert.strictEqual(target?.id, line.id);
 	});
 
+	it('MirrorTool: highlights built-in axes in mirror_line phase, not in objects phase', () => {
+		const sketch = new SketchDocument();
+		const svgRoot = createMockSvgElement('svg');
+		const axisX = createMockSvgElement('g', { 'data-id': 'axis_x', 'data-type': 'line' });
+		const axisY = createMockSvgElement('g', { 'data-id': 'axis_y', 'data-type': 'line' });
+		const originEl = createMockSvgElement('g', { 'data-id': 'origin', 'data-type': 'point' });
+		svgRoot.appendChild(axisX);
+		svgRoot.appendChild(axisY);
+		svgRoot.appendChild(originEl);
+
+		const ctx = createMockContext(sketch, svgRoot);
+		const manager = new HighlightManager(svgRoot, () => ctx);
+		const mirrorTool = new MirrorTool();
+		mirrorTool.activate(ctx);
+
+		// Phase: 'objects' -> axes and origin are not highlightable
+		mirrorTool.setPhase('objects');
+		assert.strictEqual(manager.update(mirrorTool, new Vec2(50, 0)), null);
+		assert.strictEqual(manager.update(mirrorTool, new Vec2(0, 50)), null);
+		assert.strictEqual(manager.update(mirrorTool, new Vec2(0, 0)), null);
+
+		// Phase: 'mirror_line' -> X-axis and Y-axis are highlightable, origin is still rejected
+		mirrorTool.setPhase('mirror_line');
+		assert.strictEqual(manager.update(mirrorTool, new Vec2(50, 0))?.id, 'axis_x');
+		assert.ok(axisX.classList.contains('select-hover'));
+		assert.strictEqual(manager.update(mirrorTool, new Vec2(0, 50))?.id, 'axis_y');
+		assert.ok(axisY.classList.contains('select-hover'));
+		assert.strictEqual(mirrorTool.canHighlight({ type: 'point', id: 'origin' }), false);
+		assert.notStrictEqual(manager.update(mirrorTool, new Vec2(0, 0), originEl)?.id, 'origin');
+	});
+
 	it('CircularPatternTool: highlights primitives in objects phase, only points in center_point phase, disables over checkboxes', () => {
 		const sketch = new SketchDocument();
 		const p1 = sketch.addPoint({ x: 0, y: 0 });

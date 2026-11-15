@@ -95,7 +95,7 @@ export const DASH_ARRAY = {
 	mirrorLine: '6 3',
 	directionLine: '6 3',
 	patternCenterRing: '4 2',
-	filletGizmo: '4 4',
+	gizmo: '4 4',
 	symmetryChord: '3 3',
 } as const;
 
@@ -120,8 +120,7 @@ export const STROKE_WIDTH = {
 
 export const FILTERS = {
 	splineCheckmark: 'drop-shadow(0 1px 3px rgba(0,0,0,0.25))',
-	gizmoArrow: 'drop-shadow(0 2px 5px rgba(0,0,0,0.35))',
-	filletGizmoArrow: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
+	gizmo: 'drop-shadow(0 2px 6px rgba(0,0,0,0.35))',
 	checkboxHalo: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))',
 } as const;
 
@@ -242,16 +241,11 @@ export const SYMMETRY_CHORD_ATTRS: SvgAttrs = {
 export const TRANSFORM_PREVIEW_COLOR = COLORS.splinePreview;
 export const TRANSFORM_GEOMETRY_ATTRS = { opacity: 0.7, 'pointer-events': 'none' };
 
-const TRANSFORM_OUTLINE_ATTRS = { fill: 'none', 'stroke-width': 1.5 };
-
-export const TRANSFORM_FRAME_ATTRS = { ...TRANSFORM_OUTLINE_ATTRS, 'stroke-dasharray': '4,4' };
-export const TRANSFORM_ROTATION_STEM_ATTRS = { ...TRANSFORM_OUTLINE_ATTRS, 'stroke-dasharray': '3 3' };
-export const TRANSFORM_HANDLE_ATTRS = {
-	fill: COLORS.white,
-	'stroke-width': 2,
-	'pointer-events': 'all',
+export const TRANSFORM_FRAME_ATTRS = {
+	fill: 'none',
+	'stroke-width': STROKE_WIDTH.normal,
+	'stroke-dasharray': DASH_ARRAY.gizmo,
 };
-export const TRANSFORM_HANDLE_RADIUS = 5.5;
 
 export const MIRROR_LINE_ATTRS: SvgAttrs = {
 	class: 'entity-visible visible-primitive',
@@ -383,10 +377,30 @@ export const GIZMO_POINT_ATTRS: SvgAttrs = {
 
 export const GIZMO_GUIDE_ATTRS: SvgAttrs = {
 	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.dimension,
-	'stroke-dasharray': DASH_ARRAY.filletGizmo,
+	'stroke-width': STROKE_WIDTH.normal,
+	'stroke-dasharray': DASH_ARRAY.gizmo,
 	fill: 'none',
 	'pointer-events': 'none',
+};
+
+export const GIZMO_ARROW_ATTRS: SvgAttrs = {
+	fill: COLORS.primary,
+	stroke: COLORS.white,
+	'stroke-width': STROKE_WIDTH.dimension,
+	'stroke-linejoin': 'round',
+	class: 'gizmo-arrow',
+	filter: FILTERS.gizmo,
+};
+
+export const GIZMO_CIRCLE_RADIUS = 5.5;
+
+export const GIZMO_CIRCLE_ATTRS: SvgAttrs = {
+	fill: COLORS.white,
+	stroke: COLORS.primary,
+	'stroke-width': STROKE_WIDTH.thick,
+	'pointer-events': 'all',
+	class: 'gizmo-circle',
+	filter: FILTERS.gizmo,
 };
 
 // Fillet Previews & Gizmos
@@ -420,27 +434,11 @@ export const FILLET_ARC_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
-export const FILLET_GIZMO_RADIAL_ATTRS: SvgAttrs = {
-	stroke: COLORS.primary,
-	'stroke-width': STROKE_WIDTH.normal,
-	'stroke-dasharray': DASH_ARRAY.filletGizmo,
-	'pointer-events': 'none',
-};
-
 export const FILLET_GIZMO_SQUARE_ATTRS: SvgAttrs = {
 	fill: COLORS.white,
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.dimension,
 	'pointer-events': 'none',
-};
-
-export const FILLET_GIZMO_ARROW_ATTRS: SvgAttrs = {
-	fill: COLORS.primary,
-	stroke: COLORS.white,
-	'stroke-width': STROKE_WIDTH.dimension,
-	'stroke-linejoin': 'round',
-	class: 'fillet-gizmo-arrow',
-	filter: FILTERS.filletGizmoArrow,
 };
 
 // Chamfer Previews & Gizmos
@@ -468,23 +466,6 @@ export const CHAMFER_HOVER_POINT_ATTRS: SvgAttrs = {
 	'pointer-events': 'none',
 };
 
-export const CHAMFER_GIZMO_ARROW_ATTRS: SvgAttrs = {
-	fill: COLORS.primary,
-	stroke: COLORS.white,
-	'stroke-width': STROKE_WIDTH.dimension,
-	'stroke-linejoin': 'round',
-	class: 'chamfer-gizmo-arrow',
-	filter: FILTERS.filletGizmoArrow,
-};
-
-export const CHAMFER_GIZMO_CIRCLE_ATTRS: SvgAttrs = {
-	fill: COLORS.white,
-	stroke: COLORS.primary,
-	'stroke-width': 2,
-	class: 'chamfer-gizmo-circle',
-	filter: FILTERS.filletGizmoArrow,
-};
-
 // Offset Previews & Gizmos
 export const OFFSET_CHAIN_ATTRS: SvgAttrs = {
 	stroke: COLORS.selected,
@@ -501,15 +482,6 @@ export const OFFSET_PREVIEW_ATTRS: SvgAttrs = {
 	fill: 'none',
 	'stroke-linecap': 'round',
 	'pointer-events': 'none',
-};
-
-export const OFFSET_GIZMO_ARROW_ATTRS: SvgAttrs = {
-	fill: COLORS.primary,
-	stroke: COLORS.white,
-	'stroke-width': STROKE_WIDTH.dimension,
-	'stroke-linejoin': 'round',
-	class: 'offset-gizmo-arrow chamfer-gizmo-arrow',
-	filter: FILTERS.filletGizmoArrow,
 };
 
 // Snap Indicators

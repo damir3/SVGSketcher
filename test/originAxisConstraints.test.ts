@@ -19,6 +19,9 @@ import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { CanvasInteraction } from '../src/canvas/interaction';
 import { Viewport } from '../src/canvas/viewport';
 import { LineTool } from '../src/canvas/tools/primitives/line';
+import { MirrorTool } from '../src/canvas/tools/modify/mirror';
+import { findLineNear } from '../src/canvas/hitTesting';
+import { renderMirrorPreview } from '../src/canvas/modifyPreviews';
 import { Vec2 } from '../src/math/vector';
 
 describe('Origin & Axis Constraints', () => {
@@ -1495,6 +1498,216 @@ describe('Origin & Axis Constraints', () => {
 			assert.equal(editedConstraint.l2P1, p2.id);
 			assert.equal(editedConstraint.l2P2, p3.id);
 			assert.equal(editedConstraint.targetAngle, 90);
+		});
+	});
+
+	describe('MirrorTool Axis Support', () => {
+		const createMirrorContext = (sketch: SketchDocument, viewport: Viewport) => {
+			let lastTool: string | null = null;
+			return {
+				ctx: {
+					sketch,
+					viewport,
+					renderer: { clearPreviews() {} },
+					svg: { querySelectorAll: () => [] },
+					highlightManager: { refresh() {}, clear() {} },
+					findPointNear: () => null,
+					findLineNear: (screen: Vec2, thresholdPx?: number, includeAxes?: boolean) =>
+						findLineNear(sketch, viewport, screen, 'mirror', thresholdPx, includeAxes),
+					findCircleNear: () => null,
+					findArcNear: () => null,
+					findEllipseNear: () => null,
+					findEllipticalArcNear: () => null,
+					findSplineNear: () => null,
+					requestRender: () => {},
+					setCursor: () => {},
+					showToast: () => {},
+					setTool: (t: string) => {
+						lastTool = t;
+					},
+				} as any,
+				getLastTool: () => lastTool,
+			};
+		};
+
+		it('findLineNear only returns axis_x/axis_y when includeAxes is true and no user line is closer', () => {
+			const sketch = new SketchDocument();
+			const viewport = new Viewport(800, 600);
+			const xAxisScreen = viewport.worldToScreen(new Vec2(50, 0));
+			const yAxisScreen = viewport.worldToScreen(new Vec2(0, 50));
+
+			assert.equal(findLineNear(sketch, viewport, xAxisScreen, 'mirror'), null);
+			assert.equal(findLineNear(sketch, viewport, yAxisScreen, 'mirror'), null);
+			assert.equal(findLineNear(sketch, viewport, xAxisScreen, 'mirror', undefined, true)?.id, 'axis_x');
+			assert.equal(findLineNear(sketch, viewport, yAxisScreen, 'mirror', undefined, true)?.id, 'axis_y');
+
+			const p1 = sketch.addPoint({ x: 30, y: 0 });
+			const p2 = sketch.addPoint({ x: 70, y: 0 });
+			const userLine = sketch.addLine(p1.id, p2.id);
+			assert.equal(findLineNear(sketch, viewport, xAxisScreen, 'mirror', undefined, true)?.id, userLine.id);
+		});
+
+		it('mirrors a line across X-Axis (axis_x) clicked in canvas and keeps on-axis point constrained', () => {
+			const sketch = new SketchDocument();
+			const viewport = new Viewport(800, 600);
+			const pOnAxis = sketch.addPoint({ x: 20, y: 0 });
+			const pOffAxis = sketch.addPoint({ x: 40, y: 30 });
+			const line = sketch.addLine(pOnAxis.id, pOffAxis.id);
+			sketch.selectEntity(line.id, 'line', false);
+
+			const tool = new MirrorTool();
+			const { ctx, getLastTool } = createMirrorContext(sketch, viewport);
+			tool.activate(ctx);
+			assert.equal(tool.state?.phase, 'mirror_line');
+
+			const axisClickScreen = viewport.worldToScreen(new Vec2(100, 0));
+			const handled = tool.onMouseDown({
+				screen: axisClickScreen,
+				client: axisClickScreen,
+				world: new Vec2(100, 0),
+				effectiveWorld: new Vec2(100, 0),
+				effectiveScreen: axisClickScreen,
+				snap: null,
+				raw: {} as MouseEvent,
+			});
+			assert.equal(handled, true);
+			assert.equal(tool.state?.mirrorLineId, 'axis_x');
+			assert.ok(tool.sidebarPanel.render().includes('X-Axis'));
+
+			assert.equal(tool.executeMirror(), true);
+			assert.equal(getLastTool(), 'select');
+			assert.equal(sketch.lines.size, 2);
+
+			const mirroredLine = [...sketch.lines.values()].find(l => l.id !== line.id)!;
+			assert.ok(mirroredLine);
+			assert.ok(mirroredLine.p1Id === pOnAxis.id || mirroredLine.p2Id === pOnAxis.id);
+			const mirroredPtId = mirroredLine.p1Id === pOnAxis.id ? mirroredLine.p2Id : mirroredLine.p1Id;
+			const mirroredPt = sketch.points.get(mirroredPtId)!;
+			assert.ok(Math.abs(mirroredPt.x - 40) < 1e-4);
+			assert.ok(Math.abs(mirroredPt.y + 30) < 1e-4);
+
+			const symm = [...sketch.constraints.values()].find(c => c instanceof SymmetryConstraint) as SymmetryConstraint;
+			assert.ok(symm);
+			assert.equal(symm.lineId, 'axis_x');
+
+			const onAxis = [...sketch.constraints.values()].find(
+				c => c instanceof PointOnLineConstraint
+			) as PointOnLineConstraint;
+			assert.ok(onAxis);
+			assert.equal(onAxis.pointId, pOnAxis.id);
+			assert.equal(onAxis.lineP2Id, 'axis_x');
+
+			// Dragging the original off-axis point updates its mirror symmetrically
+			sketch.dragPoint(pOffAxis.id, 55, 25);
+			assert.ok(Math.abs(mirroredPt.x - 55) < 1e-3);
+			assert.ok(Math.abs(mirroredPt.y + 25) < 1e-3);
+		});
+
+		it('mirrors a circle across Y-Axis (axis_y) selected via SVG target and pre-selection', () => {
+			const sketch = new SketchDocument();
+			const viewport = new Viewport(800, 600);
+			const center = sketch.addPoint({ x: 35, y: 15 });
+			const circle = sketch.addCircle(center.id, 12);
+			sketch.selectEntity(circle.id, 'circle', false);
+
+			const tool = new MirrorTool();
+			const { ctx } = createMirrorContext(sketch, viewport);
+			tool.activate(ctx);
+
+			const axisYScreen = viewport.worldToScreen(new Vec2(0, 60));
+			const handled = tool.onMouseDown({
+				screen: axisYScreen,
+				client: axisYScreen,
+				world: new Vec2(0, 60),
+				effectiveWorld: new Vec2(0, 60),
+				effectiveScreen: axisYScreen,
+				snap: null,
+				raw: {
+					target: {
+						closest: () => ({
+							getAttribute: (attr: string) => (attr === 'data-id' ? 'axis_y' : attr === 'data-type' ? 'line' : null),
+						}),
+					},
+				} as any,
+			});
+			assert.equal(handled, true);
+			assert.equal(tool.state?.mirrorLineId, 'axis_y');
+			assert.ok(tool.sidebarPanel.render().includes('Y-Axis'));
+
+			assert.equal(tool.executeMirror(), true);
+			assert.equal(sketch.circles.size, 2);
+
+			const mirroredCircle = [...sketch.circles.values()].find(c => c.id !== circle.id)!;
+			const mirroredCenter = sketch.points.get(mirroredCircle.centerId)!;
+			assert.ok(Math.abs(mirroredCenter.x + 35) < 1e-4);
+			assert.ok(Math.abs(mirroredCenter.y - 15) < 1e-4);
+
+			const symm = [...sketch.constraints.values()].find(c => c instanceof SymmetryConstraint) as SymmetryConstraint;
+			assert.ok(symm);
+			assert.equal(symm.lineId, 'axis_y');
+
+			// Also verify pre-selected axis in sketch.selection initializes mirrorLineId
+			sketch.clearSelection();
+			sketch.selectEntity(circle.id, 'circle', false);
+			sketch.selectEntity('axis_x', 'line', true);
+			tool.activate(ctx);
+			assert.equal(tool.state?.mirrorLineId, 'axis_x');
+			assert.ok(tool.state?.selectedObjectIds.has(circle.id));
+		});
+
+		it('renders mirror preview across full viewport for built-in axes', () => {
+			const sketch = new SketchDocument();
+			const viewport = new Viewport(800, 600);
+			const p1 = sketch.addPoint({ x: 10, y: 20 });
+			const p2 = sketch.addPoint({ x: 30, y: 40 });
+			const line = sketch.addLine(p1.id, p2.id);
+
+			const createdElements: Array<{ tag: string; attrs: Record<string, string> }> = [];
+			const origDoc = (globalThis as any).document;
+			(globalThis as any).document = {
+				createElementNS: (_ns: string, tag: string) => {
+					const el = {
+						tag,
+						style: {} as Record<string, string>,
+						attrs: {} as Record<string, string>,
+						setAttribute(k: string, v: string) {
+							this.attrs[k] = v;
+						},
+						appendChild() {},
+					};
+					createdElements.push(el);
+					return el;
+				},
+			};
+			try {
+				const targetGroup: any = {
+					_innerHTML: '',
+					set innerHTML(v: string) {
+						this._innerHTML = v;
+						if (v === '') createdElements.length = 0;
+					},
+					appendChild() {},
+				};
+
+				renderMirrorPreview(sketch, viewport, targetGroup, new Set([line.id]), 'axis_x');
+				const originScreen = viewport.worldToScreen(new Vec2(0, 0));
+				assert.ok(createdElements.length >= 2);
+				assert.equal(createdElements[0].tag, 'line');
+				assert.equal(createdElements[0].attrs.x1, '0');
+				assert.equal(createdElements[0].attrs.x2, '800');
+				assert.equal(createdElements[0].attrs.y1, String(originScreen.y));
+				assert.equal(createdElements[0].attrs.y2, String(originScreen.y));
+
+				renderMirrorPreview(sketch, viewport, targetGroup, new Set([line.id]), 'axis_y');
+				assert.ok(createdElements.length >= 2);
+				assert.equal(createdElements[0].tag, 'line');
+				assert.equal(createdElements[0].attrs.x1, String(originScreen.x));
+				assert.equal(createdElements[0].attrs.x2, String(originScreen.x));
+				assert.equal(createdElements[0].attrs.y1, '0');
+				assert.equal(createdElements[0].attrs.y2, '600');
+			} finally {
+				(globalThis as any).document = origDoc;
+			}
 		});
 	});
 });
