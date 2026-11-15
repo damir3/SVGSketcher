@@ -9,6 +9,12 @@ mod collapse;
 #[path = "offset_spline.rs"]
 mod refined_spline;
 
+// Matches the document solver's radius bound, including cancellation at the bound.
+const MIN_RADIUS: f64 = 0.01;
+fn supported_radius(radius: f64) -> bool {
+    radius >= MIN_RADIUS - 1e-12
+}
+
 // Keep reference rounding throughout iterative contour fitting and normalization.
 fn dist(a: Point2, b: Point2) -> f64 {
     a.scaled_distance(b)
@@ -287,6 +293,28 @@ fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
         _ => Some(cur.end().middle(next.start())),
     }
 }
+fn join_arcs(a: &Shape, b: &Shape) -> Option<Point2> {
+    let (Shape::Arc(c, r, aa, _), Shape::Arc(q, s, bb, _)) = (a, b) else {
+        return None;
+    };
+    let delta = *q - *c;
+    let distance = delta.length();
+    if distance < 1e-12 || distance > r + s + 1e-8 || distance < (r - s).abs() - 1e-8 {
+        return None;
+    }
+    let x = (r * r - s * s + distance * distance) / (2.0 * distance);
+    let height = (r * r - x * x).max(0.0).sqrt();
+    let u = delta * (1.0 / distance);
+    let mid = *c + u * x;
+    let normal = u.perp();
+    let near = middle(aa[1], bb[0]);
+    let (p, q) = (mid + normal * height, mid - normal * height);
+    Some(if squared(p, near) < squared(q, near) {
+        p
+    } else {
+        q
+    })
+}
 fn side(items: &[Item], closed: bool, d: f64) -> Side {
     let invalid = |error| Side {
         primitives: vec![],
@@ -310,14 +338,14 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
             return invalid(1);
         };
         let radius = r + d;
-        if radius <= 0.1 {
+        if !supported_radius(radius) {
             return invalid(2);
         }
         return Side {
             primitives: vec![Primitive {
                 source: 0,
                 contour: 0,
-                shape: Shape::Circle(*c, radius),
+                shape: Shape::Circle(*c, radius.max(MIN_RADIUS)),
             }],
             side: if d < 0.0 { -1.0 } else { 1.0 },
             distance: d.abs(),
@@ -379,9 +407,24 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
                 let radial = unit(sub(mid, *c));
                 let n = normal(unit(sub(*b, *a)), closed, ccw);
                 let radius = r + if dot(n, radial) >= 0.0 { d } else { -d };
-                if radius <= 0.1 {
+                if radius <= 0.0 && closed && d < 0.0 {
+                    // A transient bridge closes the folded parallel walk. Contour
+                    // decomposition removes it together with the consumed arc.
+                    let ends = [
+                        step(*c, unit(sub(*a, *c)), radius),
+                        step(*c, unit(sub(*b, *c)), radius),
+                    ];
+                    primitives.push(Primitive {
+                        source,
+                        contour: 0,
+                        shape: Shape::Line(ends, unit(sub(ends[1], ends[0]))),
+                    });
+                    continue;
+                }
+                if !supported_radius(radius) {
                     return invalid(3);
                 }
+                let radius = radius.max(MIN_RADIUS);
                 Shape::Arc(
                     *c,
                     radius,
@@ -442,7 +485,18 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
     let count = if closed { items.len() } else { items.len() - 1 };
     for i in 0..count {
         let next = (i + 1) % items.len();
-        if let Some(pt) = join(&primitives[i].shape, &primitives[next].shape, d) {
+        if [i, next]
+            .iter()
+            .any(|&j| items[j].kind == 1 && matches!(primitives[j].shape, Shape::Line(..)))
+        {
+            continue;
+        }
+        let exact = if closed {
+            join_arcs(&primitives[i].shape, &primitives[next].shape)
+        } else {
+            None
+        };
+        if let Some(pt) = exact.or_else(|| join(&primitives[i].shape, &primitives[next].shape, d)) {
             primitives[i].shape.set_end(pt);
             primitives[next].shape.set_start(pt);
         }
@@ -460,7 +514,9 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
             s.handles = Some(handles);
         }
     }
-    refined_spline::refine(items, &mut primitives, closed, d);
+    if !refined_spline::refine(items, &mut primitives, closed, d) {
+        return invalid(3);
+    }
     Side {
         primitives,
         side: if d < 0.0 { -1.0 } else { 1.0 },
@@ -581,6 +637,77 @@ mod tests {
         assert_eq!(r.normal, p(-0.0, 1.0));
         assert_eq!(r.sides[0].primitives[0].shape.end(), p(8.0, 2.0));
         assert_eq!(r.sides[0].primitives[1].shape.start(), p(8.0, 2.0));
+    }
+    #[test]
+    fn consumed_tangent_arc_leaves_the_expected_inset_rectangle() {
+        let vertices = [
+            p(0.0, 0.0),
+            p(19.0, 0.0),
+            p(20.0, 1.0),
+            p(20.0, 10.0),
+            p(0.0, 10.0),
+        ];
+        let mut items: Vec<_> = (0..5)
+            .map(|i| line(vertices[i], vertices[(i + 1) % 5]))
+            .collect();
+        items[1].kind = 1;
+        items[1].geometry = Some(Geometry::Arc(
+            p(19.0, 1.0),
+            1.0,
+            vertices[1],
+            vertices[2],
+            false,
+        ));
+        for d in [1.0, 1.001, 2.0, 4.9] {
+            let result = side(&items, true, -d);
+            assert_eq!(result.error, 0);
+            assert_eq!(result.primitives.len(), 4);
+            let corners = [
+                p(d, d),
+                p(20.0 - d, d),
+                p(20.0 - d, 10.0 - d),
+                p(d, 10.0 - d),
+            ];
+            for (i, prim) in result.primitives.iter().enumerate() {
+                assert!(matches!(prim.shape, Shape::Line(..)));
+                assert!(corners.iter().any(|&p| dist(p, prim.shape.start()) < 1e-8));
+                assert!(
+                    dist(
+                        prim.shape.end(),
+                        result.primitives[(i + 1) % 4].shape.start()
+                    ) < 1e-8
+                );
+            }
+        }
+    }
+    #[test]
+    fn small_analytic_radii_reach_the_document_solver_bound() {
+        let circle = Item {
+            geometry: Some(Geometry::Circle(p(0.0, 0.0), 5.0)),
+            kind: 3,
+            ..line(p(0.0, 0.0), p(1.0, 0.0))
+        };
+        let arc = Item {
+            geometry: Some(Geometry::Arc(
+                p(0.0, 0.0),
+                1.0,
+                p(1.0, 0.0),
+                p(0.0, 1.0),
+                false,
+            )),
+            kind: 1,
+            ..circle.clone()
+        };
+        for radius in [0.1, 0.05, MIN_RADIUS] {
+            let c = side(std::slice::from_ref(&circle), true, -(5.0 - radius));
+            let a = side(std::slice::from_ref(&arc), false, 1.0 - radius);
+            assert_eq!((c.error, a.error), (0, 0));
+            assert!(matches!(c.primitives[0].shape, Shape::Circle(_, r) if (r-radius).abs()<1e-12));
+            assert!(
+                matches!(a.primitives[0].shape, Shape::Arc(_, r, ..) if (r-radius).abs()<1e-12)
+            );
+        }
+        assert_eq!(side(&[arc], false, 0.995).error, 3);
     }
     #[test]
     fn closed_rectangle_offsets_outward_and_joins_its_last_corner() {

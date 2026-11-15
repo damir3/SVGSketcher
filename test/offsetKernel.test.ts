@@ -15,7 +15,7 @@ import {
 } from '../src/math/offset';
 import * as reference from '../src/math/offsetReference';
 import { Vec2 } from '../src/math/vector';
-import { mixedOffsetScene, offsetContourGroups } from './helpers/mixedOffsetScene';
+import { mixedOffsetScene, offsetContourGroups, roundedOffsetScene } from './helpers/mixedOffsetScene';
 import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelOffset.json', import.meta.url), 'utf8')) as {
@@ -251,9 +251,7 @@ test('mixed spline/arc/ellipse offset junctions match the TypeScript fallback in
 					const actual = calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip);
 					compare(
 						actual,
-						withTypeScriptFallback(actual, () =>
-							calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip)
-						),
+						withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip)),
 						`${selected}, ${direction}, flip=${flip}, d=${distance}`
 					);
 				}
@@ -322,9 +320,7 @@ test('closed spline offsets preserve both eroded components and match the TypeSc
 					}
 					compare(
 						actual,
-						withTypeScriptFallback(actual, () =>
-							calculateOffsetGeometry(sketch, chain, direction, distance, 10, flip)
-						)
+						withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, direction, distance, 10, flip))
 					);
 				}
 			}
@@ -370,8 +366,7 @@ for (const kind of ['lines', 'arcs', 'mixed', 'arc-neck'] as const)
 				const before = sketch.takeSnapshot();
 				for (const direction of ['one_side', 'two_sides', 'symmetric'] as const)
 					for (const flip of [false, true]) {
-						const distances =
-							direction === 'one_side' ? (flip ? [-4, 4] : [-4, -0.1, 0, 0.1, 4]) : [-4, 4];
+						const distances = direction === 'one_side' ? (flip ? [-4, 4] : [-4, -0.1, 0, 0.1, 4]) : [-4, 4];
 						for (const distance of distances) {
 							const actual = calculateOffsetGeometry(sketch, chain, direction, distance, 4, flip);
 							assert.ok(actual.isValid);
@@ -529,3 +524,117 @@ test('offset adapter accepts empty inward sides only on a closed chain', () => {
 		assert.throws(() => query(bad), /WASM offset result/);
 	}
 });
+
+for (const reversed of [false, true])
+	for (const rotation of [0, 1, 4])
+		test(`consumed circular fillets leave the expected rectangle: reversed=${reversed}, seam=${rotation}`, () => {
+			const { sketch, chain } = roundedOffsetScene(reversed, rotation);
+			for (const distance of [1, 1.001, 2, 4.9]) {
+				const actual = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+				assert.ok(actual.isValid);
+				assert.equal(actual.sides[0].primitives.length, 4);
+				const expected = [
+					[distance, distance],
+					[20 - distance, distance],
+					[20 - distance, 10 - distance],
+					[distance, 10 - distance],
+				];
+				for (const p of actual.sides[0].primitives) {
+					assert.equal(p.type, 'line');
+					assert.ok(expected.some(([x, y]) => Math.hypot(p.p1!.x - x, p.p1!.y - y) < 1e-8));
+				}
+				compare(
+					actual,
+					withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
+				);
+			}
+		});
+
+for (const kind of ['mixed', 'arc-neck'] as const)
+	for (const reversed of [false, true])
+		test(`mixed offsets survive consumed end arcs: ${kind}, reversed=${reversed}`, () => {
+			const { sketch, chain } = mixedOffsetScene(kind, reversed, 5);
+			for (const distance of [15, 15.001, 15.1, 15.2]) {
+				const actual = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+				assert.ok(actual.isValid, `d=${distance}`);
+				assert.equal(offsetContourGroups(actual.sides[0].primitives).length, kind === 'mixed' ? 2 : 1);
+				assert.ok(actual.sides[0].primitives.every(p => p.type !== 'arc'));
+				compare(
+					actual,
+					withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
+				);
+			}
+		});
+
+test('offsets retain small analytic radii down to the solver bound', () => {
+	const { sketch, chain } = collapseOffsetScene('circle');
+	const rounded = roundedOffsetScene(),
+		arcChain: OffsetChain = { isClosed: false, items: rounded.chain.items.filter(i => i.type === 'arc') };
+	for (const radius of [0.1, 0.05, 0.01]) {
+		for (const [doc, selected, d] of [
+			[sketch, chain, 5 - radius],
+			[rounded.sketch, arcChain, 1 - radius],
+		] as const) {
+			const actual = calculateOffsetGeometry(doc, selected, 'one_side', d, 0, doc === sketch);
+			assert.ok(actual.isValid);
+			const p = actual.sides[0].primitives[0];
+			assert.ok(Math.abs((p.radius ?? p.circleRadius!) - radius) < 1e-12);
+			compare(
+				actual,
+				withTypeScriptFallback(actual, () => calculateOffsetGeometry(doc, selected, 'one_side', d, 0, doc === sketch))
+			);
+		}
+	}
+	assert.equal(calculateOffsetGeometry(rounded.sketch, arcChain, 'one_side', 0.995, 0, false).isValid, false);
+});
+
+for (const reversed of [false, true])
+	test(`a consumed arc retains a curved neighboring join: reversed=${reversed}`, () => {
+		const { sketch, chain } = roundedOffsetScene(reversed, 2, 'arc');
+		for (const distance of [1, 1.1, 2]) {
+			const actual = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+			assert.ok(actual.isValid);
+			assert.ok(actual.sides[0].primitives.some(p => p.sourceId === 'Arc-2' && p.type === 'spline'));
+			compare(
+				actual,
+				withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
+			);
+		}
+	});
+
+test('partial arc consumption preserves the opposite side in all offset modes', () => {
+	const { sketch, chain } = mixedOffsetScene('mixed');
+	for (const [direction, d1, d2, flip] of [
+		['one_side', -15, 0, false],
+		['one_side', 15, 0, true],
+		['two_sides', 0.1, 15, false],
+		['two_sides', 15, 0.1, true],
+		['symmetric', 15, 0, false],
+		['symmetric', 15, 0, true],
+	] as const) {
+		const result = calculateOffsetGeometry(sketch, chain, direction, d1, d2, flip);
+		assert.ok(result.isValid);
+		const inner = result.sides.find(s => s.side < 0)!;
+		assert.equal(offsetContourGroups(inner.primitives).length, 2);
+		compare(
+			result,
+			withTypeScriptFallback(result, () => calculateOffsetGeometry(sketch, chain, direction, d1, d2, flip))
+		);
+	}
+});
+
+for (const reversed of [false, true])
+	test(`adjacent consumed arcs keep their common circular contact: reversed=${reversed}`, () => {
+		const { sketch, chain } = roundedOffsetScene(reversed, 0, 'consumed-arc');
+		for (const distance of [1, 1.1, 2]) {
+			const result = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+			assert.ok(result.isValid);
+			assert.equal(offsetContourGroups(result.sides[0].primitives).length, 1);
+			if (distance < 2)
+				assert.ok(result.sides[0].primitives.some(p => p.type === 'spline' && sketch.arcs.has(p.sourceId)));
+			compare(
+				result,
+				withTypeScriptFallback(result, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
+			);
+		}
+	});

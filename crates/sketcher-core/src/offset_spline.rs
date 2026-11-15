@@ -608,6 +608,7 @@ fn join_chain(
     primitives: &mut [Primitive],
     closed: bool,
     d: f64,
+    consumed: &[bool],
 ) {
     for (i, item) in items.iter().enumerate() {
         let Some(Geometry::Arc(_, _, a, b, _)) = &item.geometry else {
@@ -643,7 +644,7 @@ fn join_chain(
     };
     for i in 0..count {
         let j = (i + 1) % items.len();
-        if i == j {
+        if i == j || consumed[i] || consumed[j] {
             continue;
         }
         let mut a = paths[i].take();
@@ -658,7 +659,134 @@ fn join_chain(
         paths[j] = b;
     }
 }
-pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bool, d: f64) {
+fn connect_consumed_arcs(
+    items: &[Item],
+    primitives: &mut [Primitive],
+    paths: &mut [Option<Path>],
+    d: f64,
+    consumed: &[bool],
+) {
+    let ccw = area(&polygon(items, 4)) > 0.0;
+    let poles: Vec<_> = primitives
+        .iter()
+        .map(|p| [p.shape.start(), p.shape.end()])
+        .collect();
+    let mut joined = vec![false; items.len()];
+    for i in 0..items.len() {
+        if !consumed[i] {
+            continue;
+        }
+        let Some(Geometry::Arc(_, _, a, b, _)) = items[i].geometry else {
+            continue;
+        };
+        for (j, first, vertex, pole) in [
+            ((i + items.len() - 1) % items.len(), false, a, poles[i][0]),
+            ((i + 1) % items.len(), true, b, poles[i][1]),
+        ] {
+            let junction = if first { i } else { j };
+            if joined[junction] {
+                continue;
+            }
+            let near = paths[j].as_ref().map_or_else(
+                || {
+                    if first {
+                        primitives[j].shape.start()
+                    } else {
+                        primitives[j].shape.end()
+                    }
+                },
+                |p| {
+                    if first {
+                        p.nodes[0].p
+                    } else {
+                        p.nodes.last().unwrap().p
+                    }
+                },
+            );
+            if dist(near, pole) < 1e-8 {
+                joined[junction] = true;
+                continue;
+            }
+            if paths[j].is_none() {
+                let nodes = match &primitives[j].shape {
+                    Shape::Line(ends, t) => {
+                        let n = normal(*t, true, ccw);
+                        ends.iter()
+                            .map(|&p| Node {
+                                p,
+                                n,
+                                t: *t,
+                                corner: false,
+                            })
+                            .collect()
+                    }
+                    Shape::Arc(_, radius, ..) => {
+                        let Some(Geometry::Arc(_, original, ..)) = items[j].geometry else {
+                            continue;
+                        };
+                        (0..=64)
+                            .map(|k| {
+                                let mut node =
+                                    contours::arc_node(&primitives[j].shape, k as f64 / 64.0);
+                                node.n = scale(node.n, ((radius - original) / d).signum());
+                                node
+                            })
+                            .collect()
+                    }
+                    _ => continue,
+                };
+                paths[j] = Some(Path {
+                    nodes,
+                    closed: false,
+                });
+                primitives[j].shape =
+                    Shape::Spline(fitted(&paths[j].as_ref().unwrap().nodes, d, false, true));
+            }
+            let from = if first { pole } else { near };
+            let to = if first { near } else { pole };
+            let start = angle(vertex, from);
+            let delta = sub(to, vertex);
+            let initial = sub(from, vertex);
+            let span = cross(initial, delta).atan2(dot(initial, delta));
+            let max_angle = (8.0 * 0.005 / d.abs()).sqrt().min(0.025);
+            let count = ((span.abs() / max_angle).ceil() as usize).max(1);
+            let mut nodes: Vec<_> = (0..=count)
+                .map(|k| {
+                    let radial = polar(1.0, start + span * k as f64 / count as f64);
+                    Node {
+                        p: step(vertex, radial, d.abs()),
+                        n: scale(radial, d.signum()),
+                        t: scale(perp(radial), span.signum()),
+                        corner: false,
+                    }
+                })
+                .collect();
+            nodes[0].p = from;
+            nodes.last_mut().unwrap().p = to;
+            let path = paths[j].as_mut().unwrap();
+            if first {
+                nodes.extend_from_slice(&path.nodes[1..]);
+                path.nodes = nodes;
+            } else {
+                path.nodes.pop();
+                path.nodes.extend(nodes);
+            }
+            joined[junction] = true;
+        }
+    }
+}
+
+pub(super) fn refine(
+    items: &[Item],
+    primitives: &mut Vec<Primitive>,
+    closed: bool,
+    d: f64,
+) -> bool {
+    let consumed: Vec<_> = primitives
+        .iter()
+        .map(|p| items[p.source].kind == 1 && matches!(p.shape, Shape::Line(..)))
+        .collect();
+    let consumed_arc = consumed.iter().any(|&c| c);
     let mut paths: Vec<_> = items
         .iter()
         .enumerate()
@@ -669,13 +797,34 @@ pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bo
             _ => None,
         })
         .collect();
+    let raw_paths = paths.clone();
+    if consumed_arc {
+        connect_consumed_arcs(items, primitives, &mut paths, d, &consumed);
+    }
     if closed && items.len() > 1 && d.abs() > 1e-12 {
         let mut candidates = primitives.clone();
         let mut candidate_paths = paths.clone();
-        join_chain(items, &mut candidate_paths, &mut candidates, closed, d);
-        if let Some(contours) = contours::split(items, &candidates, &paths, &candidate_paths, d) {
+        join_chain(
+            items,
+            &mut candidate_paths,
+            &mut candidates,
+            closed,
+            d,
+            &consumed,
+        );
+        if let Some(contours) = contours::split(
+            items,
+            &candidates,
+            &raw_paths,
+            &candidate_paths,
+            d,
+            consumed_arc,
+        ) {
             *primitives = contours;
-            return;
+            return true;
+        }
+        if consumed_arc {
+            return false;
         }
         for path in paths.iter_mut().flatten() {
             if !path.closed {
@@ -697,13 +846,13 @@ pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bo
                             shape: Shape::Spline(fitted(&nodes, d, true, true)),
                         })
                         .collect();
-                    return;
+                    return true;
                 }
                 path.nodes = remove_loops(std::mem::take(&mut path.nodes));
             }
         }
     }
-    join_chain(items, &mut paths, primitives, closed, d);
+    join_chain(items, &mut paths, primitives, closed, d, &consumed);
     let active = if d.abs() > 1e-12 {
         trim_collapsed_sections(&mut paths, primitives, closed)
     } else {
@@ -724,6 +873,7 @@ pub(super) fn refine(items: &[Item], primitives: &mut Vec<Primitive>, closed: bo
         primitives[i].shape = Shape::Spline(fitted(&nodes, d, path.closed, true));
     }
     *primitives = active.into_iter().map(|i| primitives[i].clone()).collect();
+    true
 }
 
 fn fitted(nodes: &[Node], d: f64, closed: bool, with_basis: bool) -> SplineOffset {

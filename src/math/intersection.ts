@@ -483,17 +483,14 @@ function segmentBounds(seg: BezierSegment): [number, number, number, number] {
 
 function cubicSelfIntersection(seg: BezierSegment): { point: Vec2; t1: number; t2: number } | null {
 	const [p0, p1, p2, p3] = seg;
-	const ax = -p0.x + 3 * p1.x - 3 * p2.x + p3.x;
-	const ay = -p0.y + 3 * p1.y - 3 * p2.y + p3.y;
-	const bx = 3 * p0.x - 6 * p1.x + 3 * p2.x;
-	const by = 3 * p0.y - 6 * p1.y + 3 * p2.y;
-	const cx = -3 * p0.x + 3 * p1.x;
-	const cy = -3 * p0.y + 3 * p1.y;
-	const denom = ax * by - ay * bx;
-	const aa = ax * ax + ay * ay;
+	const a = new Vec2().addScaledVector(p0, -1).addScaledVector(p1, 3).addScaledVector(p2, -3).add(p3);
+	const b = new Vec2().addScaledVector(p0, 3).addScaledVector(p1, -6).addScaledVector(p2, 3);
+	const c = new Vec2().subVectors(p1, p0).multiplyScalar(3);
+	const denom = a.cross(b);
+	const aa = a.lengthSq();
 	if (Math.abs(denom) < 1e-12 || aa < 1e-12) return null;
-	const s = -(ax * cy - ay * cx) / denom;
-	const p = s * s + ((ax * bx + ay * by) * s + (ax * cx + ay * cy)) / aa;
+	const s = -a.cross(c) / denom;
+	const p = s * s + (a.dot(b) * s + a.dot(c)) / aa;
 	const disc = s * s - 4 * p;
 	if (disc <= 1e-12) return null;
 	const root = Math.sqrt(disc);
@@ -505,7 +502,7 @@ function cubicSelfIntersection(seg: BezierSegment): { point: Vec2; t1: number; t
 	const q1 = evaluateBezier(seg, u1);
 	const q2 = evaluateBezier(seg, u2);
 	if (q1.distanceTo(q2) >= 1e-5) return null;
-	return { point: new Vec2((q1.x + q2.x) * 0.5, (q1.y + q2.y) * 0.5), t1: u1, t2: u2 };
+	return { point: new Vec2().midpoint(q1, q2), t1: u1, t2: u2 };
 }
 
 /** Finds genuine self-intersection points and parameter pairs on a cubic Bezier spline. */

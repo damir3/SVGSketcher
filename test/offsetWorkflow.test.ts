@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { assertSameCubicGeometry } from './helpers/offsetGeometry';
-import { mixedOffsetScene, offsetContourGroups, openSplineLoopScene } from './helpers/mixedOffsetScene';
+import {
+	mixedOffsetScene,
+	offsetContourGroups,
+	openSplineLoopScene,
+	roundedOffsetScene,
+} from './helpers/mixedOffsetScene';
 import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
 import { fitPointsToBezier } from '../src/math/splineReference';
 import { Vec2 } from '../src/math/vector';
@@ -127,12 +132,13 @@ function canonical(s: ReturnType<SketchDocument['takeSnapshot']>) {
 		])
 	);
 }
-function assertSnapshotNear(actual: unknown, expected: unknown, path = 'snapshot'): void {
+function assertSnapshotNear(actual: unknown, expected: unknown, path = 'snapshot', tolerance = 1e-8): void {
 	if (typeof actual === 'number' && typeof expected === 'number') {
-		assert.ok(Math.abs(actual - expected) < 1e-8, `${path}: ${actual} != ${expected}`);
+		assert.ok(Math.abs(actual - expected) < tolerance, `${path}: ${actual} != ${expected}`);
 	} else if (actual && expected && typeof actual === 'object' && typeof expected === 'object') {
 		assert.deepEqual(Object.keys(actual), Object.keys(expected), path);
-		for (const key of Object.keys(expected)) assertSnapshotNear(actual[key], expected[key], `${path}.${key}`);
+		for (const key of Object.keys(expected))
+			assertSnapshotNear(actual[key], expected[key], `${path}.${key}`, tolerance);
 	} else assert.deepEqual(actual, expected, path);
 }
 for (const name of [
@@ -280,14 +286,58 @@ function assertNoCrossings(points: InstanceType<typeof Vec2>[]) {
 function assertOffsetDistance(
 	points: InstanceType<typeof Vec2>[],
 	source: InstanceType<typeof Vec2>[],
-	distance: number
+	distance: number,
+	tolerance = 0.15
 ) {
 	for (const p of points) {
 		let nearest = Infinity;
 		for (let i = 0; i + 1 < source.length; i++)
 			nearest = Math.min(nearest, projectPointOntoSegment(p, source[i], source[i + 1]).dist);
-		assert.ok(Math.abs(nearest - distance) < 0.15, `offset distance ${nearest} differs from ${distance}`);
+		assert.ok(Math.abs(nearest - distance) < tolerance, `offset distance ${nearest} differs from ${distance}`);
 	}
+}
+function denseOffsetSource(sketch: SketchDocument, chain: OffsetChain): InstanceType<typeof Vec2>[] {
+	const points = chain.items.flatMap(item => {
+		const c = sketch.toGeoCurve(item.id)!;
+		if (c.type === 'segment') return [Vec2.from(sketch.points.get(item.startPointId!)!)];
+		if (c.type === 'spline') {
+			const points = c.bezierSegments!.flatMap(b => Array.from({ length: 512 }, (_, i) => evaluateBezier(b, i / 512)));
+			return item.reversed ? points.reverse() : points;
+		}
+		if (c.type !== 'arc' && c.type !== 'elliptical_arc') throw new Error('Unsupported test source');
+		const center = Vec2.from(c.center);
+		if (c.type === 'arc') {
+			const start = center.angleToPoint(c.start),
+				end = center.angleToPoint(c.end);
+			let span = c.clockwise ? start - end : end - start;
+			while (span < 0) span += 2 * Math.PI;
+			const points = Array.from({ length: 1024 }, (_, i) =>
+				Vec2.fromPolar(c.radius, start + ((c.clockwise ? -1 : 1) * span * i) / 1024).add(center)
+			);
+			return item.reversed ? points.reverse() : points;
+		}
+		const major = Vec2.from(c.majorAxisPoint).sub(center),
+			a = major.length(),
+			b = Vec2.from(c.minorAxisPoint).distanceTo(center),
+			u = major.normalizeOrUnitX(),
+			v = u.clone().perpendicular();
+		const parameter = (p: { x: number; y: number }) => {
+			const q = Vec2.from(p).sub(center);
+			return Math.atan2(q.dot(v) / b, q.dot(u) / a);
+		};
+		const start = parameter(c.start);
+		let span = c.clockwise ? start - parameter(c.end) : parameter(c.end) - start;
+		while (span < 0) span += 2 * Math.PI;
+		const points = Array.from({ length: 1024 }, (_, i) => {
+			const t = start + ((c.clockwise ? -1 : 1) * span * i) / 1024;
+			return center
+				.clone()
+				.addScaledVector(u, a * Math.cos(t))
+				.addScaledVector(v, b * Math.sin(t));
+		});
+		return item.reversed ? points.reverse() : points;
+	});
+	return [...points, points[0]];
 }
 for (const start of ['single', 'Spline-2', 'Line-12'])
 	for (const flip of [false, true])
@@ -1059,4 +1109,92 @@ test('source edits propagate through offsets of offsets in any constraint order'
 		);
 	}
 	assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+});
+
+for (const kind of ['rounded', 'skew', 'arc', 'mixed'] as const)
+	test(`arc consumption preserves previews, source, expressions and history: ${kind}`, () => {
+		const { sketch, chain } =
+			kind === 'mixed'
+				? mixedOffsetScene('mixed')
+				: roundedOffsetScene(false, 0, kind === 'arc' ? 'arc' : kind === 'skew');
+		const source = sketch.takeSnapshot(),
+			initial = kind === 'mixed' ? 14 : 0.5;
+		const denseSource = denseOffsetSource(sketch, chain);
+		const geometry = calculateOffsetGeometry(sketch, chain, 'two_sides', 0.1, initial, false);
+		const created = sketch.withDeferredSolve(() =>
+			commitOffsetToSketch(sketch, chain, geometry, 'two_sides', 0.1, initial, false)
+		)!;
+		const id = created.constraintIds[1];
+		const outerIds = (sketch.constraints.get(created.constraintIds[0]) as OffsetConstraint).pairs.map(offsetPairChild);
+		const outer = outerIds.map(id => render(sketch).entity(id));
+		sketch.clearHistory();
+		for (const distance of kind === 'mixed' ? [15, 15.2, 14] : [1, 1.001, 2, 0.5]) {
+			const before = sketch.takeSnapshot();
+			assert.ok(sketch.updateDimensionalConstraint(id, `${distance} + 0`));
+			const c = sketch.constraints.get(id) as OffsetConstraint;
+			assert.equal(c.expression, `${distance} + 0`);
+			const expected = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+			assert.ok(expected.isValid);
+			for (const group of offsetContourGroups(expected.sides[0].primitives)) {
+				const boundary = sampledOffsetBoundary({ ...expected, sides: [{ ...expected.sides[0], primitives: group }] });
+				assertNoCrossings(boundary);
+				if (distance >= (kind === 'mixed' ? 15 : 1)) assertOffsetDistance(boundary, denseSource, distance, 0.06);
+			}
+			assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+			assert.deepEqual(
+				outerIds.map(id => render(sketch).entity(id)),
+				outer,
+				'opposite offset side changed'
+			);
+			for (const point of source.points)
+				assert.ok(sketch.points.get(point.id)!.distanceTo(point) < 1e-8, 'source moved');
+			assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+			if (kind === 'skew' && distance >= 1)
+				assert.ok(
+					c.pairs.some(p => p.kind === 'spline' && sketch.lines.has(p.origSplineId)),
+					'rounded join did not replace the line child'
+				);
+			const after = sketch.takeSnapshot();
+			assert.ok(sketch.undo());
+			// Restoring expressions runs another solver polish on the generated handles.
+			assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(before), 'snapshot', 1e-7);
+			assert.ok(sketch.redo());
+			assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(after), 'snapshot', 1e-7);
+		}
+	});
+
+test('small circle and arc offsets commit and remain editable at the solver radius bound', () => {
+	const circle = collapseOffsetScene('circle'),
+		rounded = roundedOffsetScene(),
+		arcChain: OffsetChain = { isClosed: false, items: rounded.chain.items.filter(i => i.type === 'arc') };
+	for (const [sketch, chain, sourceRadius, flip] of [
+		[circle.sketch, circle.chain, 5, true],
+		[rounded.sketch, arcChain, 1, false],
+	] as const) {
+		const geometry = calculateOffsetGeometry(sketch, chain, 'one_side', sourceRadius - 0.05, 0, flip);
+		const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, geometry))!;
+		for (const radius of [0.01, 0.05]) {
+			assert.ok(sketch.updateDimensionalConstraint(created.constraintIds[0], sourceRadius - radius));
+			const child = sketch.getPrimitive(created.createdIds[0])!;
+			assert.ok('radius' in child && Math.abs((child.radius as number) - radius) < 1e-12);
+			assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+		}
+	}
+});
+
+test('adjacent consumed arcs commit their contact and survive dimension edits', () => {
+	const { sketch, chain } = roundedOffsetScene(false, 0, 'consumed-arc');
+	const denseSource = denseOffsetSource(sketch, chain);
+	const geometry = calculateOffsetGeometry(sketch, chain, 'one_side', 1, 0, true);
+	const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, geometry))!;
+	for (const distance of [1, 1.1, 2, 1]) {
+		assert.ok(sketch.updateDimensionalConstraint(created.constraintIds[0], distance));
+		const c = sketch.constraints.get(created.constraintIds[0]) as OffsetConstraint,
+			expected = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+		assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+		const boundary = sampledOffsetBoundary(expected);
+		assertNoCrossings(boundary);
+		assertOffsetDistance(boundary, denseSource, distance, 0.06);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+	}
 });

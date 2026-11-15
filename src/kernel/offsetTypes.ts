@@ -1,5 +1,10 @@
 import type { RegionKernelCurve } from './regionTypes';
 import type { Point2 } from './types';
+/** Smallest analytic radius representable by the document solver. */
+export const MIN_OFFSET_RADIUS = 0.01;
+export function supportedOffsetRadius(radius: number): boolean {
+	return radius >= MIN_OFFSET_RADIUS - 1e-12;
+}
 export type OffsetDirection = 'one_side' | 'two_sides' | 'symmetric';
 export interface OffsetKernelItem {
 	sourceId: string;

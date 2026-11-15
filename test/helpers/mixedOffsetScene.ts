@@ -74,6 +74,48 @@ export function offsetContourGroups(primitives: OffsetPrimitiveGeom[]): OffsetPr
 	return groups;
 }
 
+/** A 20 by 10 rectangle with a tangent radius-one fillet at its lower right corner. */
+export function roundedOffsetScene(reversed = false, rotation = 0, skew: boolean | 'arc' | 'consumed-arc' = false) {
+	const sketch = new SketchDocument();
+	const items: OffsetChain['items'] = [];
+	sketch.withDeferredSolve(() => {
+		const points = [
+			[0, 0],
+			[19, 0],
+			[20, 1],
+			[
+				skew === 'consumed-arc' ? 21 : skew ? 25 : 20,
+				skew === 'consumed-arc' ? 2 : skew === 'arc' ? -4 + Math.sqrt(50) : 10,
+			],
+			[0, 10],
+		].map(([x, y]) => sketch.addPoint(new Vec2(x, y)));
+		for (let i = 0; i < points.length; i++) {
+			const a = points[i],
+				b = points[(i + 1) % points.length];
+			const shape =
+				i === 1
+					? sketch.addArc(sketch.addPoint(new Vec2(19, 1)).id, a.id, b.id, 1, false)
+					: i === 2 && skew === 'arc'
+						? sketch.addArc(sketch.addPoint(new Vec2(25, -4)).id, a.id, b.id, Math.sqrt(50), true)
+						: i === 2 && skew === 'consumed-arc'
+							? sketch.addArc(sketch.addPoint(new Vec2(20, 2)).id, a.id, b.id, 1, false)
+							: sketch.addLine(a.id, b.id);
+			items.push({ id: shape.id, type: shape.type, startPointId: a.id, endPointId: b.id });
+		}
+	});
+	if (reversed) {
+		items.reverse();
+		for (const item of items) {
+			[item.startPointId, item.endPointId] = [item.endPointId, item.startPointId];
+			item.reversed = true;
+		}
+	}
+	const ordered = [...items.slice(rotation), ...items.slice(0, rotation)],
+		chain: OffsetChain = { items: ordered, isClosed: true };
+	sketch.clearHistory();
+	return { sketch, chain };
+}
+
 /** A closed chain whose right offset component consists of only a fragment of its open source spline. */
 export function openSplineLoopScene() {
 	const original = new SketchDocument();

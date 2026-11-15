@@ -5,6 +5,7 @@ import { Vec2 } from './vector';
 import { getGeometryKernel } from '../kernel';
 import * as reference from './offsetReference';
 import { refineSplineOffsets } from './offsetSpline';
+import { recoverOffsetRadii } from './offsetRadius';
 import type { OffsetKernelItem, KernelOffsetPrimitive, OffsetDirection } from '../kernel/offsetTypes';
 import { OffsetConstraint, type OffsetPair, type OffsetSplinePoint } from '../solver/constraints/offset';
 
@@ -534,7 +535,12 @@ export function calculateOffsetGeometry(
 		? api.calculate(items, !!chain?.isClosed, items.length ? ref : -1, direction, dist1, dist2, flip)
 		: refineSplineOffsets(
 				items,
-				reference.calculateOffsetGeometry(sketch, chain, direction, dist1, dist2, flip),
+				recoverOffsetRadii(
+					items,
+					!!chain?.isClosed,
+					reference.calculateOffsetGeometry(sketch, chain, direction, dist1, dist2, flip),
+					() => reference.calculateOffsetGeometry(sketch, chain, 'one_side', 0, 0, false).sides[0]
+				),
 				!!chain?.isClosed
 			);
 	return {

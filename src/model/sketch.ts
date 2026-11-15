@@ -97,6 +97,7 @@ import type { AABB } from '../math/aabb';
 import { computeNaturalFitHandles } from '../math/spline';
 import { AutomaticSplineHandlesConstraint } from '../solver/constraints/automaticSplineHandles';
 import { calculateOffsetGeometry, createOffsetSideGeometry, type OffsetSideGeometry } from '../math/offset';
+import { MIN_OFFSET_RADIUS as MIN_SOLVER_RADIUS } from '../kernel/offsetTypes';
 import type { OffsetPair } from '../solver/constraints/offset';
 import { resizeOffsetSpline } from '../math/offsetSpline';
 import { serializePrimitive } from './primitives/serialization';
@@ -121,8 +122,6 @@ import {
 } from './io/svgIO';
 
 export type { SketchFileMetadata };
-
-const MIN_SOLVER_RADIUS = 0.01;
 
 const BUILT_IN_POINTS = new Map<string, SketchPoint>([
 	['origin', Object.freeze(new SketchPoint({ id: 'origin', x: 0, y: 0, fixed: true }))],
@@ -3833,9 +3832,14 @@ export class SketchDocument {
 				(pair, i) =>
 					this.offsetPairSource(pair) === side.primitives[i].sourceId &&
 					(pair.contourIndex ?? 0) === (side.primitives[i].contourIndex ?? 0) &&
-					(pair.kind !== 'spline' ||
-						this.splines.get(pair.offSplineId)?.isClosed === !!side.primitives[i].isSplineClosed)
+					this.offsetPairMatchesPrimitive(pair, side.primitives[i])
 			)
+		);
+	}
+	private offsetPairMatchesPrimitive(pair: OffsetPair, prim: OffsetSideGeometry['primitives'][number]): boolean {
+		return (
+			this.getPrimitive(this.offsetPairEntity(pair))?.type === prim.type &&
+			(pair.kind !== 'spline' || this.splines.get(pair.offSplineId)?.isClosed === !!prim.isSplineClosed)
 		);
 	}
 	private splitOffsetEndpoint(pair: OffsetPair, start: boolean, pos: Vec2): void {
@@ -3912,8 +3916,7 @@ export class SketchDocument {
 		try {
 			c.pairs = side.primitives.map(prim => {
 				const candidates = oldPairs.get(prim.sourceId) ?? [];
-				const compatible = (pair: OffsetPair) =>
-					pair.kind !== 'spline' || this.splines.get(pair.offSplineId)?.isClosed === !!prim.isSplineClosed;
+				const compatible = (pair: OffsetPair) => this.offsetPairMatchesPrimitive(pair, prim);
 				let index = candidates.findIndex(
 					pair => compatible(pair) && (pair.contourIndex ?? 0) === (prim.contourIndex ?? 0)
 				);

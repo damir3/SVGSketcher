@@ -1,5 +1,6 @@
 import { packRegionCurves } from './regionWasm';
 import type { OffsetKernel, KernelOffsetPrimitive, KernelOffsetSide } from './offsetTypes';
+import { supportedOffsetRadius } from './offsetTypes';
 export type OffsetBinding = (curves: Float64Array, items: Float64Array, settings: Float64Array) => Float64Array;
 export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
 	return {
@@ -114,13 +115,13 @@ export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
 							end = point(),
 							radius = read(),
 							clockwise = flag();
-						if (radius <= 0.1) fail();
+						if (!supportedOffsetRadius(radius)) fail();
 						p = { sourceId, type: 'arc', center, start, end, radius, clockwise };
 					} else if (tag === 2) {
 						if (slots !== 3 || items[source].kind !== 'circle' || items.length !== 1) fail();
 						const circleCenter = point(),
 							circleRadius = read();
-						if (circleRadius <= 0.1) fail();
+						if (!supportedOffsetRadius(circleRadius)) fail();
 						p = { sourceId, type: 'circle', circleCenter, circleRadius };
 					} else {
 						const length = count(),

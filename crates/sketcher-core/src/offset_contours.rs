@@ -15,7 +15,7 @@ fn arc_span(shape: &Shape) -> f64 {
     };
     sweep(angle(*c, *a), angle(*c, *b), *cw)
 }
-fn arc_node(shape: &Shape, t: f64) -> Node {
+pub(super) fn arc_node(shape: &Shape, t: f64) -> Node {
     let Shape::Arc(c, r, [a, _], cw) = shape else {
         unreachable!()
     };
@@ -192,12 +192,172 @@ fn source_boundary(items: &[Item], paths: &[Option<Path>], d: f64) -> Vec<Point2
         .collect()
 }
 
+// At a vanishing arc the raw walk can retrace a line or pinch at a point.
+// Split all crossings first, discard consumed edges, then trace the surviving
+// boundary graph; splitting whole rings alone loses these zero-area folds.
+fn surviving_loops(
+    edges: &[Edge],
+    primitives: &[Primitive],
+    items: &[Item],
+    source: &[Point2],
+    d: f64,
+) -> Vec<Vec<Edge>> {
+    let boxes: Vec<_> = edges.iter().map(|e| bounds(e, primitives)).collect();
+    let mut cuts = vec![vec![0.0, 1.0]; edges.len()];
+    for i in 0..edges.len() {
+        for j in i + 1..edges.len() {
+            let (a, b) = (boxes[i], boxes[j]);
+            if a[1] < b[0] || b[1] < a[0] || a[3] < b[2] || b[3] < a[2] {
+                continue;
+            }
+            for p in crossings(&edges[i], &edges[j], primitives) {
+                cuts[i].push(fraction(&edges[i], p, primitives).clamp(0.0, 1.0));
+                cuts[j].push(fraction(&edges[j], p, primitives).clamp(0.0, 1.0));
+            }
+        }
+    }
+    let valid = |e: &Edge| {
+        if items[primitives[e.source].source].kind == 1
+            && matches!(primitives[e.source].shape, Shape::Line(..))
+        {
+            return false;
+        }
+        let pt = at(e, 0.5, primitives).p;
+        // A folded parallel lies inside the disk of radius |d|-r. Genuine
+        // circular contacts around a consumed arc's endpoint lie outside it.
+        if let Some(Geometry::Arc(center, radius, ..)) = items[primitives[e.source].source].geometry
+        {
+            if -d >= radius && squared(pt, center) <= (-d - radius).powi(2) + 1e-20 {
+                return false;
+            }
+        }
+        if !inside(pt, source) {
+            return false;
+        }
+        for (i, &a) in source.iter().enumerate() {
+            let delta = source[(i + 1) % source.len()] - a;
+            let t = ((pt - a).dot(delta) / delta.length_squared().max(1e-24)).clamp(0.0, 1.0);
+            if dist(pt, step(a, delta, t)) < d.abs() - fit::TOLERANCE {
+                return false;
+            }
+        }
+        true
+    };
+    let mut pieces = vec![];
+    let mut vertices: Vec<Point2> = vec![];
+    let mut links = vec![];
+    for (e, ts) in edges.iter().zip(&mut cuts) {
+        ts.sort_by(f64::total_cmp);
+        ts.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
+        for pair in ts.windows(2) {
+            let mut a = at(e, pair[0], primitives);
+            let mut b = at(e, pair[1], primitives);
+            a.corner |= pair[0] > 1e-10 || e.a.corner;
+            b.corner |= pair[1] < 1.0 - 1e-10 || e.b.corner;
+            let piece = Edge {
+                source: e.source,
+                a,
+                b,
+                t0: e.t0 + (e.t1 - e.t0) * pair[0],
+                t1: e.t0 + (e.t1 - e.t0) * pair[1],
+            };
+            if length(&piece, primitives) <= 1e-8 || !valid(&piece) {
+                continue;
+            }
+            let mut ids = [0; 2];
+            for (k, pt) in [piece.a.p, piece.b.p].iter().enumerate() {
+                ids[k] = vertices
+                    .iter()
+                    .position(|&v| dist(v, *pt) < 1e-7)
+                    .unwrap_or_else(|| {
+                        vertices.push(*pt);
+                        vertices.len() - 1
+                    });
+            }
+            pieces.push(piece);
+            links.push(ids);
+        }
+    }
+    let mut active = vec![true; pieces.len()];
+    for i in 0..links.len() {
+        if !active[i] {
+            continue;
+        }
+        for j in i + 1..links.len() {
+            if !active[j] {
+                continue;
+            }
+            if links[i] == links[j] {
+                active[j] = false;
+            } else if links[i] == [links[j][1], links[j][0]] {
+                active[i] = false;
+                active[j] = false;
+                break;
+            }
+        }
+    }
+    loop {
+        let mut incoming = vec![0; vertices.len()];
+        let mut outgoing = vec![0; vertices.len()];
+        for (i, [a, b]) in links.iter().enumerate() {
+            if active[i] {
+                outgoing[*a] += 1;
+                incoming[*b] += 1;
+            }
+        }
+        let mut changed = false;
+        for (i, [a, b]) in links.iter().enumerate() {
+            if active[i] && (incoming[*a] == 0 || outgoing[*b] == 0) {
+                active[i] = false;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let winding = area(source).signum();
+    let mut loops = vec![];
+    for start in 0..pieces.len() {
+        if !active[start] {
+            continue;
+        }
+        let mut ring = vec![];
+        let mut current = start;
+        loop {
+            active[current] = false;
+            ring.push(pieces[current].clone());
+            let end = links[current][1];
+            if end == links[start][0] {
+                loops.push(ring);
+                break;
+            }
+            let tangent = at(&pieces[current], 1.0, primitives).t;
+            let next = (0..pieces.len())
+                .filter(|&i| active[i] && links[i][0] == end)
+                .max_by(|&a, &b| {
+                    let turn = |i| {
+                        let t = at(&pieces[i], 0.0, primitives).t;
+                        tangent.cross(t).atan2(tangent.dot(t)) * winding
+                    };
+                    turn(a).total_cmp(&turn(b))
+                });
+            let Some(next) = next else {
+                break;
+            };
+            current = next;
+        }
+    }
+    loops
+}
+
 pub(super) fn split(
     items: &[Item],
     primitives: &[Primitive],
     raw_paths: &[Option<Path>],
     paths: &[Option<Path>],
     d: f64,
+    consumed_arc: bool,
 ) -> Option<Vec<Primitive>> {
     let mut edges = vec![];
     for (source, prim) in primitives.iter().enumerate() {
@@ -244,8 +404,13 @@ pub(super) fn split(
     {
         return None;
     }
-    let mut pending = vec![edges];
-    let mut loops = vec![];
+    let source = source_boundary(items, raw_paths, d);
+    let mut loops = if consumed_arc {
+        surviving_loops(&edges, primitives, items, &source, d)
+    } else {
+        vec![]
+    };
+    let mut pending = if consumed_arc { vec![] } else { vec![edges] };
     while let Some(ring) = pending.pop() {
         let boxes: Vec<_> = ring.iter().map(|e| bounds(e, primitives)).collect();
         let total: f64 = ring.iter().map(|e| length(e, primitives)).sum();
@@ -295,12 +460,19 @@ pub(super) fn split(
             loops.push(ring);
         }
     }
-    if loops.len() < 2 {
+    if loops.len() < 2 && !consumed_arc {
         return None;
     }
-    let source = source_boundary(items, raw_paths, d);
     let source_area = area(&source);
     loops.retain(|ring| {
+        if consumed_arc
+            && ring.iter().any(|e| {
+                items[primitives[e.source].source].kind == 1
+                    && matches!(primitives[e.source].shape, Shape::Line(..))
+            })
+        {
+            return false;
+        }
         let a = ring_area(ring, primitives);
         if a.abs() < 1e-10 || (d < 0.0 && a * source_area <= 0.0) {
             return false;
@@ -347,7 +519,7 @@ pub(super) fn split(
                 .collect();
         }
     }
-    if loops.len() < 2 {
+    if loops.is_empty() || (loops.len() < 2 && !consumed_arc) {
         return None;
     }
     let min = |v: &[Edge]| {
