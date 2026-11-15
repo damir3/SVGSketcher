@@ -4,12 +4,12 @@ import type { SketchImage } from '../model/image';
 import { createTransform, type TransformValues } from '../model/transform';
 import { calculateObjectsCentroid } from './tools/modify/utils';
 import type { SketchDocument } from '../model/sketch';
-import type { SketchPoint, SketchSpline } from '../model/types';
+import { isPointIdConstrained, type ISketchPrimitive } from '../model/primitives';
 import type { Viewport } from './viewport';
 import { getAllGeoCurves } from '../math/intersection';
 import { findCurveRegions, pointInRegion, type SketchRegion } from '../math/regions';
 import type { FilletCandidate } from '../math/fillet';
-import { collectFilletPreviewTrims, filletSplinePreview } from '../math/filletPreview';
+import { collectFilletPreviewTrims } from '../math/filletPreview';
 import {
 	computePatternCopyAngle,
 	computeRectangularPatternOffset,
@@ -18,32 +18,24 @@ import {
 } from '../solver/constraints';
 import { ORIGIN, Vec2 } from '../math/vector';
 import { getBadgeIcon } from './badgeIcons';
-import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../math/spline';
-import { getFontSync, loadFontAsync } from './fonts';
-import { generateTextSvgPathData } from '../math/textPath';
+import { fitPointsToBezier, getSplineSvgPath } from '../math/spline';
 
 export * from './styles';
 export * from './svg';
 export * from './dimensionGeometry';
 export { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
 
-import {
-	TEXT_ROTATION_HANDLE_DISTANCE_PX,
-	DIMENSION_EXTERNAL_ARROW_TAIL_PX,
-	DIMENSION_EXTENSION_OVERRUN_PX,
-} from './distances';
+import { DIMENSION_EXTERNAL_ARROW_TAIL_PX, DIMENSION_EXTENSION_OVERRUN_PX } from './distances';
 
 import {
 	createSvgElement,
 	createSvgLine,
 	createSvgCircle,
 	createSvgRect,
-	createSvgEllipse,
 	createSvgPath,
 	createSvgText,
 	renderDimensionLabel,
 	getArcSvgPath,
-	getEllipticalArcSvgPath,
 } from './svg';
 import {
 	type LinearDimensionVisualOptions,
@@ -61,17 +53,10 @@ import {
 	FILTERS,
 	type SvgAttrs,
 	HIT_AREA_STROKE_ATTRS,
-	HIT_AREA_RING_ATTRS,
-	HIT_AREA_POINT_ATTRS,
-	AUX_RAY_ATTRS,
-	AUX_AXIS_ATTRS,
 	EXTENSION_LINE_ATTRS,
 	PREVIEW_EXTENSION_LINE_ATTRS,
 	SELECTION_BOX_ATTRS,
 	CROSSING_SELECTION_BOX_ATTRS,
-	MIRROR_LINE_ATTRS,
-	DIR1_LINE_ATTRS,
-	DIR2_LINE_ATTRS,
 	MIRROR_PREVIEW_LINE_ATTRS,
 	MIRROR_PREVIEW_VERTEX_ATTRS,
 	PATTERN_CENTER_RING_ATTRS,
@@ -101,12 +86,7 @@ import {
 	SNAP_POINT_ATTRS,
 	SNAP_GRID_ATTRS,
 	SNAP_OBJECT_ATTRS,
-	SPLINE_HANDLE_SELECTED_ATTRS,
-	SPLINE_CONTROL_POLYGON_ATTRS,
-	getSplineHandleStrokeAttrs,
-	SPLINE_STYLES,
 	getCopyStrokeAttrs,
-	getPrimitiveStrokeAttrs,
 } from './styles';
 
 const TWO_PI = 2 * Math.PI;
@@ -732,32 +712,62 @@ export class SVGRenderer {
 		);
 	}
 
+	private isPrimitiveSelected(prim: ISketchPrimitive, sketch: SketchDocument, options: RenderOptions): boolean {
+		const sel = sketch.selection;
+		const inSelection =
+			(prim.type === 'line' && sel.lineIds.has(prim.id)) ||
+			(prim.type === 'circle' && sel.circleIds.has(prim.id)) ||
+			(prim.type === 'arc' && sel.arcIds.has(prim.id)) ||
+			(prim.type === 'ellipse' && sel.ellipseIds.has(prim.id)) ||
+			(prim.type === 'elliptical_arc' && sel.ellipticalArcIds.has(prim.id)) ||
+			(prim.type === 'spline' && sel.splineIds.has(prim.id)) ||
+			(prim.type === 'point' && sel.pointIds.has(prim.id));
+		return (
+			inSelection ||
+			!!options.mirrorHighlight?.selectedObjectIds.has(prim.id) ||
+			!!options.patternHighlight?.selectedObjectIds.has(prim.id) ||
+			!!options.rectangularPatternHighlight?.selectedObjectIds.has(prim.id) ||
+			(options.filletState?.selectedPrimitive1?.type === prim.type &&
+				options.filletState.selectedPrimitive1.id === prim.id) ||
+			(prim.type === 'line' && options.chamferState?.firstLine?.id === prim.id) ||
+			(prim.type === 'point' && options.patternHighlight?.centerPointId === prim.id)
+		);
+	}
+
 	private renderGeometry(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
 		this.geometryGroup.innerHTML = '';
 		this.pointGroup.innerHTML = '';
 
 		const { constrainedParams, status } = sketch.lastSolverResult ?? {};
 		const hasConflict = status === 'OVER_CONSTRAINED';
-		const isPointConstrained = (id: string) => !!constrainedParams?.has(`${id}.x`) && constrainedParams.has(`${id}.y`);
+		const isPointConstrained = (id: string) => isPointIdConstrained(id, constrainedParams);
 		const getBaseColor = (isConstrained: boolean) =>
 			hasConflict ? COLORS.conflict : isConstrained ? COLORS.constrained : COLORS.unconstrained;
 
 		// Determine which splines have any part active (spline curve, fit points, or tangent handles/endpoints)
 		const activeSplineIds = new Set<string>(sketch.selection.splineIds);
+		const splinePointInfo = new Map<string, { splineId: string; isHandleDot: boolean }>();
 		for (const spline of sketch.splines.values()) {
 			if (spline.pointIds.some(pid => sketch.selection.pointIds.has(pid))) {
 				activeSplineIds.add(spline.id);
 			}
+			if (spline.splineType === 'control') {
+				for (let i = 1; i < spline.pointIds.length - 1; i++) {
+					splinePointInfo.set(spline.pointIds[i], { splineId: spline.id, isHandleDot: false });
+				}
+			}
 			if (spline.tangentLineIds) {
 				for (const lid of spline.tangentLineIds) {
-					if (sketch.selection.lineIds.has(lid)) {
-						activeSplineIds.add(spline.id);
-						break;
-					}
 					const l = sketch.lines.get(lid);
-					if (l && (sketch.selection.pointIds.has(l.p1Id) || sketch.selection.pointIds.has(l.p2Id))) {
+					if (
+						sketch.selection.lineIds.has(lid) ||
+						(l && (sketch.selection.pointIds.has(l.p1Id) || sketch.selection.pointIds.has(l.p2Id)))
+					) {
 						activeSplineIds.add(spline.id);
-						break;
+					}
+					if (l && spline.splineType !== 'control') {
+						splinePointInfo.set(l.p1Id, { splineId: spline.id, isHandleDot: true });
+						splinePointInfo.set(l.p2Id, { splineId: spline.id, isHandleDot: true });
 					}
 				}
 			}
@@ -785,513 +795,41 @@ export class SVGRenderer {
 			addCut(chamfer.line2.id, chamfer.line2.cornerPointId, chamfer.result.t2);
 		}
 
-		// 1. Render Lines
 		const splineTangentGroups: SVGGElement[] = [];
-		for (const line of sketch.lines.values()) {
-			if (options.hiddenEntityIds?.has(line.id)) continue;
-			const p1 = sketch.points.get(line.p1Id);
-			const p2 = sketch.points.get(line.p2Id);
-			if (!p1 || !p2) continue;
+		const baseCtx = {
+			sketch,
+			viewport,
+			geometryGroup: this.geometryGroup,
+			pointGroup: this.pointGroup,
+			options,
+			hasConflict,
+			isPointConstrained,
+			activeSplineIds,
+			lineCuts,
+			filletTrims,
+			splinePointInfo,
+			deferTangentGroup: (group: SVGGElement) => splineTangentGroups.push(group),
+		};
 
-			if (line.isSplineHandle) {
-				const isParentActive = line.parentSplineId ? activeSplineIds.has(line.parentSplineId) : false;
-				if (!isParentActive && !options.showSplineHandles) continue;
-			}
-
-			const s1 = viewport.worldToScreen(p1);
-			const s2 = viewport.worldToScreen(p2);
-			const isMirrorLine = options.mirrorHighlight?.mirrorLineId === line.id;
-			const isDir1Line = options.rectangularPatternHighlight?.line1Id === line.id;
-			const isDir2Line = options.rectangularPatternHighlight?.line2Id === line.id;
-			const isMirrorSelected = options.mirrorHighlight?.selectedObjectIds.has(line.id);
-			const isPatternSelected =
-				options.patternHighlight?.selectedObjectIds.has(line.id) ||
-				options.rectangularPatternHighlight?.selectedObjectIds.has(line.id);
-			const isChamferSelected = options.chamferState?.firstLine?.id === line.id;
-			const isFilletSelected =
-				options.filletState?.selectedPrimitive1?.type === 'line' &&
-				options.filletState.selectedPrimitive1.id === line.id;
-			const isSelected =
-				sketch.selection.lineIds.has(line.id) ||
-				!!isMirrorSelected ||
-				!!isPatternSelected ||
-				isChamferSelected ||
-				isFilletSelected;
-
-			const lineG = createSvgElement(
-				'g',
-				{
-					'data-id': line.id,
-					'data-type': 'line',
-					class: `sketch-entity sketch-line ${isSelected ? 'is-selected' : ''} ${line.isSplineHandle ? 'sketch-spline-handle' : ''}`,
-				},
-				this.geometryGroup
-			);
-
-			// Invisible generous hit target using the shared line hit width
-			createSvgLine(s1, s2, HIT_AREA_STROKE_ATTRS, lineG);
-
-			// Visible line
-			if (line.isSplineHandle) {
-				const parentSpline = line.parentSplineId ? sketch.splines.get(line.parentSplineId) : undefined;
-				if (parentSpline?.splineType === 'control') {
-					createSvgLine(s1, s2, isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_CONTROL_POLYGON_ATTRS, lineG);
-				} else {
-					lineG.classList.add('sketch-spline-tangent');
-					createSvgLine(s1, s2, getSplineHandleStrokeAttrs(isSelected), lineG);
-					splineTangentGroups.push(lineG);
-				}
-			} else if (isMirrorLine) {
-				createSvgLine(s1, s2, MIRROR_LINE_ATTRS, lineG);
-			} else if (isDir1Line) {
-				createSvgLine(s1, s2, DIR1_LINE_ATTRS, lineG);
-			} else if (isDir2Line) {
-				createSvgLine(s1, s2, DIR2_LINE_ATTRS, lineG);
-			} else {
-				const cuts = lineCuts.get(line.id);
-				const start = cuts?.get(line.p1Id);
-				const end = cuts?.get(line.p2Id);
-				const isChamferPreview =
-					chamfer?.result?.isValid && (chamfer.line1.id === line.id || chamfer.line2.id === line.id);
-				createSvgLine(
-					start ? viewport.worldToScreen(start) : s1,
-					end ? viewport.worldToScreen(end) : s2,
-					isChamferPreview
-						? CHAMFER_HIGHLIGHT_ATTRS
-						: getPrimitiveStrokeAttrs(
-								isSelected,
-								!!line.isConstruction,
-								getBaseColor(isPointConstrained(line.p1Id) && isPointConstrained(line.p2Id)),
-								true
-							),
-					lineG
-				);
-			}
-		}
-
-		// 2. Render Circles
-		for (const circle of sketch.circles.values()) {
-			const center = sketch.points.get(circle.centerId);
-			if (!center) continue;
-
-			const sc = viewport.worldToScreen(center);
-			const sr = circle.radius * viewport.zoom;
-			const isSelected =
-				sketch.selection.circleIds.has(circle.id) ||
-				!!options.mirrorHighlight?.selectedObjectIds.has(circle.id) ||
-				!!options.patternHighlight?.selectedObjectIds.has(circle.id) ||
-				!!options.rectangularPatternHighlight?.selectedObjectIds.has(circle.id);
-
-			const circleG = createSvgElement(
-				'g',
-				{
-					'data-id': circle.id,
-					'data-type': 'circle',
-					class: `sketch-entity sketch-circle ${isSelected ? 'is-selected' : ''}`,
-				},
-				this.geometryGroup
-			);
-
-			// Invisible generous hit target using the shared line hit width
-			createSvgCircle(sc, sr, HIT_AREA_RING_ATTRS, circleG);
-
-			// Visible circle
-			createSvgCircle(
-				sc,
-				sr,
-				{
-					fill: 'none',
-					...getPrimitiveStrokeAttrs(
-						isSelected,
-						!!circle.isConstruction,
-						getBaseColor(isPointConstrained(circle.centerId) && !!constrainedParams?.has(`${circle.id}.r`))
-					),
-				},
-				circleG
-			);
-		}
-
-		// 3. Render Arcs
-		for (const arc of sketch.arcs.values()) {
-			const center = sketch.points.get(arc.centerId);
-			const start = sketch.points.get(arc.startPointId);
-			const end = sketch.points.get(arc.endPointId);
-			if (!center || !start || !end) continue;
-
-			const sc = viewport.worldToScreen(center);
-			const ss = viewport.worldToScreen(start);
-			const se = viewport.worldToScreen(end);
-			const sr = arc.radius * viewport.zoom;
-			const isFilletSelected =
-				options.filletState?.selectedPrimitive1?.type === 'arc' && options.filletState.selectedPrimitive1.id === arc.id;
-			const isSelected =
-				sketch.selection.arcIds.has(arc.id) ||
-				!!options.mirrorHighlight?.selectedObjectIds.has(arc.id) ||
-				!!options.patternHighlight?.selectedObjectIds.has(arc.id) ||
-				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id) ||
-				isFilletSelected;
-
-			const clockwise = !!arc.clockwise;
-			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
-			const trim = filletTrims.get(arc.id);
-			const previewD = trim
-				? trim.start && trim.end && trim.start.param >= trim.end.param
-					? ''
-					: getArcSvgPath(
-							sc,
-							trim.start ? viewport.worldToScreen(trim.start.point) : ss,
-							trim.end ? viewport.worldToScreen(trim.end.point) : se,
-							sr,
-							clockwise
-						)
-				: d;
-
-			const arcG = createSvgElement(
-				'g',
-				{
-					'data-id': arc.id,
-					'data-type': 'arc',
-					class: `sketch-entity sketch-arc ${isSelected ? 'is-selected' : ''}`,
-				},
-				this.geometryGroup
-			);
-
-			// Invisible generous hit target using the shared line hit width
-			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
-
-			// Visible arc path
-			createSvgPath(
-				previewD,
-				{
-					fill: 'none',
-					...getPrimitiveStrokeAttrs(
-						isSelected,
-						!!arc.isConstruction,
-						getBaseColor(
-							[arc.centerId, arc.startPointId, arc.endPointId].every(isPointConstrained) &&
-								!!constrainedParams?.has(`${arc.id}.r`)
-						),
-						true
-					),
-				},
-				arcG
-			);
-
-			// Light dashed radial lines to center if selected
-			if (isSelected) {
-				createSvgLine(sc, ss, AUX_AXIS_ATTRS, arcG);
-				createSvgLine(sc, se, AUX_AXIS_ATTRS, arcG);
-			}
-		}
-
-		// 4. Render Ellipses
-		for (const ellipse of sketch.ellipses.values()) {
-			const center = sketch.points.get(ellipse.centerId);
-			const majorPt = sketch.points.get(ellipse.majorAxisPointId);
-			const minorPt = sketch.points.get(ellipse.minorAxisPointId);
-			if (!center || !majorPt || !minorPt) continue;
-
-			const sc = viewport.worldToScreen(center);
-			const smaj = viewport.worldToScreen(majorPt);
-			const smin = viewport.worldToScreen(minorPt);
-
-			const r = sc.distancesTo(smaj, smin);
-			if (r.x < 0.1 || r.y < 0.1) continue;
-
-			const thetaDeg = sc.angleToPointDeg(smaj);
-			const isSelected =
-				sketch.selection.ellipseIds.has(ellipse.id) ||
-				!!options.mirrorHighlight?.selectedObjectIds.has(ellipse.id) ||
-				!!options.patternHighlight?.selectedObjectIds.has(ellipse.id) ||
-				!!options.rectangularPatternHighlight?.selectedObjectIds.has(ellipse.id);
-
-			const ellipseG = createSvgElement(
-				'g',
-				{
-					'data-id': ellipse.id,
-					'data-type': 'ellipse',
-					class: `sketch-entity sketch-ellipse ${isSelected ? 'is-selected' : ''}`,
-				},
-				this.geometryGroup
-			);
-
-			// Invisible generous hit target using the shared line hit width
-			createSvgEllipse(
-				sc,
-				r,
-				{
-					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-					...HIT_AREA_RING_ATTRS,
-				},
-				ellipseG
-			);
-
-			// Visible ellipse
-			createSvgEllipse(
-				sc,
-				r,
-				{
-					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-					fill: 'none',
-					...getPrimitiveStrokeAttrs(
-						isSelected,
-						!!ellipse.isConstruction,
-						getBaseColor(
-							[ellipse.centerId, ellipse.majorAxisPointId, ellipse.minorAxisPointId].every(isPointConstrained)
-						)
-					),
-				},
-				ellipseG
-			);
-
-			// Subtle dashed conjugate axes if selected
-			if (isSelected) {
-				createSvgLine(sc, smaj, AUX_AXIS_ATTRS, ellipseG);
-				createSvgLine(sc, smin, AUX_AXIS_ATTRS, ellipseG);
-			}
-		}
-
-		// 5. Render Elliptical Arcs
-		for (const arc of sketch.ellipticalArcs.values()) {
-			const center = sketch.points.get(arc.centerId);
-			const majorPt = sketch.points.get(arc.majorAxisPointId);
-			const minorPt = sketch.points.get(arc.minorAxisPointId);
-			const startPt = sketch.points.get(arc.startPointId);
-			const endPt = sketch.points.get(arc.endPointId);
-			if (!center || !majorPt || !minorPt || !startPt || !endPt) continue;
-
-			const sc = viewport.worldToScreen(center);
-			const smaj = viewport.worldToScreen(majorPt);
-			const smin = viewport.worldToScreen(minorPt);
-			const ss = viewport.worldToScreen(startPt);
-			const se = viewport.worldToScreen(endPt);
-
-			const clockwise = !!arc.clockwise;
-			const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, clockwise);
-			const isSelected =
-				sketch.selection.ellipticalArcIds.has(arc.id) ||
-				!!options.mirrorHighlight?.selectedObjectIds.has(arc.id) ||
-				!!options.patternHighlight?.selectedObjectIds.has(arc.id) ||
-				!!options.rectangularPatternHighlight?.selectedObjectIds.has(arc.id);
-
-			const arcG = createSvgElement(
-				'g',
-				{
-					'data-id': arc.id,
-					'data-type': 'elliptical_arc',
-					class: `sketch-entity sketch-elliptical-arc ${isSelected ? 'is-selected' : ''}`,
-				},
-				this.geometryGroup
-			);
-
-			// Invisible generous hit target using the shared line hit width
-			createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
-
-			// Visible arc path
-			createSvgPath(
-				d,
-				{
-					fill: 'none',
-					...getPrimitiveStrokeAttrs(
-						isSelected,
-						!!arc.isConstruction,
-						getBaseColor(
-							[arc.centerId, arc.majorAxisPointId, arc.minorAxisPointId, arc.startPointId, arc.endPointId].every(
-								isPointConstrained
-							)
-						),
-						true
-					),
-				},
-				arcG
-			);
-
-			// Light dashed radial lines to center and axes if selected
-			if (isSelected) {
-				createSvgLine(sc, ss, AUX_AXIS_ATTRS, arcG);
-				createSvgLine(sc, se, AUX_AXIS_ATTRS, arcG);
-				createSvgLine(sc, smaj, AUX_RAY_ATTRS, arcG);
-				createSvgLine(sc, smin, AUX_RAY_ATTRS, arcG);
-			}
-		}
-
-		// 5b. Render Splines
-		for (const spline of sketch.splines.values()) {
-			const pts = spline.pointIds.map(id => sketch.points.get(id)).filter((p): p is SketchPoint => !!p);
-			if (pts.length < 2) continue;
-
-			let bezierSegments: BezierSegment[] = [];
-			if (spline.splineType === 'control') {
-				bezierSegments = bsplineToBezier(pts, spline.knots);
-			} else {
-				const handles = (spline.tangentLineIds || []).map(lid => {
-					const line = sketch.lines.get(lid);
-					if (!line) return null;
-					const p1 = sketch.points.get(line.p1Id);
-					const p2 = sketch.points.get(line.p2Id);
-					if (!p1 || !p2) return null;
-					return {
-						h1: p1,
-						h2: p2,
-					};
-				});
-				bezierSegments = fitPointsToBezier(pts, handles);
-			}
-
-			const isFilletSelected =
-				options.filletState?.selectedPrimitive1?.type === 'spline' &&
-				options.filletState.selectedPrimitive1.id === spline.id;
-			const isSelected =
-				sketch.selection.splineIds.has(spline.id) ||
-				options.mirrorHighlight?.selectedObjectIds.has(spline.id) ||
-				options.patternHighlight?.selectedObjectIds.has(spline.id) ||
-				options.rectangularPatternHighlight?.selectedObjectIds.has(spline.id) ||
-				isFilletSelected;
-
-			const d = getSplineSvgPath(bezierSegments, p => viewport.worldToScreen(p), !!spline.isClosed);
-			const trim = filletTrims.get(spline.id);
-			const closed = !!spline.isClosed && !trim;
-			const previewD = trim
-				? getSplineSvgPath(
-						filletSplinePreview(bezierSegments, spline.splineType, trim),
-						p => viewport.worldToScreen(p),
-						closed
-					)
-				: d;
-
-			const isConstrained =
-				pts.every(point => isPointConstrained(point.id)) &&
-				(spline.splineType !== 'fit' ||
-					!spline.tangentLineIds ||
-					spline.tangentLineIds.every(id => {
-						const line = sketch.lines.get(id);
-						return !line || (isPointConstrained(line.p1Id) && isPointConstrained(line.p2Id));
-					}));
-
-			const splineG = createSvgElement(
-				'g',
-				{
-					'data-id': spline.id,
-					'data-type': 'spline',
-					class: `sketch-entity sketch-spline ${isSelected ? 'is-selected' : ''}`,
-				},
-				this.geometryGroup
-			);
-
-			// Invisible generous hit target using the shared line hit width
-			createSvgPath(d, HIT_AREA_STROKE_ATTRS, splineG);
-
-			// Visible spline path
-			createSvgPath(
-				previewD,
-				{
-					fill: closed ? SPLINE_STYLES.closedFill : 'none',
-					...getPrimitiveStrokeAttrs(isSelected, !!spline.isConstruction, getBaseColor(isConstrained), true),
-				},
-				splineG
-			);
+		for (const primitive of sketch.getCurvePrimitives()) {
+			if (options.hiddenEntityIds?.has(primitive.id)) continue;
+			primitive.render({
+				...baseCtx,
+				isSelected: this.isPrimitiveSelected(primitive, sketch, options),
+				baseColor: getBaseColor(primitive.isConstrained(sketch, constrainedParams)),
+			});
 		}
 
 		// Paint tangent handles above the spline paths.
 		for (const group of splineTangentGroups) this.geometryGroup.appendChild(group);
 
-		// 6. Render Points (Vertices)
-		const handlePointToSpline = new Map<string, { spline: SketchSpline; isHandleDot: boolean }>();
-		const controlPointToSpline = new Map<string, SketchSpline>();
-		for (const spline of sketch.splines.values()) {
-			if (spline.splineType === 'control') {
-				for (let i = 1; i < spline.pointIds.length - 1; i++) {
-					controlPointToSpline.set(spline.pointIds[i], spline);
-				}
-			}
-			if (spline.tangentLineIds && spline.splineType !== 'control') {
-				for (const lid of spline.tangentLineIds) {
-					const line = sketch.lines.get(lid);
-					if (line) {
-						handlePointToSpline.set(line.p1Id, { spline, isHandleDot: true });
-						handlePointToSpline.set(line.p2Id, { spline, isHandleDot: true });
-					}
-				}
-			}
-		}
-
 		for (const pt of sketch.points.values()) {
 			if (options.hiddenEntityIds?.has(pt.id)) continue;
-			const splineHandleInfo = handlePointToSpline.get(pt.id);
-			const splineControl = controlPointToSpline.get(pt.id);
-
-			if (splineHandleInfo) {
-				if (
-					!activeSplineIds.has(splineHandleInfo.spline.id) &&
-					!sketch.selection.pointIds.has(pt.id) &&
-					!options.showSplineHandles
-				) {
-					continue;
-				}
-			}
-			if (splineControl) {
-				if (
-					!activeSplineIds.has(splineControl.id) &&
-					!sketch.selection.pointIds.has(pt.id) &&
-					!options.showSplineHandles
-				) {
-					continue;
-				}
-			}
-
-			const s = viewport.worldToScreen(pt);
-			const isPatternCenter = options.patternHighlight?.centerPointId === pt.id;
-			const isPatternSelected =
-				options.patternHighlight?.selectedObjectIds.has(pt.id) ||
-				options.rectangularPatternHighlight?.selectedObjectIds.has(pt.id);
-			const isSelected =
-				sketch.selection.pointIds.has(pt.id) ||
-				!!options.mirrorHighlight?.selectedObjectIds.has(pt.id) ||
-				!!isPatternSelected ||
-				isPatternCenter;
-
-			const ptG = createSvgElement(
-				'g',
-				{
-					'data-id': pt.id,
-					'data-type': 'point',
-					class: `sketch-entity sketch-point ${isSelected ? 'is-selected' : ''}`,
-				},
-				this.pointGroup
-			);
-
-			// Invisible larger hit target for easy clicking
-			createSvgCircle(s, 14, HIT_AREA_POINT_ATTRS, ptG);
-
-			// Visible point handle
-			let strokeColor: string = COLORS.primary;
-
-			if (splineHandleInfo?.isHandleDot) {
-				strokeColor = SPLINE_STYLES.handleDot.stroke;
-			} else if (pt.fixed) {
-				strokeColor = COLORS.fixed;
-			} else if (!hasConflict && isPointConstrained(pt.id)) {
-				strokeColor = COLORS.constrained;
-			}
-
-			if (isPatternCenter) {
-				strokeColor = COLORS.patternCenter;
-			} else if (isSelected) {
-				strokeColor = COLORS.selected;
-			}
-
-			createSvgCircle(
-				s,
-				isSelected ? 4 : splineHandleInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3,
-				{
-					class: 'entity-visible visible-point',
-					fill: COLORS.white,
-					stroke: strokeColor,
-					'stroke-width': STROKE_WIDTH.thin,
-					'pointer-events': 'all',
-				},
-				ptG
-			);
+			pt.render({
+				...baseCtx,
+				isSelected: this.isPrimitiveSelected(pt, sketch, options),
+				baseColor: getBaseColor(pt.isConstrained(sketch, constrainedParams)),
+			});
 		}
 	}
 
@@ -1305,250 +843,16 @@ export class SVGRenderer {
 			if (options.hiddenEntityIds?.has(text.id) || (preview && !preview.ids.has(text.id))) continue;
 			const isSelected = sketch.selection.textIds.has(text.id) || options.activeTextId === text.id;
 			const color = preview?.color ?? (isSelected ? COLORS.primary : COLORS.unconstrained);
-			const hScreen = Math.max(1, text.height * viewport.zoom);
-			const fontFam = text.fontFamily || 'Arial, sans-serif';
-
-			if (text.mode === 'text') {
-				const corners = text.getRectangleCorners(sketch);
-				if (!corners) continue;
-
-				const [p0, p1, p2, p3] = corners;
-				const cWorld = new Vec2().midpoint(p0, p2);
-				const sCenter = viewport.worldToScreen(cWorld);
-				const widthWorld = p0.distanceTo(p1);
-				const heightWorld = p0.distanceTo(p3);
-				const wScreen = widthWorld * viewport.zoom;
-				const hBoxScreen = heightWorld * viewport.zoom;
-
-				const angleCad = p0.angleToPoint(p1);
-				const angleScreenDeg = (-angleCad * 180) / Math.PI;
-
-				const textG = createSvgElement(
-					'g',
-					{
-						class: `sketch-text-entity ${isSelected ? 'selected' : ''}`,
-						transform: `translate(${sCenter.x.toFixed(2)}, ${sCenter.y.toFixed(2)}) rotate(${angleScreenDeg.toFixed(2)})`,
-						'data-id': text.id,
-						'data-text-id': text.id,
-						cursor: 'pointer',
-					},
-					preview?.target ?? this.textGroup
-				);
-
-				// Transparent hit-rect covering the entire box for easy clicking & double-clicking
-				createSvgElement(
-					'rect',
-					{
-						x: -wScreen / 2,
-						y: -hBoxScreen / 2,
-						width: wScreen,
-						height: hBoxScreen,
-						fill: 'rgba(0, 0, 0, 0.001)',
-						'data-id': text.id,
-						'data-text-id': text.id,
-					},
-					textG
-				);
-
-				const scaleX = text.flipHorizontal ? -1 : 1;
-				const scaleY = text.flipVertical ? -1 : 1;
-				const innerG =
-					text.flipHorizontal || text.flipVertical
-						? createSvgElement('g', { transform: `scale(${scaleX}, ${scaleY})` }, textG)
-						: textG;
-
-				let posX = 0;
-				let textAnchor = 'middle';
-				if (text.alignment === 'left') {
-					if (text.flipHorizontal) {
-						posX = wScreen / 2 - 4;
-						textAnchor = 'end';
-					} else {
-						posX = -wScreen / 2 + 4;
-						textAnchor = 'start';
-					}
-				} else if (text.alignment === 'right') {
-					if (text.flipHorizontal) {
-						posX = -wScreen / 2 + 4;
-						textAnchor = 'start';
-					} else {
-						posX = wScreen / 2 - 4;
-						textAnchor = 'end';
-					}
-				}
-
-				const letterSpacingPx = (text.characterSpacing / 100) * hScreen;
-				const lines = (text.text || '').split(/\r?\n/);
-				const numLines = Math.max(1, lines.length);
-				const lineHeightPx = hScreen * 1.25;
-				const totalBlockHeightPx = (numLines - 1) * lineHeightPx;
-
-				let startY = 0;
-				const vAlign = text.verticalAlignment ?? 'middle';
-				if (vAlign === 'top') {
-					startY = text.flipVertical ? hBoxScreen / 2 - hScreen / 2 - 3 : -hBoxScreen / 2 + hScreen / 2 + 3;
-				} else if (vAlign === 'bottom') {
-					startY = text.flipVertical
-						? -hBoxScreen / 2 + hScreen / 2 + 3 + totalBlockHeightPx
-						: hBoxScreen / 2 - hScreen / 2 - 3 - totalBlockHeightPx;
-				} else {
-					startY = text.flipVertical ? totalBlockHeightPx / 2 : -totalBlockHeightPx / 2;
-				}
-
-				const textEl = createSvgElement(
-					'text',
-					{
-						x: posX,
-						y: startY,
-						fill: color,
-						'font-family': fontFam,
-						'font-size': `${hScreen.toFixed(1)}px`,
-						'font-weight': text.bold ? 'bold' : 'normal',
-						'font-style': text.italic ? 'italic' : 'normal',
-						'letter-spacing': `${letterSpacingPx.toFixed(1)}px`,
-						'text-anchor': textAnchor,
-						'dominant-baseline': 'central',
-						'data-id': text.id,
-						'data-text-id': text.id,
-					},
-					innerG
-				);
-
-				for (let i = 0; i < lines.length; i++) {
-					const lineY = text.flipVertical ? startY - i * lineHeightPx : startY + i * lineHeightPx;
-					createSvgElement(
-						'tspan',
-						{
-							x: posX,
-							y: lineY.toFixed(1),
-							'data-id': text.id,
-							'data-text-id': text.id,
-						},
-						textEl,
-						lines[i] || ' '
-					);
-				}
-
-				// Rotation Gizmo Handle (at top center of rectangle)
-				if (isSelected && !options.hideTextGizmos && !preview) {
-					const stemLen = TEXT_ROTATION_HANDLE_DISTANCE_PX;
-					const topEdgeY = -hBoxScreen / 2;
-					const handleY = topEdgeY - stemLen;
-
-					createSvgElement(
-						'line',
-						{
-							x1: 0,
-							y1: topEdgeY,
-							x2: 0,
-							y2: handleY,
-							stroke: COLORS.primary,
-							'stroke-width': 1.5,
-							'stroke-dasharray': '2,2',
-						},
-						textG
-					);
-
-					createSvgElement(
-						'circle',
-						{
-							cx: 0,
-							cy: handleY,
-							r: 5.5,
-							fill: COLORS.white,
-							stroke: COLORS.primary,
-							'stroke-width': 2,
-							class: 'text-rotation-handle',
-							cursor: 'grab',
-						},
-						textG
-					);
-
-					const rad = (angleScreenDeg * Math.PI) / 180;
-					const handleScreen = new Vec2(0, handleY).rotateAround(ORIGIN, rad).add(sCenter);
-
-					this.textRotationGizmo = {
-						textId: text.id,
-						centerWorld: cWorld,
-						handleScreen,
-					};
-
-					// Center Drag / Move Handle (at center of rectangle)
-					createSvgElement(
-						'circle',
-						{
-							cx: 0,
-							cy: 0,
-							r: 5.5,
-							fill: COLORS.white,
-							stroke: COLORS.primary,
-							'stroke-width': 2,
-							class: 'text-drag-handle',
-							cursor: 'move',
-						},
-						textG
-					);
-
-					this.textDragGizmo = {
-						textId: text.id,
-						centerWorld: cWorld,
-						centerScreen: sCenter,
-					};
-				}
-			} else if (text.mode === 'text_on_path' && text.targetPrimitiveId) {
-				const curve = sketch.toGeoCurve(text.targetPrimitiveId, text.targetPrimitiveType);
-				if (!curve) continue;
-
-				const font = getFontSync(text.fontFamily, text.bold, text.italic);
-				if (!font) {
-					loadFontAsync(text.fontFamily, text.bold, text.italic);
-				}
-
-				const pathData = font
-					? generateTextSvgPathData(
-							{
-								mode: 'text_on_path',
-								text: text.text,
-								height: text.height,
-								characterSpacing: text.characterSpacing,
-								placement: text.placement,
-								fitToPath: text.fitToPath,
-								flipHorizontal: text.flipHorizontal,
-								flipVertical: text.flipVertical,
-								alignment: text.alignment,
-								coordSystem: 'cad',
-							},
-							font,
-							curve
-						)
-					: '';
-
-				if (pathData) {
-					const textPathG = createSvgElement(
-						'g',
-						{
-							class: `sketch-text-entity ${isSelected ? 'selected' : ''}`,
-							transform: `matrix(${viewport.zoom}, 0, 0, ${-viewport.zoom}, ${viewport.panX.toFixed(2)}, ${viewport.panY.toFixed(2)})`,
-							'data-id': text.id,
-							'data-text-id': text.id,
-							cursor: 'pointer',
-						},
-						preview?.target ?? this.textGroup
-					);
-
-					createSvgElement(
-						'path',
-						{
-							d: pathData,
-							fill: color,
-							'data-id': text.id,
-							'data-text-id': text.id,
-							cursor: 'pointer',
-						},
-						textPathG
-					);
-				}
-			}
+			const gizmos = text.render({
+				sketch,
+				viewport,
+				targetGroup: preview?.target ?? this.textGroup,
+				isSelected,
+				color,
+				showGizmos: isSelected && !options.hideTextGizmos && !preview,
+			});
+			if (gizmos.rotationGizmo) this.textRotationGizmo = gizmos.rotationGizmo;
+			if (gizmos.dragGizmo) this.textDragGizmo = gizmos.dragGizmo;
 		}
 	}
 
@@ -2206,6 +1510,10 @@ export class SVGRenderer {
 			strokeWidth?: number;
 			skipRender?: boolean;
 			transformScale?: number;
+			invertWinding?: boolean;
+			vertexRadius?: number;
+			vertexAttrs?: SvgAttrs;
+			deduplicateVertices?: boolean;
 		}
 	): Array<{ x: number; y: number }> {
 		let transformPoint: (x: number, y: number) => { x: number; y: number };
@@ -2220,19 +1528,23 @@ export class SVGRenderer {
 		}
 
 		const copyWorldPoints: Array<{ x: number; y: number }> = [];
-		const targetGroup = options.targetGroup;
-		const skipRender = options.skipRender || !targetGroup;
+		const targetGroup = options.skipRender ? undefined : options.targetGroup;
 		const opacity = options.opacity ?? 1.0;
 		const baseColor = options.baseColor ?? COLORS.unconstrained;
 		const strokeWidth = options.strokeWidth ?? STROKE_WIDTH.normal;
-		const transformScale = options.transformScale ?? 1;
+		const seenVertices = options.deduplicateVertices ? new Set<string>() : null;
 
-		const drawTransformedVertex = (screenPt: { x: number; y: number }) => {
-			if (!options.drawVertices || skipRender || !targetGroup) return;
+		const drawVertex = (screenPt: Vec2, worldPt: { x: number; y: number }) => {
+			if (!options.drawVertices || !targetGroup) return;
+			if (seenVertices) {
+				const key = `${Math.round(worldPt.x * 100)},${Math.round(worldPt.y * 100)}`;
+				if (seenVertices.has(key)) return;
+				seenVertices.add(key);
+			}
 			createSvgCircle(
 				screenPt,
-				3,
-				{
+				options.vertexRadius ?? 3,
+				options.vertexAttrs ?? {
 					fill: options.transformScale !== undefined || baseColor === COLORS.constrained ? baseColor : COLORS.primary,
 					stroke: COLORS.white,
 					'stroke-width': STROKE_WIDTH.normal,
@@ -2249,174 +1561,19 @@ export class SVGRenderer {
 		};
 
 		for (const objId of objectIds) {
-			// Line
-			const l = sketch.lines.get(objId);
-			if (l) {
-				const pt1 = sketch.points.get(l.p1Id);
-				const pt2 = sketch.points.get(l.p2Id);
-				if (pt1 && pt2) {
-					const rp1 = transformPoint(pt1.x, pt1.y);
-					const rp2 = transformPoint(pt2.x, pt2.y);
-					copyWorldPoints.push(rp1, rp2);
-
-					if (!skipRender && targetGroup) {
-						const sp1 = viewport.worldToScreen(rp1);
-						const sp2 = viewport.worldToScreen(rp2);
-						createSvgLine(sp1, sp2, getAttrs(!!l.isConstruction), targetGroup);
-
-						drawTransformedVertex(sp1);
-						drawTransformedVertex(sp2);
-					}
-				}
-				continue;
-			}
-
-			// Circle
-			const c = sketch.circles.get(objId);
-			if (c) {
-				const origCtr = sketch.points.get(c.centerId);
-				if (origCtr) {
-					const rc = transformPoint(origCtr.x, origCtr.y);
-					copyWorldPoints.push(rc);
-
-					if (!skipRender && targetGroup) {
-						const sc = viewport.worldToScreen(rc);
-						const sr = c.radius * viewport.zoom * transformScale;
-						createSvgCircle(sc, sr, getAttrs(!!c.isConstruction), targetGroup);
-
-						drawTransformedVertex(sc);
-					}
-				}
-				continue;
-			}
-
-			// Arc
-			const a = sketch.arcs.get(objId);
-			if (a) {
-				const origCtr = sketch.points.get(a.centerId);
-				const origStart = sketch.points.get(a.startPointId);
-				const origEnd = sketch.points.get(a.endPointId);
-				if (origCtr && origStart && origEnd) {
-					const rc = transformPoint(origCtr.x, origCtr.y);
-					const rs = transformPoint(origStart.x, origStart.y);
-					const re = transformPoint(origEnd.x, origEnd.y);
-					copyWorldPoints.push(rc, rs, re);
-
-					if (!skipRender && targetGroup) {
-						const sc = viewport.worldToScreen(rc);
-						const ss = viewport.worldToScreen(rs);
-						const se = viewport.worldToScreen(re);
-						const sr = a.radius * viewport.zoom * transformScale;
-
-						const d = getArcSvgPath(sc, ss, se, sr, a.clockwise);
-						createSvgPath(d, getAttrs(!!a.isConstruction), targetGroup);
-
-						drawTransformedVertex(sc);
-						drawTransformedVertex(ss);
-						drawTransformedVertex(se);
-					}
-				}
-				continue;
-			}
-
-			// Ellipse
-			const e = sketch.ellipses.get(objId);
-			if (e) {
-				const origCtr = sketch.points.get(e.centerId);
-				const origMajor = sketch.points.get(e.majorAxisPointId);
-				const origMinor = sketch.points.get(e.minorAxisPointId);
-				if (origCtr && origMajor && origMinor) {
-					const rc = transformPoint(origCtr.x, origCtr.y);
-					const rmaj = transformPoint(origMajor.x, origMajor.y);
-					const rmin = transformPoint(origMinor.x, origMinor.y);
-					copyWorldPoints.push(rc, rmaj, rmin);
-
-					if (!skipRender && targetGroup) {
-						const src = viewport.worldToScreen(rc);
-						const srmaj = viewport.worldToScreen(rmaj);
-						const srmin = viewport.worldToScreen(rmin);
-						const r = src.distancesTo(srmaj, srmin);
-						const thetaDeg = src.angleToPointDeg(srmaj);
-
-						createSvgEllipse(
-							src,
-							r,
-							{
-								transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
-								...getAttrs(!!e.isConstruction),
-							},
-							targetGroup
-						);
-
-						drawTransformedVertex(src);
-						drawTransformedVertex(srmaj);
-						drawTransformedVertex(srmin);
-					}
-				}
-				continue;
-			}
-
-			// Elliptical Arc
-			const elArc = sketch.ellipticalArcs.get(objId);
-			if (elArc) {
-				const origCtr = sketch.points.get(elArc.centerId);
-				const origMajor = sketch.points.get(elArc.majorAxisPointId);
-				const origMinor = sketch.points.get(elArc.minorAxisPointId);
-				const origStart = sketch.points.get(elArc.startPointId);
-				const origEnd = sketch.points.get(elArc.endPointId);
-				if (origCtr && origMajor && origMinor && origStart && origEnd) {
-					const rc = transformPoint(origCtr.x, origCtr.y);
-					const rmaj = transformPoint(origMajor.x, origMajor.y);
-					const rmin = transformPoint(origMinor.x, origMinor.y);
-					const rs = transformPoint(origStart.x, origStart.y);
-					const re = transformPoint(origEnd.x, origEnd.y);
-					copyWorldPoints.push(rc, rmaj, rmin, rs, re);
-
-					if (!skipRender && targetGroup) {
-						const src = viewport.worldToScreen(rc);
-						const srmaj = viewport.worldToScreen(rmaj);
-						const srmin = viewport.worldToScreen(rmin);
-						const srs = viewport.worldToScreen(rs);
-						const sre = viewport.worldToScreen(re);
-						const d = getEllipticalArcSvgPath(src, srmaj, srmin, srs, sre, elArc.clockwise);
-
-						createSvgPath(d, getAttrs(!!elArc.isConstruction), targetGroup);
-
-						drawTransformedVertex(srs);
-						drawTransformedVertex(sre);
-						drawTransformedVertex(src);
-					}
-				}
-				continue;
-			}
-
-			const spline = sketch.splines.get(objId)?.toGeoCurve(sketch);
-			if (spline) {
-				const points = spline.points.map(point => transformPoint(point.x, point.y));
-				copyWorldPoints.push(...(spline.isClosed ? points.slice(0, -1) : points));
-				if (!skipRender && targetGroup) {
-					const d = getSplineSvgPath(
-						spline.bezierSegments,
-						point => viewport.worldToScreen(transformPoint(point.x, point.y)),
-						spline.isClosed
-					);
-					createSvgPath(d, getAttrs(!!spline.isConstruction), targetGroup);
-					for (const point of points) drawTransformedVertex(viewport.worldToScreen(point));
-				}
-				continue;
-			}
-
-			// Standalone Point
-			const pt = sketch.points.get(objId);
-			if (pt) {
-				const rp = transformPoint(pt.x, pt.y);
-				copyWorldPoints.push(rp);
-
-				if (!skipRender && targetGroup) {
-					const srp = viewport.worldToScreen(rp);
-					drawTransformedVertex(srp);
-				}
-			}
+			const prim = sketch.getPrimitive(objId);
+			if (!prim) continue;
+			const pts = prim.renderTransformed({
+				sketch,
+				viewport,
+				transformPoint,
+				targetGroup,
+				strokeAttrs: targetGroup ? getAttrs(!!prim.isConstruction) : undefined,
+				transformScale: options.transformScale,
+				invertWinding: options.invertWinding,
+				drawVertex,
+			});
+			copyWorldPoints.push(...pts);
 		}
 
 		return copyWorldPoints;
@@ -2742,172 +1899,26 @@ export class SVGRenderer {
 		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
 		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
 
-		const reflectedPoints = new Set<string>();
-		const drawReflectedVertex = (screenPt: { x: number; y: number }, key: string) => {
-			if (reflectedPoints.has(key)) return;
-			reflectedPoints.add(key);
-			createSvgCircle(
-				screenPt,
-				3.5,
-				{
+		const idsToMirror = [...selectedObjectIds].filter(id => id !== mirrorLineId);
+		this.renderTransformedObjects(
+			sketch,
+			viewport,
+			idsToMirror,
+			(x, y) => new Vec2(x, y).reflectAcrossLine(pA, normal),
+			{
+				targetGroup: this.mirrorGroup,
+				baseColor,
+				opacity: 0.5,
+				drawVertices: true,
+				invertWinding: true,
+				vertexRadius: 3.5,
+				vertexAttrs: {
 					...MIRROR_PREVIEW_VERTEX_ATTRS,
 					opacity: 0.5,
 				},
-				this.mirrorGroup
-			);
-		};
-
-		const getAttrs = (isConstruction: boolean) => getCopyStrokeAttrs(isConstruction, baseColor, 0.5);
-
-		for (const objId of selectedObjectIds) {
-			if (objId === mirrorLineId) continue;
-
-			// Line
-			const l = sketch.lines.get(objId);
-			if (l) {
-				const pt1 = sketch.points.get(l.p1Id);
-				const pt2 = sketch.points.get(l.p2Id);
-				if (pt1 && pt2) {
-					const r1 = pt1.clone().reflectAcrossLine(pA, normal);
-					const r2 = pt2.clone().reflectAcrossLine(pA, normal);
-					const sr1 = viewport.worldToScreen(r1);
-					const sr2 = viewport.worldToScreen(r2);
-
-					createSvgLine(sr1, sr2, getAttrs(!!l.isConstruction), this.mirrorGroup);
-
-					drawReflectedVertex(sr1, `${Math.round(r1.x * 100)},${Math.round(r1.y * 100)}`);
-					drawReflectedVertex(sr2, `${Math.round(r2.x * 100)},${Math.round(r2.y * 100)}`);
-				}
-				continue;
+				deduplicateVertices: true,
 			}
-
-			// Circle
-			const c = sketch.circles.get(objId);
-			if (c) {
-				const center = sketch.points.get(c.centerId);
-				if (center) {
-					const rc = center.clone().reflectAcrossLine(pA, normal);
-					const src = viewport.worldToScreen(rc);
-					const sr = c.radius * viewport.zoom;
-
-					createSvgCircle(src, sr, getAttrs(!!c.isConstruction), this.mirrorGroup);
-
-					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
-				}
-				continue;
-			}
-
-			// Arc
-			const arc = sketch.arcs.get(objId);
-			if (arc) {
-				const center = sketch.points.get(arc.centerId);
-				const start = sketch.points.get(arc.startPointId);
-				const end = sketch.points.get(arc.endPointId);
-				if (center && start && end) {
-					const rc = center.clone().reflectAcrossLine(pA, normal);
-					const rs = start.clone().reflectAcrossLine(pA, normal);
-					const re = end.clone().reflectAcrossLine(pA, normal);
-					const src = viewport.worldToScreen(rc);
-					const srs = viewport.worldToScreen(rs);
-					const sre = viewport.worldToScreen(re);
-					const sr = arc.radius * viewport.zoom;
-					const d = getArcSvgPath(src, srs, sre, sr, !arc.clockwise);
-
-					createSvgPath(d, getAttrs(!!arc.isConstruction), this.mirrorGroup);
-
-					drawReflectedVertex(srs, `${Math.round(rs.x * 100)},${Math.round(rs.y * 100)}`);
-					drawReflectedVertex(sre, `${Math.round(re.x * 100)},${Math.round(re.y * 100)}`);
-					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
-				}
-				continue;
-			}
-
-			// Ellipse
-			const el = sketch.ellipses.get(objId);
-			if (el) {
-				const center = sketch.points.get(el.centerId);
-				const major = sketch.points.get(el.majorAxisPointId);
-				const minor = sketch.points.get(el.minorAxisPointId);
-				if (center && major && minor) {
-					const rc = center.clone().reflectAcrossLine(pA, normal);
-					const rmaj = major.clone().reflectAcrossLine(pA, normal);
-					const rmin = minor.clone().reflectAcrossLine(pA, normal);
-					const src = viewport.worldToScreen(rc);
-					const srmaj = viewport.worldToScreen(rmaj);
-					const srmin = viewport.worldToScreen(rmin);
-					const r = src.distancesTo(srmaj, srmin);
-					const thetaDeg = src.angleToPointDeg(srmaj);
-
-					createSvgEllipse(
-						src,
-						r,
-						{
-							transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
-							...getAttrs(!!el.isConstruction),
-						},
-						this.mirrorGroup
-					);
-
-					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
-				}
-				continue;
-			}
-
-			// Elliptical Arc
-			const elArc = sketch.ellipticalArcs.get(objId);
-			if (elArc) {
-				const center = sketch.points.get(elArc.centerId);
-				const major = sketch.points.get(elArc.majorAxisPointId);
-				const minor = sketch.points.get(elArc.minorAxisPointId);
-				const start = sketch.points.get(elArc.startPointId);
-				const end = sketch.points.get(elArc.endPointId);
-				if (center && major && minor && start && end) {
-					const rc = center.clone().reflectAcrossLine(pA, normal);
-					const rmaj = major.clone().reflectAcrossLine(pA, normal);
-					const rmin = minor.clone().reflectAcrossLine(pA, normal);
-					const rs = start.clone().reflectAcrossLine(pA, normal);
-					const re = end.clone().reflectAcrossLine(pA, normal);
-					const src = viewport.worldToScreen(rc);
-					const srmaj = viewport.worldToScreen(rmaj);
-					const srmin = viewport.worldToScreen(rmin);
-					const srs = viewport.worldToScreen(rs);
-					const sre = viewport.worldToScreen(re);
-					const d = getEllipticalArcSvgPath(src, srmaj, srmin, srs, sre, !elArc.clockwise);
-
-					createSvgPath(d, getAttrs(!!elArc.isConstruction), this.mirrorGroup);
-
-					drawReflectedVertex(srs, `${Math.round(rs.x * 100)},${Math.round(rs.y * 100)}`);
-					drawReflectedVertex(sre, `${Math.round(re.x * 100)},${Math.round(re.y * 100)}`);
-					drawReflectedVertex(src, `${Math.round(rc.x * 100)},${Math.round(rc.y * 100)}`);
-				}
-				continue;
-			}
-
-			if (sketch.splines.has(objId)) {
-				this.renderTransformedObjects(
-					sketch,
-					viewport,
-					[objId],
-					(x, y) => new Vec2(x, y).reflectAcrossLine(pA, normal),
-					{
-						targetGroup: this.mirrorGroup,
-						baseColor,
-						opacity: 0.5,
-						drawVertices: true,
-					}
-				);
-				continue;
-			}
-
-			// Standalone Point
-			const pt = sketch.points.get(objId);
-			if (pt) {
-				const rp = pt.clone().reflectAcrossLine(pA, normal);
-				const srp = viewport.worldToScreen(rp);
-				drawReflectedVertex(srp, `${Math.round(rp.x * 100)},${Math.round(rp.y * 100)}`);
-				continue;
-			}
-		}
+		);
 	}
 
 	renderPatternPreview(
@@ -3428,89 +2439,13 @@ export class SVGRenderer {
 
 		// 1. Highlight the selected chain primitives
 		for (const it of chain.items) {
-			if (it.type === 'line') {
-				const l = sketch.lines.get(it.id);
-				if (l) {
-					const p1 = sketch.points.get(l.p1Id);
-					const p2 = sketch.points.get(l.p2Id);
-					if (p1 && p2) {
-						const s1 = viewport.worldToScreen(p1);
-						const s2 = viewport.worldToScreen(p2);
-						createSvgLine(s1, s2, OFFSET_CHAIN_ATTRS, this.offsetGroup);
-					}
-				}
-			} else if (it.type === 'circle') {
-				const c = sketch.circles.get(it.id);
-				if (c) {
-					const center = sketch.points.get(c.centerId);
-					if (center) {
-						const sc = viewport.worldToScreen(center);
-						createSvgCircle(sc, c.radius * viewport.zoom, OFFSET_CHAIN_ATTRS, this.offsetGroup);
-					}
-				}
-			} else if (it.type === 'arc') {
-				const a = sketch.arcs.get(it.id);
-				if (a) {
-					const center = sketch.points.get(a.centerId);
-					const start = sketch.points.get(a.startPointId);
-					const end = sketch.points.get(a.endPointId);
-					if (center && start && end) {
-						const sc = viewport.worldToScreen(center);
-						const ss = viewport.worldToScreen(start);
-						const se = viewport.worldToScreen(end);
-						const d = getArcSvgPath(sc, ss, se, a.radius * viewport.zoom, !!a.clockwise);
-						createSvgPath(d, OFFSET_CHAIN_ATTRS, this.offsetGroup);
-					}
-				}
-			} else if (it.type === 'ellipse') {
-				const el = sketch.ellipses.get(it.id);
-				if (el) {
-					const center = sketch.points.get(el.centerId);
-					const maj = sketch.points.get(el.majorAxisPointId);
-					const min = sketch.points.get(el.minorAxisPointId);
-					if (center && maj && min) {
-						const sc = viewport.worldToScreen(center);
-						const r = center.distancesTo(maj, min).clone().multiplyScalar(viewport.zoom);
-						const thetaDeg = center.angleToPointDeg(maj);
-						createSvgEllipse(
-							sc,
-							r,
-							{
-								transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-								...OFFSET_CHAIN_ATTRS,
-							},
-							this.offsetGroup
-						);
-					}
-				}
-			} else if (it.type === 'elliptical_arc') {
-				const ea = sketch.ellipticalArcs.get(it.id);
-				if (ea) {
-					const center = sketch.points.get(ea.centerId);
-					const maj = sketch.points.get(ea.majorAxisPointId);
-					const min = sketch.points.get(ea.minorAxisPointId);
-					const start = sketch.points.get(ea.startPointId);
-					const end = sketch.points.get(ea.endPointId);
-					if (center && maj && min && start && end) {
-						const sc = viewport.worldToScreen(center);
-						const smaj = viewport.worldToScreen(maj);
-						const smin = viewport.worldToScreen(min);
-						const ss = viewport.worldToScreen(start);
-						const se = viewport.worldToScreen(end);
-						const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, !!ea.clockwise);
-						createSvgPath(d, OFFSET_CHAIN_ATTRS, this.offsetGroup);
-					}
-				}
-			} else if (it.type === 'spline') {
-				const s = sketch.splines.get(it.id);
-				if (s) {
-					const geo = s.toGeoCurve(sketch);
-					if (geo && geo.bezierSegments.length > 0) {
-						const d = getSplineSvgPath(geo.bezierSegments, p => viewport.worldToScreen(p), !!s.isClosed);
-						createSvgPath(d, OFFSET_CHAIN_ATTRS, this.offsetGroup);
-					}
-				}
-			}
+			sketch.getPrimitive(it.id, it.type)?.renderTransformed({
+				sketch,
+				viewport,
+				transformPoint: (x, y) => ({ x, y }),
+				targetGroup: this.offsetGroup,
+				strokeAttrs: OFFSET_CHAIN_ATTRS,
+			});
 		}
 
 		// 2. Render computed offset curves for each side

@@ -2,8 +2,27 @@ import { projectPointOntoSegment, Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
 import type { GeoSegment } from '../../math/intersection';
-import type { ISketchPrimitive, PrimitiveSnapCandidate } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveSnapCandidate,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgLine } from '../../canvas/svg';
+import {
+	CHAMFER_HIGHLIGHT_ATTRS,
+	DIR1_LINE_ATTRS,
+	DIR2_LINE_ATTRS,
+	getPrimitiveStrokeAttrs,
+	getSplineHandleStrokeAttrs,
+	HIT_AREA_STROKE_ATTRS,
+	MIRROR_LINE_ATTRS,
+	SPLINE_CONTROL_POLYGON_ATTRS,
+	SPLINE_HANDLE_SELECTED_ATTRS,
+} from '../../canvas/styles';
 
 export class SketchLine implements ISketchPrimitive {
 	readonly type = 'line' as const;
@@ -78,6 +97,81 @@ export class SketchLine implements ISketchPrimitive {
 
 	getPointIds(_sketch?: any): string[] {
 		return [this.p1Id, this.p2Id];
+	}
+
+	isConstrained(_sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return isPointIdConstrained(this.p1Id, constrainedParams) && isPointIdConstrained(this.p2Id, constrainedParams);
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const p1 = ctx.sketch.points.get(this.p1Id);
+		const p2 = ctx.sketch.points.get(this.p2Id);
+		if (!p1 || !p2) return;
+
+		if (this.isSplineHandle) {
+			const isParentActive = this.parentSplineId ? ctx.activeSplineIds.has(this.parentSplineId) : false;
+			if (!isParentActive && !ctx.options.showSplineHandles) return;
+		}
+
+		const s1 = ctx.viewport.worldToScreen(p1);
+		const s2 = ctx.viewport.worldToScreen(p2);
+		const lineG = createPrimitiveSvgGroup(
+			this,
+			ctx.isSelected,
+			ctx.geometryGroup,
+			this.isSplineHandle ? 'sketch-spline-handle' : ''
+		);
+
+		createSvgLine(s1, s2, HIT_AREA_STROKE_ATTRS, lineG);
+
+		if (this.isSplineHandle) {
+			const parentSpline = this.parentSplineId ? ctx.sketch.splines.get(this.parentSplineId) : undefined;
+			if (parentSpline?.splineType === 'control') {
+				createSvgLine(s1, s2, ctx.isSelected ? SPLINE_HANDLE_SELECTED_ATTRS : SPLINE_CONTROL_POLYGON_ATTRS, lineG);
+			} else {
+				lineG.classList.add('sketch-spline-tangent');
+				createSvgLine(s1, s2, getSplineHandleStrokeAttrs(ctx.isSelected), lineG);
+				ctx.deferTangentGroup(lineG);
+			}
+		} else if (ctx.options.mirrorHighlight?.mirrorLineId === this.id) {
+			createSvgLine(s1, s2, MIRROR_LINE_ATTRS, lineG);
+		} else if (ctx.options.rectangularPatternHighlight?.line1Id === this.id) {
+			createSvgLine(s1, s2, DIR1_LINE_ATTRS, lineG);
+		} else if (ctx.options.rectangularPatternHighlight?.line2Id === this.id) {
+			createSvgLine(s1, s2, DIR2_LINE_ATTRS, lineG);
+		} else {
+			const cuts = ctx.lineCuts.get(this.id);
+			const start = cuts?.get(this.p1Id);
+			const end = cuts?.get(this.p2Id);
+			const chamfer = ctx.options.chamferState?.candidate;
+			const isChamferPreview =
+				chamfer?.result?.isValid && (chamfer.line1.id === this.id || chamfer.line2.id === this.id);
+			createSvgLine(
+				start ? ctx.viewport.worldToScreen(start) : s1,
+				end ? ctx.viewport.worldToScreen(end) : s2,
+				isChamferPreview
+					? CHAMFER_HIGHLIGHT_ATTRS
+					: getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor, true),
+				lineG
+			);
+		}
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const pt1 = opts.sketch.points.get(this.p1Id);
+		const pt2 = opts.sketch.points.get(this.p2Id);
+		if (!pt1 || !pt2) return [];
+
+		const rp1 = opts.transformPoint(pt1.x, pt1.y);
+		const rp2 = opts.transformPoint(pt2.x, pt2.y);
+		if (opts.targetGroup && opts.strokeAttrs) {
+			const sp1 = opts.viewport.worldToScreen(rp1);
+			const sp2 = opts.viewport.worldToScreen(rp2);
+			createSvgLine(sp1, sp2, opts.strokeAttrs, opts.targetGroup);
+			opts.drawVertex?.(sp1, rp1);
+			opts.drawVertex?.(sp2, rp2);
+		}
+		return [rp1, rp2];
 	}
 
 	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {

@@ -1,7 +1,15 @@
 import { Vec2, type XY } from '../../math/vector';
 import { pointIntersectsAABB } from '../../math/aabb';
-import type { ISketchPrimitive } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgCircle } from '../../canvas/svg';
+import { COLORS, HIT_AREA_POINT_ATTRS, SPLINE_STYLES, STROKE_WIDTH } from '../../canvas/styles';
 
 export class SketchPoint extends Vec2 implements ISketchPrimitive {
 	readonly type = 'point' as const;
@@ -37,6 +45,64 @@ export class SketchPoint extends Vec2 implements ISketchPrimitive {
 
 	getPointIds(_sketch?: any): string[] {
 		return [this.id];
+	}
+
+	isConstrained(_sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return isPointIdConstrained(this.id, constrainedParams);
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const splineInfo = ctx.splinePointInfo.get(this.id);
+		if (
+			splineInfo &&
+			!ctx.activeSplineIds.has(splineInfo.splineId) &&
+			!ctx.sketch.selection.pointIds.has(this.id) &&
+			!ctx.options.showSplineHandles
+		) {
+			return;
+		}
+
+		const s = ctx.viewport.worldToScreen(this);
+		const isPatternCenter = ctx.options.patternHighlight?.centerPointId === this.id;
+		const ptG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.pointGroup);
+
+		createSvgCircle(s, 14, HIT_AREA_POINT_ATTRS, ptG);
+
+		let strokeColor: string = COLORS.primary;
+		if (splineInfo?.isHandleDot) {
+			strokeColor = SPLINE_STYLES.handleDot.stroke;
+		} else if (this.fixed) {
+			strokeColor = COLORS.fixed;
+		} else if (!ctx.hasConflict && ctx.isPointConstrained(this.id)) {
+			strokeColor = COLORS.constrained;
+		}
+
+		if (isPatternCenter) {
+			strokeColor = COLORS.patternCenter;
+		} else if (ctx.isSelected) {
+			strokeColor = COLORS.selected;
+		}
+
+		createSvgCircle(
+			s,
+			ctx.isSelected ? 4 : splineInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3,
+			{
+				class: 'entity-visible visible-point',
+				fill: COLORS.white,
+				stroke: strokeColor,
+				'stroke-width': STROKE_WIDTH.thin,
+				'pointer-events': 'all',
+			},
+			ptG
+		);
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const rp = opts.transformPoint(this.x, this.y);
+		if (opts.targetGroup) {
+			opts.drawVertex?.(opts.viewport.worldToScreen(rp), rp);
+		}
+		return [rp];
 	}
 
 	snapTo(): null {

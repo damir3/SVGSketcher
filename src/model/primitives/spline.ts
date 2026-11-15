@@ -1,10 +1,27 @@
 import { Vec2 } from '../../math/vector';
-import { bsplineToBezier, fitPointsToBezier, getSplineParamAtPoint, type BezierSegment } from '../../math/spline';
+import {
+	bsplineToBezier,
+	fitPointsToBezier,
+	getSplineParamAtPoint,
+	getSplineSvgPath,
+	type BezierSegment,
+} from '../../math/spline';
+import { filletSplinePreview } from '../../math/filletPreview';
 import { distanceToSpline } from '../../math/hitTest';
 import { intersectSplineCurve, type GeoSpline } from '../../math/intersection';
 import { pointIntersectsAABB } from '../../math/aabb';
-import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	translatePrimitivePoints,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveSnapCandidate,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgPath } from '../../canvas/svg';
+import { getPrimitiveStrokeAttrs, HIT_AREA_STROKE_ATTRS, SPLINE_STYLES } from '../../canvas/styles';
 
 export class SketchSpline implements ISketchPrimitive {
 	readonly type = 'spline' as const;
@@ -50,8 +67,7 @@ export class SketchSpline implements ISketchPrimitive {
 		const pts: Vec2[] = [];
 		for (const pid of this.pointIds) {
 			const p = sketch.points.get(pid);
-			if (!p) return null;
-			pts.push(new Vec2(p.x, p.y));
+			if (p) pts.push(new Vec2(p.x, p.y));
 		}
 		if (pts.length < 2) return null;
 
@@ -113,6 +129,67 @@ export class SketchSpline implements ISketchPrimitive {
 			}
 		}
 		return pts;
+	}
+
+	isConstrained(sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return (
+			this.pointIds.every(pid => !sketch.points.has(pid) || isPointIdConstrained(pid, constrainedParams)) &&
+			(this.splineType !== 'fit' ||
+				!this.tangentLineIds ||
+				this.tangentLineIds.every(id => {
+					const line = sketch.lines.get(id);
+					return (
+						!line ||
+						(isPointIdConstrained(line.p1Id, constrainedParams) && isPointIdConstrained(line.p2Id, constrainedParams))
+					);
+				}))
+		);
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const geo = this.toGeoCurve(ctx.sketch);
+		if (!geo) return;
+
+		const d = getSplineSvgPath(geo.bezierSegments, p => ctx.viewport.worldToScreen(p), !!this.isClosed);
+		const trim = ctx.filletTrims.get(this.id);
+		const closed = !!this.isClosed && !trim;
+		const previewD = trim
+			? getSplineSvgPath(
+					filletSplinePreview(geo.bezierSegments, this.splineType, trim),
+					p => ctx.viewport.worldToScreen(p),
+					closed
+				)
+			: d;
+
+		const splineG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.geometryGroup);
+		createSvgPath(d, HIT_AREA_STROKE_ATTRS, splineG);
+		createSvgPath(
+			previewD,
+			{
+				fill: closed ? SPLINE_STYLES.closedFill : 'none',
+				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor, true),
+			},
+			splineG
+		);
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const spline = this.toGeoCurve(opts.sketch);
+		if (!spline) return [];
+
+		const points = spline.points.map(point => opts.transformPoint(point.x, point.y));
+		if (opts.targetGroup && opts.strokeAttrs) {
+			const d = getSplineSvgPath(
+				spline.bezierSegments,
+				point => opts.viewport.worldToScreen(opts.transformPoint(point.x, point.y)),
+				!!spline.isClosed
+			);
+			createSvgPath(d, opts.strokeAttrs, opts.targetGroup);
+			for (const point of points) {
+				opts.drawVertex?.(opts.viewport.worldToScreen(point), point);
+			}
+		}
+		return spline.isClosed ? points.slice(0, -1) : points;
 	}
 
 	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {

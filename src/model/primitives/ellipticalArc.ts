@@ -3,8 +3,18 @@ import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '.
 import { distanceToEllipticalArc } from '../../math/hitTest';
 import { ellipticalArcIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipticalArc } from '../../math/intersection';
-import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	translatePrimitivePoints,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveSnapCandidate,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgLine, createSvgPath, getEllipticalArcSvgPath } from '../../canvas/svg';
+import { AUX_AXIS_ATTRS, AUX_RAY_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_STROKE_ATTRS } from '../../canvas/styles';
 
 export class SketchEllipticalArc implements ISketchPrimitive {
 	readonly type = 'elliptical_arc' as const;
@@ -113,6 +123,76 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 
 	getPointIds(_sketch?: any): string[] {
 		return [this.centerId, this.majorAxisPointId, this.minorAxisPointId, this.startPointId, this.endPointId];
+	}
+
+	isConstrained(_sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return this.getPointIds().every(id => isPointIdConstrained(id, constrainedParams));
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const center = ctx.sketch.points.get(this.centerId);
+		const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
+		const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
+		const startPt = ctx.sketch.points.get(this.startPointId);
+		const endPt = ctx.sketch.points.get(this.endPointId);
+		if (!center || !majorPt || !minorPt || !startPt || !endPt) return;
+
+		const sc = ctx.viewport.worldToScreen(center);
+		const smaj = ctx.viewport.worldToScreen(majorPt);
+		const smin = ctx.viewport.worldToScreen(minorPt);
+		const ss = ctx.viewport.worldToScreen(startPt);
+		const se = ctx.viewport.worldToScreen(endPt);
+
+		const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, !!this.clockwise);
+		const arcG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.geometryGroup);
+
+		createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
+		createSvgPath(
+			d,
+			{
+				fill: 'none',
+				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor, true),
+			},
+			arcG
+		);
+
+		if (ctx.isSelected) {
+			createSvgLine(sc, ss, AUX_AXIS_ATTRS, arcG);
+			createSvgLine(sc, se, AUX_AXIS_ATTRS, arcG);
+			createSvgLine(sc, smaj, AUX_RAY_ATTRS, arcG);
+			createSvgLine(sc, smin, AUX_RAY_ATTRS, arcG);
+		}
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const origCtr = opts.sketch.points.get(this.centerId);
+		const origMajor = opts.sketch.points.get(this.majorAxisPointId);
+		const origMinor = opts.sketch.points.get(this.minorAxisPointId);
+		const origStart = opts.sketch.points.get(this.startPointId);
+		const origEnd = opts.sketch.points.get(this.endPointId);
+		if (!origCtr || !origMajor || !origMinor || !origStart || !origEnd) return [];
+
+		const rc = opts.transformPoint(origCtr.x, origCtr.y);
+		const rmaj = opts.transformPoint(origMajor.x, origMajor.y);
+		const rmin = opts.transformPoint(origMinor.x, origMinor.y);
+		const rs = opts.transformPoint(origStart.x, origStart.y);
+		const re = opts.transformPoint(origEnd.x, origEnd.y);
+
+		if (opts.targetGroup && opts.strokeAttrs) {
+			const src = opts.viewport.worldToScreen(rc);
+			const srmaj = opts.viewport.worldToScreen(rmaj);
+			const srmin = opts.viewport.worldToScreen(rmin);
+			const srs = opts.viewport.worldToScreen(rs);
+			const sre = opts.viewport.worldToScreen(re);
+			const clockwise = opts.invertWinding ? !this.clockwise : !!this.clockwise;
+			const d = getEllipticalArcSvgPath(src, srmaj, srmin, srs, sre, clockwise);
+
+			createSvgPath(d, opts.strokeAttrs, opts.targetGroup);
+			opts.drawVertex?.(srs, rs);
+			opts.drawVertex?.(sre, re);
+			opts.drawVertex?.(src, rc);
+		}
+		return [rc, rmaj, rmin, rs, re];
 	}
 
 	snapTo(

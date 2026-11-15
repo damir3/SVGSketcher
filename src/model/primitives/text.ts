@@ -1,9 +1,36 @@
-import { Vec2 } from '../../math/vector';
+import { ORIGIN, Vec2 } from '../../math/vector';
 import type { SketchDocument } from '../sketch';
 import type { IInspectable, ISidebarPanel } from '../../ui/panels/inspector/types';
 import { TextInspectorPanel } from '../../ui/panels/primitives/textPanel';
+import { createSvgElement } from '../../canvas/svg';
+import { COLORS } from '../../canvas/styles';
+import { TEXT_ROTATION_HANDLE_DISTANCE_PX } from '../../canvas/distances';
+import { getFontSync, loadFontAsync } from '../../canvas/fonts';
+import { generateTextSvgPathData } from '../../math/textPath';
 
 export type TextPathTargetType = 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
+
+export interface TextRenderOptions {
+	sketch: SketchDocument;
+	viewport: any;
+	targetGroup: SVGGElement;
+	isSelected: boolean;
+	color: string;
+	showGizmos: boolean;
+}
+
+export interface TextRenderGizmos {
+	rotationGizmo?: {
+		textId: string;
+		centerWorld: Vec2;
+		handleScreen: Vec2;
+	};
+	dragGizmo?: {
+		textId: string;
+		centerWorld: Vec2;
+		centerScreen: Vec2;
+	};
+}
 
 export interface TextSnapshot {
 	type: 'text';
@@ -202,5 +229,253 @@ export class SketchText implements IInspectable {
 		}
 
 		return null;
+	}
+
+	render(opts: TextRenderOptions): TextRenderGizmos {
+		const { sketch, viewport, targetGroup, isSelected, color, showGizmos } = opts;
+		const hScreen = Math.max(1, this.height * viewport.zoom);
+		const fontFam = this.fontFamily || 'Arial, sans-serif';
+		const gizmos: TextRenderGizmos = {};
+
+		if (this.mode === 'text') {
+			const corners = this.getRectangleCorners(sketch);
+			if (!corners) return gizmos;
+
+			const [p0, p1, p2, p3] = corners;
+			const cWorld = new Vec2().midpoint(p0, p2);
+			const sCenter = viewport.worldToScreen(cWorld);
+			const widthWorld = p0.distanceTo(p1);
+			const heightWorld = p0.distanceTo(p3);
+			const wScreen = widthWorld * viewport.zoom;
+			const hBoxScreen = heightWorld * viewport.zoom;
+
+			const angleCad = p0.angleToPoint(p1);
+			const angleScreenDeg = (-angleCad * 180) / Math.PI;
+
+			const textG = createSvgElement(
+				'g',
+				{
+					class: `sketch-text-entity ${isSelected ? 'selected' : ''}`,
+					transform: `translate(${sCenter.x.toFixed(2)}, ${sCenter.y.toFixed(2)}) rotate(${angleScreenDeg.toFixed(2)})`,
+					'data-id': this.id,
+					'data-text-id': this.id,
+					cursor: 'pointer',
+				},
+				targetGroup
+			);
+
+			createSvgElement(
+				'rect',
+				{
+					x: -wScreen / 2,
+					y: -hBoxScreen / 2,
+					width: wScreen,
+					height: hBoxScreen,
+					fill: 'rgba(0, 0, 0, 0.001)',
+					'data-id': this.id,
+					'data-text-id': this.id,
+				},
+				textG
+			);
+
+			const scaleX = this.flipHorizontal ? -1 : 1;
+			const scaleY = this.flipVertical ? -1 : 1;
+			const innerG =
+				this.flipHorizontal || this.flipVertical
+					? createSvgElement('g', { transform: `scale(${scaleX}, ${scaleY})` }, textG)
+					: textG;
+
+			let posX = 0;
+			let textAnchor = 'middle';
+			if (this.alignment === 'left') {
+				if (this.flipHorizontal) {
+					posX = wScreen / 2 - 4;
+					textAnchor = 'end';
+				} else {
+					posX = -wScreen / 2 + 4;
+					textAnchor = 'start';
+				}
+			} else if (this.alignment === 'right') {
+				if (this.flipHorizontal) {
+					posX = -wScreen / 2 + 4;
+					textAnchor = 'start';
+				} else {
+					posX = wScreen / 2 - 4;
+					textAnchor = 'end';
+				}
+			}
+
+			const letterSpacingPx = (this.characterSpacing / 100) * hScreen;
+			const lines = (this.text || '').split(/\r?\n/);
+			const numLines = Math.max(1, lines.length);
+			const lineHeightPx = hScreen * 1.25;
+			const totalBlockHeightPx = (numLines - 1) * lineHeightPx;
+
+			let startY = 0;
+			const vAlign = this.verticalAlignment ?? 'middle';
+			if (vAlign === 'top') {
+				startY = this.flipVertical ? hBoxScreen / 2 - hScreen / 2 - 3 : -hBoxScreen / 2 + hScreen / 2 + 3;
+			} else if (vAlign === 'bottom') {
+				startY = this.flipVertical
+					? -hBoxScreen / 2 + hScreen / 2 + 3 + totalBlockHeightPx
+					: hBoxScreen / 2 - hScreen / 2 - 3 - totalBlockHeightPx;
+			} else {
+				startY = this.flipVertical ? totalBlockHeightPx / 2 : -totalBlockHeightPx / 2;
+			}
+
+			const textEl = createSvgElement(
+				'text',
+				{
+					x: posX,
+					y: startY,
+					fill: color,
+					'font-family': fontFam,
+					'font-size': `${hScreen.toFixed(1)}px`,
+					'font-weight': this.bold ? 'bold' : 'normal',
+					'font-style': this.italic ? 'italic' : 'normal',
+					'letter-spacing': `${letterSpacingPx.toFixed(1)}px`,
+					'text-anchor': textAnchor,
+					'dominant-baseline': 'central',
+					'data-id': this.id,
+					'data-text-id': this.id,
+				},
+				innerG
+			);
+
+			for (let i = 0; i < lines.length; i++) {
+				const lineY = this.flipVertical ? startY - i * lineHeightPx : startY + i * lineHeightPx;
+				createSvgElement(
+					'tspan',
+					{
+						x: posX,
+						y: lineY.toFixed(1),
+						'data-id': this.id,
+						'data-text-id': this.id,
+					},
+					textEl,
+					lines[i] || ' '
+				);
+			}
+
+			if (showGizmos) {
+				const stemLen = TEXT_ROTATION_HANDLE_DISTANCE_PX;
+				const topEdgeY = -hBoxScreen / 2;
+				const handleY = topEdgeY - stemLen;
+
+				createSvgElement(
+					'line',
+					{
+						x1: 0,
+						y1: topEdgeY,
+						x2: 0,
+						y2: handleY,
+						stroke: COLORS.primary,
+						'stroke-width': 1.5,
+						'stroke-dasharray': '2,2',
+					},
+					textG
+				);
+
+				createSvgElement(
+					'circle',
+					{
+						cx: 0,
+						cy: handleY,
+						r: 5.5,
+						fill: COLORS.white,
+						stroke: COLORS.primary,
+						'stroke-width': 2,
+						class: 'text-rotation-handle',
+						cursor: 'grab',
+					},
+					textG
+				);
+
+				const rad = (angleScreenDeg * Math.PI) / 180;
+				const handleScreen = new Vec2(0, handleY).rotateAround(ORIGIN, rad).add(sCenter);
+
+				gizmos.rotationGizmo = {
+					textId: this.id,
+					centerWorld: cWorld,
+					handleScreen,
+				};
+
+				createSvgElement(
+					'circle',
+					{
+						cx: 0,
+						cy: 0,
+						r: 5.5,
+						fill: COLORS.white,
+						stroke: COLORS.primary,
+						'stroke-width': 2,
+						class: 'text-drag-handle',
+						cursor: 'move',
+					},
+					textG
+				);
+
+				gizmos.dragGizmo = {
+					textId: this.id,
+					centerWorld: cWorld,
+					centerScreen: sCenter,
+				};
+			}
+		} else if (this.mode === 'text_on_path' && this.targetPrimitiveId) {
+			const curve = sketch.toGeoCurve(this.targetPrimitiveId, this.targetPrimitiveType);
+			if (!curve) return gizmos;
+
+			const font = getFontSync(this.fontFamily, this.bold, this.italic);
+			if (!font) {
+				loadFontAsync(this.fontFamily, this.bold, this.italic);
+			}
+
+			const pathData = font
+				? generateTextSvgPathData(
+						{
+							mode: 'text_on_path',
+							text: this.text,
+							height: this.height,
+							characterSpacing: this.characterSpacing,
+							placement: this.placement,
+							fitToPath: this.fitToPath,
+							flipHorizontal: this.flipHorizontal,
+							flipVertical: this.flipVertical,
+							alignment: this.alignment,
+							coordSystem: 'cad',
+						},
+						font,
+						curve
+					)
+				: '';
+
+			if (pathData) {
+				const textPathG = createSvgElement(
+					'g',
+					{
+						class: `sketch-text-entity ${isSelected ? 'selected' : ''}`,
+						transform: `matrix(${viewport.zoom}, 0, 0, ${-viewport.zoom}, ${viewport.panX.toFixed(2)}, ${viewport.panY.toFixed(2)})`,
+						'data-id': this.id,
+						'data-text-id': this.id,
+						cursor: 'pointer',
+					},
+					targetGroup
+				);
+
+				createSvgElement(
+					'path',
+					{
+						d: pathData,
+						fill: color,
+						'data-id': this.id,
+						'data-text-id': this.id,
+						cursor: 'pointer',
+					},
+					textPathG
+				);
+			}
+		}
+
+		return gizmos;
 	}
 }

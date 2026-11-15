@@ -2,8 +2,17 @@ import { Vec2 } from '../../math/vector';
 import { distanceToCircle } from '../../math/hitTest';
 import { circleIntersectsAABB } from '../../math/aabb';
 import type { GeoCircle } from '../../math/intersection';
-import type { ISketchPrimitive, PrimitiveSnapCandidate } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveSnapCandidate,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgCircle } from '../../canvas/svg';
+import { getPrimitiveStrokeAttrs, HIT_AREA_RING_ATTRS } from '../../canvas/styles';
 
 export class SketchCircle implements ISketchPrimitive {
 	readonly type = 'circle' as const;
@@ -60,6 +69,44 @@ export class SketchCircle implements ISketchPrimitive {
 
 	getPointIds(_sketch?: any): string[] {
 		return [this.centerId];
+	}
+
+	isConstrained(_sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return isPointIdConstrained(this.centerId, constrainedParams) && !!constrainedParams?.has(`${this.id}.r`);
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const center = ctx.sketch.points.get(this.centerId);
+		if (!center) return;
+
+		const sc = ctx.viewport.worldToScreen(center);
+		const sr = this.radius * ctx.viewport.zoom;
+		const circleG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.geometryGroup);
+
+		createSvgCircle(sc, sr, HIT_AREA_RING_ATTRS, circleG);
+		createSvgCircle(
+			sc,
+			sr,
+			{
+				fill: 'none',
+				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor),
+			},
+			circleG
+		);
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const origCtr = opts.sketch.points.get(this.centerId);
+		if (!origCtr) return [];
+
+		const rc = opts.transformPoint(origCtr.x, origCtr.y);
+		if (opts.targetGroup && opts.strokeAttrs) {
+			const sc = opts.viewport.worldToScreen(rc);
+			const sr = this.radius * opts.viewport.zoom * (opts.transformScale ?? 1);
+			createSvgCircle(sc, sr, opts.strokeAttrs, opts.targetGroup);
+			opts.drawVertex?.(sc, rc);
+		}
+		return [rc];
 	}
 
 	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {

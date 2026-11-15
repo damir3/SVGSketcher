@@ -2,8 +2,18 @@ import { Vec2 } from '../../math/vector';
 import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
 import type { GeoArc } from '../../math/intersection';
-import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	translatePrimitivePoints,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveSnapCandidate,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgLine, createSvgPath, getArcSvgPath } from '../../canvas/svg';
+import { AUX_AXIS_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_STROKE_ATTRS } from '../../canvas/styles';
 
 export class SketchArc implements ISketchPrimitive {
 	readonly type = 'arc' as const;
@@ -97,6 +107,80 @@ export class SketchArc implements ISketchPrimitive {
 
 	getPointIds(_sketch?: any): string[] {
 		return [this.centerId, this.startPointId, this.endPointId];
+	}
+
+	isConstrained(_sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return (
+			this.getPointIds().every(id => isPointIdConstrained(id, constrainedParams)) &&
+			!!constrainedParams?.has(`${this.id}.r`)
+		);
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const center = ctx.sketch.points.get(this.centerId);
+		const start = ctx.sketch.points.get(this.startPointId);
+		const end = ctx.sketch.points.get(this.endPointId);
+		if (!center || !start || !end) return;
+
+		const sc = ctx.viewport.worldToScreen(center);
+		const ss = ctx.viewport.worldToScreen(start);
+		const se = ctx.viewport.worldToScreen(end);
+		const sr = this.radius * ctx.viewport.zoom;
+		const clockwise = !!this.clockwise;
+		const d = getArcSvgPath(sc, ss, se, sr, clockwise);
+		const trim = ctx.filletTrims.get(this.id);
+		const previewD = trim
+			? trim.start && trim.end && trim.start.param >= trim.end.param
+				? ''
+				: getArcSvgPath(
+						sc,
+						trim.start ? ctx.viewport.worldToScreen(trim.start.point) : ss,
+						trim.end ? ctx.viewport.worldToScreen(trim.end.point) : se,
+						sr,
+						clockwise
+					)
+			: d;
+
+		const arcG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.geometryGroup);
+		createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
+		createSvgPath(
+			previewD,
+			{
+				fill: 'none',
+				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor, true),
+			},
+			arcG
+		);
+
+		if (ctx.isSelected) {
+			createSvgLine(sc, ss, AUX_AXIS_ATTRS, arcG);
+			createSvgLine(sc, se, AUX_AXIS_ATTRS, arcG);
+		}
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const origCtr = opts.sketch.points.get(this.centerId);
+		const origStart = opts.sketch.points.get(this.startPointId);
+		const origEnd = opts.sketch.points.get(this.endPointId);
+		if (!origCtr || !origStart || !origEnd) return [];
+
+		const rc = opts.transformPoint(origCtr.x, origCtr.y);
+		const rs = opts.transformPoint(origStart.x, origStart.y);
+		const re = opts.transformPoint(origEnd.x, origEnd.y);
+
+		if (opts.targetGroup && opts.strokeAttrs) {
+			const sc = opts.viewport.worldToScreen(rc);
+			const ss = opts.viewport.worldToScreen(rs);
+			const se = opts.viewport.worldToScreen(re);
+			const sr = this.radius * opts.viewport.zoom * (opts.transformScale ?? 1);
+			const clockwise = opts.invertWinding ? !this.clockwise : !!this.clockwise;
+			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
+			createSvgPath(d, opts.strokeAttrs, opts.targetGroup);
+			opts.drawVertex?.(sc, rc);
+			opts.drawVertex?.(ss, rs);
+			opts.drawVertex?.(se, re);
+		}
+		return [rc, rs, re];
 	}
 
 	snapTo(

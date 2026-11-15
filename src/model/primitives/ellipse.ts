@@ -3,8 +3,18 @@ import { ellipseParameterAtPoint, ellipsePointAtParameter } from '../../math/ell
 import { distanceToEllipse } from '../../math/hitTest';
 import { ellipseIntersectsAABB } from '../../math/aabb';
 import type { GeoEllipse } from '../../math/intersection';
-import { translatePrimitivePoints, type ISketchPrimitive, type PrimitiveSnapCandidate } from './base';
+import {
+	createPrimitiveSvgGroup,
+	isPointIdConstrained,
+	translatePrimitivePoints,
+	type ISketchPrimitive,
+	type PrimitiveRenderContext,
+	type PrimitiveSnapCandidate,
+	type PrimitiveTransformRenderOptions,
+} from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { createSvgEllipse, createSvgLine } from '../../canvas/svg';
+import { AUX_AXIS_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_RING_ATTRS } from '../../canvas/styles';
 
 export class SketchEllipse implements ISketchPrimitive {
 	readonly type = 'ellipse' as const;
@@ -85,6 +95,81 @@ export class SketchEllipse implements ISketchPrimitive {
 
 	getPointIds(_sketch?: any): string[] {
 		return [this.centerId, this.majorAxisPointId, this.minorAxisPointId];
+	}
+
+	isConstrained(_sketch: any, constrainedParams?: ReadonlySet<string>): boolean {
+		return this.getPointIds().every(id => isPointIdConstrained(id, constrainedParams));
+	}
+
+	render(ctx: PrimitiveRenderContext): void {
+		const center = ctx.sketch.points.get(this.centerId);
+		const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
+		const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
+		if (!center || !majorPt || !minorPt) return;
+
+		const sc = ctx.viewport.worldToScreen(center);
+		const smaj = ctx.viewport.worldToScreen(majorPt);
+		const smin = ctx.viewport.worldToScreen(minorPt);
+
+		const r = sc.distancesTo(smaj, smin);
+		if (r.x < 0.1 || r.y < 0.1) return;
+
+		const thetaDeg = sc.angleToPointDeg(smaj);
+		const transform = `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`;
+		const ellipseG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.geometryGroup);
+
+		createSvgEllipse(sc, r, { transform, ...HIT_AREA_RING_ATTRS }, ellipseG);
+		createSvgEllipse(
+			sc,
+			r,
+			{
+				transform,
+				fill: 'none',
+				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor),
+			},
+			ellipseG
+		);
+
+		if (ctx.isSelected) {
+			createSvgLine(sc, smaj, AUX_AXIS_ATTRS, ellipseG);
+			createSvgLine(sc, smin, AUX_AXIS_ATTRS, ellipseG);
+		}
+	}
+
+	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
+		const origCtr = opts.sketch.points.get(this.centerId);
+		const origMajor = opts.sketch.points.get(this.majorAxisPointId);
+		const origMinor = opts.sketch.points.get(this.minorAxisPointId);
+		if (!origCtr || !origMajor || !origMinor) return [];
+
+		const rc = opts.transformPoint(origCtr.x, origCtr.y);
+		const rmaj = opts.transformPoint(origMajor.x, origMajor.y);
+		const rmin = opts.transformPoint(origMinor.x, origMinor.y);
+
+		if (opts.targetGroup && opts.strokeAttrs) {
+			const src = opts.viewport.worldToScreen(rc);
+			const srmaj = opts.viewport.worldToScreen(rmaj);
+			const srmin = opts.viewport.worldToScreen(rmin);
+			const r = src.distancesTo(srmaj, srmin);
+			const thetaDeg = src.angleToPointDeg(srmaj);
+
+			createSvgEllipse(
+				src,
+				r,
+				{
+					transform: `rotate(${thetaDeg.toFixed(2)} ${src.x.toFixed(1)} ${src.y.toFixed(1)})`,
+					...opts.strokeAttrs,
+				},
+				opts.targetGroup
+			);
+
+			opts.drawVertex?.(src, rc);
+			if (!opts.invertWinding) {
+				opts.drawVertex?.(srmaj, rmaj);
+				opts.drawVertex?.(srmin, rmin);
+			}
+		}
+		return [rc, rmaj, rmin];
 	}
 
 	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {
