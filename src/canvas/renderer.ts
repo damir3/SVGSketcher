@@ -14,6 +14,8 @@ import {
 	computePatternCopyAngle,
 	computeRectangularPatternOffset,
 	computeRectangularPatternDirections,
+	getPatternBaseColor,
+	renderPatternSuppressionCheckbox,
 	type ConstraintRenderContext,
 } from '../solver/constraints';
 import { ORIGIN, Vec2 } from '../math/vector';
@@ -31,6 +33,7 @@ import {
 	createSvgCircle,
 	createSvgRect,
 	createSvgPath,
+	createSvgArrow,
 	createSvgText,
 	getArcSvgPath,
 } from './svg';
@@ -57,11 +60,6 @@ import {
 	PATTERN_CENTER_RING_ATTRS,
 	PATTERN_CENTER_CROSSHAIR_ATTRS,
 	PATTERN_CENTER_DOT_ATTRS,
-	CHECKBOX_HALO_ATTRS,
-	CHECKBOX_ACTIVE_ATTRS,
-	CHECKBOX_CHECKMARK_ATTRS,
-	CHECKBOX_SUPPRESSED_ATTRS,
-	CHECKBOX_SUPPRESSED_DASH_ATTRS,
 	RECT_PATTERN_PILL_ATTRS,
 	RECT_PATTERN_PILL_TEXT_ATTRS,
 	FILLET_WEDGE_ATTRS,
@@ -942,9 +940,6 @@ export class SVGRenderer {
 			renderTransformedObjects: (objectIds, transform, options) => {
 				return this.renderTransformedObjects(sketch, viewport, objectIds, transform, options);
 			},
-			renderPatternSuppressionCheckbox: (centroid, k, isSuppressed, constraintId) => {
-				this.renderPatternSuppressionCheckbox(centroid, k, isSuppressed, constraintId);
-			},
 			renderRectangularPatternGizmos: (v, centroidWorld, u1, u2, distance1, distance2, options) => {
 				this.renderRectangularPatternGizmos(v, centroidWorld, u1, u2, distance1, distance2, options);
 			},
@@ -1020,9 +1015,6 @@ export class SVGRenderer {
 			const tip = Vec2.from(to).addScaledVector(arrowDir, offsetDist);
 			const baseCenter = tip.clone().addScaledVector(arrowDir, -arrowLen);
 
-			const base1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
-			const base2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
-
 			// Register handle centered on the arrowhead for dragging
 			const key = options.constraintId ? `gizmo-${axisNum}-${options.constraintId}` : `gizmo-${axisNum}`;
 			this.rectangularGizmoHandles.set(key, {
@@ -1047,9 +1039,11 @@ export class SVGRenderer {
 			);
 
 			// Arrowhead as the draggable gizmo handle (replaces circle)
-			const arrowPath = `M ${tip.x} ${tip.y} L ${base1.x} ${base1.y} L ${base2.x} ${base2.y} Z`;
-			createSvgPath(
-				arrowPath,
+			createSvgArrow(
+				tip,
+				arrowDir,
+				arrowLen,
+				arrowHalfWidth,
 				{
 					fill: color,
 					stroke: COLORS.white,
@@ -1073,14 +1067,14 @@ export class SVGRenderer {
 			if (isHorizontal) {
 				// Horizontal arrow -> place label below the arrow
 				const midX = tip.x - arrowLen * 0.5 * arrowDir.x;
-				const max = new Vec2(from.x, Math.max(from.y, tip.y, base1.y, base2.y));
+				const maxY = Math.max(from.y, tip.y, baseCenter.y + Math.abs(perp.y) * arrowHalfWidth);
 				pillX = midX;
-				pillY = max.y + 16;
+				pillY = maxY + 16;
 			} else {
 				// Vertical arrow -> place label to the right of the arrow
 				const midY = tip.y - arrowLen * 0.5 * arrowDir.y;
-				const max = new Vec2(Math.max(from.x, tip.x, base1.x, base2.x), from.y);
-				pillX = max.x + 10 + pillWidth * 0.5;
+				const maxX = Math.max(from.x, tip.x, baseCenter.x + Math.abs(perp.x) * arrowHalfWidth);
+				pillX = maxX + 10 + pillWidth * 0.5;
 				pillY = midY;
 			}
 
@@ -1099,48 +1093,6 @@ export class SVGRenderer {
 
 		renderArrow(sCtr, h1Screen, u1Screen, COLORS.patternAxis1, 1, distance1);
 		renderArrow(sCtr, h2Screen, u2Screen, COLORS.patternAxis2, 2, distance2);
-	}
-
-	private renderPatternSuppressionCheckbox(
-		centroid: { x: number; y: number },
-		k: number,
-		isSuppressed: boolean,
-		constraintId?: string
-	): void {
-		const cbG = createSvgElement(
-			'g',
-			{
-				class: 'pattern-suppression-checkbox',
-				style: 'cursor: pointer;',
-				'data-copy-k': String(k),
-				...(constraintId ? { 'data-constraint-id': constraintId } : {}),
-			},
-			this.patternCheckboxGroup
-		);
-
-		// Outer halo / shadow
-		createSvgRect(Vec2.from(centroid).subScalar(11), new Vec2(22, 22), CHECKBOX_HALO_ATTRS, cbG);
-
-		if (!isSuppressed) {
-			// Active checkbox (blue filled with white checkmark)
-			createSvgRect(Vec2.from(centroid).subScalar(9), new Vec2(18, 18), CHECKBOX_ACTIVE_ATTRS, cbG);
-
-			createSvgPath(
-				`M ${centroid.x - 4.5} ${centroid.y} L ${centroid.x - 1.5} ${centroid.y + 3.5} L ${centroid.x + 5} ${centroid.y - 3.5}`,
-				CHECKBOX_CHECKMARK_ATTRS,
-				cbG
-			);
-		} else {
-			// Suppressed checkbox (grey outline with red dash)
-			createSvgRect(Vec2.from(centroid).subScalar(9), new Vec2(18, 18), CHECKBOX_SUPPRESSED_ATTRS, cbG);
-
-			createSvgLine(
-				new Vec2(centroid.x - 4, centroid.y),
-				new Vec2(centroid.x + 4, centroid.y),
-				CHECKBOX_SUPPRESSED_DASH_ATTRS,
-				cbG
-			);
-		}
 	}
 
 	renderTransformPreview(
@@ -1443,10 +1395,7 @@ export class SVGRenderer {
 
 		if (selectedObjectIds.size === 0) return;
 
-		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
-		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
-
+		const baseColor = getPatternBaseColor(sketch);
 		const idsToMirror = [...selectedObjectIds].filter(id => id !== mirrorLineId);
 		this.renderTransformedObjects(
 			sketch,
@@ -1511,9 +1460,7 @@ export class SVGRenderer {
 		if (selectedObjectIds.size === 0) return;
 
 		const N = Math.max(2, Math.round(quantity));
-		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
-		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+		const baseColor = getPatternBaseColor(sketch);
 		let lastVisibleCopyIndex = N - 1;
 		if (suppression) {
 			while (lastVisibleCopyIndex > 0 && suppressedIndices.has(lastVisibleCopyIndex)) lastVisibleCopyIndex--;
@@ -1545,13 +1492,10 @@ export class SVGRenderer {
 				copyWorldPoints.length > 0
 					? Vec2.centroid(copyWorldPoints)
 					: Vec2.fromPolar(40, (aDeg * Math.PI) / 180).add(centerPt);
-			let copyCentroid = new Vec2(0, 0);
-			if (copyWorldPoints.length > 0) {
-				copyCentroid = viewport.worldToScreen(worldCentroid);
-			} else {
-				const rad = (aDeg * Math.PI) / 180;
-				copyCentroid = Vec2.fromPolar(40, rad).add(sCtr);
-			}
+			const copyCentroid =
+				copyWorldPoints.length > 0
+					? viewport.worldToScreen(worldCentroid)
+					: Vec2.fromPolar(40, (aDeg * Math.PI) / 180).add(sCtr);
 
 			// Register checkbox screen position for hit-testing
 			this.patternCheckboxPositions.set(`tool-${k}`, {
@@ -1562,7 +1506,7 @@ export class SVGRenderer {
 
 			// Render suppression checkbox over copy if suppression is enabled
 			if (suppression) {
-				this.renderPatternSuppressionCheckbox(copyCentroid, k, isSuppressed);
+				renderPatternSuppressionCheckbox(this.patternCheckboxGroup, copyCentroid, k, isSuppressed);
 			}
 			if (angleHandleEnabled && k === lastVisibleCopyIndex) {
 				const dir = new Vec2().subVectors(copyCentroid, sCtr);
@@ -1574,18 +1518,15 @@ export class SVGRenderer {
 					.perpendicular()
 					.multiplyScalar(-direction / len);
 				const tip = Vec2.from(copyCentroid).addScaledVector(dirVector, 30);
-				const arrowLen = 16,
-					arrowHalfWidth = 6.5;
+				const arrowLen = 16;
 				const base = tip.clone().addScaledVector(dirVector, -arrowLen);
-				const perp = dirVector.clone().perpendicular();
-				const arrowPath = `M ${tip.x} ${tip.y} L ${base.x + arrowHalfWidth * perp.x} ${base.y + arrowHalfWidth * perp.y} L ${base.x - arrowHalfWidth * perp.x} ${base.y - arrowHalfWidth * perp.y} Z`;
 				createSvgLine(
 					copyCentroid,
 					base,
 					{ stroke: COLORS.primary, 'stroke-width': 2, 'stroke-dasharray': '4 3' },
 					this.patternGroup
 				);
-				createSvgPath(arrowPath, OFFSET_GIZMO_ARROW_ATTRS, this.patternGroup);
+				createSvgArrow(tip, dirVector, arrowLen, 6.5, OFFSET_GIZMO_ARROW_ATTRS, this.patternGroup);
 				this.patternAngleHandle = {
 					x: base.x,
 					y: base.y,
@@ -1635,9 +1576,7 @@ export class SVGRenderer {
 
 		const maxI = Math.abs(highlight.distance1) > 1e-6 ? highlight.quantity1 : 1;
 		const maxJ = Math.abs(highlight.distance2) > 1e-6 ? highlight.quantity2 : 1;
-		const isFullyConstrained = sketch.lastSolverResult?.status === 'CONVERGED';
-		const hasConflict = sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-		const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+		const baseColor = getPatternBaseColor(sketch);
 
 		for (let i = 0; i < maxI; i++) {
 			for (let j = 0; j < maxJ; j++) {
@@ -1665,12 +1604,9 @@ export class SVGRenderer {
 					strokeWidth: STROKE_WIDTH.normal,
 				});
 
-				let copyCentroid: { x: number; y: number };
-				if (copyWorldPoints.length > 0) {
-					copyCentroid = viewport.worldToScreen(Vec2.centroid(copyWorldPoints));
-				} else {
-					copyCentroid = viewport.worldToScreen(centroidWorld.clone().add(offset));
-				}
+				const copyCentroid = viewport.worldToScreen(
+					copyWorldPoints.length > 0 ? Vec2.centroid(copyWorldPoints) : centroidWorld.clone().add(offset)
+				);
 
 				this.patternCheckboxPositions.set(`tool-${copyIndex}`, {
 					x: copyCentroid.x,
@@ -1679,7 +1615,7 @@ export class SVGRenderer {
 				});
 
 				if (highlight.suppression) {
-					this.renderPatternSuppressionCheckbox(copyCentroid, copyIndex, isSuppressed);
+					renderPatternSuppressionCheckbox(this.patternCheckboxGroup, copyCentroid, copyIndex, isSuppressed);
 				}
 			}
 		}
@@ -1743,21 +1679,11 @@ export class SVGRenderer {
 
 				// Inward arrow gizmo at sMid pointing towards sCenter
 				const arrowDir = uDir.clone().negate();
-				const perp = arrowDir.clone().perpendicular();
-
-				const arrowLen = 18;
-				const arrowHalfWidth = 7.5;
-				const tip = sMid;
-				const baseCenter = tip.clone().addScaledVector(arrowDir, -arrowLen);
-				const b1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
-				const b2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
-
-				const arrowPath = `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`;
-				createSvgPath(arrowPath, FILLET_GIZMO_ARROW_ATTRS, this.filletGroup);
+				createSvgArrow(sMid, arrowDir, 18, 7.5, FILLET_GIZMO_ARROW_ATTRS, this.filletGroup);
 
 				this.filletGizmoHandle = {
-					screenX: tip.x,
-					screenY: tip.y,
+					screenX: sMid.x,
+					screenY: sMid.y,
 					worldMidArc: res.midArc,
 					worldBisectorDir: res.bisectorDir,
 					radius: res.radius,
@@ -1790,22 +1716,23 @@ export class SVGRenderer {
 		createSvgCircle(sT1, 3, GIZMO_POINT_ATTRS, this.chamferGroup);
 		createSvgCircle(sT2, 3, GIZMO_POINT_ATTRS, this.chamferGroup);
 
-		// Helper to draw an arrow head
-		const drawArrow = (tip: Vec2, dir: Vec2) => {
-			const arrowLen = 16;
-			const arrowHalfWidth = 6.5;
-			const perp = dir.clone().perpendicular();
-			const baseCenter = tip.clone().addScaledVector(dir, -arrowLen);
-			const b1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
-			const b2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
-			const arrowPath = `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`;
-			createSvgPath(arrowPath, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
-		};
-
 		// Unit screen directions for line 1 and line 2 (pointing away from V)
 		const screenScale = new Vec2(viewport.zoom, -viewport.zoom);
 		const uSDir1 = cand.dir1.clone().multiply(screenScale).normalize();
 		const uSDir2 = cand.dir2.clone().multiply(screenScale).normalize();
+
+		const pushDistArrow = (type: 'dist1' | 'dist2', sT: Vec2, uSDir: Vec2, worldPos: Vec2, dir: Vec2, val: number) => {
+			const tip = sT.clone().addScaledVector(uSDir, -3.5);
+			createSvgArrow(tip, uSDir, 16, 6.5, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
+			this.chamferGizmoHandles.push({
+				type,
+				screenX: tip.x - uSDir.x * 8,
+				screenY: tip.y - uSDir.y * 8,
+				worldPos,
+				dir,
+				currentValue: val,
+			});
+		};
 
 		if (state.mode === 'equal_distance') {
 			// Mode 1: 1 arrow gizmo along the angle bisector, shifted back so tip points at chamfer midpoint
@@ -1816,7 +1743,7 @@ export class SVGRenderer {
 
 			// Arrow tip points towards sMid
 			const tip = Vec2.from(sMid).addScaledVector(uSBis, -2);
-			drawArrow(tip, uSBis);
+			createSvgArrow(tip, uSBis, 16, 6.5, CHAMFER_GIZMO_ARROW_ATTRS, this.chamferGroup);
 
 			// Dashed guide line from vertex V to the base of the arrow along bisector
 			const baseCenter = tip.clone().addScaledVector(uSBis, -16);
@@ -1836,144 +1763,55 @@ export class SVGRenderer {
 			});
 		} else if (state.mode === 'two_distance') {
 			// Mode 2: 2 arrow gizmos shifted back so their tips point directly at T1 and T2
-			const tip1 = sT1.clone().addScaledVector(uSDir1, -3.5);
-			drawArrow(tip1, uSDir1);
-			this.chamferGizmoHandles.push({
-				type: 'dist1',
-				screenX: tip1.x - uSDir1.x * 8,
-				screenY: tip1.y - uSDir1.y * 8,
-				worldPos: res.t1,
-				dir: cand.dir1,
-				currentValue: res.dist1,
-			});
-
-			const tip2 = sT2.clone().addScaledVector(uSDir2, -3.5);
-			drawArrow(tip2, uSDir2);
-			this.chamferGizmoHandles.push({
-				type: 'dist2',
-				screenX: tip2.x - uSDir2.x * 8,
-				screenY: tip2.y - uSDir2.y * 8,
-				worldPos: res.t2,
-				dir: cand.dir2,
-				currentValue: res.dist2,
-			});
+			pushDistArrow('dist1', sT1, uSDir1, res.t1, cand.dir1, res.dist1);
+			pushDistArrow('dist2', sT2, uSDir2, res.t2, cand.dir2, res.dist2);
 		} else if (state.mode === 'distance_angle') {
 			// Mode 3: 1 distance arrow on reference line + 1 angle circle at 100px from reference vertex
-			if (!state.flip) {
-				// Reference line is line 1 (vertex A = T1)
-				const tip1 = sT1.clone().addScaledVector(uSDir1, -3.5);
-				drawArrow(tip1, uSDir1);
-				this.chamferGizmoHandles.push({
-					type: 'dist1',
-					screenX: tip1.x - uSDir1.x * 8,
-					screenY: tip1.y - uSDir1.y * 8,
-					worldPos: res.t1,
-					dir: cand.dir1,
-					currentValue: res.dist1,
-				});
+			const [distType, sRef, uSDirRef, tRef, dirRef, distVal, sOther] = !state.flip
+				? (['dist1', sT1, uSDir1, res.t1, cand.dir1, res.dist1, sT2] as const)
+				: (['dist2', sT2, uSDir2, res.t2, cand.dir2, res.dist2, sT1] as const);
 
-				// Direction along chamfer line from T1 to T2
-				const vChamfer = new Vec2().subVectors(sT2, sT1);
-				const lenChamfer = vChamfer.length() || 1;
-				const uSChamfer = vChamfer.clone().multiplyScalar(1.0 / lenChamfer);
+			pushDistArrow(distType, sRef, uSDirRef, tRef, dirRef, distVal);
 
-				// Circle handle at exactly 100px from point A (T1)
-				const circle = sT1.clone().addScaledVector(uSChamfer, 100);
+			// Direction along chamfer line from reference vertex to opposite vertex
+			const vChamfer = new Vec2().subVectors(sOther, sRef);
+			const lenChamfer = vChamfer.length() || 1;
+			const uSChamfer = vChamfer.clone().multiplyScalar(1.0 / lenChamfer);
 
-				// Guide line along the angle ray to the circle handle
-				createSvgLine(sT1, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
+			// Circle handle at exactly 100px from reference vertex
+			const arcR = 100;
+			const circle = sRef.clone().addScaledVector(uSChamfer, arcR);
+			createSvgLine(sRef, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
-				// Visual arc showing the angle at T1 between ray towards V and ray towards T2 at 100px
-				const vV = new Vec2().subVectors(sV, sT1);
-				const lenV = vV.length();
-				if (lenV > 1e-4) {
-					const angV = vV.signedAngle();
-					const angChamfer = uSChamfer.signedAngle();
-					let diff = angChamfer - angV;
-					while (diff > Math.PI) diff -= 2 * Math.PI;
-					while (diff < -Math.PI) diff += 2 * Math.PI;
+			// Visual arc showing the angle at reference vertex between ray towards V and chamfer ray
+			const vV = new Vec2().subVectors(sV, sRef);
+			if (vV.length() > 1e-4) {
+				const angV = vV.signedAngle();
+				let diff = uSChamfer.signedAngle() - angV;
+				while (diff > Math.PI) diff -= 2 * Math.PI;
+				while (diff < -Math.PI) diff += 2 * Math.PI;
 
-					const arcR = 100;
-					const start = Vec2.fromPolar(arcR, angV).add(sT1);
-					const end = circle;
+				const start = Vec2.fromPolar(arcR, angV).add(sRef);
+				createSvgLine(sRef, start, GIZMO_GUIDE_ATTRS, this.chamferGroup);
 
-					// Guide line along reference arm towards V out to 100px
-					createSvgLine(sT1, start, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-
-					if (Math.abs(diff) > 1e-3) {
-						const sweepFlag = diff > 0 ? 1 : 0;
-						const arcD = `M ${start.x} ${start.y} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${end.x} ${end.y}`;
-						createSvgPath(arcD, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-					}
+				if (Math.abs(diff) > 1e-3) {
+					const sweepFlag = diff > 0 ? 1 : 0;
+					createSvgPath(
+						`M ${start.x} ${start.y} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${circle.x} ${circle.y}`,
+						GIZMO_GUIDE_ATTRS,
+						this.chamferGroup
+					);
 				}
-
-				// Angle adjustment circle handle (100px from A)
-				createSvgCircle(circle, 6, CHAMFER_GIZMO_CIRCLE_ATTRS, this.chamferGroup);
-				this.chamferGizmoHandles.push({
-					type: 'angle',
-					screenX: circle.x,
-					screenY: circle.y,
-					worldPos: res.t1,
-					currentValue: res.angleDeg,
-				});
-			} else {
-				// Reference line is line 2 (flipped: reference vertex is B = T2)
-				const tip2 = sT2.clone().addScaledVector(uSDir2, -3.5);
-				drawArrow(tip2, uSDir2);
-				this.chamferGizmoHandles.push({
-					type: 'dist2',
-					screenX: tip2.x - uSDir2.x * 8,
-					screenY: tip2.y - uSDir2.y * 8,
-					worldPos: res.t2,
-					dir: cand.dir2,
-					currentValue: res.dist2,
-				});
-
-				// Direction along chamfer line from T2 to T1
-				const vChamfer = new Vec2().subVectors(sT1, sT2);
-				const lenChamfer = vChamfer.length() || 1;
-				const uSChamfer = vChamfer.clone().multiplyScalar(1.0 / lenChamfer);
-
-				// Circle handle at exactly 100px from point B (T2)
-				const circle = sT2.clone().addScaledVector(uSChamfer, 100);
-
-				// Guide line along the angle ray to the circle handle
-				createSvgLine(sT2, circle, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-
-				// Visual arc showing the angle at T2 between ray towards V and ray towards T1 at 100px
-				const vV = new Vec2().subVectors(sV, sT2);
-				const lenV = vV.length();
-				if (lenV > 1e-4) {
-					const angV = vV.signedAngle();
-					const angChamfer = uSChamfer.signedAngle();
-					let diff = angChamfer - angV;
-					while (diff > Math.PI) diff -= 2 * Math.PI;
-					while (diff < -Math.PI) diff += 2 * Math.PI;
-
-					const arcR = 100;
-					const start = Vec2.fromPolar(arcR, angV).add(sT2);
-					const end = circle;
-
-					// Guide line along reference arm towards V out to 100px
-					createSvgLine(sT2, start, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-
-					if (Math.abs(diff) > 1e-3) {
-						const sweepFlag = diff > 0 ? 1 : 0;
-						const arcD = `M ${start.x} ${start.y} A ${arcR} ${arcR} 0 0 ${sweepFlag} ${end.x} ${end.y}`;
-						createSvgPath(arcD, GIZMO_GUIDE_ATTRS, this.chamferGroup);
-					}
-				}
-
-				// Angle adjustment circle handle (100px from B)
-				createSvgCircle(circle, 6, CHAMFER_GIZMO_CIRCLE_ATTRS, this.chamferGroup);
-				this.chamferGizmoHandles.push({
-					type: 'angle',
-					screenX: circle.x,
-					screenY: circle.y,
-					worldPos: res.t2,
-					currentValue: res.angleDeg,
-				});
 			}
+
+			createSvgCircle(circle, 6, CHAMFER_GIZMO_CIRCLE_ATTRS, this.chamferGroup);
+			this.chamferGizmoHandles.push({
+				type: 'angle',
+				screenX: circle.x,
+				screenY: circle.y,
+				worldPos: tRef,
+				currentValue: res.angleDeg,
+			});
 		}
 	}
 
@@ -2020,19 +1858,7 @@ export class SVGRenderer {
 			}
 		}
 
-		// 3. Helper to draw arrow
-		const drawArrow = (tip: Vec2, dir: Vec2) => {
-			const arrowLen = 16;
-			const arrowHalfWidth = 6.5;
-			const perp = dir.clone().perpendicular();
-			const baseCenter = tip.clone().addScaledVector(dir, -arrowLen);
-			const b1 = baseCenter.clone().addScaledVector(perp, arrowHalfWidth);
-			const b2 = baseCenter.clone().addScaledVector(perp, -arrowHalfWidth);
-			const arrowPath = `M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`;
-			createSvgPath(arrowPath, OFFSET_GIZMO_ARROW_ATTRS, this.offsetGroup);
-		};
-
-		// 4. Render gizmo arrow(s) at gizmoAnchor along gizmoNormal
+		// 3. Render gizmo arrow(s) at gizmoAnchor along gizmoNormal
 		const anchor = geomResult.gizmoAnchor;
 		const norm = geomResult.gizmoNormal;
 		const sAnchor = viewport.worldToScreen(anchor);
@@ -2051,7 +1877,7 @@ export class SVGRenderer {
 
 			// Tip points towards sTarget
 			const tip = sTarget;
-			drawArrow(tip, uDir);
+			createSvgArrow(tip, uDir, 16, 6.5, OFFSET_GIZMO_ARROW_ATTRS, this.offsetGroup);
 
 			this.offsetGizmoHandles.push({
 				type,

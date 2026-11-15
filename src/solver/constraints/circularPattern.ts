@@ -1,6 +1,11 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
-import { isConstraintOnlySelected, type ConstraintRenderContext } from './renderContext';
+import {
+	getPatternBaseColor,
+	isConstraintOnlySelected,
+	renderPatternConstraintCopy,
+	type ConstraintRenderContext,
+} from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
@@ -237,63 +242,22 @@ export class CircularPatternConstraint extends BaseConstraint {
 		if (this.suppression && isConstraintActive && !this.isReadOnly) {
 			const N = this.quantity;
 			const suppressedSet = new Set(this.suppressedIndices);
-			const isFullyConstrained = ctx.sketch.lastSolverResult?.status === 'CONVERGED';
-			const hasConflict = ctx.sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-			const baseColor = hasConflict ? COLORS.conflict : isFullyConstrained ? COLORS.constrained : COLORS.unconstrained;
+			const baseColor = getPatternBaseColor(ctx.sketch);
 
 			for (let k = 1; k < N; k++) {
-				const isSuppressed = suppressedSet.has(k);
 				const aDeg = computePatternCopyAngle(k, N, this.distribution, this.totalAngle);
 				const rad = (aDeg * Math.PI) / 180;
-
-				let copyCentroid: { x: number; y: number };
-				const copy = this.copies.find(cp => cp.copyIndex === k);
-
-				if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-					const pts: Vec2[] = [];
-					for (const pair of copy.pointPairs) {
-						const pt = ctx.sketch.points.get(pair.patternPtId);
-						if (pt) pts.push(pt);
-					}
-					copyCentroid =
-						pts.length > 0 ? ctx.viewport.worldToScreen(Vec2.centroid(pts)) : Vec2.fromPolar(40, rad).add(sCtr);
-				} else if (ctx.renderTransformedObjects) {
-					// Copy is suppressed or points not yet populated: render suppressed geometry in same style with opacity=0.25 & compute centroid
-					const copyWorldPoints = ctx.renderTransformedObjects(
-						this.sourceObjectIds,
-						{ center: pCtr, angleDeg: aDeg },
-						{
-							targetGroup: ctx.targetGroup,
-							baseColor,
-							opacity: 0.25,
-							drawVertices: true,
-							skipRender: !isSuppressed,
-						}
-					);
-
-					if (copyWorldPoints.length > 0) {
-						copyCentroid = ctx.viewport.worldToScreen(Vec2.centroid(copyWorldPoints));
-					} else {
-						copyCentroid = Vec2.fromPolar(40, rad).add(sCtr);
-					}
-				} else {
-					copyCentroid = Vec2.fromPolar(40, rad).add(sCtr);
-				}
-
-				// Register screen position for hit-testing
-				if (ctx.patternCheckboxPositions) {
-					ctx.patternCheckboxPositions.set(`c-${this.id}-${k}`, {
-						x: copyCentroid.x,
-						y: copyCentroid.y,
-						copyIndex: k,
-						constraintId: this.id,
-					});
-				}
-
-				// Render suppression checkbox over copy
-				if (ctx.renderPatternSuppressionCheckbox) {
-					ctx.renderPatternSuppressionCheckbox(copyCentroid, k, isSuppressed, this.id);
-				}
+				renderPatternConstraintCopy({
+					ctx,
+					constraintId: this.id,
+					copyIndex: k,
+					isSuppressed: suppressedSet.has(k),
+					copy: this.copies.find(cp => cp.copyIndex === k),
+					sourceObjectIds: this.sourceObjectIds,
+					transform: { center: pCtr, angleDeg: aDeg },
+					baseColor,
+					fallbackScreenCentroid: () => Vec2.fromPolar(40, rad).add(sCtr),
+				});
 			}
 		}
 

@@ -2,7 +2,12 @@ import { calculateObjectsCentroid } from '../../canvas/tools/modify/utils';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { PatternCopyData, PatternPointPair, PatternRadiusPair } from './circularPattern';
-import { isConstraintOnlySelected, type ConstraintRenderContext } from './renderContext';
+import {
+	getPatternBaseColor,
+	isConstraintOnlySelected,
+	renderPatternConstraintCopy,
+	type ConstraintRenderContext,
+} from './renderContext';
 import { COLORS } from '../../canvas/styles';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { parseNumericOrExpression, getExpressionIfValid } from '../../math/expression';
@@ -384,14 +389,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 
 			if (this.suppression) {
 				const suppressedSet = new Set(this.suppressedIndices);
-				const isFullyConstrained = ctx.sketch.lastSolverResult?.status === 'CONVERGED';
-				const hasConflict = ctx.sketch.lastSolverResult?.status === 'OVER_CONSTRAINED';
-				const baseColor = hasConflict
-					? COLORS.conflict
-					: isFullyConstrained
-						? COLORS.constrained
-						: COLORS.unconstrained;
-
+				const baseColor = getPatternBaseColor(ctx.sketch);
 				const maxI = Math.abs(this.distance1) > 1e-6 ? this.quantity1 : 1;
 				const maxJ = Math.abs(this.distance2) > 1e-6 ? this.quantity2 : 1;
 
@@ -399,7 +397,6 @@ export class RectangularPatternConstraint extends BaseConstraint {
 					for (let j = 0; j < maxJ; j++) {
 						if (i === 0 && j === 0) continue;
 						const copyIndex = i * 1000 + j;
-						const isSuppressed = suppressedSet.has(copyIndex);
 						const offset = computeRectangularPatternOffset(
 							i,
 							j,
@@ -410,49 +407,17 @@ export class RectangularPatternConstraint extends BaseConstraint {
 							u1,
 							u2
 						);
-
-						let copyCentroid: { x: number; y: number };
-						const copy = this.copies.find(cp => cp.copyIndex === copyIndex);
-
-						if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-							const copyPts: Vec2[] = [];
-							for (const pair of copy.pointPairs) {
-								const pt = ctx.sketch.points.get(pair.patternPtId);
-								if (pt) copyPts.push(pt);
-							}
-							copyCentroid =
-								copyPts.length > 0
-									? ctx.viewport.worldToScreen(Vec2.centroid(copyPts))
-									: ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset));
-						} else if (ctx.renderTransformedObjects) {
-							const copyWorldPoints = ctx.renderTransformedObjects(this.sourceObjectIds, offset, {
-								targetGroup: ctx.targetGroup,
-								baseColor,
-								opacity: 0.25,
-								drawVertices: true,
-								skipRender: !isSuppressed,
-							});
-							if (copyWorldPoints.length > 0) {
-								copyCentroid = ctx.viewport.worldToScreen(Vec2.centroid(copyWorldPoints));
-							} else {
-								copyCentroid = ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset));
-							}
-						} else {
-							copyCentroid = ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset));
-						}
-
-						if (ctx.patternCheckboxPositions) {
-							ctx.patternCheckboxPositions.set(`c-${this.id}-${copyIndex}`, {
-								x: copyCentroid.x,
-								y: copyCentroid.y,
-								copyIndex,
-								constraintId: this.id,
-							});
-						}
-
-						if (ctx.renderPatternSuppressionCheckbox) {
-							ctx.renderPatternSuppressionCheckbox(copyCentroid, copyIndex, isSuppressed, this.id);
-						}
+						renderPatternConstraintCopy({
+							ctx,
+							constraintId: this.id,
+							copyIndex,
+							isSuppressed: suppressedSet.has(copyIndex),
+							copy: this.copies.find(cp => cp.copyIndex === copyIndex),
+							sourceObjectIds: this.sourceObjectIds,
+							transform: offset,
+							baseColor,
+							fallbackScreenCentroid: () => ctx.viewport.worldToScreen(new Vec2().addVectors(centroidWorld, offset)),
+						});
 					}
 				}
 			}

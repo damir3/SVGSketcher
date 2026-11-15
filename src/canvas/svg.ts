@@ -107,6 +107,22 @@ export function createSvgPath(d: string, attrs?: SvgAttrs, parent?: SVGElement):
 	);
 }
 
+export function createSvgArrow(
+	tip: XY,
+	dir: XY,
+	length = 16,
+	halfWidth = 6.5,
+	attrs?: SvgAttrs,
+	parent?: SVGElement
+): SVGPathElement {
+	const u = Vec2.from(dir);
+	const perp = u.clone().perpendicular();
+	const base = Vec2.from(tip).addScaledVector(u, -length);
+	const b1 = base.clone().addScaledVector(perp, halfWidth);
+	const b2 = base.clone().addScaledVector(perp, -halfWidth);
+	return createSvgPath(`M ${tip.x} ${tip.y} L ${b1.x} ${b1.y} L ${b2.x} ${b2.y} Z`, attrs, parent);
+}
+
 export function createSvgText(position: Vec2, text: string, attrs?: SvgAttrs, parent?: SVGElement): SVGTextElement {
 	return createSvgElement(
 		'text',
