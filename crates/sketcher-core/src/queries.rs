@@ -400,6 +400,55 @@ pub fn segment_box(a: Point2, b: Point2, rect: Bounds) -> bool {
     }
     lo <= hi
 }
+// Clockwise in screen coordinates is decreasing parameter in world coordinates.
+// Use analytic edge roots instead of chords, which miss narrow boxes and tangencies.
+fn arc_box(f: &Ellipse, begin: f64, end: f64, clockwise: bool, rect: Bounds) -> bool {
+    let direction = if clockwise { -1.0 } else { 1.0 };
+    let span = positive((end - begin) * direction);
+    let epsilon = 32.0
+        * f64::EPSILON
+        * [
+            f.c.x.abs(),
+            f.c.y.abs(),
+            f.a,
+            f.b,
+            rect.min.x.abs(),
+            rect.min.y.abs(),
+            rect.max.x.abs(),
+            rect.max.y.abs(),
+        ]
+        .into_iter()
+        .fold(0.0_f64, f64::max);
+    for axis in 0..2 {
+        let coordinate = |p: Point2| if axis == 0 { p.x } else { p.y };
+        let other = |p: Point2| if axis == 0 { p.y } else { p.x };
+        let a = f.a * coordinate(f.u);
+        let b = f.b * coordinate(f.v);
+        let amplitude = norm(p(a, b));
+        if amplitude == 0.0 {
+            continue;
+        }
+        let phase = b.atan2(a);
+        for edge in [coordinate(rect.min), coordinate(rect.max)] {
+            let value = (edge - coordinate(f.c)) / amplitude;
+            if !(-1.0 - 32.0 * f64::EPSILON..=1.0 + 32.0 * f64::EPSILON).contains(&value) {
+                continue;
+            }
+            let delta = value.clamp(-1.0, 1.0).acos();
+            for t in [phase - delta, phase + delta] {
+                let along = positive((t - begin) * direction);
+                if along > span + 64.0 * f64::EPSILON && along < TAU - 64.0 * f64::EPSILON {
+                    continue;
+                }
+                let value = other(f.c) + f.a * t.cos() * other(f.u) + f.b * t.sin() * other(f.v);
+                if value >= other(rect.min) - epsilon && value <= other(rect.max) + epsilon {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
 pub fn intersects_box(g: &Geometry, rect: Bounds) -> bool {
     match g {
         Geometry::Segment(a, b) => segment_box(*a, *b, rect),
@@ -421,56 +470,42 @@ pub fn intersects_box(g: &Geometry, rect: Bounds) -> bool {
             far.length_squared() >= r * r
         }
         Geometry::Arc(c, r, a, b, cw) => {
-            if rect.contains(*a) || rect.contains(*b) || rect.contains(*c) {
+            if rect.contains(*a) || rect.contains(*b) {
                 return true;
             }
-            let begin = c.angle_to(*a);
-            let direction = if *cw { 1.0 } else { -1.0 };
-            let span = positive((c.angle_to(*b) - begin) * direction);
-            let mut prev = *a;
-            for i in 1..=32 {
-                let q = *c + Point2::from_polar(*r, begin + direction * (i as f64 / 32.0) * span);
-                if rect.contains(q) || segment_box(prev, q, rect) {
-                    return true;
-                }
-                prev = q;
+            if *r == 0.0 {
+                return rect.contains(*c);
             }
-            false
+            let f = Ellipse {
+                c: *c,
+                a: *r,
+                b: *r,
+                u: Point2::UNIT_X,
+                v: Point2::UNIT_Y,
+            };
+            arc_box(&f, c.angle_to(*a), c.angle_to(*b), *cw, rect)
         }
-        Geometry::Ellipse(c, a, b) | Geometry::EllipticalArc(c, a, b, ..) => {
-            if rect.contains(*c) {
+        Geometry::EllipticalArc(c, a, b, start, end, cw) => {
+            if rect.contains(*start) || rect.contains(*end) {
                 return true;
             }
             let f = Ellipse::new(*c, *a, *b);
-            let (begin, span, direction, mut prev) =
-                if let Geometry::EllipticalArc(_, _, _, s, e, cw) = g {
-                    if rect.contains(*s) || rect.contains(*e) {
-                        return true;
-                    }
-                    let begin = f.param(*s);
-                    let direction = if *cw { 1.0 } else { -1.0 };
-                    (
-                        begin,
-                        positive((f.param(*e) - begin) * direction),
-                        direction,
-                        *s,
-                    )
-                } else {
-                    if rect.contains(*a) || rect.contains(*b) {
-                        return true;
-                    }
-                    (0.0, TAU, 1.0, p(c.x + f.a * f.u.x, c.y + f.a * f.u.y))
-                };
+            if f.a == 0.0 || f.b == 0.0 {
+                return false;
+            }
+            arc_box(&f, f.param(*start), f.param(*end), *cw, rect)
+        }
+        Geometry::Ellipse(c, a, b) => {
+            if rect.contains(*c) || rect.contains(*a) || rect.contains(*b) {
+                return true;
+            }
+            let f = Ellipse::new(*c, *a, *b);
             if f.a < 0.01 || f.b < 0.01 {
                 return false;
             }
+            let mut prev = p(c.x + f.a * f.u.x, c.y + f.a * f.u.y);
             for i in 1..=36 {
-                let t = if matches!(g, Geometry::Ellipse(..)) {
-                    (i as f64 / 36.0) * TAU
-                } else {
-                    begin + direction * (i as f64 / 36.0) * span
-                };
-                let q = f.point(t);
+                let q = f.point((i as f64 / 36.0) * TAU);
                 if rect.contains(q) || segment_box(prev, q, rect) {
                     return true;
                 }
@@ -586,6 +621,64 @@ mod tests {
         assert!(!contained(
             &Geometry::Segment(p(0.0, 15.0), p(30.0, 15.0)),
             rect
+        ));
+    }
+
+    #[test]
+    fn crossing_arcs_use_world_sweep_and_actual_curve_instead_of_center_or_chords() {
+        let arc = Geometry::Arc(p(0.0, 0.0), 10.0, p(10.0, 0.0), p(0.0, 10.0), false);
+        let reverse = Geometry::Arc(p(0.0, 0.0), 10.0, p(10.0, 0.0), p(0.0, 10.0), true);
+        let rect = Bounds {
+            min: p(7.0, 7.0),
+            max: p(7.2, 7.2),
+        };
+        assert!(intersects_box(&arc, rect));
+        assert!(!intersects_box(&reverse, rect));
+        assert!(!intersects_box(
+            &arc,
+            Bounds {
+                min: p(-0.1, -0.1),
+                max: p(0.1, 0.1)
+            }
+        ));
+        let point = Point2::from_polar(10.0, 0.4321);
+        assert!(intersects_box(
+            &arc,
+            Bounds {
+                min: point - p(1e-5, 1e-5),
+                max: point + p(1e-5, 1e-5)
+            }
+        ));
+        assert!(intersects_box(
+            &arc,
+            Bounds {
+                min: p(10.0, -0.1),
+                max: p(11.0, 0.1)
+            }
+        ));
+        assert!(!intersects_box(
+            &arc,
+            Bounds {
+                min: p(10.0 + 1e-7, -0.1),
+                max: p(11.0, 0.1)
+            }
+        ));
+        let ellipse = Geometry::EllipticalArc(
+            p(0.0, 0.0),
+            p(0.002, 0.0),
+            p(0.0, 0.001),
+            p(0.002, 0.0),
+            p(0.0, 0.001),
+            false,
+        );
+        let t = 0.4321_f64;
+        let q = p(0.002 * t.cos(), 0.001 * t.sin());
+        assert!(intersects_box(
+            &ellipse,
+            Bounds {
+                min: q - p(1e-10, 1e-10),
+                max: q + p(1e-10, 1e-10)
+            }
         ));
     }
 

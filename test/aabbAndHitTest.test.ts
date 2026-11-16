@@ -100,12 +100,12 @@ describe('AABB Geometry Intersections', () => {
 		// Arc 1: Facing right towards AABB (-45 deg to +45 deg)
 		const startRight = new Vec2(radius * Math.cos(-Math.PI / 4), 30 + radius * Math.sin(-Math.PI / 4));
 		const endRight = new Vec2(radius * Math.cos(Math.PI / 4), 30 + radius * Math.sin(Math.PI / 4));
-		assert.equal(arcIntersectsAABB(center, radius, startRight, endRight, true, min, max), true);
+		assert.equal(arcIntersectsAABB(center, radius, startRight, endRight, false, min, max), true);
 
 		// Arc 2: Facing left away from AABB (135 deg to 225 deg)
 		const startLeft = new Vec2(radius * Math.cos((3 * Math.PI) / 4), 30 + radius * Math.sin((3 * Math.PI) / 4));
 		const endLeft = new Vec2(radius * Math.cos((-3 * Math.PI) / 4), 30 + radius * Math.sin((-3 * Math.PI) / 4));
-		assert.equal(arcIntersectsAABB(center, radius, startLeft, endLeft, true, min, max), false);
+		assert.equal(arcIntersectsAABB(center, radius, startLeft, endLeft, false, min, max), false);
 	});
 
 	it('ellipseIntersectsAABB and ellipticalArcIntersectsAABB detect intersection accurately', () => {

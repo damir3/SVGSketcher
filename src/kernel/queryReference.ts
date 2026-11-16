@@ -1,3 +1,4 @@
+import { arcCrossesBox } from './queryArcBox';
 import type { GeometryQueryKernel, QueryCurve, QueryMatch, QueryRegion } from './queryTypes';
 import { Vec2, projectPointOntoSegment } from '../math/vector';
 import * as hit from '../math/hitTestReference';
@@ -163,20 +164,11 @@ function crossing(c: GeoCurve, min: Vec2, max: Vec2): boolean {
 		case 'circle':
 			return box.circleIntersectsAABB(c.center, c.radius, min, max);
 		case 'arc':
-			return box.arcIntersectsAABB(c.center, c.radius, c.start, c.end, c.clockwise, min, max);
+			return arcCrossesBox(c, min, max);
 		case 'ellipse':
 			return box.ellipseIntersectsAABB(c.center, c.majorAxisPoint, c.minorAxisPoint, min, max);
 		case 'elliptical_arc':
-			return box.ellipticalArcIntersectsAABB(
-				c.center,
-				c.majorAxisPoint,
-				c.minorAxisPoint,
-				c.start,
-				c.end,
-				c.clockwise,
-				min,
-				max
-			);
+			return arcCrossesBox(c, min, max);
 		case 'spline': {
 			if (
 				c.bezierSegments.some(
