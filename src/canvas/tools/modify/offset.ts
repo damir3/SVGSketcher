@@ -9,6 +9,7 @@ import { dispatchToolModeChange } from '../modeChangeEvent';
 import {
 	type OffsetDirection,
 	type OffsetChain,
+	type ChainItem,
 	type OffsetGeometryResult,
 	toggleOrExtendChain,
 	getValidChainContinuations,
@@ -412,34 +413,38 @@ export class OffsetTool extends BaseTool {
 		const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(screen);
 		const hitSpline = this.ctx.findSplineNear(screen);
 
-		let hitId: string | null = null;
-		let hitType: any = null;
+		const candidates: Array<{ type: ChainItem['type']; item: any }> = [
+			{ type: 'line', item: hitLine && !hitLine.isSplineHandle ? hitLine : null },
+			{ type: 'arc', item: hitArc },
+			{ type: 'circle', item: hitCircle },
+			{ type: 'elliptical_arc', item: hitEllipticalArc },
+			{ type: 'ellipse', item: hitEllipse },
+			{ type: 'spline', item: hitSpline },
+		];
 
-		if (hitLine && !hitLine.isSplineHandle) {
-			hitId = hitLine.id;
-			hitType = 'line';
-		} else if (hitArc) {
-			hitId = hitArc.id;
-			hitType = 'arc';
-		} else if (hitCircle) {
-			hitId = hitCircle.id;
-			hitType = 'circle';
-		} else if (hitEllipticalArc) {
-			hitId = hitEllipticalArc.id;
-			hitType = 'elliptical_arc';
-		} else if (hitEllipse) {
-			hitId = hitEllipse.id;
-			hitType = 'ellipse';
-		} else if (hitSpline) {
-			hitId = hitSpline.id;
-			hitType = 'spline';
+		let hitId: string | null = null;
+		let hitType: ChainItem['type'] | null = null;
+		let bestDist = Infinity;
+
+		for (const { type, item } of candidates) {
+			if (!item || !this.canHighlight({ type, id: item.id })) continue;
+			const dist =
+				typeof this.ctx.viewport?.zoom === 'number' && Number.isFinite(this.ctx.viewport.zoom) && item.distanceTo
+					? item.distanceTo(screen, this.ctx.sketch, this.ctx.viewport)
+					: null;
+			if (dist !== null && Number.isFinite(dist)) {
+				if (dist < bestDist) {
+					bestDist = dist;
+					hitId = item.id;
+					hitType = type;
+				}
+			} else if (!hitId) {
+				hitId = item.id;
+				hitType = type;
+			}
 		}
 
 		if (hitId && hitType) {
-			if (!this.canHighlight({ type: hitType, id: hitId })) {
-				return;
-			}
-
 			const nextChain = toggleOrExtendChain(this.ctx.sketch, this.chain, hitId, hitType, this.chainSelection);
 
 			this.chain = nextChain;

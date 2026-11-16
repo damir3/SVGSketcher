@@ -116,6 +116,86 @@ function join(
 	return ae.midpoint(ae, bs);
 }
 
+function arcContains(center: Vec2, startPt: Vec2, endPt: Vec2, cw: boolean, p: Vec2): boolean {
+	const a = center.angleToPoint(startPt),
+		b = center.angleToPoint(endPt),
+		t = center.angleToPoint(p),
+		tau = Math.PI * 2;
+	const sweep = (u: number, v: number) => {
+		let s = cw ? u - v : v - u;
+		while (s < 0) s += tau;
+		return s;
+	};
+	return sweep(a, t) <= sweep(a, b) + 1e-7;
+}
+function joinArcsValid(a: KernelOffsetPrimitive, b: KernelOffsetPrimitive, d: number, vertex?: Vec2): Vec2 | undefined {
+	if (a.type !== 'arc' || b.type !== 'arc') return undefined;
+	const aEnd = Vec2.from(a.end!),
+		bStart = Vec2.from(b.start!);
+	if (aEnd.distanceTo(bStart) < 1e-8) return aEnd.midpoint(aEnd, bStart);
+	const c = Vec2.from(a.center!),
+		qCenter = Vec2.from(b.center!),
+		delta = qCenter.clone().sub(c),
+		distance = Math.sqrt(delta.lengthSq()),
+		r = a.radius!,
+		s = b.radius!;
+	if (distance < 1e-12 || distance > r + s + 1e-8 || distance < Math.abs(r - s) - 1e-8) return undefined;
+	const x = (r * r - s * s + distance * distance) / (2 * distance),
+		height = Math.sqrt(Math.max(0, r * r - x * x)),
+		u = delta.divideScalar(distance),
+		mid = c.clone().addScaledVector(u, x),
+		normal = u.clone().perpendicular(),
+		near = new Vec2().midpoint(aEnd, bStart),
+		p = mid.clone().addScaledVector(normal, height),
+		q = mid.clone().addScaledVector(normal, -height),
+		hit = p.distanceToSquared(near) < q.distanceToSquared(near) ? p : q;
+	if (
+		arcContains(c, Vec2.from(a.start!), aEnd, !!a.clockwise, hit) &&
+		arcContains(qCenter, bStart, Vec2.from(b.end!), !!b.clockwise, hit)
+	) {
+		return hit;
+	}
+	if (vertex && vertex.distanceTo(hit) > 2.5 * Math.abs(d)) return undefined;
+	return hit;
+}
+function sourceEnd(item: OffsetKernelItem): Vec2 | undefined {
+	const c = item.curve;
+	if (c?.type === 'segment') return Vec2.from(c.p2);
+	if (c?.type === 'arc') return Vec2.from(c.end);
+	return undefined;
+}
+function sourceStart(item: OffsetKernelItem): Vec2 | undefined {
+	const c = item.curve;
+	if (c?.type === 'segment') return Vec2.from(c.p1);
+	if (c?.type === 'arc') return Vec2.from(c.start);
+	return undefined;
+}
+function untrimmedEnds(
+	item: OffsetKernelItem,
+	prim: KernelOffsetPrimitive,
+	d: number,
+	ccw: boolean
+): [Vec2, Vec2] | undefined {
+	const c = item.curve;
+	if (c?.type === 'segment' && prim.type === 'line') {
+		const t = Vec2.from(c.p2).sub(c.p1).normalizeOrUnitX(),
+			n = t
+				.clone()
+				.perpendicular()
+				.multiplyScalar(ccw ? -1 : 1);
+		return [Vec2.from(c.p1).addScaledVector(n, d), Vec2.from(c.p2).addScaledVector(n, d)];
+	}
+	if (c?.type === 'arc' && prim.type === 'arc') {
+		const center = Vec2.from(prim.center!),
+			r = prim.radius!;
+		return [
+			center.clone().addScaledVector(Vec2.from(c.start).sub(center).normalizeOrUnitX(), r),
+			center.clone().addScaledVector(Vec2.from(c.end).sub(center).normalizeOrUnitX(), r),
+		];
+	}
+	return undefined;
+}
+
 /** Recover radius cases rejected by the frozen pre-migration reference. */
 export function recoverOffsetRadii(
 	items: readonly OffsetKernelItem[],
@@ -192,10 +272,28 @@ export function recoverOffsetRadii(
 			for (let i = 0; i < (closed ? items.length : items.length - 1); i++) {
 				const j = (i + 1) % items.length;
 				if (consumed(i) || consumed(j)) continue;
-				const p = join(primitives[i], primitives[j], dirs, d);
+				const a = primitives[i],
+					b = primitives[j];
+				if (
+					closed &&
+					((a.type === 'arc' && b.type === 'arc') ||
+						(a.type === 'line' && b.type === 'arc') ||
+						(a.type === 'arc' && b.type === 'line'))
+				) {
+					const se = sourceEnd(items[i]),
+						ss = sourceStart(items[j]),
+						vertex = se && ss ? se.midpoint(se, ss) : (se ?? ss);
+					const p = a.type === 'arc' && b.type === 'arc' ? joinArcsValid(a, b, d, vertex) : join(a, b, dirs, d);
+					if (p) {
+						setEnd(a, p, false);
+						setEnd(b, p, true);
+					}
+					continue;
+				}
+				const p = join(a, b, dirs, d);
 				if (p) {
-					setEnd(primitives[i], p, false);
-					setEnd(primitives[j], p, true);
+					setEnd(a, p, false);
+					setEnd(b, p, true);
 				}
 			}
 			side.primitives = primitives;
@@ -207,27 +305,53 @@ export function recoverOffsetRadii(
 	}
 	if (closed)
 		for (const side of result.sides) {
-			if (!side.isValid) continue;
+			if (!side.isValid || side.primitives.length !== items.length) continue;
+			const d = side.side * side.distance;
+			if (Math.abs(d) <= 1e-12) continue;
+			const ccw = offsetSourceCounterClockwise(items);
+			const rawEnds = items.map((it, i) => untrimmedEnds(it, side.primitives[i], d, ccw));
+			const dirs = new Map<string, Vec2>();
+			for (const it of items) {
+				if (it.curve?.type === 'segment')
+					dirs.set(it.sourceId, Vec2.from(it.curve.p2).sub(it.curve.p1).normalizeOrUnitX());
+			}
 			for (let i = 0; i < side.primitives.length; i++) {
+				const j = (i + 1) % side.primitives.length;
+				if (i === j) continue;
 				const a = side.primitives[i],
-					b = side.primitives[(i + 1) % side.primitives.length];
-				if (i === (i + 1) % side.primitives.length || a.type !== 'arc' || b.type !== 'arc') continue;
-				const delta = Vec2.from(b.center!).sub(a.center!),
-					distance = Math.sqrt(delta.lengthSq()),
-					r = a.radius!,
-					s = b.radius!;
-				if (distance < 1e-12 || distance > r + s + 1e-8 || distance < Math.abs(r - s) - 1e-8) continue;
-				const x = (r * r - s * s + distance * distance) / (2 * distance),
-					height = Math.sqrt(Math.max(0, r * r - x * x)),
-					u = delta.divideScalar(distance),
-					mid = Vec2.from(a.center!).addScaledVector(u, x),
-					normal = u.clone().perpendicular(),
-					near = new Vec2().midpoint(a.end!, b.start!),
-					p = mid.clone().addScaledVector(normal, height),
-					q = mid.clone().addScaledVector(normal, -height),
-					hit = p.distanceToSquared(near) < q.distanceToSquared(near) ? p : q;
-				a.end = hit;
-				b.start = hit;
+					b = side.primitives[j];
+				if ((items[i].kind === 'arc' && a.type === 'line') || (items[j].kind === 'arc' && b.type === 'line')) continue;
+				const ra = rawEnds[i],
+					rb = rawEnds[j];
+				if (!ra || !rb) continue;
+				const se = sourceEnd(items[i]),
+					ss = sourceStart(items[j]),
+					vertex = se && ss ? se.midpoint(se, ss) : (se ?? ss);
+				if (a.type === 'arc' && b.type === 'arc') {
+					const tmpA: KernelOffsetPrimitive = { ...a, start: ra[0], end: ra[1] };
+					const tmpB: KernelOffsetPrimitive = { ...b, start: rb[0], end: rb[1] };
+					const hit = joinArcsValid(tmpA, tmpB, d, vertex);
+					if (hit) {
+						a.end = hit;
+						b.start = hit;
+					} else {
+						a.end = ra[1];
+						b.start = rb[0];
+					}
+				} else if ((a.type === 'line' && b.type === 'arc') || (a.type === 'arc' && b.type === 'line')) {
+					const tmpA: KernelOffsetPrimitive =
+						a.type === 'line' ? { ...a, p1: ra[0], p2: ra[1] } : { ...a, start: ra[0], end: ra[1] };
+					const tmpB: KernelOffsetPrimitive =
+						b.type === 'line' ? { ...b, p1: rb[0], p2: rb[1] } : { ...b, start: rb[0], end: rb[1] };
+					const hit =
+						tmpA.type === 'line'
+							? lineCircle(Vec2.from(tmpA.p1!), dirs.get(tmpA.sourceId)!, tmpB, Vec2.from(tmpA.p2!))
+							: lineCircle(Vec2.from(tmpB.p1!), dirs.get(tmpB.sourceId)!, tmpA, Vec2.from(tmpA.end!));
+					if (!hit) {
+						setEnd(a, ra[1], false);
+						setEnd(b, rb[0], true);
+					}
+				}
 			}
 		}
 	return result;

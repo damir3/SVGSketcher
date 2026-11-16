@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { SketchDocument } from '../src/model/sketch';
 import {
 	toggleOrExtendChain,
@@ -329,5 +330,55 @@ describe('Offset Geometry Calculation', () => {
 		// At distance 3, midpoint should be at y = 78
 		const createdSpline = sketch.splines.get(res.createdIds[1])!;
 		assert.ok(distanceToCubics(createdSpline.toGeoCurve(sketch)!.bezierSegments!, new Vec2(0, 78)) < 0.1);
+	});
+
+	it('selects the entire closed chain from any arc across geometrically coincident pattern seams', () => {
+		const fixture = JSON.parse(readFileSync(new URL('./fixtures/arc18-pattern-trim.json', import.meta.url), 'utf8'));
+		const sketch = new SketchDocument();
+		sketch.restoreSnapshot(fixture);
+
+		for (const arc of sketch.arcs.values()) {
+			const chain = toggleOrExtendChain(sketch, null, arc.id, 'arc', true);
+			assert.ok(chain, `expected chain for ${arc.id}`);
+			assert.equal(chain.isClosed, true, `${arc.id} should form a closed chain`);
+			assert.equal(chain.items.length, 15, `${arc.id} should include all 15 arcs`);
+
+			const geom = calculateOffsetGeometry(sketch, chain, 'one_side', 5, 5, false);
+			assert.equal(geom.isValid, true, `${arc.id} offset geometry should be valid`);
+			assert.equal(geom.sides[0]?.primitives.length, 15);
+
+			const cleared = toggleOrExtendChain(sketch, chain, arc.id, 'arc', true);
+			assert.equal(cleared, null, `clicking ${arc.id} again should deselect the loop`);
+		}
+
+		// Manual chaining (chainSelection = false) also recognizes geometrically coincident continuations
+		const first = toggleOrExtendChain(sketch, null, 'Arc-14', 'arc', false)!;
+		assert.equal(first.items.length, 1);
+		const continuations = getValidChainContinuations(sketch, first);
+		assert.ok(continuations.has('Arc-15'));
+		assert.ok(continuations.has('Arc-17'));
+
+		const extended = toggleOrExtendChain(sketch, first, 'Arc-17', 'arc', false)!;
+		assert.equal(extended.items.length, 2);
+		assert.equal(extended.items[0].id, 'Arc-17');
+	});
+
+	it('preserves forward orientation when backward-traversing an open spline', () => {
+		const sketch = new SketchDocument();
+		const p0 = sketch.addPoint({ x: 0, y: 0 });
+		const p1 = sketch.addPoint({ x: 25, y: 20 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
+		const p3 = sketch.addPoint({ x: 100, y: 0 });
+
+		const spline = sketch.addFitSpline([p0.id, p1.id, p2.id]);
+		const line = sketch.addLine(p2.id, p3.id);
+
+		const chain = toggleOrExtendChain(sketch, null, line.id, 'line', true)!;
+		assert.equal(chain.isClosed, false);
+		assert.equal(chain.items.length, 2);
+		assert.equal(chain.items[0].id, spline.id);
+		assert.equal(chain.items[0].startPointId, p0.id);
+		assert.equal(chain.items[0].endPointId, p2.id);
+		assert.equal(chain.items[0].reversed, false);
 	});
 });

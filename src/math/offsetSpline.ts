@@ -461,11 +461,13 @@ function trimCollapsedSections(
 }
 function joinChain(
 	items: readonly OffsetKernelItem[],
+	rawPaths: (Path | undefined)[],
 	paths: (Path | undefined)[],
 	primitives: KernelOffsetPrimitive[],
 	closed: boolean,
 	d: number,
-	consumed: boolean[]
+	consumed: boolean[],
+	joined: boolean[]
 ): void {
 	// Restore arc endpoints adjacent to sampled curves before evaluating finite intersections.
 	for (let i = 0; i < items.length; i++) {
@@ -475,9 +477,9 @@ function joinChain(
 		const prev = i > 0 ? i - 1 : closed ? items.length - 1 : -1,
 			next = i + 1 < items.length ? i + 1 : closed ? 0 : -1,
 			center = Vec2.from(prim.center!);
-		if (paths[prev])
+		if (rawPaths[prev])
 			prim.start = center.clone().addScaledVector(Vec2.from(curve.start).sub(center).normalizeOrUnitX(), prim.radius!);
-		if (paths[next])
+		if (rawPaths[next])
 			prim.end = center.clone().addScaledVector(Vec2.from(curve.end).sub(center).normalizeOrUnitX(), prim.radius!);
 	}
 	const n = closed ? items.length : items.length - 1;
@@ -485,24 +487,78 @@ function joinChain(
 		const j = (i + 1) % items.length,
 			a = paths[i],
 			b = paths[j];
-		if (i === j || consumed[i] || consumed[j]) continue;
+		if (i === j || consumed[i] || consumed[j] || joined[i]) continue;
 		if (a && b) joinPaths(a, b, d);
 		else if (a) joinAnalytic(a, primitives[j], false, d);
 		else if (b) joinAnalytic(b, primitives[i], true, d);
 	}
+}
+function ensureAnalyticPath(
+	index: number,
+	items: readonly OffsetKernelItem[],
+	primitives: KernelOffsetPrimitive[],
+	paths: (Path | undefined)[],
+	d: number,
+	ccw: boolean
+): boolean {
+	if (paths[index]) return true;
+	const p = primitives[index];
+	if (p.type === 'line') {
+		const t = Vec2.from(p.p2!).sub(p.p1!).normalizeOrUnitX(),
+			n = t
+				.clone()
+				.perpendicular()
+				.multiplyScalar(ccw ? -1 : 1);
+		paths[index] = { nodes: [p.p1!, p.p2!].map(pt => ({ p: Vec2.from(pt), n, t, corner: false })), closed: false };
+	} else if (p.type === 'arc' && items[index].curve?.type === 'arc') {
+		const sign = Math.sign((p.radius! - items[index].curve.radius) / d);
+		paths[index] = {
+			nodes: Array.from({ length: 65 }, (_, k) => {
+				const n = arcNode(p, k / 64);
+				n.n.multiplyScalar(sign);
+				return n;
+			}),
+			closed: false,
+		};
+	} else return false;
+	primitives[index] = { sourceId: p.sourceId, type: 'spline' };
+	writeFitted(primitives[index], paths[index]!.nodes, d);
+	return true;
+}
+function cornerArcNodes(vertex: Vec2, from: Vec2, to: Vec2, d: number, tangentHint?: Vec2): Node[] {
+	const begin = vertex.angleToPoint(from),
+		delta = to.clone().sub(vertex),
+		initial = from.clone().sub(vertex);
+	let span = Math.atan2(initial.cross(delta), initial.dot(delta));
+	if (tangentHint && Math.abs(span) > Math.PI - 1e-6 && initial.cross(tangentHint) * span < 0) {
+		span = -span;
+	}
+	const count = Math.max(1, Math.ceil(Math.abs(span) / Math.min(0.025, Math.sqrt((8 * 0.005) / Math.abs(d)))));
+	const nodes = Array.from({ length: count + 1 }, (_, k): Node => {
+		const radial = Vec2.fromPolar(1, begin + (span * k) / count);
+		return {
+			p: vertex.clone().addScaledVector(radial, Math.abs(d)),
+			n: radial.clone().multiplyScalar(Math.sign(d)),
+			t: radial.clone().perpendicular().multiplyScalar(Math.sign(span)),
+			corner: false,
+		};
+	});
+	nodes[0].p = from;
+	nodes[nodes.length - 1].p = to;
+	return nodes;
 }
 function connectConsumedArcs(
 	items: readonly OffsetKernelItem[],
 	primitives: KernelOffsetPrimitive[],
 	paths: (Path | undefined)[],
 	d: number,
-	consumed: boolean[]
+	consumed: boolean[],
+	joined: boolean[]
 ): void {
 	const ccw = offsetSourceCounterClockwise(items);
 	const start = (p: KernelOffsetPrimitive) => Vec2.from(p.p1 ?? p.start ?? p.fitPoints![0]);
 	const end = (p: KernelOffsetPrimitive) => Vec2.from(p.p2 ?? p.end ?? p.fitPoints!.at(-1)!);
-	const poles = primitives.map(p => [start(p), end(p)]),
-		joined = items.map(() => false);
+	const poles = primitives.map(p => [start(p), end(p)]);
 	for (let i = 0; i < items.length; i++) {
 		const c = items[i].curve;
 		if (c?.type !== 'arc' || !consumed[i]) continue;
@@ -530,52 +586,47 @@ function connectConsumedArcs(
 				joined[junction] = true;
 				continue;
 			}
-			if (!paths[j]) {
-				const p = primitives[j];
-				if (p.type === 'line') {
-					const t = Vec2.from(p.p2!).sub(p.p1!).normalizeOrUnitX(),
-						n = t
-							.clone()
-							.perpendicular()
-							.multiplyScalar(ccw ? -1 : 1);
-					paths[j] = { nodes: [p.p1!, p.p2!].map(p => ({ p: Vec2.from(p), n, t, corner: false })), closed: false };
-				} else if (p.type === 'arc' && items[j].curve?.type === 'arc') {
-					const sign = Math.sign((p.radius! - items[j].curve.radius) / d);
-					paths[j] = {
-						nodes: Array.from({ length: 65 }, (_, k) => {
-							const n = arcNode(p, k / 64);
-							n.n.multiplyScalar(sign);
-							return n;
-						}),
-						closed: false,
-					};
-				} else continue;
-				primitives[j] = { sourceId: p.sourceId, type: 'spline' };
-				writeFitted(primitives[j], paths[j]!.nodes, d);
-			}
+			if (!ensureAnalyticPath(j, items, primitives, paths, d, ccw)) continue;
 			const from = first ? pole : near,
 				to = first ? near : pole,
-				begin = vertex.angleToPoint(from),
-				delta = to.clone().sub(vertex),
-				initial = from.clone().sub(vertex),
-				span = Math.atan2(initial.cross(delta), initial.dot(delta)),
-				count = Math.max(1, Math.ceil(Math.abs(span) / Math.min(0.025, Math.sqrt((8 * 0.005) / Math.abs(d)))));
-			const nodes = Array.from({ length: count + 1 }, (_, k): Node => {
-				const radial = Vec2.fromPolar(1, begin + (span * k) / count);
-				return {
-					p: vertex.clone().addScaledVector(radial, Math.abs(d)),
-					n: radial.clone().multiplyScalar(Math.sign(d)),
-					t: radial.clone().perpendicular().multiplyScalar(Math.sign(span)),
-					corner: false,
-				};
-			});
-			nodes[0].p = from;
-			nodes[nodes.length - 1].p = to;
+				nodes = cornerArcNodes(vertex, from, to, d);
 			const path = paths[j]!;
 			if (first) path.nodes = [...nodes, ...path.nodes.slice(1)];
 			else path.nodes = [...path.nodes.slice(0, -1), ...nodes];
 			joined[junction] = true;
 		}
+	}
+}
+function connectCornerGaps(
+	items: readonly OffsetKernelItem[],
+	primitives: KernelOffsetPrimitive[],
+	paths: (Path | undefined)[],
+	d: number,
+	consumed: boolean[],
+	joined: boolean[]
+): void {
+	const ccw = offsetSourceCounterClockwise(items);
+	const start = (p: KernelOffsetPrimitive) => Vec2.from(p.p1 ?? p.start ?? p.fitPoints![0]);
+	const end = (p: KernelOffsetPrimitive) => Vec2.from(p.p2 ?? p.end ?? p.fitPoints!.at(-1)!);
+	for (let i = 0; i < items.length; i++) {
+		const j = (i + 1) % items.length;
+		if (i === j || joined[i] || consumed[i] || consumed[j]) continue;
+		const ci = items[i].curve,
+			cj = items[j].curve;
+		if (!ci || !cj || (ci.type !== 'segment' && ci.type !== 'arc') || (cj.type !== 'segment' && cj.type !== 'arc'))
+			continue;
+		const from = paths[i] ? paths[i]!.nodes.at(-1)!.p : end(primitives[i]),
+			to = paths[j] ? paths[j]!.nodes[0].p : start(primitives[j]);
+		if (from.distanceTo(to) < 1e-8) continue;
+		const ve = ci.type === 'segment' ? ci.p2 : ci.end,
+			vs = cj.type === 'segment' ? cj.p1 : cj.start,
+			vertex = new Vec2().midpoint(ve, vs);
+		if (!ensureAnalyticPath(i, items, primitives, paths, d, ccw)) continue;
+		const path = paths[i]!;
+		const corner = cornerArcNodes(vertex, from, to, d, path.nodes.at(-1)!.t);
+		path.nodes.push(...corner.slice(1));
+		writeFitted(primitives[i], path.nodes, d);
+		joined[i] = true;
 	}
 }
 
@@ -690,11 +741,15 @@ export function refineSplineOffsets(
 			return { nodes, closed: isClosed };
 		});
 		const rawPaths = paths.map(path => path && { ...path, nodes: [...path.nodes] });
-		if (consumedArc) connectConsumedArcs(items, side.primitives, paths, d, consumed);
+		const joined = items.map(() => false);
+		if (consumedArc) connectConsumedArcs(items, side.primitives, paths, d, consumed, joined);
+		if (closed && items.length > 1 && Math.abs(d) > 1e-12) {
+			connectCornerGaps(items, side.primitives, paths, d, consumed, joined);
+		}
 		if (closed && items.length > 1 && Math.abs(d) > 1e-12) {
 			const candidates = side.primitives.map(p => ({ ...p }));
 			const candidatePaths = paths.map(path => path && { ...path, nodes: path.nodes.map(n => ({ ...n })) });
-			joinChain(items, candidatePaths, candidates, closed, d, consumed);
+			joinChain(items, rawPaths, candidatePaths, candidates, closed, d, consumed, joined);
 			const contours = splitOffsetContours(items, candidates, rawPaths, candidatePaths, d, writeFitted, consumedArc);
 			if (contours) {
 				side.primitives = contours;
@@ -722,7 +777,7 @@ export function refineSplineOffsets(
 			}
 			paths[0].nodes = removeLoops(paths[0].nodes);
 		}
-		joinChain(items, paths, side.primitives, closed, d, consumed);
+		joinChain(items, rawPaths, paths, side.primitives, closed, d, consumed, joined);
 		const active = Math.abs(d) > 1e-12 ? trimCollapsedSections(paths, side.primitives, closed) : items.map((_, i) => i);
 		for (let i = 0; i < paths.length; i++) {
 			const path = paths[i];

@@ -1,8 +1,11 @@
 import { Vec2 } from '../src/math/vector';
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { SketchDocument } from '../src/model/sketch';
 import { OffsetTool } from '../src/canvas/tools/modify/offset';
+import { Viewport } from '../src/canvas/viewport';
+import { findArcNear, findCircleNear, findLineNear } from '../src/canvas/hitTesting';
 import { collapseOffsetScene } from './helpers/collapseOffsetScene';
 
 function addConstrainedTriangle(sketch: SketchDocument): void {
@@ -776,6 +779,89 @@ describe('OffsetTool UI and Workflow', () => {
 			// left should be bbox.max.x + 100 = 250 + 100 = 350
 			const container = (tool.popup as any).container;
 			assert.equal(container.style.left, '350px');
+		} finally {
+			cleanup();
+		}
+	});
+
+	it('selects full closed chain when clicking any arc in patterned star scene even near construction geometry', () => {
+		const cleanup = setupMockDocument();
+		try {
+			const fixture = JSON.parse(readFileSync(new URL('./fixtures/arc18-pattern-trim.json', import.meta.url), 'utf8'));
+			const sketch = new SketchDocument();
+			sketch.restoreSnapshot(fixture);
+
+			// Add a construction line right through Arc-14 midpoint to verify construction lines do not shadow arcs
+			const cP1 = sketch.addPoint({ x: -10, y: 74 });
+			const cP2 = sketch.addPoint({ x: 20, y: 74 });
+			sketch.addLine(cP1.id, cP2.id, true);
+
+			const viewport = new Viewport(800, 600);
+			const tool = new OffsetTool();
+			tool.setChainSelection(true);
+
+			const mockCtx: any = {
+				sketch,
+				viewport,
+				renderer: {
+					offsetGizmoHandles: [],
+				},
+				findLineNear: (screen: Vec2) => findLineNear(sketch, viewport, screen, 'offset'),
+				findArcNear: (screen: Vec2) => findArcNear(sketch, viewport, screen),
+				findCircleNear: (screen: Vec2) => findCircleNear(sketch, viewport, screen),
+				findEllipseNear: () => null,
+				findEllipticalArcNear: () => null,
+				findSplineNear: () => null,
+				requestRender: () => {},
+				setCursor: () => {},
+				showToast: () => {},
+			};
+
+			tool.activate(mockCtx);
+
+			// Click midpoint of Arc-14 (near the construction line)
+			const arc14 = sketch.arcs.get('Arc-14')!;
+			const c = sketch.points.get(arc14.centerId)!;
+			const s = sketch.points.get(arc14.startPointId)!;
+			const e = sketch.points.get(arc14.endPointId)!;
+			const sc = viewport.worldToScreen(c);
+			const as = sc.angleToPoint(viewport.worldToScreen(s));
+			const ae = sc.angleToPoint(viewport.worldToScreen(e));
+			let sweep = arc14.clockwise ? ae - as : as - ae;
+			while (sweep < 0) sweep += 2 * Math.PI;
+			const midAng = arc14.clockwise ? as + sweep / 2 : as - sweep / 2;
+			const midScreen = Vec2.fromPolar(arc14.radius * viewport.zoom, midAng).add(sc);
+			const midWorld = viewport.screenToWorld(midScreen);
+
+			tool.onMouseDown({
+				screen: midScreen,
+				world: midWorld,
+				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
+			});
+
+			assert.ok(tool.chain);
+			assert.equal(tool.chain.isClosed, true);
+			assert.equal(tool.chain.items.length, 15);
+			assert.ok(tool.geomResult?.isValid);
+
+			// Clicking another arc in the chain (Arc-24) toggles the whole closed loop off
+			const arc24 = sketch.arcs.get('Arc-24')!;
+			const c24 = viewport.worldToScreen(sketch.points.get(arc24.centerId)!);
+			const as24 = c24.angleToPoint(viewport.worldToScreen(sketch.points.get(arc24.startPointId)!));
+			const ae24 = c24.angleToPoint(viewport.worldToScreen(sketch.points.get(arc24.endPointId)!));
+			let sweep24 = arc24.clockwise ? ae24 - as24 : as24 - ae24;
+			while (sweep24 < 0) sweep24 += 2 * Math.PI;
+			const mid24Ang = arc24.clockwise ? as24 + sweep24 / 2 : as24 - sweep24 / 2;
+			const mid24Screen = Vec2.fromPolar(arc24.radius * viewport.zoom, mid24Ang).add(c24);
+
+			tool.onMouseDown({
+				screen: mid24Screen,
+				world: viewport.screenToWorld(mid24Screen),
+				raw: { preventDefault: () => {}, stopPropagation: () => {} } as any,
+			});
+
+			assert.equal(tool.chain, null);
+			assert.equal(tool.geomResult, null);
 		} finally {
 			cleanup();
 		}

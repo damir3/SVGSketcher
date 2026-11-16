@@ -638,3 +638,89 @@ for (const reversed of [false, true])
 			);
 		}
 	});
+
+test('six-lobed flower inward offset bridges diverging cusp corners with rolling-ball arcs', () => {
+	const sketch = new SketchDocument();
+	const ringRadius = 50;
+	const lobeRadius = 2 * ringRadius * Math.sin(Math.PI / 12);
+	const cuspIds: string[] = [];
+	const cusps: Vec2[] = [];
+	for (let i = 0; i < 6; i++) {
+		const centerAngle = Math.PI / 2 - (i * Math.PI) / 3;
+		const cuspAngle = centerAngle + Math.PI / 6;
+		const cusp = new Vec2(ringRadius * Math.cos(cuspAngle), ringRadius * Math.sin(cuspAngle));
+		cusps.push(cusp);
+		cuspIds.push(sketch.addPoint(cusp).id);
+	}
+	const arcIds: string[] = [];
+	sketch.withDeferredSolve(() => {
+		for (let i = 0; i < 6; i++) {
+			const centerAngle = Math.PI / 2 - (i * Math.PI) / 3;
+			const centerId = sketch.addPoint(
+				new Vec2(ringRadius * Math.cos(centerAngle), ringRadius * Math.sin(centerAngle))
+			).id;
+			arcIds.push(sketch.addArc(centerId, cuspIds[i], cuspIds[(i + 1) % 6], lobeRadius, true).id);
+		}
+	});
+	const chain = toggleOrExtendChain(sketch, null, arcIds[0], 'arc', true)!;
+	assert.equal(chain.items.length, 6);
+	assert.equal(chain.isClosed, true);
+
+	const outward = calculateOffsetGeometry(sketch, chain, 'one_side', 10, 0, false);
+	assert.ok(outward.isValid);
+	assert.equal(outward.sides[0].primitives.length, 6);
+	assert.ok(outward.sides[0].primitives.every(p => p.type === 'arc' && Math.abs(p.radius! - (lobeRadius + 10)) < 1e-8));
+	compare(
+		outward,
+		withTypeScriptFallback(outward, () => calculateOffsetGeometry(sketch, chain, 'one_side', 10, 0, false))
+	);
+
+	for (const distance of [5, 10, 15, 20]) {
+		const inward = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+		assert.ok(inward.isValid);
+		assert.equal(offsetContourGroups(inward.sides[0].primitives).length, 1);
+		assert.equal(inward.sides[0].primitives.length, 6);
+		// Every rolling-ball corner touches radius (50 - distance) directly inward from its cusp.
+		for (const prim of inward.sides[0].primitives) {
+			assert.equal(prim.type, 'spline');
+			const maxDist = Math.max(...prim.fitPoints!.map(pt => pt.length()));
+			assert.ok(maxDist <= ringRadius + lobeRadius - distance + 0.06);
+		}
+		const radialMin = Math.min(
+			...inward.sides[0].primitives.flatMap(p =>
+				(p.fitPoints ?? []).flatMap((pt, idx) => {
+					if (idx + 1 >= p.fitPoints!.length) return [pt.length()];
+					const p0 = pt,
+						p1 = p.handles![idx].h2,
+						p2 = p.handles![idx + 1].h1,
+						p3 = p.fitPoints![idx + 1];
+					return Array.from({ length: 16 }, (_, step) => {
+						const t = step / 16;
+						const mt = 1 - t;
+						return Math.hypot(
+							mt ** 3 * p0.x + 3 * mt ** 2 * t * p1.x + 3 * mt * t ** 2 * p2.x + t ** 3 * p3.x,
+							mt ** 3 * p0.y + 3 * mt ** 2 * t * p1.y + 3 * mt * t ** 2 * p2.y + t ** 3 * p3.y
+						);
+					});
+				})
+			)
+		);
+		assert.ok(Math.abs(radialMin - (ringRadius - distance)) < 0.15);
+		compare(
+			inward,
+			withTypeScriptFallback(inward, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
+		);
+	}
+
+	for (const distance of [0.5, 26]) {
+		const inward = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+		const fallback = withTypeScriptFallback(inward, () =>
+			calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true)
+		);
+		for (const res of [inward, fallback]) {
+			assert.ok(res.isValid);
+			assert.equal(offsetContourGroups(res.sides[0].primitives).length, 1);
+			for (const p of res.sides[0].primitives) assert.equal(p.type, 'spline');
+		}
+	}
+});

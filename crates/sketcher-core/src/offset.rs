@@ -293,10 +293,33 @@ fn join(cur: &Shape, next: &Shape, d: f64) -> Option<Point2> {
         _ => Some(cur.end().middle(next.start())),
     }
 }
-fn join_arcs(a: &Shape, b: &Shape) -> Option<Point2> {
-    let (Shape::Arc(c, r, aa, _), Shape::Arc(q, s, bb, _)) = (a, b) else {
+fn arc_contains(c: Point2, start: Point2, end: Point2, cw: bool, pt: Point2) -> bool {
+    let a = angle(c, start);
+    let b = angle(c, end);
+    let t = angle(c, pt);
+    sweep(a, t, cw) <= sweep(a, b, cw) + 1e-7
+}
+fn source_start(item: &Item) -> Option<Point2> {
+    match &item.geometry {
+        Some(Geometry::Segment(a, _)) => Some(*a),
+        Some(Geometry::Arc(_, _, a, _, _)) => Some(*a),
+        _ => None,
+    }
+}
+fn source_end(item: &Item) -> Option<Point2> {
+    match &item.geometry {
+        Some(Geometry::Segment(_, b)) => Some(*b),
+        Some(Geometry::Arc(_, _, _, b, _)) => Some(*b),
+        _ => None,
+    }
+}
+fn join_arcs(a: &Shape, b: &Shape, d: f64, vertex: Option<Point2>) -> Option<Point2> {
+    let (Shape::Arc(c, r, aa, cw1), Shape::Arc(q, s, bb, cw2)) = (a, b) else {
         return None;
     };
+    if dist(aa[1], bb[0]) < 1e-8 {
+        return Some(middle(aa[1], bb[0]));
+    }
     let delta = *q - *c;
     let distance = delta.length();
     if distance < 1e-12 || distance > r + s + 1e-8 || distance < (r - s).abs() - 1e-8 {
@@ -308,12 +331,19 @@ fn join_arcs(a: &Shape, b: &Shape) -> Option<Point2> {
     let mid = *c + u * x;
     let normal = u.perp();
     let near = middle(aa[1], bb[0]);
-    let (p, q) = (mid + normal * height, mid - normal * height);
-    Some(if squared(p, near) < squared(q, near) {
+    let (p, q_pt) = (mid + normal * height, mid - normal * height);
+    let hit = if squared(p, near) < squared(q_pt, near) {
         p
     } else {
-        q
-    })
+        q_pt
+    };
+    if arc_contains(*c, aa[0], aa[1], *cw1, hit) && arc_contains(*q, bb[0], bb[1], *cw2, hit) {
+        return Some(hit);
+    }
+    if vertex.is_some_and(|v| dist(v, hit) > 2.5 * d.abs()) {
+        return None;
+    }
+    Some(hit)
 }
 fn side(items: &[Item], closed: bool, d: f64) -> Side {
     let invalid = |error| Side {
@@ -491,12 +521,29 @@ fn side(items: &[Item], closed: bool, d: f64) -> Side {
         {
             continue;
         }
-        let exact = if closed {
-            join_arcs(&primitives[i].shape, &primitives[next].shape)
+        let joined_pt = if closed {
+            let vertex = match (source_end(&items[i]), source_start(&items[next])) {
+                (Some(a), Some(b)) => Some(middle(a, b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (None, None) => None,
+            };
+            match (&primitives[i].shape, &primitives[next].shape) {
+                (Shape::Arc(..), Shape::Arc(..)) => {
+                    join_arcs(&primitives[i].shape, &primitives[next].shape, d, vertex)
+                }
+                (Shape::Line(a, dir), Shape::Arc(c, r, ..)) => {
+                    line_circle(a[0], *dir, *c, *r, a[1])
+                }
+                (Shape::Arc(c, r, a, _), Shape::Line(b, dir)) => {
+                    line_circle(b[0], *dir, *c, *r, a[1])
+                }
+                _ => join(&primitives[i].shape, &primitives[next].shape, d),
+            }
         } else {
-            None
+            join(&primitives[i].shape, &primitives[next].shape, d)
         };
-        if let Some(pt) = exact.or_else(|| join(&primitives[i].shape, &primitives[next].shape, d)) {
+        if let Some(pt) = joined_pt {
             primitives[i].shape.set_end(pt);
             primitives[next].shape.set_start(pt);
         }

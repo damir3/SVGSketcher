@@ -1,5 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint } from '../model/types';
+import { POINT_TOLERANCE } from '../constants';
 import { CoincidentConstraint } from '../solver/constraints';
 import { Vec2 } from './vector';
 import { getGeometryKernel } from '../kernel';
@@ -68,8 +69,8 @@ export interface OffsetGeometryResult {
 }
 
 /**
- * Returns all point IDs that are topologically coincident with `startPointId`
- * by traversing CoincidentConstraint relationships.
+ * Returns all point IDs that are topologically or geometrically coincident with `startPointId`
+ * by traversing CoincidentConstraint relationships and matching points within POINT_TOLERANCE.
  */
 export function getCoincidentPointGroup(sketch: SketchDocument, startPointId: string): Set<string> {
 	const group = new Set<string>([startPointId]);
@@ -85,6 +86,29 @@ export function getCoincidentPointGroup(sketch: SketchDocument, startPointId: st
 					group.add(c.p1Id);
 					queue.push(c.p1Id);
 				}
+			}
+		}
+		const currPt = sketch.points.get(curr);
+		if (currPt) {
+			for (const pt of sketch.points.values()) {
+				if (
+					!group.has(pt.id) &&
+					Math.abs(pt.x - currPt.x) <= POINT_TOLERANCE &&
+					Math.abs(pt.y - currPt.y) <= POINT_TOLERANCE &&
+					currPt.distanceTo(pt) <= POINT_TOLERANCE
+				) {
+					group.add(pt.id);
+					queue.push(pt.id);
+				}
+			}
+			if (
+				!group.has('origin') &&
+				Math.abs(currPt.x) <= POINT_TOLERANCE &&
+				Math.abs(currPt.y) <= POINT_TOLERANCE &&
+				Math.hypot(currPt.x, currPt.y) <= POINT_TOLERANCE
+			) {
+				group.add('origin');
+				queue.push('origin');
 			}
 		}
 	}
@@ -278,6 +302,47 @@ export function deselectChainSegment(
 	return { items: remaining, isClosed: false, firstSelectedId };
 }
 
+function extendChainDirection(
+	sketch: SketchDocument,
+	items: ChainItem[],
+	startPtId: string,
+	startPrimId: string,
+	forward: boolean
+): boolean {
+	const oppositeEndId = forward ? items[0].startPointId! : items[items.length - 1].endPointId!;
+	const stopGroup = getCoincidentPointGroup(sketch, oppositeEndId);
+	let currPt = startPtId;
+	let prevId = startPrimId;
+
+	while (true) {
+		const conn = getConnectedPrimitivesAtVertex(sketch, currPt, prevId);
+		if (conn.length !== 1) return false;
+		const next = conn[0];
+		if (items.some(it => it.id === next.id)) {
+			return stopGroup.has(next.connectedPointId) || stopGroup.has(next.otherPointId);
+		}
+		const itemStartId = forward ? next.connectedPointId : next.otherPointId;
+		const itemEndId = forward ? next.otherPointId : next.connectedPointId;
+		const ep = getPrimitiveEndpoints(sketch, next.type, next.id);
+		const isRev = ep ? getCoincidentPointGroup(sketch, itemStartId).has(ep.p2Id) : false;
+		const nextItem: ChainItem = {
+			id: next.id,
+			type: next.type,
+			startPointId: itemStartId,
+			endPointId: itemEndId,
+			reversed: isRev,
+		};
+		if (forward) items.push(nextItem);
+		else items.unshift(nextItem);
+		prevId = next.id;
+		currPt = next.otherPointId;
+
+		if (stopGroup.has(currPt)) {
+			return true;
+		}
+	}
+}
+
 /**
  * Builds or extends a chain when a primitive is clicked.
  */
@@ -331,70 +396,11 @@ export function toggleOrExtendChain(
 
 		// Auto-traverse along both directions
 		const chainItems = [startItem];
-		let isClosed = false;
-
-		// Traverse forward from endPointId
-		let currEndPt = startItem.endPointId!;
-		let prevPrimId = startItem.id;
-		while (true) {
-			const conn = getConnectedPrimitivesAtVertex(sketch, currEndPt, prevPrimId);
-			if (conn.length !== 1) break; // Ambiguity or boundary
-			const next = conn[0];
-			if (chainItems.some(it => it.id === next.id)) {
-				// Connected back to existing chain
-				const headPtGroup = getCoincidentPointGroup(sketch, chainItems[0].startPointId!);
-				if (headPtGroup.has(next.connectedPointId) || headPtGroup.has(next.otherPointId)) {
-					isClosed = true;
-				}
-				break;
-			}
-			const ep = getPrimitiveEndpoints(sketch, next.type, next.id);
-			const isRev = ep ? getCoincidentPointGroup(sketch, next.connectedPointId).has(ep.p2Id) : false;
-			const nextItem: ChainItem = {
-				id: next.id,
-				type: next.type,
-				startPointId: next.connectedPointId,
-				endPointId: next.otherPointId,
-				reversed: isRev,
-			};
-			chainItems.push(nextItem);
-			prevPrimId = next.id;
-			currEndPt = next.otherPointId;
-
-			// Check if we reached the start of the chain (loop closed)
-			const headGroup = getCoincidentPointGroup(sketch, chainItems[0].startPointId!);
-			if (headGroup.has(currEndPt)) {
-				isClosed = true;
-				break;
-			}
-		}
+		let isClosed = extendChainDirection(sketch, chainItems, startItem.endPointId!, startItem.id, true);
 
 		// If not closed, traverse backward from startPointId
 		if (!isClosed) {
-			let currStartPt = chainItems[0].startPointId!;
-			let prevBackwardId = chainItems[0].id;
-			while (true) {
-				const conn = getConnectedPrimitivesAtVertex(sketch, currStartPt, prevBackwardId);
-				if (conn.length !== 1) break;
-				const prev = conn[0];
-				if (chainItems.some(it => it.id === prev.id)) break;
-				const prevItem: ChainItem = {
-					id: prev.id,
-					type: prev.type,
-					startPointId: prev.otherPointId,
-					endPointId: prev.connectedPointId,
-					reversed: true,
-				};
-				chainItems.unshift(prevItem);
-				prevBackwardId = prev.id;
-				currStartPt = prev.otherPointId;
-
-				const tailGroup = getCoincidentPointGroup(sketch, chainItems[chainItems.length - 1].endPointId!);
-				if (tailGroup.has(currStartPt)) {
-					isClosed = true;
-					break;
-				}
-			}
+			isClosed = extendChainDirection(sketch, chainItems, chainItems[0].startPointId!, chainItems[0].id, false);
 		}
 
 		return { items: chainItems, isClosed, firstSelectedId: primitiveId };
@@ -435,35 +441,10 @@ export function toggleOrExtendChain(
 		};
 		newItems.push(item);
 
-		// Check if this closed the chain
 		if (headGroup.has(attachEnd)) {
 			isClosed = true;
 		} else if (chainSelection) {
-			// Continue traversing forward
-			let currEndPt = attachEnd;
-			let prevId = primitiveId;
-			while (true) {
-				const conn = getConnectedPrimitivesAtVertex(sketch, currEndPt, prevId);
-				if (conn.length !== 1) break;
-				const next = conn[0];
-				if (newItems.some(it => it.id === next.id)) break;
-				const ep = getPrimitiveEndpoints(sketch, next.type, next.id);
-				const isRev = ep ? getCoincidentPointGroup(sketch, next.connectedPointId).has(ep.p2Id) : false;
-				const nextItem: ChainItem = {
-					id: next.id,
-					type: next.type,
-					startPointId: next.connectedPointId,
-					endPointId: next.otherPointId,
-					reversed: isRev,
-				};
-				newItems.push(nextItem);
-				prevId = next.id;
-				currEndPt = next.otherPointId;
-				if (headGroup.has(currEndPt)) {
-					isClosed = true;
-					break;
-				}
-			}
+			isClosed = extendChainDirection(sketch, newItems, attachEnd, primitiveId, true);
 		}
 	} else {
 		// Connects to head
@@ -481,29 +462,7 @@ export function toggleOrExtendChain(
 		if (tailGroup.has(attachStart)) {
 			isClosed = true;
 		} else if (chainSelection) {
-			// Continue traversing backward
-			let currStartPt = attachStart;
-			let prevId = primitiveId;
-			while (true) {
-				const conn = getConnectedPrimitivesAtVertex(sketch, currStartPt, prevId);
-				if (conn.length !== 1) break;
-				const prev = conn[0];
-				if (newItems.some(it => it.id === prev.id)) break;
-				const prevItem: ChainItem = {
-					id: prev.id,
-					type: prev.type,
-					startPointId: prev.otherPointId,
-					endPointId: prev.connectedPointId,
-					reversed: true,
-				};
-				newItems.unshift(prevItem);
-				prevId = prev.id;
-				currStartPt = prev.otherPointId;
-				if (tailGroup.has(currStartPt)) {
-					isClosed = true;
-					break;
-				}
-			}
+			isClosed = extendChainDirection(sketch, newItems, attachStart, primitiveId, false);
 		}
 	}
 

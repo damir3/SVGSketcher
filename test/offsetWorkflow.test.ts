@@ -20,6 +20,7 @@ import { OffsetConstraint } from '../src/solver/constraints/offset';
 import {
 	calculateOffsetGeometry,
 	commitOffsetToSketch,
+	toggleOrExtendChain,
 	type OffsetChain,
 	type OffsetDirection,
 	type OffsetGeometryResult,
@@ -1196,5 +1197,57 @@ test('adjacent consumed arcs commit their contact and survive dimension edits', 
 		assertNoCrossings(boundary);
 		assertOffsetDistance(boundary, denseSource, distance, 0.06);
 		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+	}
+});
+
+test('six-lobed flower inward offset commits rolling-ball contours and survives dimension edits and history', () => {
+	const sketch = new SketchDocument();
+	const ringRadius = 50;
+	const lobeRadius = 2 * ringRadius * Math.sin(Math.PI / 12);
+	const arcIds: string[] = [];
+	sketch.withDeferredSolve(() => {
+		for (let i = 0; i < 6; i++) {
+			const centerAngle = Math.PI / 2 - (i * Math.PI) / 3;
+			const startAngle = centerAngle + Math.PI / 6;
+			const endAngle = centerAngle - Math.PI / 6;
+			const centerId = sketch.addPoint(
+				new Vec2(ringRadius * Math.cos(centerAngle), ringRadius * Math.sin(centerAngle))
+			).id;
+			const startId = sketch.addPoint(
+				new Vec2(ringRadius * Math.cos(startAngle), ringRadius * Math.sin(startAngle))
+			).id;
+			const endId = sketch.addPoint(new Vec2(ringRadius * Math.cos(endAngle), ringRadius * Math.sin(endAngle))).id;
+			arcIds.push(sketch.addArc(centerId, startId, endId, lobeRadius, true).id);
+		}
+	});
+	const chain = toggleOrExtendChain(sketch, null, arcIds[0], 'arc', true)!;
+	assert.equal(chain.items.length, 6);
+	assert.equal(chain.isClosed, true);
+
+	const denseSource = denseOffsetSource(sketch, chain);
+	const initial = calculateOffsetGeometry(sketch, chain, 'one_side', 10, 0, true);
+	const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, initial))!;
+	assert.equal(created.constraintIds.length, 1);
+	assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+
+	sketch.clearHistory();
+	for (const distance of [12, 15, 5, 10]) {
+		const before = sketch.takeSnapshot();
+		assert.ok(sketch.updateDimensionalConstraint(created.constraintIds[0], distance));
+		const c = sketch.constraints.get(created.constraintIds[0]) as OffsetConstraint;
+		const expected = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
+		assert.ok(expected.isValid);
+		assert.equal(offsetContourGroups(expected.sides[0].primitives).length, 1);
+		assertAppliedOffset(sketch, c.pairs.map(offsetPairChild), chain, expected);
+		const boundary = sampledOffsetBoundary(expected);
+		assertNoCrossings(boundary);
+		assertOffsetDistance(boundary, denseSource, distance, 0.06);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+
+		const after = sketch.takeSnapshot();
+		assert.ok(sketch.undo());
+		assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(before), 'flower undo', 1e-7);
+		assert.ok(sketch.redo());
+		assertSnapshotNear(canonical(sketch.takeSnapshot()), canonical(after), 'flower redo', 1e-7);
 	}
 });
