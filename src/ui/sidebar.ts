@@ -16,10 +16,14 @@ import { ICONS } from './icons';
 import { type Vec2 } from '../math/vector';
 import type { IInspectable, InspectorContext } from './panels/inspector/types';
 
+const CHEVRON_DOWN_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+const MAX_SELECTED_INSPECTOR_ITEMS = 200;
+
 export class Sidebar {
 	private container: HTMLElement;
 	private sketch: SketchDocument;
 	private interaction?: CanvasInteraction;
+	private isPrimitivesExpanded = false;
 
 	onEditDimension?: (
 		constraint:
@@ -60,72 +64,36 @@ export class Sidebar {
 			return;
 		}
 
-		const res = this.sketch.lastSolverResult;
-		const dof = res ? res.degreesOfFreedom : 0;
-		const status = res ? res.status : 'CONVERGED';
-
-		let statusClass = 'status-under';
-		let statusLabel = `Under-constrained (${dof} DoF)`;
-
-		if (status === 'OVER_CONSTRAINED') {
-			statusClass = 'status-conflict';
-			statusLabel = 'Over-constrained / Conflict';
-		} else if (status === 'CONVERGED' && dof === 0) {
-			statusClass = 'status-fully';
-			statusLabel = 'Fully Defined (0 DoF)';
-		}
-
-		const points = [...this.sketch.points.values()].filter(p => !this.sketch.isSplineHandlePoint(p.id));
-		const lines = [...this.sketch.lines.values()].filter(l => !l.isSplineHandle);
-		const circles = [...this.sketch.circles.values()];
-		const arcs = [...this.sketch.arcs.values()];
-		const ellipses = [...this.sketch.ellipses.values()];
-		const ellipticalArcs = [...this.sketch.ellipticalArcs.values()];
-		const splines = [...this.sketch.splines.values()];
-		const texts = [...this.sketch.texts.values()];
+		const handlePointIds = this.getSplineHandlePointIds();
 		const images = [...this.sketch.images.values()];
-		const totalPrimitives =
-			points.length +
-			lines.length +
-			circles.length +
-			arcs.length +
-			ellipses.length +
-			ellipticalArcs.length +
-			splines.length +
-			texts.length;
+		const totalPrimitives = this.getPrimitivesCount(handlePointIds);
 
 		this.container.innerHTML = `
 			<div class="sidebar-header">
 				<div class="sidebar-title">Inspector & Tree</div>
-				<div class="dof-badge ${statusClass}">
-					<span class="dof-indicator"></span>
-					${statusLabel}
-				</div>
 			</div>
 
 			<div class="sidebar-content">
 				<!-- Active Tool Panel (delegated to active tool) -->
 				${this.renderActiveToolCard()}
 
-				<!-- Selected item inspector -->
-				${this.renderInspector()}
+				<!-- Selected item(s) inspector -->
+				${this.renderInspector(handlePointIds)}
 
-				<!-- Primitives Tree -->
-				<div class="tree-group">
-					<div class="tree-header">
-						<span class="tree-title">Primitives (${totalPrimitives})</span>
-					</div>
-					<div class="tree-list">
-						${texts.map(t => this.renderTextItem(t)).join('')}
-						${splines.map(s => this.renderSplineItem(s)).join('')}
-						${lines.map(l => this.renderLineItem(l)).join('')}
-						${circles.map(c => this.renderCircleItem(c)).join('')}
-						${arcs.map(a => this.renderArcItem(a)).join('')}
-						${ellipses.map(e => this.renderEllipseItem(e)).join('')}
-						${ellipticalArcs.map(ea => this.renderEllipticalArcItem(ea)).join('')}
-						${points.map(p => this.renderPointItem(p)).join('')}
-						${totalPrimitives === 0 && images.length === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
-					</div>
+				<!-- Primitives Tree (collapsed by default to save resources) -->
+				<div class="tree-group ${this.isPrimitivesExpanded ? 'is-expanded' : 'is-collapsed'}">
+					<button
+						type="button"
+						class="tree-header tree-toggle-btn"
+						id="primitives-tree-toggle"
+						aria-expanded="${this.isPrimitivesExpanded}"
+					>
+						<span class="tree-title">
+							<span class="tree-chevron">${CHEVRON_DOWN_SVG}</span>
+							Primitives (${totalPrimitives})
+						</span>
+					</button>
+					${this.isPrimitivesExpanded ? this.renderPrimitivesTreeList(handlePointIds, totalPrimitives, images.length) : ''}
 				</div>
 				${
 					images.length
@@ -143,21 +111,178 @@ export class Sidebar {
 		this.bindEvents();
 	}
 
+	private getSplineHandlePointIds(): Set<string> {
+		const handleIds = new Set<string>();
+		if (this.sketch.splines.size === 0) return handleIds;
+		for (const line of this.sketch.lines.values()) {
+			if (!line.isSplineHandle) continue;
+			const parentSpline = line.parentSplineId ? this.sketch.splines.get(line.parentSplineId) : undefined;
+			if ((!parentSpline || !parentSpline.pointIds.includes(line.p1Id)) && this.sketch.points.has(line.p1Id)) {
+				handleIds.add(line.p1Id);
+			}
+			if ((!parentSpline || !parentSpline.pointIds.includes(line.p2Id)) && this.sketch.points.has(line.p2Id)) {
+				handleIds.add(line.p2Id);
+			}
+		}
+		return handleIds;
+	}
+
+	private getPrimitivesCount(handlePointIds: Set<string>): number {
+		let splineHandleLines = 0;
+		if (this.sketch.splines.size > 0) {
+			for (const line of this.sketch.lines.values()) {
+				if (line.isSplineHandle) splineHandleLines++;
+			}
+		}
+		return (
+			this.sketch.points.size -
+			handlePointIds.size +
+			(this.sketch.lines.size - splineHandleLines) +
+			this.sketch.circles.size +
+			this.sketch.arcs.size +
+			this.sketch.ellipses.size +
+			this.sketch.ellipticalArcs.size +
+			this.sketch.splines.size +
+			this.sketch.texts.size
+		);
+	}
+
+	private renderPrimitivesTreeList(handlePointIds: Set<string>, totalPrimitives: number, imagesCount: number): string {
+		const points = [...this.sketch.points.values()].filter(p => !handlePointIds.has(p.id));
+		const lines = [...this.sketch.lines.values()].filter(l => !l.isSplineHandle);
+		const circles = [...this.sketch.circles.values()];
+		const arcs = [...this.sketch.arcs.values()];
+		const ellipses = [...this.sketch.ellipses.values()];
+		const ellipticalArcs = [...this.sketch.ellipticalArcs.values()];
+		const splines = [...this.sketch.splines.values()];
+		const texts = [...this.sketch.texts.values()];
+
+		return `
+			<div class="tree-list">
+				${texts.map(t => this.renderTextItem(t)).join('')}
+				${splines.map(s => this.renderSplineItem(s)).join('')}
+				${lines.map(l => this.renderLineItem(l)).join('')}
+				${circles.map(c => this.renderCircleItem(c)).join('')}
+				${arcs.map(a => this.renderArcItem(a)).join('')}
+				${ellipses.map(e => this.renderEllipseItem(e)).join('')}
+				${ellipticalArcs.map(ea => this.renderEllipticalArcItem(ea)).join('')}
+				${points.map(p => this.renderPointItem(p)).join('')}
+				${totalPrimitives === 0 && imagesCount === 0 ? '<div class="tree-empty">No primitives yet. Use the left toolbar to draw.</div>' : ''}
+			</div>
+		`;
+	}
+
 	private renderActiveToolCard(): string {
 		return this.interaction?.activeToolInstance?.sidebarPanel?.render() ?? '';
 	}
 
-	private renderInspector(): string {
-		if (
-			this.interaction?.activeTool === 'text' ||
-			this.interaction?.activeTool === 'transform' ||
-			this.interaction?.activeTool === 'image'
-		) {
+	private renderInspector(handlePointIds: Set<string>): string {
+		const activeTool = this.interaction?.activeTool;
+		if (activeTool === 'text' || activeTool === 'image') {
 			return '';
 		}
-		const entity = this.getSelectedInspectableEntity();
-		if (!entity?.sidebarPanel) return '';
-		return entity.sidebarPanel.render(this.createInspectorContext());
+
+		const sel = this.sketch.selection;
+		const totalSelectedCount =
+			sel.pointIds.size +
+			sel.lineIds.size +
+			sel.circleIds.size +
+			sel.arcIds.size +
+			sel.ellipseIds.size +
+			sel.ellipticalArcIds.size +
+			sel.splineIds.size +
+			sel.textIds.size +
+			sel.constraintIds.size;
+
+		if (totalSelectedCount === 0) return '';
+
+		if (totalSelectedCount === 1) {
+			if (activeTool === 'transform') return '';
+			const entity = this.getSelectedInspectableEntity();
+			if (!entity?.sidebarPanel) return '';
+			return entity.sidebarPanel.render(this.createInspectorContext());
+		}
+
+		return this.renderMultiSelectionInspector(handlePointIds);
+	}
+
+	private renderMultiSelectionInspector(handlePointIds: Set<string>): string {
+		const sel = this.sketch.selection;
+		const renderedItems: string[] = [];
+		let totalVisibleCount = 0;
+		let primitiveCount = 0;
+		let constraintCount = 0;
+
+		const pushItem = (html: string, isConstraint = false) => {
+			totalVisibleCount++;
+			if (isConstraint) constraintCount++;
+			else primitiveCount++;
+			if (renderedItems.length < MAX_SELECTED_INSPECTOR_ITEMS) {
+				renderedItems.push(html);
+			}
+		};
+
+		for (const id of sel.textIds) {
+			const t = this.sketch.texts.get(id);
+			if (t) pushItem(this.renderTextItem(t));
+		}
+		for (const id of sel.splineIds) {
+			const s = this.sketch.splines.get(id);
+			if (s) pushItem(this.renderSplineItem(s));
+		}
+		for (const id of sel.lineIds) {
+			if (id === 'axis_x' || id === 'axis_y') continue;
+			const l = this.sketch.lines.get(id);
+			if (l && !l.isSplineHandle) pushItem(this.renderLineItem(l));
+		}
+		for (const id of sel.circleIds) {
+			const c = this.sketch.circles.get(id);
+			if (c) pushItem(this.renderCircleItem(c));
+		}
+		for (const id of sel.arcIds) {
+			const a = this.sketch.arcs.get(id);
+			if (a) pushItem(this.renderArcItem(a));
+		}
+		for (const id of sel.ellipseIds) {
+			const e = this.sketch.ellipses.get(id);
+			if (e) pushItem(this.renderEllipseItem(e));
+		}
+		for (const id of sel.ellipticalArcIds) {
+			const ea = this.sketch.ellipticalArcs.get(id);
+			if (ea) pushItem(this.renderEllipticalArcItem(ea));
+		}
+		for (const id of sel.pointIds) {
+			if (id === 'origin' || handlePointIds.has(id) || !this.sketch.points.has(id)) continue;
+			const p = this.sketch.points.get(id);
+			if (p) pushItem(this.renderPointItem(p));
+		}
+		for (const id of sel.constraintIds) {
+			const c = this.sketch.constraints.get(id);
+			if (c && c.type !== 'arc_endpoints' && c.type !== 'elliptical_arc_endpoints') {
+				pushItem(this.renderConstraintItem(c), true);
+			}
+		}
+
+		if (totalVisibleCount === 0) return '';
+
+		const title =
+			primitiveCount === 0 && constraintCount > 0
+				? `Selected Constraints (${totalVisibleCount})`
+				: `Selected Primitives (${totalVisibleCount})`;
+		const remaining = totalVisibleCount - renderedItems.length;
+
+		return `
+			<div class="inspector-card">
+				<div class="inspector-card-title">
+					<span>${title}</span>
+					<button type="button" class="btn-insp-clear-selection" id="btn-clear-selection" title="Clear selection">Clear</button>
+				</div>
+				<div class="inspector-selected-list">
+					${renderedItems.join('')}
+					${remaining > 0 ? `<div class="inspector-empty-primitives">...and ${remaining} more selected</div>` : ''}
+				</div>
+			</div>
+		`;
 	}
 
 	private createInspectorContext(): InspectorContext {
@@ -608,6 +733,18 @@ export class Sidebar {
 	}
 
 	private bindEvents(): void {
+		// Collapsible Primitives tree toggle
+		this.container.querySelector<HTMLButtonElement>('#primitives-tree-toggle')?.addEventListener('click', () => {
+			this.isPrimitivesExpanded = !this.isPrimitivesExpanded;
+			this.render();
+		});
+
+		// Clear multi-selection button
+		this.container.querySelector<HTMLButtonElement>('#btn-clear-selection')?.addEventListener('click', e => {
+			e.stopPropagation();
+			this.sketch.clearSelection();
+		});
+
 		// Tree item selection
 		this.container.querySelectorAll<HTMLElement>('.tree-item[data-type]').forEach(item => {
 			item.addEventListener('click', e => {
@@ -628,6 +765,8 @@ export class Sidebar {
 				if (this.interaction?.activeTool === 'image') this.interaction.setTool('select');
 				if (this.interaction?.activeTool === 'transform') {
 					if (type !== 'constraint') this.sketch.toggleEntitySelection(id, type);
+				} else if (e.shiftKey || e.metaKey || e.ctrlKey) {
+					this.sketch.toggleEntitySelection(id, type);
 				} else {
 					this.sketch.selectEntity(id, type, false);
 				}

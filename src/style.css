@@ -590,7 +590,8 @@ body {
 	gap: 6px;
 	font-size: 11px;
 	font-weight: 600;
-	padding: 3px 8px;
+	line-height: 1.2;
+	padding: 2px 8px;
 	border-radius: 9999px;
 }
 
@@ -810,6 +811,42 @@ body {
 	display: none !important;
 }
 
+.inspector-selected-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	max-height: 260px;
+	overflow-y: auto;
+}
+
+.inspector-selected-list .tree-item.selected {
+	background-color: transparent;
+	border-color: transparent;
+}
+
+.inspector-selected-list .tree-item.selected:hover {
+	background-color: var(--bg-surface-hover);
+}
+
+.btn-insp-clear-selection {
+	margin-left: auto;
+	padding: 2px 7px;
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--text-secondary);
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border-color);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.btn-insp-clear-selection:hover {
+	color: var(--cad-red);
+	border-color: #fca5a5;
+	background-color: #fef2f2;
+}
+
 /* Tree groups */
 .tree-group {
 	display: flex;
@@ -823,12 +860,41 @@ body {
 	justify-content: space-between;
 }
 
+.tree-toggle-btn {
+	background: none;
+	border: none;
+	padding: 4px 2px;
+	width: 100%;
+	cursor: pointer;
+	text-align: left;
+	border-radius: 4px;
+	transition: background-color 0.15s ease;
+}
+
+.tree-toggle-btn:hover {
+	background-color: var(--bg-surface-hover);
+}
+
 .tree-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
 	font-size: 11px;
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
 	color: var(--text-muted);
+}
+
+.tree-chevron {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: transform 0.15s ease;
+}
+
+.tree-group.is-collapsed .tree-chevron {
+	transform: rotate(-90deg);
 }
 
 .tree-list {
@@ -999,6 +1065,7 @@ body {
 
 .footer-status {
 	display: flex;
+	align-items: center;
 	gap: 16px;
 }
 

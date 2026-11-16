@@ -127,6 +127,10 @@ function initApp(): void {
 			<div class="footer-status">
 				<span>Constraint Solver: <strong id="solver-time">0.0 ms</strong></span>
 				<span>Region Solver: <strong id="region-solver-time" title="Time for the last region calculation">0.0 ms</strong></span>
+				<div class="dof-badge status-fully" id="dof-status-badge">
+					<span class="dof-indicator"></span>
+					<span id="dof-status-label">Fully Defined (0 DoF)</span>
+				</div>
 			</div>
 		</footer>
 
@@ -186,6 +190,8 @@ function initApp(): void {
 	const zoomLevel = document.getElementById('zoom-level') as HTMLElement;
 	const solverTime = document.getElementById('solver-time') as HTMLElement;
 	const regionSolverTime = document.getElementById('region-solver-time') as HTMLElement;
+	const dofStatusBadge = document.getElementById('dof-status-badge') as HTMLElement;
+	const dofStatusLabel = document.getElementById('dof-status-label') as HTMLElement;
 
 	// Initialization of Architecture
 	const sketch = new SketchDocument();
@@ -275,12 +281,35 @@ function initApp(): void {
 		}
 	}
 
+	function updateDofStatus(): void {
+		const res = sketch.lastSolverResult;
+		const dof = res ? res.degreesOfFreedom : 0;
+		const status = res ? res.status : 'CONVERGED';
+
+		let statusClass = 'status-under';
+		let statusLabel = `Under-constrained (${dof} DoF)`;
+
+		if (status === 'OVER_CONSTRAINED') {
+			statusClass = 'status-conflict';
+			statusLabel = 'Over-constrained / Conflict';
+		} else if (status === 'CONVERGED' && dof === 0) {
+			statusClass = 'status-fully';
+			statusLabel = 'Fully Defined (0 DoF)';
+		}
+
+		dofStatusBadge.className = `dof-badge ${statusClass}`;
+		dofStatusLabel.textContent = statusLabel;
+	}
+
+	updateDofStatus();
+
 	sketch.onChange(() => {
 		solverTime.textContent = `${sketch.lastSolveTimeMs.toFixed(2)} ms`;
 		if (interaction.activeTool === 'transform' || interaction.activeTool === 'image') interaction.render();
 		else renderer.render(sketch, viewport);
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 		updateUndoRedoButtons();
+		updateDofStatus();
 	});
 
 	// Header Actions
