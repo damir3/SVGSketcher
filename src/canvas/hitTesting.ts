@@ -1,3 +1,4 @@
+import { closestPrimitive } from './geometryQueries';
 import { ORIGIN, type Vec2 } from '../math/vector';
 import type { GeoCurve } from '../math/intersection';
 import type { SketchDocument } from '../model/sketch';
@@ -22,9 +23,12 @@ export function findClosest<
 		distanceTo?(screen: Vec2, sketch: SketchDocument, viewport: Viewport, thresholdPx?: number): number | null;
 	},
 >(sketch: SketchDocument, viewport: Viewport, items: Iterable<T>, screen: Vec2, thresholdPx: number): T | null {
+	const list = Array.from(items);
+	const batch = closestPrimitive(list, sketch, viewport, screen, thresholdPx);
+	if (batch !== undefined) return batch;
 	let closestDist = thresholdPx;
 	let found: T | null = null;
-	for (const item of items) {
+	for (const item of list) {
 		if (!item.distanceTo) continue;
 		const d = item.distanceTo(screen, sketch, viewport, closestDist);
 		if (d !== null && d < closestDist) {
@@ -92,19 +96,13 @@ export function findLineNear(
 	thresholdPx = LINE_DISTANCE_PX,
 	includeAxes = false
 ): SketchLine | null {
-	let closestDist = thresholdPx;
-	let foundLine: SketchLine | null = null;
-
-	for (const line of sketch.lines.values()) {
-		if (!isSplineHandleLineVisible(sketch, line, activeTool)) {
-			continue;
-		}
-		const d = line.distanceTo(screen, sketch, viewport, closestDist);
-		if (d !== null && d < closestDist) {
-			closestDist = d;
-			foundLine = line;
-		}
-	}
+	const foundLine = findClosest(
+		sketch,
+		viewport,
+		[...sketch.lines.values()].filter(line => isSplineHandleLineVisible(sketch, line, activeTool)),
+		screen,
+		thresholdPx
+	);
 
 	if (!foundLine && includeAxes) {
 		return findAxisNear(sketch, viewport, screen, thresholdPx);
@@ -232,17 +230,12 @@ export function findTrimTargetNear(
 	screen: Vec2,
 	thresholdPx = LINE_DISTANCE_PX
 ): GeoCurve | null {
-	let bestDist = thresholdPx;
-	let bestCurve: GeoCurve | null = null;
-
-	for (const prim of sketch.getCurvePrimitives()) {
-		if (prim.type === 'line' && (prim as SketchLine).isSplineHandle) continue;
-		const d = prim.distanceTo(screen, sketch, viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestCurve = prim.toGeoCurve(sketch);
-		}
-	}
-
-	return bestCurve;
+	const found = findClosest(
+		sketch,
+		viewport,
+		[...sketch.getCurvePrimitives()].filter(prim => prim.type !== 'line' || !(prim as SketchLine).isSplineHandle),
+		screen,
+		thresholdPx
+	);
+	return found?.toGeoCurve(sketch) ?? null;
 }

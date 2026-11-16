@@ -8,8 +8,8 @@ import {
 } from '../../math/spline';
 import { filletSplinePreview } from '../../math/filletPreview';
 import { distanceToSpline } from '../../math/hitTest';
-import { intersectSplineCurve, type GeoSpline } from '../../math/intersection';
-import { pointIntersectsAABB } from '../../math/aabb';
+import { type GeoSpline } from '../../math/intersection';
+import { curvesIntersectAABB } from '../../math/aabb';
 import {
 	createPrimitiveSvgGroup,
 	isPointIdConstrained,
@@ -215,22 +215,7 @@ export class SketchSpline implements ISketchPrimitive {
 	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
 		const curve = this.toGeoCurve(sketch);
 		if (!curve) return false;
-		if (
-			curve.bezierSegments.some(
-				([start, , , end]) => pointIntersectsAABB(start, min, max) || pointIntersectsAABB(end, min, max)
-			)
-		)
-			return true;
-		const corners = [min, new Vec2(max.x, min.y), max, new Vec2(min.x, max.y)];
-		return corners.some(
-			(p1, index) =>
-				intersectSplineCurve(curve, {
-					type: 'segment',
-					id: '',
-					p1,
-					p2: corners[(index + 1) % corners.length],
-				}).length > 0
-		);
+		return curvesIntersectAABB([curve], min, max)[0];
 	}
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({

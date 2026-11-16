@@ -5,7 +5,15 @@ import { extractSplineInterval } from './spline';
 import { Vec2 } from './vector';
 import { findCurveRegions as findCurveRegionsReference, type SketchRegion } from './regionsReference';
 
-export { pointInRegion, type SketchRegion } from './regionsReference';
+export type { SketchRegion } from './regionsReference';
+import { getQueryKernel } from './queries';
+
+export function regionsContainingPoint(point: Vec2, regions: readonly SketchRegion[]): boolean[] {
+	return getQueryKernel().contains(regions, point);
+}
+export function pointInRegion(point: Vec2, region: SketchRegion): boolean {
+	return regionsContainingPoint(point, [region])[0];
+}
 
 function splitSelfIntersectingSplines(curves: GeoCurve[]): GeoCurve[] {
 	let result: GeoCurve[] | undefined;

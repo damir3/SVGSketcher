@@ -1,3 +1,4 @@
+import { canBatchQuery } from '../../geometryQueries';
 import { BaseTool } from '../base';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import type { ITool, SnapResult, ToolType } from '../types';
@@ -8,7 +9,7 @@ import type { SVGRenderer } from '../../renderer';
 import type { ISketchPrimitive, SketchLine } from '../../../model/types';
 import { DistanceConstraint, RadiusConstraint, RectangularPatternConstraint } from '../../../solver/constraints';
 import { DimensionTool } from '../constraints/dimension';
-import { AABB, curveContainedInAABB } from '../../../math/aabb';
+import { AABB, curveContainedInAABB, curvesIntersectAABB } from '../../../math/aabb';
 import type { GeoCurve } from '../../../math/intersection';
 import { Vec2 } from '../../../math/vector';
 import { LABEL_DISTANCE_PX } from '../../distances';
@@ -147,12 +148,21 @@ export class SelectTool extends BaseTool {
 			}
 		}
 
-		for (const prim of sketch.getCurvePrimitives()) {
-			if (hasToolBoxSelect && prim.type === 'line' && (prim as SketchLine).isSplineHandle) continue;
-			if (matches(prim)) {
-				itemsToSelect.push({ id: prim.id, type: prim.type });
-			}
-		}
+		const primitives = [...sketch.getCurvePrimitives()].filter(
+			prim => !(hasToolBoxSelect && prim.type === 'line' && (prim as SketchLine).isSplineHandle)
+		);
+		const curves = primitives.map(prim => (canBatchQuery(prim, 'intersectsAABB') ? prim.toGeoCurve(sketch) : null));
+		const batchable = curves.map(curve => curve !== null);
+		const results = curvesIntersectAABB(
+			curves.filter((c, i) => batchable[i] && c !== null) as GeoCurve[],
+			min,
+			max,
+			!crossing
+		);
+		let resultIndex = 0;
+		primitives.forEach((prim, i) => {
+			if (batchable[i] ? results[resultIndex++] : matches(prim)) itemsToSelect.push({ id: prim.id, type: prim.type });
+		});
 
 		if (tool?.handleBoxSelect) {
 			tool.handleBoxSelect(itemsToSelect);

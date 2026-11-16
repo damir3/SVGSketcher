@@ -18,9 +18,11 @@ import { createWasmFilletKernel, type FilletBinding } from './filletWasm';
 import { createWasmChamferKernel, type ChamferBinding } from './chamferWasm';
 
 import { createWasmOffsetKernel, type OffsetBinding } from './offsetWasm';
+import { createWasmQueryKernel, type QueryBinding } from './queryWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	geometry_queries: QueryBinding;
 	offset_geometry: OffsetBinding;
 	chamfer_geometry: ChamferBinding;
 	fillet_geometry: FilletBinding;
@@ -136,6 +138,7 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 		backend: 'wasm',
 		apiVersion: GEOMETRY_KERNEL_API_VERSION,
 		spline: createWasmSplineKernel((...args) => bindings.spline_geometry(...args)),
+		queries: createWasmQueryKernel((data, settings) => bindings.geometry_queries(data, settings)),
 		findRegions: createWasmRegionKernel(data => bindings.find_regions_packed(data)),
 		offset: createWasmOffsetKernel((data, items, settings) => bindings.offset_geometry(data, items, settings)),
 		chamfer: createWasmChamferKernel((data, settings) => bindings.chamfer_geometry(data, settings)),

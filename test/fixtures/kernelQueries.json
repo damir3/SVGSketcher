@@ -1,0 +1,6 @@
+{
+  "sourceHashes": {
+    "src/math/aabbReference.ts": "a56098f3da1aca45598e1c0c16ae6d4af5f14b00695f923943430656f0b102f2",
+    "src/math/hitTestReference.ts": "fadbec7247827533004b4c04b6b602b0c61469c150d260ae3790fb1e771cc43c"
+  }
+}

@@ -1,3 +1,4 @@
+import { snapPrimitives } from './geometryQueries';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchLine } from '../model/types';
 import type { Viewport } from './viewport';
@@ -168,13 +169,7 @@ export function findSnapTarget(
 
 	// Priority 2: Line, Circle/Arc, Ellipse & Spline snapping
 	const geomSnapDistPx = SNAP_GEOMETRY_DISTANCE_PX;
-	let closestGeomDist = geomSnapDistPx;
-	let foundGeom: {
-		type: 'line' | 'circle' | 'ellipse' | 'spline';
-		id: string;
-		worldPos: Vec2;
-		screenPos: Vec2;
-	} | null = null;
+	const candidates = [];
 
 	for (const prim of sketch.getCurvePrimitives()) {
 		if (prim.type === 'spline') {
@@ -188,12 +183,9 @@ export function findSnapTarget(
 			if (!isSplineHandleLineVisible(sketch, line, activeTool, selectedSplineIds)) continue;
 		}
 
-		const snap = prim.snapTo(screenPos, sketch, viewport, closestGeomDist, geomSnapDistPx);
-		if (snap && snap.dist < closestGeomDist) {
-			closestGeomDist = snap.dist;
-			foundGeom = snap;
-		}
+		candidates.push(prim);
 	}
+	const foundGeom = snapPrimitives(candidates, sketch, viewport, screenPos, geomSnapDistPx);
 
 	if (foundGeom) {
 		return {

@@ -6,7 +6,7 @@ import type { SketchDocument } from '../model/sketch';
 import { isPointIdConstrained, type ISketchPrimitive } from '../model/primitives';
 import type { Viewport } from './viewport';
 import { getAllGeoCurves } from '../math/intersection';
-import { findCurveRegions, pointInRegion, type SketchRegion } from '../math/regions';
+import { findCurveRegions, regionsContainingPoint, type SketchRegion } from '../math/regions';
 import { collectFilletPreviewTrims } from '../math/filletPreview';
 import type { ConstraintRenderContext } from '../solver/constraints';
 import { Vec2 } from '../math/vector';
@@ -251,8 +251,9 @@ export class SVGRenderer {
 	}
 
 	updateRegionHover(hoverPoint: Vec2 | null): boolean {
-		if (this.cachedViewport) this.drawRegions(hoverPoint);
-		return hoverPoint !== null && this.cachedRegions.some(region => pointInRegion(hoverPoint, region));
+		const hovered = hoverPoint ? regionsContainingPoint(hoverPoint, this.cachedRegions) : [];
+		if (this.cachedViewport) this.drawRegions(hoverPoint, hovered);
+		return hovered.some(Boolean);
 	}
 
 	setRegionsVisible(visible: boolean): void {
@@ -274,11 +275,14 @@ export class SVGRenderer {
 		});
 	}
 
-	private drawRegions(hoverPoint: Vec2 | null): void {
+	private drawRegions(
+		hoverPoint: Vec2 | null,
+		hoveredRegions = hoverPoint ? regionsContainingPoint(hoverPoint, this.cachedRegions) : []
+	): void {
 		this.regionGroup.innerHTML = '';
 		this.regionHoverGroup.innerHTML = '';
-		for (const region of this.cachedRegions) {
-			const hovered = hoverPoint ? pointInRegion(hoverPoint, region) : false;
+		for (const [index, region] of this.cachedRegions.entries()) {
+			const hovered = hoveredRegions[index] ?? false;
 			const d = [region.points, ...region.holes]
 				.map(
 					ring =>

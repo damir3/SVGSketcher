@@ -9,6 +9,7 @@ pub mod fillet;
 mod matrix;
 pub mod offset;
 pub mod point;
+pub mod queries;
 pub mod regions;
 pub mod solver;
 pub mod spline;
