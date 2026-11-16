@@ -26,12 +26,18 @@ test('benchmark scenes are deterministic, preserve the active backend and scale 
 	}
 });
 
-test('benchmark drag paths preserve solution and region counts across the active and reference backends', () => {
+test('benchmark drag paths preserve solution and region counts with Rust self-intersections in both backends', {
+	skip: !getGeometryKernel().spline?.selfIntersections,
+}, () => {
 	const previous = getGeometryKernel();
 	try {
 		for (const family of ['rectangles', 'splines'] as const) {
 			const scene = createBenchmarkScene(family, 'small');
-			const results = [typescriptGeometryKernel, previous].map(kernel => {
+			const reference = {
+				...typescriptGeometryKernel,
+				spline: { ...typescriptGeometryKernel.spline!, selfIntersections: previous.spline!.selfIntersections },
+			};
+			const results = [reference, previous].map(kernel => {
 				setGeometryKernel(kernel);
 				const sketch = new SketchDocument();
 				sketch.restoreSnapshot(scene.snapshot);

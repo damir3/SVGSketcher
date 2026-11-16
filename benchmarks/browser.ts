@@ -159,6 +159,10 @@ async function initialize() {
 	const bindings = await import(/* @vite-ignore */ moduleUrl);
 	await bindings.default();
 	const wasm = createWasmGeometryKernel(bindings);
+	const referenceKernel: GeometryKernel = {
+		...typescriptGeometryKernel,
+		spline: { ...typescriptGeometryKernel.spline!, selfIntersections: wasm.spline!.selfIntersections },
+	};
 	status.textContent = `Ready. Kernel API ${wasm.apiVersion}. Keep this tab visible during measurement.`;
 	run.disabled = false;
 	element<HTMLFormElement>('controls').onsubmit = async event => {
@@ -184,6 +188,7 @@ async function initialize() {
 			schemaVersion: 1,
 			sceneVersion: SCENE_VERSION,
 			apiVersion: wasm.apiVersion,
+			selfIntersectionsBackend: 'wasm',
 			createdAt: new Date().toISOString(),
 			runtime: navigator.userAgent,
 			hardwareConcurrency: navigator.hardwareConcurrency,
@@ -200,7 +205,7 @@ async function initialize() {
 			for (const [index, spec] of selected.entries()) {
 				const scene = createBenchmarkScene(spec.family, spec.size);
 				// Alternate backend order between scenes to reduce systematic warm-up/order bias.
-				const kernels = index % 2 ? [wasm, typescriptGeometryKernel] : [typescriptGeometryKernel, wasm];
+				const kernels = index % 2 ? [wasm, referenceKernel] : [referenceKernel, wasm];
 				for (const regions of [false, true])
 					for (const kernel of kernels) {
 						if (cancelled) break;

@@ -9,8 +9,14 @@ export interface SplineProjection {
 	distance: number;
 	point: Point2;
 }
+export interface SplineSelfIntersection {
+	point: Point2;
+	paramA: number;
+	paramB: number;
+}
 /** UI-independent operations in the caller's coordinate system; outputs never alias document state. */
 export interface SplineKernel {
+	selfIntersections?(segments: readonly CubicBezier[], closed: boolean): SplineSelfIntersection[];
 	naturalHandles(points: readonly Point2[]): SplineHandles[];
 	fitToBezier(points: readonly Point2[], handles?: readonly (SplineHandles | null)[]): CubicBezier[];
 	controlToBezier(points: readonly Point2[], knots?: readonly number[]): CubicBezier[];

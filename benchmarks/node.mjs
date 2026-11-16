@@ -32,12 +32,20 @@ try {
 		await bindings.default({
 			module_or_path: await readFile(new URL('../public/kernel/sketcher_wasm_bg.wasm', import.meta.url)),
 		});
-		kernels.push(createWasmGeometryKernel(bindings));
+		const wasm = createWasmGeometryKernel(bindings);
+		kernels = [
+			{
+				...typescriptGeometryKernel,
+				spline: { ...typescriptGeometryKernel.spline, selfIntersections: wasm.spline.selfIntersections },
+			},
+			wasm,
+		];
 	}
 	const report = {
 		schemaVersion: 1,
 		sceneVersion: SCENE_VERSION,
 		apiVersion: kernels[0].apiVersion,
+		selfIntersectionsBackend: scenesOnly ? undefined : 'wasm',
 		createdAt: new Date().toISOString(),
 		runtime: process.version,
 		platform: `${process.platform}/${process.arch}`,

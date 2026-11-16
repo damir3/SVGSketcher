@@ -14,7 +14,7 @@
     "bench:editing": "node --import tsx benchmarks/editing.mjs",
     "bench:build": "npm run build:kernel && tsc -p benchmarks/tsconfig.json && vite build --config benchmarks/vite.config.ts",
     "bench:serve": "vite preview --config benchmarks/vite.config.ts",
-    "test": "tsx --test test/*.test.ts",
+    "test": "npm run test:wasm",
     "test:rust": "cargo test --locked --workspace",
     "test:wasm": "node --import tsx --import ./test/helpers/wasmKernel.ts --test test/*.test.ts",
     "typecheck": "tsc --noEmit",

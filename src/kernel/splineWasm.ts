@@ -47,6 +47,22 @@ export function createWasmSplineKernel(binding: SplineGeometryBinding): SplineKe
 		knots = empty
 	) => binding(data, handles, knots, new Float64Array([mode, target.x, target.y, param]));
 	return {
+		selfIntersections(segments, closed) {
+			const packed = packCurves(segments);
+			if (!packed) throw new Error('Non-finite spline self-intersection input');
+			const data = query(10, packed, Number(closed));
+			const maxHits = segments.length + (16 * segments.length * (segments.length - 1)) / 2;
+			if (data.length % 4 !== 0 || data.length / 4 > maxHits)
+				throw new Error('Invalid WASM spline self-intersection count');
+			checked(data, data.length);
+			return Array.from({ length: data.length / 4 }, (_, i) => {
+				const paramA = data[i * 4 + 2],
+					paramB = data[i * 4 + 3];
+				if (paramA < 0 || paramB > 1 || paramA >= paramB)
+					throw new Error('Invalid WASM spline self-intersection parameters');
+				return { point: point(data, i * 4), paramA, paramB };
+			});
+		},
 		naturalHandles(pts) {
 			if (pts.length < 2) return [];
 			const packed = pack(pts);

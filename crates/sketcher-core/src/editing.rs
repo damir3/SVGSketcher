@@ -67,7 +67,11 @@ pub fn curve_intersections(target: &RegionCurve, others: &[RegionCurve]) -> Vec<
             &primitives,
             &other.geometry.primitives(),
         ) {
-            push_hit(point, g.param(point), index);
+            let param = match g {
+                Geometry::Spline(segments, _) => spline::intersection_param(segments, point),
+                _ => g.param(point),
+            };
+            push_hit(point, param, index);
         }
     }
     if let Geometry::Spline(ref segments, closed) = *g {

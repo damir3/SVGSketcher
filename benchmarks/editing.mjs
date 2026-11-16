@@ -33,9 +33,14 @@ await bindings.default({
 });
 const wasm = createWasmGeometryKernel(bindings),
 	previous = getGeometryKernel();
+const referenceKernel = {
+	...typescriptGeometryKernel,
+	spline: { ...typescriptGeometryKernel.spline, selfIntersections: wasm.spline.selfIntersections },
+};
 const report = {
 	schemaVersion: 1,
 	apiVersion: wasm.apiVersion,
+	selfIntersectionsBackend: 'wasm',
 	createdAt: new Date().toISOString(),
 	runtime: process.version,
 	platform: `${process.platform}/${process.arch}`,
@@ -90,7 +95,7 @@ try {
 			const cursors = Array.from({ length: samples + warmup }, (_, i) =>
 				getPointAtParam(target, (i + 1) / (samples + warmup + 1))
 			);
-			const kernels = order++ % 2 ? [wasm, typescriptGeometryKernel] : [typescriptGeometryKernel, wasm];
+			const kernels = order++ % 2 ? [wasm, referenceKernel] : [referenceKernel, wasm];
 			let reference;
 			for (const kernel of kernels) {
 				setGeometryKernel(kernel);

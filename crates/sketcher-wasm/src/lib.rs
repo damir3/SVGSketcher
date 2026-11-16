@@ -18,7 +18,7 @@ const PAIR_STRIDE: usize = CURVE_STRIDE * 2;
 
 #[wasm_bindgen]
 pub fn api_version() -> u32 {
-    25
+    27
 }
 
 fn decode_curve(data: &[f64]) -> Result<Curve, &'static str> {

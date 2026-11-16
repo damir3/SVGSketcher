@@ -1,3 +1,4 @@
+import { withPreciseSplineParameters } from './helpers/preciseEditingOracle';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -15,7 +16,10 @@ import {
 } from '../src/math/intersection';
 import { findSketchRegions, pointInRegion } from '../src/math/regions';
 import { findExtendCandidate, executeExtend } from '../src/math/extend';
-import { getTrimCandidate as trimReference } from '../src/math/trimReference';
+import {
+	getTrimCandidate as trimReference,
+	getCurveIntersections as intersectionsReference,
+} from '../src/math/trimReference';
 import { findExtendCandidate as extendReference } from '../src/math/extendReference';
 import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { Vec2 } from '../src/math/vector';
@@ -67,7 +71,11 @@ describe('trim/extend candidates captured before native routing', () => {
 			const target = hydrate(fixture.target) as GeoCurve,
 				others = hydrate(fixture.others) as GeoCurve[];
 			const saved = JSON.stringify([target, others]);
-			compare(plain(getCurveIntersections(target, others)), fixture.intersections, 'intersections');
+			const preciseSpline = !!getGeometryKernel().editing && target.type === 'spline';
+			const expectedHits = preciseSpline
+				? withPreciseSplineParameters(() => intersectionsReference(target, others))
+				: fixture.intersections;
+			compare(plain(getCurveIntersections(target, others)), plain(expectedHits), 'intersections');
 			for (const probe of fixture.probes) {
 				const cursor = Vec2.from(probe.cursor),
 					t = getTrimCandidate(target, others, cursor)!;
@@ -75,7 +83,13 @@ describe('trim/extend candidates captured before native routing', () => {
 				assert.ok(t.cutStartWorld instanceof Vec2);
 				assert.ok(t.cutEndWorld instanceof Vec2);
 				const { curve, ...trim } = t;
-				compare(plain(trim), probe.trim, 'trim');
+				const expectedTrim = preciseSpline
+					? withPreciseSplineParameters(() => {
+							const { curve, ...result } = trimReference(target, others, cursor)!;
+							return plain(result);
+						}, cursor)
+					: probe.trim;
+				compare(plain(trim), expectedTrim, 'trim');
 				const e = findExtendCandidate(undefined as unknown as SketchDocument, target, others, cursor);
 				if (e) {
 					assert.equal(e.target, target);
@@ -180,7 +194,10 @@ test('off-curve cursors match the frozen reference across supported geometry typ
 			]) {
 				const cursor = Vec2.from(fixture.probes[1].cursor).add(new Vec2(dx, dy));
 				setGeometryKernel(typescriptGeometryKernel);
-				const expectedTrim = trimReference(target, others, cursor),
+				const expectedTrim =
+						target.type === 'spline'
+							? withPreciseSplineParameters(() => trimReference(target, others, cursor), cursor)
+							: trimReference(target, others, cursor),
 					expectedExtend = extendReference(undefined as unknown as SketchDocument, target, others, cursor);
 				setGeometryKernel(native);
 				compare(plain(getTrimCandidate(target, others, cursor)), plain(expectedTrim), fixture.name);
@@ -236,9 +253,16 @@ test('trim/extend preserve document constraints and transaction undo/redo', () =
 	}
 });
 
-test('spline self-intersections support intersections, trim, break and self-extend across active and reference kernels', () => {
+test('Rust self-intersections support native and TS editing, break, self-extend and regions', {
+	skip: !getGeometryKernel().spline?.selfIntersections,
+}, () => {
 	const native = getGeometryKernel();
-	const backends = native.editing ? [typescriptGeometryKernel, native] : [typescriptGeometryKernel];
+	// The TS control-flow reference shares only the mandatory Rust self-intersection query.
+	const reference = {
+		...typescriptGeometryKernel,
+		spline: { ...typescriptGeometryKernel.spline!, selfIntersections: native.spline!.selfIntersections },
+	};
+	const backends = [reference, native];
 
 	const makeAlphaSketch = () => {
 		const sketch = new SketchDocument();
@@ -249,7 +273,13 @@ test('spline self-intersections support intersections, trim, break and self-exte
 	const makeBowTieSketch = () => {
 		const sketch = new SketchDocument();
 		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
-		sketch.addFitSpline([pt(-40, 25), pt(40, -25), pt(40, 25), pt(-40, -25)].map(p => p.id), undefined, false, undefined, true);
+		sketch.addFitSpline(
+			[pt(-40, 25), pt(40, -25), pt(40, 25), pt(-40, -25)].map(p => p.id),
+			undefined,
+			false,
+			undefined,
+			true
+		);
 		return sketch;
 	};
 	const makeHookSketch = () => {

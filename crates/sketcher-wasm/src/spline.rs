@@ -1,10 +1,10 @@
-use sketcher_core::{spline, CubicBezier, Point2};
+use sketcher_core::{regions, spline, CubicBezier, Point2};
 use wasm_bindgen::prelude::*;
 
 /// Numeric spline boundary for editor operations and independent parity checks.
 /// Settings: [mode, target x, target y, parameter]. Modes 0..3 retain the original queries;
 /// 4/5 evaluate position/tangent, 6/7 evaluate one cubic/derivative, 8 splits one cubic,
-/// and 9 projects without computing the unused tangent and sample.
+/// 9 projects without computing the unused tangent and sample, and 10 finds all spline self-intersections.
 #[wasm_bindgen]
 pub fn spline_geometry(
     points: &[f64],
@@ -13,7 +13,7 @@ pub fn spline_geometry(
     settings: &[f64],
 ) -> Result<Vec<f64>, JsValue> {
     if settings.len() != 4
-        || !(0.0..=9.0).contains(&settings[0])
+        || !(0.0..=10.0).contains(&settings[0])
         || settings[0].fract() != 0.0
         || !points.len().is_multiple_of(2)
         || points
@@ -35,6 +35,28 @@ pub fn spline_geometry(
         let (segments, remainder) = pts.as_chunks::<4>();
         if !remainder.is_empty() {
             return Err(JsValue::from_str("Invalid spline segment buffer"));
+        }
+        if settings[0] == 10.0 {
+            if !handles.is_empty()
+                || !knots.is_empty()
+                || settings[1] != 0.0
+                || settings[2] != 0.0
+                || ![0.0, 1.0].contains(&settings[3])
+            {
+                return Err(JsValue::from_str(
+                    "Invalid spline self-intersection settings",
+                ));
+            }
+            let result: Vec<f64> = regions::spline_self_intersections(segments, settings[3] == 1.0)
+                .into_iter()
+                .flat_map(|(point, a, b)| [point.x, point.y, a, b])
+                .collect();
+            if result.iter().any(|v| !v.is_finite()) {
+                return Err(JsValue::from_str(
+                    "Non-finite spline self-intersection result",
+                ));
+            }
+            return Ok(result);
         }
         if settings[0] == 4.0 || settings[0] == 5.0 {
             let point = if settings[0] == 4.0 {

@@ -7,7 +7,7 @@ import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import { Vec2 } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint, SketchLine, SketchSpline } from '../model/types';
-import { evaluateBezier, getSplineParamAtPoint, extractSplineInterval, type BezierSegment } from './spline';
+import { extractSplineInterval, type BezierSegment } from './spline';
 import {
 	HorizontalConstraint,
 	VerticalConstraint,
@@ -342,93 +342,14 @@ export interface CurveIntersection {
 	cuttingCurveType: CurveType;
 }
 
-function refineSegmentParam(seg: BezierSegment, point: Vec2): number {
-	const t = getSplineParamAtPoint([seg], point).param;
-	let a = Math.max(0, t - 0.05);
-	let b = Math.min(1, t + 0.05);
-	for (let iter = 0; iter < 50; iter++) {
-		const t1 = a + (b - a) * 0.382;
-		const t2 = a + (b - a) * 0.618;
-		if (evaluateBezier(seg, t1).distanceTo(point) < evaluateBezier(seg, t2).distanceTo(point)) b = t2;
-		else a = t1;
-	}
-	return (a + b) * 0.5;
-}
-
-function segmentBounds(seg: BezierSegment): [number, number, number, number] {
-	let minX = Infinity,
-		minY = Infinity,
-		maxX = -Infinity,
-		maxY = -Infinity;
-	for (const p of seg) {
-		if (p.x < minX) minX = p.x;
-		if (p.y < minY) minY = p.y;
-		if (p.x > maxX) maxX = p.x;
-		if (p.y > maxY) maxY = p.y;
-	}
-	return [minX, minY, maxX, maxY];
-}
-
-function cubicSelfIntersection(seg: BezierSegment): { point: Vec2; t1: number; t2: number } | null {
-	const [p0, p1, p2, p3] = seg;
-	const a = new Vec2().addScaledVector(p0, -1).addScaledVector(p1, 3).addScaledVector(p2, -3).add(p3);
-	const b = new Vec2().addScaledVector(p0, 3).addScaledVector(p1, -6).addScaledVector(p2, 3);
-	const c = new Vec2().subVectors(p1, p0).multiplyScalar(3);
-	const denom = a.cross(b);
-	const aa = a.lengthSq();
-	if (Math.abs(denom) < 1e-12 || aa < 1e-12) return null;
-	const s = -a.cross(c) / denom;
-	const p = s * s + (a.dot(b) * s + a.dot(c)) / aa;
-	const disc = s * s - 4 * p;
-	if (disc <= 1e-12) return null;
-	const root = Math.sqrt(disc);
-	const t1 = 0.5 * (s - root);
-	const t2 = 0.5 * (s + root);
-	if (t1 < -1e-6 || t2 > 1 + 1e-6 || t2 - t1 <= 1e-4) return null;
-	const u1 = Math.max(0, Math.min(1, t1));
-	const u2 = Math.max(0, Math.min(1, t2));
-	const q1 = evaluateBezier(seg, u1);
-	const q2 = evaluateBezier(seg, u2);
-	if (q1.distanceTo(q2) >= 1e-5) return null;
-	return { point: new Vec2().midpoint(q1, q2), t1: u1, t2: u2 };
-}
-
-/** Finds genuine self-intersection points and parameter pairs on a cubic Bezier spline. */
+/** Finds genuine self-intersection points and parameter pairs in one native query. */
 export function getSplineSelfIntersections(
 	segments: BezierSegment[],
 	isClosed = false
 ): Array<{ point: Vec2; paramA: number; paramB: number }> {
-	const n = segments.length;
-	if (n === 0) return [];
-	const hits: Array<{ point: Vec2; paramA: number; paramB: number }> = [];
-	for (let a = 0; a < n; a++) {
-		const single = cubicSelfIntersection(segments[a]);
-		if (single) hits.push({ point: single.point, paramA: (a + single.t1) / n, paramB: (a + single.t2) / n });
-	}
-	if (n < 2) return hits;
-	const boxes = segments.map(segmentBounds);
-	for (let a = 0; a < n; a++) {
-		const [minAx, minAy, maxAx, maxAy] = boxes[a];
-		for (let b = a + 1; b < n; b++) {
-			const [minBx, minBy, maxBx, maxBy] = boxes[b];
-			if (maxAx < minBx - 1e-4 || minAx > maxBx + 1e-4 || maxAy < minBy - 1e-4 || minAy > maxBy + 1e-4) continue;
-			for (const hit of intersectBezierBezier(segments[a], segments[b])) {
-				if (b === a + 1 && hit.distanceTo(segments[a][3]) < 1e-3) continue;
-				if (isClosed && a === 0 && b === n - 1 && hit.distanceTo(segments[0][0]) < 1e-3) continue;
-				const ta = refineSegmentParam(segments[a], hit);
-				const tb = refineSegmentParam(segments[b], hit);
-				const pa = evaluateBezier(segments[a], ta);
-				const pb = evaluateBezier(segments[b], tb);
-				if (pa.distanceTo(pb) >= 1e-5) continue;
-				hits.push({
-					point: new Vec2((pa.x + pb.x) * 0.5, (pa.y + pb.y) * 0.5),
-					paramA: (a + ta) / n,
-					paramB: (b + tb) / n,
-				});
-			}
-		}
-	}
-	return hits;
+	const query = getGeometryKernel().spline?.selfIntersections;
+	if (!query) throw new Error('Spline self-intersections require the Rust/WASM kernel');
+	return query(segments, isClosed).map(hit => ({ ...hit, point: Vec2.from(hit.point) }));
 }
 
 function splineSelfCurveIntersections(target: GeoSpline): CurveIntersection[] {

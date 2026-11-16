@@ -25,9 +25,7 @@ jobs:
         run: cargo fmt --all --check
       - name: Test native Rust
         run: npm run test:rust
-      - name: Test TypeScript backend
-        run: npm test
       - name: Build WASM application
         run: npm run build:wasm
       - name: Test full editor suite with WASM backend
-        run: npm run test:wasm
+        run: npm test

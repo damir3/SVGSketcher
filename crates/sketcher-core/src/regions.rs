@@ -729,7 +729,9 @@ fn cubic_self_intersection(segment: &CubicBezier) -> Option<(Point2, f64, f64)> 
     Some((q1.middle(q2), u1, u2))
 }
 
-pub(crate) fn spline_self_intersections(
+/// Ordered crossing points and normalized parameter pairs for an entire cubic spline.
+/// Single-cubic loops precede ascending segment pairs; adjacent endpoints and closed seams are excluded.
+pub fn spline_self_intersections(
     segments: &[CubicBezier],
     closed: bool,
 ) -> Vec<(Point2, f64, f64)> {
@@ -1203,5 +1205,41 @@ mod tests {
         ];
         let r = find_regions(&curves);
         assert_eq!(r.len(), 1);
+    }
+    fn self_test_line(a: Point2, b: Point2) -> CubicBezier {
+        [a, a.lerp(b, 1.0 / 3.0), a.lerp(b, 2.0 / 3.0), b]
+    }
+    #[test]
+    fn self_intersections_return_normalized_parameters_on_both_branches() {
+        let segments = [
+            self_test_line(p(-40.0, -30.0), p(40.0, 30.0)),
+            self_test_line(p(-40.0, 30.0), p(40.0, -30.0)),
+        ];
+        let hits = spline_self_intersections(&segments, false);
+        assert_eq!(hits.len(), 1);
+        let (point, a, b) = hits[0];
+        assert!(point.length() < 1e-8);
+        assert!((a - 0.25).abs() < 1e-8 && (b - 0.75).abs() < 1e-8);
+    }
+    #[test]
+    fn self_intersections_exclude_only_the_closed_seam_and_handle_empty_geometry() {
+        assert!(spline_self_intersections(&[], false).is_empty());
+        assert!(spline_self_intersections(&[[p(1.0, 2.0); 4]], true).is_empty());
+        let segments = [
+            self_test_line(p(-40.0, -30.0), p(40.0, 30.0)),
+            self_test_line(p(-40.0, 30.0), p(-40.0, -30.0)),
+        ];
+        assert_eq!(spline_self_intersections(&segments, false).len(), 1);
+        assert!(spline_self_intersections(&segments, true).is_empty());
+    }
+    #[test]
+    fn self_intersections_detect_a_loop_within_one_cubic() {
+        let curve = [p(0.0, 0.0), p(100.0, 100.0), p(-100.0, 100.0), p(50.0, 0.0)];
+        let hits = spline_self_intersections(&[curve], false);
+        assert_eq!(hits.len(), 1);
+        let (point, a, b) = hits[0];
+        assert!(a > 0.0 && a < b && b < 1.0);
+        assert!(point.distance(bezier::evaluate(&curve, a)) < 1e-5);
+        assert!(point.distance(bezier::evaluate(&curve, b)) < 1e-5);
     }
 }

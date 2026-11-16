@@ -218,6 +218,58 @@ pub fn project(segments: &[CubicBezier], target: Point2) -> (f64, f64, Point2) {
     (best_param, best_distance, best_point)
 }
 
+/// Refine an already located intersection on its selected cubic branch.
+/// Keep the solver/cursor projection's legacy sampling separate from precision-critical cuts.
+pub fn intersection_param(segments: &[CubicBezier], target: Point2) -> f64 {
+    if segments.is_empty() {
+        return 0.0;
+    }
+    let (seed, _, _) = project(segments, target);
+    let value = seed * segments.len() as f64;
+    let index = (value.floor() as usize).min(segments.len() - 1);
+    let curve = &segments[index];
+    let mut t = value - index as f64;
+    let mut best = bezier::evaluate(curve, t).distance_squared(target);
+    // Endpoints must remain exact, including intersections shared with another primitive.
+    for endpoint in [0.0, 1.0] {
+        let d = bezier::evaluate(curve, endpoint).distance_squared(target);
+        if d < best {
+            best = d;
+            t = endpoint;
+        }
+    }
+    for _ in 0..20 {
+        let point = bezier::evaluate(curve, t);
+        let tangent = bezier::derivative(curve, t);
+        let length_sq = tangent.length_squared();
+        if length_sq == 0.0 || !length_sq.is_finite() {
+            break;
+        }
+        let step = (point - target).dot(tangent) / length_sq;
+        if !step.is_finite() {
+            break;
+        }
+        let mut factor = 1.0;
+        let mut next = t;
+        // Damping prevents a correction from moving away from the already selected branch.
+        for _ in 0..20 {
+            let candidate = (t - factor * step).clamp(0.0, 1.0);
+            let distance = bezier::evaluate(curve, candidate).distance_squared(target);
+            if distance < best {
+                next = candidate;
+                best = distance;
+                break;
+            }
+            factor *= 0.5;
+        }
+        if next == t {
+            break;
+        }
+        t = next;
+    }
+    (index as f64 + t) / segments.len() as f64
+}
+
 pub fn signed_distance(segments: &[CubicBezier], target: Point2) -> f64 {
     if segments.is_empty() {
         return 0.0;
@@ -286,5 +338,27 @@ mod tests {
         assert_eq!(signed_distance(&segments, p(12.0, -3.0)), -3.0);
         let (param, distance, point) = project(&[], p(4.0, 3.0));
         assert_eq!((param, distance, point), (0.0, f64::INFINITY, p(4.0, 3.0)));
+    }
+    #[test]
+    fn intersection_parameters_reconstruct_known_points_at_cut_precision() {
+        for scale in [0.01, 1.0, 1000.0] {
+            let curve =
+                [p(0.0, 0.0), p(20.0, 80.0), p(70.0, -20.0), p(100.0, 40.0)].map(|p| p * scale);
+            for t in [0.0, 0.123456789, 0.5, 0.87654321, 1.0] {
+                let point = bezier::evaluate(&curve, t);
+                let param = intersection_param(&[curve], point);
+                assert!(bezier::evaluate(&curve, param).distance(point) < 1e-8);
+            }
+        }
+    }
+    #[test]
+    fn precise_cuts_keep_shared_cubic_endpoints_exact() {
+        let first = [p(0.0, 0.0), p(1.0, 4.0), p(4.0, 6.0), p(8.0, 8.0)];
+        let second = [first[3], p(9.0, 12.0), p(12.0, 7.0), p(15.0, 0.0)];
+        let segments = [first, second];
+        assert_eq!(intersection_param(&segments, first[0]), 0.0);
+        assert_eq!(intersection_param(&segments, first[3]), 0.5);
+        assert_eq!(intersection_param(&segments, second[3]), 1.0);
+        assert_eq!(intersection_param(&[], Point2::ZERO), 0.0);
     }
 }
