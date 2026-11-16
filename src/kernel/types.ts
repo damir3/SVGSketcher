@@ -9,7 +9,7 @@ import type { CurveEvaluationKernel } from './curveTypes';
 import type { GeometryQueryKernel } from './queryTypes';
 
 /** Versioned, UI-independent boundary for migrated kernel operations. */
-export const GEOMETRY_KERNEL_API_VERSION = 23;
+export const GEOMETRY_KERNEL_API_VERSION = 24;
 export const KERNEL_CURVE_STRIDE = 9;
 export const MAX_BEZIER_INTERSECTION_CANDIDATES = 17;
 // The existing sampled conic algorithm can emit one candidate per interval, including coincident curves.

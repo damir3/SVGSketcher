@@ -1,3 +1,4 @@
+import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import assert from 'node:assert/strict';
 import { assertSameCubicGeometry } from './helpers/offsetGeometry';
 import {
@@ -434,13 +435,40 @@ test('spline offsets saved with 17 points keep their IDs when the distance chang
 	const ids = [...sketch.splines.get(splineId)!.pointIds];
 	assert.equal(ids.length, 17);
 	const c = sketch.constraints.get(created.constraintIds[0]) as OffsetConstraint;
-	assert.equal(sketch.applyConstraintValueDirectly(c, 10), true);
-	sketch.solve();
-	assert.deepEqual(sketch.splines.get(splineId)!.pointIds, ids);
-	const points = sampledSpline(sketch, splineId);
-	points.push(points[0]);
-	assertNoCrossings(points);
-	assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+	const previous = getGeometryKernel(),
+		resize = previous.offset?.resizeSpline;
+	let resizeCalls = 0;
+	if (resize)
+		setGeometryKernel({
+			...previous,
+			offset: {
+				...previous.offset!,
+				resizeSpline(...args) {
+					resizeCalls++;
+					return resize(...args);
+				},
+			},
+		});
+	try {
+		sketch.beginTransaction();
+		assert.equal(sketch.applyConstraintValueDirectly(c, 10), true);
+		sketch.solve();
+		sketch.commitTransaction(false);
+		assert.deepEqual(sketch.splines.get(splineId)!.pointIds, ids);
+		const points = sampledSpline(sketch, splineId);
+		points.push(points[0]);
+		assertNoCrossings(points);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-8);
+		if (resize) assert.ok(resizeCalls > 0, 'document update did not use the native spline resizer');
+		assert.equal(sketch.undo(), true);
+		assert.deepEqual(sketch.splines.get(splineId)!.pointIds, ids);
+		assert.equal((sketch.constraints.get(c.id) as OffsetConstraint).targetDistance, 3);
+		assert.equal(sketch.redo(), true);
+		assert.deepEqual(sketch.splines.get(splineId)!.pointIds, ids);
+		assert.equal((sketch.constraints.get(c.id) as OffsetConstraint).targetDistance, 10);
+	} finally {
+		setGeometryKernel(previous);
+	}
 });
 
 test('collapsed spline handles yield finite offset geometry', () => {

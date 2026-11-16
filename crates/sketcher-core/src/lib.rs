@@ -9,6 +9,7 @@ mod ellipse;
 pub mod fillet;
 mod matrix;
 pub mod offset;
+pub mod offset_resize;
 pub mod point;
 pub mod queries;
 pub mod regions;

@@ -1,9 +1,14 @@
+import { createWasmOffsetSplineResize, type OffsetSplineResizeBinding } from './offsetSplineWasm';
 import { packRegionCurves } from './regionWasm';
 import type { OffsetKernel, KernelOffsetPrimitive, KernelOffsetSide } from './offsetTypes';
 import { supportedOffsetRadius } from './offsetTypes';
 export type OffsetBinding = (curves: Float64Array, items: Float64Array, settings: Float64Array) => Float64Array;
-export function createWasmOffsetKernel(binding: OffsetBinding): OffsetKernel {
+export function createWasmOffsetKernel(
+	binding: OffsetBinding,
+	resizeBinding?: OffsetSplineResizeBinding
+): OffsetKernel {
 	return {
+		...(resizeBinding ? { resizeSpline: createWasmOffsetSplineResize(resizeBinding) } : {}),
 		calculate(items, closed, reference, direction, d1, d2, flip) {
 			const curves = items.flatMap(item => (item.curve ? [item.curve] : [])),
 				records: number[] = [];

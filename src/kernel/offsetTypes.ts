@@ -50,7 +50,23 @@ export interface KernelOffsetResult {
 	isValid: boolean;
 	errorMessage?: string;
 }
+/** Guard allocation sizes at the wire boundary; ordinary document offsets use far fewer points. */
+export const MAX_OFFSET_SPLINE_POINTS = 1_000_000;
+export interface OffsetSplineGeometry {
+	points: readonly Point2[];
+	normals: readonly Point2[];
+	handles: readonly { h1: Point2; h2: Point2 }[];
+	closed: boolean;
+}
+export interface ResizedOffsetSpline {
+	points: Point2[];
+	normals: Point2[];
+	bases: Point2[];
+	handles: { h1: Point2; h2: Point2 }[];
+}
+export type OffsetSplineResize = (spline: OffsetSplineGeometry, count: number, distance: number) => ResizedOffsetSpline;
 export interface OffsetKernel {
+	resizeSpline?: OffsetSplineResize;
 	calculate(
 		items: readonly OffsetKernelItem[],
 		closed: boolean,
