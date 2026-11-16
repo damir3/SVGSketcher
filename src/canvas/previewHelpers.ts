@@ -4,7 +4,14 @@ import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
 import { POINT_TOLERANCE } from '../constants';
-import { createSvgElement, createSvgLine, createSvgCircle, createSvgEllipse, createSvgPath } from './svg';
+import {
+	createSvgElement,
+	createSvgLine,
+	createSvgCircle,
+	createSvgEllipse,
+	createSvgPath,
+	createSvgRect,
+} from './svg';
 import {
 	COLORS,
 	STROKE_WIDTH,
@@ -21,6 +28,11 @@ import {
 	SPLINE_CHECKMARK_PATH_ATTRS,
 	getSplinePreviewStrokeAttrs,
 	TRIM_STROKE_ATTRS,
+	SELECTION_BOX_ATTRS,
+	CROSSING_SELECTION_BOX_ATTRS,
+	SNAP_POINT_ATTRS,
+	SNAP_GRID_ATTRS,
+	SNAP_OBJECT_ATTRS,
 } from './styles';
 import { getArcSvgPath, getEllipticalArcSvgPath } from './svg';
 import {
@@ -512,4 +524,50 @@ export function renderTracePreviewVisual(
 			createSvgCircle(screenVertices[index], 2.5, PREVIEW_POINT_ATTRS, group);
 		}
 	}
+}
+
+export function renderSnapIndicatorVisual(
+	overlayGroup: SVGGElement,
+	s: Vec2,
+	type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid' = 'point',
+	clearFirst = true
+): void {
+	if (clearFirst) {
+		overlayGroup.innerHTML = '';
+	}
+
+	if (type === 'line' || type === 'circle' || type === 'spline' || type === 'ellipse') {
+		const d = 7;
+		createSvgElement(
+			'polygon',
+			{
+				points: `${s.x.toFixed(1)},${(s.y - d).toFixed(1)} ${(s.x + d).toFixed(1)},${s.y.toFixed(1)} ${s.x.toFixed(1)},${(s.y + d).toFixed(1)} ${(s.x - d).toFixed(1)},${s.y.toFixed(1)}`,
+				...SNAP_OBJECT_ATTRS,
+			},
+			overlayGroup
+		);
+	} else if (type === 'grid') {
+		const size = 5;
+		createSvgRect(
+			s.clone().subScalar(size),
+			new Vec2(size * 2, size * 2),
+			{
+				...SNAP_GRID_ATTRS,
+				rx: 1,
+			},
+			overlayGroup
+		);
+	} else {
+		createSvgCircle(s, 7, SNAP_POINT_ATTRS, overlayGroup);
+	}
+}
+
+export function renderSelectionBoxVisual(overlayGroup: SVGGElement, s1: Vec2, s2: Vec2): void {
+	overlayGroup.innerHTML = '';
+	const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
+	const width = Math.abs(s2.x - s1.x);
+	const height = Math.abs(s2.y - s1.y);
+
+	const attrs = s2.x < s1.x ? CROSSING_SELECTION_BOX_ATTRS : SELECTION_BOX_ATTRS;
+	createSvgRect(min, new Vec2(width, height), attrs, overlayGroup);
 }

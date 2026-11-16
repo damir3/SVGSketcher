@@ -454,3 +454,106 @@ export function renderAngleDimensionVisual(opts: AngleDimensionVisualOptions): v
 		});
 	}
 }
+
+export function renderDistancePreviewVisual(
+	parent: SVGElement,
+	s1: Vec2,
+	s2: Vec2,
+	cursor?: Vec2,
+	distVal = 0,
+	orientation: 'aligned' | 'horizontal' | 'vertical' | 'direct' = 'aligned',
+	isTargetSnapped = false
+): void {
+	const geom = computeDistanceDimensionGeometry(s1, s2, orientation, 0, cursor);
+	if (!geom) return;
+
+	let labelPosition: number | undefined;
+	if (cursor && orientation !== 'direct') {
+		if (orientation === 'horizontal') {
+			const dx = s2.x - s1.x;
+			if (Math.abs(dx) > 1e-4) labelPosition = (cursor.x - s1.x) / dx;
+		} else if (orientation === 'vertical') {
+			const dy = s2.y - s1.y;
+			if (Math.abs(dy) > 1e-4) labelPosition = (cursor.y - s1.y) / dy;
+		} else {
+			const dir = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4);
+			if (dir) {
+				const totalLen = s1.distanceTo(s2);
+				if (totalLen > 1e-4) {
+					labelPosition = new Vec2().subVectors(cursor, s1).dot(dir) / totalLen;
+				}
+			}
+		}
+	}
+
+	const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
+	renderLinearDimensionVisual({
+		d1: geom.d1,
+		d2: geom.d2,
+		label: `${labelPrefix}${formatDimensionValue(distVal, 1)} mm`,
+		extensionLines: geom.extensionLines,
+		parent,
+		isPreview: true,
+		startPointHighlight: orientation === 'direct' ? s1 : undefined,
+		targetPointSnapped: isTargetSnapped,
+		labelPosition,
+	});
+}
+
+export function renderPointToLineDistancePreviewVisual(
+	parent: SVGElement,
+	sp: Vec2,
+	s1: Vec2,
+	s2: Vec2,
+	cursor?: Vec2,
+	distVal = 0
+): void {
+	const geom = computePointToLineDimensionGeometry(sp, s1, s2, 0, cursor);
+	if (!geom) return;
+
+	renderLinearDimensionVisual({
+		d1: geom.d1,
+		d2: geom.d2,
+		label: `${formatDimensionValue(distVal, 1)} mm`,
+		extensionLines: geom.extensionLines,
+		parent,
+		isPreview: true,
+		startPointHighlight: sp,
+	});
+}
+
+export function renderAnglePreviewVisual(
+	parent: SVGElement,
+	sCenter: Vec2,
+	sRay1: Vec2,
+	sRay2: Vec2,
+	cursor: Vec2,
+	angleDeg: number,
+	sp1?: Vec2,
+	sp2?: Vec2,
+	sp3?: Vec2,
+	sp4?: Vec2
+): void {
+	const a1 = sCenter.angleToPoint(sRay1);
+	const a2 = sCenter.angleToPoint(sRay2);
+
+	let delta = a2 - a1;
+	while (delta > Math.PI) delta -= 2 * Math.PI;
+	while (delta < -Math.PI) delta += 2 * Math.PI;
+
+	const rScreen = Math.max(28, sCenter.distanceTo(cursor));
+	const extensionLines: Array<{ angle: number; pA: Vec2; pB: Vec2 }> = [];
+	if (sp1 && sp2) extensionLines.push({ angle: a1, pA: sp1, pB: sp2 });
+	if (sp3 && sp4) extensionLines.push({ angle: a2, pA: sp3, pB: sp4 });
+
+	renderAngleDimensionVisual({
+		parent,
+		sCenter,
+		a1,
+		a2,
+		delta,
+		rScreen,
+		label: `${formatDimensionValue(angleDeg, 1)}°`,
+		extensionLines,
+	});
+}

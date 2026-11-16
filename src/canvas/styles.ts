@@ -35,7 +35,6 @@ export const COLORS = {
 	originQuarter: 'rgba(100, 116, 139, 0.45)',
 	gridMinor: 'rgba(0, 0, 0, 0.08)',
 	gridMajor: 'rgba(0, 0, 0, 0.20)',
-	gridLabel: 'rgba(0, 0, 0, 0.6)',
 	trim: 'rgba(255, 0, 0, 0.75)',
 
 	// Spline styles and colors

@@ -9,8 +9,9 @@ import { getAllGeoCurves } from '../math/intersection';
 import { findCurveRegions, pointInRegion, type SketchRegion } from '../math/regions';
 import { collectFilletPreviewTrims } from '../math/filletPreview';
 import type { ConstraintRenderContext } from '../solver/constraints';
-import { ORIGIN, Vec2 } from '../math/vector';
+import { Vec2 } from '../math/vector';
 import { renderConstraintBadge, renderBadgeOnSegment, renderBadgeOnCircle } from './badgeIcons';
+import { getGridRenderKey, renderGridAndAxes } from './gridRenderer';
 
 export * from './styles';
 export * from './svg';
@@ -18,14 +19,14 @@ export * from './dimensionGeometry';
 export * from './modifyPreviews';
 export { TEXT_ROTATION_HANDLE_DISTANCE_PX } from './distances';
 
-import { createSvgElement, createSvgLine, createSvgCircle, createSvgRect, createSvgPath, createSvgText } from './svg';
+import { createSvgElement, createSvgPath } from './svg';
 import {
-	formatDimensionValue,
-	computeDistanceDimensionGeometry,
-	computePointToLineDimensionGeometry,
+	renderAnglePreviewVisual,
+	renderDistancePreviewVisual,
 	renderLinearDimensionVisual,
-	renderAngleDimensionVisual,
+	renderPointToLineDistancePreviewVisual,
 } from './dimensionGeometry';
+import { renderSelectionBoxVisual, renderSnapIndicatorVisual } from './previewHelpers';
 import {
 	type ChamferGizmoHandle,
 	type ChamferPreviewState,
@@ -49,23 +50,7 @@ import {
 	renderTransformedObjects as renderTransformedPreviewObjects,
 	renderTransformPreview as renderTransformPreviewElements,
 } from './modifyPreviews';
-import {
-	COLORS,
-	REGION_STYLE,
-	DASH_ARRAY,
-	STROKE_WIDTH,
-	SVG_EXPORT_STYLE,
-	type SvgAttrs,
-	HIT_AREA_STROKE_ATTRS,
-	SELECTION_BOX_ATTRS,
-	CROSSING_SELECTION_BOX_ATTRS,
-	SNAP_POINT_ATTRS,
-	SNAP_GRID_ATTRS,
-	SNAP_OBJECT_ATTRS,
-	MIRROR_LINE_ATTRS,
-} from './styles';
-
-const TWO_PI = 2 * Math.PI;
+import { COLORS, DASH_ARRAY, REGION_STYLE, STROKE_WIDTH, SVG_EXPORT_STYLE } from './styles';
 
 export interface RenderOptions {
 	activeTextId?: string | null;
@@ -98,6 +83,7 @@ export class SVGRenderer {
 	private dimensionsVisible = true;
 	private cachedRegions: SketchRegion[] = [];
 	private regionGeometryKey: string | null = null;
+	private gridRenderKey: string | null = null;
 	private cachedViewport: Viewport | null = null;
 	deferRegionSolve = false;
 	onRegionSolve?: (elapsedMs: number) => void;
@@ -137,60 +123,31 @@ export class SVGRenderer {
 		this.defsEl = createSvgElement('defs', undefined, this.svg);
 		this.setupDefs();
 
-		this.gridGroup = this.createGroup('grid-layer');
-		this.gridGroup.style.pointerEvents = 'none';
-
+		this.gridGroup = this.createGroup('grid-layer', true);
 		this.imageGroup = this.createGroup('image-layer');
 		this.originAxisGroup = this.createGroup('origin-axis-layer');
-		this.regionGroup = this.createGroup('region-layer');
-		this.regionGroup.style.pointerEvents = 'none';
-		this.regionHoverGroup = this.createGroup('region-hover-layer');
-		this.regionHoverGroup.style.pointerEvents = 'none';
-
+		this.regionGroup = this.createGroup('region-layer', true);
 		this.geometryGroup = this.createGroup('geometry-layer');
 		this.textGroup = this.createGroup('text-layer');
+		this.regionHoverGroup = this.createGroup('region-hover-layer', true);
 		this.constraintGroup = this.createGroup('constraint-layer');
 		this.pointGroup = this.createGroup('point-layer');
-
-		this.mirrorGroup = this.createGroup('mirror-preview-layer');
-		this.mirrorGroup.style.pointerEvents = 'none';
-
-		this.patternGroup = this.createGroup('pattern-preview-layer');
-		this.patternGroup.style.pointerEvents = 'none';
-
+		this.mirrorGroup = this.createGroup('mirror-preview-layer', true);
+		this.patternGroup = this.createGroup('pattern-preview-layer', true);
 		this.patternCheckboxGroup = this.createGroup('pattern-checkbox-layer');
-
 		this.filletGroup = this.createGroup('fillet-layer');
 		this.chamferGroup = this.createGroup('chamfer-layer');
 		this.offsetGroup = this.createGroup('offset-layer');
-
-		this.previewGroup = this.createGroup('preview-layer');
-		this.previewGroup.style.pointerEvents = 'none';
-
-		this.overlayGroup = this.createGroup('overlay-layer');
-		this.overlayGroup.style.pointerEvents = 'none';
-
-		this.svg.appendChild(this.gridGroup);
-		this.svg.appendChild(this.imageGroup);
-		this.svg.appendChild(this.originAxisGroup);
-		this.svg.appendChild(this.regionGroup);
-		this.svg.appendChild(this.geometryGroup);
-		this.svg.appendChild(this.textGroup);
-		this.svg.appendChild(this.regionHoverGroup);
-		this.svg.appendChild(this.constraintGroup);
-		this.svg.appendChild(this.pointGroup);
-		this.svg.appendChild(this.mirrorGroup);
-		this.svg.appendChild(this.patternGroup);
-		this.svg.appendChild(this.patternCheckboxGroup);
-		this.svg.appendChild(this.filletGroup);
-		this.svg.appendChild(this.chamferGroup);
-		this.svg.appendChild(this.offsetGroup);
-		this.svg.appendChild(this.previewGroup);
-		this.svg.appendChild(this.overlayGroup);
+		this.previewGroup = this.createGroup('preview-layer', true);
+		this.overlayGroup = this.createGroup('overlay-layer', true);
 	}
 
-	private createGroup(className: string): SVGGElement {
-		return createSvgElement('g', { class: className });
+	private createGroup(className: string, pointerEventsNone = false): SVGGElement {
+		const group = createSvgElement('g', { class: className }, this.svg);
+		if (pointerEventsNone) {
+			group.style.pointerEvents = 'none';
+		}
+		return group;
 	}
 
 	private setupDefs(): void {
@@ -400,223 +357,15 @@ export class SVGRenderer {
 	}
 
 	private renderGrid(sketch: SketchDocument, viewport: Viewport, showGrid: boolean, options: RenderOptions = {}): void {
-		this.gridGroup.innerHTML = '';
-		this.originAxisGroup.innerHTML = '';
-
-		const origin = viewport.worldToScreen(ORIGIN);
-
-		if (showGrid) {
-			const { step, subStep } = viewport.getGridStep();
-			const minWorld = viewport.screenToWorld(new Vec2(0, viewport.height));
-			const maxWorld = viewport.screenToWorld(new Vec2(viewport.width, 0));
-
-			const start = new Vec2(Math.floor(minWorld.x / subStep) * subStep, Math.floor(minWorld.y / subStep) * subStep);
-			const end = new Vec2(Math.ceil(maxWorld.x / subStep) * subStep, Math.ceil(maxWorld.y / subStep) * subStep);
-
-			const subStepPx = subStep * viewport.zoom;
-			const showSubGrid = subStepPx >= 6;
-
-			// 1. Minor grid lines (every subStep)
-			let dMinor = '';
-			// 2. Major grid lines (every step = 5 * subStep)
-			let dMajor = '';
-
-			const axisY = Math.max(8, Math.min(viewport.height - 40, origin.y));
-			const axisX = Math.max(8, Math.min(viewport.width - 30, origin.x));
-
-			const labelsG = createSvgElement('g', { class: 'grid-labels', 'pointer-events': 'none' }, this.originAxisGroup);
-
-			const labelStyle: SvgAttrs = {
-				'dominant-baseline': 'central',
-				'font-size': 11,
-				'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-				fill: COLORS.gridLabel,
-				'paint-order': 'stroke fill',
-				stroke: COLORS.white,
-				'stroke-width': 3,
-				'stroke-linejoin': 'round',
-			};
-
-			for (let x = start.x; x <= end.x; x += subStep) {
-				const s = viewport.worldToScreen(new Vec2(x, 0));
-				const isMajor = Math.abs(Math.round(x / subStep) % 5) === 0;
-				if (isMajor) {
-					dMajor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
-
-					const cleanVal = parseFloat((Math.round(x / step) * step).toFixed(6));
-					if (Math.abs(cleanVal) > 1e-4) {
-						const anchor = new Vec2(s.x, axisY + 4);
-						createSvgText(
-							anchor,
-							cleanVal.toString(),
-							{
-								transform: `rotate(-90 ${anchor.x.toFixed(1)} ${anchor.y.toFixed(1)})`,
-								'text-anchor': 'end',
-								...labelStyle,
-							},
-							labelsG
-						);
-					}
-				} else if (showSubGrid) {
-					dMinor += `M ${s.x.toFixed(1)} 0 L ${s.x.toFixed(1)} ${viewport.height} `;
-				}
-			}
-
-			for (let y = start.y; y <= end.y; y += subStep) {
-				const s = viewport.worldToScreen(new Vec2(0, y));
-				const isMajor = Math.abs(Math.round(y / subStep) % 5) === 0;
-				if (isMajor) {
-					dMajor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
-
-					const cleanVal = parseFloat((Math.round(y / step) * step).toFixed(6));
-					if (Math.abs(cleanVal) > 1e-4) {
-						createSvgText(
-							new Vec2(axisX + 8, s.y),
-							cleanVal.toString(),
-							{
-								'text-anchor': 'start',
-								...labelStyle,
-							},
-							labelsG
-						);
-					}
-				} else if (showSubGrid) {
-					dMinor += `M 0 ${s.y.toFixed(1)} L ${viewport.width} ${s.y.toFixed(1)} `;
-				}
-			}
-
-			// Minor grid (subStep) - light subtle lines
-			if (showSubGrid && dMinor) {
-				createSvgPath(
-					dMinor,
-					{
-						stroke: COLORS.gridMinor,
-						'stroke-width': STROKE_WIDTH.minorGrid,
-						fill: 'none',
-					},
-					this.gridGroup
-				);
-			}
-
-			// Major grid (step = 5 * subStep) - distinct darker lines
-			if (dMajor) {
-				createSvgPath(
-					dMajor,
-					{
-						stroke: COLORS.gridMajor,
-						'stroke-width': STROKE_WIDTH.majorGrid,
-						fill: 'none',
-					},
-					this.gridGroup
-				);
-			}
-		}
-
-		// Origin Axes & Marker
-		const isXMirror = options.mirrorHighlight?.mirrorLineId === 'axis_x';
-		const isYMirror = options.mirrorHighlight?.mirrorLineId === 'axis_y';
-		const isXSelected = !isXMirror && sketch.selection.lineIds.has('axis_x');
-		const isYSelected = !isYMirror && sketch.selection.lineIds.has('axis_y');
-		const isOriginSelected = sketch.selection.pointIds.has('origin');
-
-		// X Axis (Red)
-		const axisXG = createSvgElement(
-			'g',
-			{
-				'data-id': 'axis_x',
-				'data-type': 'line',
-				class: 'sketch-entity sketch-line sketch-axis-line' + (isXSelected ? ' is-selected selected' : ''),
-			},
-			this.originAxisGroup
-		);
-
-		createSvgLine(new Vec2(0, origin.y), new Vec2(viewport.width, origin.y), HIT_AREA_STROKE_ATTRS, axisXG);
-		createSvgLine(
-			new Vec2(0, origin.y),
-			new Vec2(viewport.width, origin.y),
-			isXMirror
-				? MIRROR_LINE_ATTRS
-				: {
-						stroke: isXSelected ? COLORS.selected : COLORS.xAxis,
-						'stroke-width': isXSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-					},
-			axisXG
-		);
-
-		// Y Axis (Green)
-		const axisYG = createSvgElement(
-			'g',
-			{
-				'data-id': 'axis_y',
-				'data-type': 'line',
-				class: 'sketch-entity sketch-line sketch-axis-line' + (isYSelected ? ' is-selected selected' : ''),
-			},
-			this.originAxisGroup
-		);
-
-		createSvgLine(new Vec2(origin.x, 0), new Vec2(origin.x, viewport.height), HIT_AREA_STROKE_ATTRS, axisYG);
-		createSvgLine(
-			new Vec2(origin.x, 0),
-			new Vec2(origin.x, viewport.height),
-			isYMirror
-				? MIRROR_LINE_ATTRS
-				: {
-						stroke: isYSelected ? COLORS.selected : COLORS.yAxis,
-						'stroke-width': isYSelected ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-					},
-			axisYG
-		);
-
-		// Origin marker target (CAD surveyor style matching reference image)
-		const isPatternCenter = options.patternHighlight?.centerPointId === 'origin';
-		const originMarkerG = createSvgElement(
-			'g',
-			{
-				'data-id': 'origin',
-				'data-type': 'point',
-				class: 'sketch-entity sketch-point sketch-origin-marker' + (isOriginSelected ? ' is-selected selected' : ''),
-			},
-			this.originAxisGroup
-		);
-
-		const r = 8;
-		createSvgPath(
-			`M ${origin.x} ${origin.y} L ${origin.x + r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y - r} Z`,
-			{
-				fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
-			},
-			originMarkerG
-		);
-
-		createSvgPath(
-			`M ${origin.x} ${origin.y} L ${origin.x - r} ${origin.y} A ${r} ${r} 0 0 0 ${origin.x} ${origin.y + r} Z`,
-			{
-				fill: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.originQuarter,
-			},
-			originMarkerG
-		);
-
-		createSvgCircle(
-			origin,
-			r,
-			{
-				fill: 'none',
-				stroke: isOriginSelected ? COLORS.selected : isPatternCenter ? COLORS.patternCenter : COLORS.construction,
-				'stroke-width': isOriginSelected || isPatternCenter ? STROKE_WIDTH.selected : STROKE_WIDTH.dimension,
-			},
-			originMarkerG
-		);
-
-		// Transparent hit target circle so clicking/hovering near (0,0) is easy
-		createSvgCircle(
-			origin,
-			14,
-			{
-				fill: COLORS.hitTransparent,
-				stroke: 'none',
-			},
-			originMarkerG
-		);
+		const state = {
+			showGrid,
+			mirrorLineId: options.mirrorHighlight?.mirrorLineId,
+			patternCenterPointId: options.patternHighlight?.centerPointId,
+		};
+		const key = getGridRenderKey(sketch, viewport, state);
+		if (key === this.gridRenderKey) return;
+		this.gridRenderKey = key;
+		renderGridAndAxes(this.gridGroup, this.originAxisGroup, sketch, viewport, state);
 	}
 
 	private isPrimitiveSelected(prim: ISketchPrimitive, sketch: SketchDocument, options: RenderOptions): boolean {
@@ -898,40 +647,7 @@ export class SVGRenderer {
 		isTargetSnapped = false
 	): void {
 		this.previewGroup.innerHTML = '';
-		const geom = computeDistanceDimensionGeometry(s1, s2, orientation, 0, cursor);
-		if (!geom) return;
-
-		let labelPosition: number | undefined;
-		if (cursor && orientation !== 'direct') {
-			if (orientation === 'horizontal') {
-				const dx = s2.x - s1.x;
-				if (Math.abs(dx) > 1e-4) labelPosition = (cursor.x - s1.x) / dx;
-			} else if (orientation === 'vertical') {
-				const dy = s2.y - s1.y;
-				if (Math.abs(dy) > 1e-4) labelPosition = (cursor.y - s1.y) / dy;
-			} else {
-				const dir = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4);
-				if (dir) {
-					const totalLen = s1.distanceTo(s2);
-					if (totalLen > 1e-4) {
-						labelPosition = new Vec2().subVectors(cursor, s1).dot(dir) / totalLen;
-					}
-				}
-			}
-		}
-
-		const labelPrefix = orientation === 'horizontal' ? 'H: ' : orientation === 'vertical' ? 'V: ' : '';
-		renderLinearDimensionVisual({
-			d1: geom.d1,
-			d2: geom.d2,
-			label: `${labelPrefix}${formatDimensionValue(distVal, 1)} mm`,
-			extensionLines: geom.extensionLines,
-			parent: this.previewGroup,
-			isPreview: true,
-			startPointHighlight: orientation === 'direct' ? s1 : undefined,
-			targetPointSnapped: isTargetSnapped,
-			labelPosition,
-		});
+		renderDistancePreviewVisual(this.previewGroup, s1, s2, cursor, distVal, orientation, isTargetSnapped);
 	}
 
 	renderDistanceLinePreview(s1: Vec2, s2: Vec2, distVal: number, isTargetSnapped = false): void {
@@ -940,18 +656,7 @@ export class SVGRenderer {
 
 	renderPointToLineDistancePreview(sp: Vec2, s1: Vec2, s2: Vec2, cursor?: Vec2, distVal = 0): void {
 		this.previewGroup.innerHTML = '';
-		const geom = computePointToLineDimensionGeometry(sp, s1, s2, 0, cursor);
-		if (!geom) return;
-
-		renderLinearDimensionVisual({
-			d1: geom.d1,
-			d2: geom.d2,
-			label: `${formatDimensionValue(distVal, 1)} mm`,
-			extensionLines: geom.extensionLines,
-			parent: this.previewGroup,
-			isPreview: true,
-			startPointHighlight: sp,
-		});
+		renderPointToLineDistancePreviewVisual(this.previewGroup, sp, s1, s2, cursor, distVal);
 	}
 
 	renderAnglePreview(
@@ -966,29 +671,7 @@ export class SVGRenderer {
 		sp4?: Vec2
 	): void {
 		this.previewGroup.innerHTML = '';
-
-		const a1 = sCenter.angleToPoint(sRay1);
-		const a2 = sCenter.angleToPoint(sRay2);
-
-		let delta = a2 - a1;
-		while (delta > Math.PI) delta -= TWO_PI;
-		while (delta < -Math.PI) delta += TWO_PI;
-
-		const rScreen = Math.max(28, sCenter.distanceTo(cursor));
-		const extensionLines: Array<{ angle: number; pA: Vec2; pB: Vec2 }> = [];
-		if (sp1 && sp2) extensionLines.push({ angle: a1, pA: sp1, pB: sp2 });
-		if (sp3 && sp4) extensionLines.push({ angle: a2, pA: sp3, pB: sp4 });
-
-		renderAngleDimensionVisual({
-			parent: this.previewGroup,
-			sCenter,
-			a1,
-			a2,
-			delta,
-			rScreen,
-			label: `${formatDimensionValue(angleDeg, 1)}°`,
-			extensionLines,
-		});
+		renderAnglePreviewVisual(this.previewGroup, sCenter, sRay1, sRay2, cursor, angleDeg, sp1, sp2, sp3, sp4);
 	}
 
 	renderSnapIndicator(
@@ -996,52 +679,11 @@ export class SVGRenderer {
 		type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid' = 'point',
 		clearFirst = true
 	): void {
-		if (clearFirst) {
-			this.overlayGroup.innerHTML = '';
-		}
-
-		if (type === 'line' || type === 'circle' || type === 'spline' || type === 'ellipse') {
-			// Emerald diamond on object - enlarged so it clearly surrounds points
-			const d = 7;
-			createSvgElement(
-				'polygon',
-				{
-					points: `${s.x.toFixed(1)},${(s.y - d).toFixed(1)} ${(s.x + d).toFixed(1)},${s.y.toFixed(1)} ${s.x.toFixed(1)},${(s.y + d).toFixed(1)} ${(s.x - d).toFixed(1)},${s.y.toFixed(1)}`,
-					...SNAP_OBJECT_ATTRS,
-				},
-				this.overlayGroup
-			);
-		} else if (type === 'grid') {
-			// Indigo square at grid intersection
-			const size = 5;
-			createSvgRect(
-				s.clone().subScalar(size),
-				new Vec2(size * 2, size * 2),
-				{
-					...SNAP_GRID_ATTRS,
-					rx: 1,
-				},
-				this.overlayGroup
-			);
-		} else {
-			// Circular blue ring for point
-			createSvgCircle(s, 7, SNAP_POINT_ATTRS, this.overlayGroup);
-		}
-	}
-
-	renderDragLine(_s1: Vec2, _s2: Vec2): void {
-		// Disabled: user requested not to display dashed displacement line or old ghost anchor dot
-		this.overlayGroup.innerHTML = '';
+		renderSnapIndicatorVisual(this.overlayGroup, s, type, clearFirst);
 	}
 
 	renderSelectionBox(s1: Vec2, s2: Vec2): void {
-		this.overlayGroup.innerHTML = '';
-		const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
-		const width = Math.abs(s2.x - s1.x);
-		const height = Math.abs(s2.y - s1.y);
-
-		const attrs = s2.x < s1.x ? CROSSING_SELECTION_BOX_ATTRS : SELECTION_BOX_ATTRS;
-		createSvgRect(min, new Vec2(width, height), attrs, this.overlayGroup);
+		renderSelectionBoxVisual(this.overlayGroup, s1, s2);
 	}
 
 	renderMirrorPreview(
