@@ -602,16 +602,25 @@ fn trim_collapsed_sections(
         };
     }
 }
-fn join_chain(
-    items: &[Item],
-    raw_paths: &[Option<Path>],
-    paths: &mut [Option<Path>],
-    primitives: &mut [Primitive],
+// Shared source geometry and join decisions for candidate and final passes.
+struct JoinContext<'a> {
+    items: &'a [Item],
+    raw_paths: &'a [Option<Path>],
     closed: bool,
-    d: f64,
-    consumed: &[bool],
-    joined: &[bool],
-) {
+    distance: f64,
+    consumed: &'a [bool],
+    joined: &'a [bool],
+}
+
+fn join_chain(context: &JoinContext<'_>, paths: &mut [Option<Path>], primitives: &mut [Primitive]) {
+    let JoinContext {
+        items,
+        raw_paths,
+        closed,
+        distance: d,
+        consumed,
+        joined,
+    } = *context;
     for (i, item) in items.iter().enumerate() {
         let Some(Geometry::Arc(_, _, a, b, _)) = &item.geometry else {
             continue;
@@ -884,19 +893,18 @@ pub(super) fn refine(
     if closed && items.len() > 1 && d.abs() > 1e-12 {
         connect_corner_gaps(items, primitives, &mut paths, d, &consumed, &mut joined);
     }
+    let context = JoinContext {
+        items,
+        raw_paths: &raw_paths,
+        closed,
+        distance: d,
+        consumed: &consumed,
+        joined: &joined,
+    };
     if closed && items.len() > 1 && d.abs() > 1e-12 {
         let mut candidates = primitives.clone();
         let mut candidate_paths = paths.clone();
-        join_chain(
-            items,
-            &raw_paths,
-            &mut candidate_paths,
-            &mut candidates,
-            closed,
-            d,
-            &consumed,
-            &joined,
-        );
+        join_chain(&context, &mut candidate_paths, &mut candidates);
         if let Some(contours) = contours::split(
             items,
             &candidates,
@@ -937,9 +945,7 @@ pub(super) fn refine(
             }
         }
     }
-    join_chain(
-        items, &raw_paths, &mut paths, primitives, closed, d, &consumed, &joined,
-    );
+    join_chain(&context, &mut paths, primitives);
     let active = if d.abs() > 1e-12 {
         trim_collapsed_sections(&mut paths, primitives, closed)
     } else {

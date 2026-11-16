@@ -18,10 +18,12 @@ import { createWasmFilletKernel, type FilletBinding } from './filletWasm';
 import { createWasmChamferKernel, type ChamferBinding } from './chamferWasm';
 
 import { createWasmOffsetKernel, type OffsetBinding } from './offsetWasm';
+import { createWasmCurveKernel, type CurvePathBinding } from './curveWasm';
 import { createWasmQueryKernel, type QueryBinding } from './queryWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	curve_path: CurvePathBinding;
 	geometry_queries: QueryBinding;
 	offset_geometry: OffsetBinding;
 	chamfer_geometry: ChamferBinding;
@@ -134,10 +136,12 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.fillet_geometry !== 'function') throw new Error('WASM kernel has no fillet operations');
 	if (typeof bindings.chamfer_geometry !== 'function') throw new Error('WASM kernel has no chamfer operations');
 	if (typeof bindings.offset_geometry !== 'function') throw new Error('WASM kernel has no offset operations');
+	if (typeof bindings.curve_path !== 'function') throw new Error('WASM kernel has no curve path operations');
 	return {
 		backend: 'wasm',
 		apiVersion: GEOMETRY_KERNEL_API_VERSION,
 		spline: createWasmSplineKernel((...args) => bindings.spline_geometry(...args)),
+		curves: createWasmCurveKernel((...args) => bindings.curve_path(...args)),
 		queries: createWasmQueryKernel((data, settings) => bindings.geometry_queries(data, settings)),
 		findRegions: createWasmRegionKernel(data => bindings.find_regions_packed(data)),
 		offset: createWasmOffsetKernel((data, items, settings) => bindings.offset_geometry(data, items, settings)),
