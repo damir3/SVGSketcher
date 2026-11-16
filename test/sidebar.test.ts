@@ -14,11 +14,14 @@ interface MockElement {
 	listeners: Map<string, Array<(e: any) => void>>;
 	getAttribute(name: string): string | null;
 	addEventListener(type: string, fn: (e: any) => void): void;
+	trigger(type: string, eventOverrides?: Record<string, any>): void;
 	click(eventOverrides?: Record<string, any>): void;
 	closest(selector: string): MockElement | null;
+	querySelector(selector: string): MockElement | null;
+	querySelectorAll(selector: string): MockElement[];
 }
 
-function createMockElement(tagName: string, attrString: string): MockElement {
+function createMockElement(tagName: string, attrString: string, getAllElements: () => MockElement[]): MockElement {
 	const attrs = new Map<string, string>();
 	const attrRegex = /([a-zA-Z0-9_-]+)(?:="([^"]*)")?/g;
 	let m: RegExpExecArray | null;
@@ -42,7 +45,7 @@ function createMockElement(tagName: string, attrString: string): MockElement {
 			list.push(fn);
 			listeners.set(type, list);
 		},
-		click(eventOverrides = {}) {
+		trigger(type: string, eventOverrides = {}) {
 			const evt = {
 				target: el,
 				shiftKey: false,
@@ -52,9 +55,12 @@ function createMockElement(tagName: string, attrString: string): MockElement {
 				preventDefault() {},
 				...eventOverrides,
 			};
-			for (const fn of listeners.get('click') ?? []) {
+			for (const fn of listeners.get(type) ?? []) {
 				fn(evt);
 			}
+		},
+		click(eventOverrides = {}) {
+			el.trigger('click', eventOverrides);
 		},
 		closest(selector: string) {
 			const parts = selector.split(',').map(s => s.trim());
@@ -62,6 +68,12 @@ function createMockElement(tagName: string, attrString: string): MockElement {
 				if (part.startsWith('.') && classes.has(part.slice(1))) return el;
 			}
 			return null;
+		},
+		querySelector(selector: string) {
+			return getAllElements().find(item => matchesSelector(item, selector)) ?? null;
+		},
+		querySelectorAll(selector: string) {
+			return getAllElements().filter(item => matchesSelector(item, selector));
 		},
 	};
 	return el;
@@ -72,7 +84,7 @@ function parseElements(html: string): MockElement[] {
 	const tagRegex = /<([a-zA-Z][a-zA-Z0-9-]*)(\s+[^>]*)?>/g;
 	let m: RegExpExecArray | null;
 	while ((m = tagRegex.exec(html))) {
-		elements.push(createMockElement(m[1], m[2] ?? ''));
+		elements.push(createMockElement(m[1], m[2] ?? '', () => elements));
 	}
 	return elements;
 }
@@ -80,6 +92,13 @@ function parseElements(html: string): MockElement[] {
 function matchesSelector(el: MockElement, selector: string): boolean {
 	if (selector.startsWith('#')) {
 		return el.id === selector.slice(1);
+	}
+	const attrValueMatch = selector.match(/^(\.[a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)="([^"]*)"\]$/);
+	if (attrValueMatch) {
+		return (
+			el.classes.has(attrValueMatch[1].slice(1)) &&
+			el.attrs.get(attrValueMatch[2]) === attrValueMatch[3]
+		);
 	}
 	// Support patterns like ".tree-item[data-type]" or ".tree-delete-btn[data-delete-id]" or ".constraint-entity-chip"
 	const attrMatch = selector.match(/^(\.[a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$/);
@@ -260,5 +279,53 @@ describe('Sidebar', () => {
 		assert.ok(container.innerHTML.includes('Selected Primitives (205)'));
 		assert.equal(container.querySelectorAll('.tree-item[data-type]').length, 200);
 		assert.ok(container.innerHTML.includes('...and 5 more selected'));
+	});
+
+	it('highlights primitive on canvas when hovering over it in Selected Primitives', () => {
+		const sketch = new SketchDocument();
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
+		const line = sketch.addLine(p1.id, p2.id);
+		const circle = sketch.addCircle(p1.id, 15);
+
+		const externalTargets: Array<{ id: string; type: string } | null> = [];
+		const mockInteraction: any = {
+			activeTool: 'select',
+			highlightManager: {
+				setExternalTarget: (target: { id: string; type: string } | null) => {
+					externalTargets.push(target);
+				},
+			},
+			render: () => {},
+		};
+
+		const container = createSidebarContainer();
+		new Sidebar(container, sketch, mockInteraction);
+		sketch.selectEntities(
+			[
+				{ id: line.id, type: 'line' },
+				{ id: circle.id, type: 'circle' },
+			],
+			false
+		);
+
+		const rows = container.querySelectorAll('.tree-item[data-type]');
+		const lineRow = rows.find(r => r.getAttribute('data-id') === line.id)!;
+		const circleRow = rows.find(r => r.getAttribute('data-id') === circle.id)!;
+
+		lineRow.trigger('mouseenter');
+		assert.deepEqual(externalTargets.at(-1), { id: line.id, type: 'line' });
+
+		circleRow.trigger('mouseenter');
+		assert.deepEqual(externalTargets.at(-1), { id: circle.id, type: 'circle' });
+
+		circleRow.trigger('mouseleave');
+		assert.equal(externalTargets.at(-1), null);
+
+		// Clearing selection while an item is hovered clears external highlight
+		lineRow.trigger('mouseenter');
+		assert.deepEqual(externalTargets.at(-1), { id: line.id, type: 'line' });
+		sketch.clearSelection();
+		assert.equal(externalTargets.at(-1), null);
 	});
 });

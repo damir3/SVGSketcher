@@ -407,6 +407,12 @@ body {
 	stroke-width: 3.5px !important;
 }
 
+#cad-svg:not(.is-dragging) .sketch-text-entity.select-hover text,
+#cad-svg:not(.is-dragging) .sketch-text-entity.select-hover path {
+	fill: #38bdf8 !important;
+	filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.7)) !important;
+}
+
 /* Axis & Origin Hover & Selection Highlighting */
 .sketch-axis-line,
 .sketch-origin-marker {

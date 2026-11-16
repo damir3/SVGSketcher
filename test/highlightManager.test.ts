@@ -542,4 +542,42 @@ describe('Constraint and Transform tools hovering', () => {
 		target = manager.update(rectTool, new Vec2(50, 0));
 		assert.strictEqual(target, null);
 	});
+
+	it('supports external sidebar hover highlight preserved across clearCanvasHover and refresh', () => {
+		const sketch = new SketchDocument();
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 100, y: 0 });
+		const line = sketch.addLine(p1.id, p2.id);
+
+		const svgRoot = createMockSvgElement('svg');
+		const lineG = createMockSvgElement('g', { 'data-id': line.id });
+		svgRoot.appendChild(lineG);
+
+		const ctx = createMockContext(sketch, svgRoot);
+		const manager = new HighlightManager(svgRoot, () => ctx);
+		const disabledTool = new TestCustomTool();
+		disabledTool.enabled = false;
+
+		manager.setExternalTarget({ id: line.id, type: 'line' });
+		assert.strictEqual(lineG.classList.contains('select-hover'), true);
+
+		// Canvas hover clearing does not wipe active sidebar hover
+		manager.clearCanvasHover();
+		assert.strictEqual(lineG.classList.contains('select-hover'), true);
+
+		// Refresh preserves external highlight even when active tool disables canvas hover
+		lineG.classList.remove('select-hover');
+		manager.refresh(disabledTool);
+		assert.strictEqual(lineG.classList.contains('select-hover'), true);
+
+		// Moving onto canvas clears external target
+		manager.update(disabledTool, new Vec2(50, 0));
+		assert.strictEqual(lineG.classList.contains('select-hover'), false);
+
+		// Setting null explicitly clears highlight
+		manager.setExternalTarget({ id: line.id, type: 'line' });
+		assert.strictEqual(lineG.classList.contains('select-hover'), true);
+		manager.setExternalTarget(null);
+		assert.strictEqual(lineG.classList.contains('select-hover'), false);
+	});
 });

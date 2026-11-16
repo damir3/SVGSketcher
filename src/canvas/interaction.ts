@@ -484,7 +484,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 		this.svg.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
 		this.svg.addEventListener('dblclick', this.handleDoubleClick.bind(this));
 		this.svg.addEventListener('mouseleave', () => {
-			this.highlightManager.clear();
+			this.highlightManager.clearCanvasHover();
 		});
 
 		// Prevent default context menu for smooth right-click panning
@@ -709,7 +709,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 		if (!isOverCanvas) {
 			this.regionHoverPoint = null;
 			this.renderer.updateRegionHover(null);
-			this.highlightManager.clear();
+			this.highlightManager.clearCanvasHover();
 			if (!this.activeToolInstance?.keepPreviewOutsideCanvas) this.renderer.clearPreviews();
 			return;
 		}

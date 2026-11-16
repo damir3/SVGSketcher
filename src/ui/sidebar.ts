@@ -2,6 +2,7 @@ import type { SketchImage } from '../model/image';
 import type { SketchDocument } from '../model/sketch';
 import type { SketchSpline, SketchText } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
+import type { HoverTarget } from '../canvas/tools/hoverTarget';
 import { parseNumericOrExpression } from '../math/expression';
 import {
 	DistanceConstraint,
@@ -24,6 +25,7 @@ export class Sidebar {
 	private sketch: SketchDocument;
 	private interaction?: CanvasInteraction;
 	private isPrimitivesExpanded = false;
+	private hoveredSelectedTargetId: string | null = null;
 
 	onEditDimension?: (
 		constraint:
@@ -744,6 +746,38 @@ export class Sidebar {
 			e.stopPropagation();
 			this.sketch.clearSelection();
 		});
+
+		// Hover highlight on canvas when hovering items in Selected Primitives
+		const selectedList = this.container.querySelector<HTMLElement>('.inspector-selected-list');
+		if (
+			this.hoveredSelectedTargetId &&
+			!selectedList?.querySelector(`.tree-item[data-id="${this.hoveredSelectedTargetId}"]`)
+		) {
+			this.hoveredSelectedTargetId = null;
+			this.interaction?.highlightManager?.setExternalTarget(null);
+		}
+		if (selectedList) {
+			selectedList.querySelectorAll<HTMLElement>('.tree-item[data-type]').forEach(item => {
+				const id = item.getAttribute('data-id')!;
+				const type = item.getAttribute('data-type')! as HoverTarget['type'];
+				item.addEventListener('mouseenter', () => {
+					this.hoveredSelectedTargetId = id;
+					this.interaction?.highlightManager?.setExternalTarget({ id, type });
+				});
+				item.addEventListener('mouseleave', () => {
+					if (this.hoveredSelectedTargetId === id) {
+						this.hoveredSelectedTargetId = null;
+						this.interaction?.highlightManager?.setExternalTarget(null);
+					}
+				});
+			});
+			selectedList.addEventListener('mouseleave', () => {
+				if (this.hoveredSelectedTargetId !== null) {
+					this.hoveredSelectedTargetId = null;
+					this.interaction?.highlightManager?.setExternalTarget(null);
+				}
+			});
+		}
 
 		// Tree item selection
 		this.container.querySelectorAll<HTMLElement>('.tree-item[data-type]').forEach(item => {

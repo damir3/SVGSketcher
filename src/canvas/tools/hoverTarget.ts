@@ -3,7 +3,7 @@ import { ORIGIN, Vec2 } from '../../math/vector';
 import { LINE_DISTANCE_PX, POINT_DISTANCE_PX } from '../distances';
 
 export interface HoverTarget {
-	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'constraint';
+	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline' | 'text' | 'constraint';
 	id: string;
 }
 
