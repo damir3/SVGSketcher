@@ -1,5 +1,16 @@
 import type { XY } from '../../math/vector';
 
+export interface TraceInput {
+	/** Grayscale values 0..255, row-major. Transparent pixels should already be composited onto white. */
+	gray: Float32Array;
+	width: number;
+	height: number;
+	/** Ratio of the world size of a pixel in y to its size in x. Fitting happens in x-pixel units. */
+	yScale: number;
+	/** World size (mm) of one pixel in x. Used to reject arcs below the sketch's minimum radius. */
+	pixelSize: number;
+}
+
 export type TraceMode = 'outline' | 'centerline';
 export type OutlineAlgorithm = 'marching-squares' | 'pixel-edges';
 export type CenterlineAlgorithm = 'zhang-suen' | 'guo-hall';
@@ -90,22 +101,6 @@ export function getAutoMinSegment(
 	height: number
 ): number {
 	return Math.max(8, settings.tolerance * 5, Math.hypot(width, height) * 0.01);
-}
-
-export function getEffectiveMinSegment(settings: ImageTraceSettings, width: number, height: number): number {
-	return settings.autoMinSegment ? getAutoMinSegment(settings, width, height) : Math.max(0, settings.minSegment);
-}
-
-/** Fitting options derived from settings and the image placement. Lengths are in fitting units (x pixels). */
-export interface FitOptions {
-	tolerance: number;
-	minSegment: number;
-	cornerAngle: number;
-	smoothing: number;
-	useCircles: boolean;
-	useSplines: boolean;
-	minRadius: number;
-	maxRadius: number;
 }
 
 export type TracedSegment =

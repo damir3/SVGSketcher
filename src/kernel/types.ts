@@ -1,3 +1,4 @@
+import type { ImageTraceKernel } from './imageTraceWasm';
 import type { KernelSolve } from './solverTypes';
 import type { SplineKernel } from './splineTypes';
 import type { RegionKernel } from './regionTypes';
@@ -9,7 +10,7 @@ import type { CurveEvaluationKernel } from './curveTypes';
 import type { GeometryQueryKernel } from './queryTypes';
 
 /** Versioned, UI-independent boundary for migrated kernel operations. */
-export const GEOMETRY_KERNEL_API_VERSION = 24;
+export const GEOMETRY_KERNEL_API_VERSION = 25;
 export const KERNEL_CURVE_STRIDE = 9;
 export const MAX_BEZIER_INTERSECTION_CANDIDATES = 17;
 // The existing sampled conic algorithm can emit one candidate per interval, including coincident curves.
@@ -35,6 +36,7 @@ export interface IntersectionPair {
 
 export interface GeometryKernel {
 	readonly backend: 'typescript' | 'wasm';
+	traceImage?: ImageTraceKernel;
 	readonly apiVersion: typeof GEOMETRY_KERNEL_API_VERSION;
 	/** Candidate points in world coordinates, one result per pair. Filter arc spans before deduplication. */
 	intersectPairs(pairs: readonly IntersectionPair[]): Point2[][];

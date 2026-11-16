@@ -1,3 +1,4 @@
+import { getGeometryKernel } from '../src/kernel';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildTraceGeometry } from '../src/model/imageTrace/build';
@@ -24,7 +25,7 @@ function settings(changes: Partial<ImageTraceSettings> = {}): ImageTraceSettings
 	return { ...cloneTraceSettings(DEFAULT_TRACE_SETTINGS), ...changes };
 }
 
-describe('image tracing', () => {
+describe('image tracing', { skip: !getGeometryKernel().traceImage }, () => {
 	it('traces a filled disk as a single circle', () => {
 		const image = makeImage(120, 120, (x, y) => Math.hypot(x - 60, y - 60) < 40);
 		const result = traceImage(image, settings());
@@ -190,7 +191,7 @@ describe('image tracing', () => {
 	});
 });
 
-describe('image trace geometry', () => {
+describe('image trace geometry', { skip: !getGeometryKernel().traceImage }, () => {
 	const r = 20;
 	const roundedRect = (x: number, y: number) => {
 		const cx = Math.min(Math.max(x, 20 + r), 180 - r);

@@ -7,6 +7,7 @@ pub mod curve_path;
 pub mod editing;
 mod ellipse;
 pub mod fillet;
+pub mod image_trace;
 mod matrix;
 pub mod offset;
 pub mod offset_resize;

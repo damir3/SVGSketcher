@@ -1,7 +1,10 @@
-import { traceImage, type TraceInput } from './trace';
+import type { TraceInput } from './trace';
+import { createTraceWorkerHandler } from './workerRuntime';
 import type { ImageTraceSettings, TraceResult } from './types';
 
 export interface TraceWorkerRequest {
+	/** Absolute URL of the required Rust/WASM tracing module. */
+	kernelUrl: string;
 	id: number;
 	input: TraceInput;
 	settings: ImageTraceSettings;
@@ -19,16 +22,7 @@ const scope = globalThis as unknown as {
 	postMessage: (message: TraceWorkerResponse) => void;
 };
 
-scope.onmessage = (event: MessageEvent<TraceWorkerRequest>) => {
-	const { id, input, settings } = event.data;
-	try {
-		const result = traceImage(input, settings);
-		scope.postMessage({ id, ok: true, result });
-	} catch (err) {
-		scope.postMessage({
-			id,
-			ok: false,
-			error: err instanceof Error ? err.message : 'Failed to trace image',
-		});
-	}
+const handle = createTraceWorkerHandler();
+scope.onmessage = async (event: MessageEvent<TraceWorkerRequest>) => {
+	scope.postMessage(await handle(event.data));
 };

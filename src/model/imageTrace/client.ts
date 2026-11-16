@@ -1,5 +1,7 @@
+import { getGeometryKernel } from '../../kernel';
 import type { SketchImage } from '../image';
-import { traceImage, type TraceInput } from './trace';
+import type { TraceInput } from './types';
+import { loadImageTraceKernel } from '../../kernel/imageTraceLoader';
 import type { ImageTraceSettings, TraceResult } from './types';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './worker';
 
@@ -115,13 +117,7 @@ export class ImageTraceRunner {
 					this.worker = null;
 					const job = this.activeJob;
 					this.activeJob = null;
-					if (job) {
-						try {
-							job.resolve(traceImage(job.input, job.settings));
-						} catch (err) {
-							job.reject(err instanceof Error ? err : new Error('Failed to trace image'));
-						}
-					}
+					if (job) this.traceInline(job.input, job.settings).then(job.resolve, job.reject);
 					this.flushQueue();
 				};
 			} catch {
@@ -135,7 +131,7 @@ export class ImageTraceRunner {
 	trace(input: TraceInput, settings: ImageTraceSettings): Promise<TraceResult | null> {
 		const worker = this.ensureWorker();
 		if (!worker) {
-			return Promise.resolve(traceImage(input, settings));
+			return this.traceInline(input, settings);
 		}
 		return new Promise<TraceResult | null>((resolve, reject) => {
 			const job: PendingJob = {
@@ -156,9 +152,19 @@ export class ImageTraceRunner {
 		});
 	}
 
+	private kernelUrl(): string {
+		return new URL(`${import.meta.env?.BASE_URL ?? '/'}kernel/sketcher_wasm.js`, document.baseURI).href;
+	}
+
+	private async traceInline(input: TraceInput, settings: ImageTraceSettings): Promise<TraceResult> {
+		const trace = getGeometryKernel().traceImage ?? (await loadImageTraceKernel(this.kernelUrl()));
+		return trace(input, settings);
+	}
+
 	private startJob(worker: Worker, job: PendingJob): void {
 		this.activeJob = job;
 		const message: TraceWorkerRequest = {
+			kernelUrl: this.kernelUrl(),
 			id: job.id,
 			input: job.input,
 			settings: job.settings,
@@ -186,11 +192,7 @@ export class ImageTraceRunner {
 		if (worker) {
 			this.startJob(worker, next);
 		} else {
-			try {
-				next.resolve(traceImage(next.input, next.settings));
-			} catch (err) {
-				next.reject(err instanceof Error ? err : new Error('Failed to trace image'));
-			}
+			this.traceInline(next.input, next.settings).then(next.resolve, next.reject);
 		}
 	}
 

@@ -5,6 +5,7 @@ mod chamfer;
 mod curve_path;
 mod editing;
 mod fillet;
+mod image_trace;
 mod offset;
 mod offset_resize;
 mod queries;
@@ -17,7 +18,7 @@ const PAIR_STRIDE: usize = CURVE_STRIDE * 2;
 
 #[wasm_bindgen]
 pub fn api_version() -> u32 {
-    24
+    25
 }
 
 fn decode_curve(data: &[f64]) -> Result<Curve, &'static str> {

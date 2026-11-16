@@ -1,3 +1,4 @@
+import { createWasmImageTrace, type ImageTraceBinding } from './imageTraceWasm';
 import {
 	GEOMETRY_KERNEL_API_VERSION,
 	KERNEL_CURVE_STRIDE,
@@ -24,6 +25,7 @@ import { createWasmQueryKernel, type QueryBinding } from './queryWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	trace_image: ImageTraceBinding;
 	resize_offset_spline: OffsetSplineResizeBinding;
 	curve_path: CurvePathBinding;
 	geometry_queries: QueryBinding;
@@ -140,7 +142,9 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.offset_geometry !== 'function') throw new Error('WASM kernel has no offset operations');
 	if (typeof bindings.curve_path !== 'function') throw new Error('WASM kernel has no curve path operations');
 	if (typeof bindings.resize_offset_spline !== 'function') throw new Error('WASM kernel has no offset spline resizing');
+	if (typeof bindings.trace_image !== 'function') throw new Error('WASM kernel has no image tracing');
 	return {
+		traceImage: createWasmImageTrace((gray, settings) => bindings.trace_image(gray, settings)),
 		backend: 'wasm',
 		apiVersion: GEOMETRY_KERNEL_API_VERSION,
 		spline: createWasmSplineKernel((...args) => bindings.spline_geometry(...args)),
