@@ -96,24 +96,32 @@ import {
 import type { GeoCurve } from '../math/intersection';
 import { Vec2, type XY } from '../math/vector';
 import type { AABB } from '../math/aabb';
-import { computeNaturalFitHandles } from '../math/spline';
-import { AutomaticSplineHandlesConstraint } from '../solver/constraints/automaticSplineHandles';
-import { calculateOffsetGeometry, createOffsetSideGeometry, type OffsetSideGeometry } from '../math/offset';
 import { MIN_OFFSET_RADIUS as MIN_SOLVER_RADIUS } from '../kernel/offsetTypes';
-import type { OffsetPair } from '../solver/constraints/offset';
-import { resizeOffsetSpline } from '../math/offsetSpline';
 import { serializePrimitive } from './primitives/serialization';
 import { HistoryManager, type SketchSnapshot } from './history';
 import { serializeConstraint, deserializeConstraint } from '../solver/constraints/serialization';
+import { evaluateParameterGraph, type SketchParameter, type ParameterGraphResult } from '../math/expression';
 import {
-	evaluateExpression,
-	validateExpression,
-	evaluateParameterGraph,
-	isValidParameterName,
-	renameParameterInExpression,
-	type SketchParameter,
-	type ParameterGraphResult,
-} from '../math/expression';
+	getParameterValuesMap,
+	evaluateSketchExpression,
+	addSketchParameter,
+	updateSketchParameter,
+	deleteSketchParameter,
+	recomputeParametersAndConstraints,
+} from './parameterOperations';
+import {
+	createControlSplineHandleLines,
+	addFitSpline,
+	addControlSpline,
+	copySpline,
+	isSplineHandleLine,
+	isSplineHandlePoint,
+	resetFitSplineTangents,
+	isSplineInternalConstraint,
+	restoreAutomaticSplineHandles,
+	prepareSplineConstraints,
+} from './splineOperations';
+import { syncOffsetSources, applyOffsetConstraintValue } from './offsetSync';
 import {
 	exportSketchToSVG,
 	importSketchFromSVG,
@@ -197,7 +205,25 @@ export class SketchDocument {
 	private batchSnapshot: SketchSnapshot | null = null;
 	private solveDeferred = 0;
 	private updatingOffsets = false;
-	private offsetSourceStates = new WeakMap<OffsetConstraint, Array<string | number | boolean | undefined>>();
+
+	isInTransaction(): boolean {
+		return this.batchDepth > 0;
+	}
+
+	runSilentDerivedUpdate(fn: () => void): void {
+		// Derived edits belong to the caller's history entry. Suppress nested solves,
+		// snapshots and notifications while topology is being reconciled.
+		this.updatingOffsets = true;
+		this.solveDeferred++;
+		this.batchDepth++;
+		try {
+			fn();
+		} finally {
+			this.batchDepth--;
+			this.solveDeferred--;
+			this.updatingOffsets = false;
+		}
+	}
 
 	// Listeners for UI reactivity
 	private changeListeners: Array<() => void> = [];
@@ -375,7 +401,7 @@ export class SketchDocument {
 			}
 		}
 
-		this.restoreAutomaticSplineHandles();
+		restoreAutomaticSplineHandles(this);
 
 		this.counters.clear();
 		const idMaps: Array<Map<string, unknown>> = [
@@ -614,141 +640,18 @@ export class SketchDocument {
 		isClosed?: boolean,
 		explicitHandles?: Array<{ h1: Vec2; h2: Vec2 }>
 	): SketchSpline {
-		this.pushHistory();
-		const sid = id || this.nextId('Spline');
-
-		const closed =
-			isClosed ??
-			(pointIds.length >= 4 &&
-				(pointIds[0] === pointIds[pointIds.length - 1] ||
-					(this.points.has(pointIds[0]) &&
-						this.points.has(pointIds[pointIds.length - 1]) &&
-						this.points.get(pointIds[pointIds.length - 1])!.distanceTo(this.points.get(pointIds[0])!) < 1e-4)));
-
-		const actualPointIds = [...pointIds];
-		if (closed && actualPointIds[0] !== actualPointIds[actualPointIds.length - 1]) {
-			actualPointIds.push(actualPointIds[0]);
-		}
-
-		let actualTangentLineIds = tangentLineIds ? [...tangentLineIds] : undefined;
-
-		// Automatically construct tangent handle lines with midpoint constraints if not provided
-		if (!actualTangentLineIds || actualTangentLineIds.length === 0) {
-			const pts = actualPointIds.map(pid => this.points.get(pid)).filter((p): p is SketchPoint => !!p);
-			if (pts.length >= 2) {
-				const handles = explicitHandles || computeNaturalFitHandles(pts);
-				actualTangentLineIds = [];
-				const count = closed ? pts.length - 1 : pts.length;
-				for (let i = 0; i < count; i++) {
-					const h = handles[i];
-					const pFit = pts[i];
-					const p1Id = this.nextId('Point');
-					this.points.set(p1Id, new SketchPoint(p1Id, h.h1.x, h.h1.y, false));
-					const p2Id = this.nextId('Point');
-					this.points.set(p2Id, new SketchPoint(p2Id, h.h2.x, h.h2.y, false));
-					const lineId = this.nextId('Line');
-					const hLine = new SketchLine({
-						id: lineId,
-						p1Id,
-						p2Id,
-						isConstruction: true,
-						isSplineHandle: true,
-						parentSplineId: sid,
-						isAutomaticSplineHandle: !explicitHandles,
-					});
-					this.lines.set(lineId, hLine);
-					const d1 = pFit.distanceTo(h.h1);
-					const d2 = pFit.distanceTo(h.h2);
-					const ratio = d1 + d2 > 1e-6 ? d1 / (d1 + d2) : 0.5;
-					const midC = new MidpointConstraint(this.nextId('c_midpoint'), pFit.id, p1Id, p2Id, 1.0, ratio);
-					this.constraints.set(midC.id, midC);
-					actualTangentLineIds.push(lineId);
-				}
-				if (closed && actualTangentLineIds.length > 0) {
-					actualTangentLineIds.push(actualTangentLineIds[0]);
-				}
-				this.rebuildParamManager();
-			}
-		}
-
-		const spline = new SketchSpline({
-			id: sid,
-			splineType: 'fit',
-			pointIds: actualPointIds,
-			tangentLineIds: actualTangentLineIds,
-			isClosed: closed,
-			isConstruction,
-		});
-		this.splines.set(sid, spline);
-
-		if (actualTangentLineIds) {
-			for (const lid of actualTangentLineIds) {
-				const line = this.lines.get(lid);
-				if (line) {
-					line.parentSplineId = sid;
-					line.isAutomaticSplineHandle ??= false;
-					line.isSplineHandle = true;
-				}
-			}
-		}
-
-		this.notify();
-		return spline;
+		return addFitSpline(this, pointIds, tangentLineIds, isConstruction, id, isClosed, explicitHandles);
 	}
 
 	addControlSpline(
 		pointIds: string[],
 		isConstruction = false,
 		id?: string,
-		_isClosed?: boolean,
+		isClosed?: boolean,
 		knots?: number[],
 		tangentLineIds?: string[]
 	): SketchSpline {
-		this.pushHistory();
-		const sid = id || this.nextId('Spline');
-
-		const actualPointIds = [...pointIds];
-		let actualTangentLineIds = tangentLineIds ? [...tangentLineIds] : undefined;
-
-		if (!actualTangentLineIds) {
-			actualTangentLineIds = [];
-			for (let i = 0; i < actualPointIds.length - 1; i++) {
-				const p1Id = actualPointIds[i];
-				const p2Id = actualPointIds[i + 1];
-				const lineId = this.nextId('Line');
-				const hLine = new SketchLine({
-					id: lineId,
-					p1Id,
-					p2Id,
-					isConstruction: true,
-					isSplineHandle: true,
-					parentSplineId: sid,
-				});
-				this.lines.set(lineId, hLine);
-				actualTangentLineIds.push(lineId);
-			}
-		} else {
-			for (const lid of actualTangentLineIds) {
-				const line = this.lines.get(lid);
-				if (line) {
-					line.parentSplineId = sid;
-					line.isSplineHandle = true;
-				}
-			}
-		}
-
-		const spline = new SketchSpline({
-			id: sid,
-			splineType: 'control',
-			pointIds: actualPointIds,
-			tangentLineIds: actualTangentLineIds,
-			knots: knots ? [...knots] : undefined,
-			isClosed: false,
-			isConstruction,
-		});
-		this.splines.set(sid, spline);
-		this.notify();
-		return spline;
+		return addControlSpline(this, pointIds, isConstruction, id, isClosed, knots, tangentLineIds);
 	}
 
 	getSpline(id: string): SketchSpline | undefined {
@@ -756,45 +659,7 @@ export class SketchDocument {
 	}
 
 	copySpline(source: SketchSpline, mapPoint: (id: string) => string): SketchSpline {
-		const pointIds = source.pointIds.map(mapPoint);
-		if (source.splineType === 'control') {
-			return this.addControlSpline(pointIds, source.isConstruction, undefined, false, source.knots);
-		}
-
-		const constraints = [...this.constraints.values()];
-		const lines = new Map<string, string>();
-		const tangentLineIds = pointIds.map((pointId, index) => {
-			const line = this.lines.get(source.tangentLineIds?.[index] ?? '');
-			if (!line || !this.points.get(line.p1Id) || !this.points.get(line.p2Id)) return '';
-			const existing = lines.get(line.id);
-			if (existing) return existing;
-
-			const p1Id = mapPoint(line.p1Id);
-			const p2Id = mapPoint(line.p2Id);
-			const copy = this.addLine(p1Id, p2Id, line.isConstruction);
-			copy.isAutomaticSplineHandle = line.isAutomaticSplineHandle;
-			lines.set(line.id, copy.id);
-			const midpoint = constraints.find(
-				(c): c is MidpointConstraint =>
-					c instanceof MidpointConstraint &&
-					c.midId === source.pointIds[index] &&
-					c.p1Id === line.p1Id &&
-					c.p2Id === line.p2Id
-			);
-			if (midpoint) {
-				const c = new MidpointConstraint(
-					this.nextId('c_midpoint'),
-					pointId,
-					p1Id,
-					p2Id,
-					midpoint.weight,
-					midpoint.ratio
-				);
-				this.constraints.set(c.id, c);
-			}
-			return copy.id;
-		});
-		return this.addFitSpline(pointIds, tangentLineIds, source.isConstruction, undefined, source.isClosed);
+		return copySpline(this, source, mapPoint);
 	}
 
 	// --- Constraint methods ---
@@ -2404,77 +2269,19 @@ export class SketchDocument {
 	}
 
 	isSplineHandleLine(lineId: string): boolean {
-		const line = this.lines.get(lineId);
-		return !!line?.isSplineHandle;
+		return isSplineHandleLine(this, lineId);
 	}
 
 	isSplineHandlePoint(pointId: string): boolean {
-		for (const line of this.lines.values()) {
-			if (line.isSplineHandle && (line.p1Id === pointId || line.p2Id === pointId)) {
-				const parentSpline = line.parentSplineId ? this.splines.get(line.parentSplineId) : undefined;
-				if (parentSpline && parentSpline.pointIds.includes(pointId)) {
-					return false;
-				}
-				return true;
-			}
-		}
-		return false;
+		return isSplineHandlePoint(this, pointId);
 	}
 
 	resetFitSplineTangents(selectedLines: string[], selectedPoints: string[]): void {
-		for (const spline of this.splines.values()) {
-			if (spline.splineType !== 'fit' || !spline.tangentLineIds) continue;
-			for (const id of new Set(spline.tangentLineIds)) {
-				const line = this.lines.get(id);
-				if (
-					!line ||
-					line.isAutomaticSplineHandle ||
-					(!selectedLines.includes(id) && !selectedPoints.includes(line.p1Id) && !selectedPoints.includes(line.p2Id))
-				) {
-					continue;
-				}
-
-				const midpoint = [...this.constraints.values()].find(
-					c => c instanceof MidpointConstraint && c.p1Id === line.p1Id && c.p2Id === line.p2Id
-				);
-				if (!(midpoint instanceof MidpointConstraint)) continue;
-
-				const constrained = [...this.constraints.values()].some(
-					c =>
-						c !== midpoint &&
-						!(c instanceof PointOnSplineConstraint) &&
-						c.entityIds.some(entityId => entityId === id || entityId === line.p1Id || entityId === line.p2Id)
-				);
-				if (constrained || this.points.get(line.p1Id)?.fixed || this.points.get(line.p2Id)?.fixed) continue;
-
-				// Explicit handles can have unequal lengths. The automatic handles are symmetric.
-				if (midpoint.ratio !== 0.5) {
-					this.constraints.set(
-						midpoint.id,
-						new MidpointConstraint(midpoint.id, midpoint.midId, midpoint.p1Id, midpoint.p2Id, midpoint.weight)
-					);
-				}
-				line.isAutomaticSplineHandle = true;
-			}
-		}
+		resetFitSplineTangents(this, selectedLines, selectedPoints);
 	}
 
 	isSplineInternalConstraint(c: IConstraint): boolean {
-		if (c instanceof MidpointConstraint) {
-			return c.isInternalConstraint(this);
-		}
-		if (c.type === 'midpoint') {
-			const anyC = c as any;
-			for (const line of this.lines.values()) {
-				if (
-					line.isSplineHandle &&
-					((line.p1Id === anyC.p1Id && line.p2Id === anyC.p2Id) || (line.p1Id === anyC.p2Id && line.p2Id === anyC.p1Id))
-				) {
-					return true;
-				}
-			}
-		}
-		return false;
+		return isSplineInternalConstraint(this, c);
 	}
 
 	private hasUserPrimitive(id: string): boolean {
@@ -2659,22 +2466,7 @@ export class SketchDocument {
 						if (spline.tangentLineIds) {
 							for (const lid of spline.tangentLineIds) this.deleteSplineTangentLine(lid);
 						}
-						spline.tangentLineIds = [];
-						for (let i = 0; i < remaining.length - 1; i++) {
-							const lineId = this.nextId('Line');
-							this.lines.set(
-								lineId,
-								new SketchLine({
-									id: lineId,
-									p1Id: remaining[i],
-									p2Id: remaining[i + 1],
-									isConstruction: true,
-									isSplineHandle: true,
-									parentSplineId: sid,
-								})
-							);
-							spline.tangentLineIds.push(lineId);
-						}
+						spline.tangentLineIds = createControlSplineHandleLines(this, sid, remaining);
 					} else {
 						this.deleteSplineWithHandles(sid, spline, candidatePointIds);
 					}
@@ -2899,117 +2691,6 @@ export class SketchDocument {
 		return stiffness;
 	}
 
-	private restoreAutomaticSplineHandles(): void {
-		for (const spline of this.splines.values()) {
-			if (spline.splineType !== 'fit' || !spline.tangentLineIds) continue;
-			const points = spline.pointIds.map(id => this.points.get(id));
-			if (points.some(point => !point)) continue;
-			const natural = computeNaturalFitHandles(points as SketchPoint[]);
-			for (const [index, lineId] of spline.tangentLineIds.entries()) {
-				const line = this.lines.get(lineId);
-				const handle = natural[index];
-				if (!line || line.isAutomaticSplineHandle !== undefined || !handle) continue;
-				const p1 = this.points.get(line.p1Id);
-				const p2 = this.points.get(line.p2Id);
-				// Older snapshots only stored the handle geometry.
-				line.isAutomaticSplineHandle =
-					!!p1 && !!p2 && p1.distanceTo(handle.h1) < 1e-5 && p2.distanceTo(handle.h2) < 1e-5;
-			}
-		}
-	}
-
-	private prepareSplineConstraints(
-		extraConstraints: IConstraint[],
-		lockedParams: Set<string>,
-		editedHandles: SketchLine[]
-	): IConstraint[] {
-		const constraints = [...this.constraints.values(), ...extraConstraints];
-		if (this.splines.size === 0) return constraints;
-		const splineConstraints: IConstraint[] = [];
-		const replaced = new Set<IConstraint>();
-		const midpoints = new Map<string, MidpointConstraint>();
-		const editedPoints = new Set<string>();
-		const constrained = new Set<string>();
-		for (const c of constraints) {
-			if (c instanceof MidpointConstraint) {
-				midpoints.set(c.p1Id, c);
-			} else if (!(c instanceof PointOnSplineConstraint)) {
-				if (extraConstraints.includes(c) && (c instanceof DragPointConstraint || c instanceof FixedConstraint)) {
-					editedPoints.add(c.pointId);
-				} else {
-					// Copy constraints drive the destination, so automatic source handles can still follow their fit points.
-					if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
-						for (const copy of c.copies) {
-							for (const pair of copy.pointPairs) constrained.add(pair.patternPtId);
-						}
-						if (c instanceof CircularPatternConstraint) {
-							constrained.add(c.centerPtId);
-						} else {
-							for (const id of [c.line1P1Id, c.line1P2Id, c.line2P1Id, c.line2P2Id]) {
-								if (id) constrained.add(id);
-							}
-						}
-					} else {
-						for (const id of c.entityIds) {
-							if (!(c instanceof SymmetryConstraint && c.isMirrorCopy && id === c.p1Id)) constrained.add(id);
-						}
-					}
-				}
-			}
-		}
-
-		for (const spline of this.splines.values()) {
-			if (spline.splineType !== 'fit' || !spline.tangentLineIds || spline.pointIds.length < 2) continue;
-			const points = spline.pointIds.map(id => this.points.get(id));
-			if (points.some(point => !point)) continue;
-			const natural = computeNaturalFitHandles(points as SketchPoint[]);
-			const automatic: { index: number; midpoint: MidpointConstraint }[] = [];
-			for (const [index, lineId] of spline.tangentLineIds.entries()) {
-				// Closed splines reuse the first tangent at the closing point.
-				if (index === spline.pointIds.length - 1 && index > 0 && lineId === spline.tangentLineIds[0]) continue;
-				const line = this.lines.get(lineId);
-				const fit = points[index];
-				if (!line || !fit) continue;
-				const midpoint = midpoints.get(line.p1Id);
-				const p1 = this.points.get(line.p1Id);
-				const p2 = this.points.get(line.p2Id);
-				if (!midpoint || midpoint.midId !== fit.id || midpoint.p2Id !== line.p2Id || !p1 || !p2) continue;
-
-				const editP1 = editedPoints.has(p1.id);
-				const editP2 = editedPoints.has(p2.id);
-				if (editP1 || editP2) {
-					editedHandles.push(line);
-					lockedParams.add(`${fit.id}.x`);
-					lockedParams.add(`${fit.id}.y`);
-				}
-
-				if (constrained.has(lineId) || constrained.has(p1.id) || constrained.has(p2.id) || p1.fixed || p2.fixed) {
-					continue;
-				}
-
-				const ratio = midpoint.ratio;
-				const dir: Vec2 = new Vec2().subVectors(fit, p1.clone().lerp(p2, ratio));
-				if (editP1 && !editP2 && ratio > 1e-6) {
-					p2.addScaledVector(dir, 1 / ratio);
-				} else if (editP2 && !editP1 && 1 - ratio > 1e-6) {
-					p1.addScaledVector(dir, 1 / (1 - ratio));
-				} else if (!editP1 && !editP2 && line.isAutomaticSplineHandle) {
-					p1.copy(natural[index].h1);
-					p2.copy(natural[index].h2);
-					automatic.push({ index, midpoint });
-					replaced.add(midpoint);
-				} else if (editedPoints.has(fit.id)) {
-					p1.add(dir);
-					p2.add(dir);
-				}
-			}
-			if (automatic.length > 0) {
-				splineConstraints.push(new AutomaticSplineHandlesConstraint(spline.id, spline.pointIds, automatic));
-			}
-		}
-		return [...constraints.filter(c => !replaced.has(c)), ...splineConstraints];
-	}
-
 	/**
 	 * Runs `fn` without solving after each individual edit, then solves once.
 	 * Use for bulk creation of many primitives and constraints.
@@ -3047,13 +2728,10 @@ export class SketchDocument {
 		const offsets = [...this.constraints.values()].filter(
 			(c): c is OffsetConstraint => c instanceof OffsetConstraint && !!c.sourceChain
 		);
-		// New/restored constraints already describe their snapshot's source geometry.
-		for (const c of offsets)
-			if (!this.offsetSourceStates.has(c)) this.offsetSourceStates.set(c, this.offsetSourceState(c));
-		let res = this.solveConstraints(extraConstraints);
-		// Each pass also propagates offsets of offsets, regardless of constraint order.
-		for (let pass = 0; pass < offsets.length && this.refreshOffsetSources(offsets); pass++)
+		let res!: SolverResult;
+		syncOffsetSources(this, offsets, () => {
 			res = this.solveConstraints(extraConstraints);
+		});
 		this.lastSolverResult = res;
 		this.lastSolveTimeMs = performance.now() - start;
 		this.notify();
@@ -3160,7 +2838,7 @@ export class SketchDocument {
 	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
-		const activeConstraints = this.prepareSplineConstraints(extraConstraints, drivenRadii, editedHandles);
+		const activeConstraints = prepareSplineConstraints(this, extraConstraints, drivenRadii, editedHandles);
 		for (const line of editedHandles) line.isAutomaticSplineHandle = false;
 		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii);
 		if (stable) return stable;
@@ -3272,54 +2950,7 @@ export class SketchDocument {
 		}
 
 		if (c instanceof OffsetConstraint) {
-			const value = Math.abs(newValue);
-			const geom = c.sourceChain
-				? calculateOffsetGeometry(this, c.sourceChain, c.direction || 'one_side', value, value, c.flip || false)
-				: undefined;
-			if (geom && !geom.isValid) return false;
-			const topologyChanged = !!(geom?.isValid && geom.sides.length && !this.offsetTopologyMatches(c, geom.sides[0]));
-			const layoutChanged = !!(
-				geom?.isValid &&
-				geom.sides.length &&
-				geom.sides[0].primitives.some((prim, i) => {
-					const pair = c.pairs[i];
-					return (
-						pair?.kind === 'spline' &&
-						prim.fitPoints &&
-						prim.fitPoints.length > (this.splines.get(pair.offSplineId)?.pointIds.length ?? 0)
-					);
-				})
-			);
-			const structureChanged = topologyChanged || layoutChanged;
-			if (structureChanged) this.beginTransaction();
-			try {
-				c.targetDistance = value;
-				c.value = value;
-				c.name = 'Offset';
-				if (geom?.isValid && geom.sides.length) {
-					if (structureChanged)
-						this.withDeferredSolve(() => {
-							if (topologyChanged) this.reconcileOffsetTopology(c, geom.sides[0]);
-							this.applyOffsetGeometryUpdate(c, geom);
-						});
-					else this.applyOffsetGeometryUpdate(c, geom);
-				} else if (!c.sourceChain) {
-					for (const pair of c.pairs) {
-						if (pair.kind === 'spline') {
-							for (const sp of pair.points) {
-								const pt = this.points.get(sp.pointId);
-								if (pt && !this.isPointFixed(sp.pointId)) {
-									pt.x = sp.basePos.x + sp.side * c.targetDistance * sp.normal.x;
-									pt.y = sp.basePos.y + sp.side * c.targetDistance * sp.normal.y;
-								}
-							}
-						}
-					}
-				}
-			} finally {
-				if (structureChanged) this.commitTransaction();
-			}
-			return true;
+			return applyOffsetConstraintValue(this, c, newValue);
 		}
 
 		if (c instanceof AngleConstraint) {
@@ -3419,11 +3050,7 @@ export class SketchDocument {
 	}
 
 	getParameterValuesMap(): Map<string, number> {
-		const map = new Map<string, number>();
-		for (const [name, p] of this.parameters) {
-			map.set(name, p.value);
-		}
-		return map;
+		return getParameterValuesMap(this);
 	}
 
 	evaluateExpression(expr: string): {
@@ -3432,7 +3059,7 @@ export class SketchDocument {
 		error?: string;
 		referencedVars: string[];
 	} {
-		return validateExpression(expr, this.getParameterValuesMap());
+		return evaluateSketchExpression(this, expr);
 	}
 
 	getParameter(name: string): SketchParameter | undefined {
@@ -3456,28 +3083,7 @@ export class SketchDocument {
 		expression: string,
 		comment?: string
 	): { success: boolean; error?: string; parameter?: SketchParameter } {
-		const nameCheck = isValidParameterName(name);
-		if (!nameCheck.isValid) {
-			return { success: false, error: nameCheck.error };
-		}
-		if (this.parameters.has(name)) {
-			return { success: false, error: `Parameter '${name}' already exists` };
-		}
-		this.beginTransaction();
-		try {
-			const p: SketchParameter = {
-				id: this.nextId('Param'),
-				name,
-				expression,
-				value: 0,
-				comment,
-			};
-			this.parameters.set(name, p);
-			this.recomputeParametersAndConstraints(false);
-			return { success: true, parameter: p };
-		} finally {
-			this.commitTransaction(false);
-		}
+		return addSketchParameter(this, name, expression, comment);
 	}
 
 	updateParameter(
@@ -3486,550 +3092,25 @@ export class SketchDocument {
 		newExpr: string,
 		comment?: string
 	): { success: boolean; error?: string } {
-		const existing = this.parameters.get(name);
-		if (!existing) {
-			return { success: false, error: `Parameter '${name}' not found` };
-		}
-		if (newName !== name) {
-			const nameCheck = isValidParameterName(newName);
-			if (!nameCheck.isValid) {
-				return { success: false, error: nameCheck.error };
-			}
-			if (this.parameters.has(newName)) {
-				return { success: false, error: `Parameter '${newName}' already exists` };
-			}
-		}
-		this.beginTransaction();
-		try {
-			existing.expression = newExpr;
-			existing.comment = comment;
-			if (newName !== name) {
-				this.parameters.delete(name);
-				existing.name = newName;
-				this.parameters.set(newName, existing);
-
-				// Rename in other parameters and constraint expressions
-				for (const other of this.parameters.values()) {
-					if (other.name !== newName) {
-						other.expression = renameParameterInExpression(other.expression, name, newName);
-					}
-				}
-				for (const c of this.constraints.values()) {
-					if (c.expression) {
-						c.expression = renameParameterInExpression(c.expression, name, newName);
-					}
-					if (c instanceof RectangularPatternConstraint) {
-						if (c.distance1Expression) {
-							c.distance1Expression = renameParameterInExpression(c.distance1Expression, name, newName);
-						}
-						if (c.distance2Expression) {
-							c.distance2Expression = renameParameterInExpression(c.distance2Expression, name, newName);
-						}
-					}
-					if (c instanceof CircularPatternConstraint && c.totalAngleExpression) {
-						c.totalAngleExpression = renameParameterInExpression(c.totalAngleExpression, name, newName);
-					}
-				}
-			}
-			this.recomputeParametersAndConstraints(false);
-			return { success: true };
-		} finally {
-			this.commitTransaction(false);
-		}
+		return updateSketchParameter(this, name, newName, newExpr, comment);
 	}
 
 	deleteParameter(name: string): { success: boolean; error?: string } {
-		if (!this.parameters.has(name)) {
-			return { success: false, error: `Parameter '${name}' not found` };
-		}
-		this.beginTransaction();
-		try {
-			this.parameters.delete(name);
-			this.recomputeParametersAndConstraints(false);
-			return { success: true };
-		} finally {
-			this.commitTransaction(false);
-		}
+		return deleteSketchParameter(this, name);
 	}
 
 	recomputeParametersAndConstraints(pushHistory = false): {
 		success: boolean;
 		errors: Map<string, string>;
 	} {
-		if (pushHistory) {
-			this.pushHistory();
-		}
-		const graphRes = evaluateParameterGraph(this.parameters);
-		for (const [pName, val] of graphRes.values) {
-			const p = this.parameters.get(pName);
-			if (p) p.value = val;
-		}
-
-		for (const c of this.constraints.values()) {
-			if (c instanceof RectangularPatternConstraint) {
-				let updated = false;
-				const updates: any = {};
-				if (c.distance1Expression) {
-					try {
-						const val = evaluateExpression(c.distance1Expression, graphRes.values);
-						if (Number.isFinite(val)) {
-							updates.distance1 = val;
-							updated = true;
-						}
-					} catch {}
-				}
-				if (c.distance2Expression) {
-					try {
-						const val = evaluateExpression(c.distance2Expression, graphRes.values);
-						if (Number.isFinite(val)) {
-							updates.distance2 = val;
-							updated = true;
-						}
-					} catch {}
-				}
-				if (updated) {
-					this.updateRectangularPattern(c.id, updates);
-				}
-				continue;
-			}
-			if (c instanceof CircularPatternConstraint) {
-				if (c.totalAngleExpression) {
-					try {
-						const val = evaluateExpression(c.totalAngleExpression, graphRes.values);
-						if (Number.isFinite(val) && Math.abs(val) > 1e-3) {
-							this.updateCircularPattern(c.id, { totalAngle: val });
-						}
-					} catch {}
-				}
-				continue;
-			}
-			if (!c.expression) continue;
-			try {
-				const val = evaluateExpression(c.expression, graphRes.values);
-				if (Number.isFinite(val) && val > 0) {
-					this.applyConstraintValueDirectly(c, val);
-				}
-			} catch {
-				// Expression failed to evaluate, keep previous value
-			}
-		}
-
-		this.solve();
-		if (this.batchDepth === 0) this.notify();
-		return { success: graphRes.errors.size === 0, errors: graphRes.errors };
-	}
-
-	private offsetSourceState(c: OffsetConstraint): Array<string | number | boolean | undefined> {
-		const state: Array<string | number | boolean | undefined> = [JSON.stringify(c.sourceChain)];
-		for (const item of c.sourceChain.items) {
-			const primitive = this.getPrimitive(item.id, item.type);
-			state.push(primitive?.id);
-			if (!primitive) continue;
-			const pointIds = new Set<string>(primitive.getPointIds(this));
-			if (item.startPointId) pointIds.add(item.startPointId);
-			if (item.endPointId) pointIds.add(item.endPointId);
-			for (const id of pointIds) {
-				const point = this.points.get(id);
-				state.push(id, point?.x, point?.y);
-			}
-			if (primitive instanceof SketchCircle || primitive instanceof SketchArc) state.push(primitive.radius);
-			if (primitive instanceof SketchArc || primitive instanceof SketchEllipticalArc) state.push(primitive.clockwise);
-			if (primitive instanceof SketchSpline)
-				state.push(primitive.splineType, primitive.isClosed, ...(primitive.knots ?? []));
-		}
-		return state;
-	}
-
-	private refreshOffsetSources(offsets: OffsetConstraint[]): boolean {
-		let changed = false;
-		// Derived edits belong to the caller's history entry. Suppress nested solves,
-		// snapshots and notifications while topology is being reconciled.
-		this.updatingOffsets = true;
-		this.solveDeferred++;
-		this.batchDepth++;
-		try {
-			for (const c of offsets) {
-				if (this.constraints.get(c.id) !== c) continue;
-				const state = this.offsetSourceState(c),
-					previous = this.offsetSourceStates.get(c);
-				if (
-					previous?.length === state.length &&
-					state.every((v, i) =>
-						typeof v === 'number' && typeof previous[i] === 'number'
-							? Math.abs(v - previous[i]) <= 1e-8
-							: v === previous[i]
-					)
-				)
-					continue;
-				this.offsetSourceStates.set(c, state);
-				const geom = calculateOffsetGeometry(
-					this,
-					c.sourceChain,
-					c.direction || 'one_side',
-					c.targetDistance,
-					c.targetDistance,
-					c.flip || false
-				);
-				if (!geom.isValid || !geom.sides.length) continue;
-				if (!this.offsetTopologyMatches(c, geom.sides[0])) this.reconcileOffsetTopology(c, geom.sides[0]);
-				this.applyOffsetGeometryUpdate(c, geom);
-				changed = true;
-			}
-		} finally {
-			this.batchDepth--;
-			this.solveDeferred--;
-			this.updatingOffsets = false;
-		}
-		return changed;
-	}
-
-	private offsetPairSource(pair: OffsetPair): string {
-		return pair.kind === 'line' ? pair.origLineId : pair.kind === 'circle' ? pair.origId : pair.origSplineId;
-	}
-	private offsetPairEntity(pair: OffsetPair): string {
-		return pair.kind === 'line' ? pair.offLineId : pair.kind === 'circle' ? pair.offId : pair.offSplineId;
-	}
-	private offsetPairEndpoints(pair: OffsetPair): [string, string] | undefined {
-		if (pair.kind === 'line') return [pair.offP1Id, pair.offP2Id];
-		if (pair.kind === 'circle') {
-			const arc = this.arcs.get(pair.offId);
-			return arc ? [arc.startPointId, arc.endPointId] : undefined;
-		}
-		const spline = this.splines.get(pair.offSplineId);
-		return spline ? [spline.pointIds[0], spline.pointIds.at(-1)!] : undefined;
-	}
-	private offsetTopologyMatches(c: OffsetConstraint, side: OffsetSideGeometry): boolean {
-		return (
-			c.pairs.length === side.primitives.length &&
-			c.pairs.every(
-				(pair, i) =>
-					this.offsetPairSource(pair) === side.primitives[i].sourceId &&
-					(pair.contourIndex ?? 0) === (side.primitives[i].contourIndex ?? 0) &&
-					this.offsetPairMatchesPrimitive(pair, side.primitives[i])
-			)
-		);
-	}
-	private offsetPairMatchesPrimitive(pair: OffsetPair, prim: OffsetSideGeometry['primitives'][number]): boolean {
-		return (
-			this.getPrimitive(this.offsetPairEntity(pair))?.type === prim.type &&
-			(pair.kind !== 'spline' || this.splines.get(pair.offSplineId)?.isClosed === !!prim.isSplineClosed)
-		);
-	}
-	private splitOffsetEndpoint(pair: OffsetPair, start: boolean, pos: Vec2): void {
-		const endpoints = this.offsetPairEndpoints(pair);
-		if (!endpoints) return;
-		const old = endpoints[start ? 0 : 1],
-			point = this.addPoint(pos);
-		if (pair.kind === 'line') {
-			const line = this.lines.get(pair.offLineId)!;
-			if (start) {
-				line.p1Id = point.id;
-				pair.offP1Id = point.id;
-			} else {
-				line.p2Id = point.id;
-				pair.offP2Id = point.id;
-			}
-		} else if (pair.kind === 'circle') {
-			const arc = this.arcs.get(pair.offId)!;
-			if (start) arc.startPointId = point.id;
-			else arc.endPointId = point.id;
-			for (const constraint of this.constraints.values())
-				if (constraint instanceof ArcEndpointsConstraint && constraint.arcId === arc.id) {
-					this.constraints.set(
-						constraint.id,
-						new ArcEndpointsConstraint(
-							constraint.id,
-							arc.id,
-							arc.centerId,
-							arc.startPointId,
-							arc.endPointId,
-							constraint.weight
-						)
-					);
-				}
-		} else {
-			const spline = this.splines.get(pair.offSplineId)!,
-				index = start ? 0 : spline.pointIds.length - 1;
-			spline.pointIds[index] = point.id;
-			for (const sp of pair.points) if (sp.pointId === old) sp.pointId = point.id;
-			const handle = this.lines.get(spline.tangentLineIds?.[index] ?? '');
-			if (handle)
-				for (const constraint of this.constraints.values())
-					if (
-						constraint instanceof MidpointConstraint &&
-						constraint.midId === old &&
-						constraint.p1Id === handle.p1Id &&
-						constraint.p2Id === handle.p2Id
-					) {
-						this.constraints.set(
-							constraint.id,
-							new MidpointConstraint(
-								constraint.id,
-								point.id,
-								constraint.p1Id,
-								constraint.p2Id,
-								constraint.weight,
-								constraint.ratio
-							)
-						);
-					}
-		}
-	}
-	private reconcileOffsetTopology(c: OffsetConstraint, side: OffsetSideGeometry): void {
-		const oldPairs = new Map<string, OffsetPair[]>();
-		for (const pair of c.pairs) {
-			const source = this.offsetPairSource(pair);
-			oldPairs.set(source, [...(oldPairs.get(source) ?? []), pair]);
-		}
-		const dimPair = c.pairs[c.dimPairIndex];
-		for (const id of c.junctionConstraintIds ?? []) this.constraints.delete(id);
-		c.junctionConstraintIds = [];
-		// Deleting a vanished child must not remove its own dimension or its surviving siblings.
-		this.constraints.delete(c.id);
-		try {
-			c.pairs = side.primitives.map(prim => {
-				const candidates = oldPairs.get(prim.sourceId) ?? [];
-				const compatible = (pair: OffsetPair) => this.offsetPairMatchesPrimitive(pair, prim);
-				let index = candidates.findIndex(
-					pair => compatible(pair) && (pair.contourIndex ?? 0) === (prim.contourIndex ?? 0)
-				);
-				if (index < 0) index = candidates.findIndex(compatible);
-				if (index >= 0) {
-					const existing = candidates.splice(index, 1)[0];
-					if (prim.contourIndex) existing.contourIndex = prim.contourIndex;
-					else delete existing.contourIndex;
-					return existing;
-				}
-				const built = createOffsetSideGeometry(
-					this,
-					{ ...c.sourceChain, isClosed: false },
-					{ ...side, primitives: [prim] }
-				);
-				if (!built.offsetPairs[0]) throw new Error('Cannot restore an offset primitive');
-				return built.offsetPairs[0];
-			});
-			for (const pairs of oldPairs.values()) for (const pair of pairs) this.removeEntity(this.offsetPairEntity(pair));
-			// A restored feature can separate two endpoints that used to be one shared vertex.
-			const assigned = new Map<string, Vec2>();
-			for (let i = 0; i < c.pairs.length; i++) {
-				const prim = side.primitives[i],
-					pair = c.pairs[i],
-					ends = this.offsetPairEndpoints(pair);
-				if (!ends) continue;
-				const positions =
-					prim.type === 'line'
-						? [prim.p1!, prim.p2!]
-						: prim.type === 'arc'
-							? [prim.start!, prim.end!]
-							: [prim.fitPoints![0], prim.fitPoints!.at(-1)!];
-				for (let end = 0; end < 2; end++) {
-					const prev = assigned.get(ends[end]);
-					if (prev && prev.distanceTo(positions[end]) > 1e-7) this.splitOffsetEndpoint(pair, end === 0, positions[end]);
-					else assigned.set(ends[end], positions[end]);
-				}
-			}
-			const endpoints = c.pairs.map(pair => this.offsetPairEndpoints(pair));
-			for (let start = 0; start < endpoints.length; ) {
-				let end = start + 1;
-				while (
-					end < endpoints.length &&
-					(side.primitives[end].contourIndex ?? 0) === (side.primitives[start].contourIndex ?? 0)
-				)
-					end++;
-				const count = c.sourceChain?.isClosed ? end : end - 1;
-				for (let i = start; i < count; i++) {
-					if (side.primitives[i].isSplineClosed) continue;
-					const a = endpoints[i]?.[1],
-						b = endpoints[i + 1 < end ? i + 1 : start]?.[0];
-					if (!a || !b || a === b) continue;
-					const join = new CoincidentConstraint(this.nextId('c_coinc'), a, b);
-					this.constraints.set(join.id, join);
-					c.junctionConstraintIds.push(join.id);
-				}
-				start = end;
-			}
-			c.cornerPointIds = endpoints.flatMap((p, i) => (p && !side.primitives[i].isSplineClosed ? [p[0]] : []));
-			if (!c.sourceChain?.isClosed && endpoints.at(-1)) c.cornerPointIds.push(endpoints.at(-1)![1]);
-			c.dimPairIndex = Math.max(0, c.pairs.indexOf(dimPair));
-			c.entityIds = [
-				...new Set([
-					...new OffsetConstraint(c.id, c.pairs, c.targetDistance).entityIds,
-					...(c.sourceChain?.items ?? []).map((item: { id: string }) => item.id),
-				]),
-			];
-		} finally {
-			this.constraints.set(c.id, c);
-		}
-		this.rebuildParamManager();
-	}
-
-	private growOffsetSpline(
-		c: OffsetConstraint,
-		pair: Extract<OffsetPair, { kind: 'spline' }>,
-		prim: OffsetSideGeometry['primitives'][number]
-	): void {
-		const spline = this.splines.get(pair.offSplineId)!;
-		while (spline.pointIds.length < prim.fitPoints!.length) {
-			const index = spline.pointIds.length - 1,
-				p = prim.fitPoints![index],
-				h = prim.handles![index];
-			const point = new SketchPoint(this.nextId('Point'), p.x, p.y, false),
-				h1 = new SketchPoint(this.nextId('Point'), h.h1.x, h.h1.y, false),
-				h2 = new SketchPoint(this.nextId('Point'), h.h2.x, h.h2.y, false);
-			this.points.set(point.id, point);
-			this.points.set(h1.id, h1);
-			this.points.set(h2.id, h2);
-			const line = new SketchLine({
-				id: this.nextId('Line'),
-				p1Id: h1.id,
-				p2Id: h2.id,
-				isConstruction: true,
-				isSplineHandle: true,
-				parentSplineId: spline.id,
-				isAutomaticSplineHandle: false,
-			});
-			this.lines.set(line.id, line);
-			spline.pointIds.splice(index, 0, point.id);
-			spline.tangentLineIds!.splice(index, 0, line.id);
-			const a = p.distanceTo(h.h1),
-				b = p.distanceTo(h.h2),
-				mid = new MidpointConstraint(
-					this.nextId('c_midpoint'),
-					point.id,
-					h1.id,
-					h2.id,
-					1,
-					a + b > 1e-12 ? a / (a + b) : 0.5
-				);
-			this.constraints.set(mid.id, mid);
-			pair.points.push({
-				pointId: point.id,
-				basePos: prim.fitBases![index],
-				normal: prim.fitNormals![index],
-				side: c.flip ? -1 : 1,
-			});
-		}
-		c.entityIds = new OffsetConstraint(c.id, c.pairs, c.targetDistance, 0, 1, c.sourceChain).entityIds;
-		this.rebuildParamManager();
-	}
-
-	private applyOffsetGeometryUpdate(c: OffsetConstraint, geom: any): void {
-		if (!geom.sides || !geom.sides.length) return;
-		const side = geom.sides[0];
-		const numPrims = side.primitives.length;
-		if (!numPrims)
-			c.emptyDimension = {
-				anchor: Vec2.from(geom.gizmoAnchor),
-				normal: Vec2.from(geom.gizmoNormal).multiplyScalar(side.side),
-			};
-		else delete c.emptyDimension;
-
-		// Every primitive updates its own endpoints, including shared vertices within a contour.
-		for (let i = 0; i < numPrims; i++) {
-			const prim = side.primitives[i];
-			const pair = c.pairs[i];
-			if (!pair) continue;
-
-			if (pair.kind === 'line') {
-				if (prim.p1 && prim.p2) {
-					const p1 = this.points.get(pair.offP1Id);
-					const p2 = this.points.get(pair.offP2Id);
-					if (p1 && !this.isPointFixed(p1.id)) {
-						p1.x = prim.p1.x;
-						p1.y = prim.p1.y;
-					}
-					if (p2 && !this.isPointFixed(p2.id)) {
-						p2.x = prim.p2.x;
-						p2.y = prim.p2.y;
-					}
-				}
-			} else if (pair.kind === 'circle') {
-				const circ = this.circles.get(pair.offId);
-				if (circ && prim.circleRadius) circ.radius = prim.circleRadius;
-				const arc = this.arcs.get(pair.offId);
-				if (arc && prim.radius) arc.radius = prim.radius;
-				if (arc && prim.start && prim.end) {
-					for (const [id, pos] of [
-						[arc.startPointId, prim.start],
-						[arc.endPointId, prim.end],
-					] as const) {
-						const pt = this.points.get(id);
-						if (pt && !this.isPointFixed(id)) {
-							pt.x = pos.x;
-							pt.y = pos.y;
-						}
-					}
-				}
-			} else if (pair.kind === 'spline') {
-				const spline = this.splines.get(pair.offSplineId);
-				if (spline && prim.fitPoints) {
-					if (prim.fitPoints.length > spline.pointIds.length) this.growOffsetSpline(c, pair, prim);
-					const ptsCount = spline.pointIds.length;
-					resizeOffsetSpline(prim, ptsCount, side.side * side.distance);
-					// Closed seams share one point ID; creation stores the first branch's basis.
-					const sampleById = new Map<string, number>();
-					for (const [k, id] of spline.pointIds.entries()) if (!sampleById.has(id)) sampleById.set(id, k);
-					for (const sp of pair.points) {
-						const k = sampleById.get(sp.pointId);
-						if (k !== undefined && prim.fitBases?.[k] && prim.fitNormals?.[k]) {
-							sp.basePos = prim.fitBases[k];
-							sp.normal = prim.fitNormals[k];
-							sp.side = side.side;
-						}
-					}
-					const startIdx = 0;
-					const endIdx = ptsCount;
-					for (let k = startIdx; k < endIdx; k++) {
-						const pt = this.points.get(spline.pointIds[k]);
-						if (pt && !this.isPointFixed(pt.id) && prim.fitPoints[k]) {
-							pt.x = prim.fitPoints[k].x;
-							pt.y = prim.fitPoints[k].y;
-						}
-					}
-					// Update tangent handle points
-					const fitPts = spline.pointIds.map(pid => this.points.get(pid)).filter((p): p is SketchPoint => !!p);
-					if (fitPts.length >= 2 && spline.tangentLineIds && spline.tangentLineIds.length > 0) {
-						const handles = prim.handles || computeNaturalFitHandles(fitPts);
-						const midpoints = new Map(
-							[...this.constraints.values()]
-								.filter((c): c is MidpointConstraint => c instanceof MidpointConstraint)
-								.map(c => [`${c.p1Id}:${c.p2Id}`, c])
-						);
-						for (let h = 0; h < spline.tangentLineIds.length; h++) {
-							const tLine = this.lines.get(spline.tangentLineIds[h]);
-							if (tLine && handles[h]) {
-								const mid = midpoints.get(`${tLine.p1Id}:${tLine.p2Id}`),
-									a = fitPts[h].distanceTo(handles[h].h1),
-									b = fitPts[h].distanceTo(handles[h].h2),
-									ratio = a + b > 1e-12 ? a / (a + b) : 0.5;
-								if (mid && Math.abs(mid.ratio - ratio) > 1e-12)
-									this.constraints.set(
-										mid.id,
-										new MidpointConstraint(mid.id, mid.midId, mid.p1Id, mid.p2Id, mid.weight, ratio)
-									);
-								const h1 = this.points.get(tLine.p1Id);
-								const h2 = this.points.get(tLine.p2Id);
-								if (h1 && !this.isPointFixed(h1.id)) {
-									h1.x = handles[h].h1.x;
-									h1.y = handles[h].h1.y;
-								}
-								if (h2 && !this.isPointFixed(h2.id)) {
-									h2.x = handles[h].h2.x;
-									h2.y = handles[h].h2.y;
-								}
-							}
-						}
-					}
-				}
-			}
-		}
+		return recomputeParametersAndConstraints(this, pushHistory);
 	}
 
 	tryHardSolve(tempHardConstraints: IConstraint[], extraValidator?: () => boolean): boolean {
 		const initialValues = this.paramManager.getCurrentValues();
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
-		const activeConstraints = this.prepareSplineConstraints(tempHardConstraints, drivenRadii, editedHandles);
+		const activeConstraints = prepareSplineConstraints(this, tempHardConstraints, drivenRadii, editedHandles);
 		this.collectDrivenRadii(tempHardConstraints, drivenRadii);
 
 		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii, true, extraValidator);
