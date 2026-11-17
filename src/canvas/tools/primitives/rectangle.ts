@@ -295,22 +295,65 @@ export class RectangleTool extends BaseTool {
 		}
 	}
 
+	private screenRectBounds(viewport: ToolRenderContext['viewport'], w1: Vec2, w2: Vec2) {
+		const s1 = viewport.worldToScreen(w1);
+		const s2 = viewport.worldToScreen(w2);
+		return {
+			s1,
+			s2,
+			min: new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y)),
+			size: new Vec2(Math.abs(s2.x - s1.x), Math.abs(s2.y - s1.y)),
+		};
+	}
+
+	private getBaseNormal(p1: Vec2, p2: Vec2): Vec2 {
+		const v = new Vec2().subVectors(p2, p1);
+		const len = v.length();
+		return len > 1e-4 ? v.perpendicular().divideScalar(len) : new Vec2(0, 1);
+	}
+
+	private applyFieldDim(field: 'width' | 'height' | 'radius', create: () => { expression?: string } | null): void {
+		const locked =
+			field === 'width' ? this.isWidthLocked : field === 'height' ? this.isHeightLocked : this.isRadiusLocked;
+		if (!locked && !this.popup.isLocked(field)) return;
+		const c = create();
+		const expr = this.popup.getExpression(field);
+		if (c && expr) c.expression = expr;
+	}
+
+	private finalizeCommit(toastMsg: string): void {
+		this.ctx.sketch.commitTransaction();
+		this.ctx.sketch.solve();
+		this.popup.hide();
+		this.resetState();
+		this.ctx.requestRender();
+		this.ctx.showToast(toastMsg);
+	}
+
+	private findClosestPoint<T extends Vec2>(pts: T[], target: Vec2): T {
+		let closest = pts[0];
+		let minD = Infinity;
+		for (const p of pts) {
+			const d = target.distanceTo(p);
+			if (d < minD) {
+				minD = d;
+				closest = p;
+			}
+		}
+		return closest;
+	}
+
 	override onMouseMove(e: ToolMouseEvent): void {
 		if (this.drawingStep === 0 || !this.startWorldPos) return;
 
 		const effectiveWorld = e.effectiveWorld;
 		this.lastEffectiveWorld = effectiveWorld;
 
-		if (this._mode === 'corner') {
+		if (this._mode === 'corner' || this._mode === 'center') {
 			const dir = new Vec2().subVectors(effectiveWorld, this.startWorldPos);
-			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dir.x));
-			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dir.y));
-			this.updatePopupDimensions(this.width, this.height);
-			this.popup.updatePosition(e.screen);
-		} else if (this._mode === 'center') {
-			const dir = new Vec2().subVectors(effectiveWorld, this.startWorldPos);
-			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dir.x) * 2);
-			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dir.y) * 2);
+			const mult = this._mode === 'center' ? 2 : 1;
+			if (!this.isWidthLocked) this.width = Math.max(0.1, Math.abs(dir.x) * mult);
+			if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(dir.y) * mult);
 			this.updatePopupDimensions(this.width, this.height);
 			this.popup.updatePosition(e.screen);
 		} else if (this._mode === 'three_point') {
@@ -319,11 +362,8 @@ export class RectangleTool extends BaseTool {
 				if (!this.isWidthLocked) this.width = Math.max(0.1, d);
 				this.updatePopupDimensions(this.width, this.height);
 			} else if (this.drawingStep === 2 && this.secondWorldPos) {
-				const V = new Vec2().subVectors(this.secondWorldPos, this.startWorldPos);
-				const baseLen = V.length();
-				const n = baseLen > 1e-4 ? V.clone().perpendicular().divideScalar(baseLen) : new Vec2(0, 1);
-				const offset = new Vec2().subVectors(effectiveWorld, this.secondWorldPos);
-				const proj = offset.dot(n);
+				const n = this.getBaseNormal(this.startWorldPos, this.secondWorldPos);
+				const proj = new Vec2().subVectors(effectiveWorld, this.secondWorldPos).dot(n);
 				if (!this.isHeightLocked) this.height = Math.max(0.1, Math.abs(proj));
 				this.updatePopupDimensions(this.width, this.height);
 			}
@@ -382,32 +422,23 @@ export class RectangleTool extends BaseTool {
 		const previewAttrs = getPreviewStrokeAttrs(ctx.isConstruction);
 
 		if (this._mode === 'corner') {
-			const c1 = this.startWorldPos;
 			const c2 = this.computeCornerSecondPoint(effectiveWorld);
-			const s1 = ctx.viewport.worldToScreen(c1);
-			const s2 = ctx.viewport.worldToScreen(c2);
-
-			const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
-			const rw = Math.abs(s2.x - s1.x);
-			const rh = Math.abs(s2.y - s1.y);
-
-			createSvgRect(min, new Vec2(rw, rh), previewAttrs, ctx.targetGroup);
+			const { min, size } = this.screenRectBounds(ctx.viewport, this.startWorldPos, c2);
+			createSvgRect(min, size, previewAttrs, ctx.targetGroup);
 		} else if (this._mode === 'center') {
 			const C = this.startWorldPos;
 			const halfDims = this.computeCenterHalfDims(effectiveWorld);
 			const halfSize = new Vec2(halfDims.w, halfDims.h);
 			const worldMin = C.clone().sub(halfSize);
 			const worldMax = C.clone().add(halfSize);
-
-			const s1 = ctx.viewport.worldToScreen(new Vec2(worldMin.x, worldMax.y));
-			const s2 = ctx.viewport.worldToScreen(new Vec2(worldMax.x, worldMin.y));
+			const { s1, s2, min, size } = this.screenRectBounds(
+				ctx.viewport,
+				new Vec2(worldMin.x, worldMax.y),
+				new Vec2(worldMax.x, worldMin.y)
+			);
 			const sc = ctx.viewport.worldToScreen(C);
 
-			const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
-			const rw = Math.abs(s2.x - s1.x);
-			const rh = Math.abs(s2.y - s1.y);
-
-			createSvgRect(min, new Vec2(rw, rh), previewAttrs, ctx.targetGroup);
+			createSvgRect(min, size, previewAttrs, ctx.targetGroup);
 			createSvgLine(s1, s2, AUX_AXIS_ATTRS, ctx.targetGroup);
 			createSvgLine(new Vec2(s1.x, s2.y), new Vec2(s2.x, s1.y), AUX_AXIS_ATTRS, ctx.targetGroup);
 			createSvgCircle(sc, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
@@ -421,20 +452,15 @@ export class RectangleTool extends BaseTool {
 			} else if (this.drawingStep === 2 && this.secondWorldPos) {
 				const p2 = this.secondWorldPos;
 				const p3 = this.computeThreePointHeightPoint(effectiveWorld);
-				const V = new Vec2().subVectors(p2, this.startWorldPos);
-				const baseLen = V.length();
-				const n = baseLen > 1e-4 ? V.clone().perpendicular().divideScalar(baseLen) : new Vec2(0, 1);
-				const offset = new Vec2().subVectors(p3, p2);
-				const hSigned = offset.dot(n);
+				const n = this.getBaseNormal(this.startWorldPos, p2);
+				const hSigned = new Vec2().subVectors(p3, p2).dot(n);
 
 				const p0 = this.startWorldPos;
-				const p1 = p2;
-				const pCorner2 = p3;
 				const pCorner3 = p0.clone().addScaledVector(n, hSigned);
 
 				const s0 = ctx.viewport.worldToScreen(p0);
-				const sPt1 = ctx.viewport.worldToScreen(p1);
-				const sPt2 = ctx.viewport.worldToScreen(pCorner2);
+				const sPt1 = ctx.viewport.worldToScreen(p2);
+				const sPt2 = ctx.viewport.worldToScreen(p3);
 				const sPt3 = ctx.viewport.worldToScreen(pCorner3);
 
 				const pathD = `M ${s0.x.toFixed(1)} ${s0.y.toFixed(1)} L ${sPt1.x.toFixed(1)} ${sPt1.y.toFixed(1)} L ${sPt2.x.toFixed(1)} ${sPt2.y.toFixed(1)} L ${sPt3.x.toFixed(1)} ${sPt3.y.toFixed(1)} Z`;
@@ -446,18 +472,13 @@ export class RectangleTool extends BaseTool {
 				this.drawingStep === 2 && this.secondWorldPos
 					? this.secondWorldPos
 					: this.computeCornerSecondPoint(effectiveWorld);
-			const s1 = ctx.viewport.worldToScreen(c1);
-			const s2 = ctx.viewport.worldToScreen(c2);
-
-			const min = new Vec2(Math.min(s1.x, s2.x), Math.min(s1.y, s2.y));
-			const rw = Math.abs(s2.x - s1.x);
-			const rh = Math.abs(s2.y - s1.y);
+			const { min, size } = this.screenRectBounds(ctx.viewport, c1, c2);
 
 			const maxR = Math.max(0, Math.min(this.width, this.height) / 2);
 			const effectiveR = Math.max(0, Math.min(this.radius, maxR));
 			const sr = effectiveR * ctx.viewport.zoom;
 
-			createSvgRect(min, new Vec2(rw, rh), { ...previewAttrs, rx: sr, ry: sr }, ctx.targetGroup);
+			createSvgRect(min, size, { ...previewAttrs, rx: sr, ry: sr }, ctx.targetGroup);
 		}
 	}
 
@@ -546,36 +567,26 @@ export class RectangleTool extends BaseTool {
 	}
 
 	private computeThreePointHeightPoint(effectiveWorld: Vec2): Vec2 {
-		const P1 = this.startWorldPos!;
 		const P2 = this.secondWorldPos!;
-		const V = new Vec2().subVectors(P2, P1);
-		const baseLen = V.length();
-		const n = baseLen > 1e-4 ? V.clone().perpendicular().divideScalar(baseLen) : new Vec2(0, 1);
-
-		const offset = new Vec2().subVectors(effectiveWorld, P2);
-		const proj = offset.dot(n);
-
-		let signedH = proj;
-		if (this.isHeightLocked) {
-			const signH = Math.sign(proj) || 1;
-			signedH = signH * this.height;
-		}
-
+		const n = this.getBaseNormal(this.startWorldPos!, P2);
+		const proj = new Vec2().subVectors(effectiveWorld, P2).dot(n);
+		const signedH = this.isHeightLocked ? (Math.sign(proj) || 1) * this.height : proj;
 		return P2.clone().addScaledVector(n, signedH);
 	}
 
 	private commitFromCurrentValues(): void {
-		if (this._mode === 'corner') {
+		if (this._mode === 'corner' || this._mode === 'rounded') {
 			const c1 = this.startWorldPos!;
 			const eff = this.lastEffectiveWorld ?? new Vec2(c1.x + this.width, c1.y + this.height);
 			const dir = new Vec2().subVectors(eff, c1);
-			const signX = Math.sign(dir.x) || 1;
-			const signY = Math.sign(dir.y) || 1;
-			const c2 = new Vec2(c1.x + signX * this.width, c1.y + signY * this.height);
-			this.commitCorner(c1, c2, null);
+			const computedC2 = new Vec2(
+				c1.x + (Math.sign(dir.x) || 1) * this.width,
+				c1.y + (Math.sign(dir.y) || 1) * this.height
+			);
+			if (this._mode === 'corner') this.commitCorner(c1, computedC2, null);
+			else this.commitRounded(c1, this.secondWorldPos ?? computedC2, this.radius, this.secondSnap);
 		} else if (this._mode === 'center') {
-			const C = this.startWorldPos!;
-			this.commitCenter(C, this.width / 2, this.height / 2);
+			this.commitCenter(this.startWorldPos!, this.width / 2, this.height / 2);
 		} else if (this._mode === 'three_point') {
 			const P1 = this.startWorldPos!;
 			const P2 =
@@ -583,23 +594,10 @@ export class RectangleTool extends BaseTool {
 				(this.lastEffectiveWorld
 					? this.computeThreePointSecondPoint(this.lastEffectiveWorld)
 					: new Vec2(P1.x + this.width, P1.y));
-			const V = new Vec2().subVectors(P2, P1);
-			const baseLen = V.length();
-			const n = baseLen > 1e-4 ? V.clone().perpendicular().divideScalar(baseLen) : new Vec2(0, 1);
+			const n = this.getBaseNormal(P1, P2);
 			const eff = this.lastEffectiveWorld ?? P2.clone().addScaledVector(n, this.height);
-			const offset = new Vec2().subVectors(eff, P2);
-			const proj = offset.dot(n);
-			const signH = Math.sign(proj) || 1;
-			const P3 = P2.clone().addScaledVector(n, this.height * signH);
-			this.commitThreePoint(P1, P2, P3, null);
-		} else if (this._mode === 'rounded') {
-			const c1 = this.startWorldPos!;
-			const eff = this.lastEffectiveWorld ?? new Vec2(c1.x + this.width, c1.y + this.height);
-			const dir = new Vec2().subVectors(eff, c1);
-			const signX = Math.sign(dir.x) || 1;
-			const signY = Math.sign(dir.y) || 1;
-			const c2 = this.secondWorldPos ?? new Vec2(c1.x + signX * this.width, c1.y + signY * this.height);
-			this.commitRounded(c1, c2, this.radius, this.secondSnap);
+			const signH = Math.sign(new Vec2().subVectors(eff, P2).dot(n)) || 1;
+			this.commitThreePoint(P1, P2, P2.clone().addScaledVector(n, this.height * signH), null);
 		}
 	}
 
@@ -607,40 +605,12 @@ export class RectangleTool extends BaseTool {
 	// Commit Methods
 	// =========================================================================
 
-	private commitCorner(c1: Vec2, c2: Vec2, snap: SnapResult | null): void {
+	private commitAxisAlignedRect(min: Vec2, max: Vec2) {
 		const { sketch } = this.ctx;
-
-		const min = new Vec2(Math.min(c1.x, c2.x), Math.min(c1.y, c2.y));
-		const max = new Vec2(Math.max(c1.x, c2.x), Math.max(c1.y, c2.y));
-
 		const p0 = sketch.addPoint(min);
 		const p1 = sketch.addPoint(new Vec2(max.x, min.y));
 		const p2 = sketch.addPoint(max);
 		const p3 = sketch.addPoint(new Vec2(min.x, max.y));
-
-		const pts = [p0, p1, p2, p3];
-		const findClosest = (target: Vec2) => {
-			let closest = pts[0];
-			let minD = Infinity;
-			for (const p of pts) {
-				const d = target.distanceTo(p);
-				if (d < minD) {
-					minD = d;
-					closest = p;
-				}
-			}
-			return closest;
-		};
-
-		const ptC1 = findClosest(c1);
-		const ptC2 = findClosest(c2);
-
-		if (this.startSnap) {
-			this.ctx.applySnapConstraintIfNeeded?.(ptC1.id, this.startSnap);
-		}
-		if (snap) {
-			this.ctx.applySnapConstraintIfNeeded?.(ptC2.id, snap);
-		}
 
 		const isConst = this.ctx.isConstructionMode;
 		sketch.addLine(p0.id, p1.id, isConst);
@@ -653,24 +623,25 @@ export class RectangleTool extends BaseTool {
 		sketch.addHorizontalConstraint(p3.id, p2.id);
 		sketch.addVerticalConstraint(p0.id, p3.id);
 
-		if (this.isWidthLocked || this.popup.isLocked('width')) {
-			const c = sketch.addDistanceConstraint(p0.id, p1.id, this.width);
-			const expr = this.popup.getExpression('width');
-			if (c && expr) c.expression = expr;
+		this.applyFieldDim('width', () => sketch.addDistanceConstraint(p0.id, p1.id, this.width));
+		this.applyFieldDim('height', () => sketch.addDistanceConstraint(p1.id, p2.id, this.height));
+
+		return [p0, p1, p2, p3];
+	}
+
+	private commitCorner(c1: Vec2, c2: Vec2, snap: SnapResult | null): void {
+		const min = new Vec2(Math.min(c1.x, c2.x), Math.min(c1.y, c2.y));
+		const max = new Vec2(Math.max(c1.x, c2.x), Math.max(c1.y, c2.y));
+		const pts = this.commitAxisAlignedRect(min, max);
+
+		if (this.startSnap) {
+			this.ctx.applySnapConstraintIfNeeded?.(this.findClosestPoint(pts, c1).id, this.startSnap);
 		}
-		if (this.isHeightLocked || this.popup.isLocked('height')) {
-			const c = sketch.addDistanceConstraint(p1.id, p2.id, this.height);
-			const expr = this.popup.getExpression('height');
-			if (c && expr) c.expression = expr;
+		if (snap) {
+			this.ctx.applySnapConstraintIfNeeded?.(this.findClosestPoint(pts, c2).id, snap);
 		}
 
-		sketch.commitTransaction();
-		sketch.solve();
-
-		this.popup.hide();
-		this.resetState();
-		this.ctx.requestRender();
-		this.ctx.showToast('Rectangle created');
+		this.finalizeCommit('Rectangle created');
 	}
 
 	private commitCenter(
@@ -699,73 +670,24 @@ export class RectangleTool extends BaseTool {
 		}
 
 		const halfSize = new Vec2(halfW, halfH);
-		const min = center.clone().sub(halfSize);
-		const max = center.clone().add(halfSize);
-
-		const p0 = sketch.addPoint(min);
-		const p1 = sketch.addPoint(new Vec2(max.x, min.y));
-		const p2 = sketch.addPoint(max);
-		const p3 = sketch.addPoint(new Vec2(min.x, max.y));
+		const [p0, p1, p2, p3] = this.commitAxisAlignedRect(center.clone().sub(halfSize), center.clone().add(halfSize));
 
 		if (snap && effectiveWorld) {
-			const pts = [p0, p1, p2, p3];
-			let closest = pts[0];
-			let minD = Infinity;
-			for (const p of pts) {
-				const d = effectiveWorld.distanceTo(p);
-				if (d < minD) {
-					minD = d;
-					closest = p;
-				}
-			}
-			this.ctx.applySnapConstraintIfNeeded?.(closest.id, snap);
+			this.ctx.applySnapConstraintIfNeeded?.(this.findClosestPoint([p0, p1, p2, p3], effectiveWorld).id, snap);
 		}
 
-		const isConst = this.ctx.isConstructionMode;
-		sketch.addLine(p0.id, p1.id, isConst);
-		sketch.addLine(p1.id, p2.id, isConst);
-		sketch.addLine(p2.id, p3.id, isConst);
-		sketch.addLine(p3.id, p0.id, isConst);
-
-		// Diagonal construction lines
 		const d1 = sketch.addLine(p0.id, p2.id, true);
 		sketch.addLine(p1.id, p3.id, true);
-
-		sketch.addHorizontalConstraint(p0.id, p1.id);
-		sketch.addVerticalConstraint(p1.id, p2.id);
-		sketch.addHorizontalConstraint(p3.id, p2.id);
-		sketch.addVerticalConstraint(p0.id, p3.id);
-
 		sketch.addMidpointConstraint(centerPtId, d1.id);
 
-		if (this.isWidthLocked || this.popup.isLocked('width')) {
-			const c = sketch.addDistanceConstraint(p0.id, p1.id, this.width);
-			const expr = this.popup.getExpression('width');
-			if (c && expr) c.expression = expr;
-		}
-		if (this.isHeightLocked || this.popup.isLocked('height')) {
-			const c = sketch.addDistanceConstraint(p1.id, p2.id, this.height);
-			const expr = this.popup.getExpression('height');
-			if (c && expr) c.expression = expr;
-		}
-
-		sketch.commitTransaction();
-		sketch.solve();
-
-		this.popup.hide();
-		this.resetState();
-		this.ctx.requestRender();
-		this.ctx.showToast('Center rectangle created');
+		this.finalizeCommit('Center rectangle created');
 	}
 
 	private commitThreePoint(p1: Vec2, p2: Vec2, p3: Vec2, snap: SnapResult | null = null): void {
 		const { sketch } = this.ctx;
 
-		const V = new Vec2().subVectors(p2, p1);
-		const baseLen = V.length();
-		const n = baseLen > 1e-4 ? V.clone().perpendicular().divideScalar(baseLen) : new Vec2(0, 1);
-		const offset = new Vec2().subVectors(p3, p2);
-		const hSigned = offset.dot(n);
+		const n = this.getBaseNormal(p1, p2);
+		const hSigned = new Vec2().subVectors(p3, p2).dot(n);
 
 		const pCorner0 = sketch.addPoint(p1);
 		const pCorner1 = sketch.addPoint(p2);
@@ -793,24 +715,10 @@ export class RectangleTool extends BaseTool {
 		sketch.addPerpendicularConstraint(l0.id, l1.id);
 		sketch.addEqualLengthConstraint(l0.id, l2.id);
 
-		if (this.isWidthLocked || this.popup.isLocked('width')) {
-			const c = sketch.addDistanceConstraint(pCorner0.id, pCorner1.id, this.width);
-			const expr = this.popup.getExpression('width');
-			if (c && expr) c.expression = expr;
-		}
-		if (this.isHeightLocked || this.popup.isLocked('height')) {
-			const c = sketch.addDistanceConstraint(pCorner1.id, pCorner2.id, this.height);
-			const expr = this.popup.getExpression('height');
-			if (c && expr) c.expression = expr;
-		}
+		this.applyFieldDim('width', () => sketch.addDistanceConstraint(pCorner0.id, pCorner1.id, this.width));
+		this.applyFieldDim('height', () => sketch.addDistanceConstraint(pCorner1.id, pCorner2.id, this.height));
 
-		sketch.commitTransaction();
-		sketch.solve();
-
-		this.popup.hide();
-		this.resetState();
-		this.ctx.requestRender();
-		this.ctx.showToast('3-point rectangle created');
+		this.finalizeCommit('3-point rectangle created');
 	}
 
 	private commitRounded(c1: Vec2, c2: Vec2, radius: number, snap: SnapResult | null = null): void {
@@ -878,28 +786,14 @@ export class RectangleTool extends BaseTool {
 		sketch.addEqualRadiusConstraint(brArc.id, blArc.id);
 		sketch.addEqualRadiusConstraint(blArc.id, tlArc.id);
 
-		if (this.isRadiusLocked || this.popup.isLocked('radius')) {
-			const c = sketch.addRadiusConstraint(trArc.id, r);
-			const expr = this.popup.getExpression('radius');
-			if (c && expr) c.expression = expr;
-		}
-		if (this.isWidthLocked || this.popup.isLocked('width')) {
-			const c = sketch.addDistanceConstraint(ptTopStart.id, ptTopEnd.id, Math.max(0.1, w - 2 * r));
-			const expr = this.popup.getExpression('width');
-			if (c && expr) c.expression = expr;
-		}
-		if (this.isHeightLocked || this.popup.isLocked('height')) {
-			const c = sketch.addDistanceConstraint(ptLeftStart.id, ptLeftEnd.id, Math.max(0.1, h - 2 * r));
-			const expr = this.popup.getExpression('height');
-			if (c && expr) c.expression = expr;
-		}
+		this.applyFieldDim('radius', () => sketch.addRadiusConstraint(trArc.id, r));
+		this.applyFieldDim('width', () =>
+			sketch.addDistanceConstraint(ptTopStart.id, ptTopEnd.id, Math.max(0.1, w - 2 * r))
+		);
+		this.applyFieldDim('height', () =>
+			sketch.addDistanceConstraint(ptLeftStart.id, ptLeftEnd.id, Math.max(0.1, h - 2 * r))
+		);
 
-		sketch.commitTransaction();
-		sketch.solve();
-
-		this.popup.hide();
-		this.resetState();
-		this.ctx.requestRender();
-		this.ctx.showToast('Rounded rectangle created');
+		this.finalizeCommit('Rounded rectangle created');
 	}
 }

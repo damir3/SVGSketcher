@@ -1,11 +1,30 @@
 import { Vec2 } from '../../../math/vector';
 import type { SketchDocument } from '../../../model/sketch';
-import { deselectEntity } from '../../../model/selection';
+import { deselectEntity, SELECTION_KEYS } from '../../../model/selection';
 import type { Viewport } from '../../viewport';
 import { findAxisNear } from '../../hitTesting';
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent, ToolType } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
+
+const COMPATIBLE_ENTITY_TYPES: Record<string, ReadonlySet<string>> = {
+	fixed: new Set(['point']),
+	coincident: new Set(['point', 'line', 'circle', 'arc', 'ellipse', 'elliptical_arc', 'spline']),
+	horizontal_vertical: new Set(['line', 'point']),
+	horizontal: new Set(['line', 'point']),
+	vertical: new Set(['line', 'point']),
+	dimension: new Set(['line', 'point', 'circle', 'arc']),
+	distance: new Set(['line', 'point', 'circle', 'arc']),
+	equal: new Set(['line', 'circle', 'arc']),
+	parallel: new Set(['line']),
+	perpendicular: new Set(['line']),
+	collinear: new Set(['line', 'point']),
+	tangent: new Set(['line', 'circle', 'arc']),
+	concentric: new Set(['circle', 'arc']),
+	point_on_line: new Set(['point', 'line']),
+	midpoint: new Set(['point', 'line']),
+	symmetry: new Set(['point', 'line', 'circle', 'arc']),
+};
 
 export class ConstraintTool extends BaseTool {
 	readonly id: ConstraintToolType;
@@ -84,55 +103,30 @@ export class ConstraintTool extends BaseTool {
 		if (nearPoint) {
 			id = nearPoint.id;
 			type = 'point';
-		} else if (
-			!type ||
-			(type !== 'point' &&
-				type !== 'line' &&
-				type !== 'circle' &&
-				type !== 'arc' &&
-				type !== 'ellipse' &&
-				type !== 'elliptical_arc' &&
-				type !== 'spline')
-		) {
-			const hitLine = this.ctx.findLineNear(screen);
-			if (hitLine) {
-				id = hitLine.id;
-				type = 'line';
-			} else {
-				const hitCircle = this.ctx.findCircleNear(screen);
-				if (hitCircle) {
-					id = hitCircle.id;
-					type = 'circle';
-				} else {
-					const hitArc = this.ctx.findArcNear(screen);
-					if (hitArc) {
-						id = hitArc.id;
-						type = 'arc';
-					} else {
-						const hitEllipse = this.ctx.findEllipseNear?.(screen);
-						if (hitEllipse) {
-							id = hitEllipse.id;
-							type = 'ellipse';
-						} else {
-							const hitEllipticalArc = this.ctx.findEllipticalArcNear?.(screen);
-							if (hitEllipticalArc) {
-								id = hitEllipticalArc.id;
-								type = 'elliptical_arc';
-							} else {
-								const hitSpline = this.ctx.findSplineNear?.(screen);
-								if (hitSpline) {
-									id = hitSpline.id;
-									type = 'spline';
-								} else if (this.isEntityCompatibleWithConstraint('line')) {
-									const hitAxis = findAxisNear(this.ctx.sketch, this.ctx.viewport, screen);
-									if (hitAxis) {
-										id = hitAxis.id;
-										type = 'line';
-									}
-								}
-							}
-						}
-					}
+		} else if (!type || !COMPATIBLE_ENTITY_TYPES.coincident.has(type)) {
+			const hitFinders: Array<
+				['line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline', () => { id: string } | null | undefined]
+			> = [
+				['line', () => this.ctx.findLineNear(screen)],
+				['circle', () => this.ctx.findCircleNear(screen)],
+				['arc', () => this.ctx.findArcNear(screen)],
+				['ellipse', () => this.ctx.findEllipseNear?.(screen)],
+				['elliptical_arc', () => this.ctx.findEllipticalArcNear?.(screen)],
+				['spline', () => this.ctx.findSplineNear?.(screen)],
+			];
+			for (const [candidateType, find] of hitFinders) {
+				const hit = find();
+				if (hit) {
+					id = hit.id;
+					type = candidateType;
+					break;
+				}
+			}
+			if (!id && this.isEntityCompatibleWithConstraint('line')) {
+				const hitAxis = findAxisNear(this.ctx.sketch, this.ctx.viewport, screen);
+				if (hitAxis) {
+					id = hitAxis.id;
+					type = 'line';
 				}
 			}
 		}
@@ -412,79 +406,36 @@ export class ConstraintTool extends BaseTool {
 
 	static pruneIncompatibleSelection(sketch: SketchDocument, type: string): void {
 		const sel = sketch.selection;
-		switch (type) {
-			case 'fixed': {
+		const allowed = COMPATIBLE_ENTITY_TYPES[type];
+		for (const primType of ['point', 'line', 'circle', 'arc', 'ellipse', 'elliptical_arc', 'spline'] as const) {
+			if (
+				allowed
+					? !allowed.has(primType)
+					: primType === 'ellipse' || primType === 'elliptical_arc' || primType === 'spline'
+			) {
+				sel[SELECTION_KEYS[primType]].clear();
+			}
+		}
+		if (type === 'coincident' && sel.lineIds.size > 0) {
+			sel.circleIds.clear();
+			sel.arcIds.clear();
+		} else if (
+			(type === 'collinear' || type === 'horizontal_vertical' || type === 'horizontal' || type === 'vertical') &&
+			sel.lineIds.size > 0
+		) {
+			sel.pointIds.clear();
+		} else if (type === 'tangent') {
+			if (sel.lineIds.size > 1) sel.lineIds.clear();
+			if (sel.circleIds.size + sel.arcIds.size > 2) {
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+			}
+		} else if (type === 'equal') {
+			if (sel.lineIds.size > 0) {
+				sel.circleIds.clear();
+				sel.arcIds.clear();
+			} else if (sel.circleIds.size + sel.arcIds.size > 0) {
 				sel.lineIds.clear();
-				sel.circleIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'coincident': {
-				if (sel.lineIds.size > 0 && sel.circleIds.size + sel.arcIds.size > 0) {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
-				}
-				break;
-			}
-			case 'parallel':
-			case 'perpendicular': {
-				sel.pointIds.clear();
-				sel.circleIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'collinear': {
-				if (sel.lineIds.size > 0) {
-					sel.pointIds.clear();
-				}
-				sel.circleIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'concentric': {
-				sel.pointIds.clear();
-				sel.lineIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'tangent': {
-				sel.pointIds.clear();
-				if (sel.lineIds.size > 1) sel.lineIds.clear();
-				if (sel.circleIds.size + sel.arcIds.size > 2) {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
-				}
-				break;
-			}
-			case 'point_on_line':
-			case 'midpoint': {
-				sel.circleIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'horizontal_vertical':
-			case 'horizontal':
-			case 'vertical': {
-				if (sel.lineIds.size > 0) {
-					sel.pointIds.clear();
-				}
-				sel.circleIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'equal': {
-				if (sel.lineIds.size > 0) {
-					sel.circleIds.clear();
-				} else if (sel.circleIds.size > 0) {
-					sel.lineIds.clear();
-				}
-				sel.pointIds.clear();
-				sel.arcIds.clear();
-				break;
-			}
-			case 'dimension':
-			case 'distance': {
-				break;
 			}
 		}
 		if (sel.lineIds.size > 0 && sel.pointIds.size > 0) {
@@ -496,56 +447,13 @@ export class ConstraintTool extends BaseTool {
 				}
 			}
 		}
-		if (type !== 'coincident') {
-			sel.ellipseIds.clear();
-			sel.ellipticalArcIds.clear();
-			sel.splineIds.clear();
-		}
 		sel.constraintIds.clear();
 	}
 
 	private isEntityCompatibleWithConstraint(
 		entityType: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
 	): boolean {
-		switch (this.id) {
-			case 'fixed':
-				return entityType === 'point';
-			case 'coincident':
-				return (
-					entityType === 'point' ||
-					entityType === 'line' ||
-					entityType === 'circle' ||
-					entityType === 'arc' ||
-					entityType === 'ellipse' ||
-					entityType === 'elliptical_arc' ||
-					entityType === 'spline'
-				);
-			case 'horizontal_vertical':
-			case 'horizontal':
-			case 'vertical':
-				return entityType === 'line' || entityType === 'point';
-			case 'dimension':
-			case 'distance':
-				return entityType === 'line' || entityType === 'point' || entityType === 'circle' || entityType === 'arc';
-			case 'equal':
-				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
-			case 'parallel':
-			case 'perpendicular':
-				return entityType === 'line';
-			case 'collinear':
-				return entityType === 'line' || entityType === 'point';
-			case 'tangent':
-				return entityType === 'line' || entityType === 'circle' || entityType === 'arc';
-			case 'concentric':
-				return entityType === 'circle' || entityType === 'arc';
-			case 'point_on_line':
-			case 'midpoint':
-				return entityType === 'point' || entityType === 'line';
-			case 'symmetry':
-				return entityType === 'point' || entityType === 'line' || entityType === 'circle' || entityType === 'arc';
-			default:
-				return false;
-		}
+		return COMPATIBLE_ENTITY_TYPES[this.id]?.has(entityType) ?? false;
 	}
 
 	private canApplyConstraint(type: string): boolean {
@@ -755,65 +663,30 @@ export class ConstraintTool extends BaseTool {
 				}
 				break;
 			}
-			case 'horizontal_vertical': {
-				if (lIds.length === 1) {
-					const l = sketch.lines.get(lIds[0])!;
-					const p1 = sketch.points.get(l.p1Id);
-					const p2 = sketch.points.get(l.p2Id);
-					if (p1 && p2) {
-						const dir = new Vec2().subVectors(p2, p1);
-						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
-							sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
-							applied = true;
-							toastMsg = 'Horizontal constraint applied';
-						} else {
-							sketch.addVerticalConstraint(l.p1Id, l.p2Id);
-							applied = true;
-							toastMsg = 'Vertical constraint applied';
-						}
-					}
-				} else if (pIds.length === 2) {
-					const p1 = sketch.points.get(pIds[0]);
-					const p2 = sketch.points.get(pIds[1]);
-					if (p1 && p2) {
-						const dir = new Vec2().subVectors(p2, p1);
-						if (Math.abs(dir.x) >= Math.abs(dir.y)) {
-							sketch.addHorizontalConstraint(pIds[0], pIds[1]);
-							applied = true;
-							toastMsg = 'Horizontal constraint applied';
-						} else {
-							sketch.addVerticalConstraint(pIds[0], pIds[1]);
-							applied = true;
-							toastMsg = 'Vertical constraint applied';
-						}
-					}
-				}
-				break;
-			}
-			case 'horizontal': {
-				if (lIds.length === 1) {
-					const l = sketch.lines.get(lIds[0])!;
-					sketch.addHorizontalConstraint(l.p1Id, l.p2Id);
-					applied = true;
-					toastMsg = 'Horizontal constraint applied';
-				} else if (pIds.length === 2) {
-					sketch.addHorizontalConstraint(pIds[0], pIds[1]);
-					applied = true;
-					toastMsg = 'Horizontal constraint applied';
-				}
-				break;
-			}
+			case 'horizontal_vertical':
+			case 'horizontal':
 			case 'vertical': {
-				if (lIds.length === 1) {
-					const l = sketch.lines.get(lIds[0])!;
-					sketch.addVerticalConstraint(l.p1Id, l.p2Id);
-					applied = true;
-					toastMsg = 'Vertical constraint applied';
-				} else if (pIds.length === 2) {
-					sketch.addVerticalConstraint(pIds[0], pIds[1]);
-					applied = true;
-					toastMsg = 'Vertical constraint applied';
+				const pair =
+					lIds.length === 1
+						? (() => {
+								const l = sketch.lines.get(lIds[0]);
+								return l ? ([l.p1Id, l.p2Id] as const) : null;
+							})()
+						: pIds.length === 2
+							? ([pIds[0], pIds[1]] as const)
+							: null;
+				if (!pair) break;
+				let mode = type;
+				if (type === 'horizontal_vertical') {
+					const p1 = sketch.points.get(pair[0]);
+					const p2 = sketch.points.get(pair[1]);
+					if (!p1 || !p2) break;
+					mode = Math.abs(p2.x - p1.x) >= Math.abs(p2.y - p1.y) ? 'horizontal' : 'vertical';
 				}
+				if (mode === 'horizontal') sketch.addHorizontalConstraint(pair[0], pair[1]);
+				else sketch.addVerticalConstraint(pair[0], pair[1]);
+				applied = true;
+				toastMsg = mode === 'horizontal' ? 'Horizontal constraint applied' : 'Vertical constraint applied';
 				break;
 			}
 			case 'dimension':
@@ -924,51 +797,26 @@ export class ConstraintTool extends BaseTool {
 				}
 				break;
 			}
-			case 'parallel': {
-				if (lIds.length === 2) {
-					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
-						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
-						const axis = lIds.includes('axis_x') ? 'x' : 'y';
-						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
-						const line = sketch.lines.get(userLineId);
-						if (line) {
-							if (axis === 'x') {
-								sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
-							} else {
-								sketch.addVerticalConstraint(line.p1Id, line.p2Id);
-							}
-							applied = true;
-							toastMsg = `Parallel to ${axis.toUpperCase()}-axis applied`;
-						}
-					} else {
-						sketch.addParallelConstraint(lIds[0], lIds[1]);
-						applied = true;
-						toastMsg = 'Parallel constraint applied';
-					}
-				}
-				break;
-			}
+			case 'parallel':
 			case 'perpendicular': {
-				if (lIds.length === 2) {
-					if (lIds.includes('axis_x') || lIds.includes('axis_y')) {
-						if (lIds.includes('axis_x') && lIds.includes('axis_y')) break;
-						const axis = lIds.includes('axis_x') ? 'x' : 'y';
-						const userLineId = lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0];
-						const line = sketch.lines.get(userLineId);
-						if (line) {
-							if (axis === 'x') {
-								sketch.addVerticalConstraint(line.p1Id, line.p2Id);
-							} else {
-								sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
-							}
-							applied = true;
-							toastMsg = `Perpendicular to ${axis.toUpperCase()}-axis applied`;
-						}
-					} else {
-						sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
-						applied = true;
-						toastMsg = 'Perpendicular constraint applied';
-					}
+				if (lIds.length !== 2) break;
+				const hasX = lIds.includes('axis_x');
+				const hasY = lIds.includes('axis_y');
+				if (hasX || hasY) {
+					if (hasX && hasY) break;
+					const axis = hasX ? 'x' : 'y';
+					const line = sketch.lines.get(lIds[0] === 'axis_x' || lIds[0] === 'axis_y' ? lIds[1] : lIds[0]);
+					if (!line) break;
+					const addHoriz = (type === 'parallel') === (axis === 'x');
+					if (addHoriz) sketch.addHorizontalConstraint(line.p1Id, line.p2Id);
+					else sketch.addVerticalConstraint(line.p1Id, line.p2Id);
+					applied = true;
+					toastMsg = `${type === 'parallel' ? 'Parallel' : 'Perpendicular'} to ${axis.toUpperCase()}-axis applied`;
+				} else {
+					if (type === 'parallel') sketch.addParallelConstraint(lIds[0], lIds[1]);
+					else sketch.addPerpendicularConstraint(lIds[0], lIds[1]);
+					applied = true;
+					toastMsg = type === 'parallel' ? 'Parallel constraint applied' : 'Perpendicular constraint applied';
 				}
 				break;
 			}

@@ -15,7 +15,7 @@ export type SelectableEntityType =
 	| 'text'
 	| 'constraint';
 
-const SELECTION_KEYS: Record<SelectableEntityType, keyof SelectionState> = {
+export const SELECTION_KEYS: Record<SelectableEntityType, keyof SelectionState> = {
 	point: 'pointIds',
 	line: 'lineIds',
 	circle: 'circleIds',

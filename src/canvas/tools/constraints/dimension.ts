@@ -90,17 +90,97 @@ export function determineDistanceOrientation(
 	}
 }
 
+const EMPTY_STATE: DimensionState = {
+	step: 0,
+	line1Id: null,
+	line2Id: null,
+	point1Id: null,
+	point2Id: null,
+};
+
+function computeLabelPosition(
+	s1: Vec2,
+	s2: Vec2,
+	screen: Vec2,
+	orientation: 'aligned' | 'horizontal' | 'vertical'
+): number | undefined {
+	let t: number | undefined;
+	if (orientation === 'horizontal') {
+		const dx = s2.x - s1.x;
+		if (Math.abs(dx) > 1e-4) t = (screen.x - s1.x) / dx;
+	} else if (orientation === 'vertical') {
+		const dy = s2.y - s1.y;
+		if (Math.abs(dy) > 1e-4) t = (screen.y - s1.y) / dy;
+	} else {
+		const delta = new Vec2().subVectors(s2, s1);
+		const len = delta.length();
+		if (len > 1e-4) t = new Vec2().subVectors(screen, s1).dot(delta.multiplyScalar(1 / len)) / len;
+	}
+	if (t === undefined) return undefined;
+	return Math.abs(t - 0.5) < 0.04 ? 0.5 : t;
+}
+
 export class DimensionTool extends BaseTool {
 	readonly id = 'dimension' as const;
 	private radialDraft: { constraint: RadiusConstraint | DistanceConstraint; returnToSelect: boolean } | null = null;
 
-	state: DimensionState = {
-		step: 0,
-		line1Id: null,
-		line2Id: null,
-		point1Id: null,
-		point2Id: null,
-	};
+	state: DimensionState = { ...EMPTY_STATE };
+
+	private finishDimensionPlacement(c: any, toastMsg: string, clientPos?: Vec2, keepSelection = false): void {
+		this.ctx.showToast(toastMsg);
+		this.state = { ...EMPTY_STATE };
+		this.ctx.renderer.clearPreviews();
+		if (!keepSelection) this.ctx.sketch.clearSelection();
+		this.ctx.requestRender();
+		this.ctx.onEditDimension?.(c, clientPos);
+	}
+
+	private renderPointToLinePreview(pointId: string, lineId: string, screen: Vec2, minPerpDist = 0): boolean {
+		const { sketch, viewport, renderer } = this.ctx;
+		const pt = sketch.points.get(pointId);
+		const line = sketch.getLine(lineId);
+		if (!pt || !line || pointId === line.p1Id || pointId === line.p2Id) return false;
+		const a = sketch.points.get(line.p1Id);
+		const b = sketch.points.get(line.p2Id);
+		if (!a || !b) return false;
+		const dir = new Vec2().subVectors(b, a);
+		const perpDist = Math.abs(new Vec2().subVectors(pt, a).cross(dir)) / Math.max(dir.length(), 1e-7);
+		if (perpDist < minPerpDist) return false;
+		renderer.renderPointToLineDistancePreview(
+			viewport.worldToScreen(pt),
+			viewport.worldToScreen(a),
+			viewport.worldToScreen(b),
+			screen,
+			perpDist
+		);
+		return true;
+	}
+
+	private renderThreePointAnglePreview(p1Id: string, vertexId: string, p3Id: string, screen: Vec2): boolean {
+		const { sketch, viewport, renderer } = this.ctx;
+		const p1 = sketch.points.get(p1Id);
+		const p2 = sketch.points.get(vertexId);
+		const p3 = sketch.points.get(p3Id);
+		if (!p1 || !p2 || !p3) return false;
+		const geom = sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
+		const sCenter = viewport.worldToScreen(geom.pInt);
+		const sRay1 = viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
+		const sRay2 = viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
+		const hasSeg1 = Boolean(sketch.getLineBetween(vertexId, p1Id));
+		const hasSeg2 = Boolean(sketch.getLineBetween(vertexId, p3Id));
+		renderer.renderAnglePreview(
+			sCenter,
+			sRay1,
+			sRay2,
+			screen,
+			geom.initialAngleDeg,
+			sCenter,
+			hasSeg1 ? viewport.worldToScreen(p1) : sCenter,
+			sCenter,
+			hasSeg2 ? viewport.worldToScreen(p3) : sCenter
+		);
+		return true;
+	}
 
 	override activate(ctx: ToolContext): void {
 		super.activate(ctx);
@@ -178,24 +258,10 @@ export class DimensionTool extends BaseTool {
 	}
 
 	private renderCenterLinePreview(radialId: string, lineId: string, screen: Vec2): boolean {
-		const { sketch, viewport, renderer } = this.ctx;
+		const { sketch } = this.ctx;
 		if (!sketch.canAddCircleToLineDistanceConstraint(radialId, lineId)) return false;
-		const radial = (sketch.circles.get(radialId) ?? sketch.arcs.get(radialId))!;
-		const line = sketch.getLine(lineId)!;
-		const center = sketch.points.get(radial.centerId);
-		const a = sketch.points.get(line.p1Id);
-		const b = sketch.points.get(line.p2Id);
-		if (!center || !a || !b) return false;
-		const direction = new Vec2().subVectors(b, a);
-		const distance = Math.abs(new Vec2().subVectors(center, a).cross(direction)) / Math.max(direction.length(), 1e-7);
-		renderer.renderPointToLineDistancePreview(
-			viewport.worldToScreen(center),
-			viewport.worldToScreen(a),
-			viewport.worldToScreen(b),
-			screen,
-			distance
-		);
-		return true;
+		const radial = sketch.circles.get(radialId) ?? sketch.arcs.get(radialId);
+		return !!radial && this.renderPointToLinePreview(radial.centerId, lineId, screen);
 	}
 
 	private beginPointLinePlacement(pointId: string, lineId: string, radialEntityId?: string): boolean {
@@ -231,12 +297,8 @@ export class DimensionTool extends BaseTool {
 				: sketch.addPointToLineDistanceConstraint(point1Id, line1Id);
 		if (!c) return false;
 		c.moveLabelTo(e.screen, sketch, viewport);
-		this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
-		this.ctx.renderer.clearPreviews();
 		sketch.selectEntity(c.id, 'constraint', false);
-		this.ctx.showToast('Distance constraint applied');
-		this.ctx.requestRender();
-		this.ctx.onEditDimension?.(c, e.client);
+		this.finishDimensionPlacement(c, 'Distance constraint applied', e.client, true);
 		return true;
 	}
 
@@ -582,22 +644,8 @@ export class DimensionTool extends BaseTool {
 				return true;
 			}
 
-			// If clicked on an axis line -> switch to Angle constraint mode!
-			if (type === 'line' && (id === 'axis_x' || id === 'axis_y')) {
-				this.ctx.sketch.selectEntity(id, 'line', true);
-				this.state = {
-					step: 2,
-					line1Id: l1.id,
-					line2Id: id,
-					point1Id: null,
-					point2Id: null,
-				};
-				this.ctx.requestRender();
-				return true;
-			}
-
-			// If clicked on another line -> switch to Angle constraint mode!
-			if (type === 'line' && id && id !== l1.id) {
+			// If clicked on an axis line or another line -> switch to Angle constraint mode!
+			if (type === 'line' && id && (id === 'axis_x' || id === 'axis_y' || id !== l1.id)) {
 				this.ctx.sketch.selectEntity(id, 'line', true);
 				this.state = {
 					step: 2,
@@ -626,30 +674,8 @@ export class DimensionTool extends BaseTool {
 				const existed = this.ctx.sketch.hasDistanceConstraint(l1.p1Id, l1.p2Id, orientation);
 				const c = this.ctx.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld, orientation);
 				if (c) {
-					if (orientation === 'horizontal') {
-						const dx = s2.x - s1.x;
-						if (Math.abs(dx) > 1e-4) {
-							let t = (screen.x - s1.x) / dx;
-							if (Math.abs(t - 0.5) < 0.04) t = 0.5;
-							c.labelPosition = t;
-						}
-					} else if (orientation === 'vertical') {
-						const dy = s2.y - s1.y;
-						if (Math.abs(dy) > 1e-4) {
-							let t = (screen.y - s1.y) / dy;
-							if (Math.abs(t - 0.5) < 0.04) t = 0.5;
-							c.labelPosition = t;
-						}
-					} else {
-						const delta = new Vec2().subVectors(s2, s1);
-						const len = delta.length();
-						if (len > 1e-4) {
-							const dir = delta.clone().multiplyScalar(1 / len);
-							let t = new Vec2().subVectors(screen, s1).dot(dir) / len;
-							if (Math.abs(t - 0.5) < 0.04) t = 0.5;
-							c.labelPosition = t;
-						}
-					}
+					const t = computeLabelPosition(s1, s2, screen, orientation);
+					if (t !== undefined) c.labelPosition = t;
 					const toastMsg = existed
 						? 'Editing distance constraint'
 						: orientation === 'horizontal'
@@ -657,20 +683,7 @@ export class DimensionTool extends BaseTool {
 							: orientation === 'vertical'
 								? 'Vertical distance constraint applied'
 								: 'Distance constraint applied';
-					this.ctx.showToast(toastMsg);
-					this.state = {
-						step: 0,
-						line1Id: null,
-						line2Id: null,
-						point1Id: null,
-						point2Id: null,
-					};
-					this.ctx.renderer.clearPreviews();
-					this.ctx.sketch.clearSelection();
-					this.ctx.requestRender();
-					if (this.ctx.onEditDimension) {
-						this.ctx.onEditDimension(c, e.client);
-					}
+					this.finishDimensionPlacement(c, toastMsg, e.client);
 				}
 			}
 			return true;
@@ -699,21 +712,11 @@ export class DimensionTool extends BaseTool {
 						arcRadiusWorld
 					);
 					if (c) {
-						this.ctx.showToast(existed ? 'Editing angle constraint' : 'Angle constraint applied');
-						this.state = {
-							step: 0,
-							line1Id: null,
-							line2Id: null,
-							point1Id: null,
-							point2Id: null,
-							point3Id: null,
-						};
-						this.ctx.renderer.clearPreviews();
-						this.ctx.sketch.clearSelection();
-						this.ctx.requestRender();
-						if (this.ctx.onEditDimension) {
-							this.ctx.onEditDimension(c, e.client);
-						}
+						this.finishDimensionPlacement(
+							c,
+							existed ? 'Editing angle constraint' : 'Angle constraint applied',
+							e.client
+						);
 					}
 				}
 				return true;
@@ -748,11 +751,9 @@ export class DimensionTool extends BaseTool {
 							const dy = sAxisY.y - sOrigin.y;
 							const lineLen = Math.hypot(0, dy);
 							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
-							const screenOffsetAlongAxis = (screen.y - sPt.y) * uy;
-							offsetWorld = screenOffsetAlongAxis / this.ctx.viewport.zoom;
+							offsetWorld = ((screen.y - sPt.y) * uy) / this.ctx.viewport.zoom;
 						} else if (orientation === 'vertical') {
-							const screenOffsetAlongAxis = screen.x - sPt.x;
-							offsetWorld = screenOffsetAlongAxis / this.ctx.viewport.zoom;
+							offsetWorld = (screen.x - sPt.x) / this.ctx.viewport.zoom;
 						}
 
 						const existed = this.ctx.sketch.hasOriginConstraint(userPtId);
@@ -765,20 +766,7 @@ export class DimensionTool extends BaseTool {
 									: orientation === 'vertical'
 										? 'Vertical distance to (0,0) applied'
 										: 'Distance to (0,0) applied';
-							this.ctx.showToast(toastMsg);
-							this.state = {
-								step: 0,
-								line1Id: null,
-								line2Id: null,
-								point1Id: null,
-								point2Id: null,
-							};
-							this.ctx.renderer.clearPreviews();
-							this.ctx.sketch.clearSelection();
-							this.ctx.requestRender();
-							if (this.ctx.onEditDimension) {
-								this.ctx.onEditDimension(c, e.client);
-							}
+							this.finishDimensionPlacement(c, toastMsg, e.client);
 						}
 					}
 					return true;
@@ -801,30 +789,8 @@ export class DimensionTool extends BaseTool {
 						orientation
 					);
 					if (c) {
-						if (orientation === 'horizontal') {
-							const dx = s2.x - s1.x;
-							if (Math.abs(dx) > 1e-4) {
-								let t = (screen.x - s1.x) / dx;
-								if (Math.abs(t - 0.5) < 0.04) t = 0.5;
-								c.labelPosition = t;
-							}
-						} else if (orientation === 'vertical') {
-							const dy = s2.y - s1.y;
-							if (Math.abs(dy) > 1e-4) {
-								let t = (screen.y - s1.y) / dy;
-								if (Math.abs(t - 0.5) < 0.04) t = 0.5;
-								c.labelPosition = t;
-							}
-						} else {
-							const delta = new Vec2().subVectors(s2, s1);
-							const len = delta.length();
-							if (len > 1e-4) {
-								const dir = delta.clone().multiplyScalar(1 / len);
-								let t = new Vec2().subVectors(screen, s1).dot(dir) / len;
-								if (Math.abs(t - 0.5) < 0.04) t = 0.5;
-								c.labelPosition = t;
-							}
-						}
+						const t = computeLabelPosition(s1, s2, screen, orientation);
+						if (t !== undefined) c.labelPosition = t;
 						const toastMsg = existed
 							? 'Editing distance constraint'
 							: orientation === 'horizontal'
@@ -832,20 +798,7 @@ export class DimensionTool extends BaseTool {
 								: orientation === 'vertical'
 									? 'Vertical distance constraint applied'
 									: 'Distance constraint applied';
-						this.ctx.showToast(toastMsg);
-						this.state = {
-							step: 0,
-							line1Id: null,
-							line2Id: null,
-							point1Id: null,
-							point2Id: null,
-						};
-						this.ctx.renderer.clearPreviews();
-						this.ctx.sketch.clearSelection();
-						this.ctx.requestRender();
-						if (this.ctx.onEditDimension) {
-							this.ctx.onEditDimension(c, e.client);
-						}
+						this.finishDimensionPlacement(c, toastMsg, e.client);
 					}
 				}
 				return true;
@@ -857,13 +810,7 @@ export class DimensionTool extends BaseTool {
 			const l1 = this.ctx.sketch.getLine(line1Id);
 			const l2 = this.ctx.sketch.getLine(line2Id);
 			if (!l1 || !l2 || (!this.ctx.sketch.lines.has(line1Id) && !this.ctx.sketch.lines.has(line2Id))) {
-				this.state = {
-					step: 0,
-					line1Id: null,
-					line2Id: null,
-					point1Id: null,
-					point2Id: null,
-				};
+				this.state = { ...EMPTY_STATE };
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
 				return true;
@@ -879,20 +826,7 @@ export class DimensionTool extends BaseTool {
 				const existed = this.ctx.sketch.hasAngleConstraint(line1Id, line2Id);
 				const c = this.ctx.sketch.addAngleConstraint(line1Id, line2Id, undefined, arcRadiusWorld, world);
 				if (c) {
-					this.ctx.showToast(existed ? 'Editing angle constraint' : 'Angle constraint applied');
-					this.state = {
-						step: 0,
-						line1Id: null,
-						line2Id: null,
-						point1Id: null,
-						point2Id: null,
-					};
-					this.ctx.renderer.clearPreviews();
-					this.ctx.sketch.clearSelection();
-					this.ctx.requestRender();
-					if (this.ctx.onEditDimension) {
-						this.ctx.onEditDimension(c, e.client);
-					}
+					this.finishDimensionPlacement(c, existed ? 'Editing angle constraint' : 'Angle constraint applied', e.client);
 				}
 			}
 			return true;
@@ -923,20 +857,7 @@ export class DimensionTool extends BaseTool {
 			if (l1) {
 				// Check if hovering over a point (that is NOT an endpoint of line1)
 				const hitPt = this.ctx.findPointNear(screen);
-				if (hitPt && hitPt.id !== l1.p1Id && hitPt.id !== l1.p2Id) {
-					const p1 = ctx.sketch.points.get(l1.p1Id);
-					const p2 = ctx.sketch.points.get(l1.p2Id);
-					if (p1 && p2) {
-						const dir = new Vec2().subVectors(p2, p1);
-						const lineLen = Math.max(dir.length(), 1e-7);
-						const perpDist = Math.abs(new Vec2().subVectors(hitPt, p1).cross(dir)) / lineLen;
-						const sp = ctx.viewport.worldToScreen(hitPt);
-						const s1 = ctx.viewport.worldToScreen(p1);
-						const s2 = ctx.viewport.worldToScreen(p2);
-						this.ctx.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, perpDist);
-						return;
-					}
-				}
+				if (hitPt && this.renderPointToLinePreview(hitPt.id, l1.id, screen)) return;
 
 				const radial =
 					(ctx.sketch.circles.size ? this.ctx.findCircleNear(screen) : null) ??
@@ -947,30 +868,7 @@ export class DimensionTool extends BaseTool {
 				p2Id = l1.p2Id;
 			}
 		} else if (this.state.step === 2 && this.state.point1Id && this.state.point2Id && this.state.point3Id) {
-			const p1 = ctx.sketch.points.get(this.state.point1Id);
-			const p2 = ctx.sketch.points.get(this.state.point2Id);
-			const p3 = ctx.sketch.points.get(this.state.point3Id);
-			if (p1 && p2 && p3) {
-				const geom = ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
-				const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-				const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
-				const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
-				const hasSeg1 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point1Id));
-				const hasSeg2 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point3Id));
-				const sp1 = ctx.viewport.worldToScreen(p1);
-				const sp3 = ctx.viewport.worldToScreen(p3);
-				this.ctx.renderer.renderAnglePreview(
-					sCenter,
-					sRay1,
-					sRay2,
-					screen,
-					geom.initialAngleDeg,
-					sCenter,
-					hasSeg1 ? sp1 : sCenter,
-					sCenter,
-					hasSeg2 ? sp3 : sCenter
-				);
-			}
+			this.renderThreePointAnglePreview(this.state.point1Id, this.state.point2Id, this.state.point3Id, screen);
 			return;
 		} else if (this.state.step === 2 && this.state.point1Id && this.state.point2Id) {
 			const hoverPtId =
@@ -981,35 +879,10 @@ export class DimensionTool extends BaseTool {
 					? ctx.snap.id
 					: (() => {
 							const pt = this.ctx.findPointNear(screen);
-							if (pt && pt.id !== this.state.point1Id && pt.id !== this.state.point2Id) return pt.id;
-							return null;
+							return pt && pt.id !== this.state.point1Id && pt.id !== this.state.point2Id ? pt.id : null;
 						})();
-			if (hoverPtId) {
-				const p1 = ctx.sketch.points.get(this.state.point1Id);
-				const p2 = ctx.sketch.points.get(this.state.point2Id);
-				const p3 = ctx.sketch.points.get(hoverPtId);
-				if (p1 && p2 && p3) {
-					const geom = ctx.sketch.calculateLinesAngleGeometry(p2, p1, p2, p3);
-					const sCenter = ctx.viewport.worldToScreen(geom.pInt);
-					const sRay1 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u1, 20));
-					const sRay2 = ctx.viewport.worldToScreen(Vec2.from(geom.pInt).addScaledVector(geom.u2, 20));
-					const hasSeg1 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, this.state.point1Id));
-					const hasSeg2 = Boolean(ctx.sketch.getLineBetween(this.state.point2Id, hoverPtId));
-					const sp1 = ctx.viewport.worldToScreen(p1);
-					const sp3 = ctx.viewport.worldToScreen(p3);
-					this.ctx.renderer.renderAnglePreview(
-						sCenter,
-						sRay1,
-						sRay2,
-						screen,
-						geom.initialAngleDeg,
-						sCenter,
-						hasSeg1 ? sp1 : sCenter,
-						sCenter,
-						hasSeg2 ? sp3 : sCenter
-					);
-					return;
-				}
+			if (hoverPtId && this.renderThreePointAnglePreview(this.state.point1Id, this.state.point2Id, hoverPtId, screen)) {
+				return;
 			}
 			p1Id = this.state.point1Id;
 			p2Id = this.state.point2Id;
@@ -1048,22 +921,7 @@ export class DimensionTool extends BaseTool {
 
 				// 2. SECOND PRIORITY: Check if hovering over the body of a line
 				const hitLine = this.ctx.findLineNear(screen);
-				if (hitLine && hitLine.p1Id !== p1.id && hitLine.p2Id !== p1.id) {
-					const lp1 = ctx.sketch.points.get(hitLine.p1Id);
-					const lp2 = ctx.sketch.points.get(hitLine.p2Id);
-					if (lp1 && lp2) {
-						const dir = new Vec2().subVectors(lp2, lp1);
-						const lineLen = Math.max(dir.length(), 1e-7);
-						const perpDist = Math.abs(new Vec2().subVectors(p1, lp1).cross(dir)) / lineLen;
-						if (perpDist >= 0.5) {
-							const sp = ctx.viewport.worldToScreen(p1);
-							const s1Line = ctx.viewport.worldToScreen(lp1);
-							const s2Line = ctx.viewport.worldToScreen(lp2);
-							this.ctx.renderer.renderPointToLineDistancePreview(sp, s1Line, s2Line, screen, perpDist);
-							return;
-						}
-					}
-				}
+				if (hitLine && this.renderPointToLinePreview(p1.id, hitLine.id, screen, 0.5)) return;
 
 				// 3. Fallback: Free cursor in empty space
 				const currentDist = p1.distanceTo(world);
@@ -1111,21 +969,7 @@ export class DimensionTool extends BaseTool {
 				}
 			}
 		} else if (this.state.step === 2 && this.state.point1Id && this.state.line1Id) {
-			const pt = ctx.sketch.points.get(this.state.point1Id);
-			const l = ctx.sketch.getLine(this.state.line1Id);
-			if (pt && l) {
-				const p1 = ctx.sketch.points.get(l.p1Id);
-				const p2 = ctx.sketch.points.get(l.p2Id);
-				if (p1 && p2) {
-					const sp = ctx.viewport.worldToScreen(pt);
-					const s1 = ctx.viewport.worldToScreen(p1);
-					const s2 = ctx.viewport.worldToScreen(p2);
-					const dir = new Vec2().subVectors(p2, p1);
-					const lineLen = Math.max(dir.length(), 1e-7);
-					const perpDist = Math.abs(new Vec2().subVectors(pt, p1).cross(dir)) / lineLen;
-					this.ctx.renderer.renderPointToLineDistancePreview(sp, s1, s2, screen, perpDist);
-				}
-			}
+			this.renderPointToLinePreview(this.state.point1Id, this.state.line1Id, screen);
 		}
 	}
 }
