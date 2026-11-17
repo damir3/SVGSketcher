@@ -51,46 +51,33 @@ export interface ExtendCandidate {
  * Finds the nearest extendable primitive near the given screen position.
  */
 export function findExtendTarget(ctx: any, screen: Vec2, thresholdPx = 18): GeoCurve | null {
+	const sketch = ctx.sketch as SketchDocument;
 	let bestDist = thresholdPx;
 	let bestCurve: GeoCurve | null = null;
 
-	// 1. Lines
-	for (const line of ctx.sketch.lines.values()) {
-		if (line.isSplineHandle) continue;
-		const d = line.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestCurve = line.toGeoCurve(ctx.sketch);
+	const checkCollection = <
+		T extends {
+			distanceTo: (s: Vec2, sk: SketchDocument, vp: any, d: number) => number | null;
+			toGeoCurve: (sk: SketchDocument) => GeoCurve | null;
+		},
+	>(
+		items: Iterable<T>,
+		skip?: (item: T) => boolean
+	) => {
+		for (const item of items) {
+			if (skip?.(item)) continue;
+			const d = item.distanceTo(screen, sketch, ctx.viewport, bestDist);
+			if (d !== null && d < bestDist) {
+				bestDist = d;
+				bestCurve = item.toGeoCurve(sketch);
+			}
 		}
-	}
+	};
 
-	// 2. Arcs
-	for (const arc of ctx.sketch.arcs.values()) {
-		const d = arc.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestCurve = arc.toGeoCurve(ctx.sketch);
-		}
-	}
-
-	// 3. Elliptical Arcs
-	for (const ea of ctx.sketch.ellipticalArcs.values()) {
-		const d = ea.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestCurve = ea.toGeoCurve(ctx.sketch);
-		}
-	}
-
-	// 4. Splines (only open splines can be extended)
-	for (const spline of ctx.sketch.splines.values()) {
-		if (spline.isClosed && spline.splineType !== 'control') continue;
-		const d = spline.distanceTo(screen, ctx.sketch, ctx.viewport, bestDist);
-		if (d !== null && d < bestDist) {
-			bestDist = d;
-			bestCurve = spline.toGeoCurve(ctx.sketch);
-		}
-	}
+	checkCollection(sketch.lines.values(), line => Boolean(line.isSplineHandle));
+	checkCollection(sketch.arcs.values());
+	checkCollection(sketch.ellipticalArcs.values());
+	checkCollection(sketch.splines.values(), spline => Boolean(spline.isClosed && spline.splineType !== 'control'));
 
 	return bestCurve;
 }
@@ -174,6 +161,47 @@ export function findExtendCandidate(
 			: { ...geometry, from: fromPoint, to: toPoint, clockwise: end ? !!target.clockwise : !target.clockwise };
 	} else candidate.previewData = { from: fromPoint, to: toPoint };
 	return candidate;
+}
+
+function removeExternalPointConstraints(sketch: SketchDocument, movingEndId: string, fixedEndId?: string): void {
+	const toRemove: string[] = [];
+	for (const c of sketch.constraints.values()) {
+		if (
+			c instanceof PointOnLineConstraint ||
+			c instanceof PointOnCircleConstraint ||
+			c instanceof PointOnEllipseConstraint ||
+			c instanceof PointOnSplineConstraint
+		) {
+			if (c.pointId === movingEndId) toRemove.push(c.id);
+		} else if (fixedEndId && (c instanceof HorizontalConstraint || c instanceof VerticalConstraint)) {
+			const p1 = (c as any).p1Id;
+			const p2 = (c as any).p2Id;
+			if ((p1 === movingEndId && p2 !== fixedEndId) || (p2 === movingEndId && p1 !== fixedEndId)) {
+				toRemove.push(c.id);
+			}
+		}
+	}
+	for (const cid of toRemove) {
+		sketch.removeConstraint(cid);
+	}
+}
+
+function attachExtendIntersectionConstraint(
+	sketch: SketchDocument,
+	pointId: string,
+	intersectedCurveId?: string,
+	intersectedCurveType?: string
+): void {
+	if (!intersectedCurveId) return;
+	if (intersectedCurveType === 'line' || intersectedCurveType === 'segment') {
+		sketch.addPointOnLineConstraint(pointId, intersectedCurveId);
+	} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
+		sketch.addPointOnCircleConstraint(pointId, intersectedCurveId);
+	} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
+		sketch.addPointOnEllipseConstraint(pointId, intersectedCurveId);
+	} else if (intersectedCurveType === 'spline') {
+		sketch.addPointOnSplineConstraint(pointId, intersectedCurveId);
+	}
 }
 
 /**
@@ -307,28 +335,7 @@ export function executeExtend(
 		} else {
 			// Remove conflicting constraints tying movingEndId to external entities FIRST
 			// while movingPt is still at its current valid position
-			const toRemove: string[] = [];
-			for (const c of sketch.constraints.values()) {
-				if (
-					c instanceof PointOnLineConstraint ||
-					c instanceof PointOnCircleConstraint ||
-					c instanceof PointOnEllipseConstraint ||
-					c instanceof PointOnSplineConstraint
-				) {
-					if (c.pointId === movingEndId) {
-						toRemove.push(c.id);
-					}
-				} else if (c instanceof HorizontalConstraint || c instanceof VerticalConstraint) {
-					const p1 = (c as any).p1Id;
-					const p2 = (c as any).p2Id;
-					if ((p1 === movingEndId && p2 !== fixedEndId) || (p2 === movingEndId && p1 !== fixedEndId)) {
-						toRemove.push(c.id);
-					}
-				}
-			}
-			for (const cid of toRemove) {
-				sketch.removeConstraint(cid);
-			}
+			removeExternalPointConstraints(sketch, movingEndId, fixedEndId);
 
 			// Now move point to target position
 			movingPt.x = toPoint.x;
@@ -350,18 +357,7 @@ export function executeExtend(
 			}
 		}
 
-		// Geometric constraint with intersected curve
-		if (intersectedCurveId) {
-			if (intersectedCurveType === 'line' || intersectedCurveType === 'segment') {
-				sketch.addPointOnLineConstraint(newEndPtId, intersectedCurveId);
-			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
-				sketch.addPointOnCircleConstraint(newEndPtId, intersectedCurveId);
-			} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
-				sketch.addPointOnEllipseConstraint(newEndPtId, intersectedCurveId);
-			} else if (intersectedCurveType === 'spline') {
-				sketch.addPointOnSplineConstraint(newEndPtId, intersectedCurveId);
-			}
-		}
+		attachExtendIntersectionConstraint(sketch, newEndPtId, intersectedCurveId, intersectedCurveType);
 
 		sketch.solve();
 		return { modifiedEntityId: line.id };
@@ -401,38 +397,13 @@ export function executeExtend(
 			newEndPtId = newPt.id;
 			sketch.replaceArcEndpoint(arc, edge, newEndPtId);
 		} else {
-			const toRemove: string[] = [];
-			for (const c of sketch.constraints.values()) {
-				if (
-					c instanceof PointOnLineConstraint ||
-					c instanceof PointOnCircleConstraint ||
-					c instanceof PointOnEllipseConstraint ||
-					c instanceof PointOnSplineConstraint
-				) {
-					if (c.pointId === movingEndId) {
-						toRemove.push(c.id);
-					}
-				}
-			}
-			for (const cid of toRemove) {
-				sketch.removeConstraint(cid);
-			}
+			removeExternalPointConstraints(sketch, movingEndId);
 
 			movingPt.x = toPoint.x;
 			movingPt.y = toPoint.y;
 		}
 
-		if (intersectedCurveId) {
-			if (intersectedCurveType === 'line' || intersectedCurveType === 'segment') {
-				sketch.addPointOnLineConstraint(newEndPtId, intersectedCurveId);
-			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
-				sketch.addPointOnCircleConstraint(newEndPtId, intersectedCurveId);
-			} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
-				sketch.addPointOnEllipseConstraint(newEndPtId, intersectedCurveId);
-			} else if (intersectedCurveType === 'spline') {
-				sketch.addPointOnSplineConstraint(newEndPtId, intersectedCurveId);
-			}
-		}
+		attachExtendIntersectionConstraint(sketch, newEndPtId, intersectedCurveId, intersectedCurveType);
 
 		sketch.solve();
 		return { modifiedEntityId: arc.id };
@@ -470,16 +441,8 @@ export function executeExtend(
 			extendFitSpline(sketch, spline, edge, toPoint, newPt);
 		}
 
-		if (intersectedCurveId && intersectedCurveId !== spline.id) {
-			if (intersectedCurveType === 'line' || intersectedCurveType === 'segment') {
-				sketch.addPointOnLineConstraint(newPt.id, intersectedCurveId);
-			} else if (intersectedCurveType === 'circle' || intersectedCurveType === 'arc') {
-				sketch.addPointOnCircleConstraint(newPt.id, intersectedCurveId);
-			} else if (intersectedCurveType === 'ellipse' || intersectedCurveType === 'elliptical_arc') {
-				sketch.addPointOnEllipseConstraint(newPt.id, intersectedCurveId);
-			} else if (intersectedCurveType === 'spline') {
-				sketch.addPointOnSplineConstraint(newPt.id, intersectedCurveId);
-			}
+		if (intersectedCurveId !== spline.id) {
+			attachExtendIntersectionConstraint(sketch, newPt.id, intersectedCurveId, intersectedCurveType);
 		}
 
 		sketch.rebuildParamManager();

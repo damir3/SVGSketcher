@@ -21,6 +21,33 @@ import type { IInspectable, InspectorContext } from './panels/inspector/types';
 const CHEVRON_DOWN_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 const MAX_SELECTED_INSPECTOR_ITEMS = 200;
 
+const CONSTRAINT_ICON_MAP: Record<string, string> = {
+	fixed: ICONS.fixed,
+	coincident: ICONS.coincident,
+	horizontal: ICONS.horizontal,
+	vertical: ICONS.vertical,
+	distance: ICONS.distance,
+	point_to_line_distance: ICONS.distance,
+	angle: ICONS.angle,
+	radius: ICONS.circle,
+	equal_length: ICONS.equal,
+	equal_radius: ICONS.equal,
+	parallel: ICONS.parallel,
+	collinear: ICONS.collinear,
+	perpendicular: ICONS.perpendicular,
+	tangent_line_circle: ICONS.tangent,
+	tangent_circle_circle: ICONS.tangent,
+	concentric: ICONS.concentric,
+	point_on_line: ICONS.pointOnLine,
+	point_on_circle: ICONS.pointOnLine,
+	point_on_ellipse: ICONS.pointOnLine,
+	point_on_spline: ICONS.pointOnLine,
+	midpoint: ICONS.midpoint,
+	symmetry: ICONS.symmetry,
+	circular_pattern: ICONS.circular_pattern,
+	rectangular_pattern: ICONS.rectangular_pattern,
+};
+
 export class Sidebar {
 	private container: HTMLElement;
 	private sketch: SketchDocument;
@@ -215,39 +242,33 @@ export class Sidebar {
 			}
 		};
 
-		for (const id of sel.textIds) {
-			const t = this.sketch.texts.get(id);
-			if (t) pushItem(this.renderTextItem(t));
-		}
-		for (const id of sel.splineIds) {
-			const s = this.sketch.splines.get(id);
-			if (s) pushItem(this.renderSplineItem(s));
-		}
-		for (const id of sel.lineIds) {
-			if (id === 'axis_x' || id === 'axis_y') continue;
-			const l = this.sketch.lines.get(id);
-			if (l && !l.isSplineHandle) pushItem(this.renderLineItem(l));
-		}
-		for (const id of sel.circleIds) {
-			const c = this.sketch.circles.get(id);
-			if (c) pushItem(this.renderCircleItem(c));
-		}
-		for (const id of sel.arcIds) {
-			const a = this.sketch.arcs.get(id);
-			if (a) pushItem(this.renderArcItem(a));
-		}
-		for (const id of sel.ellipseIds) {
-			const e = this.sketch.ellipses.get(id);
-			if (e) pushItem(this.renderEllipseItem(e));
-		}
-		for (const id of sel.ellipticalArcIds) {
-			const ea = this.sketch.ellipticalArcs.get(id);
-			if (ea) pushItem(this.renderEllipticalArcItem(ea));
-		}
-		for (const id of sel.pointIds) {
-			if (id === 'origin' || handlePointIds.has(id) || !this.sketch.points.has(id)) continue;
-			const p = this.sketch.points.get(id);
-			if (p) pushItem(this.renderPointItem(p));
+		const groups: Array<
+			[Iterable<string>, ReadonlyMap<string, any>, (ent: any) => string, ((ent: any, id: string) => boolean)?]
+		> = [
+			[sel.textIds, this.sketch.texts, t => this.renderTextItem(t)],
+			[sel.splineIds, this.sketch.splines, s => this.renderSplineItem(s)],
+			[
+				sel.lineIds,
+				this.sketch.lines,
+				l => this.renderLineItem(l),
+				(l, id) => id === 'axis_x' || id === 'axis_y' || l.isSplineHandle,
+			],
+			[sel.circleIds, this.sketch.circles, c => this.renderCircleItem(c)],
+			[sel.arcIds, this.sketch.arcs, a => this.renderArcItem(a)],
+			[sel.ellipseIds, this.sketch.ellipses, e => this.renderEllipseItem(e)],
+			[sel.ellipticalArcIds, this.sketch.ellipticalArcs, ea => this.renderEllipticalArcItem(ea)],
+			[
+				sel.pointIds,
+				this.sketch.points,
+				p => this.renderPointItem(p),
+				(_p, id) => id === 'origin' || handlePointIds.has(id),
+			],
+		];
+		for (const [ids, map, renderFn, skip] of groups) {
+			for (const id of ids) {
+				const ent = map.get(id);
+				if (ent && !skip?.(ent, id)) pushItem(renderFn(ent));
+			}
 		}
 		for (const id of sel.constraintIds) {
 			const c = this.sketch.constraints.get(id);
@@ -400,88 +421,92 @@ export class Sidebar {
 		`;
 	}
 
+	private renderTreeItem(
+		type: string,
+		id: string,
+		selectedIds: ReadonlySet<string>,
+		icon: string,
+		meta: string,
+		showDelete = true
+	): string {
+		const isSelected = selectedIds.has(id);
+		return `
+			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="${type}" data-id="${id}">
+				<div class="tree-item-info">
+					<span class="tree-icon">${icon}</span>
+					<span class="tree-name">${id}</span>
+					<span class="tree-meta">${meta}</span>
+				</div>
+				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${id}" title="Delete">${ICONS.delete}</button>` : ''}
+			</div>
+		`;
+	}
+
+	private formatEllipseMeta(ent: any): string {
+		const center = this.sketch.points.get(ent.centerId);
+		const majorPt = this.sketch.points.get(ent.majorAxisPointId);
+		const minorPt = this.sketch.points.get(ent.minorAxisPointId);
+		const rx = center && majorPt ? center.distanceTo(majorPt).toFixed(1) : '?';
+		const ry = center && minorPt ? center.distanceTo(minorPt).toFixed(1) : '?';
+		return `Rx ${rx} / Ry ${ry} mm ${ent.isConstruction ? '(aux)' : ''}`;
+	}
+
 	private renderLineItem(line: any, showDelete = true): string {
-		const isSelected = this.sketch.selection.lineIds.has(line.id);
 		const p1 = this.sketch.points.get(line.p1Id);
 		const p2 = this.sketch.points.get(line.p2Id);
 		const len = p1 && p2 ? p1.distanceTo(p2).toFixed(1) : '?';
-
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="line" data-id="${line.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.line}</span>
-					<span class="tree-name">${line.id}</span>
-					<span class="tree-meta">${len} mm ${line.isConstruction ? '(aux)' : ''}</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${line.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'line',
+			line.id,
+			this.sketch.selection.lineIds,
+			ICONS.line,
+			`${len} mm ${line.isConstruction ? '(aux)' : ''}`,
+			showDelete
+		);
 	}
 
 	private renderCircleItem(circle: any, showDelete = true): string {
-		const isSelected = this.sketch.selection.circleIds.has(circle.id);
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="circle" data-id="${circle.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.circle}</span>
-					<span class="tree-name">${circle.id}</span>
-					<span class="tree-meta">R ${circle.radius.toFixed(1)} mm</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${circle.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'circle',
+			circle.id,
+			this.sketch.selection.circleIds,
+			ICONS.circle,
+			`R ${circle.radius.toFixed(1)} mm`,
+			showDelete
+		);
 	}
 
 	private renderArcItem(arc: any, showDelete = true): string {
-		const isSelected = this.sketch.selection.arcIds.has(arc.id);
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="arc" data-id="${arc.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.arc}</span>
-					<span class="tree-name">${arc.id}</span>
-					<span class="tree-meta">R ${arc.radius.toFixed(1)} mm ${arc.isConstruction ? '(aux)' : ''}</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'arc',
+			arc.id,
+			this.sketch.selection.arcIds,
+			ICONS.arc,
+			`R ${arc.radius.toFixed(1)} mm ${arc.isConstruction ? '(aux)' : ''}`,
+			showDelete
+		);
 	}
 
 	private renderEllipseItem(ellipse: any, showDelete = true): string {
-		const isSelected = this.sketch.selection.ellipseIds.has(ellipse.id);
-		const center = this.sketch.points.get(ellipse.centerId);
-		const majorPt = this.sketch.points.get(ellipse.majorAxisPointId);
-		const minorPt = this.sketch.points.get(ellipse.minorAxisPointId);
-		const rx = center && majorPt ? center.distanceTo(majorPt).toFixed(1) : '?';
-		const ry = center && minorPt ? center.distanceTo(minorPt).toFixed(1) : '?';
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="ellipse" data-id="${ellipse.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.ellipse}</span>
-					<span class="tree-name">${ellipse.id}</span>
-					<span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${ellipse.isConstruction ? '(aux)' : ''}</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${ellipse.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'ellipse',
+			ellipse.id,
+			this.sketch.selection.ellipseIds,
+			ICONS.ellipse,
+			this.formatEllipseMeta(ellipse),
+			showDelete
+		);
 	}
 
 	private renderEllipticalArcItem(arc: any, showDelete = true): string {
-		const isSelected = this.sketch.selection.ellipticalArcIds.has(arc.id);
-		const center = this.sketch.points.get(arc.centerId);
-		const majorPt = this.sketch.points.get(arc.majorAxisPointId);
-		const minorPt = this.sketch.points.get(arc.minorAxisPointId);
-		const rx = center && majorPt ? center.distanceTo(majorPt).toFixed(1) : '?';
-		const ry = center && minorPt ? center.distanceTo(minorPt).toFixed(1) : '?';
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="elliptical_arc" data-id="${arc.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.elliptical_arc}</span>
-					<span class="tree-name">${arc.id}</span>
-					<span class="tree-meta">Rx ${rx} / Ry ${ry} mm ${arc.isConstruction ? '(aux)' : ''}</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${arc.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'elliptical_arc',
+			arc.id,
+			this.sketch.selection.ellipticalArcIds,
+			ICONS.elliptical_arc,
+			this.formatEllipseMeta(arc),
+			showDelete
+		);
 	}
 
 	private renderImageItem(image: SketchImage): string {
@@ -498,47 +523,39 @@ export class Sidebar {
 	}
 
 	private renderTextItem(text: SketchText, showDelete = true): string {
-		const isSelected = this.sketch.selection.textIds.has(text.id);
 		const label = text.text ? `"${text.text.slice(0, 15)}"` : text.id;
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="text" data-id="${text.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.text || 'T'}</span>
-					<span class="tree-name">${text.id}</span>
-					<span class="tree-meta">${label} (${text.mode === 'text' ? 'Box' : 'Path'})</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${text.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'text',
+			text.id,
+			this.sketch.selection.textIds,
+			ICONS.text || 'T',
+			`${label} (${text.mode === 'text' ? 'Box' : 'Path'})`,
+			showDelete
+		);
 	}
 
 	private renderSplineItem(spline: SketchSpline, showDelete = true): string {
-		const isSelected = this.sketch.selection.splineIds.has(spline.id);
 		const typeLabel = spline.splineType === 'fit' ? 'Fit Spline' : 'Control Spline';
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="spline" data-id="${spline.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${spline.splineType === 'fit' ? ICONS.spline_fit : ICONS.spline_control}</span>
-					<span class="tree-name">${spline.id}</span>
-					<span class="tree-meta">${typeLabel} (${spline.pointIds.length} pts) ${spline.isConstruction ? '(aux)' : ''}</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${spline.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		const icon = spline.splineType === 'fit' ? ICONS.spline_fit : ICONS.spline_control;
+		return this.renderTreeItem(
+			'spline',
+			spline.id,
+			this.sketch.selection.splineIds,
+			icon,
+			`${typeLabel} (${spline.pointIds.length} pts) ${spline.isConstruction ? '(aux)' : ''}`,
+			showDelete
+		);
 	}
 
 	private renderPointItem(pt: any, showDelete = true): string {
-		const isSelected = this.sketch.selection.pointIds.has(pt.id);
-		return `
-			<div class="tree-item ${isSelected ? 'selected' : ''}" data-type="point" data-id="${pt.id}">
-				<div class="tree-item-info">
-					<span class="tree-icon">${ICONS.point}</span>
-					<span class="tree-name">${pt.id}</span>
-					<span class="tree-meta">(${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}) ${pt.fixed ? '🔒' : ''}</span>
-				</div>
-				${showDelete ? `<button class="tree-delete-btn" data-delete-id="${pt.id}" title="Delete">${ICONS.delete}</button>` : ''}
-			</div>
-		`;
+		return this.renderTreeItem(
+			'point',
+			pt.id,
+			this.sketch.selection.pointIds,
+			ICONS.point,
+			`(${pt.x.toFixed(0)}, ${pt.y.toFixed(0)}) ${pt.fixed ? '🔒' : ''}`,
+			showDelete
+		);
 	}
 
 	private renderConstraintItem(c: any, currentEntityIds: string[] = []): string {
@@ -615,78 +632,14 @@ export class Sidebar {
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
 		id: string
 	): string {
-		switch (type) {
-			case 'line':
-				return ICONS.line;
-			case 'circle':
-				return ICONS.circle;
-			case 'arc':
-				return ICONS.arc;
-			case 'ellipse':
-				return ICONS.ellipse;
-			case 'elliptical_arc':
-				return ICONS.elliptical_arc;
-			case 'spline': {
-				const s = this.sketch.splines.get(id);
-				return s?.splineType === 'control' ? ICONS.spline_control : ICONS.spline_fit;
-			}
-			case 'point':
-			default:
-				return ICONS.point;
+		if (type === 'spline') {
+			return this.sketch.splines.get(id)?.splineType === 'control' ? ICONS.spline_control : ICONS.spline_fit;
 		}
+		return ICONS[type] ?? ICONS.point;
 	}
 
 	private getConstraintIcon(type: string): string {
-		switch (type) {
-			case 'fixed':
-				return ICONS.fixed;
-			case 'coincident':
-				return ICONS.coincident;
-			case 'horizontal':
-				return ICONS.horizontal;
-			case 'vertical':
-				return ICONS.vertical;
-			case 'distance':
-				return ICONS.distance;
-			case 'point_to_line_distance':
-				return ICONS.distance;
-			case 'angle':
-				return ICONS.angle;
-			case 'radius':
-				return ICONS.circle;
-			case 'equal_length':
-			case 'equal_radius':
-				return ICONS.equal;
-			case 'parallel':
-				return ICONS.parallel;
-			case 'collinear':
-				return ICONS.collinear;
-			case 'perpendicular':
-				return ICONS.perpendicular;
-			case 'tangent_line_circle':
-			case 'tangent_circle_circle':
-				return ICONS.tangent;
-			case 'concentric':
-				return ICONS.concentric;
-			case 'point_on_line':
-				return ICONS.pointOnLine;
-			case 'point_on_circle':
-				return ICONS.pointOnLine;
-			case 'point_on_ellipse':
-				return ICONS.pointOnLine;
-			case 'point_on_spline':
-				return ICONS.pointOnLine;
-			case 'midpoint':
-				return ICONS.midpoint;
-			case 'symmetry':
-				return ICONS.symmetry;
-			case 'circular_pattern':
-				return ICONS.circular_pattern;
-			case 'rectangular_pattern':
-				return ICONS.rectangular_pattern;
-			default:
-				return ICONS.coincident;
-		}
+		return CONSTRAINT_ICON_MAP[type] ?? ICONS.coincident;
 	}
 
 	private bindEvents(): void {
