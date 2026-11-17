@@ -1,4 +1,4 @@
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
+import { LINE_DISTANCE_PX } from '../../distances';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
@@ -6,7 +6,12 @@ import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { Vec2 } from '../../../math/vector';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
-import { calculateObjectsCentroid, findTransformObjectId } from './utils';
+import {
+	calculateObjectsCentroid,
+	findPatternCheckboxAtScreen,
+	findTransformObjectId,
+	togglePatternCheckboxAtScreen,
+} from './utils';
 import { computePatternCopyAngle } from '../../../solver/constraints';
 
 export interface CircularPatternState {
@@ -306,18 +311,7 @@ export class CircularPatternTool extends BaseTool {
 	}
 
 	override isHighlightEnabled(screen?: Vec2): boolean {
-		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
-			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (
-					!entry.constraintId &&
-					Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX &&
-					Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX
-				) {
-					return false;
-				}
-			}
-		}
-		return true;
+		return !(screen && this.state?.suppression && findPatternCheckboxAtScreen(this.ctx, screen));
 	}
 
 	override canHighlight(target: HoverTarget): boolean {
@@ -425,23 +419,13 @@ export class CircularPatternTool extends BaseTool {
 		}
 
 		// 1. Suppression checkbox click hit-test
-		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
-			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (
-					!entry.constraintId &&
-					Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX &&
-					Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX
-				) {
-					if (this.state.suppressedIndices.has(entry.copyIndex)) {
-						this.state.suppressedIndices.delete(entry.copyIndex);
-					} else {
-						this.state.suppressedIndices.add(entry.copyIndex);
-					}
-					this.onStateChange?.();
-					this.ctx.requestRender();
-					return true;
-				}
-			}
+		if (
+			togglePatternCheckboxAtScreen(this.ctx, this.state, e.screen, () => {
+				this.onStateChange?.();
+				this.ctx.requestRender();
+			})
+		) {
+			return true;
 		}
 
 		let hitId: string | null = null;

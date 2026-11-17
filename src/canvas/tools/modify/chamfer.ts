@@ -275,13 +275,7 @@ export class ChamferTool extends BaseTool {
 			this.ctx.showToast('Chamfer created');
 		}
 
-		this.ctx?.highlightManager?.clear();
-		this.candidate = null;
-		this.firstLine = null;
-		this.gizmoDragState = null;
-		this.popup.hide();
-		this.ctx.setCursor(this.defaultCursor);
-		this.ctx.requestRender();
+		this.cancel();
 		return Boolean(res);
 	}
 
@@ -463,8 +457,7 @@ export class ChamferTool extends BaseTool {
 					this.dist1 = newDist;
 				}
 				this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
-				const bbox = this.getGizmoBoundingBox();
-				if (bbox) this.popup.updatePosition(bbox);
+				this.updatePopupPosition();
 				this.recalculate();
 				this.ctx.requestRender();
 				return;
@@ -492,8 +485,7 @@ export class ChamferTool extends BaseTool {
 					const newAngle = Math.max(0, Math.min(maxAngle, Math.round(signedAngleDeg)));
 					this.angleDeg = newAngle;
 					this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
-					const angleBbox = this.getGizmoBoundingBox();
-					if (angleBbox) this.popup.updatePosition(angleBbox);
+					this.updatePopupPosition();
 					this.recalculate();
 					this.ctx.requestRender();
 				}

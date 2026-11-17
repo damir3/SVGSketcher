@@ -51,32 +51,9 @@ export class FilletTool extends BaseTool {
 			const radius = this.popup.getNumericValue('radius', 10);
 			this.filletRadius = radius <= 0.01 ? 1 : radius;
 			this.recalculatePendingFillets();
-			const activePf =
-				this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
-				this.pendingFillets[this.pendingFillets.length - 1];
+			const activePf = this.getActivePendingFillet();
 			if (activePf && !activePf.result) {
-				const c1 = this.ctx.toGeoCurve(activePf.primitive1.type, activePf.primitive1.id);
-				const c2 = this.ctx.toGeoCurve(activePf.primitive2.type, activePf.primitive2.id);
-				let maxR: number | null = null;
-				if (c1 && c2) {
-					let cornerVertex: Vec2 | undefined;
-					if (activePf.vertexPointId) {
-						cornerVertex = this.ctx.sketch.points.get(activePf.vertexPointId);
-					}
-					maxR = findMaxFilletRadius(
-						c1,
-						c2,
-						{
-							cornerVertex,
-							clickPos1: activePf.clickPos1,
-							clickPos2: activePf.clickPos2,
-							endPointId1: activePf.endPointId1,
-							endPointId2: activePf.endPointId2,
-						},
-						radius,
-						0.1
-					);
-				}
+				const maxR = this.findMaxRadiusForCandidate(activePf, radius);
 				this.popup.setError(true, maxR !== null ? `Max: ${maxR.toFixed(1)} mm` : 'Radius too large');
 			} else {
 				this.popup.setError(false);
@@ -86,28 +63,7 @@ export class FilletTool extends BaseTool {
 		this.popup.onCommit = () => {
 			const invalidPf = this.pendingFillets.find(pf => !pf.result);
 			if (invalidPf) {
-				const c1 = this.ctx.toGeoCurve(invalidPf.primitive1.type, invalidPf.primitive1.id);
-				const c2 = this.ctx.toGeoCurve(invalidPf.primitive2.type, invalidPf.primitive2.id);
-				let maxR: number | null = null;
-				if (c1 && c2) {
-					let cornerVertex: Vec2 | undefined;
-					if (invalidPf.vertexPointId) {
-						cornerVertex = this.ctx.sketch.points.get(invalidPf.vertexPointId);
-					}
-					maxR = findMaxFilletRadius(
-						c1,
-						c2,
-						{
-							cornerVertex,
-							clickPos1: invalidPf.clickPos1,
-							clickPos2: invalidPf.clickPos2,
-							endPointId1: invalidPf.endPointId1,
-							endPointId2: invalidPf.endPointId2,
-						},
-						this.filletRadius,
-						0.1
-					);
-				}
+				const maxR = this.findMaxRadiusForCandidate(invalidPf, this.filletRadius);
 				if (maxR !== null) {
 					this.filletRadius = maxR;
 					this.recalculatePendingFillets();
@@ -160,7 +116,7 @@ export class FilletTool extends BaseTool {
 		// 1. Check for Fillet Gizmo handle dragging
 		const gh = hitGizmoHandle(screen, [this.ctx.renderer.filletGizmoHandle]);
 		if (gh) {
-			const active = this.pendingFillets.find(pf => pf.id === this.activeFilletId) ?? this.pendingFillets.at(-1);
+			const active = this.getActivePendingFillet();
 			const inward = gh.worldBisectorDir.clone().negate();
 			const travelPerRadius =
 				active?.result && active.primitive1.type === 'line' && active.primitive2.type === 'line'
@@ -223,9 +179,7 @@ export class FilletTool extends BaseTool {
 	getGizmoBoundingBox(): ScreenBoundingBox | null {
 		if (!this.ctx || this.pendingFillets.length === 0) return null;
 
-		const activePf =
-			this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
-			this.pendingFillets[this.pendingFillets.length - 1];
+		const activePf = this.getActivePendingFillet();
 		if (!activePf) return null;
 
 		const pts: Vec2[] = [];
@@ -274,9 +228,7 @@ export class FilletTool extends BaseTool {
 				const oldRadius = this.filletRadius;
 				this.filletRadius = newRadius;
 				this.recalculatePendingFillets();
-				const activePf =
-					this.pendingFillets.find(pf => pf.id === this.activeFilletId) ||
-					this.pendingFillets[this.pendingFillets.length - 1];
+				const activePf = this.getActivePendingFillet();
 				if (activePf && !activePf.result && newRadius > oldRadius) {
 					this.filletRadius = oldRadius;
 					this.recalculatePendingFillets();
@@ -298,13 +250,7 @@ export class FilletTool extends BaseTool {
 			this.ctx.setCursor('default');
 		}
 
-		// Update popup position
-		if (this.popup.isOpen() && this.pendingFillets.length > 0) {
-			const bbox = this.getGizmoBoundingBox();
-			if (bbox) {
-				this.popup.updatePosition(bbox);
-			}
-		}
+		this.updatePopupPosition();
 	}
 
 	override onMouseUp(_e: ToolMouseEvent): void {
@@ -398,47 +344,47 @@ export class FilletTool extends BaseTool {
 		return null;
 	}
 
-	private addFilletForPoint(pointId: string): void {
-		const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, pointId);
-		if (!conn.valid || conn.primitives.length !== 2) return;
+	private getActivePendingFillet(): FilletCandidate | undefined {
+		return this.pendingFillets.find(pf => pf.id === this.activeFilletId) ?? this.pendingFillets.at(-1);
+	}
 
-		const existingIdx = this.pendingFillets.findIndex(pf => pf.vertexPointId && conn.pointIds.has(pf.vertexPointId));
-		if (existingIdx !== -1) {
-			this.pendingFillets.splice(existingIdx, 1);
-			if (this.pendingFillets.length === 0) {
-				this.popup.hide();
-				this.activeFilletId = null;
-				this.ctx.setCursor(this.defaultCursor);
-			} else {
-				this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
-			}
-			this.ctx.requestRender();
-			return;
-		}
-
-		const prim1 = conn.primitives[0];
-		const prim2 = conn.primitives[1];
-		const pt = this.ctx.sketch.points.get(pointId);
-		if (!pt) return;
-
-		const candidate: FilletCandidate = {
-			id: `fillet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-			vertexPointId: pointId,
-			primitive1: { type: prim1.type, id: prim1.id },
-			primitive2: { type: prim2.type, id: prim2.id },
-			endPointId1: prim1.endPointId,
-			endPointId2: prim2.endPointId,
+	private buildFilletOptions(pf: FilletCandidate) {
+		const cornerVertex = pf.vertexPointId ? this.ctx.sketch.points.get(pf.vertexPointId)?.clone() : undefined;
+		return {
+			cornerVertex,
+			clickPos1: pf.clickPos1,
+			clickPos2: pf.clickPos2,
+			endPointId1: pf.endPointId1,
+			endPointId2: pf.endPointId2,
 		};
+	}
 
-		const c1 = this.ctx.toGeoCurve(prim1.type, prim1.id);
-		const c2 = this.ctx.toGeoCurve(prim2.type, prim2.id);
+	private findMaxRadiusForCandidate(pf: FilletCandidate, initialMax: number): number | null {
+		const c1 = this.ctx.toGeoCurve(pf.primitive1.type, pf.primitive1.id);
+		const c2 = this.ctx.toGeoCurve(pf.primitive2.type, pf.primitive2.id);
+		return c1 && c2 ? findMaxFilletRadius(c1, c2, this.buildFilletOptions(pf), initialMax, 0.1) : null;
+	}
+
+	private removePendingFilletAt(existingIdx: number): boolean {
+		if (existingIdx === -1) return false;
+		this.pendingFillets.splice(existingIdx, 1);
+		if (this.pendingFillets.length === 0) {
+			this.popup.hide();
+			this.activeFilletId = null;
+			this.ctx.setCursor(this.defaultCursor);
+		} else {
+			this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
+		}
+		this.ctx.requestRender();
+		return true;
+	}
+
+	private commitPendingCandidate(candidate: FilletCandidate, fallbackWorldPos: Vec2): void {
+		const c1 = this.ctx.toGeoCurve(candidate.primitive1.type, candidate.primitive1.id);
+		const c2 = this.ctx.toGeoCurve(candidate.primitive2.type, candidate.primitive2.id);
 		let candidateResult: FilletResult | null = null;
 		if (c1 && c2) {
-			const filletOpts = {
-				cornerVertex: pt.clone(),
-				endPointId1: prim1.endPointId,
-				endPointId2: prim2.endPointId,
-			};
+			const filletOpts = this.buildFilletOptions(candidate);
 			candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
 			if (!candidateResult) {
 				const maxR = findMaxFilletRadius(c1, c2, filletOpts, Math.max(100, this.filletRadius), 0.1);
@@ -459,7 +405,7 @@ export class FilletTool extends BaseTool {
 
 		const sPos = candidate.result
 			? this.ctx.viewport.worldToScreen(candidate.result.midArc)
-			: this.ctx.viewport.worldToScreen(pt);
+			: this.ctx.viewport.worldToScreen(fallbackWorldPos);
 
 		const bbox = this.getGizmoBoundingBox();
 		if (this.pendingFillets.length === 1) {
@@ -473,27 +419,50 @@ export class FilletTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
+	private addFilletForPoint(pointId: string): void {
+		const conn = getConnectedPrimitivesForPoint(this.ctx.sketch, pointId);
+		if (!conn.valid || conn.primitives.length !== 2) return;
+
+		if (
+			this.removePendingFilletAt(
+				this.pendingFillets.findIndex(pf => pf.vertexPointId && conn.pointIds.has(pf.vertexPointId))
+			)
+		) {
+			return;
+		}
+
+		const [prim1, prim2] = conn.primitives;
+		const pt = this.ctx.sketch.points.get(pointId);
+		if (!pt) return;
+
+		this.commitPendingCandidate(
+			{
+				id: `fillet-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+				vertexPointId: pointId,
+				primitive1: { type: prim1.type, id: prim1.id },
+				primitive2: { type: prim2.type, id: prim2.id },
+				endPointId1: prim1.endPointId,
+				endPointId2: prim2.endPointId,
+			},
+			pt
+		);
+	}
+
 	private addFilletForPrimitives(
 		prim1: { type: 'line' | 'arc' | 'spline'; id: string },
 		prim2: { type: 'line' | 'arc' | 'spline'; id: string },
 		clickPos1: Vec2,
 		clickPos2: Vec2
 	): void {
-		const existingIdx = this.pendingFillets.findIndex(
-			pf =>
-				(pf.primitive1.id === prim1.id && pf.primitive2.id === prim2.id) ||
-				(pf.primitive1.id === prim2.id && pf.primitive2.id === prim1.id)
-		);
-		if (existingIdx !== -1) {
-			this.pendingFillets.splice(existingIdx, 1);
-			if (this.pendingFillets.length === 0) {
-				this.popup.hide();
-				this.activeFilletId = null;
-				this.ctx.setCursor(this.defaultCursor);
-			} else {
-				this.activeFilletId = this.pendingFillets[this.pendingFillets.length - 1].id;
-			}
-			this.ctx.requestRender();
+		if (
+			this.removePendingFilletAt(
+				this.pendingFillets.findIndex(
+					pf =>
+						(pf.primitive1.id === prim1.id && pf.primitive2.id === prim2.id) ||
+						(pf.primitive1.id === prim2.id && pf.primitive2.id === prim1.id)
+				)
+			)
+		) {
 			return;
 		}
 
@@ -524,8 +493,6 @@ export class FilletTool extends BaseTool {
 		const eps1 = getEndpoints(prim1);
 		const eps2 = getEndpoints(prim2);
 		let sharedCornerPt: Vec2 | undefined;
-		let endPointId1: string | undefined;
-		let endPointId2: string | undefined;
 
 		for (const ep1 of eps1) {
 			const conn1 = getConnectedPrimitivesForPoint(this.ctx.sketch, ep1);
@@ -534,8 +501,6 @@ export class FilletTool extends BaseTool {
 					const pt = this.ctx.sketch.points.get(ep1);
 					if (pt) {
 						sharedCornerPt = pt.clone();
-						endPointId1 = ep1;
-						endPointId2 = ep2;
 						candidate.vertexPointId = ep1;
 						candidate.endPointId1 = ep1;
 						candidate.endPointId2 = ep2;
@@ -546,51 +511,7 @@ export class FilletTool extends BaseTool {
 			if (sharedCornerPt) break;
 		}
 
-		const c1 = this.ctx.toGeoCurve(prim1.type, prim1.id);
-		const c2 = this.ctx.toGeoCurve(prim2.type, prim2.id);
-		let candidateResult: FilletResult | null = null;
-		if (c1 && c2) {
-			const filletOpts = {
-				cornerVertex: sharedCornerPt,
-				endPointId1,
-				endPointId2,
-				clickPos1,
-				clickPos2,
-			};
-			candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
-			if (!candidateResult) {
-				const maxR = findMaxFilletRadius(c1, c2, filletOpts, Math.max(100, this.filletRadius), 0.1);
-				if (maxR === null) {
-					this.ctx.showToast('Cannot fillet this corner (curves are parallel or collinear)');
-					return;
-				}
-				this.filletRadius = Math.min(this.filletRadius, maxR);
-				candidateResult = calculateFilletGeometry(c1, c2, this.filletRadius, filletOpts);
-				this.ctx.showToast(`Radius adjusted to ${this.filletRadius.toFixed(1)} mm for this corner`);
-			}
-		}
-
-		candidate.result = candidateResult;
-		this.pendingFillets.push(candidate);
-		this.activeFilletId = candidate.id;
-		this.ctx.setCursor('default');
-
-		const sPos = candidate.result
-			? this.ctx.viewport.worldToScreen(candidate.result.midArc)
-			: sharedCornerPt
-				? this.ctx.viewport.worldToScreen(sharedCornerPt)
-				: this.ctx.viewport.worldToScreen(clickPos1);
-
-		const bbox = this.getGizmoBoundingBox();
-		if (this.pendingFillets.length === 1) {
-			this.popup.setLocked('radius', false);
-			this.popup.setValue('radius', this.filletRadius);
-			this.popup.show(bbox ?? sPos);
-		} else {
-			this.popup.updatePosition(bbox ?? sPos);
-		}
-
-		this.ctx.requestRender();
+		this.commitPendingCandidate(candidate, sharedCornerPt ?? clickPos1);
 	}
 
 	private recalculatePendingFillets(): void {
@@ -598,18 +519,7 @@ export class FilletTool extends BaseTool {
 			const c1 = this.ctx.toGeoCurve(pf.primitive1.type, pf.primitive1.id);
 			const c2 = this.ctx.toGeoCurve(pf.primitive2.type, pf.primitive2.id);
 			if (c1 && c2) {
-				let cornerVertex: Vec2 | undefined;
-				if (pf.vertexPointId) {
-					const pt = this.ctx.sketch.points.get(pf.vertexPointId);
-					if (pt) cornerVertex = pt.clone();
-				}
-				pf.result = calculateFilletGeometry(c1, c2, this.filletRadius, {
-					cornerVertex,
-					clickPos1: pf.clickPos1,
-					clickPos2: pf.clickPos2,
-					endPointId1: pf.endPointId1,
-					endPointId2: pf.endPointId2,
-				});
+				pf.result = calculateFilletGeometry(c1, c2, this.filletRadius, this.buildFilletOptions(pf));
 			}
 		}
 	}

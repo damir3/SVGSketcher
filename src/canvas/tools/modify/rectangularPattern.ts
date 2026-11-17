@@ -1,4 +1,4 @@
-import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../distances';
+import { LINE_DISTANCE_PX } from '../../distances';
 import { hitGizmoHandle } from '../../modifyPreviews';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
@@ -9,7 +9,14 @@ import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 } from '../../../solver/constraints/rectangularPattern';
-import { calculateObjectsCentroid, findTransformObjectId } from './utils';
+import {
+	calculateObjectsCentroid,
+	collectPatternCheckboxesToAABB,
+	findPatternCheckboxAtScreen,
+	findTransformObjectId,
+	formatLineLengthLabel,
+	togglePatternCheckboxAtScreen,
+} from './utils';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
 import { ToolPopup, type ScreenBoundingBox } from '../../../ui/tool-popup';
 
@@ -64,212 +71,99 @@ export class RectangularPatternTool extends BaseTool {
 				id: 'dir1',
 				num: 2,
 				title: 'Direction 1',
-				getValue: () => {
-					const line1Id = this.state?.line1Id;
-					if (line1Id && this.ctx?.sketch) {
-						const line = this.ctx.sketch.lines.get(line1Id);
-						if (line) {
-							const p1 = this.ctx.sketch.points.get(line.p1Id);
-							const p2 = this.ctx.sketch.points.get(line.p2Id);
-							const len = p1 && p2 ? ` (${p1.distanceTo(p2).toFixed(1)} mm)` : '';
-							return `${line.id}${len}`;
-						}
-						return line1Id;
-					}
-					return 'Default: X-Axis (1, 0)';
-				},
+				getValue: () => formatLineLengthLabel(this.ctx?.sketch, this.state?.line1Id, 'Default: X-Axis (1, 0)'),
 				isSelected: () => Boolean(this.state?.line1Id),
 				isActive: () => this.state?.phase === 'direction1',
 				showClear: () => Boolean(this.state?.line1Id),
 				clearTitle: 'Reset to X-Axis',
 				onSelect: () => this.setPhase('direction1'),
-				onClear: () => {
-					if (this.state) {
-						this.state.line1Id = null;
-						this.onStateChange?.();
-						this.ctx?.requestRender();
-					}
-				},
+				onClear: () => this.clearDirectionLine(1),
 			},
 			{
 				id: 'dir2',
 				num: 3,
 				title: 'Direction 2',
-				getValue: () => {
-					const line2Id = this.state?.line2Id;
-					if (line2Id && this.ctx?.sketch) {
-						const line = this.ctx.sketch.lines.get(line2Id);
-						if (line) {
-							const p1 = this.ctx.sketch.points.get(line.p1Id);
-							const p2 = this.ctx.sketch.points.get(line.p2Id);
-							const len = p1 && p2 ? ` (${p1.distanceTo(p2).toFixed(1)} mm)` : '';
-							return `${line.id}${len}`;
-						}
-						return line2Id;
-					}
-					return this.state?.line1Id ? 'Default: Perpendicular' : 'Default: Y-Axis (0, 1)';
-				},
+				getValue: () =>
+					formatLineLengthLabel(
+						this.ctx?.sketch,
+						this.state?.line2Id,
+						this.state?.line1Id ? 'Default: Perpendicular' : 'Default: Y-Axis (0, 1)'
+					),
 				isSelected: () => Boolean(this.state?.line2Id),
 				isActive: () => this.state?.phase === 'direction2',
 				showClear: () => Boolean(this.state?.line2Id),
 				clearTitle: 'Reset to Perpendicular',
 				onSelect: () => this.setPhase('direction2'),
-				onClear: () => {
-					if (this.state) {
-						this.state.line2Id = null;
-						this.onStateChange?.();
-						this.ctx?.requestRender();
-					}
-				},
+				onClear: () => this.clearDirectionLine(2),
 			},
 		],
 		params: [
-			{ type: 'header', label: 'AXIS 1', marginTop: '2px' },
-			{
-				type: 'segmented',
-				label: 'Direction',
-				options: [
-					{ id: 'one_direction', label: 'One Direction' },
-					{ id: 'symmetric', label: 'Symmetric' },
-				],
-				getValue: () => this.state?.direction1 ?? 'one_direction',
-				onSelect: val => {
-					if (this.state) {
-						this.state.direction1 = val as any;
-						this.ctx?.requestRender();
-						this.onStateChange?.();
-					}
-				},
-			},
-			{
-				type: 'field',
-				id: 'input-rpat-dist1',
-				label: 'Distance',
-				unit: 'mm',
-				step: 0.5,
-				getValue: () => this.state?.distance1 ?? 0,
-				onInput: val => {
-					if (this.state) {
-						this.state.distance1 = val;
-						this.ctx?.requestRender();
-					}
-				},
-				onChange: val => {
-					if (this.state) {
-						this.state.distance1 = val;
-						this.ctx?.requestRender();
-					}
-				},
-			},
-			{
-				type: 'field',
-				id: 'input-rpat-qty1',
-				label: 'Quantity',
-				min: 1,
-				max: 100,
-				step: 1,
-				getValue: () => this.state?.quantity1 ?? 3,
-				onInput: val => {
-					if (this.state) {
-						const qty = Math.max(1, Math.floor(val));
-						this.state.quantity1 = qty;
-						this.popup.setValue('qty1', qty);
-						this.ctx?.requestRender();
-					}
-				},
-				onChange: val => {
-					if (this.state) {
-						const qty = Math.max(1, Math.floor(val));
-						this.state.quantity1 = qty;
-						this.popup.setValue('qty1', qty);
-						this.ctx?.requestRender();
-					}
-				},
-			},
-			{ type: 'header', label: 'AXIS 2', marginTop: '6px' },
-			{
-				type: 'segmented',
-				label: 'Direction',
-				options: [
-					{ id: 'one_direction', label: 'One Direction' },
-					{ id: 'symmetric', label: 'Symmetric' },
-				],
-				getValue: () => this.state?.direction2 ?? 'one_direction',
-				onSelect: val => {
-					if (this.state) {
-						this.state.direction2 = val as any;
-						this.ctx?.requestRender();
-						this.onStateChange?.();
-					}
-				},
-			},
-			{
-				type: 'field',
-				id: 'input-rpat-dist2',
-				label: 'Distance',
-				unit: 'mm',
-				step: 0.5,
-				getValue: () => this.state?.distance2 ?? 0,
-				onInput: val => {
-					if (this.state) {
-						this.state.distance2 = val;
-						this.ctx?.requestRender();
-					}
-				},
-				onChange: val => {
-					if (this.state) {
-						this.state.distance2 = val;
-						this.ctx?.requestRender();
-					}
-				},
-			},
-			{
-				type: 'field',
-				id: 'input-rpat-qty2',
-				label: 'Quantity',
-				min: 1,
-				max: 100,
-				step: 1,
-				getValue: () => this.state?.quantity2 ?? 3,
-				onInput: val => {
-					if (this.state) {
-						const qty = Math.max(1, Math.floor(val));
-						this.state.quantity2 = qty;
-						this.popup.setValue('qty2', qty);
-						this.ctx?.requestRender();
-					}
-				},
-				onChange: val => {
-					if (this.state) {
-						const qty = Math.max(1, Math.floor(val));
-						this.state.quantity2 = qty;
-						this.popup.setValue('qty2', qty);
-						this.ctx?.requestRender();
-					}
-				},
-			},
+			...([1, 2] as const).flatMap(axis => {
+				const dirKey = axis === 1 ? 'direction1' : 'direction2';
+				const distKey = axis === 1 ? 'distance1' : 'distance2';
+				const qtyKey = axis === 1 ? 'quantity1' : 'quantity2';
+				const popupQty = axis === 1 ? 'qty1' : 'qty2';
+				const setQty = (val: number) => {
+					if (!this.state) return;
+					const qty = Math.max(1, Math.floor(val));
+					this.state[qtyKey] = qty;
+					this.popup.setValue(popupQty, qty);
+					this.ctx?.requestRender();
+				};
+				const setDist = (val: number) => {
+					if (!this.state) return;
+					this.state[distKey] = val;
+					this.ctx?.requestRender();
+				};
+				return [
+					{ type: 'header' as const, label: `AXIS ${axis}`, marginTop: axis === 1 ? '2px' : '6px' },
+					{
+						type: 'segmented' as const,
+						label: 'Direction',
+						options: [
+							{ id: 'one_direction', label: 'One Direction' },
+							{ id: 'symmetric', label: 'Symmetric' },
+						],
+						getValue: () => this.state?.[dirKey] ?? 'one_direction',
+						onSelect: (val: string) => {
+							if (this.state) {
+								this.state[dirKey] = val as any;
+								this.ctx?.requestRender();
+								this.onStateChange?.();
+							}
+						},
+					},
+					{
+						type: 'field' as const,
+						id: `input-rpat-dist${axis}`,
+						label: 'Distance',
+						unit: 'mm',
+						step: 0.5,
+						getValue: () => this.state?.[distKey] ?? 0,
+						onInput: setDist,
+						onChange: setDist,
+					},
+					{
+						type: 'field' as const,
+						id: `input-rpat-qty${axis}`,
+						label: 'Quantity',
+						min: 1,
+						max: 100,
+						step: 1,
+						getValue: () => this.state?.[qtyKey] ?? 3,
+						onInput: setQty,
+						onChange: setQty,
+					},
+				];
+			}),
 			{
 				type: 'checkbox',
 				id: 'check-rpat-suppression',
 				label: 'Suppression',
 				marginTop: '6px',
 				badge: () => {
-					const state = this.state;
-					if (!state) return '';
-					const maxI = Math.abs(state.distance1) > 1e-6 ? state.quantity1 : 1;
-					const maxJ = Math.abs(state.distance2) > 1e-6 ? state.quantity2 : 1;
-					let total = 0;
-					let suppressed = 0;
-					for (let i = 0; i < maxI; i++) {
-						for (let j = 0; j < maxJ; j++) {
-							if (i === 0 && j === 0) continue;
-							total++;
-							if (state.suppression && state.suppressedIndices.has(i * 1000 + j)) {
-								suppressed++;
-							}
-						}
-					}
-					return `${total - suppressed} of ${total} enabled`;
+					const counts = this.getCopyCounts();
+					return counts ? `${counts.active} of ${counts.total} enabled` : '';
 				},
 				isChecked: () => this.state?.suppression ?? false,
 				onChange: checked => {
@@ -283,24 +177,10 @@ export class RectangularPatternTool extends BaseTool {
 			},
 		],
 		canApply: () => {
-			const state = this.state;
-			if (!state) return false;
-			const objCount = state.selectedObjectIds.size;
-			const maxI = Math.abs(state.distance1) > 1e-6 ? state.quantity1 : 1;
-			const maxJ = Math.abs(state.distance2) > 1e-6 ? state.quantity2 : 1;
-			let totalCopies = 0;
-			let suppressedCount = 0;
-			for (let i = 0; i < maxI; i++) {
-				for (let j = 0; j < maxJ; j++) {
-					if (i === 0 && j === 0) continue;
-					totalCopies++;
-					if (state.suppression && state.suppressedIndices.has(i * 1000 + j)) {
-						suppressedCount++;
-					}
-				}
-			}
-			const activeCopies = totalCopies - suppressedCount;
-			return objCount > 0 && totalCopies > 0 && activeCopies > 0;
+			const counts = this.getCopyCounts();
+			return Boolean(
+				this.state && this.state.selectedObjectIds.size > 0 && counts && counts.total > 0 && counts.active > 0
+			);
 		},
 		applyLabel: 'Apply Pattern',
 		onApply: () => this.executeRectangularPattern(),
@@ -473,18 +353,50 @@ export class RectangularPatternTool extends BaseTool {
 		) {
 			return false;
 		}
-		if (screen && this.state?.suppression && this.ctx?.renderer?.patternCheckboxPositions) {
-			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (
-					!entry.constraintId &&
-					Math.abs(screen.x - entry.x) <= LABEL_DISTANCE_PX &&
-					Math.abs(screen.y - entry.y) <= LABEL_DISTANCE_PX
-				) {
-					return false;
-				}
-			}
+		if (screen && this.state?.suppression && findPatternCheckboxAtScreen(this.ctx, screen)) {
+			return false;
 		}
 		return true;
+	}
+
+	private clearDirectionLine(axis: 1 | 2): void {
+		if (!this.state) return;
+		if (axis === 1) this.state.line1Id = null;
+		else this.state.line2Id = null;
+		this.onStateChange?.();
+		this.ctx?.requestRender();
+	}
+
+	private getCopyCounts(): { total: number; active: number } | null {
+		const state = this.state;
+		if (!state) return null;
+		const maxI = Math.abs(state.distance1) > 1e-6 ? state.quantity1 : 1;
+		const maxJ = Math.abs(state.distance2) > 1e-6 ? state.quantity2 : 1;
+		let total = 0;
+		let suppressed = 0;
+		for (let i = 0; i < maxI; i++) {
+			for (let j = 0; j < maxJ; j++) {
+				if (i === 0 && j === 0) continue;
+				total++;
+				if (state.suppression && state.suppressedIndices.has(i * 1000 + j)) suppressed++;
+			}
+		}
+		return { total, active: total - suppressed };
+	}
+
+	private computeDirections() {
+		const paramMap = new Map<string, number>();
+		for (const [pid, pt] of this.ctx.sketch.points.entries()) {
+			paramMap.set(`${pid}.x`, pt.x);
+			paramMap.set(`${pid}.y`, pt.y);
+		}
+		const line1 = this.state?.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
+		const line2 = this.state?.line2Id ? this.ctx.sketch.lines.get(this.state.line2Id) : null;
+		return computeRectangularPatternDirections(
+			paramMap,
+			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
+			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
+		);
 	}
 
 	override canHighlight(target: HoverTarget): boolean {
@@ -529,31 +441,14 @@ export class RectangularPatternTool extends BaseTool {
 		}
 
 		if (!hasHandles) {
-			const paramMap = new Map<string, number>();
-			for (const [pid, pt] of this.ctx.sketch.points.entries()) {
-				paramMap.set(`${pid}.x`, pt.x);
-				paramMap.set(`${pid}.y`, pt.y);
-			}
-			const line1 = this.state.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
-			const line2 = this.state.line2Id ? this.ctx.sketch.lines.get(this.state.line2Id) : null;
-			const { u1, u2 } = computeRectangularPatternDirections(
-				paramMap,
-				line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-				line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-			);
+			const { u1, u2 } = this.computeDirections();
 
 			const p1 = this.ctx.viewport.worldToScreen(centroidWorld.clone().addScaledVector(u1, this.state.distance1));
 			const p2 = this.ctx.viewport.worldToScreen(centroidWorld.clone().addScaledVector(u2, this.state.distance2));
 			pts.push(p1.clone().subScalar(48), p1.clone().addScalar(48), p2.clone().subScalar(48), p2.clone().addScalar(48));
 		}
 
-		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
-			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (!entry.constraintId) {
-					pts.push(Vec2.from(entry).subScalar(14), Vec2.from(entry).addScalar(14));
-				}
-			}
-		}
+		collectPatternCheckboxesToAABB(this.ctx, this.state.suppression, pts);
 
 		return AABB.fromPoints(pts);
 	}
@@ -608,18 +503,7 @@ export class RectangularPatternTool extends BaseTool {
 		);
 		if (gizmoHandle) {
 			const startDistance = gizmoHandle.axis === 1 ? this.state.distance1 : this.state.distance2;
-			const paramMap = new Map<string, number>();
-			for (const [pid, pt] of this.ctx.sketch.points.entries()) {
-				paramMap.set(`${pid}.x`, pt.x);
-				paramMap.set(`${pid}.y`, pt.y);
-			}
-			const line1 = this.state.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
-			const line2 = this.state.line2Id ? this.ctx.sketch.lines.get(this.state.line2Id) : null;
-			const dirs = computeRectangularPatternDirections(
-				paramMap,
-				line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-				line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-			);
+			const dirs = this.computeDirections();
 			const u = gizmoHandle.axis === 1 ? dirs.u1 : dirs.u2;
 			const centroidWorld = calculateObjectsCentroid(this.ctx.sketch, this.state.selectedObjectIds);
 
@@ -636,23 +520,13 @@ export class RectangularPatternTool extends BaseTool {
 		}
 
 		// 2. Suppression checkbox click hit-test
-		if (this.state.suppression && this.ctx.renderer?.patternCheckboxPositions) {
-			for (const entry of this.ctx.renderer.patternCheckboxPositions.values()) {
-				if (
-					!entry.constraintId &&
-					Math.abs(e.screen.x - entry.x) <= LABEL_DISTANCE_PX &&
-					Math.abs(e.screen.y - entry.y) <= LABEL_DISTANCE_PX
-				) {
-					if (this.state.suppressedIndices.has(entry.copyIndex)) {
-						this.state.suppressedIndices.delete(entry.copyIndex);
-					} else {
-						this.state.suppressedIndices.add(entry.copyIndex);
-					}
-					this.onStateChange?.();
-					this.ctx.requestRender();
-					return true;
-				}
-			}
+		if (
+			togglePatternCheckboxAtScreen(this.ctx, this.state, e.screen, () => {
+				this.onStateChange?.();
+				this.ctx.requestRender();
+			})
+		) {
+			return true;
 		}
 
 		let hitId: string | null = null;
@@ -786,18 +660,7 @@ export class RectangularPatternTool extends BaseTool {
 			return false;
 		}
 
-		const paramMap = new Map<string, number>();
-		for (const [pid, pt] of this.ctx.sketch.points.entries()) {
-			paramMap.set(`${pid}.x`, pt.x);
-			paramMap.set(`${pid}.y`, pt.y);
-		}
-		const line1 = state.line1Id ? this.ctx.sketch.lines.get(state.line1Id) : null;
-		const line2 = state.line2Id ? this.ctx.sketch.lines.get(state.line2Id) : null;
-		const { u1, u2 } = computeRectangularPatternDirections(
-			paramMap,
-			line1 ? { p1Id: line1.p1Id, p2Id: line1.p2Id } : null,
-			line2 ? { p1Id: line2.p1Id, p2Id: line2.p2Id } : null
-		);
+		const { u1, u2 } = this.computeDirections();
 
 		this.ctx.sketch.beginTransaction();
 
