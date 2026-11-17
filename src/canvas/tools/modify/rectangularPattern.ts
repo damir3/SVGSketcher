@@ -730,17 +730,17 @@ export class RectangularPatternTool extends BaseTool {
 	}
 
 	override onKeyDown(e: KeyboardEvent): boolean | void {
-		if (e.key === 'Tab') {
-			if (this.popup.isOpen()) {
-				e.preventDefault();
-				this.popup.focus();
-				return true;
-			}
-		} else if (e.key === 'Enter') {
+		if (e.key === 'Tab' && this.popup.isOpen()) {
+			e.preventDefault();
+			this.popup.focus();
+			return true;
+		}
+		if (e.key === 'Enter') {
 			e.preventDefault();
 			this.executeRectangularPattern();
 			return true;
-		} else if (e.key === 'Escape') {
+		}
+		if (e.key === 'Escape') {
 			e.preventDefault();
 			this.cancel();
 			return true;

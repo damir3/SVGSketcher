@@ -1,4 +1,4 @@
-import { findTransformObjectId } from './utils';
+import { findTransformObjectId, formatLineLengthLabel } from './utils';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
@@ -46,17 +46,7 @@ export class MirrorTool extends BaseTool {
 					const mirrorLineId = this.state?.mirrorLineId;
 					if (mirrorLineId === 'axis_x') return 'X-Axis';
 					if (mirrorLineId === 'axis_y') return 'Y-Axis';
-					if (mirrorLineId && this.ctx?.sketch) {
-						const line = this.ctx.sketch.lines.get(mirrorLineId);
-						if (line) {
-							const p1 = this.ctx.sketch.points.get(line.p1Id);
-							const p2 = this.ctx.sketch.points.get(line.p2Id);
-							const len = p1 && p2 ? ` (${p1.distanceTo(p2).toFixed(1)} mm)` : '';
-							return `${line.id}${len}`;
-						}
-						return mirrorLineId;
-					}
-					return 'Click a line or axis in canvas';
+					return formatLineLengthLabel(this.ctx?.sketch, mirrorLineId, 'Click a line or axis in canvas');
 				},
 				isSelected: () => Boolean(this.state?.mirrorLineId),
 				isActive: () => this.state?.phase === 'mirror_line',

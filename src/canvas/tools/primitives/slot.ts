@@ -802,7 +802,7 @@ export class SlotTool extends BaseTool {
 		const v = new Vec2().subVectors(effectiveWorld, p1);
 		const d = v.length();
 
-		if (this.isDistanceLocked || this.popup.isLocked('distance')) {
+		if (this.isFieldLocked('distance')) {
 			const dir = d > 1e-4 ? v.divideScalar(d) : new Vec2(1, 0);
 			return p1.clone().addScaledVector(dir, this.distance);
 		}
@@ -905,6 +905,23 @@ export class SlotTool extends BaseTool {
 
 		const theta2 = theta1 + sweepSign * sweepRad;
 		this.arcEndWorld = Vec2.fromPolar(rArc, theta2).add(center);
+	}
+
+	private computeLinearOutline(c1: Vec2, c2: Vec2, u: Vec2, n: Vec2, r: number, vp: any) {
+		const [pt1, pt2, pt3, pt4] = [
+			c1.clone().addScaledVector(n, r),
+			c2.clone().addScaledVector(n, r),
+			c2.clone().addScaledVector(n, -r),
+			c1.clone().addScaledVector(n, -r),
+		];
+		return {
+			pt1,
+			pt2,
+			pt3,
+			pt4,
+			cw1: isArcClockwiseThroughPoint(vp, c1, pt4, pt1, c1.clone().addScaledVector(u, -r)),
+			cw2: isArcClockwiseThroughPoint(vp, c2, pt2, pt3, c2.clone().addScaledVector(u, r)),
+		};
 	}
 
 	private computeArcSlotRadiusFromCursor(effectiveWorld: Vec2): number {
@@ -1013,12 +1030,8 @@ export class SlotTool extends BaseTool {
 				createSvgCircle(se2, 3, PREVIEW_POINT_ATTRS, ctx.targetGroup);
 			}
 
-			if (hasRadius && (this.drawingStep === 2 || this.isRadiusLocked || this.popup.isLocked('radius'))) {
-				const pt1 = c1.clone().addScaledVector(n, effectiveR);
-				const pt2 = c2.clone().addScaledVector(n, effectiveR);
-				const pt3 = c2.clone().addScaledVector(n, -effectiveR);
-				const pt4 = c1.clone().addScaledVector(n, -effectiveR);
-
+			if (hasRadius && (this.drawingStep === 2 || this.isFieldLocked('radius'))) {
+				const { pt1, pt2, pt3, pt4, cw1, cw2 } = this.computeLinearOutline(c1, c2, u, n, effectiveR, ctx.viewport);
 				const sPt1 = ctx.viewport.worldToScreen(pt1);
 				const sPt2 = ctx.viewport.worldToScreen(pt2);
 				const sPt3 = ctx.viewport.worldToScreen(pt3);
@@ -1027,15 +1040,23 @@ export class SlotTool extends BaseTool {
 
 				createSvgLine(sPt1, sPt2, previewAttrs, ctx.targetGroup);
 				createSvgLine(sPt3, sPt4, previewAttrs, ctx.targetGroup);
-
-				const mid1 = c1.clone().addScaledVector(u, -effectiveR);
-				const mid2 = c2.clone().addScaledVector(u, effectiveR);
-				const cw1 = isArcClockwiseThroughPoint(ctx.viewport, c1, pt4, pt1, mid1);
-				const cw2 = isArcClockwiseThroughPoint(ctx.viewport, c2, pt2, pt3, mid2);
-
 				createSvgPath(getArcSvgPath(sc1, sPt4, sPt1, sr, cw1), previewAttrs, ctx.targetGroup);
 				createSvgPath(getArcSvgPath(sc2, sPt2, sPt3, sr, cw2), previewAttrs, ctx.targetGroup);
 			}
+			return;
+		}
+
+		if (this.drawingStep === 3 && this.arcCenterWorld && this.arcStartWorld && this.arcEndWorld) {
+			this.renderArcSlotPreviewGeometry(
+				ctx,
+				this.arcCenterWorld,
+				this.arcStartWorld,
+				this.arcEndWorld,
+				this.arcRadius,
+				this.arcWorldSweepSign,
+				this.radius,
+				this.radius !== null
+			);
 			return;
 		}
 
@@ -1078,19 +1099,6 @@ export class SlotTool extends BaseTool {
 				);
 				return;
 			}
-
-			if (this.drawingStep === 3 && this.arcCenterWorld && this.arcStartWorld && this.arcEndWorld) {
-				this.renderArcSlotPreviewGeometry(
-					ctx,
-					this.arcCenterWorld,
-					this.arcStartWorld,
-					this.arcEndWorld,
-					this.arcRadius,
-					this.arcWorldSweepSign,
-					this.radius,
-					this.radius !== null
-				);
-			}
 			return;
 		}
 
@@ -1119,21 +1127,7 @@ export class SlotTool extends BaseTool {
 					this.arcRadius,
 					this.arcWorldSweepSign,
 					this.radius,
-					this.radius !== null && (this.isRadiusLocked || this.popup.isLocked('radius'))
-				);
-				return;
-			}
-
-			if (this.drawingStep === 3 && this.arcStartWorld && this.arcEndWorld) {
-				this.renderArcSlotPreviewGeometry(
-					ctx,
-					center,
-					this.arcStartWorld,
-					this.arcEndWorld,
-					this.arcRadius,
-					this.arcWorldSweepSign,
-					this.radius,
-					this.radius !== null
+					this.radius !== null && this.isFieldLocked('radius')
 				);
 			}
 		}
@@ -1293,8 +1287,8 @@ export class SlotTool extends BaseTool {
 		const { c1, c2, u, n, effectiveR } = this.computeLinearCenters(p1, p2, this.radius);
 
 		const isConst = this.ctx.isConstructionMode;
-		const distLocked = this.isDistanceLocked || this.popup.isLocked('distance');
-		const radLocked = this.isRadiusLocked || this.popup.isLocked('radius');
+		const distLocked = this.isFieldLocked('distance');
+		const radLocked = this.isFieldLocked('radius');
 
 		let c1Id: string;
 		let c2Id: string;
@@ -1320,30 +1314,20 @@ export class SlotTool extends BaseTool {
 			c2Id = ptC2.id;
 		}
 
-		// 4 tangent points on the straight sides
-		const pt1Pos = c1.clone().addScaledVector(n, effectiveR);
-		const pt2Pos = c2.clone().addScaledVector(n, effectiveR);
-		const pt3Pos = c2.clone().addScaledVector(n, -effectiveR);
-		const pt4Pos = c1.clone().addScaledVector(n, -effectiveR);
-
-		const pt1 = sketch.addPoint(pt1Pos);
-		const pt2 = sketch.addPoint(pt2Pos);
-		const pt3 = sketch.addPoint(pt3Pos);
-		const pt4 = sketch.addPoint(pt4Pos);
+		// 4 tangent points on the straight sides and end-cap arcs
+		const outline = this.computeLinearOutline(c1, c2, u, n, effectiveR, this.ctx.viewport);
+		const pt1 = sketch.addPoint(outline.pt1);
+		const pt2 = sketch.addPoint(outline.pt2);
+		const pt3 = sketch.addPoint(outline.pt3);
+		const pt4 = sketch.addPoint(outline.pt4);
 
 		// Centerline construction line and side lines
 		const axisLine = sketch.addLine(c1Id, c2Id, true);
 		const topLine = sketch.addLine(pt1.id, pt2.id, isConst);
 		const bottomLine = sketch.addLine(pt3.id, pt4.id, isConst);
 
-		// End-cap arcs
-		const mid1 = c1.clone().addScaledVector(u, -effectiveR);
-		const mid2 = c2.clone().addScaledVector(u, effectiveR);
-		const cw1 = isArcClockwiseThroughPoint(this.ctx.viewport, c1, pt4Pos, pt1Pos, mid1);
-		const cw2 = isArcClockwiseThroughPoint(this.ctx.viewport, c2, pt2Pos, pt3Pos, mid2);
-
-		const arc1 = sketch.addArc(c1Id, pt4.id, pt1.id, effectiveR, cw1, isConst);
-		const arc2 = sketch.addArc(c2Id, pt2.id, pt3.id, effectiveR, cw2, isConst);
+		const arc1 = sketch.addArc(c1Id, pt4.id, pt1.id, effectiveR, outline.cw1, isConst);
+		const arc2 = sketch.addArc(c2Id, pt2.id, pt3.id, effectiveR, outline.cw2, isConst);
 
 		// Geometric constraints
 		sketch.addTangentConstraint(topLine.id, arc1.id);
@@ -1400,9 +1384,9 @@ export class SlotTool extends BaseTool {
 
 		const geom = this.computeArcSlotGeometry(center, c1, c2, rArc, sweepSign, this.radius);
 		const isConst = this.ctx.isConstructionMode;
-		const distLocked = this.isDistanceLocked || this.popup.isLocked('distance');
-		const angleLocked = this.isAngleLocked || this.popup.isLocked('angle');
-		const radLocked = this.isRadiusLocked || this.popup.isLocked('radius');
+		const distLocked = this.isFieldLocked('distance');
+		const angleLocked = this.isFieldLocked('angle');
+		const radLocked = this.isFieldLocked('radius');
 
 		let centerId: string;
 		let c1Id: string;

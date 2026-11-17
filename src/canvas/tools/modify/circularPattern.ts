@@ -113,20 +113,15 @@ export class CircularPatternTool extends BaseTool {
 				step: 5,
 				isVisible: () => this.state?.distribution !== 'full',
 				getValue: () => this.state?.angle ?? 180,
-				onInput: val => {
-					if (this.state) {
+				...(() => {
+					const setAngle = (val: number) => {
+						if (!this.state) return;
 						this.state.angle = val;
 						this.onStateChange?.();
 						this.ctx?.requestRender();
-					}
-				},
-				onChange: val => {
-					if (this.state) {
-						this.state.angle = val;
-						this.onStateChange?.();
-						this.ctx?.requestRender();
-					}
-				},
+					};
+					return { onInput: setAngle, onChange: setAngle };
+				})(),
 			},
 			{
 				type: 'field',
@@ -136,22 +131,16 @@ export class CircularPatternTool extends BaseTool {
 				max: 100,
 				step: 1,
 				getValue: () => this.state?.quantity ?? 3,
-				onInput: val => {
-					if (this.state) {
+				...(() => {
+					const setQty = (val: number) => {
+						if (!this.state) return;
 						const qty = Math.max(2, Math.floor(val));
 						this.state.quantity = qty;
 						this.popup.setValue('quantity', qty);
 						this.ctx?.requestRender();
-					}
-				},
-				onChange: val => {
-					if (this.state) {
-						const qty = Math.max(2, Math.floor(val));
-						this.state.quantity = qty;
-						this.popup.setValue('quantity', qty);
-						this.ctx?.requestRender();
-					}
-				},
+					};
+					return { onInput: setQty, onChange: setQty };
+				})(),
 			},
 			{
 				type: 'checkbox',
@@ -499,17 +488,17 @@ export class CircularPatternTool extends BaseTool {
 	}
 
 	override onKeyDown(e: KeyboardEvent): boolean | void {
-		if (e.key === 'Tab') {
-			if (this.popup.isOpen()) {
-				e.preventDefault();
-				this.popup.focus();
-				return true;
-			}
-		} else if (e.key === 'Enter') {
+		if (e.key === 'Tab' && this.popup.isOpen()) {
+			e.preventDefault();
+			this.popup.focus();
+			return true;
+		}
+		if (e.key === 'Enter') {
 			e.preventDefault();
 			this.executeCircularPattern();
 			return true;
-		} else if (e.key === 'Escape') {
+		}
+		if (e.key === 'Escape') {
 			e.preventDefault();
 			this.cancel();
 			return true;

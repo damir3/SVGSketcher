@@ -100,6 +100,29 @@ export class ImageTraceModal {
 
 	private render(): void {
 		if (!this.container) return;
+		const check = (cls: string, id: string, label: string, title = '') =>
+			`<label class="${cls}"${title ? ` title="${title}"` : ''}><input type="checkbox" id="${id}" /><span>${label}</span></label>`;
+		const sliderRow = (
+			id: string,
+			label: string,
+			rMin: number,
+			rMax: number,
+			step: number,
+			unit = '',
+			nMin = rMin,
+			nMax = rMax,
+			title = '',
+			autoId = '',
+			autoTitle = ''
+		) => {
+			const lbl = `<label class="trace-label" for="${id}"${title ? ` title="${title}"` : ''}>${label}</label>`;
+			const head = autoId
+				? `<div class="trace-label-with-toggle">${lbl}${check('trace-inline-check', autoId, 'Auto', autoTitle)}</div>`
+				: lbl;
+			const unitSpan = unit ? `<span class="trace-unit">${unit}</span>` : '';
+			return `<div class="trace-row">${head}<div class="trace-slider-group"><input type="range" id="${id}-range" min="${rMin}" max="${rMax}" step="${step}" /><input type="number" class="trace-num-input" id="${id}" min="${nMin}" max="${nMax}" step="${step}" />${unitSpan}</div></div>`;
+		};
+
 		this.container.innerHTML = `
 			<div class="trace-modal-dialog" role="dialog" aria-modal="false" aria-labelledby="trace-modal-title">
 				<div class="trace-modal-header" data-trace-drag-handle>
@@ -154,106 +177,26 @@ export class ImageTraceModal {
 
 					<div class="trace-section">
 						<div class="trace-section-title">Binarization & Cleanup</div>
-						<div class="trace-row">
-							<div class="trace-label-with-toggle">
-								<label class="trace-label" for="trace-threshold">Threshold</label>
-								<label class="trace-inline-check" title="Compute threshold automatically using Otsu's method">
-									<input type="checkbox" id="trace-auto-threshold" />
-									<span>Auto</span>
-								</label>
-							</div>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-threshold-range" min="1" max="255" step="1" />
-								<input type="number" class="trace-num-input" id="trace-threshold" min="1" max="255" step="1" />
-							</div>
-						</div>
-						<div class="trace-row">
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-invert" />
-								<span>Invert (light lines on dark background)</span>
-							</label>
-						</div>
-						<div class="trace-row">
-							<label class="trace-label" for="trace-blur">Blur</label>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-blur-range" min="0" max="5" step="0.5" />
-								<input type="number" class="trace-num-input" id="trace-blur" min="0" max="5" step="0.5" />
-								<span class="trace-unit">px</span>
-							</div>
-						</div>
-						<div class="trace-row">
-							<label class="trace-label" for="trace-despeckle" title="Ignore specks and holes smaller than this area">Despeckle</label>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-despeckle-range" min="0" max="200" step="1" />
-								<input type="number" class="trace-num-input" id="trace-despeckle" min="0" max="500" step="1" />
-								<span class="trace-unit">px²</span>
-							</div>
-						</div>
+						${sliderRow('trace-threshold', 'Threshold', 1, 255, 1, '', 1, 255, '', 'trace-auto-threshold', "Compute threshold automatically using Otsu's method")}
+						<div class="trace-row">${check('trace-check-row', 'trace-invert', 'Invert (light lines on dark background)')}</div>
+						${sliderRow('trace-blur', 'Blur', 0, 5, 0.5, 'px')}
+						${sliderRow('trace-despeckle', 'Despeckle', 0, 200, 1, 'px²', 0, 500, 'Ignore specks and holes smaller than this area')}
 					</div>
 
 					<div class="trace-section">
 						<div class="trace-section-title">Curve Fitting & Primitives</div>
-						<div class="trace-row">
-							<label class="trace-label" for="trace-tolerance" title="Maximum deviation of fitted lines, arcs and splines from the contour">Tolerance</label>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-tolerance-range" min="0.3" max="8" step="0.1" />
-								<input type="number" class="trace-num-input" id="trace-tolerance" min="0.1" max="25" step="0.1" />
-								<span class="trace-unit">px</span>
-							</div>
-						</div>
-						<div class="trace-row">
-							<div class="trace-label-with-toggle">
-								<label class="trace-label" for="trace-min-segment" title="Minimum length for lines and arcs; shorter curved runs stay splines">Min Segment</label>
-								<label class="trace-inline-check" title="Determine minimum segment length automatically from tolerance and image size">
-									<input type="checkbox" id="trace-auto-min-segment" />
-									<span>Auto</span>
-								</label>
-							</div>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-min-segment-range" min="2" max="80" step="1" />
-								<input type="number" class="trace-num-input" id="trace-min-segment" min="2" max="300" step="1" />
-								<span class="trace-unit">px</span>
-							</div>
-						</div>
-						<div class="trace-row">
-							<label class="trace-label" for="trace-smoothing">Smoothing</label>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-smoothing-range" min="0" max="4" step="0.2" />
-								<input type="number" class="trace-num-input" id="trace-smoothing" min="0" max="10" step="0.2" />
-								<span class="trace-unit">px</span>
-							</div>
-						</div>
-						<div class="trace-row">
-							<label class="trace-label" for="trace-corner-angle">Corner Angle</label>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-corner-angle-range" min="15" max="90" step="5" />
-								<input type="number" class="trace-num-input" id="trace-corner-angle" min="10" max="120" step="5" />
-								<span class="trace-unit">°</span>
-							</div>
-						</div>
-						<label class="trace-check-row" title="Convert all traced geometry to editable spline paths">
-							<input type="checkbox" id="trace-use-splines" />
-							<span>Convert to Paths</span>
-						</label>
+						${sliderRow('trace-tolerance', 'Tolerance', 0.3, 8, 0.1, 'px', 0.1, 25, 'Maximum deviation of fitted lines, arcs and splines from the contour')}
+						${sliderRow('trace-min-segment', 'Min Segment', 2, 80, 1, 'px', 2, 300, 'Minimum length for lines and arcs; shorter curved runs stay splines', 'trace-auto-min-segment', 'Determine minimum segment length automatically from tolerance and image size')}
+						${sliderRow('trace-smoothing', 'Smoothing', 0, 4, 0.2, 'px', 0, 10)}
+						${sliderRow('trace-corner-angle', 'Corner Angle', 15, 90, 5, '°', 10, 120)}
+						${check('trace-check-row', 'trace-use-splines', 'Convert to Paths', 'Convert all traced geometry to editable spline paths')}
 						<div class="trace-row">
 							<span class="trace-label">Primitives</span>
 							<div class="trace-checks-inline">
-								<label class="trace-inline-check" title="Include fitted lines in the result">
-									<input type="checkbox" id="trace-use-lines" />
-									<span>Lines</span>
-								</label>
-								<label class="trace-inline-check" title="Include fitted arcs in the result">
-									<input type="checkbox" id="trace-use-arcs" />
-									<span>Arcs</span>
-								</label>
-								<label class="trace-inline-check" title="Include fitted circles in the result">
-									<input type="checkbox" id="trace-use-circles" />
-									<span>Circles</span>
-								</label>
-								<label class="trace-inline-check" title="Include fitted splines in the result">
-									<input type="checkbox" id="trace-include-splines" />
-									<span>Splines</span>
-								</label>
+								${check('trace-inline-check', 'trace-use-lines', 'Lines', 'Include fitted lines in the result')}
+								${check('trace-inline-check', 'trace-use-arcs', 'Arcs', 'Include fitted arcs in the result')}
+								${check('trace-inline-check', 'trace-use-circles', 'Circles', 'Include fitted circles in the result')}
+								${check('trace-inline-check', 'trace-include-splines', 'Splines', 'Include fitted splines in the result')}
 							</div>
 						</div>
 					</div>
@@ -261,45 +204,18 @@ export class ImageTraceModal {
 					<div class="trace-section">
 						<div class="trace-section-title">Automatic Constraints</div>
 						<div class="trace-constraints-grid">
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-c-tangent" />
-								<span>Tangent (Line–Arc, Arc–Arc)</span>
-							</label>
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-c-hv" />
-								<span>Horizontal / Vertical</span>
-							</label>
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-c-pp" />
-								<span>Parallel / Perpendicular</span>
-							</label>
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-c-equal" />
-								<span>Equal Length / Radius</span>
-							</label>
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-c-concentric" />
-								<span>Concentric</span>
-							</label>
+							${check('trace-check-row', 'trace-c-tangent', 'Tangent (Line–Arc, Arc–Arc)')}
+							${check('trace-check-row', 'trace-c-hv', 'Horizontal / Vertical')}
+							${check('trace-check-row', 'trace-c-pp', 'Parallel / Perpendicular')}
+							${check('trace-check-row', 'trace-c-equal', 'Equal Length / Radius')}
+							${check('trace-check-row', 'trace-c-concentric', 'Concentric')}
 						</div>
-						<div class="trace-row">
-							<label class="trace-label" for="trace-angle-tol">Angle Tolerance</label>
-							<div class="trace-slider-group">
-								<input type="range" id="trace-angle-tol-range" min="0.5" max="10" step="0.5" />
-								<input type="number" class="trace-num-input" id="trace-angle-tol" min="0.5" max="15" step="0.5" />
-								<span class="trace-unit">°</span>
-							</div>
-						</div>
+						${sliderRow('trace-angle-tol', 'Angle Tolerance', 0.5, 10, 0.5, '°', 0.5, 15)}
 					</div>
 
 					<div class="trace-section">
 						<div class="trace-section-title">Output</div>
-						<div class="trace-row">
-							<label class="trace-check-row">
-								<input type="checkbox" id="trace-construction" />
-								<span>Create as Construction Geometry</span>
-							</label>
-						</div>
+						<div class="trace-row">${check('trace-check-row', 'trace-construction', 'Create as Construction Geometry')}</div>
 						<div class="trace-row">
 							<label class="trace-label" for="trace-after-convert">Source Image</label>
 							<select class="trace-select" id="trace-after-convert">
@@ -706,11 +622,9 @@ export class ImageTraceModal {
 		}
 
 		const total = getTracePrimitiveCount(res.stats);
-		const parts: string[] = [];
-		if (res.stats.lines) parts.push(`${res.stats.lines} line${res.stats.lines === 1 ? '' : 's'}`);
-		if (res.stats.arcs) parts.push(`${res.stats.arcs} arc${res.stats.arcs === 1 ? '' : 's'}`);
-		if (res.stats.circles) parts.push(`${res.stats.circles} circle${res.stats.circles === 1 ? '' : 's'}`);
-		if (res.stats.splines) parts.push(`${res.stats.splines} spline${res.stats.splines === 1 ? '' : 's'}`);
+		const parts = (['lines', 'arcs', 'circles', 'splines'] as const)
+			.filter(k => res.stats[k] > 0)
+			.map(k => `${res.stats[k]} ${res.stats[k] === 1 ? k.slice(0, -1) : k}`);
 
 		const text = parts.length ? `${parts.join(' · ')} (${total} total)` : 'No primitives detected';
 		if (summaryEl) {

@@ -157,6 +157,11 @@ export class ConstraintTool extends BaseTool {
 			return;
 		}
 
+		const clearRadial = () => {
+			sel.circleIds.clear();
+			sel.arcIds.clear();
+		};
+
 		// Prune incompatible combinations before adding new item
 		switch (constraintType) {
 			case 'horizontal_vertical':
@@ -174,8 +179,7 @@ export class ConstraintTool extends BaseTool {
 			case 'distance': {
 				if (type === 'line') {
 					if (sel.circleIds.size + sel.arcIds.size !== 1 || sel.lineIds.size > 0 || sel.pointIds.size > 0) {
-						sel.circleIds.clear();
-						sel.arcIds.clear();
+						clearRadial();
 					}
 					if (sel.pointIds.size > 1) sel.pointIds.clear();
 					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) sel.lineIds.clear();
@@ -183,11 +187,9 @@ export class ConstraintTool extends BaseTool {
 				} else if (type === 'circle' || type === 'arc') {
 					sel.pointIds.clear();
 					if (sel.lineIds.size !== 1 || sel.circleIds.size + sel.arcIds.size > 0) sel.lineIds.clear();
-					sel.circleIds.clear();
-					sel.arcIds.clear();
+					clearRadial();
 				} else if (type === 'point') {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
+					clearRadial();
 					if (sel.lineIds.size > 1) sel.lineIds.clear();
 					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) sel.pointIds.clear();
 					else if (sel.pointIds.size >= 2) sel.pointIds.clear();
@@ -196,15 +198,11 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'equal': {
 				if (type === 'line') {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
+					clearRadial();
 					if (sel.lineIds.size >= 2) sel.lineIds.clear();
 				} else if (type === 'circle' || type === 'arc') {
 					sel.lineIds.clear();
-					if (sel.circleIds.size + sel.arcIds.size >= 2) {
-						sel.circleIds.clear();
-						sel.arcIds.clear();
-					}
+					if (sel.circleIds.size + sel.arcIds.size >= 2) clearRadial();
 				}
 				break;
 			}
@@ -224,53 +222,30 @@ export class ConstraintTool extends BaseTool {
 				break;
 			}
 			case 'concentric': {
-				if (sel.circleIds.size + sel.arcIds.size >= 2) {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
-				}
+				if (sel.circleIds.size + sel.arcIds.size >= 2) clearRadial();
 				break;
 			}
 			case 'coincident': {
+				const hasCurve =
+					sel.lineIds.size >= 1 ||
+					sel.circleIds.size + sel.arcIds.size >= 1 ||
+					sel.ellipseIds.size + sel.ellipticalArcIds.size >= 1 ||
+					sel.splineIds.size >= 1;
+				const clearCurves = () => {
+					sel.lineIds.clear();
+					clearRadial();
+					sel.ellipseIds.clear();
+					sel.ellipticalArcIds.clear();
+					sel.splineIds.clear();
+				};
 				if (type === 'point') {
-					if (
-						sel.pointIds.size >= 2 ||
-						(sel.pointIds.size >= 1 &&
-							(sel.lineIds.size >= 1 ||
-								sel.circleIds.size + sel.arcIds.size >= 1 ||
-								sel.ellipseIds.size + sel.ellipticalArcIds.size >= 1 ||
-								sel.splineIds.size >= 1))
-					) {
+					if (sel.pointIds.size >= 2 || (sel.pointIds.size >= 1 && hasCurve)) {
 						sel.pointIds.clear();
-						sel.lineIds.clear();
-						sel.circleIds.clear();
-						sel.arcIds.clear();
-						sel.ellipseIds.clear();
-						sel.ellipticalArcIds.clear();
-						sel.splineIds.clear();
+						clearCurves();
 					}
-				} else if (
-					type === 'line' ||
-					type === 'circle' ||
-					type === 'arc' ||
-					type === 'ellipse' ||
-					type === 'elliptical_arc' ||
-					type === 'spline'
-				) {
-					if (
-						sel.lineIds.size >= 1 ||
-						sel.circleIds.size + sel.arcIds.size >= 1 ||
-						sel.ellipseIds.size + sel.ellipticalArcIds.size >= 1 ||
-						sel.splineIds.size >= 1 ||
-						sel.pointIds.size >= 2
-					) {
-						sel.lineIds.clear();
-						sel.circleIds.clear();
-						sel.arcIds.clear();
-						sel.ellipseIds.clear();
-						sel.ellipticalArcIds.clear();
-						sel.splineIds.clear();
-						if (sel.pointIds.size >= 2) sel.pointIds.clear();
-					}
+				} else if (hasCurve || sel.pointIds.size >= 2) {
+					clearCurves();
+					if (sel.pointIds.size >= 2) sel.pointIds.clear();
 				}
 				break;
 			}
@@ -278,8 +253,7 @@ export class ConstraintTool extends BaseTool {
 				if (type === 'line') {
 					if (sel.lineIds.size >= 1 || sel.circleIds.size + sel.arcIds.size >= 2) {
 						sel.lineIds.clear();
-						sel.circleIds.clear();
-						sel.arcIds.clear();
+						clearRadial();
 					}
 				} else if (type === 'circle' || type === 'arc') {
 					if (
@@ -287,8 +261,7 @@ export class ConstraintTool extends BaseTool {
 						(sel.lineIds.size >= 1 && sel.circleIds.size + sel.arcIds.size >= 1)
 					) {
 						sel.lineIds.clear();
-						sel.circleIds.clear();
-						sel.arcIds.clear();
+						clearRadial();
 					}
 				}
 				break;
@@ -577,6 +550,26 @@ export class ConstraintTool extends BaseTool {
 			const rect = opts.svg.getBoundingClientRect();
 			opts.onEditDimension(c, new Vec2(rect.left + s.x, rect.top + s.y));
 		};
+		const applyDim = (c: any, appliedMsg: string, editingMsg?: string, existed = false) => {
+			if (!c) return;
+			applied = true;
+			toastMsg = existed && editingMsg ? editingMsg : appliedMsg;
+			openDimensionEditor(c);
+		};
+		const applyPointOnLineOrAxis = (pointId: string, lineId: string) => {
+			if (lineId === 'axis_x' || lineId === 'axis_y') {
+				const axis = lineId === 'axis_x' ? 'x' : 'y';
+				if (sketch.addPointOnAxisConstraint(pointId, axis)) {
+					applied = true;
+					toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
+				}
+			} else if (sketch.addPointOnLineConstraint(pointId, lineId)) {
+				applied = true;
+				toastMsg = 'Point on line constraint applied';
+			} else {
+				opts.showToast('Cannot constrain point to this line');
+			}
+		};
 
 		switch (type) {
 			case 'fixed': {
@@ -602,22 +595,7 @@ export class ConstraintTool extends BaseTool {
 					eIds.length === 0 &&
 					sIds.length === 0
 				) {
-					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
-						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
-						const c = sketch.addPointOnAxisConstraint(pIds[0], axis);
-						if (c) {
-							applied = true;
-							toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
-						}
-					} else {
-						const c = sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-						if (c) {
-							applied = true;
-							toastMsg = 'Point on line constraint applied';
-						} else {
-							opts.showToast('Cannot constrain point to this line');
-						}
-					}
+					applyPointOnLineOrAxis(pIds[0], lIds[0]);
 				} else if (
 					pIds.length === 1 &&
 					cIds.length === 1 &&
@@ -700,88 +678,84 @@ export class ConstraintTool extends BaseTool {
 					return true;
 				}
 				if (lIds.length === 1 && pIds.length === 0 && cIds.length === 1) {
-					const c = sketch.addCircleToLineDistanceConstraint(cIds[0], lIds[0]);
-					if (c) {
-						applied = true;
-						toastMsg = 'Center-to-line distance constraint applied';
-						openDimensionEditor(c);
-					}
+					applyDim(
+						sketch.addCircleToLineDistanceConstraint(cIds[0], lIds[0]),
+						'Center-to-line distance constraint applied'
+					);
 				} else if (lIds.length === 1 && pIds.length === 1) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
 						const existed = sketch.hasPointToAxisConstraint(pIds[0], axis);
-						const c = sketch.addPointToAxisDistanceConstraint(pIds[0], axis);
-						applied = true;
-						toastMsg = existed
-							? `Editing distance to ${axis.toUpperCase()}-axis`
-							: `Distance to ${axis.toUpperCase()}-axis applied`;
-						openDimensionEditor(c);
+						applyDim(
+							sketch.addPointToAxisDistanceConstraint(pIds[0], axis),
+							`Distance to ${axis.toUpperCase()}-axis applied`,
+							`Editing distance to ${axis.toUpperCase()}-axis`,
+							existed
+						);
 					} else {
 						const l = sketch.lines.get(lIds[0])!;
 						if (pIds[0] !== l.p1Id && pIds[0] !== l.p2Id) {
 							const existed = sketch.hasPointToLineDistanceConstraint(pIds[0], lIds[0]);
-							const c = sketch.addPointToLineDistanceConstraint(pIds[0], lIds[0]);
-							applied = true;
-							toastMsg = existed
-								? 'Editing point-to-line distance constraint'
-								: 'Point-to-line distance constraint applied';
-							openDimensionEditor(c);
+							applyDim(
+								sketch.addPointToLineDistanceConstraint(pIds[0], lIds[0]),
+								'Point-to-line distance constraint applied',
+								'Editing point-to-line distance constraint',
+								existed
+							);
 						}
 					}
 				} else if (lIds.length === 1 && pIds.length === 0) {
 					const l = sketch.lines.get(lIds[0])!;
 					const existed = sketch.hasDistanceConstraint(l.p1Id, l.p2Id);
-					const c = sketch.addDistanceConstraint(l.p1Id, l.p2Id);
-					applied = true;
-					toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
-					openDimensionEditor(c);
+					applyDim(
+						sketch.addDistanceConstraint(l.p1Id, l.p2Id),
+						'Distance constraint applied',
+						'Editing distance constraint',
+						existed
+					);
 				} else if (lIds.length === 2) {
 					const existed = sketch.hasAngleConstraint(lIds[0], lIds[1]);
-					const c = sketch.addAngleConstraint(lIds[0], lIds[1]);
-					if (c) {
-						applied = true;
-						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
-						openDimensionEditor(c);
-					}
+					applyDim(
+						sketch.addAngleConstraint(lIds[0], lIds[1]),
+						'Angle constraint applied',
+						'Editing angle constraint',
+						existed
+					);
 				} else if (pIds.length === 3 && lIds.length === 0) {
 					const existed = sketch.hasThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]);
-					const c = sketch.addThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]);
-					if (c) {
-						applied = true;
-						toastMsg = existed ? 'Editing angle constraint' : 'Angle constraint applied';
-						openDimensionEditor(c);
-					}
+					applyDim(
+						sketch.addThreePointAngleConstraint(pIds[0], pIds[1], pIds[2]),
+						'Angle constraint applied',
+						'Editing angle constraint',
+						existed
+					);
 				} else if (pIds.length === 2) {
 					if (pIds.includes('origin')) {
 						const userPtId = pIds[0] === 'origin' ? pIds[1] : pIds[0];
 						const existed = sketch.hasOriginConstraint(userPtId);
-						const c = sketch.addOriginDistanceConstraint(userPtId);
-						applied = true;
-						toastMsg = existed ? 'Editing distance to (0,0)' : 'Distance to (0,0) applied';
-						openDimensionEditor(c);
+						applyDim(
+							sketch.addOriginDistanceConstraint(userPtId),
+							'Distance to (0,0) applied',
+							'Editing distance to (0,0)',
+							existed
+						);
 					} else {
 						const existed = sketch.hasDistanceConstraint(pIds[0], pIds[1]);
-						const c = sketch.addDistanceConstraint(pIds[0], pIds[1]);
-						applied = true;
-						toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
-						openDimensionEditor(c);
+						applyDim(
+							sketch.addDistanceConstraint(pIds[0], pIds[1]),
+							'Distance constraint applied',
+							'Editing distance constraint',
+							existed
+						);
 					}
 				} else if (cIds.length === 2 && lIds.length === 0 && pIds.length === 0) {
-					const c = sketch.addCircleDistanceConstraint(cIds[0], cIds[1]);
-					if (c) {
-						applied = true;
-						toastMsg = 'Radial distance constraint applied';
-						openDimensionEditor(c);
-					}
+					applyDim(sketch.addCircleDistanceConstraint(cIds[0], cIds[1]), 'Radial distance constraint applied');
 				} else if (cIds.length === 1) {
 					if (!sketch.hasRadiusConstraint(cIds[0])) {
 						opts.setTool?.('dimension');
 						return true;
 					}
-					const c = sketch.addRadiusConstraint(cIds[0]);
-					applied = true;
-					toastMsg = 'Editing radius constraint';
-					openDimensionEditor(c);
+					applyDim(sketch.addRadiusConstraint(cIds[0]), 'Editing radius constraint');
 				}
 				break;
 			}
@@ -871,22 +845,7 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'point_on_line': {
 				if (pIds.length === 1 && lIds.length === 1) {
-					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
-						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
-						const c = sketch.addPointOnAxisConstraint(pIds[0], axis);
-						if (c) {
-							applied = true;
-							toastMsg = `Point constrained to ${axis.toUpperCase()}-axis`;
-						}
-					} else {
-						const c = sketch.addPointOnLineConstraint(pIds[0], lIds[0]);
-						if (c) {
-							applied = true;
-							toastMsg = 'Point on line constraint applied';
-						} else {
-							opts.showToast('Cannot constrain point to this line');
-						}
-					}
+					applyPointOnLineOrAxis(pIds[0], lIds[0]);
 				}
 				break;
 			}
