@@ -126,6 +126,38 @@ export class ParametersPopup {
 		// Pure evaluation: does NOT trigger notify() or solver solve, preventing infinite loops
 		const evalResult = this.sketch.evaluateParameterGraph();
 
+		const renderRow = (opts: {
+			rowAttr: string;
+			name: string;
+			expression: string;
+			valueHtml: string;
+			comment: string;
+			hasError?: boolean;
+			deleteTitle: string;
+			deleteIcon: string;
+		}) => {
+			const errClass = opts.hasError ? ' error' : '';
+			return `
+				<tr ${opts.rowAttr}>
+					<td>
+						<input type="text" class="param-cell-input param-name-input${errClass}" value="${opts.name}" spellcheck="false" autocomplete="off" />
+					</td>
+					<td>
+						<input type="text" class="param-cell-input param-expr-input${errClass}" value="${opts.expression}" spellcheck="false" autocomplete="off" />
+					</td>
+					${opts.valueHtml}
+					<td>
+						<input type="text" class="param-cell-input param-comment-input" value="${opts.comment}" spellcheck="false" autocomplete="off" />
+					</td>
+					<td style="text-align: center;">
+						<button type="button" class="btn-param-row-delete" title="${opts.deleteTitle}" aria-label="${opts.deleteTitle}">
+							${opts.deleteIcon}
+						</button>
+					</td>
+				</tr>
+			`;
+		};
+
 		const committedRowsHtml = params
 			.map(p => {
 				const errorMsg = evalResult.errors.get(p.name);
@@ -136,60 +168,30 @@ export class ParametersPopup {
 						? p.value.toFixed(1)
 						: Number(p.value.toFixed(2)).toString();
 
-				return `
-				<tr data-param-name="${p.name}">
-					<td>
-						<input type="text" class="param-cell-input param-name-input ${hasError ? 'error' : ''}" value="${p.name}" spellcheck="false" autocomplete="off" />
-					</td>
-					<td>
-						<input type="text" class="param-cell-input param-expr-input ${hasError ? 'error' : ''}" value="${p.expression}" spellcheck="false" autocomplete="off" />
-					</td>
-					<td class="param-cell-value">
-						${displayVal}
-					</td>
-					<td>
-						<input type="text" class="param-cell-input param-comment-input" value="${p.comment || ''}" spellcheck="false" autocomplete="off" />
-					</td>
-					<td style="text-align: center;">
-						<button type="button" class="btn-param-row-delete" title="Delete parameter" aria-label="Delete parameter">
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-								<polyline points="3 6 5 6 21 6"></polyline>
-								<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-							</svg>
-						</button>
-					</td>
-				</tr>
-			`;
+				return renderRow({
+					rowAttr: `data-param-name="${p.name}"`,
+					name: p.name,
+					expression: p.expression,
+					valueHtml: `<td class="param-cell-value">${displayVal}</td>`,
+					comment: p.comment || '',
+					hasError,
+					deleteTitle: 'Delete parameter',
+					deleteIcon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`,
+				});
 			})
 			.join('');
 
-		let draftRowHtml = '';
-		if (this.draftRow) {
-			draftRowHtml = `
-				<tr data-draft="true">
-					<td>
-						<input type="text" class="param-cell-input param-name-input" value="${this.draftRow.name}" spellcheck="false" autocomplete="off" />
-					</td>
-					<td>
-						<input type="text" class="param-cell-input param-expr-input" value="${this.draftRow.expression}" spellcheck="false" autocomplete="off" />
-					</td>
-					<td class="param-cell-value" style="color: var(--text-muted); font-weight: normal;">
-						—
-					</td>
-					<td>
-						<input type="text" class="param-cell-input param-comment-input" value="${this.draftRow.comment}" spellcheck="false" autocomplete="off" />
-					</td>
-					<td style="text-align: center;">
-						<button type="button" class="btn-param-row-delete" title="Cancel" aria-label="Cancel">
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-								<line x1="18" y1="6" x2="6" y2="18"></line>
-								<line x1="6" y1="6" x2="18" y2="18"></line>
-							</svg>
-						</button>
-					</td>
-				</tr>
-			`;
-		}
+		const draftRowHtml = this.draftRow
+			? renderRow({
+					rowAttr: 'data-draft="true"',
+					name: this.draftRow.name,
+					expression: this.draftRow.expression,
+					valueHtml: `<td class="param-cell-value" style="color: var(--text-muted); font-weight: normal;">—</td>`,
+					comment: this.draftRow.comment,
+					deleteTitle: 'Cancel',
+					deleteIcon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+				})
+			: '';
 
 		tbody.innerHTML = committedRowsHtml + draftRowHtml;
 
@@ -259,29 +261,18 @@ export class ParametersPopup {
 				}
 			});
 
-			exprInput?.addEventListener('keydown', e => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
+			for (const inp of [exprInput, commentInput]) {
+				inp?.addEventListener('keydown', e => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						applyRowUpdate(false);
+						inp.blur();
+					}
+				});
+				inp?.addEventListener('blur', () => {
 					applyRowUpdate(false);
-					exprInput.blur();
-				}
-			});
-
-			exprInput?.addEventListener('blur', () => {
-				applyRowUpdate(false);
-			});
-
-			commentInput?.addEventListener('keydown', e => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
-					applyRowUpdate(false);
-					commentInput.blur();
-				}
-			});
-
-			commentInput?.addEventListener('blur', () => {
-				applyRowUpdate(false);
-			});
+				});
+			}
 
 			// Prevent input blur before click event registers on delete button
 			deleteBtn?.addEventListener('mousedown', e => {
@@ -321,22 +312,17 @@ export class ParametersPopup {
 				exprInp.classList.remove('error');
 			});
 
-			exprInp?.addEventListener('keydown', e => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
-					this.commitDraftRow();
-				}
-			});
+			for (const inp of [exprInp, commentInp]) {
+				inp?.addEventListener('keydown', e => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						this.commitDraftRow();
+					}
+				});
+			}
 
 			commentInp?.addEventListener('input', () => {
 				if (this.draftRow) this.draftRow.comment = commentInp.value;
-			});
-
-			commentInp?.addEventListener('keydown', e => {
-				if (e.key === 'Enter') {
-					e.preventDefault();
-					this.commitDraftRow();
-				}
 			});
 
 			deleteBtn?.addEventListener('mousedown', e => {

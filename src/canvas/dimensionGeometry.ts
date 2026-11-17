@@ -232,6 +232,12 @@ export function distanceToLinearDimensionVisual(screen: Vec2, d1: Vec2, d2: Vec2
 	return minDist;
 }
 
+function createDimensionGroup(parent: SVGElement, constraintId?: string): SVGElement {
+	return constraintId
+		? createSvgElement('g', { class: 'dimension-item', 'data-id': constraintId, 'data-type': 'constraint' }, parent)
+		: parent;
+}
+
 export function renderLinearDimensionVisual(opts: LinearDimensionVisualOptions): void {
 	const {
 		d1,
@@ -247,42 +253,24 @@ export function renderLinearDimensionVisual(opts: LinearDimensionVisualOptions):
 		targetPointSnapped = false,
 	} = opts;
 
-	const g = constraintId
-		? createSvgElement(
-				'g',
-				{
-					class: 'dimension-item',
-					'data-id': constraintId,
-					'data-type': 'constraint',
-				},
-				parent
-			)
-		: parent;
-
+	const g = createDimensionGroup(parent, constraintId);
 	const color = isSelected ? COLORS.selected : COLORS.primary;
 	const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
+	const extAttrs = isPreview
+		? PREVIEW_EXTENSION_LINE_ATTRS
+		: isSelected
+			? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
+			: EXTENSION_LINE_ATTRS;
 
 	// 1. Extension lines
-	if (extensionLines && extensionLines.length > 0) {
-		const extAttrs = isPreview
-			? PREVIEW_EXTENSION_LINE_ATTRS
-			: isSelected
-				? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
-				: EXTENSION_LINE_ATTRS;
-		for (const ext of extensionLines) {
-			createSvgLine(ext.from, ext.to, extAttrs, g);
-		}
+	for (const ext of extensionLines ?? []) {
+		createSvgLine(ext.from, ext.to, extAttrs, g);
 	}
 
 	for (const extension of arcExtensions ?? []) {
-		const attrs = isPreview
-			? PREVIEW_EXTENSION_LINE_ATTRS
-			: isSelected
-				? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
-				: EXTENSION_LINE_ATTRS;
 		createSvgPath(
 			getArcSvgPath(extension.center, extension.from, extension.to, extension.radius, extension.clockwise),
-			{ ...attrs, fill: 'none', class: 'dimension-arc-extension' },
+			{ ...extAttrs, fill: 'none', class: 'dimension-arc-extension' },
 			g
 		);
 	}
@@ -433,18 +421,7 @@ export function renderAngleExtensionLines(
 export function renderAngleDimensionVisual(opts: AngleDimensionVisualOptions): void {
 	const { parent, sCenter, a1, a2, delta, rScreen, label, isSelected = false, constraintId, extensionLines } = opts;
 
-	const g = constraintId
-		? createSvgElement(
-				'g',
-				{
-					class: 'dimension-item',
-					'data-id': constraintId,
-					'data-type': 'constraint',
-				},
-				parent
-			)
-		: parent;
-
+	const g = createDimensionGroup(parent, constraintId);
 	const color = isSelected ? COLORS.selected : COLORS.primary;
 	const arrowUrl = isSelected ? DIM_ARROWS.selected : DIM_ARROWS.default;
 
@@ -481,22 +458,19 @@ export function renderAngleDimensionVisual(opts: AngleDimensionVisualOptions): v
 	} else {
 		// Flipped tangential arrows outside for sharp angles (GOST 2.307)
 		createSvgPath(arcPath, lineAttrs, g);
-		const uA = Vec2.fromPolar(1, a1);
-		const tanA = uA.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
-		createSvgLine(
-			a.clone().addScaledVector(tanA, -DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-			a,
-			{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
-			g
-		);
-		const uB = Vec2.fromPolar(1, a2);
-		const tanB = uB.perpendicular().multiplyScalar(sweepFlag ? 1 : -1);
-		createSvgLine(
-			b.clone().addScaledVector(tanB, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
-			b,
-			{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
-			g
-		);
+		const addExternalArrow = (pt: Vec2, angle: number, tailSign: number) => {
+			const tangent = Vec2.fromPolar(1, angle)
+				.perpendicular()
+				.multiplyScalar(sweepFlag ? tailSign : -tailSign);
+			createSvgLine(
+				pt.clone().addScaledVector(tangent, DIMENSION_EXTERNAL_ARROW_TAIL_PX),
+				pt,
+				{ stroke: color, 'stroke-width': STROKE_WIDTH.dimension, 'marker-end': arrowUrl },
+				g
+			);
+		};
+		addExternalArrow(a, a1, -1);
+		addExternalArrow(b, a2, 1);
 	}
 
 	const uRad = Vec2.fromPolar(1, midAngle);

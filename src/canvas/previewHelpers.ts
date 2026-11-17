@@ -33,6 +33,7 @@ import {
 	SNAP_POINT_ATTRS,
 	SNAP_GRID_ATTRS,
 	SNAP_OBJECT_ATTRS,
+	type SvgAttrs,
 } from './styles';
 import { getArcSvgPath, getEllipticalArcSvgPath } from './svg';
 import {
@@ -265,86 +266,89 @@ export function renderSplinePreviewVisual(
 	return { checkmarkPos };
 }
 
+function drawRotatedScreenEllipse(
+	parent: SVGElement,
+	viewport: Viewport,
+	center: Vec2,
+	majorAxisPoint: Vec2,
+	minorAxisPoint: Vec2,
+	attrs: SvgAttrs
+): void {
+	const sc = viewport.worldToScreen(center);
+	const smaj = viewport.worldToScreen(majorAxisPoint);
+	const smin = viewport.worldToScreen(minorAxisPoint);
+	const r = sc.distancesTo(smaj, smin);
+	const thetaDeg = sc.angleToPointDeg(smaj);
+	createSvgEllipse(
+		sc,
+		r,
+		{
+			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+			...attrs,
+		},
+		parent
+	);
+}
+
 export function renderTrimPreviewVisual(parent: SVGElement, candidate: TrimCandidate, viewport: Viewport): void {
 	const { curve, isWholeEntity, cutStartWorld, cutEndWorld } = candidate;
 
-	if (isWholeEntity) {
-		if (curve.type === 'segment') {
-			const s1 = viewport.worldToScreen(curve.p1);
-			const s2 = viewport.worldToScreen(curve.p2);
-			createSvgLine(s1, s2, TRIM_STROKE_ATTRS, parent);
-		} else if (curve.type === 'circle') {
-			const sc = viewport.worldToScreen(curve.center);
-			const sr = curve.radius * viewport.zoom;
-			createSvgCircle(sc, sr, TRIM_STROKE_ATTRS, parent);
-		} else if (curve.type === 'arc') {
-			const sc = viewport.worldToScreen(curve.center);
-			const ss = viewport.worldToScreen(curve.start);
-			const se = viewport.worldToScreen(curve.end);
-			const sr = curve.radius * viewport.zoom;
-			const d = getArcSvgPath(sc, ss, se, sr, curve.clockwise);
-			createSvgPath(d, TRIM_STROKE_ATTRS, parent);
-		} else if (curve.type === 'ellipse') {
-			const sc = viewport.worldToScreen(curve.center);
-			const smaj = viewport.worldToScreen(curve.majorAxisPoint);
-			const smin = viewport.worldToScreen(curve.minorAxisPoint);
-			const r = sc.distancesTo(smaj, smin);
-			const thetaDeg = sc.angleToPointDeg(smaj);
-			createSvgEllipse(
-				sc,
-				r,
-				{
-					transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-					...TRIM_STROKE_ATTRS,
-				},
-				parent
-			);
-		} else if (curve.type === 'elliptical_arc') {
-			const sc = viewport.worldToScreen(curve.center);
-			const smaj = viewport.worldToScreen(curve.majorAxisPoint);
-			const smin = viewport.worldToScreen(curve.minorAxisPoint);
-			const ss = viewport.worldToScreen(curve.start);
-			const se = viewport.worldToScreen(curve.end);
-			const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, curve.clockwise);
-			createSvgPath(d, TRIM_STROKE_ATTRS, parent);
-		} else if (curve.type === 'spline') {
-			const d = getSplineSvgPath(curve.bezierSegments, p => viewport.worldToScreen(p), !!curve.isClosed);
-			createSvgPath(d, TRIM_STROKE_ATTRS, parent);
-		}
-		return;
-	}
-
-	const sStart = viewport.worldToScreen(cutStartWorld);
-	const sEnd = viewport.worldToScreen(cutEndWorld);
+	const sFrom = viewport.worldToScreen(
+		!isWholeEntity
+			? cutStartWorld
+			: curve.type === 'segment'
+				? curve.p1
+				: curve.type === 'arc' || curve.type === 'elliptical_arc'
+					? curve.start
+					: cutStartWorld
+	);
+	const sTo = viewport.worldToScreen(
+		!isWholeEntity
+			? cutEndWorld
+			: curve.type === 'segment'
+				? curve.p2
+				: curve.type === 'arc' || curve.type === 'elliptical_arc'
+					? curve.end
+					: cutEndWorld
+	);
 
 	if (curve.type === 'segment') {
-		createSvgLine(sStart, sEnd, TRIM_STROKE_ATTRS, parent);
-	} else if (curve.type === 'circle') {
+		createSvgLine(sFrom, sTo, TRIM_STROKE_ATTRS, parent);
+	} else if (curve.type === 'circle' || curve.type === 'arc') {
 		const sc = viewport.worldToScreen(curve.center);
 		const sr = curve.radius * viewport.zoom;
-		const d = getArcSvgPath(sc, sStart, sEnd, sr, true);
-		createSvgPath(d, TRIM_STROKE_ATTRS, parent);
-	} else if (curve.type === 'arc') {
-		const sc = viewport.worldToScreen(curve.center);
-		const sr = curve.radius * viewport.zoom;
-		const d = getArcSvgPath(sc, sStart, sEnd, sr, curve.clockwise);
-		createSvgPath(d, TRIM_STROKE_ATTRS, parent);
-	} else if (curve.type === 'ellipse') {
-		const sc = viewport.worldToScreen(curve.center);
-		const smaj = viewport.worldToScreen(curve.majorAxisPoint);
-		const smin = viewport.worldToScreen(curve.minorAxisPoint);
-		const d = getEllipticalArcSvgPath(sc, smaj, smin, sStart, sEnd, true);
-		createSvgPath(d, TRIM_STROKE_ATTRS, parent);
-	} else if (curve.type === 'elliptical_arc') {
-		const sc = viewport.worldToScreen(curve.center);
-		const smaj = viewport.worldToScreen(curve.majorAxisPoint);
-		const smin = viewport.worldToScreen(curve.minorAxisPoint);
-		const d = getEllipticalArcSvgPath(sc, smaj, smin, sStart, sEnd, curve.clockwise);
-		createSvgPath(d, TRIM_STROKE_ATTRS, parent);
+		if (isWholeEntity && curve.type === 'circle') {
+			createSvgCircle(sc, sr, TRIM_STROKE_ATTRS, parent);
+		} else {
+			const clockwise = curve.type === 'circle' ? true : curve.clockwise;
+			createSvgPath(getArcSvgPath(sc, sFrom, sTo, sr, clockwise), TRIM_STROKE_ATTRS, parent);
+		}
+	} else if (curve.type === 'ellipse' || curve.type === 'elliptical_arc') {
+		if (isWholeEntity && curve.type === 'ellipse') {
+			drawRotatedScreenEllipse(
+				parent,
+				viewport,
+				curve.center,
+				curve.majorAxisPoint,
+				curve.minorAxisPoint,
+				TRIM_STROKE_ATTRS
+			);
+		} else {
+			const sc = viewport.worldToScreen(curve.center);
+			const smaj = viewport.worldToScreen(curve.majorAxisPoint);
+			const smin = viewport.worldToScreen(curve.minorAxisPoint);
+			const clockwise = curve.type === 'ellipse' ? true : curve.clockwise;
+			createSvgPath(getEllipticalArcSvgPath(sc, smaj, smin, sFrom, sTo, clockwise), TRIM_STROKE_ATTRS, parent);
+		}
 	} else if (curve.type === 'spline') {
-		const subSegments = extractSplineInterval(curve.bezierSegments, candidate.interval[0], candidate.interval[1]);
-		const d = getSplineSvgPath(subSegments, p => viewport.worldToScreen(p));
-		createSvgPath(d, TRIM_STROKE_ATTRS, parent);
+		const segments = isWholeEntity
+			? curve.bezierSegments
+			: extractSplineInterval(curve.bezierSegments, candidate.interval[0], candidate.interval[1]);
+		createSvgPath(
+			getSplineSvgPath(segments, p => viewport.worldToScreen(p), isWholeEntity && !!curve.isClosed),
+			TRIM_STROKE_ATTRS,
+			parent
+		);
 	}
 }
 
@@ -390,6 +394,43 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 
 	if (candidate.previewType === 'line' || candidate.previewType === 'spline') {
 		createSvgLine(sFrom, sTo, EXTEND_PREVIEW_ATTRS, parent);
+	} else if (candidate.previewType === 'arc') {
+		if (candidate.becomesFullLoop) {
+			if (candidate.previewData.becomesFullCircle) {
+				const sc = viewport.worldToScreen(candidate.previewData.center);
+				createSvgCircle(sc, candidate.previewData.radius * viewport.zoom, EXTEND_PREVIEW_ATTRS, parent);
+			} else if (candidate.previewData.becomesFullEllipse) {
+				drawRotatedScreenEllipse(
+					parent,
+					viewport,
+					candidate.previewData.center,
+					candidate.previewData.majorAxisPoint,
+					candidate.previewData.minorAxisPoint,
+					EXTEND_PREVIEW_ATTRS
+				);
+			}
+			return;
+		}
+		if (candidate.targetType === 'arc') {
+			const sc = viewport.worldToScreen(candidate.previewData.center);
+			const d = getArcSvgPath(
+				sc,
+				sFrom,
+				sTo,
+				candidate.previewData.radius * viewport.zoom,
+				!!candidate.previewData.clockwise
+			);
+			createSvgPath(d, EXTEND_PREVIEW_ATTRS, parent);
+		} else if (candidate.targetType === 'elliptical_arc') {
+			const sc = viewport.worldToScreen(candidate.previewData.center);
+			const smaj = viewport.worldToScreen(candidate.previewData.majorAxisPoint);
+			const smin = viewport.worldToScreen(candidate.previewData.minorAxisPoint);
+			const d = getEllipticalArcSvgPath(sc, smaj, smin, sFrom, sTo, !!candidate.previewData.clockwise);
+			createSvgPath(d, EXTEND_PREVIEW_ATTRS, parent);
+		}
+	}
+
+	if (candidate.previewType === 'line' || candidate.previewType === 'spline' || candidate.previewType === 'arc') {
 		createSvgCircle(
 			sTo,
 			4,
@@ -401,65 +442,6 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 			},
 			parent
 		);
-	} else if (candidate.previewType === 'arc') {
-		if (candidate.becomesFullLoop) {
-			if (candidate.previewData.becomesFullCircle) {
-				const c = candidate.previewData.center;
-				const r = candidate.previewData.radius;
-				const sc = viewport.worldToScreen(c);
-				createSvgCircle(sc, r * viewport.zoom, EXTEND_PREVIEW_ATTRS, parent);
-			} else if (candidate.previewData.becomesFullEllipse) {
-				const c = candidate.previewData.center;
-				const maj = candidate.previewData.majorAxisPoint;
-				const min = candidate.previewData.minorAxisPoint;
-				const sc = viewport.worldToScreen(c);
-				const smaj = viewport.worldToScreen(maj);
-				const smin = viewport.worldToScreen(min);
-				const r = sc.distancesTo(smaj, smin);
-				const thetaDeg = sc.angleToPointDeg(smaj);
-				createSvgEllipse(
-					sc,
-					r,
-					{
-						transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-						...EXTEND_PREVIEW_ATTRS,
-					},
-					parent
-				);
-			}
-		} else {
-			if (candidate.targetType === 'arc') {
-				const c = candidate.previewData.center;
-				const r = candidate.previewData.radius;
-				const sc = viewport.worldToScreen(c);
-				const ss = viewport.worldToScreen(candidate.fromPoint);
-				const se = viewport.worldToScreen(candidate.toPoint);
-				const d = getArcSvgPath(sc, ss, se, r * viewport.zoom, !!candidate.previewData.clockwise);
-				createSvgPath(d, EXTEND_PREVIEW_ATTRS, parent);
-			} else if (candidate.targetType === 'elliptical_arc') {
-				const c = candidate.previewData.center;
-				const maj = candidate.previewData.majorAxisPoint;
-				const min = candidate.previewData.minorAxisPoint;
-				const sc = viewport.worldToScreen(c);
-				const smaj = viewport.worldToScreen(maj);
-				const smin = viewport.worldToScreen(min);
-				const ss = viewport.worldToScreen(candidate.fromPoint);
-				const se = viewport.worldToScreen(candidate.toPoint);
-				const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, !!candidate.previewData.clockwise);
-				createSvgPath(d, EXTEND_PREVIEW_ATTRS, parent);
-			}
-			createSvgCircle(
-				sTo,
-				4,
-				{
-					fill: '#0284c7',
-					stroke: '#ffffff',
-					'stroke-width': 1.5,
-					'pointer-events': 'none',
-				},
-				parent
-			);
-		}
 	}
 }
 

@@ -506,41 +506,29 @@ export class ImageTraceModal {
 			this.scheduleTrace();
 		});
 
-		c.querySelector<HTMLInputElement>('#trace-include-splines')?.addEventListener('change', e => {
-			this.settings.includeSplines = (e.target as HTMLInputElement).checked;
-			this.updatePrimitiveFilter();
-		});
+		for (const [selector, key] of [
+			['#trace-include-splines', 'includeSplines'],
+			['#trace-use-lines', 'useLines'],
+			['#trace-use-arcs', 'useArcs'],
+			['#trace-use-circles', 'useCircles'],
+		] as const) {
+			c.querySelector<HTMLInputElement>(selector)?.addEventListener('change', e => {
+				this.settings[key] = (e.target as HTMLInputElement).checked;
+				this.updatePrimitiveFilter();
+			});
+		}
 
-		c.querySelector<HTMLInputElement>('#trace-use-lines')?.addEventListener('change', e => {
-			this.settings.useLines = (e.target as HTMLInputElement).checked;
-			this.updatePrimitiveFilter();
-		});
-
-		c.querySelector<HTMLInputElement>('#trace-use-arcs')?.addEventListener('change', e => {
-			this.settings.useArcs = (e.target as HTMLInputElement).checked;
-			this.updatePrimitiveFilter();
-		});
-
-		c.querySelector<HTMLInputElement>('#trace-use-circles')?.addEventListener('change', e => {
-			this.settings.useCircles = (e.target as HTMLInputElement).checked;
-			this.updatePrimitiveFilter();
-		});
-
-		c.querySelector<HTMLInputElement>('#trace-c-tangent')?.addEventListener('change', e => {
-			this.settings.constraints.tangent = (e.target as HTMLInputElement).checked;
-		});
-		c.querySelector<HTMLInputElement>('#trace-c-hv')?.addEventListener('change', e => {
-			this.settings.constraints.horizontalVertical = (e.target as HTMLInputElement).checked;
-		});
-		c.querySelector<HTMLInputElement>('#trace-c-pp')?.addEventListener('change', e => {
-			this.settings.constraints.parallelPerpendicular = (e.target as HTMLInputElement).checked;
-		});
-		c.querySelector<HTMLInputElement>('#trace-c-equal')?.addEventListener('change', e => {
-			this.settings.constraints.equal = (e.target as HTMLInputElement).checked;
-		});
-		c.querySelector<HTMLInputElement>('#trace-c-concentric')?.addEventListener('change', e => {
-			this.settings.constraints.concentric = (e.target as HTMLInputElement).checked;
-		});
+		for (const [selector, key] of [
+			['#trace-c-tangent', 'tangent'],
+			['#trace-c-hv', 'horizontalVertical'],
+			['#trace-c-pp', 'parallelPerpendicular'],
+			['#trace-c-equal', 'equal'],
+			['#trace-c-concentric', 'concentric'],
+		] as const) {
+			c.querySelector<HTMLInputElement>(selector)?.addEventListener('change', e => {
+				this.settings.constraints[key] = (e.target as HTMLInputElement).checked;
+			});
+		}
 
 		this.bindLinkedSlider('#trace-angle-tol-range', '#trace-angle-tol', 0.5, 15, val => {
 			this.settings.angleTolerance = val;
