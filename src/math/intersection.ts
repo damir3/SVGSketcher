@@ -798,348 +798,7 @@ function replaceSplineWithInterval(
  * Executes a trim on the SketchDocument given a TrimCandidate.
  */
 export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): void {
-	const { curve, interval, isWholeEntity } = candidate;
-
-	if (isWholeEntity) {
-		sketch.removeEntity(curve.id);
-		return;
-	}
-
-	if (curve.type === 'segment') {
-		const line = sketch.lines.get(curve.id);
-		if (!line) return;
-		const [uA, uB] = interval;
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) {
-			sketch.removeEntity(line.id);
-			return;
-		}
-
-		if (isStart) {
-			// Trim off start: keep [uB, 1]
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			const newLine = sketch.addLine(pB.id, line.p2Id, line.isConstruction);
-
-			// Inherit constraints from old line
-			const oldConstraints = getLineConstraints(sketch, line);
-			for (const c of oldConstraints) {
-				sketch.removeConstraint(c.id);
-			}
-			transferLineConstraints(sketch, line, newLine, oldConstraints);
-			sketch.removeEntity(line.id);
-		} else if (isEnd) {
-			// Trim off end: keep [0, uA]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const newLine = sketch.addLine(line.p1Id, pA.id, line.isConstruction);
-
-			// Inherit constraints from old line
-			const oldConstraints = getLineConstraints(sketch, line);
-			for (const c of oldConstraints) {
-				sketch.removeConstraint(c.id);
-			}
-			transferLineConstraints(sketch, line, newLine, oldConstraints);
-			sketch.removeEntity(line.id);
-		} else {
-			// Trim middle: keep [0, uA] and [uB, 1]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-
-			const line1 = sketch.addLine(line.p1Id, pA.id, line.isConstruction);
-			const line2 = sketch.addLine(pB.id, line.p2Id, line.isConstruction);
-
-			// Rule 2: 2 new points must have point on line constraint
-			sketch.addPointOnLineConstraint(pA.id, line2.id);
-			sketch.addPointOnLineConstraint(pB.id, line1.id);
-
-			// Transfer orientation constraints to line1
-			const oldConstraints = getLineConstraints(sketch, line);
-			for (const c of oldConstraints) {
-				sketch.removeConstraint(c.id);
-			}
-			transferLineConstraints(sketch, line, line1, oldConstraints);
-			sketch.removeEntity(line.id);
-		}
-	} else if (curve.type === 'circle') {
-		const circle = sketch.circles.get(curve.id);
-		if (!circle) return;
-		const [thetaA, thetaB] = interval;
-
-		// Cut from thetaA to thetaB in clockwise direction.
-		// Remaining is arc from thetaB around clockwise to thetaA!
-		const pA = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaA),
-			candidate.startCuttingCurveId,
-			candidate.startCuttingCurveType
-		);
-		const pB = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaB),
-			candidate.endCuttingCurveId,
-			candidate.endCuttingCurveType
-		);
-
-		// Check if old circle had a RadiusConstraint
-		const radConstraint = sketch.getConstraintsForEntity('circle', circle.id).find(c => c.type === 'radius') as any;
-
-		// Add arc FIRST to keep centerId in use
-		const newArc = sketch.addArc(circle.centerId, pB.id, pA.id, circle.radius, true, circle.isConstruction);
-		sketch.removeEntity(circle.id);
-
-		if (radConstraint && radConstraint.targetRadius) {
-			sketch.addRadiusConstraint(newArc.id, radConstraint.targetRadius, radConstraint.displayMode);
-		}
-	} else if (curve.type === 'arc') {
-		const arc = sketch.arcs.get(curve.id);
-		if (!arc) return;
-		const [uA, uB] = interval;
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) {
-			sketch.removeEntity(arc.id);
-			return;
-		}
-
-		const radConstraint = sketch.getConstraintsForEntity('arc', arc.id).find(c => c.type === 'radius') as any;
-
-		if (isStart) {
-			// Trim off start: keep [uB, 1]
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			const newArc = sketch.addArc(arc.centerId, pB.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
-			sketch.removeEntity(arc.id);
-			if (radConstraint && radConstraint.targetRadius) {
-				sketch.addRadiusConstraint(newArc.id, radConstraint.targetRadius, radConstraint.displayMode);
-			}
-		} else if (isEnd) {
-			// Trim off end: keep [0, uA]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const newArc = sketch.addArc(
-				arc.centerId,
-				arc.startPointId,
-				pA.id,
-				arc.radius,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
-			if (radConstraint && radConstraint.targetRadius) {
-				sketch.addRadiusConstraint(newArc.id, radConstraint.targetRadius, radConstraint.displayMode);
-			}
-		} else {
-			// Trim middle: keep [0, uA] and [uB, 1]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			const arc1 = sketch.addArc(arc.centerId, arc.startPointId, pA.id, arc.radius, arc.clockwise, arc.isConstruction);
-			const arc2 = sketch.addArc(arc.centerId, pB.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
-			sketch.removeEntity(arc.id);
-			if (radConstraint && radConstraint.targetRadius) {
-				sketch.addRadiusConstraint(arc1.id, radConstraint.targetRadius, radConstraint.displayMode);
-				sketch.addRadiusConstraint(arc2.id, radConstraint.targetRadius, radConstraint.displayMode);
-			}
-		}
-	} else if (curve.type === 'ellipse') {
-		const ellipse = sketch.ellipses.get(curve.id);
-		if (!ellipse) return;
-		const [thetaA, thetaB] = interval;
-
-		// Cut from thetaA to thetaB. Remaining is elliptical arc from thetaB around clockwise to thetaA!
-		const pA = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaA),
-			candidate.startCuttingCurveId,
-			candidate.startCuttingCurveType
-		);
-		const pB = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaB),
-			candidate.endCuttingCurveId,
-			candidate.endCuttingCurveType
-		);
-
-		// Add elliptical arc FIRST to keep center and axis points in use
-		sketch.addEllipticalArc(
-			ellipse.centerId,
-			ellipse.majorAxisPointId,
-			ellipse.minorAxisPointId,
-			pB.id,
-			pA.id,
-			true,
-			ellipse.isConstruction
-		);
-		sketch.removeEntity(ellipse.id);
-	} else if (curve.type === 'elliptical_arc') {
-		const arc = sketch.ellipticalArcs.get(curve.id);
-		if (!arc) return;
-		const [uA, uB] = interval;
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) {
-			sketch.removeEntity(arc.id);
-			return;
-		}
-
-		if (isStart) {
-			// Trim off start: keep [uB, 1]
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				pB.id,
-				arc.endPointId,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
-		} else if (isEnd) {
-			// Trim off end: keep [0, uA]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				arc.startPointId,
-				pA.id,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
-		} else {
-			// Trim middle: keep [0, uA] and [uB, 1]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				arc.startPointId,
-				pA.id,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				pB.id,
-				arc.endPointId,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
-		}
-	} else if (curve.type === 'spline') {
-		const spline = sketch.splines.get(curve.id);
-		if (!spline) return;
-		const [uA, uB] = interval;
-		const cutPoint = (param: number, cuttingCurveId?: string, cuttingCurveType?: CurveType) =>
-			createCutPoint(
-				sketch,
-				getPointAtParam(curve, param),
-				cuttingCurveId && cuttingCurveId !== curve.id ? cuttingCurveId : undefined,
-				cuttingCurveId && cuttingCurveId !== curve.id ? cuttingCurveType : undefined
-			);
-
-		if (spline.isClosed && spline.splineType === 'fit') {
-			// Closed spline: cut out [uA, uB], remaining is an open spline from uB around to uA!
-			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
-			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, uB, uA, pB.id, pA.id);
-			sketch.removeEntity(spline.id);
-			return;
-		}
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) {
-			sketch.removeEntity(spline.id);
-			return;
-		}
-
-		if (isStart) {
-			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
-			sketch.removeEntity(spline.id);
-		} else if (isEnd) {
-			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
-			sketch.removeEntity(spline.id);
-		} else {
-			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
-			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
-			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
-			sketch.removeEntity(spline.id);
-		}
-	}
+	executeSplitOperation(sketch, candidate, 'trim');
 }
 
 /**
@@ -1148,194 +807,122 @@ export function executeTrim(sketch: SketchDocument, candidate: TrimCandidate): v
  * into segments at the cut points.
  */
 export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): void {
+	executeSplitOperation(sketch, candidate, 'break');
+}
+
+function executeSplitOperation(sketch: SketchDocument, candidate: TrimCandidate, mode: 'trim' | 'break'): void {
 	const { curve, interval, isWholeEntity } = candidate;
 
 	if (isWholeEntity) {
+		if (mode === 'trim') sketch.removeEntity(curve.id);
 		return;
 	}
+
+	const [uA, uB] = interval;
+	const cutPoint = (param: number, cuttingCurveId?: string, cuttingCurveType?: CurveType, ignoreSelf = false) => {
+		const validId = cuttingCurveId && (!ignoreSelf || cuttingCurveId !== curve.id);
+		return createCutPoint(
+			sketch,
+			getPointAtParam(curve, param),
+			validId ? cuttingCurveId : undefined,
+			validId ? cuttingCurveType : undefined
+		);
+	};
+
+	const buildOpenSpans = (startId: string, endId: string, ignoreSelfCut = false) => {
+		const isStart = uA <= POINT_TOLERANCE;
+		const isEnd = uB >= 1 - POINT_TOLERANCE;
+		if (isStart && isEnd) return null;
+
+		const pA = isStart
+			? null
+			: cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType, ignoreSelfCut);
+		const pB = isEnd ? null : cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType, ignoreSelfCut);
+
+		const spans: Array<[number, number, string, string]> = [];
+		if (pA) spans.push([0, uA, startId, pA.id]);
+		if (mode === 'break') {
+			const cutStart = pA ? uA : 0;
+			const cutEnd = pB ? uB : 1;
+			spans.push([cutStart, cutEnd, pA ? pA.id : startId, pB ? pB.id : endId]);
+		}
+		if (pB) spans.push([uB, 1, pB.id, endId]);
+		return { spans, pA, pB, isStart, isEnd };
+	};
+
+	const copyRadiusConstraints = (
+		entityType: 'circle' | 'arc',
+		entityId: string,
+		newArcs: Array<{ id: string }>,
+		removeAfter?: () => void
+	) => {
+		const radConstraint = sketch.getConstraintsForEntity(entityType, entityId).find(c => c.type === 'radius') as any;
+		removeAfter?.();
+		if (radConstraint && radConstraint.targetRadius) {
+			for (const newArc of newArcs) {
+				sketch.addRadiusConstraint(newArc.id, radConstraint.targetRadius, radConstraint.displayMode);
+			}
+		}
+	};
 
 	if (curve.type === 'segment') {
 		const line = sketch.lines.get(curve.id);
 		if (!line) return;
-		const [uA, uB] = interval;
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) {
+		const split = buildOpenSpans(line.p1Id, line.p2Id);
+		if (!split) {
+			if (mode === 'trim') sketch.removeEntity(line.id);
 			return;
 		}
 
-		if (isStart) {
-			// One cut at uB: split into [0, uB] and [uB, 1]
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			const line1 = sketch.addLine(line.p1Id, pB.id, line.isConstruction);
-			sketch.addLine(pB.id, line.p2Id, line.isConstruction);
-
-			const oldConstraints = getLineConstraints(sketch, line);
-			for (const c of oldConstraints) {
-				sketch.removeConstraint(c.id);
-			}
-			transferLineConstraints(sketch, line, line1, oldConstraints);
-			sketch.removeEntity(line.id);
-		} else if (isEnd) {
-			// One cut at uA: split into [0, uA] and [uA, 1]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const line1 = sketch.addLine(line.p1Id, pA.id, line.isConstruction);
-			sketch.addLine(pA.id, line.p2Id, line.isConstruction);
-
-			const oldConstraints = getLineConstraints(sketch, line);
-			for (const c of oldConstraints) {
-				sketch.removeConstraint(c.id);
-			}
-			transferLineConstraints(sketch, line, line1, oldConstraints);
-			sketch.removeEntity(line.id);
-		} else {
-			// Two cuts at uA and uB: split into [0, uA], [uA, uB], and [uB, 1]
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-
-			const line1 = sketch.addLine(line.p1Id, pA.id, line.isConstruction);
-			sketch.addLine(pA.id, pB.id, line.isConstruction);
-			sketch.addLine(pB.id, line.p2Id, line.isConstruction);
-
-			const oldConstraints = getLineConstraints(sketch, line);
-			for (const c of oldConstraints) {
-				sketch.removeConstraint(c.id);
-			}
-			transferLineConstraints(sketch, line, line1, oldConstraints);
-			sketch.removeEntity(line.id);
+		const newLines = split.spans.map(([, , p1, p2]) => sketch.addLine(p1, p2, line.isConstruction));
+		if (mode === 'trim' && !split.isStart && !split.isEnd && split.pA && split.pB && newLines.length === 2) {
+			sketch.addPointOnLineConstraint(split.pA.id, newLines[1].id);
+			sketch.addPointOnLineConstraint(split.pB.id, newLines[0].id);
 		}
+
+		const oldConstraints = getLineConstraints(sketch, line);
+		for (const c of oldConstraints) {
+			sketch.removeConstraint(c.id);
+		}
+		transferLineConstraints(sketch, line, newLines[0], oldConstraints);
+		sketch.removeEntity(line.id);
 	} else if (curve.type === 'circle') {
 		const circle = sketch.circles.get(curve.id);
 		if (!circle) return;
-		const [thetaA, thetaB] = interval;
+		const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+		const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 
-		const pA = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaA),
-			candidate.startCuttingCurveId,
-			candidate.startCuttingCurveType
+		copyRadiusConstraints(
+			'circle',
+			circle.id,
+			[
+				sketch.addArc(circle.centerId, pB.id, pA.id, circle.radius, true, circle.isConstruction),
+				...(mode === 'break'
+					? [sketch.addArc(circle.centerId, pA.id, pB.id, circle.radius, true, circle.isConstruction)]
+					: []),
+			],
+			() => sketch.removeEntity(circle.id)
 		);
-		const pB = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaB),
-			candidate.endCuttingCurveId,
-			candidate.endCuttingCurveType
-		);
-
-		const radConstraint = sketch.getConstraintsForEntity('circle', circle.id).find(c => c.type === 'radius') as any;
-
-		// Break into 2 arcs covering the full circle
-		const arc1 = sketch.addArc(circle.centerId, pB.id, pA.id, circle.radius, true, circle.isConstruction);
-		const arc2 = sketch.addArc(circle.centerId, pA.id, pB.id, circle.radius, true, circle.isConstruction);
-
-		sketch.removeEntity(circle.id);
-
-		if (radConstraint && radConstraint.targetRadius) {
-			sketch.addRadiusConstraint(arc1.id, radConstraint.targetRadius, radConstraint.displayMode);
-			sketch.addRadiusConstraint(arc2.id, radConstraint.targetRadius, radConstraint.displayMode);
-		}
 	} else if (curve.type === 'arc') {
 		const arc = sketch.arcs.get(curve.id);
 		if (!arc) return;
-		const [uA, uB] = interval;
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) return;
-
-		const radConstraint = sketch.getConstraintsForEntity('arc', arc.id).find(c => c.type === 'radius') as any;
-
-		if (isStart) {
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			const arc1 = sketch.addArc(arc.centerId, arc.startPointId, pB.id, arc.radius, arc.clockwise, arc.isConstruction);
-			const arc2 = sketch.addArc(arc.centerId, pB.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
-			sketch.removeEntity(arc.id);
-			if (radConstraint && radConstraint.targetRadius) {
-				sketch.addRadiusConstraint(arc1.id, radConstraint.targetRadius, radConstraint.displayMode);
-				sketch.addRadiusConstraint(arc2.id, radConstraint.targetRadius, radConstraint.displayMode);
-			}
-		} else if (isEnd) {
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const arc1 = sketch.addArc(arc.centerId, arc.startPointId, pA.id, arc.radius, arc.clockwise, arc.isConstruction);
-			const arc2 = sketch.addArc(arc.centerId, pA.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
-			sketch.removeEntity(arc.id);
-			if (radConstraint && radConstraint.targetRadius) {
-				sketch.addRadiusConstraint(arc1.id, radConstraint.targetRadius, radConstraint.displayMode);
-				sketch.addRadiusConstraint(arc2.id, radConstraint.targetRadius, radConstraint.displayMode);
-			}
-		} else {
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			const arc1 = sketch.addArc(arc.centerId, arc.startPointId, pA.id, arc.radius, arc.clockwise, arc.isConstruction);
-			const arc2 = sketch.addArc(arc.centerId, pA.id, pB.id, arc.radius, arc.clockwise, arc.isConstruction);
-			const arc3 = sketch.addArc(arc.centerId, pB.id, arc.endPointId, arc.radius, arc.clockwise, arc.isConstruction);
-			sketch.removeEntity(arc.id);
-			if (radConstraint && radConstraint.targetRadius) {
-				sketch.addRadiusConstraint(arc1.id, radConstraint.targetRadius, radConstraint.displayMode);
-				sketch.addRadiusConstraint(arc2.id, radConstraint.targetRadius, radConstraint.displayMode);
-				sketch.addRadiusConstraint(arc3.id, radConstraint.targetRadius, radConstraint.displayMode);
-			}
+		const split = buildOpenSpans(arc.startPointId, arc.endPointId);
+		if (!split) {
+			if (mode === 'trim') sketch.removeEntity(arc.id);
+			return;
 		}
+
+		copyRadiusConstraints(
+			'arc',
+			arc.id,
+			split.spans.map(([, , s, e]) => sketch.addArc(arc.centerId, s, e, arc.radius, arc.clockwise, arc.isConstruction)),
+			() => sketch.removeEntity(arc.id)
+		);
 	} else if (curve.type === 'ellipse') {
 		const ellipse = sketch.ellipses.get(curve.id);
 		if (!ellipse) return;
-		const [thetaA, thetaB] = interval;
-
-		const pA = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaA),
-			candidate.startCuttingCurveId,
-			candidate.startCuttingCurveType
-		);
-		const pB = createCutPoint(
-			sketch,
-			getPointAtParam(curve, thetaB),
-			candidate.endCuttingCurveId,
-			candidate.endCuttingCurveType
-		);
+		const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
+		const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
 
 		sketch.addEllipticalArc(
 			ellipse.centerId,
@@ -1346,164 +933,63 @@ export function executeBreak(sketch: SketchDocument, candidate: TrimCandidate): 
 			true,
 			ellipse.isConstruction
 		);
-		sketch.addEllipticalArc(
-			ellipse.centerId,
-			ellipse.majorAxisPointId,
-			ellipse.minorAxisPointId,
-			pA.id,
-			pB.id,
-			true,
-			ellipse.isConstruction
-		);
+		if (mode === 'break') {
+			sketch.addEllipticalArc(
+				ellipse.centerId,
+				ellipse.majorAxisPointId,
+				ellipse.minorAxisPointId,
+				pA.id,
+				pB.id,
+				true,
+				ellipse.isConstruction
+			);
+		}
 		sketch.removeEntity(ellipse.id);
 	} else if (curve.type === 'elliptical_arc') {
 		const arc = sketch.ellipticalArcs.get(curve.id);
 		if (!arc) return;
-		const [uA, uB] = interval;
-
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) return;
-
-		if (isStart) {
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				arc.startPointId,
-				pB.id,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				pB.id,
-				arc.endPointId,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
-		} else if (isEnd) {
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				arc.startPointId,
-				pA.id,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				pA.id,
-				arc.endPointId,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
-		} else {
-			const pA = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uA),
-				candidate.startCuttingCurveId,
-				candidate.startCuttingCurveType
-			);
-			const pB = createCutPoint(
-				sketch,
-				getPointAtParam(curve, uB),
-				candidate.endCuttingCurveId,
-				candidate.endCuttingCurveType
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				arc.startPointId,
-				pA.id,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				pA.id,
-				pB.id,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.addEllipticalArc(
-				arc.centerId,
-				arc.majorAxisPointId,
-				arc.minorAxisPointId,
-				pB.id,
-				arc.endPointId,
-				arc.clockwise,
-				arc.isConstruction
-			);
-			sketch.removeEntity(arc.id);
+		const split = buildOpenSpans(arc.startPointId, arc.endPointId);
+		if (!split) {
+			if (mode === 'trim') sketch.removeEntity(arc.id);
+			return;
 		}
+
+		for (const [, , s, e] of split.spans) {
+			sketch.addEllipticalArc(
+				arc.centerId,
+				arc.majorAxisPointId,
+				arc.minorAxisPointId,
+				s,
+				e,
+				arc.clockwise,
+				arc.isConstruction
+			);
+		}
+		sketch.removeEntity(arc.id);
 	} else if (curve.type === 'spline') {
 		const spline = sketch.splines.get(curve.id);
 		if (!spline) return;
-		const [uA, uB] = interval;
-		const cutPoint = (param: number, cuttingCurveId?: string, cuttingCurveType?: CurveType) =>
-			createCutPoint(
-				sketch,
-				getPointAtParam(curve, param),
-				cuttingCurveId && cuttingCurveId !== curve.id ? cuttingCurveId : undefined,
-				cuttingCurveId && cuttingCurveId !== curve.id ? cuttingCurveType : undefined
-			);
 
 		if (spline.isClosed && spline.splineType === 'fit') {
-			// Closed spline: break into 2 open splines covering the full loop: [uA, uB] and [uB, uA]
-			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
-			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, uA, uB, pA.id, pB.id);
+			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType, true);
+			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType, true);
+			if (mode === 'break') {
+				replaceSplineWithInterval(sketch, spline, curve, uA, uB, pA.id, pB.id);
+			}
 			replaceSplineWithInterval(sketch, spline, curve, uB, uA, pB.id, pA.id);
 			sketch.removeEntity(spline.id);
 			return;
 		}
 
-		const isStart = uA <= POINT_TOLERANCE;
-		const isEnd = uB >= 1 - POINT_TOLERANCE;
-
-		if (isStart && isEnd) return;
-
-		if (isStart) {
-			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, 0, uB, spline.pointIds[0], pB.id);
-			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
-			sketch.removeEntity(spline.id);
-		} else if (isEnd) {
-			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
-			replaceSplineWithInterval(sketch, spline, curve, uA, 1, pA.id, spline.pointIds[spline.pointIds.length - 1]);
-			sketch.removeEntity(spline.id);
-		} else {
-			const pA = cutPoint(uA, candidate.startCuttingCurveId, candidate.startCuttingCurveType);
-			const pB = cutPoint(uB, candidate.endCuttingCurveId, candidate.endCuttingCurveType);
-			replaceSplineWithInterval(sketch, spline, curve, 0, uA, spline.pointIds[0], pA.id);
-			replaceSplineWithInterval(sketch, spline, curve, uA, uB, pA.id, pB.id);
-			replaceSplineWithInterval(sketch, spline, curve, uB, 1, pB.id, spline.pointIds[spline.pointIds.length - 1]);
-			sketch.removeEntity(spline.id);
+		const split = buildOpenSpans(spline.pointIds[0], spline.pointIds[spline.pointIds.length - 1], true);
+		if (!split) {
+			if (mode === 'trim') sketch.removeEntity(spline.id);
+			return;
 		}
+
+		for (const [sU, eU, sId, eId] of split.spans) {
+			replaceSplineWithInterval(sketch, spline, curve, sU, eU, sId, eId);
+		}
+		sketch.removeEntity(spline.id);
 	}
 }

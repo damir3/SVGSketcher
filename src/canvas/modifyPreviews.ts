@@ -6,6 +6,7 @@ import { Vec2 } from '../math/vector';
 import type { SketchDocument } from '../model/sketch';
 import { createTransform, type TransformValues } from '../model/transform';
 import {
+	buildPointParamMap,
 	computePatternCopyAngle,
 	computeRectangularPatternDirections,
 	computeRectangularPatternOffset,
@@ -648,11 +649,7 @@ export function renderRectangularPatternPreview(
 	const centroidWorld = calculateObjectsCentroid(sketch, highlight.selectedObjectIds);
 	if (!centroidWorld) return;
 
-	const paramMap = new Map<string, number>();
-	for (const [pid, pt] of sketch.points.entries()) {
-		paramMap.set(`${pid}.x`, pt.x);
-		paramMap.set(`${pid}.y`, pt.y);
-	}
+	const paramMap = buildPointParamMap(sketch);
 	const line1 = highlight.line1Id ? sketch.lines.get(highlight.line1Id) : null;
 	const line2 = highlight.line2Id ? sketch.lines.get(highlight.line2Id) : null;
 	const { u1, u2 } = computeRectangularPatternDirections(

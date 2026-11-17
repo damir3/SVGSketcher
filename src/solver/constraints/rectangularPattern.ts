@@ -1,7 +1,13 @@
 import { calculateObjectsCentroid } from '../../canvas/tools/modify/utils';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, readParamPoint } from './base';
-import type { PatternCopyData, PatternPointPair, PatternRadiusPair } from './circularPattern';
+import { readParamPoint } from './base';
+import {
+	BasePatternConstraint,
+	collectPatternEntityIds,
+	type PatternCopyData,
+	type PatternPointPair,
+	type PatternRadiusPair,
+} from './circularPattern';
 import {
 	getPatternBaseColor,
 	isConstraintOnlySelected,
@@ -50,33 +56,35 @@ export function computeRectangularPatternOffset(
 	return Vec2.from(u1).multiplyScalar(o1).addScaledVector(u2, o2);
 }
 
+function lineUnitDirection(
+	paramMap: ReadonlyMap<string, number>,
+	line: { p1Id: string; p2Id: string } | null | undefined,
+	fallback: Vec2
+): Vec2 {
+	if (!line) return fallback;
+	const dir = new Vec2().subVectors(readParamPoint(paramMap, line.p2Id), readParamPoint(paramMap, line.p1Id));
+	const len = dir.length();
+	return len > 1e-6 ? dir.multiplyScalar(1 / len) : fallback;
+}
+
+export function buildPointParamMap(sketch: {
+	points: ReadonlyMap<string, { x: number; y: number }>;
+}): Map<string, number> {
+	const paramMap = new Map<string, number>();
+	for (const [pid, pt] of sketch.points.entries()) {
+		paramMap.set(`${pid}.x`, pt.x);
+		paramMap.set(`${pid}.y`, pt.y);
+	}
+	return paramMap;
+}
+
 export function computeRectangularPatternDirections(
 	paramMap: Map<string, number>,
 	line1?: { p1Id: string; p2Id: string } | null,
 	line2?: { p1Id: string; p2Id: string } | null
 ): { u1: Vec2; u2: Vec2 } {
-	let u1 = new Vec2(1, 0);
-	if (line1) {
-		const p1a = readParamPoint(paramMap, line1.p1Id);
-		const p1b = readParamPoint(paramMap, line1.p2Id);
-		const dir1 = new Vec2().subVectors(p1b, p1a);
-		const len1 = dir1.length();
-		if (len1 > 1e-6) {
-			u1 = dir1.clone().multiplyScalar(1.0 / len1);
-		}
-	}
-
-	let u2 = u1.clone().perpendicular();
-	if (line2) {
-		const p2a = readParamPoint(paramMap, line2.p1Id);
-		const p2b = readParamPoint(paramMap, line2.p2Id);
-		const dir2 = new Vec2().subVectors(p2b, p2a);
-		const len2 = dir2.length();
-		if (len2 > 1e-6) {
-			u2 = dir2.clone().multiplyScalar(1.0 / len2);
-		}
-	}
-
+	const u1 = lineUnitDirection(paramMap, line1, new Vec2(1, 0));
+	const u2 = lineUnitDirection(paramMap, line2, u1.clone().perpendicular());
 	return { u1, u2 };
 }
 
@@ -84,7 +92,7 @@ export function computeRectangularPatternDirections(
  * Constrains patterned entities in a 2D linear array along 1 or 2 direction axes.
  * Holds all pattern copies and point correspondences in a single constraint.
  */
-export class RectangularPatternConstraint extends BaseConstraint {
+export class RectangularPatternConstraint extends BasePatternConstraint<RectangularPatternCopyData> {
 	readonly sourceObjectIds: string[];
 	line1Id: string | null;
 	line1P1Id?: string | null;
@@ -98,9 +106,6 @@ export class RectangularPatternConstraint extends BaseConstraint {
 	quantity2: number;
 	distance2: number;
 	direction2: 'one_direction' | 'symmetric';
-	suppression: boolean;
-	suppressedIndices: number[];
-	copies: RectangularPatternCopyData[];
 	distance1Expression?: string;
 	distance2Expression?: string;
 
@@ -126,26 +131,13 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		distance1Expression?: string,
 		distance2Expression?: string
 	) {
-		const entityIdSet = new Set<string>();
-		if (line1P1Id) entityIdSet.add(line1P1Id);
-		if (line1P2Id) entityIdSet.add(line1P2Id);
-		if (line2P1Id) entityIdSet.add(line2P1Id);
-		if (line2P2Id) entityIdSet.add(line2P2Id);
-
-		for (const copy of copies) {
-			for (const pair of copy.pointPairs) {
-				entityIdSet.add(pair.sourcePtId);
-				entityIdSet.add(pair.patternPtId);
-			}
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					entityIdSet.add(pair.sourceCircleId);
-					entityIdSet.add(pair.patternCircleId);
-				}
-			}
-		}
-
-		super(id, 'rectangular_pattern', 'Rectangular Pattern', Array.from(entityIdSet), weight);
+		super(
+			id,
+			'rectangular_pattern',
+			'Rectangular Pattern',
+			collectPatternEntityIds(copies, [line1P1Id, line1P2Id, line2P1Id, line2P2Id]),
+			weight
+		);
 
 		this.sourceObjectIds = [...sourceObjectIds];
 		this.line1Id = line1Id;
@@ -167,32 +159,8 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		this.distance2Expression = distance2Expression;
 	}
 
-	toggleSuppressedCopy(sketch: any, copyIndex: number): boolean {
-		if (!this.suppression) return false;
-		sketch.selectEntity(this.id, 'constraint', false);
-		const currentSuppressed = new Set(this.suppressedIndices);
-		if (currentSuppressed.has(copyIndex)) {
-			currentSuppressed.delete(copyIndex);
-		} else {
-			currentSuppressed.add(copyIndex);
-		}
-		sketch.updateRectangularPattern(this.id, {
-			suppressedIndices: Array.from(currentSuppressed),
-		});
-		return true;
-	}
-
-	override getEquationsCount(): number {
-		let count = 0;
-		const suppressedSet = new Set(this.suppressedIndices);
-		for (const copy of this.copies) {
-			if (this.suppression && suppressedSet.has(copy.copyIndex)) continue;
-			count += copy.pointPairs.length * 2;
-			if (copy.radiusPairs) {
-				count += copy.radiusPairs.length;
-			}
-		}
-		return count;
+	protected override applySuppressedIndices(sketch: any, suppressedIndices: number[]): void {
+		sketch.updateRectangularPattern(this.id, { suppressedIndices });
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
@@ -227,13 +195,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				errors.push((p.y - target.y) * this.weight);
 			}
 
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					const rSource = paramMap.get(`${pair.sourceCircleId}.r`) ?? 0;
-					const rPattern = paramMap.get(`${pair.patternCircleId}.r`) ?? 0;
-					errors.push((rPattern - rSource) * this.weight);
-				}
-			}
+			this.evaluateRadiusPairs(copy, paramMap, errors);
 		}
 
 		return errors;
@@ -251,46 +213,24 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		const line2 = this.line2P1Id && this.line2P2Id ? { p1Id: this.line2P1Id, p2Id: this.line2P2Id } : null;
 		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
 
-		let du1_dx1b = 0,
-			du1_dy1b = 0,
-			du1_dx1b_y = 0,
-			du1_dy1b_y = 0;
-		let hasL1 = false;
-		if (line1) {
-			const p1a = readParamPoint(paramMap, line1.p1Id);
-			const p1b = readParamPoint(paramMap, line1.p2Id);
-			const dir1 = new Vec2().subVectors(p1b, p1a);
-			const L1 = dir1.length();
-			if (L1 > 1e-6) {
-				hasL1 = true;
-				const invL = 1 / L1;
-				du1_dx1b = (1 - u1.x * u1.x) * invL;
-				du1_dy1b = -u1.x * u1.y * invL;
-				du1_dx1b_y = -u1.x * u1.y * invL;
-				du1_dy1b_y = (1 - u1.y * u1.y) * invL;
-			}
-		}
+		const computeLineDeriv = (line: { p1Id: string; p2Id: string } | null, u: Vec2) => {
+			if (!line) return null;
+			const L = new Vec2()
+				.subVectors(readParamPoint(paramMap, line.p2Id), readParamPoint(paramMap, line.p1Id))
+				.length();
+			if (L <= 1e-6) return null;
+			const invL = 1 / L;
+			return { xx: (1 - u.x * u.x) * invL, xy: -u.x * u.y * invL, yy: (1 - u.y * u.y) * invL };
+		};
+		const pushLineDeriv = (line: { p1Id: string; p2Id: string }, row: number, d: Vec2) => {
+			this.addJacobianEntry(entries, paramIndices, `${line.p2Id}.x`, row, -d.x * this.weight);
+			this.addJacobianEntry(entries, paramIndices, `${line.p2Id}.y`, row, -d.y * this.weight);
+			this.addJacobianEntry(entries, paramIndices, `${line.p1Id}.x`, row, d.x * this.weight);
+			this.addJacobianEntry(entries, paramIndices, `${line.p1Id}.y`, row, d.y * this.weight);
+		};
 
-		let du2_dx2b = 0,
-			du2_dy2b = 0,
-			du2_dx2b_y = 0,
-			du2_dy2b_y = 0;
-		let hasL2 = false;
-		if (line2) {
-			const p2a = readParamPoint(paramMap, line2.p1Id);
-			const p2b = readParamPoint(paramMap, line2.p2Id);
-			const dir2 = new Vec2().subVectors(p2b, p2a);
-			const L2 = dir2.length();
-			if (L2 > 1e-6) {
-				hasL2 = true;
-				const invL = 1 / L2;
-				du2_dx2b = (1 - u2.x * u2.x) * invL;
-				du2_dy2b = -u2.x * u2.y * invL;
-				du2_dx2b_y = -u2.x * u2.y * invL;
-				du2_dy2b_y = (1 - u2.y * u2.y) * invL;
-			}
-		}
-
+		const d1 = computeLineDeriv(line1, u1);
+		const d2 = computeLineDeriv(line2, u2);
 		let eqIdx = 0;
 
 		for (const copy of this.copies) {
@@ -314,51 +254,26 @@ export class RectangularPatternConstraint extends BaseConstraint {
 				if (colPy !== undefined) entries.push({ row: rowY, col: colPy, val: this.weight });
 				if (colSy !== undefined) entries.push({ row: rowY, col: colSy, val: -this.weight });
 
-				if (hasL1 && line1) {
-					const dDeltaX_d1b = new Vec2(
-						o1 * du1_dx1b + (!hasL2 ? o2 * -du1_dx1b_y : 0),
-						o1 * du1_dy1b + (!hasL2 ? o2 * -du1_dy1b_y : 0)
+				if (d1 && line1) {
+					pushLineDeriv(
+						line1,
+						rowX,
+						new Vec2(o1 * d1.xx + (!d2 ? o2 * -d1.xy : 0), o1 * d1.xy + (!d2 ? o2 * -d1.yy : 0))
 					);
-					const dDeltaY_d1b = new Vec2(
-						o1 * du1_dx1b_y + (!hasL2 ? o2 * du1_dx1b : 0),
-						o1 * du1_dy1b_y + (!hasL2 ? o2 * du1_dy1b : 0)
+					pushLineDeriv(
+						line1,
+						rowY,
+						new Vec2(o1 * d1.xy + (!d2 ? o2 * d1.xx : 0), o1 * d1.yy + (!d2 ? o2 * d1.xy : 0))
 					);
-
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.x`, rowX, -dDeltaX_d1b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.y`, rowX, -dDeltaX_d1b.y * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.x`, rowX, dDeltaX_d1b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.y`, rowX, dDeltaX_d1b.y * this.weight);
-
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.x`, rowY, -dDeltaY_d1b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p2Id}.y`, rowY, -dDeltaY_d1b.y * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.x`, rowY, dDeltaY_d1b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line1.p1Id}.y`, rowY, dDeltaY_d1b.y * this.weight);
 				}
 
-				if (hasL2 && line2) {
-					const dDeltaX_d2b = new Vec2(o2 * du2_dx2b, o2 * du2_dy2b);
-					const dDeltaY_d2b = new Vec2(o2 * du2_dx2b_y, o2 * du2_dy2b_y);
-
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowX, -dDeltaX_d2b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowX, -dDeltaX_d2b.y * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.x`, rowX, dDeltaX_d2b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.y`, rowX, dDeltaX_d2b.y * this.weight);
-
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.x`, rowY, -dDeltaY_d2b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p2Id}.y`, rowY, -dDeltaY_d2b.y * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.x`, rowY, dDeltaY_d2b.x * this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${line2.p1Id}.y`, rowY, dDeltaY_d2b.y * this.weight);
+				if (d2 && line2) {
+					pushLineDeriv(line2, rowX, new Vec2(o2 * d2.xx, o2 * d2.xy));
+					pushLineDeriv(line2, rowY, new Vec2(o2 * d2.xy, o2 * d2.yy));
 				}
 			}
 
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					const row = baseRow + eqIdx;
-					eqIdx += 1;
-					this.addJacobianEntry(entries, paramIndices, `${pair.patternCircleId}.r`, row, this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${pair.sourceCircleId}.r`, row, -this.weight);
-				}
-			}
+			eqIdx = this.addRadiusPairJacobian(copy, entries, paramIndices, baseRow, eqIdx);
 		}
 
 		return entries;
@@ -369,11 +284,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		if (!centroidWorld) return;
 		const sCtr = ctx.viewport.worldToScreen(centroidWorld);
 
-		const paramMap = new Map<string, number>();
-		for (const [pid, pt] of ctx.sketch.points.entries()) {
-			paramMap.set(`${pid}.x`, pt.x);
-			paramMap.set(`${pid}.y`, pt.y);
-		}
+		const paramMap = buildPointParamMap(ctx.sketch);
 		const line1 = this.line1P1Id && this.line1P2Id ? { p1Id: this.line1P1Id, p2Id: this.line1P2Id } : null;
 		const line2 = this.line2P1Id && this.line2P2Id ? { p1Id: this.line2P1Id, p2Id: this.line2P2Id } : null;
 		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
@@ -431,9 +342,13 @@ export class RectangularPatternConstraint extends BaseConstraint {
 			constraint: this,
 			title: 'Rectangular Pattern',
 			iconName: 'rectangular_pattern',
-			sections: [
-				{
-					title: 'AXIS 1',
+			sections: ([1, 2] as const).map(axis => {
+				const dirKey = axis === 1 ? 'direction1' : 'direction2';
+				const distKey = axis === 1 ? 'distance1' : 'distance2';
+				const exprKey = axis === 1 ? 'distance1Expression' : 'distance2Expression';
+				const qtyKey = axis === 1 ? 'quantity1' : 'quantity2';
+				return {
+					title: `AXIS ${axis}`,
 					segmentedControls: [
 						{
 							label: 'Direction',
@@ -441,10 +356,10 @@ export class RectangularPatternConstraint extends BaseConstraint {
 								{ id: 'one_direction', label: 'One Direction' },
 								{ id: 'symmetric', label: 'Symmetric' },
 							],
-							getCurrent: () => this.direction1,
-							onSelect: (dir, context) => {
+							getCurrent: () => this[dirKey],
+							onSelect: (dir: string, context: any) => {
 								context.sketch.updateRectangularPattern(this.id, {
-									direction1: dir as 'one_direction' | 'symmetric',
+									[dirKey]: dir as 'one_direction' | 'symmetric',
 								});
 								context.requestRender?.();
 							},
@@ -452,103 +367,43 @@ export class RectangularPatternConstraint extends BaseConstraint {
 					],
 					fields: [
 						{
-							id: `insp-rpat-dist1-${this.id}`,
+							id: `insp-rpat-dist${axis}-${this.id}`,
 							label: 'Distance',
 							unit: 'mm',
 							type: 'text',
 							step: 0.5,
-							getValue: () => this.distance1Expression ?? Number(this.distance1.toFixed(2)),
-							onChange: (val, context) => {
+							getValue: () => this[exprKey] ?? Number(this[distKey].toFixed(2)),
+							onChange: (val: string | number, context: any) => {
 								const text = String(val).trim();
-								const parsed = parseNumericOrExpression(text, this.distance1, context.sketch.getParameterValuesMap());
+								const parsed = parseNumericOrExpression(text, this[distKey], context.sketch.getParameterValuesMap());
 								const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
 								if (!isNaN(parsed) && isFinite(parsed)) {
 									context.sketch.updateRectangularPattern(this.id, {
-										distance1: parsed,
-										distance1Expression: expr,
+										[distKey]: parsed,
+										[exprKey]: expr,
 									});
 									context.requestRender?.();
 								}
 							},
 						},
 						{
-							id: `insp-rpat-qty1-${this.id}`,
+							id: `insp-rpat-qty${axis}-${this.id}`,
 							label: 'Quantity',
 							type: 'number',
 							min: 1,
 							max: 100,
 							step: 1,
-							getValue: () => this.quantity1,
-							onInput: (val, context) => {
+							getValue: () => this[qtyKey],
+							onInput: (val: number, context: any) => {
 								if (!isNaN(val) && val >= 1) {
-									context.sketch.updateRectangularPattern(this.id, {
-										quantity1: val,
-									});
+									context.sketch.updateRectangularPattern(this.id, { [qtyKey]: val });
 									context.requestRender?.();
 								}
 							},
 						},
 					],
-				},
-				{
-					title: 'AXIS 2',
-					segmentedControls: [
-						{
-							label: 'Direction',
-							options: [
-								{ id: 'one_direction', label: 'One Direction' },
-								{ id: 'symmetric', label: 'Symmetric' },
-							],
-							getCurrent: () => this.direction2,
-							onSelect: (dir, context) => {
-								context.sketch.updateRectangularPattern(this.id, {
-									direction2: dir as 'one_direction' | 'symmetric',
-								});
-								context.requestRender?.();
-							},
-						},
-					],
-					fields: [
-						{
-							id: `insp-rpat-dist2-${this.id}`,
-							label: 'Distance',
-							unit: 'mm',
-							type: 'text',
-							step: 0.5,
-							getValue: () => this.distance2Expression ?? Number(this.distance2.toFixed(2)),
-							onChange: (val, context) => {
-								const text = String(val).trim();
-								const parsed = parseNumericOrExpression(text, this.distance2, context.sketch.getParameterValuesMap());
-								const expr = getExpressionIfValid(text, context.sketch.getParameterValuesMap());
-								if (!isNaN(parsed) && isFinite(parsed)) {
-									context.sketch.updateRectangularPattern(this.id, {
-										distance2: parsed,
-										distance2Expression: expr,
-									});
-									context.requestRender?.();
-								}
-							},
-						},
-						{
-							id: `insp-rpat-qty2-${this.id}`,
-							label: 'Quantity',
-							type: 'number',
-							min: 1,
-							max: 100,
-							step: 1,
-							getValue: () => this.quantity2,
-							onInput: (val, context) => {
-								if (!isNaN(val) && val >= 1) {
-									context.sketch.updateRectangularPattern(this.id, {
-										quantity2: val,
-									});
-									context.requestRender?.();
-								}
-							},
-						},
-					],
-				},
-			],
+				};
+			}),
 			checkboxes: [
 				{
 					id: `insp-rpat-suppression-${this.id}`,
@@ -593,11 +448,7 @@ export class RectangularPatternConstraint extends BaseConstraint {
 		startDistance: number;
 		constraintId: string;
 	} | null {
-		const paramMap = new Map<string, number>();
-		for (const [pid, pt] of sketch.points.entries()) {
-			paramMap.set(`${pid}.x`, pt.x);
-			paramMap.set(`${pid}.y`, pt.y);
-		}
+		const paramMap = buildPointParamMap(sketch);
 		const line1 = this.line1Id ? sketch.lines.get(this.line1Id) : null;
 		const line2 = this.line2Id ? sketch.lines.get(this.line2Id) : null;
 		const dirs = computeRectangularPatternDirections(

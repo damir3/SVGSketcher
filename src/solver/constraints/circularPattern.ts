@@ -54,19 +54,100 @@ export function computePatternCopyAngle(
 	return 0;
 }
 
+export function collectPatternEntityIds(
+	copies: PatternCopyData[],
+	extraIds: Array<string | null | undefined> = []
+): string[] {
+	const entityIdSet = new Set<string>();
+	for (const id of extraIds) {
+		if (id) entityIdSet.add(id);
+	}
+	for (const copy of copies) {
+		for (const pair of copy.pointPairs) {
+			entityIdSet.add(pair.sourcePtId);
+			entityIdSet.add(pair.patternPtId);
+		}
+		if (copy.radiusPairs) {
+			for (const pair of copy.radiusPairs) {
+				entityIdSet.add(pair.sourceCircleId);
+				entityIdSet.add(pair.patternCircleId);
+			}
+		}
+	}
+	return Array.from(entityIdSet);
+}
+
+/** Shared base behavior for circular and rectangular pattern constraints. */
+export abstract class BasePatternConstraint<TCopy extends PatternCopyData = PatternCopyData> extends BaseConstraint {
+	suppression = false;
+	suppressedIndices: number[] = [];
+	copies: TCopy[] = [];
+
+	protected abstract applySuppressedIndices(sketch: any, suppressedIndices: number[]): void;
+
+	toggleSuppressedCopy(sketch: any, copyIndex: number): boolean {
+		if (!this.suppression) return false;
+		sketch.selectEntity(this.id, 'constraint', false);
+		const currentSuppressed = new Set(this.suppressedIndices);
+		if (currentSuppressed.has(copyIndex)) {
+			currentSuppressed.delete(copyIndex);
+		} else {
+			currentSuppressed.add(copyIndex);
+		}
+		this.applySuppressedIndices(sketch, Array.from(currentSuppressed));
+		return true;
+	}
+
+	override getEquationsCount(): number {
+		let count = 0;
+		const suppressedSet = new Set(this.suppressedIndices);
+		for (const copy of this.copies) {
+			if (this.suppression && suppressedSet.has(copy.copyIndex)) continue;
+			count += copy.pointPairs.length * 2;
+			if (copy.radiusPairs) {
+				count += copy.radiusPairs.length;
+			}
+		}
+		return count;
+	}
+
+	protected evaluateRadiusPairs(copy: TCopy, paramMap: Map<string, number>, errors: number[]): void {
+		if (!copy.radiusPairs) return;
+		for (const pair of copy.radiusPairs) {
+			const rSource = paramMap.get(`${pair.sourceCircleId}.r`) ?? 0;
+			const rPattern = paramMap.get(`${pair.patternCircleId}.r`) ?? 0;
+			errors.push((rPattern - rSource) * this.weight);
+		}
+	}
+
+	protected addRadiusPairJacobian(
+		copy: TCopy,
+		entries: JacobianEntry[],
+		paramIndices: Map<string, number>,
+		baseRow: number,
+		eqIdx: number
+	): number {
+		if (!copy.radiusPairs) return eqIdx;
+		for (const pair of copy.radiusPairs) {
+			const row = baseRow + eqIdx;
+			eqIdx += 1;
+			this.addJacobianEntry(entries, paramIndices, `${pair.patternCircleId}.r`, row, this.weight);
+			this.addJacobianEntry(entries, paramIndices, `${pair.sourceCircleId}.r`, row, -this.weight);
+		}
+		return eqIdx;
+	}
+}
+
 /**
  * Constrains patterned entities around a rotation center point.
  * Holds all pattern copies and point correspondences in a single constraint.
  */
-export class CircularPatternConstraint extends BaseConstraint {
+export class CircularPatternConstraint extends BasePatternConstraint<PatternCopyData> {
 	readonly centerPtId: string;
 	readonly sourceObjectIds: string[];
 	distribution: 'full' | 'partial' | 'symmetric';
 	totalAngle: number;
 	quantity: number;
-	suppression: boolean;
-	suppressedIndices: number[];
-	copies: PatternCopyData[];
 	isReadOnly?: boolean;
 	totalAngleExpression?: string;
 
@@ -84,21 +165,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 		isReadOnly = false,
 		totalAngleExpression?: string
 	) {
-		const entityIdSet = new Set<string>();
-		entityIdSet.add(centerPtId);
-		for (const copy of copies) {
-			for (const pair of copy.pointPairs) {
-				entityIdSet.add(pair.sourcePtId);
-				entityIdSet.add(pair.patternPtId);
-			}
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					entityIdSet.add(pair.sourceCircleId);
-					entityIdSet.add(pair.patternCircleId);
-				}
-			}
-		}
-		super(id, 'circular_pattern', 'Circular Pattern', Array.from(entityIdSet), weight);
+		super(id, 'circular_pattern', 'Circular Pattern', collectPatternEntityIds(copies, [centerPtId]), weight);
 
 		this.centerPtId = centerPtId;
 		this.sourceObjectIds = [...sourceObjectIds];
@@ -112,32 +179,8 @@ export class CircularPatternConstraint extends BaseConstraint {
 		this.totalAngleExpression = totalAngleExpression;
 	}
 
-	toggleSuppressedCopy(sketch: any, copyIndex: number): boolean {
-		if (!this.suppression) return false;
-		sketch.selectEntity(this.id, 'constraint', false);
-		const currentSuppressed = new Set(this.suppressedIndices);
-		if (currentSuppressed.has(copyIndex)) {
-			currentSuppressed.delete(copyIndex);
-		} else {
-			currentSuppressed.add(copyIndex);
-		}
-		sketch.updateCircularPattern(this.id, {
-			suppressedIndices: Array.from(currentSuppressed),
-		});
-		return true;
-	}
-
-	override getEquationsCount(): number {
-		let count = 0;
-		const suppressedSet = new Set(this.suppressedIndices);
-		for (const copy of this.copies) {
-			if (this.suppression && suppressedSet.has(copy.copyIndex)) continue;
-			count += copy.pointPairs.length * 2;
-			if (copy.radiusPairs) {
-				count += copy.radiusPairs.length;
-			}
-		}
-		return count;
+	protected override applySuppressedIndices(sketch: any, suppressedIndices: number[]): void {
+		sketch.updateCircularPattern(this.id, { suppressedIndices });
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
@@ -161,13 +204,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 				errors.push((p.y - target.y) * this.weight);
 			}
 
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					const rSource = paramMap.get(`${pair.sourceCircleId}.r`) ?? 0;
-					const rPattern = paramMap.get(`${pair.patternCircleId}.r`) ?? 0;
-					errors.push((rPattern - rSource) * this.weight);
-				}
-			}
+			this.evaluateRadiusPairs(copy, paramMap, errors);
 		}
 
 		return errors;
@@ -218,14 +255,7 @@ export class CircularPatternConstraint extends BaseConstraint {
 				if (colCy !== undefined) entries.push({ row: rowY, col: colCy, val: -(1 - cosA) * this.weight });
 			}
 
-			if (copy.radiusPairs) {
-				for (const pair of copy.radiusPairs) {
-					const row = baseRow + eqIdx;
-					eqIdx += 1;
-					this.addJacobianEntry(entries, paramIndices, `${pair.patternCircleId}.r`, row, this.weight);
-					this.addJacobianEntry(entries, paramIndices, `${pair.sourceCircleId}.r`, row, -this.weight);
-				}
-			}
+			eqIdx = this.addRadiusPairJacobian(copy, entries, paramIndices, baseRow, eqIdx);
 		}
 
 		return entries;
