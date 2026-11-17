@@ -441,49 +441,18 @@ export function getConstraintsForEntity(
 				}
 			}
 		}
-	} else if (type === 'circle') {
-		const circ = sketch.circles.get(id);
-		if (!circ) return [];
+	} else if (type === 'circle' || type === 'arc') {
+		const radial = type === 'circle' ? sketch.circles.get(id) : sketch.arcs.get(id);
+		if (!radial) return [];
 		for (const c of sketch.constraints.values()) {
 			const anyC = c as any;
-			if (c.type === 'radius') {
+			if (c.type === 'radius' || c.type === 'tangent_line_circle' || c.type === 'point_on_circle') {
 				if (anyC.circleId === id) res.push(c);
-			} else if (c.type === 'equal_radius') {
+			} else if (c.type === 'equal_radius' || c.type === 'tangent_circle_circle') {
 				if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
 			} else if (c.type === 'concentric') {
-				if (anyC.c1CenterId === circ.centerId || anyC.c2CenterId === circ.centerId) {
-					res.push(c);
-				}
-			} else if (c.type === 'tangent_line_circle') {
-				if (anyC.circleId === id) res.push(c);
-			} else if (c.type === 'tangent_circle_circle') {
-				if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-			} else if (c.type === 'point_on_circle') {
-				if (anyC.circleId === id) res.push(c);
-			} else if (c.entityIds.includes(id)) {
-				res.push(c);
-			}
-		}
-	} else if (type === 'arc') {
-		const arc = sketch.arcs.get(id);
-		if (!arc) return [];
-		for (const c of sketch.constraints.values()) {
-			const anyC = c as any;
-			if (c.type === 'radius') {
-				if (anyC.circleId === id) res.push(c);
-			} else if (c.type === 'equal_radius') {
-				if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-			} else if (c.type === 'concentric') {
-				if (anyC.c1CenterId === arc.centerId || anyC.c2CenterId === arc.centerId) {
-					res.push(c);
-				}
-			} else if (c.type === 'tangent_line_circle') {
-				if (anyC.circleId === id) res.push(c);
-			} else if (c.type === 'tangent_circle_circle') {
-				if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-			} else if (c.type === 'point_on_circle') {
-				if (anyC.circleId === id) res.push(c);
-			} else if (c.type === 'angle') {
+				if (anyC.c1CenterId === radial.centerId || anyC.c2CenterId === radial.centerId) res.push(c);
+			} else if (type === 'arc' && c.type === 'angle') {
 				if (anyC.line1Id === id || anyC.line2Id === id) res.push(c);
 			} else if (c.entityIds.includes(id)) {
 				res.push(c);
@@ -556,6 +525,16 @@ export function getEntitiesForConstraint(
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}> = [];
 	const seen = new Set<string>();
+	const collections = [
+		['line', sketch.lines],
+		['circle', sketch.circles],
+		['arc', sketch.arcs],
+		['ellipse', sketch.ellipses],
+		['elliptical_arc', sketch.ellipticalArcs],
+		['spline', sketch.splines],
+		['point', sketch.points],
+	] as const;
+	const collectionByType = new Map<string, Map<string, unknown>>(collections);
 
 	const add = (id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline') => {
 		if (type === 'line') {
@@ -572,6 +551,45 @@ export function getEntitiesForConstraint(
 		}
 	};
 
+	const addAny = (id: string) => {
+		for (const [primType, map] of collections) {
+			if (map.has(id)) {
+				add(id, primType);
+				return;
+			}
+		}
+	};
+
+	const addRadial = (id: string) => {
+		if (sketch.circles.has(id)) add(id, 'circle');
+		else if (sketch.arcs.has(id)) add(id, 'arc');
+	};
+
+	const addConcentricEnd = (centerId: string) => {
+		const entity =
+			[...sketch.circles.values()].find(circ => circ.centerId === centerId) ??
+			[...sketch.arcs.values()].find(arc => arc.centerId === centerId);
+		if (entity) {
+			add(entity.id, sketch.circles.has(entity.id) ? 'circle' : 'arc');
+		} else if (centerId && sketch.points.has(centerId)) {
+			add(centerId, 'point');
+		}
+	};
+
+	const addPatternEntities = (
+		pattern: CircularPatternConstraint | RectangularPatternConstraint,
+		links: PatternLinks
+	): boolean => {
+		for (const id of pattern.sourceObjectIds ?? []) addAny(id);
+		if (links === 'sources') return true;
+		for (const copy of pattern.copies ?? []) {
+			for (const item of copy.createdEntityIds) {
+				if (collectionByType.get(item.type)?.has(item.id)) add(item.id, item.type);
+			}
+		}
+		return false;
+	};
+
 	const anyC = c as any;
 
 	if (c.type === 'fixed') {
@@ -582,10 +600,7 @@ export function getEntitiesForConstraint(
 		if (anyC.p1Id && sketch.points.get(anyC.p1Id)) add(anyC.p1Id, 'point');
 		if (anyC.p2Id && sketch.points.get(anyC.p2Id)) add(anyC.p2Id, 'point');
 	} else if (c.type === 'distance' && anyC.circleIds) {
-		for (const id of anyC.circleIds) {
-			if (sketch.circles.has(id)) add(id, 'circle');
-			else if (sketch.arcs.has(id)) add(id, 'arc');
-		}
+		for (const id of anyC.circleIds) addRadial(id);
 	} else if (c.type === 'distance' && anyC.p1Id === 'origin' && anyC.orientation !== 'aligned') {
 		add(anyC.p2Id, 'point');
 		add(anyC.orientation === 'vertical' ? 'axis_x' : 'axis_y', 'line');
@@ -607,16 +622,10 @@ export function getEntitiesForConstraint(
 			if (line) add(line.id, 'line');
 		}
 	} else if (c.type === 'radius') {
-		const cid = anyC.circleId;
-		if (sketch.circles.has(cid)) add(cid, 'circle');
-		else if (sketch.arcs.has(cid)) add(cid, 'arc');
-	} else if (c.type === 'equal_radius') {
-		const c1 = anyC.circle1Id;
-		const c2 = anyC.circle2Id;
-		if (sketch.circles.has(c1)) add(c1, 'circle');
-		else if (sketch.arcs.has(c1)) add(c1, 'arc');
-		if (sketch.circles.has(c2)) add(c2, 'circle');
-		else if (sketch.arcs.has(c2)) add(c2, 'arc');
+		addRadial(anyC.circleId);
+	} else if (c.type === 'equal_radius' || c.type === 'tangent_circle_circle') {
+		addRadial(anyC.circle1Id);
+		addRadial(anyC.circle2Id);
 	} else if (c.type === 'equal_length') {
 		const l1 = sketch.getLineBetween(anyC.line1P1, anyC.line1P2);
 		const l2 = sketch.getLineBetween(anyC.line2P1, anyC.line2P2);
@@ -652,80 +661,31 @@ export function getEntitiesForConstraint(
 		const cpat = c as CircularPatternConstraint;
 		const links = cpat.isReadOnly ? 'all' : patternLinks;
 		if (links !== 'sources' && sketch.points.get(cpat.centerPtId)) add(cpat.centerPtId, 'point');
-		if (cpat.sourceObjectIds) {
-			for (const id of cpat.sourceObjectIds) {
-				if (sketch.lines.has(id)) add(id, 'line');
-				else if (sketch.circles.has(id)) add(id, 'circle');
-				else if (sketch.arcs.has(id)) add(id, 'arc');
-				else if (sketch.ellipses.has(id)) add(id, 'ellipse');
-				else if (sketch.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
-				else if (sketch.splines.has(id)) add(id, 'spline');
-				else if (sketch.points.has(id)) add(id, 'point');
-			}
-		}
 		// The fallback below would add copies back to the inspector list.
-		if (links !== 'all') return res;
-		if (cpat.copies) {
-			for (const copy of cpat.copies) {
-				for (const item of copy.createdEntityIds) {
-					if (item.type === 'line' && sketch.lines.has(item.id)) add(item.id, 'line');
-					else if (item.type === 'circle' && sketch.circles.has(item.id)) add(item.id, 'circle');
-					else if (item.type === 'arc' && sketch.arcs.has(item.id)) add(item.id, 'arc');
-					else if (item.type === 'ellipse' && sketch.ellipses.has(item.id)) add(item.id, 'ellipse');
-					else if (item.type === 'elliptical_arc' && sketch.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
-					else if (item.type === 'spline' && sketch.splines.has(item.id)) add(item.id, 'spline');
-					else if (item.type === 'point' && sketch.points.has(item.id)) add(item.id, 'point');
-				}
-			}
-		}
+		if (addPatternEntities(cpat, links)) return res;
 	} else if (c.type === 'rectangular_pattern') {
 		const rpat = c as RectangularPatternConstraint;
 		if (patternLinks === 'all') {
 			if (rpat.line1Id && sketch.lines.has(rpat.line1Id)) add(rpat.line1Id, 'line');
 			if (rpat.line2Id && sketch.lines.has(rpat.line2Id)) add(rpat.line2Id, 'line');
 		}
-		if (rpat.sourceObjectIds) {
-			for (const id of rpat.sourceObjectIds) {
-				if (sketch.lines.has(id)) add(id, 'line');
-				else if (sketch.circles.has(id)) add(id, 'circle');
-				else if (sketch.arcs.has(id)) add(id, 'arc');
-				else if (sketch.ellipses.has(id)) add(id, 'ellipse');
-				else if (sketch.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
-				else if (sketch.splines.has(id)) add(id, 'spline');
-				else if (sketch.points.has(id)) add(id, 'point');
-			}
-		}
-		if (patternLinks === 'sources') return res;
-		if (rpat.copies) {
-			for (const copy of rpat.copies) {
-				for (const item of copy.createdEntityIds) {
-					if (item.type === 'line' && sketch.lines.has(item.id)) add(item.id, 'line');
-					else if (item.type === 'circle' && sketch.circles.has(item.id)) add(item.id, 'circle');
-					else if (item.type === 'arc' && sketch.arcs.has(item.id)) add(item.id, 'arc');
-					else if (item.type === 'ellipse' && sketch.ellipses.has(item.id)) add(item.id, 'ellipse');
-					else if (item.type === 'elliptical_arc' && sketch.ellipticalArcs.has(item.id)) add(item.id, 'elliptical_arc');
-					else if (item.type === 'spline' && sketch.splines.has(item.id)) add(item.id, 'spline');
-					else if (item.type === 'point' && sketch.points.has(item.id)) add(item.id, 'point');
-				}
-			}
-		}
+		if (addPatternEntities(rpat, patternLinks)) return res;
 	} else if (c.type === 'angle') {
 		if (!anyC.line1Id && !anyC.line2Id) {
 			for (const pid of [anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2]) {
 				if (sketch.points.get(pid)) add(pid, 'point');
 			}
 		} else {
-			if (anyC.line1Id && sketch.arcs.has(anyC.line1Id)) {
-				add(anyC.line1Id, 'arc');
-			} else {
-				const l1 = sketch.getLine(anyC.line1Id) ?? lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
-				if (l1) add(l1.id, 'line');
-			}
-			if (anyC.line2Id && sketch.arcs.has(anyC.line2Id)) {
-				add(anyC.line2Id, 'arc');
-			} else {
-				const l2 = sketch.getLine(anyC.line2Id) ?? lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
-				if (l2) add(l2.id, 'line');
+			for (const [lineId, pA, pB] of [
+				[anyC.line1Id, anyC.l1P1, anyC.l1P2],
+				[anyC.line2Id, anyC.l2P1, anyC.l2P2],
+			] as const) {
+				if (lineId && sketch.arcs.has(lineId)) {
+					add(lineId, 'arc');
+				} else {
+					const l = sketch.getLine(lineId) ?? lineFromPoints(sketch, pA, pB);
+					if (l) add(l.id, 'line');
+				}
 			}
 		}
 	} else if (c.type === 'point_on_line') {
@@ -734,9 +694,7 @@ export function getEntitiesForConstraint(
 		if (line) add(line.id, 'line');
 	} else if (c.type === 'point_on_circle') {
 		if (sketch.points.get(anyC.pointId)) add(anyC.pointId, 'point');
-		const cid = anyC.circleId;
-		if (sketch.circles.has(cid)) add(cid, 'circle');
-		else if (sketch.arcs.has(cid)) add(cid, 'arc');
+		addRadial(anyC.circleId);
 	} else if (c.type === 'point_on_ellipse') {
 		if (sketch.points.get(anyC.pointId)) add(anyC.pointId, 'point');
 		const eid = anyC.ellipseId;
@@ -750,34 +708,10 @@ export function getEntitiesForConstraint(
 		const line =
 			(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id);
 		if (line) add(line.id, 'line');
-		const cid = anyC.circleId;
-		if (sketch.circles.has(cid)) add(cid, 'circle');
-		else if (sketch.arcs.has(cid)) add(cid, 'arc');
-	} else if (c.type === 'tangent_circle_circle') {
-		const c1 = anyC.circle1Id;
-		if (sketch.circles.has(c1)) add(c1, 'circle');
-		else if (sketch.arcs.has(c1)) add(c1, 'arc');
-		const c2 = anyC.circle2Id;
-		if (sketch.circles.has(c2)) add(c2, 'circle');
-		else if (sketch.arcs.has(c2)) add(c2, 'arc');
+		addRadial(anyC.circleId);
 	} else if (c.type === 'concentric') {
-		const e1 =
-			[...sketch.circles.values()].find(circ => circ.centerId === anyC.c1CenterId) ??
-			[...sketch.arcs.values()].find(arc => arc.centerId === anyC.c1CenterId);
-		if (e1) {
-			add(e1.id, sketch.circles.has(e1.id) ? 'circle' : 'arc');
-		} else if (anyC.c1CenterId && sketch.points.has(anyC.c1CenterId)) {
-			add(anyC.c1CenterId, 'point');
-		}
-
-		const e2 =
-			[...sketch.circles.values()].find(circ => circ.centerId === anyC.c2CenterId) ??
-			[...sketch.arcs.values()].find(arc => arc.centerId === anyC.c2CenterId);
-		if (e2) {
-			add(e2.id, sketch.circles.has(e2.id) ? 'circle' : 'arc');
-		} else if (anyC.c2CenterId && sketch.points.has(anyC.c2CenterId)) {
-			add(anyC.c2CenterId, 'point');
-		}
+		addConcentricEnd(anyC.c1CenterId);
+		addConcentricEnd(anyC.c2CenterId);
 	} else if (c.type === 'midpoint') {
 		if (sketch.points.get(anyC.midId)) add(anyC.midId, 'point');
 		const line = sketch.getLineBetween(anyC.p1Id, anyC.p2Id);
@@ -797,39 +731,14 @@ export function getEntitiesForConstraint(
 			add(anyC.arcId, 'elliptical_arc');
 		}
 	} else if (c.type === 'offset') {
-		for (const id of c.entityIds) {
-			if (sketch.lines.has(id)) add(id, 'line');
-			else if (sketch.circles.has(id)) add(id, 'circle');
-			else if (sketch.arcs.has(id)) add(id, 'arc');
-			else if (sketch.ellipses.has(id)) add(id, 'ellipse');
-			else if (sketch.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
-			else if (sketch.splines.has(id)) add(id, 'spline');
-			else if (sketch.points.has(id)) add(id, 'point');
-		}
+		for (const id of c.entityIds) addAny(id);
 	}
 
 	// Safety net: check if any primitive in the sketch considers this constraint related
-	for (const l of sketch.lines.values()) {
-		if (sketch.getConstraintsForEntity('line', l.id).some(sc => sc.id === c.id)) add(l.id, 'line');
-	}
-	for (const circ of sketch.circles.values()) {
-		if (sketch.getConstraintsForEntity('circle', circ.id).some(sc => sc.id === c.id)) add(circ.id, 'circle');
-	}
-	for (const a of sketch.arcs.values()) {
-		if (sketch.getConstraintsForEntity('arc', a.id).some(sc => sc.id === c.id)) add(a.id, 'arc');
-	}
-	for (const el of sketch.ellipses.values()) {
-		if (sketch.getConstraintsForEntity('ellipse', el.id).some(sc => sc.id === c.id)) add(el.id, 'ellipse');
-	}
-	for (const ea of sketch.ellipticalArcs.values()) {
-		if (sketch.getConstraintsForEntity('elliptical_arc', ea.id).some(sc => sc.id === c.id))
-			add(ea.id, 'elliptical_arc');
-	}
-	for (const s of sketch.splines.values()) {
-		if (sketch.getConstraintsForEntity('spline', s.id).some(sc => sc.id === c.id)) add(s.id, 'spline');
-	}
-	for (const pt of sketch.points.values()) {
-		if (sketch.getConstraintsForEntity('point', pt.id).some(sc => sc.id === c.id)) add(pt.id, 'point');
+	for (const [primType, map] of collections) {
+		for (const id of map.keys()) {
+			if (sketch.getConstraintsForEntity(primType, id).some(sc => sc.id === c.id)) add(id, primType);
+		}
 	}
 
 	return res;

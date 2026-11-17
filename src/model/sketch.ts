@@ -447,15 +447,25 @@ export class SketchDocument {
 		this.notify();
 	}
 
+	private registerPrimitive<T extends ISketchPrimitive>(
+		map: Map<string, T>,
+		primitive: T,
+		afterRegister?: () => void
+	): T {
+		this.pushHistory();
+		map.set(primitive.id, primitive);
+		this.rebuildParamManager();
+		afterRegister?.();
+		this.solve();
+		return primitive;
+	}
+
 	// --- Point methods ---
 	addPoint(point: XY, fixed = false): SketchPoint {
-		this.pushHistory();
-		const id = this.nextId('Point');
-		const pt = new SketchPoint({ id, x: point.x, y: point.y, fixed });
-		this.points.set(id, pt);
-		this.rebuildParamManager();
-		this.solve();
-		return pt;
+		return this.registerPrimitive(
+			this.points,
+			new SketchPoint({ id: this.nextId('Point'), x: point.x, y: point.y, fixed })
+		);
 	}
 
 	getPoint(id: string): SketchPoint | undefined {
@@ -491,24 +501,15 @@ export class SketchDocument {
 
 	// --- Line methods ---
 	addLine(p1Id: string, p2Id: string, isConstruction = false): SketchLine {
-		this.pushHistory();
-		const id = this.nextId('Line');
-		const line = new SketchLine({ id, p1Id, p2Id, isConstruction });
-		this.lines.set(id, line);
-		this.rebuildParamManager();
-		this.solve();
-		return line;
+		return this.registerPrimitive(this.lines, new SketchLine({ id: this.nextId('Line'), p1Id, p2Id, isConstruction }));
 	}
 
 	// --- Circle methods ---
 	addCircle(centerId: string, radius: number, isConstruction = false): SketchCircle {
-		this.pushHistory();
-		const id = this.nextId('Circle');
-		const circle = new SketchCircle({ id, centerId, radius, isConstruction });
-		this.circles.set(id, circle);
-		this.rebuildParamManager();
-		this.solve();
-		return circle;
+		return this.registerPrimitive(
+			this.circles,
+			new SketchCircle({ id: this.nextId('Circle'), centerId, radius, isConstruction })
+		);
 	}
 
 	// --- Arc methods ---
@@ -520,10 +521,8 @@ export class SketchDocument {
 		clockwise = false,
 		isConstruction = false
 	): SketchArc {
-		this.pushHistory();
-		const id = this.nextId('Arc');
 		const arc = new SketchArc({
-			id,
+			id: this.nextId('Arc'),
 			centerId,
 			startPointId,
 			endPointId,
@@ -531,11 +530,7 @@ export class SketchDocument {
 			clockwise,
 			isConstruction,
 		});
-		this.arcs.set(id, arc);
-		this.rebuildParamManager();
-		this.syncArcEndpoints(arc);
-		this.solve();
-		return arc;
+		return this.registerPrimitive(this.arcs, arc, () => this.syncArcEndpoints(arc));
 	}
 
 	replaceArcEndpoint(arc: SketchArc, edge: 'start' | 'end', pointId: string): void {
@@ -574,21 +569,12 @@ export class SketchDocument {
 		minorAxisPointId: string,
 		isConstruction = false
 	): SketchEllipse {
-		this.pushHistory();
 		const id = this.nextId('Ellipse');
-		const ellipse = new SketchEllipse({
-			id,
-			centerId,
-			majorAxisPointId,
-			minorAxisPointId,
-			isConstruction,
+		const ellipse = new SketchEllipse({ id, centerId, majorAxisPointId, minorAxisPointId, isConstruction });
+		return this.registerPrimitive(this.ellipses, ellipse, () => {
+			const c = new EllipseAxisConstraint(this.nextId('c_elaxis'), id, centerId, majorAxisPointId, minorAxisPointId);
+			this.constraints.set(c.id, c);
 		});
-		this.ellipses.set(id, ellipse);
-		this.rebuildParamManager();
-		const c = new EllipseAxisConstraint(this.nextId('c_elaxis'), id, centerId, majorAxisPointId, minorAxisPointId);
-		this.constraints.set(c.id, c);
-		this.solve();
-		return ellipse;
 	}
 
 	// --- Elliptical Arc methods ---
@@ -601,7 +587,6 @@ export class SketchDocument {
 		clockwise = false,
 		isConstruction = false
 	): SketchEllipticalArc {
-		this.pushHistory();
 		const id = this.nextId('EllipticalArc');
 		const arc = new SketchEllipticalArc({
 			id,
@@ -613,22 +598,26 @@ export class SketchDocument {
 			clockwise,
 			isConstruction,
 		});
-		this.ellipticalArcs.set(id, arc);
-		this.rebuildParamManager();
-		const cAxis = new EllipseAxisConstraint(this.nextId('c_elaxis'), id, centerId, majorAxisPointId, minorAxisPointId);
-		this.constraints.set(cAxis.id, cAxis);
-		const cEndpoints = new EllipticalArcEndpointsConstraint(
-			this.nextId('c_elarcept'),
-			id,
-			centerId,
-			majorAxisPointId,
-			minorAxisPointId,
-			startPointId,
-			endPointId
-		);
-		this.constraints.set(cEndpoints.id, cEndpoints);
-		this.solve();
-		return arc;
+		return this.registerPrimitive(this.ellipticalArcs, arc, () => {
+			const cAxis = new EllipseAxisConstraint(
+				this.nextId('c_elaxis'),
+				id,
+				centerId,
+				majorAxisPointId,
+				minorAxisPointId
+			);
+			this.constraints.set(cAxis.id, cAxis);
+			const cEndpoints = new EllipticalArcEndpointsConstraint(
+				this.nextId('c_elarcept'),
+				id,
+				centerId,
+				majorAxisPointId,
+				minorAxisPointId,
+				startPointId,
+				endPointId
+			);
+			this.constraints.set(cEndpoints.id, cEndpoints);
+		});
 	}
 
 	// --- Spline methods ---
@@ -663,6 +652,10 @@ export class SketchDocument {
 	}
 
 	// --- Constraint methods ---
+	private getRadial(id: string): SketchCircle | SketchArc | undefined {
+		return this.circles.get(id) ?? this.arcs.get(id);
+	}
+
 	private findConstraint<T extends IConstraint>(
 		Ctor: abstract new (...args: never[]) => T,
 		predicate: (constraint: T) => boolean
@@ -671,6 +664,19 @@ export class SketchDocument {
 			if (c instanceof Ctor && predicate(c)) return c;
 		}
 		return undefined;
+	}
+
+	private addUniqueConstraint<T extends IConstraint>(
+		Ctor: abstract new (...args: never[]) => T,
+		predicate: (constraint: T) => boolean,
+		create: () => T,
+		onExisting: 'return' | 'null' = 'return'
+	): T | null {
+		const existing = this.findConstraint(Ctor, predicate);
+		if (existing) return onExisting === 'return' ? existing : null;
+		const c = create();
+		this.addConstraint(c);
+		return c;
 	}
 
 	private roundDimensionDefault(measured: number, min = 0.01): number {
@@ -694,18 +700,44 @@ export class SketchDocument {
 		return existing;
 	}
 
+	private upsertPointDistance(
+		p1Id: string,
+		p2Id: string,
+		measured: number,
+		orientation: 'aligned' | 'horizontal' | 'vertical',
+		targetDist?: number,
+		offset?: number,
+		sign?: number
+	): DistanceConstraint {
+		const existing = this.getDistanceConstraint(p1Id, p2Id, orientation);
+		if (existing) return this.updateExistingDistanceConstraint(existing, targetDist, offset);
+		const dist = targetDist ?? this.roundDimensionDefault(measured);
+		const c = new DistanceConstraint(
+			this.nextId('c_dist'),
+			p1Id,
+			p2Id,
+			dist,
+			1.0,
+			offset,
+			orientation,
+			undefined,
+			sign
+		);
+		this.addConstraint(c);
+		return c;
+	}
+
 	private addOrientationConstraint<T extends HorizontalConstraint | VerticalConstraint>(
 		Ctor: new (id: string, p1Id: string, p2Id: string) => T,
 		prefix: string,
 		p1Id: string,
 		p2Id: string
 	): T {
-		const existing = this.findConstraint(Ctor, c => this.matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id));
-		if (existing) return existing;
-
-		const c = new Ctor(this.nextId(prefix), p1Id, p2Id);
-		this.addConstraint(c);
-		return c;
+		return this.addUniqueConstraint(
+			Ctor,
+			c => this.matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id),
+			() => new Ctor(this.nextId(prefix), p1Id, p2Id)
+		)!;
 	}
 
 	private matchesLinePair(a1: string, a2: string, b1: string, b2: string, l1: SketchLine, l2: SketchLine): boolean {
@@ -726,12 +758,11 @@ export class SketchDocument {
 		const l2 = this.lines.get(line2Id);
 		if (!l1 || !l2) return null;
 
-		const existing = this.findConstraint(Ctor, c => this.matchesLinePair(...endpointsOf(c), l1, l2));
-		if (existing) return existing;
-
-		const c = new Ctor(this.nextId(prefix), l1.p1Id, l1.p2Id, l2.p1Id, l2.p2Id);
-		this.addConstraint(c);
-		return c;
+		return this.addUniqueConstraint(
+			Ctor,
+			c => this.matchesLinePair(...endpointsOf(c), l1, l2),
+			() => new Ctor(this.nextId(prefix), l1.p1Id, l1.p2Id, l2.p1Id, l2.p2Id)
+		);
 	}
 
 	private updateExistingAngleConstraint(
@@ -751,15 +782,46 @@ export class SketchDocument {
 		return existing;
 	}
 
-	private resolveAngleParams(
-		initialAngleDeg: number,
+	private createAngleConstraint(
+		line1Id: string,
+		line2Id: string,
+		p1: SketchPoint,
+		p2: SketchPoint,
+		p3: SketchPoint,
+		p4: SketchPoint,
 		targetAngleDeg?: number,
-		arcRadius?: number
-	): { angleVal: number; radiusVal: number } {
-		return {
-			angleVal: targetAngleDeg ?? Math.max(0.1, Math.min(179.9, Math.round(initialAngleDeg * 10) / 10)),
-			radiusVal: arcRadius ?? 40,
-		};
+		arcRadius?: number,
+		cursorPos?: { x: number; y: number },
+		s1Override?: number,
+		s2Override?: number,
+		signOverride?: number
+	): AngleConstraint {
+		const geom = this.calculateLinesAngleGeometry(
+			p1,
+			p2,
+			p3,
+			p4,
+			cursorPos,
+			line1Id || undefined,
+			line2Id || undefined
+		);
+		const angleVal = targetAngleDeg ?? Math.max(0.1, Math.min(179.9, Math.round(geom.initialAngleDeg * 10) / 10));
+		const c = new AngleConstraint(
+			this.nextId('c_ang'),
+			line1Id,
+			line2Id,
+			p1.id,
+			p2.id,
+			p3.id,
+			p4.id,
+			angleVal,
+			arcRadius ?? 40,
+			s1Override ?? geom.s1,
+			s2Override ?? geom.s2,
+			signOverride ?? geom.sign
+		);
+		this.addConstraint(c);
+		return c;
 	}
 
 	private formatRadiusConstraintName(radius: number, mode: 'radius' | 'diameter'): string {
@@ -866,19 +928,15 @@ export class SketchDocument {
 	}
 
 	addCoincidentConstraint(p1Id: string, p2Id: string): CoincidentConstraint | null {
-		if (p1Id === p2Id) return null;
-		if (!this.points.has(p1Id) || !this.points.has(p2Id)) return null;
-
+		if (p1Id === p2Id || !this.points.has(p1Id) || !this.points.has(p2Id)) return null;
 		// Do not constrain endpoints of the same line segment (would collapse length to 0)
 		if (this.getLineBetween(p1Id, p2Id)) return null;
-
-		// Check if coincident constraint already exists between these two points
-		const existing = this.findConstraint(CoincidentConstraint, c => this.matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id));
-		if (existing) return null;
-
-		const c = new CoincidentConstraint(this.nextId('c_coinc'), p1Id, p2Id);
-		this.addConstraint(c);
-		return c;
+		return this.addUniqueConstraint(
+			CoincidentConstraint,
+			c => this.matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id),
+			() => new CoincidentConstraint(this.nextId('c_coinc'), p1Id, p2Id),
+			'null'
+		);
 	}
 
 	addCoincidentConstraints(pointIds: Iterable<string>): boolean {
@@ -938,31 +996,16 @@ export class SketchDocument {
 		const p2 = this.points.get(p2Id);
 		if (!p1 || !p2) return null;
 
-		const effectiveOrientation = orientation ?? 'aligned';
-
-		// Prevent duplicate identical distance constraints
-		const existing = this.getDistanceConstraint(p1Id, p2Id, effectiveOrientation);
-		if (existing) {
-			return this.updateExistingDistanceConstraint(existing, targetDist, offset);
-		}
-
-		let measured = p1.distanceTo(p2);
-		if (effectiveOrientation === 'horizontal') {
-			measured = Math.abs(p2.x - p1.x);
-		} else if (effectiveOrientation === 'vertical') {
-			measured = Math.abs(p2.y - p1.y);
-		}
-
-		const currentDist = targetDist ?? this.roundDimensionDefault(measured);
-		const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset, effectiveOrientation);
-		this.addConstraint(c);
-		return c;
+		const eff = orientation ?? 'aligned';
+		const measured =
+			eff === 'horizontal' ? Math.abs(p2.x - p1.x) : eff === 'vertical' ? Math.abs(p2.y - p1.y) : p1.distanceTo(p2);
+		return this.upsertPointDistance(p1Id, p2Id, measured, eff, targetDist, offset);
 	}
 
 	canAddCircleDistanceConstraint(circle1Id: string, circle2Id: string): boolean {
 		if (circle1Id === circle2Id) return false;
-		const a = this.circles.get(circle1Id) ?? this.arcs.get(circle1Id);
-		const b = this.circles.get(circle2Id) ?? this.arcs.get(circle2Id);
+		const a = this.getRadial(circle1Id);
+		const b = this.getRadial(circle2Id);
 		const p1 = a && this.points.get(a.centerId);
 		const p2 = b && this.points.get(b.centerId);
 		return !!p1 && !!p2 && p1.distanceTo(p2) < 1e-5;
@@ -982,8 +1025,8 @@ export class SketchDocument {
 			return this.updateExistingDistanceConstraint(existing, targetDistance);
 		}
 		if (!this.canAddCircleDistanceConstraint(circle1Id, circle2Id)) return null;
-		const a = (this.circles.get(circle1Id) ?? this.arcs.get(circle1Id))!;
-		const b = (this.circles.get(circle2Id) ?? this.arcs.get(circle2Id))!;
+		const a = this.getRadial(circle1Id)!;
+		const b = this.getRadial(circle2Id)!;
 		const distance = targetDistance ?? this.roundDimensionDefault(Math.abs(a.radius - b.radius));
 		const c = new DistanceConstraint(this.nextId('c_dist'), a.centerId, b.centerId, distance);
 		c.circleIds = [circle1Id, circle2Id];
@@ -995,7 +1038,7 @@ export class SketchDocument {
 	}
 
 	canAddCircleToLineDistanceConstraint(radialId: string, lineId: string): boolean {
-		const radial = this.circles.get(radialId) ?? this.arcs.get(radialId);
+		const radial = this.getRadial(radialId);
 		const line = this.getLine(lineId);
 		return !!radial && !!line && radial.centerId !== line.p1Id && radial.centerId !== line.p2Id;
 	}
@@ -1006,7 +1049,7 @@ export class SketchDocument {
 		targetDistance?: number
 	): DistanceConstraint | PointToLineDistanceConstraint | null {
 		if (!this.canAddCircleToLineDistanceConstraint(radialId, lineId)) return null;
-		const radial = (this.circles.get(radialId) ?? this.arcs.get(radialId))!;
+		const radial = this.getRadial(radialId)!;
 		const c =
 			lineId === 'axis_x' || lineId === 'axis_y'
 				? this.addPointToAxisDistanceConstraint(radial.centerId, lineId === 'axis_x' ? 'x' : 'y', targetDistance)
@@ -1094,33 +1137,25 @@ export class SketchDocument {
 	): DistanceConstraint | null {
 		const pt = this.points.get(pointId);
 		if (!pt) return null;
-		const existing = this.getDistanceConstraint('origin', pointId, orientation);
-		if (existing) return this.addDistanceConstraint('origin', pointId, targetDist, offset, orientation);
-		const measured = orientation === 'horizontal' ? pt.x : orientation === 'vertical' ? pt.y : pt.length();
-		const c = new DistanceConstraint(
-			this.nextId('c_dist'),
+		const signed = orientation === 'horizontal' ? pt.x : orientation === 'vertical' ? pt.y : pt.length();
+		return this.upsertPointDistance(
 			'origin',
 			pointId,
-			targetDist ?? this.roundDimensionDefault(Math.abs(measured)),
-			1,
-			offset,
+			Math.abs(signed),
 			orientation,
-			undefined,
-			orientation === 'aligned' ? undefined : measured >= 0 ? 1 : -1
+			targetDist,
+			offset,
+			orientation === 'aligned' ? undefined : signed >= 0 ? 1 : -1
 		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addOriginCoincidentConstraint(pointId: string): CoincidentConstraint | null {
 		if (!this.points.get(pointId) || pointId === 'origin') return null;
-		const existing = this.findConstraint(CoincidentConstraint, c =>
-			this.matchesEndpoints(c.p1Id, c.p2Id, 'origin', pointId)
+		return this.addUniqueConstraint(
+			CoincidentConstraint,
+			c => this.matchesEndpoints(c.p1Id, c.p2Id, 'origin', pointId),
+			() => new CoincidentConstraint(this.nextId('c_coinc'), 'origin', pointId)
 		);
-		if (existing) return existing;
-		const c = new CoincidentConstraint(this.nextId('c_coinc'), 'origin', pointId);
-		this.addConstraint(c);
-		return c;
 	}
 
 	getPointToAxisConstraint(pointId: string, axis: 'x' | 'y'): DistanceConstraint | PointOnLineConstraint | undefined {
@@ -1156,14 +1191,11 @@ export class SketchDocument {
 
 	addPointOnAxisConstraint(pointId: string, axis: 'x' | 'y'): PointOnLineConstraint | null {
 		if (!this.points.get(pointId)) return null;
-		const existing = this.findConstraint(
+		return this.addUniqueConstraint(
 			PointOnLineConstraint,
-			c => c.pointId === pointId && c.lineP1Id === 'origin' && c.lineP2Id === `axis_${axis}`
+			c => c.pointId === pointId && c.lineP1Id === 'origin' && c.lineP2Id === `axis_${axis}`,
+			() => new PointOnLineConstraint(this.nextId('c_ptline'), pointId, 'origin', `axis_${axis}`)
 		);
-		if (existing) return existing;
-		const c = new PointOnLineConstraint(this.nextId('c_ptline'), pointId, 'origin', `axis_${axis}`);
-		this.addConstraint(c);
-		return c;
 	}
 
 	getLineToAxisConstraint(
@@ -1227,11 +1259,12 @@ export class SketchDocument {
 	addLineCollinearWithAxisConstraint(lineId: string, axis: 'x' | 'y'): CollinearConstraint | null {
 		const line = this.lines.get(lineId);
 		if (!line) return null;
-		const existing = this.getLineToAxisConstraint(lineId, axis);
-		if (existing instanceof CollinearConstraint) return existing;
-		const c = new CollinearConstraint(this.nextId('c_collin'), 'origin', `axis_${axis}`, line.p1Id, line.p2Id);
-		this.addConstraint(c);
-		return c;
+		return this.addUniqueConstraint(
+			CollinearConstraint,
+			c =>
+				c.l1P1 === 'origin' && c.l1P2 === `axis_${axis}` && this.matchesEndpoints(c.l2P1, c.l2P2, line.p1Id, line.p2Id),
+			() => new CollinearConstraint(this.nextId('c_collin'), 'origin', `axis_${axis}`, line.p1Id, line.p2Id)
+		);
 	}
 
 	calculateLinesAngleGeometry(
@@ -1377,39 +1410,26 @@ export class SketchDocument {
 		const p4 = this.points.get(l2.p2Id);
 		if (!p1 || !p2 || !p3 || !p4) return null;
 
-		// Check if an angle constraint already exists between these two lines
 		const existing = this.findConstraint(
 			AngleConstraint,
 			c => (c.line1Id === line1Id && c.line2Id === line2Id) || (c.line1Id === line2Id && c.line2Id === line1Id)
 		);
-		if (existing) {
-			return this.updateExistingAngleConstraint(existing, targetAngleDeg, arcRadius);
-		}
+		if (existing) return this.updateExistingAngleConstraint(existing, targetAngleDeg, arcRadius);
 
-		const cursorPos = typeof cursorPosOrS1 === 'object' && cursorPosOrS1 !== null ? cursorPosOrS1 : undefined;
-		const geom = this.calculateLinesAngleGeometry(p1, p2, p3, p4, cursorPos, line1Id, line2Id);
-
-		const s1 = typeof cursorPosOrS1 === 'number' ? cursorPosOrS1 : geom.s1;
-		const s2 = typeof s2Param === 'number' ? s2Param : geom.s2;
-		const sign = typeof signParam === 'number' ? signParam : geom.sign;
-		const { angleVal, radiusVal } = this.resolveAngleParams(geom.initialAngleDeg, targetAngleDeg, arcRadius);
-
-		const c = new AngleConstraint(
-			this.nextId('c_ang'),
+		return this.createAngleConstraint(
 			line1Id,
 			line2Id,
-			l1.p1Id,
-			l1.p2Id,
-			l2.p1Id,
-			l2.p2Id,
-			angleVal,
-			radiusVal,
-			s1,
-			s2,
-			sign
+			p1,
+			p2,
+			p3,
+			p4,
+			targetAngleDeg,
+			arcRadius,
+			typeof cursorPosOrS1 === 'object' && cursorPosOrS1 !== null ? cursorPosOrS1 : undefined,
+			typeof cursorPosOrS1 === 'number' ? cursorPosOrS1 : undefined,
+			typeof s2Param === 'number' ? s2Param : undefined,
+			typeof signParam === 'number' ? signParam : undefined
 		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addThreePointAngleConstraint(
@@ -1437,32 +1457,22 @@ export class SketchDocument {
 				c.l2P1 === p2Id &&
 				this.matchesEndpoints(c.l1P2, c.l2P2, p1Id, p3Id)
 		);
-		if (existing) {
-			return this.updateExistingAngleConstraint(existing, targetAngleDeg, arcRadius);
-		}
+		if (existing) return this.updateExistingAngleConstraint(existing, targetAngleDeg, arcRadius);
 
-		const geom = this.calculateLinesAngleGeometry(p2, p1, p2, p3);
-		const s1 = typeof s1Param === 'number' ? s1Param : 1;
-		const s2 = typeof s2Param === 'number' ? s2Param : 1;
-		const sign = typeof signParam === 'number' ? signParam : geom.sign;
-		const { angleVal, radiusVal } = this.resolveAngleParams(geom.initialAngleDeg, targetAngleDeg, arcRadius);
-
-		const c = new AngleConstraint(
-			this.nextId('c_ang'),
+		return this.createAngleConstraint(
 			'',
 			'',
-			p2Id,
-			p1Id,
-			p2Id,
-			p3Id,
-			angleVal,
-			radiusVal,
-			s1,
-			s2,
-			sign
+			p2,
+			p1,
+			p2,
+			p3,
+			targetAngleDeg,
+			arcRadius,
+			undefined,
+			typeof s1Param === 'number' ? s1Param : 1,
+			typeof s2Param === 'number' ? s2Param : 1,
+			typeof signParam === 'number' ? signParam : undefined
 		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addArcAngleConstraint(arcId: string, targetAngleDeg: number, arcRadius = 40, sweepSign = 1): AngleConstraint | null {
@@ -1498,7 +1508,7 @@ export class SketchDocument {
 		placement?: Pick<RadiusConstraint, 'leaderAngle' | 'leaderOffset'>
 	): RadiusConstraint | null {
 		const isCircle = this.circles.has(circleOrArcId);
-		const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
+		const entity = this.getRadial(circleOrArcId);
 		if (!entity) return null;
 
 		const defaultMode: 'radius' | 'diameter' = displayMode ?? (isCircle ? 'diameter' : 'radius');
@@ -1540,14 +1550,11 @@ export class SketchDocument {
 	}
 
 	addEqualRadiusConstraint(circle1Id: string, circle2Id: string): EqualRadiusConstraint {
-		const existing = this.findConstraint(EqualRadiusConstraint, c =>
-			this.matchesEndpoints(c.circle1Id, c.circle2Id, circle1Id, circle2Id)
-		);
-		if (existing) return existing;
-
-		const c = new EqualRadiusConstraint(this.nextId('c_eqrad'), circle1Id, circle2Id);
-		this.addConstraint(c);
-		return c;
+		return this.addUniqueConstraint(
+			EqualRadiusConstraint,
+			c => this.matchesEndpoints(c.circle1Id, c.circle2Id, circle1Id, circle2Id),
+			() => new EqualRadiusConstraint(this.nextId('c_eqrad'), circle1Id, circle2Id)
+		)!;
 	}
 
 	addParallelConstraint(line1Id: string, line2Id: string): ParallelConstraint | null {
@@ -1587,18 +1594,16 @@ export class SketchDocument {
 		const part = this.partitionThreePointsByMiddle(p1Id, p2Id, p3Id);
 		if (!part) return null;
 		const { midId, end1Id, end2Id } = part;
-
 		const targetSet = new Set([p1Id, p2Id, p3Id]);
-		const existing = this.findConstraint(CollinearConstraint, c => {
-			if (!c.isThreePoint()) return false;
-			const cSet = new Set([c.l1P1, c.l1P2, c.l2P1, c.l2P2]);
-			return cSet.size === 3 && [...targetSet].every(id => cSet.has(id));
-		});
-		if (existing) return existing;
-
-		const c = new CollinearConstraint(this.nextId('c_collin'), end1Id, midId, midId, end2Id);
-		this.addConstraint(c);
-		return c;
+		return this.addUniqueConstraint(
+			CollinearConstraint,
+			c => {
+				if (!c.isThreePoint()) return false;
+				const cSet = new Set([c.l1P1, c.l1P2, c.l2P1, c.l2P2]);
+				return cSet.size === 3 && [...targetSet].every(id => cSet.has(id));
+			},
+			() => new CollinearConstraint(this.nextId('c_collin'), end1Id, midId, midId, end2Id)
+		);
 	}
 
 	addCollinearConstraint(line1Id: string, line2Id: string, p3Id?: string): CollinearConstraint | null {
@@ -1640,28 +1645,25 @@ export class SketchDocument {
 			if (p1Id === line.p2Id && p2Id === line.p1Id) return null;
 		}
 
-		const existing = this.findConstraint(
+		return this.addUniqueConstraint(
 			SymmetryConstraint,
 			c =>
 				this.matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id) &&
 				(isOriginAxis
 					? c.lineId === 'origin'
-					: c.lineId === line!.id || this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line!.p1Id, line!.p2Id))
+					: c.lineId === line!.id || this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line!.p1Id, line!.p2Id)),
+			() =>
+				new SymmetryConstraint(
+					this.nextId('c_symm'),
+					p1Id,
+					p2Id,
+					line ? line.p1Id : '',
+					line ? line.p2Id : '',
+					1.0,
+					isOriginAxis ? 'origin' : line!.id,
+					isMirrorCopy
+				)
 		);
-		if (existing) return existing;
-
-		const c = new SymmetryConstraint(
-			this.nextId('c_symm'),
-			p1Id,
-			p2Id,
-			line ? line.p1Id : '',
-			line ? line.p2Id : '',
-			1.0,
-			isOriginAxis ? 'origin' : line!.id,
-			isMirrorCopy
-		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addLineSymmetryConstraints(line1Id: string, line2Id: string, axisId: string): IConstraint[] {
@@ -2006,107 +2008,78 @@ export class SketchDocument {
 
 	addPointOnLineConstraint(pointId: string, lineId: string): PointOnLineConstraint | null {
 		const line = this.lines.get(lineId);
-		if (!line) return null;
-
-		// Do not constrain an endpoint of the line to the line itself
-		if (pointId === line.p1Id || pointId === line.p2Id) return null;
-
-		// Check if constraint already exists
-		const existing = this.findConstraint(
+		if (!line || pointId === line.p1Id || pointId === line.p2Id) return null;
+		return this.addUniqueConstraint(
 			PointOnLineConstraint,
-			c => c.pointId === pointId && this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)
+			c => c.pointId === pointId && this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id),
+			() => new PointOnLineConstraint(this.nextId('c_ptline'), pointId, line.p1Id, line.p2Id),
+			'null'
 		);
-		if (existing) return null;
-
-		const c = new PointOnLineConstraint(this.nextId('c_ptline'), pointId, line.p1Id, line.p2Id);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addPointOnCircleConstraint(pointId: string, circleOrArcId: string): PointOnCircleConstraint | null {
-		const circle = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
-		if (!circle) return null;
-
-		if (pointId === circle.centerId) return null;
+		const circle = this.getRadial(circleOrArcId);
+		if (!circle || pointId === circle.centerId) return null;
 		const arc = this.arcs.get(circleOrArcId);
-		if (arc && (pointId === arc.startPointId || pointId === arc.endPointId)) {
-			return null;
-		}
-
-		const existing = this.findConstraint(
+		if (arc && (pointId === arc.startPointId || pointId === arc.endPointId)) return null;
+		return this.addUniqueConstraint(
 			PointOnCircleConstraint,
-			c => c.pointId === pointId && c.circleId === circleOrArcId
+			c => c.pointId === pointId && c.circleId === circleOrArcId,
+			() => new PointOnCircleConstraint(this.nextId('c_ptcirc'), pointId, circle.centerId, circleOrArcId),
+			'null'
 		);
-		if (existing) return null;
-
-		const c = new PointOnCircleConstraint(this.nextId('c_ptcirc'), pointId, circle.centerId, circleOrArcId);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addPointOnEllipseConstraint(pointId: string, ellipseOrArcId: string): PointOnEllipseConstraint | null {
 		const el = this.ellipses.get(ellipseOrArcId) ?? this.ellipticalArcs.get(ellipseOrArcId);
-		if (!el) return null;
-
-		if (pointId === el.centerId || pointId === el.majorAxisPointId || pointId === el.minorAxisPointId) {
+		if (!el || pointId === el.centerId || pointId === el.majorAxisPointId || pointId === el.minorAxisPointId) {
 			return null;
 		}
 		if (el instanceof SketchEllipticalArc && (pointId === el.startPointId || pointId === el.endPointId)) {
 			return null;
 		}
-
-		const existing = this.findConstraint(
+		return this.addUniqueConstraint(
 			PointOnEllipseConstraint,
-			c => c.pointId === pointId && c.ellipseId === ellipseOrArcId
+			c => c.pointId === pointId && c.ellipseId === ellipseOrArcId,
+			() =>
+				new PointOnEllipseConstraint(
+					this.nextId('c_ptel'),
+					pointId,
+					ellipseOrArcId,
+					el.centerId,
+					el.majorAxisPointId,
+					el.minorAxisPointId
+				),
+			'null'
 		);
-		if (existing) return null;
-
-		const c = new PointOnEllipseConstraint(
-			this.nextId('c_ptel'),
-			pointId,
-			ellipseOrArcId,
-			el.centerId,
-			el.majorAxisPointId,
-			el.minorAxisPointId
-		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addPointOnSplineConstraint(pointId: string, splineId: string): PointOnSplineConstraint | null {
 		const spline = this.splines.get(splineId);
-		if (!spline) return null;
-
-		if (spline.pointIds.includes(pointId)) return null;
-		if (this.isSplineHandlePoint(pointId)) return null;
-
-		const existing = this.findConstraint(
+		if (!spline || spline.pointIds.includes(pointId) || this.isSplineHandlePoint(pointId)) return null;
+		return this.addUniqueConstraint(
 			PointOnSplineConstraint,
-			c => c.pointId === pointId && c.splineId === splineId
+			c => c.pointId === pointId && c.splineId === splineId,
+			() => {
+				const handlePoints: Array<{ p1Id: string; p2Id: string }> = [];
+				for (const lid of spline.tangentLineIds ?? []) {
+					const l = this.lines.get(lid);
+					if (l) handlePoints.push({ p1Id: l.p1Id, p2Id: l.p2Id });
+				}
+				return new PointOnSplineConstraint(
+					this.nextId('c_ptspline'),
+					pointId,
+					spline.id,
+					spline.splineType,
+					[...spline.pointIds],
+					handlePoints.length > 0 ? handlePoints : undefined,
+					spline.tangentLineIds ? [...spline.tangentLineIds] : undefined,
+					spline.knots ? [...spline.knots] : undefined,
+					spline.isClosed
+				);
+			},
+			'null'
 		);
-		if (existing) return null;
-
-		const handlePoints: Array<{ p1Id: string; p2Id: string }> = [];
-		if (spline.tangentLineIds) {
-			for (const lid of spline.tangentLineIds) {
-				const l = this.lines.get(lid);
-				if (l) handlePoints.push({ p1Id: l.p1Id, p2Id: l.p2Id });
-			}
-		}
-
-		const c = new PointOnSplineConstraint(
-			this.nextId('c_ptspline'),
-			pointId,
-			spline.id,
-			spline.splineType,
-			[...spline.pointIds],
-			handlePoints.length > 0 ? handlePoints : undefined,
-			spline.tangentLineIds ? [...spline.tangentLineIds] : undefined,
-			spline.knots ? [...spline.knots] : undefined,
-			spline.isClosed
-		);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addTangentConstraint(
@@ -2115,34 +2088,30 @@ export class SketchDocument {
 	): TangentLineCircleConstraint | TangentCircleCircleConstraint | null {
 		const line1 = this.getLine(entity1Id);
 		const line2 = this.getLine(entity2Id);
-		const circ1 = this.circles.get(entity1Id) ?? this.arcs.get(entity1Id);
-		const circ2 = this.circles.get(entity2Id) ?? this.arcs.get(entity2Id);
+		const circ1 = this.getRadial(entity1Id);
+		const circ2 = this.getRadial(entity2Id);
 
 		// Case 1: Line (or Coordinate Axis) and Circle/Arc
 		if ((line1 && circ2) || (line2 && circ1)) {
 			const line = line1 ?? line2!;
 			const circ = circ2 ?? circ1!;
-
-			const existing = this.findConstraint(
+			return this.addUniqueConstraint(
 				TangentLineCircleConstraint,
 				c =>
 					c.circleId === circ.id &&
-					(c.lineId === line.id || this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id))
+					(c.lineId === line.id || this.matchesEndpoints(c.lineP1Id, c.lineP2Id, line.p1Id, line.p2Id)),
+				() =>
+					new TangentLineCircleConstraint(
+						this.nextId('c_tang'),
+						line.p1Id,
+						line.p2Id,
+						circ.centerId,
+						circ.id,
+						this.getTangentSide(line, circ.centerId),
+						1.0,
+						line.id
+					)
 			);
-			if (existing) return existing;
-
-			const c = new TangentLineCircleConstraint(
-				this.nextId('c_tang'),
-				line.p1Id,
-				line.p2Id,
-				circ.centerId,
-				circ.id,
-				this.getTangentSide(line, circ.centerId),
-				1.0,
-				line.id
-			);
-			this.addConstraint(c);
-			return c;
 		}
 
 		// Case 2: Circle/Arc and Circle/Arc
@@ -2157,29 +2126,16 @@ export class SketchDocument {
 			if (!center1 || !center2) return null;
 
 			const d = center1.distanceTo(center2);
-			const r1 = circ1.radius;
-			const r2 = circ2.radius;
-
-			const errExt = Math.abs(d - (r1 + r2));
-			const errInt = Math.abs(d - Math.abs(r1 - r2));
-
-			const isInternal = errInt < errExt;
-			let outerCircleId: string | null = null;
-			if (isInternal) {
-				outerCircleId = r1 >= r2 ? circ1.id : circ2.id;
-			}
-
-			let sharedPointId: string | null = null;
+			const isInternal =
+				Math.abs(d - Math.abs(circ1.radius - circ2.radius)) < Math.abs(d - (circ1.radius + circ2.radius));
+			const outerCircleId = isInternal ? (circ1.radius >= circ2.radius ? circ1.id : circ2.id) : null;
 			const arc1 = this.arcs.get(circ1.id);
 			const arc2 = this.arcs.get(circ2.id);
-			if (arc1 && arc2) {
-				if (arc1.startPointId === arc2.startPointId || arc1.startPointId === arc2.endPointId) {
-					sharedPointId = arc1.startPointId;
-				} else if (arc1.endPointId === arc2.startPointId || arc1.endPointId === arc2.endPointId) {
-					sharedPointId = arc1.endPointId;
-				}
-			}
-
+			const sharedPointId =
+				arc1 && arc2
+					? ([arc1.startPointId, arc1.endPointId].find(id => id === arc2.startPointId || id === arc2.endPointId) ??
+						null)
+					: null;
 			const c = new TangentCircleCircleConstraint(
 				this.nextId('c_tang'),
 				circ1.centerId,
@@ -2218,8 +2174,8 @@ export class SketchDocument {
 	}
 
 	addConcentricConstraint(c1Id: string, c2Id: string): ConcentricConstraint | null {
-		const circ1 = this.circles.get(c1Id) ?? this.arcs.get(c1Id);
-		const circ2 = this.circles.get(c2Id) ?? this.arcs.get(c2Id);
+		const circ1 = this.getRadial(c1Id);
+		const circ2 = this.getRadial(c2Id);
 		if (!circ1 || !circ2) return null;
 
 		const c = new ConcentricConstraint(this.nextId('c_concen'), circ1.centerId, circ2.centerId);
@@ -2233,8 +2189,7 @@ export class SketchDocument {
 		let end1Id: string;
 		let end2Id: string;
 		if (p2Id !== undefined) {
-			if (lineOrP1Id === p2Id) return null;
-			if (!this.points.get(lineOrP1Id) || !this.points.get(p2Id)) return null;
+			if (lineOrP1Id === p2Id || !this.points.get(lineOrP1Id) || !this.points.get(p2Id)) return null;
 			end1Id = lineOrP1Id;
 			end2Id = p2Id;
 		} else {
@@ -2245,16 +2200,11 @@ export class SketchDocument {
 		}
 
 		if (pointId === end1Id || pointId === end2Id) return null;
-
-		const existing = this.findConstraint(
+		return this.addUniqueConstraint(
 			MidpointConstraint,
-			c => c.midId === pointId && this.matchesEndpoints(c.p1Id, c.p2Id, end1Id, end2Id)
+			c => c.midId === pointId && this.matchesEndpoints(c.p1Id, c.p2Id, end1Id, end2Id),
+			() => new MidpointConstraint(this.nextId('c_mid'), pointId, end1Id, end2Id)
 		);
-		if (existing) return existing;
-
-		const c = new MidpointConstraint(this.nextId('c_mid'), pointId, end1Id, end2Id);
-		this.addConstraint(c);
-		return c;
 	}
 
 	addThreePointMidpointConstraint(p1Id: string, p2Id: string, p3Id: string): MidpointConstraint | null {
@@ -2601,7 +2551,7 @@ export class SketchDocument {
 	): Set<string> {
 		for (const c of constraints) {
 			if (!(c instanceof RadiusConstraint)) continue;
-			const entity = this.circles.get(c.circleId) ?? this.arcs.get(c.circleId);
+			const entity = this.getRadial(c.circleId);
 			if (!entity) continue;
 			entity.radius = Math.max(MIN_SOLVER_RADIUS, c.targetRadius);
 			locked.add(`${c.circleId}.r`);
@@ -2929,7 +2879,7 @@ export class SketchDocument {
 	}
 
 	dragCircleRadius(circleOrArcId: string, targetRadius: number): SolverResult {
-		const entity = this.circles.get(circleOrArcId) ?? this.arcs.get(circleOrArcId);
+		const entity = this.getRadial(circleOrArcId);
 		if (!entity) return this.solve();
 
 		entity.radius = Math.max(MIN_SOLVER_RADIUS, targetRadius);

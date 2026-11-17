@@ -1,5 +1,7 @@
 import type { SketchDocument } from './sketch';
 import { deselectEntity } from './selection';
+import type { SketchPoint } from './types';
+import type { Vec2 } from '../math/vector';
 import {
 	CircularPatternConstraint,
 	computePatternCopyAngle,
@@ -11,6 +13,118 @@ import {
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
 } from '../solver/constraints';
+
+function buildPatternCopyEntities(
+	sketch: SketchDocument,
+	sourceObjectIds: string[],
+	transformPoint: (origPtId: string, pt: SketchPoint) => Vec2 | string
+): {
+	pointPairs: PatternPointPair[];
+	radiusPairs: PatternRadiusPair[];
+	createdEntityIds: PatternCopyData['createdEntityIds'];
+} {
+	const pointMap = new Map<string, string>();
+	const pointPairs: PatternPointPair[] = [];
+	const radiusPairs: PatternRadiusPair[] = [];
+	const createdEntityIds: PatternCopyData['createdEntityIds'] = [];
+
+	const mapPoint = (origPtId: string): string => {
+		if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
+		const pt = sketch.points.get(origPtId);
+		if (!pt) return origPtId;
+
+		const mapped = transformPoint(origPtId, pt);
+		if (typeof mapped === 'string') {
+			pointMap.set(origPtId, mapped);
+			return mapped;
+		}
+
+		const newPt = sketch.addPoint(mapped, false);
+		pointMap.set(origPtId, newPt.id);
+		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
+		createdEntityIds.push({ id: newPt.id, type: 'point' });
+		return newPt.id;
+	};
+
+	for (const objId of sourceObjectIds) {
+		const line = sketch.lines.get(objId);
+		if (line) {
+			const np1Id = mapPoint(line.p1Id);
+			const np2Id = mapPoint(line.p2Id);
+			if (np1Id !== np2Id) {
+				const newLine = sketch.addLine(np1Id, np2Id, line.isConstruction);
+				createdEntityIds.push({ id: newLine.id, type: 'line' });
+			}
+			continue;
+		}
+
+		const circle = sketch.circles.get(objId);
+		if (circle) {
+			const newCircle = sketch.addCircle(mapPoint(circle.centerId), circle.radius, circle.isConstruction);
+			radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
+			createdEntityIds.push({ id: newCircle.id, type: 'circle' });
+			continue;
+		}
+
+		const arc = sketch.arcs.get(objId);
+		if (arc) {
+			const newArc = sketch.addArc(
+				mapPoint(arc.centerId),
+				mapPoint(arc.startPointId),
+				mapPoint(arc.endPointId),
+				arc.radius,
+				arc.clockwise,
+				arc.isConstruction
+			);
+			radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
+			createdEntityIds.push({ id: newArc.id, type: 'arc' });
+			continue;
+		}
+
+		const ellipse = sketch.ellipses.get(objId);
+		if (ellipse) {
+			const newEllipse = sketch.addEllipse(
+				mapPoint(ellipse.centerId),
+				mapPoint(ellipse.majorAxisPointId),
+				mapPoint(ellipse.minorAxisPointId),
+				ellipse.isConstruction
+			);
+			createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
+			continue;
+		}
+
+		const elArc = sketch.ellipticalArcs.get(objId);
+		if (elArc) {
+			const newElArc = sketch.addEllipticalArc(
+				mapPoint(elArc.centerId),
+				mapPoint(elArc.majorAxisPointId),
+				mapPoint(elArc.minorAxisPointId),
+				mapPoint(elArc.startPointId),
+				mapPoint(elArc.endPointId),
+				elArc.clockwise,
+				elArc.isConstruction
+			);
+			createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
+			continue;
+		}
+
+		const sourceSpline = sketch.splines.get(objId);
+		if (sourceSpline) {
+			const spline = sketch.copySpline(sourceSpline, mapPoint);
+			createdEntityIds.push({ id: spline.id, type: 'spline' });
+			for (const id of new Set(spline.tangentLineIds)) {
+				if (id) createdEntityIds.push({ id, type: 'line' });
+			}
+			continue;
+		}
+
+		if (sketch.points.get(objId)) {
+			mapPoint(objId);
+		}
+	}
+
+	return { pointPairs, radiusPairs, createdEntityIds };
+}
 
 export function generateCircularPatternCopy(
 	sketch: SketchDocument,
@@ -26,143 +140,32 @@ export function generateCircularPatternCopy(
 
 	const angleDeg = computePatternCopyAngle(copyIndex, quantity, distribution, totalAngle);
 	const rad = (angleDeg * Math.PI) / 180;
-
-	const pointMap = new Map<string, string>();
-	const pointPairs: PatternPointPair[] = [];
-	const radiusPairs: PatternRadiusPair[] = [];
-	const createdEntityIds: PatternCopyData['createdEntityIds'] = [];
-
 	const splinePointIds = new Set(
 		sourceObjectIds.filter(id => sketch.splines.has(id)).flatMap(id => sketch.getPrimitivePointIds(id))
 	);
-	const getOrRotatePoint = (origPtId: string): string => {
-		if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
-		if (origPtId === centerPtId) {
-			pointMap.set(origPtId, centerPtId);
+
+	const data = buildPatternCopyEntities(sketch, sourceObjectIds, (origPtId, pt) => {
+		if (origPtId === centerPtId || (centerPt.distanceTo(pt) < 1e-3 && !splinePointIds.has(origPtId))) {
 			return centerPtId;
 		}
-		const pt = sketch.points.get(origPtId);
-		if (!pt) return origPtId;
+		return pt.clone().rotateAround(centerPt, rad);
+	});
 
-		const distToCenter = centerPt.distanceTo(pt);
-		if (distToCenter < 1e-3 && !splinePointIds.has(origPtId)) {
-			pointMap.set(origPtId, centerPtId);
-			return centerPtId;
-		}
-
-		const rotated = pt.clone().rotateAround(centerPt, rad);
-		const newPt = sketch.addPoint(rotated, false);
-		pointMap.set(origPtId, newPt.id);
-		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
-		createdEntityIds.push({ id: newPt.id, type: 'point' });
-		return newPt.id;
-	};
-
-	for (const objId of sourceObjectIds) {
-		const line = sketch.lines.get(objId);
-		if (line) {
-			const np1Id = getOrRotatePoint(line.p1Id);
-			const np2Id = getOrRotatePoint(line.p2Id);
-			if (np1Id !== np2Id) {
-				const newLine = sketch.addLine(np1Id, np2Id, line.isConstruction);
-				createdEntityIds.push({ id: newLine.id, type: 'line' });
-			}
-			continue;
-		}
-
-		const circle = sketch.circles.get(objId);
-		if (circle) {
-			const nCenterId = getOrRotatePoint(circle.centerId);
-			const newCircle = sketch.addCircle(nCenterId, circle.radius, circle.isConstruction);
-			radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
-			createdEntityIds.push({ id: newCircle.id, type: 'circle' });
-			continue;
-		}
-
-		const arc = sketch.arcs.get(objId);
-		if (arc) {
-			const nCenterId = getOrRotatePoint(arc.centerId);
-			const nStartId = getOrRotatePoint(arc.startPointId);
-			const nEndId = getOrRotatePoint(arc.endPointId);
-			const newArc = sketch.addArc(nCenterId, nStartId, nEndId, arc.radius, arc.clockwise, arc.isConstruction);
-			radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
-			createdEntityIds.push({ id: newArc.id, type: 'arc' });
-			continue;
-		}
-
-		const ellipse = sketch.ellipses.get(objId);
-		if (ellipse) {
-			const nCenterId = getOrRotatePoint(ellipse.centerId);
-			const nMajorId = getOrRotatePoint(ellipse.majorAxisPointId);
-			const nMinorId = getOrRotatePoint(ellipse.minorAxisPointId);
-			const newEllipse = sketch.addEllipse(nCenterId, nMajorId, nMinorId, ellipse.isConstruction);
-			createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
-			continue;
-		}
-
-		const elArc = sketch.ellipticalArcs.get(objId);
-		if (elArc) {
-			const nCenterId = getOrRotatePoint(elArc.centerId);
-			const nMajorId = getOrRotatePoint(elArc.majorAxisPointId);
-			const nMinorId = getOrRotatePoint(elArc.minorAxisPointId);
-			const nStartId = getOrRotatePoint(elArc.startPointId);
-			const nEndId = getOrRotatePoint(elArc.endPointId);
-			const newElArc = sketch.addEllipticalArc(
-				nCenterId,
-				nMajorId,
-				nMinorId,
-				nStartId,
-				nEndId,
-				elArc.clockwise,
-				elArc.isConstruction
-			);
-			createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
-			continue;
-		}
-
-		if (copyPatternSpline(sketch, objId, getOrRotatePoint, createdEntityIds)) continue;
-
-		const pt = sketch.points.get(objId);
-		if (pt) {
-			getOrRotatePoint(pt.id);
-			continue;
-		}
-	}
-
-	return {
-		copyIndex,
-		pointPairs,
-		radiusPairs,
-		createdEntityIds,
-	};
-}
-
-function copyPatternSpline(
-	sketch: SketchDocument,
-	id: string,
-	mapPoint: (id: string) => string,
-	createdEntityIds: PatternCopyData['createdEntityIds']
-): boolean {
-	const source = sketch.splines.get(id);
-	if (!source) return false;
-	const spline = sketch.copySpline(source, mapPoint);
-	createdEntityIds.push({ id: spline.id, type: 'spline' });
-	for (const id of new Set(spline.tangentLineIds)) {
-		if (id) createdEntityIds.push({ id, type: 'line' });
-	}
-	return true;
+	return { copyIndex, ...data };
 }
 
 export function deletePatternCopy(sketch: SketchDocument, copy: PatternCopyData): boolean {
+	const maps: Record<string, Map<string, unknown>> = {
+		line: sketch.lines,
+		circle: sketch.circles,
+		arc: sketch.arcs,
+		ellipse: sketch.ellipses,
+		elliptical_arc: sketch.ellipticalArcs,
+		spline: sketch.splines,
+		point: sketch.points,
+	};
 	for (const item of copy.createdEntityIds) {
-		if (item.type === 'line') sketch.lines.delete(item.id);
-		else if (item.type === 'circle') sketch.circles.delete(item.id);
-		else if (item.type === 'arc') sketch.arcs.delete(item.id);
-		else if (item.type === 'ellipse') sketch.ellipses.delete(item.id);
-		else if (item.type === 'elliptical_arc') sketch.ellipticalArcs.delete(item.id);
-		else if (item.type === 'spline') sketch.splines.delete(item.id);
-		else if (item.type === 'point') sketch.points.delete(item.id);
-
+		maps[item.type]?.delete(item.id);
 		deselectEntity(sketch, item.id, item.type, false);
 	}
 	const hasSpline = copy.createdEntityIds.some(item => item.type === 'spline');
@@ -310,15 +313,33 @@ export function updateCircularPattern(
 	}
 
 	// 4. Update pointIds on BaseConstraint
-	const pointIdSet = new Set<string>();
-	pointIdSet.add(c.centerPtId);
+	return finalizePatternUpdate(sketch, c, [c.centerPtId], false, removedSplineCopy);
+}
+
+function finalizePatternUpdate(
+	sketch: SketchDocument,
+	c: CircularPatternConstraint | RectangularPatternConstraint,
+	seedEntityIds: Array<string | null | undefined>,
+	includeRadiusPairs: boolean,
+	removedSplineCopy: boolean
+): boolean {
+	const entityIdSet = new Set<string>();
+	for (const id of seedEntityIds) {
+		if (id) entityIdSet.add(id);
+	}
 	for (const copy of c.copies) {
 		for (const pair of copy.pointPairs) {
-			pointIdSet.add(pair.sourcePtId);
-			pointIdSet.add(pair.patternPtId);
+			entityIdSet.add(pair.sourcePtId);
+			entityIdSet.add(pair.patternPtId);
+		}
+		if (includeRadiusPairs && copy.radiusPairs) {
+			for (const pair of copy.radiusPairs) {
+				entityIdSet.add(pair.sourceCircleId);
+				entityIdSet.add(pair.patternCircleId);
+			}
 		}
 	}
-	(c as any).entityIds = Array.from(pointIdSet);
+	(c as any).entityIds = Array.from(entityIdSet);
 
 	if (removedSplineCopy) sketch.cleanOrphanConstraints();
 	sketch.rebuildParamManager();
@@ -340,102 +361,12 @@ export function generateRectangularPatternCopy(
 	u2: { x: number; y: number }
 ): RectangularPatternCopyData | null {
 	const offset = computeRectangularPatternOffset(i, j, distance1, direction1, distance2, direction2, u1, u2);
-	const pointMap = new Map<string, string>();
-	const pointPairs: PatternPointPair[] = [];
-	const radiusPairs: PatternRadiusPair[] = [];
-	const createdEntityIds: PatternCopyData['createdEntityIds'] = [];
-
-	const getOrTranslatePoint = (origPtId: string): string => {
-		if (pointMap.has(origPtId)) return pointMap.get(origPtId)!;
-		const pt = sketch.points.get(origPtId);
-		if (!pt) return origPtId;
-
-		const translated = pt.clone().add(offset);
-		const newPt = sketch.addPoint(translated, false);
-		pointMap.set(origPtId, newPt.id);
-		pointPairs.push({ sourcePtId: origPtId, patternPtId: newPt.id });
-		createdEntityIds.push({ id: newPt.id, type: 'point' });
-		return newPt.id;
-	};
-
-	for (const objId of sourceObjectIds) {
-		const line = sketch.lines.get(objId);
-		if (line) {
-			const np1Id = getOrTranslatePoint(line.p1Id);
-			const np2Id = getOrTranslatePoint(line.p2Id);
-			if (np1Id !== np2Id) {
-				const newLine = sketch.addLine(np1Id, np2Id, line.isConstruction);
-				createdEntityIds.push({ id: newLine.id, type: 'line' });
-			}
-			continue;
-		}
-
-		const circle = sketch.circles.get(objId);
-		if (circle) {
-			const nCenterId = getOrTranslatePoint(circle.centerId);
-			const newCircle = sketch.addCircle(nCenterId, circle.radius, circle.isConstruction);
-			radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
-			createdEntityIds.push({ id: newCircle.id, type: 'circle' });
-			continue;
-		}
-
-		const arc = sketch.arcs.get(objId);
-		if (arc) {
-			const nCenterId = getOrTranslatePoint(arc.centerId);
-			const nStartId = getOrTranslatePoint(arc.startPointId);
-			const nEndId = getOrTranslatePoint(arc.endPointId);
-			const newArc = sketch.addArc(nCenterId, nStartId, nEndId, arc.radius, arc.clockwise, arc.isConstruction);
-			radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
-			createdEntityIds.push({ id: newArc.id, type: 'arc' });
-			continue;
-		}
-
-		const ellipse = sketch.ellipses.get(objId);
-		if (ellipse) {
-			const nCenterId = getOrTranslatePoint(ellipse.centerId);
-			const nMajorId = getOrTranslatePoint(ellipse.majorAxisPointId);
-			const nMinorId = getOrTranslatePoint(ellipse.minorAxisPointId);
-			const newEllipse = sketch.addEllipse(nCenterId, nMajorId, nMinorId, ellipse.isConstruction);
-			createdEntityIds.push({ id: newEllipse.id, type: 'ellipse' });
-			continue;
-		}
-
-		const elArc = sketch.ellipticalArcs.get(objId);
-		if (elArc) {
-			const nCenterId = getOrTranslatePoint(elArc.centerId);
-			const nMajorId = getOrTranslatePoint(elArc.majorAxisPointId);
-			const nMinorId = getOrTranslatePoint(elArc.minorAxisPointId);
-			const nStartId = getOrTranslatePoint(elArc.startPointId);
-			const nEndId = getOrTranslatePoint(elArc.endPointId);
-			const newElArc = sketch.addEllipticalArc(
-				nCenterId,
-				nMajorId,
-				nMinorId,
-				nStartId,
-				nEndId,
-				elArc.clockwise,
-				elArc.isConstruction
-			);
-			createdEntityIds.push({ id: newElArc.id, type: 'elliptical_arc' });
-			continue;
-		}
-
-		if (copyPatternSpline(sketch, objId, getOrTranslatePoint, createdEntityIds)) continue;
-
-		const pt = sketch.points.get(objId);
-		if (pt) {
-			getOrTranslatePoint(pt.id);
-			continue;
-		}
-	}
-
+	const data = buildPatternCopyEntities(sketch, sourceObjectIds, (_origPtId, pt) => pt.clone().add(offset));
 	return {
 		copyIndex: i * 1000 + j,
 		i,
 		j,
-		pointPairs,
-		radiusPairs,
-		createdEntityIds,
+		...data,
 	};
 }
 
@@ -616,28 +547,11 @@ export function updateRectangularPattern(
 	}
 
 	// 4. Update entityIds on BaseConstraint
-	const entityIdSet = new Set<string>();
-	if (c.line1P1Id) entityIdSet.add(c.line1P1Id);
-	if (c.line1P2Id) entityIdSet.add(c.line1P2Id);
-	if (c.line2P1Id) entityIdSet.add(c.line2P1Id);
-	if (c.line2P2Id) entityIdSet.add(c.line2P2Id);
-	for (const copy of c.copies) {
-		for (const pair of copy.pointPairs) {
-			entityIdSet.add(pair.sourcePtId);
-			entityIdSet.add(pair.patternPtId);
-		}
-		if (copy.radiusPairs) {
-			for (const pair of copy.radiusPairs) {
-				entityIdSet.add(pair.sourceCircleId);
-				entityIdSet.add(pair.patternCircleId);
-			}
-		}
-	}
-	(c as any).entityIds = Array.from(entityIdSet);
-
-	if (removedSplineCopy) sketch.cleanOrphanConstraints();
-	sketch.rebuildParamManager();
-	sketch.solve();
-	sketch.commitTransaction();
-	return true;
+	return finalizePatternUpdate(
+		sketch,
+		c,
+		[c.line1P1Id, c.line1P2Id, c.line2P1Id, c.line2P2Id],
+		true,
+		removedSplineCopy
+	);
 }
