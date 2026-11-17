@@ -49,6 +49,10 @@ type ConstraintSnapshotData =
 	| { type: 'coincident' | 'horizontal' | 'vertical'; p1Id: string; p2Id: string }
 	| {
 			type: 'distance';
+			circleIds?: [string, string];
+			labelRadius?: number;
+			leaderOffset?: number;
+			leaderAngle?: number;
 			side?: number;
 			p1Id: string;
 			p2Id: string;

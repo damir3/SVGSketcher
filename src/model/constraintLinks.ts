@@ -581,6 +581,11 @@ export function getEntitiesForConstraint(
 	} else if (c.type === 'coincident') {
 		if (anyC.p1Id && sketch.points.get(anyC.p1Id)) add(anyC.p1Id, 'point');
 		if (anyC.p2Id && sketch.points.get(anyC.p2Id)) add(anyC.p2Id, 'point');
+	} else if (c.type === 'distance' && anyC.circleIds) {
+		for (const id of anyC.circleIds) {
+			if (sketch.circles.has(id)) add(id, 'circle');
+			else if (sketch.arcs.has(id)) add(id, 'arc');
+		}
 	} else if (c.type === 'distance' && anyC.p1Id === 'origin' && anyC.orientation !== 'aligned') {
 		add(anyC.p2Id, 'point');
 		add(anyC.orientation === 'vertical' ? 'axis_x' : 'axis_y', 'line');

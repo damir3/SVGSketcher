@@ -6,8 +6,12 @@ import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import {
 	computeDistanceDimensionGeometry,
+	computeArcDimensionExtension,
+	distanceToArcDimensionExtension,
+	type ArcDimensionExtension,
 	distanceToLinearDimensionVisual,
 	formatDimensionValue,
+	renderLinearDimensionVisual,
 } from '../../canvas/dimensionGeometry';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { PointToLineDistanceConstraint } from './pointToLineDistance';
@@ -27,6 +31,13 @@ export class DistanceConstraint extends BaseConstraint {
 	labelPosition?: number;
 	/** Fixed direction for projected distances; omitted means unsigned distance. */
 	side?: number;
+	/** Radial gap between circles or circular arcs; point IDs identify the centers. */
+	circleIds?: [string, string];
+	leaderAngle?: number;
+	/** Signed radial offset of the label from the outer perimeter. */
+	leaderOffset?: number;
+	/** Legacy placement, converted to leaderOffset when first displayed. */
+	labelRadius?: number;
 
 	constructor(
 		id: string,
@@ -57,6 +68,7 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	get displayName(): string {
+		if (this.circleIds) return 'Radial Distance';
 		if (this.p1Id === 'origin')
 			return this.orientation === 'horizontal'
 				? 'Distance to Y-Axis'
@@ -71,10 +83,20 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
-		return 1;
+		return this.circleIds && this.p1Id !== this.p2Id ? 3 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.circleIds) {
+			const [a, b] = this.circleIds.map(id => paramMap.get(`${id}.r`) ?? 0);
+			const residuals = [(Math.abs(b - a) - this.targetDistance) * this.weight];
+			if (this.p1Id !== this.p2Id) {
+				const p1 = readParamPoint(paramMap, this.p1Id);
+				const p2 = readParamPoint(paramMap, this.p2Id);
+				residuals.push((p1.x - p2.x) * this.weight, (p1.y - p2.y) * this.weight);
+			}
+			return residuals;
+		}
 		const p1 = readParamPoint(paramMap, this.p1Id);
 		const p2 = readParamPoint(paramMap, this.p2Id);
 
@@ -102,6 +124,19 @@ export class DistanceConstraint extends BaseConstraint {
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
 		const res: JacobianEntry[] = [];
+		if (this.circleIds) {
+			const [a, b] = this.circleIds;
+			const sign = (paramMap.get(`${b}.r`) ?? 0) >= (paramMap.get(`${a}.r`) ?? 0) ? 1 : -1;
+			this.addJacobianEntry(res, paramIndices, `${a}.r`, baseRow, -sign * this.weight);
+			this.addJacobianEntry(res, paramIndices, `${b}.r`, baseRow, sign * this.weight);
+			if (this.p1Id !== this.p2Id) {
+				this.addJacobianEntry(res, paramIndices, `${this.p1Id}.x`, baseRow + 1, this.weight);
+				this.addJacobianEntry(res, paramIndices, `${this.p2Id}.x`, baseRow + 1, -this.weight);
+				this.addJacobianEntry(res, paramIndices, `${this.p1Id}.y`, baseRow + 2, this.weight);
+				this.addJacobianEntry(res, paramIndices, `${this.p2Id}.y`, baseRow + 2, -this.weight);
+			}
+			return res;
+		}
 		const p1 = readParamPoint(paramMap, this.p1Id);
 		const p2 = readParamPoint(paramMap, this.p2Id);
 
@@ -134,6 +169,46 @@ export class DistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
+	private dimensionPoints(sketch: SketchDocument): [Vec2 | undefined, Vec2 | undefined] {
+		const p1 = sketch.points.get(this.p1Id);
+		const p2 = sketch.points.get(this.p2Id);
+		if (!this.circleIds || !p1 || !p2) return [p1, p2];
+		const [a, b] = this.circleIds.map(id => sketch.circles.get(id) ?? sketch.arcs.get(id));
+		if (!a || !b) return [undefined, undefined];
+		const direction = new Vec2(Math.cos(this.leaderAngle ?? 0), Math.sin(this.leaderAngle ?? 0));
+		return [p1.clone().addScaledVector(direction, a.radius), p2.clone().addScaledVector(direction, b.radius)];
+	}
+
+	private arcExtensions(sketch: SketchDocument, viewport: Viewport, targets: [Vec2, Vec2]): ArcDimensionExtension[] {
+		return (this.circleIds ?? []).flatMap((id, i) => {
+			const arc = sketch.arcs.get(id);
+			if (!arc) return [];
+			const center = sketch.points.get(arc.centerId);
+			const start = sketch.points.get(arc.startPointId);
+			const end = sketch.points.get(arc.endPointId);
+			if (!center || !start || !end) return [];
+			const extension = computeArcDimensionExtension(
+				viewport.worldToScreen(center),
+				viewport.worldToScreen(start),
+				viewport.worldToScreen(end),
+				arc.radius * viewport.zoom,
+				!!arc.clockwise,
+				targets[i]
+			);
+			return extension ? [extension] : [];
+		});
+	}
+
+	private dimensionLabelPosition(sketch: SketchDocument): number {
+		if (!this.circleIds) return this.labelPosition ?? 0.5;
+		const [a, b] = this.circleIds.map(id => sketch.circles.get(id) ?? sketch.arcs.get(id));
+		if (!a || !b || Math.abs(b.radius - a.radius) < 1e-7) return this.labelPosition ?? 0.5;
+		const outerRadius = Math.max(a.radius, b.radius);
+		this.leaderOffset ??=
+			(this.labelRadius ?? a.radius + (b.radius - a.radius) * (this.labelPosition ?? 0.5)) - outerRadius;
+		return (outerRadius + this.leaderOffset - a.radius) / (b.radius - a.radius);
+	}
+
 	private axisDimension(): PointToLineDistanceConstraint | undefined {
 		if (this.p1Id !== 'origin' || this.orientation === 'aligned') return undefined;
 		const axis = this.orientation === 'vertical' ? 'axis_x' : 'axis_y';
@@ -152,6 +227,22 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		if (this.circleIds) {
+			const center = sketch.points.get(this.p1Id);
+			if (!center) return;
+			const world = viewport.screenToWorld(screen);
+			this.leaderAngle = Math.atan2(world.y - center.y, world.x - center.x);
+			const radii = this.circleIds.map(id => (sketch.circles.get(id) ?? sketch.arcs.get(id))?.radius);
+			if (radii[0] === undefined || radii[1] === undefined) return;
+			this.leaderOffset = world.distanceTo(center) - Math.max(radii[0], radii[1]);
+			this.labelRadius = undefined;
+			const [p1, p2] = this.dimensionPoints(sketch);
+			if (p1 && p2 && p1.distanceTo(p2) > 1e-7) {
+				this.labelPosition =
+					new Vec2().subVectors(world, p1).dot(new Vec2().subVectors(p2, p1)) / p1.distanceToSquared(p2);
+			}
+			return;
+		}
 		const axis = this.axisDimension();
 		if (axis) {
 			axis.moveLabelTo(screen, sketch, viewport);
@@ -159,8 +250,7 @@ export class DistanceConstraint extends BaseConstraint {
 			this.labelPosition = axis.labelPosition;
 			return;
 		}
-		const p1 = sketch.points.get(this.p1Id);
-		const p2 = sketch.points.get(this.p2Id);
+		const [p1, p2] = this.dimensionPoints(sketch);
 		if (!p1 || !p2) return;
 		const s1 = viewport.worldToScreen(p1);
 		const s2 = viewport.worldToScreen(p2);
@@ -199,14 +289,18 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	getLabelScreenPos(sketch: SketchDocument, viewport: Viewport): Vec2 | null {
-		if (this.p1Id === 'origin' || this.p2Id === 'origin') {
+		if (!this.circleIds && (this.p1Id === 'origin' || this.p2Id === 'origin')) {
 			const userPtId = this.p1Id === 'origin' ? this.p2Id : this.p1Id;
 			const pt = sketch.points.get(userPtId);
 			return pt ? viewport.worldToScreen(pt) : null;
 		}
-		const p1 = sketch.points.get(this.p1Id);
-		const p2 = sketch.points.get(this.p2Id);
-		const midPoint = p1 && p2 ? new Vec2().midpoint(p1, p2) : new Vec2(0, 0);
+		const [p1, p2] = this.dimensionPoints(sketch);
+		const midPoint =
+			p1 && p2
+				? this.circleIds
+					? p1.clone().addScaledVector(new Vec2().subVectors(p2, p1), this.dimensionLabelPosition(sketch))
+					: new Vec2().midpoint(p1, p2)
+				: new Vec2(0, 0);
 		return viewport.worldToScreen(midPoint);
 	}
 
@@ -217,44 +311,68 @@ export class DistanceConstraint extends BaseConstraint {
 			axis.render(ctx);
 			return;
 		}
-		const p1 = ctx.sketch.points.get(this.p1Id);
-		const p2 = ctx.sketch.points.get(this.p2Id);
+		this.renderDimension(ctx.sketch, ctx.viewport, ctx.targetGroup, ctx.isSelected, ctx.renderLinearDimensionVisual);
+	}
+
+	renderDimension(
+		sketch: SketchDocument,
+		viewport: Viewport,
+		targetGroup: SVGGElement,
+		isSelected = false,
+		renderVisual = renderLinearDimensionVisual
+	): void {
+		const [p1, p2] = this.dimensionPoints(sketch);
 		if (!p1 || !p2) return;
 
-		const s1 = ctx.viewport.worldToScreen(p1);
-		const s2 = ctx.viewport.worldToScreen(p2);
-		const offsetMm = this.offset ?? DEFAULT_DISTANCE_OFFSET;
-		const offsetScreen = offsetMm * ctx.viewport.zoom;
-		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
+		const s1 = viewport.worldToScreen(p1);
+		const s2 = viewport.worldToScreen(p2);
+		const offsetMm = this.circleIds ? 0 : (this.offset ?? DEFAULT_DISTANCE_OFFSET);
+		const offsetScreen = offsetMm * viewport.zoom;
+		const geom = computeDistanceDimensionGeometry(
+			s1,
+			s2,
+			this.circleIds ? 'direct' : (this.orientation ?? 'aligned'),
+			offsetScreen
+		);
 		if (!geom) return;
 
-		ctx.renderLinearDimensionVisual({
+		renderVisual({
 			d1: geom.d1,
 			d2: geom.d2,
 			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
 			extensionLines: geom.extensionLines,
-			parent: ctx.targetGroup,
-			isSelected: ctx.isSelected,
+			arcExtensions: this.arcExtensions(sketch, viewport, [s1, s2]),
+			parent: targetGroup,
+			isSelected: isSelected,
 			constraintId: this.id,
-			labelPosition: this.labelPosition,
+			labelPosition: this.dimensionLabelPosition(sketch),
 		});
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
 		const axis = this.axisDimension();
 		if (axis) return axis.distanceTo(screen, sketch, viewport);
-		const p1 = sketch.points.get(this.p1Id);
-		const p2 = sketch.points.get(this.p2Id);
+		const [p1, p2] = this.dimensionPoints(sketch);
 		if (!p1 || !p2) return null;
 
 		const s1 = viewport.worldToScreen(p1);
 		const s2 = viewport.worldToScreen(p2);
-		const offsetMm = this.offset ?? DEFAULT_DISTANCE_OFFSET;
+		const offsetMm = this.circleIds ? 0 : (this.offset ?? DEFAULT_DISTANCE_OFFSET);
 		const offsetScreen = offsetMm * viewport.zoom;
-		const geom = computeDistanceDimensionGeometry(s1, s2, this.orientation ?? 'aligned', offsetScreen);
+		const geom = computeDistanceDimensionGeometry(
+			s1,
+			s2,
+			this.circleIds ? 'direct' : (this.orientation ?? 'aligned'),
+			offsetScreen
+		);
 		if (!geom) return null;
 
-		return distanceToLinearDimensionVisual(screen, geom.d1, geom.d2, this.labelPosition ?? 0.5);
+		return Math.min(
+			distanceToLinearDimensionVisual(screen, geom.d1, geom.d2, this.dimensionLabelPosition(sketch)),
+			...this.arcExtensions(sketch, viewport, [s1, s2]).map(extension =>
+				distanceToArcDimensionExtension(screen, extension)
+			)
+		);
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

@@ -1,7 +1,14 @@
 import { DIMENSION_EXTENSION_OVERRUN_PX, DIMENSION_EXTERNAL_ARROW_TAIL_PX } from './distances';
 import { Vec2 } from '../math/vector';
-import { distanceToLinearDimension } from '../math/hitTest';
-import { createSvgCircle, createSvgElement, createSvgLine, createSvgPath, renderDimensionLabel } from './svg';
+import { distanceToArc, distanceToLinearDimension } from '../math/hitTest';
+import {
+	createSvgCircle,
+	createSvgElement,
+	createSvgLine,
+	createSvgPath,
+	getArcSvgPath,
+	renderDimensionLabel,
+} from './svg';
 import {
 	COLORS,
 	DIM_ARROWS,
@@ -17,10 +24,56 @@ export interface LinearDimensionGeometry {
 	extensionLines: Array<{ from: Vec2; to: Vec2 }>;
 }
 
+export interface ArcDimensionExtension {
+	center: Vec2;
+	radius: number;
+	from: Vec2;
+	to: Vec2;
+	clockwise: boolean;
+}
+
+/** Continue the nearest arc endpoint to a dimension arrow outside its sweep. */
+export function computeArcDimensionExtension(
+	center: Vec2,
+	start: Vec2,
+	end: Vec2,
+	radius: number,
+	clockwise: boolean,
+	target: Vec2
+): ArcDimensionExtension | undefined {
+	const twoPi = 2 * Math.PI;
+	const positive = (angle: number) => ((angle % twoPi) + twoPi) % twoPi;
+	const sign = clockwise ? 1 : -1;
+	const startAngle = center.angleToPoint(start);
+	const angle = center.angleToPoint(target);
+	const sweep = positive((center.angleToPoint(end) - startAngle) * sign);
+	const relative = positive((angle - startAngle) * sign);
+	if (relative <= sweep + 1e-8 || twoPi - relative < 1e-8) return undefined;
+	const extendEnd = relative - sweep < twoPi - relative;
+	const extensionSign = extendEnd ? sign : -sign;
+	return {
+		center,
+		radius,
+		from: extendEnd ? end : start,
+		to: Vec2.fromPolar(radius, angle + (extensionSign * 4) / Math.max(radius, 1)).add(center),
+		clockwise: extensionSign > 0,
+	};
+}
+
+export function distanceToArcDimensionExtension(screen: Vec2, extension: ArcDimensionExtension): number {
+	return Math.min(
+		distanceToArc(screen, extension.center, extension.radius, extension.from, extension.to, extension.clockwise) ??
+			Infinity,
+		screen.distanceTo(extension.from),
+		screen.distanceTo(extension.to)
+	);
+}
+
 export interface LinearDimensionVisualOptions {
 	d1: Vec2;
 	d2: Vec2;
 	label: string;
+	arcExtensions?: ArcDimensionExtension[];
 	extensionLines?: Array<{ from: Vec2; to: Vec2 }>;
 	parent: SVGElement;
 	isSelected?: boolean;
@@ -185,6 +238,7 @@ export function renderLinearDimensionVisual(opts: LinearDimensionVisualOptions):
 		d2,
 		label,
 		extensionLines,
+		arcExtensions,
 		parent,
 		isSelected = false,
 		constraintId,
@@ -218,6 +272,19 @@ export function renderLinearDimensionVisual(opts: LinearDimensionVisualOptions):
 		for (const ext of extensionLines) {
 			createSvgLine(ext.from, ext.to, extAttrs, g);
 		}
+	}
+
+	for (const extension of arcExtensions ?? []) {
+		const attrs = isPreview
+			? PREVIEW_EXTENSION_LINE_ATTRS
+			: isSelected
+				? { ...EXTENSION_LINE_ATTRS, stroke: COLORS.selected }
+				: EXTENSION_LINE_ATTRS;
+		createSvgPath(
+			getArcSvgPath(extension.center, extension.from, extension.to, extension.radius, extension.clockwise),
+			{ ...attrs, fill: 'none', class: 'dimension-arc-extension' },
+			g
+		);
 	}
 
 	// 2. Start point highlight (origin anchor)
@@ -510,6 +577,12 @@ export function renderPointToLineDistancePreviewVisual(
 ): void {
 	const geom = computePointToLineDimensionGeometry(sp, s1, s2, 0, cursor);
 	if (!geom) return;
+	let labelPosition =
+		cursor && geom.d1.distanceToSquared(geom.d2) > 1e-8
+			? new Vec2().subVectors(cursor, geom.d1).dot(new Vec2().subVectors(geom.d2, geom.d1)) /
+				geom.d1.distanceToSquared(geom.d2)
+			: 0.5;
+	if (Math.abs(labelPosition - 0.5) < 0.04) labelPosition = 0.5;
 
 	renderLinearDimensionVisual({
 		d1: geom.d1,
@@ -519,6 +592,7 @@ export function renderPointToLineDistancePreviewVisual(
 		parent,
 		isPreview: true,
 		startPointHighlight: sp,
+		labelPosition,
 	});
 }
 

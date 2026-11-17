@@ -107,6 +107,27 @@ function describe(c: IConstraint): Description | Description[] | null {
 		return { kind: 4, refs: [scalar(`${c.circleId}.r`, c.targetRadius)], a: c.targetRadius, b: 0 };
 	if (c instanceof EqualRadiusConstraint)
 		return { kind: 5, refs: [scalar(`${c.circle1Id}.r`), scalar(`${c.circle2Id}.r`)], a: 0, b: 0 };
+	if (c instanceof DistanceConstraint && c.circleIds) {
+		const gap: Description = {
+			kind: 6,
+			refs: [scalar(`${c.circleIds[0]}.r`), constant(0), scalar(`${c.circleIds[1]}.r`), constant(0)],
+			a: c.targetDistance,
+			b: 1,
+			equations: 1,
+		};
+		return c.p1Id === c.p2Id
+			? gap
+			: [
+					gap,
+					{
+						kind: 1,
+						refs: [...point(c.p1Id), ...point(c.p2Id)],
+						a: 0,
+						b: 0,
+						equations: 2,
+					},
+				];
+	}
 	if (c instanceof DistanceConstraint && c.side !== undefined && c.orientation !== 'aligned') {
 		if (c.p1Id !== 'origin') return null;
 		return {

@@ -12,6 +12,15 @@ import {
 import { Vec2 } from '../math/vector';
 
 export function setPointCoords(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
+	const editsArcEndpoint = [...sketch.arcs.values()].some(
+		arc => arc.centerId !== pointId && (arc.startPointId === pointId || arc.endPointId === pointId)
+	);
+	return editsArcEndpoint
+		? sketch.withStableCircleCenters(() => setPointCoordsImpl(sketch, pointId, targetX, targetY))
+		: setPointCoordsImpl(sketch, pointId, targetX, targetY);
+}
+
+function setPointCoordsImpl(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
 	const pt = sketch.points.get(pointId);
 	if (!pt || !isFinite(targetX) || !isFinite(targetY)) return false;
 
@@ -366,6 +375,10 @@ export function setLinesRelativeAngle(
 }
 
 export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, newRadius: number): boolean {
+	return sketch.withStableCircleCenters(() => setCircleOrArcRadiusImpl(sketch, entityId, newRadius));
+}
+
+function setCircleOrArcRadiusImpl(sketch: SketchDocument, entityId: string, newRadius: number): boolean {
 	if (!isFinite(newRadius) || newRadius <= 0) return false;
 	const circle = sketch.circles.get(entityId);
 	const arc = sketch.arcs.get(entityId);
@@ -428,6 +441,10 @@ export function setCircleOrArcRadius(sketch: SketchDocument, entityId: string, n
 }
 
 export function setArcAngle(sketch: SketchDocument, arcId: string, newSweepDeg: number): boolean {
+	return sketch.withStableCircleCenters(() => setArcAngleImpl(sketch, arcId, newSweepDeg));
+}
+
+function setArcAngleImpl(sketch: SketchDocument, arcId: string, newSweepDeg: number): boolean {
 	const arc = sketch.arcs.get(arcId);
 	if (!arc || !isFinite(newSweepDeg) || newSweepDeg <= 0) return false;
 	const center = sketch.points.get(arc.centerId);

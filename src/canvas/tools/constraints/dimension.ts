@@ -1,9 +1,9 @@
-import { LABEL_DISTANCE_PX } from '../../distances';
 import { findAxisNear } from '../../hitTesting';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { ORIGIN, Vec2 } from '../../../math/vector';
+import { DistanceConstraint } from '../../../solver/constraints/distance';
 import { RadiusConstraint } from '../../../solver/constraints/radius';
 
 export interface DimensionState {
@@ -13,6 +13,7 @@ export interface DimensionState {
 	point1Id: string | null;
 	point2Id: string | null;
 	point3Id?: string | null;
+	radialEntityId?: string;
 }
 
 export function determineDistanceOrientation(
@@ -91,7 +92,7 @@ export function determineDistanceOrientation(
 
 export class DimensionTool extends BaseTool {
 	readonly id = 'dimension' as const;
-	private radiusDraft: { constraint: RadiusConstraint; returnToSelect: boolean } | null = null;
+	private radialDraft: { constraint: RadiusConstraint | DistanceConstraint; returnToSelect: boolean } | null = null;
 
 	state: DimensionState = {
 		step: 0,
@@ -105,6 +106,23 @@ export class DimensionTool extends BaseTool {
 		super.activate(ctx);
 
 		const sel = ctx.sketch.selection;
+		const circles = [...sel.circleIds, ...sel.arcIds];
+		if (
+			circles.length === 2 &&
+			sel.pointIds.size === 0 &&
+			sel.lineIds.size === 0 &&
+			ctx.sketch.canAddCircleDistanceConstraint(circles[0], circles[1])
+		) {
+			this.beginCircleDistancePlacement(circles[0], circles[1]);
+			return;
+		}
+		if (sel.lineIds.size === 1 && (sel.pointIds.size === 1 || circles.length === 1)) {
+			const radialId = sel.pointIds.size ? undefined : circles[0];
+			const pointId = radialId
+				? (ctx.sketch.circles.get(radialId) ?? ctx.sketch.arcs.get(radialId))?.centerId
+				: [...sel.pointIds][0];
+			if (pointId && this.beginPointLinePlacement(pointId, [...sel.lineIds][0], radialId)) return;
+		}
 		if (sel.lineIds.size === 1) {
 			this.state = {
 				step: 1,
@@ -153,10 +171,92 @@ export class DimensionTool extends BaseTool {
 		} else {
 			this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 			const radialIds = [...sel.circleIds, ...sel.arcIds];
-			if (radialIds.length === 1 && !ctx.sketch.hasRadiusConstraint(radialIds[0])) {
+			if (radialIds.length === 1) {
 				this.beginRadiusPlacement(radialIds[0]);
 			}
 		}
+	}
+
+	private renderCenterLinePreview(radialId: string, lineId: string, screen: Vec2): boolean {
+		const { sketch, viewport, renderer } = this.ctx;
+		if (!sketch.canAddCircleToLineDistanceConstraint(radialId, lineId)) return false;
+		const radial = (sketch.circles.get(radialId) ?? sketch.arcs.get(radialId))!;
+		const line = sketch.getLine(lineId)!;
+		const center = sketch.points.get(radial.centerId);
+		const a = sketch.points.get(line.p1Id);
+		const b = sketch.points.get(line.p2Id);
+		if (!center || !a || !b) return false;
+		const direction = new Vec2().subVectors(b, a);
+		const distance = Math.abs(new Vec2().subVectors(center, a).cross(direction)) / Math.max(direction.length(), 1e-7);
+		renderer.renderPointToLineDistancePreview(
+			viewport.worldToScreen(center),
+			viewport.worldToScreen(a),
+			viewport.worldToScreen(b),
+			screen,
+			distance
+		);
+		return true;
+	}
+
+	private beginPointLinePlacement(pointId: string, lineId: string, radialEntityId?: string): boolean {
+		const line = this.ctx.sketch.getLine(lineId);
+		if (!line || !this.ctx.sketch.points.get(pointId) || pointId === line.p1Id || pointId === line.p2Id) return false;
+		this.radialDraft = null;
+		this.state = { step: 2, line1Id: lineId, line2Id: null, point1Id: pointId, point2Id: null, radialEntityId };
+		this.ctx.sketch.selectEntity(
+			radialEntityId ?? pointId,
+			radialEntityId ? (this.ctx.sketch.circles.has(radialEntityId) ? 'circle' : 'arc') : 'point',
+			false
+		);
+		this.ctx.sketch.selectEntity(lineId, 'line', true);
+		this.ctx.renderer.clearPreviews();
+		this.ctx.showToast('Click to place the distance label');
+		this.ctx.requestRender();
+		return true;
+	}
+
+	private beginCenterLinePlacement(radialId: string, lineId: string, _e: ToolMouseEvent): boolean {
+		const radial = this.ctx.sketch.circles.get(radialId) ?? this.ctx.sketch.arcs.get(radialId);
+		return !!radial && this.beginPointLinePlacement(radial.centerId, lineId, radialId);
+	}
+
+	private placePointLineDistance(e: ToolMouseEvent): boolean {
+		const { sketch, viewport } = this.ctx;
+		const { point1Id, line1Id, radialEntityId } = this.state;
+		if (!point1Id || !line1Id) return false;
+		const c = radialEntityId
+			? sketch.addCircleToLineDistanceConstraint(radialEntityId, line1Id)
+			: line1Id === 'axis_x' || line1Id === 'axis_y'
+				? sketch.addPointToAxisDistanceConstraint(point1Id, line1Id === 'axis_x' ? 'x' : 'y')
+				: sketch.addPointToLineDistanceConstraint(point1Id, line1Id);
+		if (!c) return false;
+		c.moveLabelTo(e.screen, sketch, viewport);
+		this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+		this.ctx.renderer.clearPreviews();
+		sketch.selectEntity(c.id, 'constraint', false);
+		this.ctx.showToast('Distance constraint applied');
+		this.ctx.requestRender();
+		this.ctx.onEditDimension?.(c, e.client);
+		return true;
+	}
+
+	beginCircleDistancePlacement(firstId: string, secondId: string): void {
+		const { sketch } = this.ctx;
+		if (!sketch.canAddCircleDistanceConstraint(firstId, secondId)) return;
+		const a = (sketch.circles.get(firstId) ?? sketch.arcs.get(firstId))!;
+		const b = (sketch.circles.get(secondId) ?? sketch.arcs.get(secondId))!;
+		const draft = new DistanceConstraint(
+			'distance-preview',
+			a.centerId,
+			b.centerId,
+			Math.max(0.01, Number(Math.abs(a.radius - b.radius).toFixed(2)))
+		);
+		draft.circleIds = [firstId, secondId];
+		this.radialDraft = { constraint: draft, returnToSelect: false };
+		sketch.selectEntity(firstId, sketch.circles.has(firstId) ? 'circle' : 'arc', false);
+		sketch.selectEntity(secondId, sketch.circles.has(secondId) ? 'circle' : 'arc', true);
+		this.ctx.showToast('Click to place the distance label');
+		this.ctx.requestRender();
 	}
 
 	beginRadiusPlacement(id: string, returnToSelect = false): void {
@@ -166,7 +266,7 @@ export class DimensionTool extends BaseTool {
 		if (!entity) return;
 
 		const radius = Math.max(0.01, Number(entity.radius.toFixed(2)));
-		this.radiusDraft = {
+		this.radialDraft = {
 			constraint: new RadiusConstraint('radius-preview', id, radius, 1, undefined, circle ? 'diameter' : 'radius'),
 			returnToSelect,
 		};
@@ -180,7 +280,7 @@ export class DimensionTool extends BaseTool {
 	}
 
 	override cancel(): void {
-		this.radiusDraft = null;
+		this.radialDraft = null;
 		this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
 		this.ctx.renderer.clearPreviews();
 		this.ctx.sketch.clearSelection();
@@ -188,7 +288,9 @@ export class DimensionTool extends BaseTool {
 	}
 
 	override isHighlightEnabled(): boolean {
-		if (this.radiusDraft) return false;
+		if (this.radialDraft) {
+			return this.radialDraft.constraint instanceof RadiusConstraint && !this.radialDraft.returnToSelect;
+		}
 		return (
 			this.state.step < 2 ||
 			Boolean(this.state.step === 2 && this.state.point1Id && this.state.point2Id && !this.state.point3Id)
@@ -196,6 +298,17 @@ export class DimensionTool extends BaseTool {
 	}
 
 	override canHighlight(target: HoverTarget): boolean {
+		if (this.radialDraft) {
+			const { constraint, returnToSelect } = this.radialDraft;
+			return (
+				!returnToSelect &&
+				constraint instanceof RadiusConstraint &&
+				((target.type === 'line' &&
+					this.ctx.sketch.canAddCircleToLineDistanceConstraint(constraint.circleId, target.id)) ||
+					((target.type === 'circle' || target.type === 'arc') &&
+						this.ctx.sketch.canAddCircleDistanceConstraint(constraint.circleId, target.id)))
+			);
+		}
 		if (target.type === 'constraint') return false;
 		if (this.state.step === 0) {
 			return (
@@ -212,7 +325,12 @@ export class DimensionTool extends BaseTool {
 				return (target.type === 'point' && target.id !== this.state.point1Id) || target.type === 'line';
 			}
 			if (this.state.line1Id) {
-				return (target.type === 'line' && target.id !== this.state.line1Id) || target.type === 'point';
+				return (
+					(target.type === 'line' && target.id !== this.state.line1Id) ||
+					target.type === 'point' ||
+					((target.type === 'circle' || target.type === 'arc') &&
+						this.ctx.sketch.canAddCircleToLineDistanceConstraint(target.id, this.state.line1Id))
+				);
 			}
 		}
 		if (this.state.step === 2 && this.state.point1Id && this.state.point2Id && !this.state.point3Id) {
@@ -227,18 +345,47 @@ export class DimensionTool extends BaseTool {
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {
 		const screen = e.screen;
-		if (this.radiusDraft) {
+		if (this.state.step === 2 && this.state.point1Id && this.state.line1Id && !this.state.point2Id) {
+			return this.placePointLineDistance(e);
+		}
+		if (this.radialDraft) {
 			const { sketch, viewport } = this.ctx;
-			const { constraint: draft, returnToSelect } = this.radiusDraft;
-			this.radiusDraft = null;
+			const { constraint: draft, returnToSelect } = this.radialDraft;
+			if (draft instanceof RadiusConstraint && !returnToSelect) {
+				const line = this.ctx.findLineNear?.(screen, undefined, true);
+				if (line && this.beginCenterLinePlacement(draft.circleId, line.id, e)) return true;
+			}
+			if (draft instanceof RadiusConstraint && !returnToSelect && sketch.circles.size + sketch.arcs.size > 1) {
+				const hit = [
+					sketch.circles.size ? this.ctx.findCircleNear(screen) : null,
+					sketch.arcs.size ? this.ctx.findArcNear(screen) : null,
+				].find(entity => entity && sketch.canAddCircleDistanceConstraint(draft.circleId, entity.id));
+				if (hit) {
+					this.beginCircleDistancePlacement(draft.circleId, hit.id);
+					return true;
+				}
+			}
+			this.radialDraft = null;
 			draft.moveLabelTo(screen, sketch, viewport);
-			const constraint = sketch.addRadiusConstraint(draft.circleId, undefined, undefined, draft);
+			const constraint =
+				draft instanceof DistanceConstraint
+					? sketch.addCircleDistanceConstraint(...draft.circleIds!)
+					: sketch.addRadiusConstraint(draft.circleId, undefined, undefined, draft);
+			if (constraint instanceof DistanceConstraint && draft instanceof DistanceConstraint) {
+				constraint.leaderAngle = draft.leaderAngle;
+				constraint.labelPosition = draft.labelPosition;
+				constraint.leaderOffset = draft.leaderOffset;
+			}
 			this.ctx.renderer.clearPreviews();
 			if (returnToSelect) this.ctx.setTool('select');
 			if (constraint) {
 				sketch.selectEntity(constraint.id, 'constraint', false);
 				this.ctx.showToast(
-					constraint.displayMode === 'diameter' ? 'Diameter constraint applied' : 'Radius constraint applied'
+					constraint instanceof DistanceConstraint
+						? 'Radial distance constraint applied'
+						: constraint.displayMode === 'diameter'
+							? 'Diameter constraint applied'
+							: 'Radius constraint applied'
 				);
 				this.ctx.requestRender();
 				this.ctx.onEditDimension?.(constraint, e.client);
@@ -318,6 +465,10 @@ export class DimensionTool extends BaseTool {
 			}
 		}
 
+		if (this.state.step === 1 && this.state.line1Id && (type === 'circle' || type === 'arc') && id) {
+			return this.beginCenterLinePlacement(id, this.state.line1Id, e);
+		}
+
 		// STEP 0: Select first entity (point, line, or circle/arc)
 		if (this.state.step === 0) {
 			if (type === 'point' && id) {
@@ -343,17 +494,7 @@ export class DimensionTool extends BaseTool {
 				};
 				this.ctx.requestRender();
 			} else if ((type === 'circle' || type === 'arc') && id) {
-				const { sketch } = this.ctx;
-				if (sketch.hasRadiusConstraint(id)) {
-					const constraint = sketch.addRadiusConstraint(id);
-					if (constraint) {
-						sketch.selectEntity(constraint.id, 'constraint', false);
-						this.ctx.requestRender();
-						this.ctx.onEditDimension?.(constraint, e.client);
-					}
-				} else {
-					this.beginRadiusPlacement(id);
-				}
+				this.beginRadiusPlacement(id);
 			} else {
 				this.ctx.sketch.clearSelection();
 				this.state = {
@@ -384,31 +525,7 @@ export class DimensionTool extends BaseTool {
 					};
 					this.ctx.requestRender();
 				} else if (type === 'line' && (id === 'axis_x' || id === 'axis_y')) {
-					const axis = id === 'axis_x' ? 'x' : 'y';
-					const userPtId = this.state.point1Id;
-					const existed = this.ctx.sketch.hasPointToAxisConstraint(userPtId, axis);
-					const c = this.ctx.sketch.addPointToAxisDistanceConstraint(userPtId, axis);
-					if (c) {
-						this.ctx.showToast(
-							existed
-								? `Editing distance to ${axis.toUpperCase()}-axis`
-								: `Distance to ${axis.toUpperCase()}-axis applied`
-						);
-						this.state = {
-							step: 0,
-							line1Id: null,
-							line2Id: null,
-							point1Id: null,
-							point2Id: null,
-						};
-						this.ctx.renderer.clearPreviews();
-						this.ctx.sketch.clearSelection();
-						this.ctx.requestRender();
-						if (this.ctx.onEditDimension) {
-							this.ctx.onEditDimension(c, e.client);
-						}
-					}
-					return true;
+					return this.beginPointLinePlacement(this.state.point1Id, id);
 				} else if (type === 'line' && id) {
 					const l = this.ctx.sketch.lines.get(id);
 					// If this line contains point1 as an endpoint, snap to the other endpoint
@@ -424,48 +541,7 @@ export class DimensionTool extends BaseTool {
 						};
 						this.ctx.requestRender();
 					} else if (l) {
-						const ptId = this.state.point1Id;
-						const pt = this.ctx.sketch.points.get(ptId);
-						const lp1 = this.ctx.sketch.points.get(l.p1Id);
-						const lp2 = this.ctx.sketch.points.get(l.p2Id);
-						let offsetWorld = 0;
-						if (pt && lp1 && lp2) {
-							const sp = this.ctx.viewport.worldToScreen(pt);
-							const s1 = this.ctx.viewport.worldToScreen(lp1);
-							const s2 = this.ctx.viewport.worldToScreen(lp2);
-							const dir = new Vec2().subVectors(s2, s1);
-							const lineLen = dir.length();
-							if (lineLen > 1e-4) {
-								const u = dir.clone().multiplyScalar(1 / lineLen);
-								const tProj = new Vec2().subVectors(sp, s1).dot(u);
-								const tCursor = new Vec2().subVectors(screen, s1).dot(u);
-								let offsetScreen = tCursor - tProj;
-								if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
-									offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
-								}
-								offsetWorld = offsetScreen / this.ctx.viewport.zoom;
-							}
-						}
-						const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(ptId, id);
-						const c = this.ctx.sketch.addPointToLineDistanceConstraint(ptId, id, undefined, offsetWorld);
-						if (c) {
-							this.ctx.showToast(
-								existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied'
-							);
-							this.state = {
-								step: 0,
-								line1Id: null,
-								line2Id: null,
-								point1Id: null,
-								point2Id: null,
-							};
-							this.ctx.renderer.clearPreviews();
-							this.ctx.sketch.clearSelection();
-							this.ctx.requestRender();
-							if (this.ctx.onEditDimension) {
-								this.ctx.onEditDimension(c, e.client);
-							}
-						}
+						return this.beginPointLinePlacement(this.state.point1Id, id);
 					}
 				}
 				return true;
@@ -474,31 +550,8 @@ export class DimensionTool extends BaseTool {
 			// Subcase 2: First line was selected.
 			const isAxis1 = this.state.line1Id === 'axis_x' || this.state.line1Id === 'axis_y';
 			if (isAxis1) {
-				const axis = this.state.line1Id === 'axis_x' ? 'x' : 'y';
 				if (type === 'point' && id && id !== 'origin') {
-					const existed = this.ctx.sketch.hasPointToAxisConstraint(id, axis);
-					const c = this.ctx.sketch.addPointToAxisDistanceConstraint(id, axis);
-					if (c) {
-						this.ctx.showToast(
-							existed
-								? `Editing distance to ${axis.toUpperCase()}-axis`
-								: `Distance to ${axis.toUpperCase()}-axis applied`
-						);
-						this.state = {
-							step: 0,
-							line1Id: null,
-							line2Id: null,
-							point1Id: null,
-							point2Id: null,
-						};
-						this.ctx.renderer.clearPreviews();
-						this.ctx.sketch.clearSelection();
-						this.ctx.requestRender();
-						if (this.ctx.onEditDimension) {
-							this.ctx.onEditDimension(c, e.client);
-						}
-					}
-					return true;
+					return this.beginPointLinePlacement(id, this.state.line1Id!);
 				}
 				if (type === 'line' && id && id !== 'axis_x' && id !== 'axis_y') {
 					this.ctx.sketch.selectEntity(id, 'line', true);
@@ -557,50 +610,8 @@ export class DimensionTool extends BaseTool {
 				return true;
 			}
 
-			// If clicked on a point (not one of line's endpoints) -> immediately apply Point-to-Line distance constraint!
 			if (type === 'point' && id && id !== l1.p1Id && id !== l1.p2Id) {
-				const pt = this.ctx.sketch.points.get(id);
-				const lp1 = this.ctx.sketch.points.get(l1.p1Id);
-				const lp2 = this.ctx.sketch.points.get(l1.p2Id);
-				let offsetWorld = 0;
-				if (pt && lp1 && lp2) {
-					const sp = this.ctx.viewport.worldToScreen(pt);
-					const s1 = this.ctx.viewport.worldToScreen(lp1);
-					const s2 = this.ctx.viewport.worldToScreen(lp2);
-					const dir = new Vec2().subVectors(s2, s1);
-					const lineLen = dir.length();
-					if (lineLen > 1e-4) {
-						const u = dir.clone().multiplyScalar(1 / lineLen);
-						const tProj = new Vec2().subVectors(sp, s1).dot(u);
-						const tCursor = new Vec2().subVectors(screen, s1).dot(u);
-						let offsetScreen = tCursor - tProj;
-						if (Math.abs(offsetScreen) < LABEL_DISTANCE_PX) {
-							offsetScreen = tProj < lineLen * 0.5 ? 25 : -25;
-						}
-						offsetWorld = offsetScreen / this.ctx.viewport.zoom;
-					}
-				}
-				const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(id, l1.id);
-				const c = this.ctx.sketch.addPointToLineDistanceConstraint(id, l1.id, undefined, offsetWorld);
-				if (c) {
-					this.ctx.showToast(
-						existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied'
-					);
-					this.state = {
-						step: 0,
-						line1Id: null,
-						line2Id: null,
-						point1Id: null,
-						point2Id: null,
-					};
-					this.ctx.renderer.clearPreviews();
-					this.ctx.sketch.clearSelection();
-					this.ctx.requestRender();
-					if (this.ctx.onEditDimension) {
-						this.ctx.onEditDimension(c, e.client);
-					}
-				}
-				return true;
+				return this.beginPointLinePlacement(id, l1.id);
 			}
 
 			// Second click sets offset & orientation for line distance constraint
@@ -840,56 +851,6 @@ export class DimensionTool extends BaseTool {
 				return true;
 			}
 
-			// Subcase 2: Point and Line selected (Point-to-Line Distance mode)
-			if (this.state.point1Id && this.state.line1Id) {
-				const pt = this.ctx.sketch.points.get(this.state.point1Id);
-				const l = this.ctx.sketch.lines.get(this.state.line1Id);
-				if (pt && l) {
-					const p1 = this.ctx.sketch.points.get(l.p1Id);
-					const p2 = this.ctx.sketch.points.get(l.p2Id);
-					if (p1 && p2) {
-						const sp = this.ctx.viewport.worldToScreen(pt);
-						const s1 = this.ctx.viewport.worldToScreen(p1);
-						const s2 = this.ctx.viewport.worldToScreen(p2);
-						const dir = new Vec2().subVectors(s2, s1);
-						const lineLen = dir.length();
-						if (lineLen > 1e-4) {
-							const u = dir.clone().multiplyScalar(1 / lineLen);
-							const tProj = new Vec2().subVectors(sp, s1).dot(u);
-							const tCursor = new Vec2().subVectors(screen, s1).dot(u);
-							const offsetWorld = (tCursor - tProj) / this.ctx.viewport.zoom;
-
-							const existed = this.ctx.sketch.hasPointToLineDistanceConstraint(this.state.point1Id, this.state.line1Id);
-							const c = this.ctx.sketch.addPointToLineDistanceConstraint(
-								this.state.point1Id,
-								this.state.line1Id,
-								undefined,
-								offsetWorld
-							);
-							if (c) {
-								this.ctx.showToast(
-									existed ? 'Editing point-to-line distance constraint' : 'Point-to-line distance constraint applied'
-								);
-								this.state = {
-									step: 0,
-									line1Id: null,
-									line2Id: null,
-									point1Id: null,
-									point2Id: null,
-								};
-								this.ctx.renderer.clearPreviews();
-								this.ctx.sketch.clearSelection();
-								this.ctx.requestRender();
-								if (this.ctx.onEditDimension) {
-									this.ctx.onEditDimension(c, e.client);
-								}
-							}
-						}
-					}
-				}
-				return true;
-			}
-
 			// Subcase 3: Two lines selected (Angle mode)
 			const line1Id = this.state.line1Id!;
 			const line2Id = this.state.line2Id!;
@@ -942,8 +903,12 @@ export class DimensionTool extends BaseTool {
 
 	override renderPreview(ctx: ToolRenderContext): void {
 		const screen = ctx.cursorScreen;
-		if (this.radiusDraft) {
-			const { constraint } = this.radiusDraft;
+		if (this.radialDraft) {
+			const { constraint, returnToSelect } = this.radialDraft;
+			if (constraint instanceof RadiusConstraint && !returnToSelect) {
+				const line = this.ctx.findLineNear?.(screen, undefined, true);
+				if (line && this.renderCenterLinePreview(constraint.circleId, line.id, screen)) return;
+			}
 			constraint.moveLabelTo(screen, ctx.sketch, ctx.viewport);
 			constraint.renderDimension(ctx.sketch, ctx.viewport, ctx.targetGroup);
 			return;
@@ -954,7 +919,7 @@ export class DimensionTool extends BaseTool {
 		let p2Id: string | null = null;
 
 		if (this.state.step === 1 && this.state.line1Id) {
-			const l1 = ctx.sketch.lines.get(this.state.line1Id);
+			const l1 = ctx.sketch.getLine(this.state.line1Id);
 			if (l1) {
 				// Check if hovering over a point (that is NOT an endpoint of line1)
 				const hitPt = this.ctx.findPointNear(screen);
@@ -972,6 +937,11 @@ export class DimensionTool extends BaseTool {
 						return;
 					}
 				}
+
+				const radial =
+					(ctx.sketch.circles.size ? this.ctx.findCircleNear(screen) : null) ??
+					(ctx.sketch.arcs.size ? this.ctx.findArcNear(screen) : null);
+				if (radial && this.renderCenterLinePreview(radial.id, l1.id, screen)) return;
 
 				p1Id = l1.p1Id;
 				p2Id = l1.p2Id;
@@ -1142,7 +1112,7 @@ export class DimensionTool extends BaseTool {
 			}
 		} else if (this.state.step === 2 && this.state.point1Id && this.state.line1Id) {
 			const pt = ctx.sketch.points.get(this.state.point1Id);
-			const l = ctx.sketch.lines.get(this.state.line1Id);
+			const l = ctx.sketch.getLine(this.state.line1Id);
 			if (pt && l) {
 				const p1 = ctx.sketch.points.get(l.p1Id);
 				const p2 = ctx.sketch.points.get(l.p2Id);

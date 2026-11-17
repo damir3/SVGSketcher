@@ -184,14 +184,16 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'distance': {
 				if (type === 'line') {
-					sel.circleIds.clear();
-					sel.arcIds.clear();
+					if (sel.circleIds.size + sel.arcIds.size !== 1 || sel.lineIds.size > 0 || sel.pointIds.size > 0) {
+						sel.circleIds.clear();
+						sel.arcIds.clear();
+					}
 					if (sel.pointIds.size > 1) sel.pointIds.clear();
 					if (sel.lineIds.size >= 1 && sel.pointIds.size >= 1) sel.lineIds.clear();
 					else if (sel.lineIds.size >= 2) sel.lineIds.clear();
 				} else if (type === 'circle' || type === 'arc') {
 					sel.pointIds.clear();
-					sel.lineIds.clear();
+					if (sel.lineIds.size !== 1 || sel.circleIds.size + sel.arcIds.size > 0) sel.lineIds.clear();
 					sel.circleIds.clear();
 					sel.arcIds.clear();
 				} else if (type === 'point') {
@@ -494,7 +496,6 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'dimension':
 			case 'distance': {
-				sel.arcIds.clear();
 				break;
 			}
 		}
@@ -594,7 +595,15 @@ export class ConstraintTool extends BaseTool {
 					(pCount === 2 && lCount === 0 && cCount === 0) ||
 					(pCount === 3 && lCount === 0 && cCount === 0) ||
 					(cCount === 1 && pCount === 0 && lCount === 0) ||
-					(lCount === 1 && pCount === 1 && cCount === 0)
+					(cCount === 2 &&
+						pCount === 0 &&
+						lCount === 0 &&
+						sketch.canAddCircleDistanceConstraint(...([...sel.circleIds, ...sel.arcIds] as [string, string]))) ||
+					(lCount === 1 && pCount === 1 && cCount === 0) ||
+					(lCount === 1 &&
+						pCount === 0 &&
+						cCount === 1 &&
+						sketch.canAddCircleToLineDistanceConstraint([...sel.circleIds, ...sel.arcIds][0], [...sel.lineIds][0]))
 				);
 			case 'equal':
 				return (lCount === 2 && pCount === 0 && cCount === 0) || (cCount === 2 && pCount === 0 && lCount === 0);
@@ -821,7 +830,22 @@ export class ConstraintTool extends BaseTool {
 			}
 			case 'dimension':
 			case 'distance': {
-				if (lIds.length === 1 && pIds.length === 1) {
+				if (
+					opts.setTool &&
+					lIds.length === 1 &&
+					((pIds.length === 1 && cIds.length === 0) || (pIds.length === 0 && cIds.length === 1))
+				) {
+					opts.setTool('dimension');
+					return true;
+				}
+				if (lIds.length === 1 && pIds.length === 0 && cIds.length === 1) {
+					const c = sketch.addCircleToLineDistanceConstraint(cIds[0], lIds[0]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Center-to-line distance constraint applied';
+						openDimensionEditor(c);
+					}
+				} else if (lIds.length === 1 && pIds.length === 1) {
 					if (lIds[0] === 'axis_x' || lIds[0] === 'axis_y') {
 						const axis = lIds[0] === 'axis_x' ? 'x' : 'y';
 						const existed = sketch.hasPointToAxisConstraint(pIds[0], axis);
@@ -879,6 +903,13 @@ export class ConstraintTool extends BaseTool {
 						const c = sketch.addDistanceConstraint(pIds[0], pIds[1]);
 						applied = true;
 						toastMsg = existed ? 'Editing distance constraint' : 'Distance constraint applied';
+						openDimensionEditor(c);
+					}
+				} else if (cIds.length === 2 && lIds.length === 0 && pIds.length === 0) {
+					const c = sketch.addCircleDistanceConstraint(cIds[0], cIds[1]);
+					if (c) {
+						applied = true;
+						toastMsg = 'Radial distance constraint applied';
 						openDimensionEditor(c);
 					}
 				} else if (cIds.length === 1) {

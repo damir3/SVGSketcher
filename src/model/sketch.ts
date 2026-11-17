@@ -1011,6 +1011,7 @@ export class SketchDocument {
 		for (const c of this.constraints.values()) {
 			if (
 				c instanceof DistanceConstraint &&
+				!c.circleIds &&
 				((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
 			) {
 				if (!orientation || (c.orientation ?? 'aligned') === orientation) {
@@ -1067,6 +1068,71 @@ export class SketchDocument {
 		const currentDist = targetDist ?? Math.max(0.01, Number(measured.toFixed(2)));
 		const c = new DistanceConstraint(this.nextId('c_dist'), p1Id, p2Id, currentDist, 1.0, offset, effectiveOrientation);
 		this.addConstraint(c);
+		return c;
+	}
+
+	canAddCircleDistanceConstraint(circle1Id: string, circle2Id: string): boolean {
+		if (circle1Id === circle2Id) return false;
+		const a = this.circles.get(circle1Id) ?? this.arcs.get(circle1Id);
+		const b = this.circles.get(circle2Id) ?? this.arcs.get(circle2Id);
+		const p1 = a && this.points.get(a.centerId);
+		const p2 = b && this.points.get(b.centerId);
+		return !!p1 && !!p2 && p1.distanceTo(p2) < 1e-5;
+	}
+
+	addCircleDistanceConstraint(
+		circle1Id: string,
+		circle2Id: string,
+		targetDistance?: number
+	): DistanceConstraint | null {
+		const existing = [...this.constraints.values()].find(
+			(c): c is DistanceConstraint =>
+				c instanceof DistanceConstraint &&
+				!!c.circleIds &&
+				c.circleIds.includes(circle1Id) &&
+				c.circleIds.includes(circle2Id) &&
+				circle1Id !== circle2Id
+		);
+		if (existing) {
+			if (targetDistance !== undefined && targetDistance !== existing.targetDistance) {
+				this.pushHistory();
+				existing.targetDistance = targetDistance;
+				existing.value = targetDistance;
+				this.solve();
+			}
+			return existing;
+		}
+		if (!this.canAddCircleDistanceConstraint(circle1Id, circle2Id)) return null;
+		const a = (this.circles.get(circle1Id) ?? this.arcs.get(circle1Id))!;
+		const b = (this.circles.get(circle2Id) ?? this.arcs.get(circle2Id))!;
+		const distance = targetDistance ?? Math.max(0.01, Number(Math.abs(a.radius - b.radius).toFixed(2)));
+		const c = new DistanceConstraint(this.nextId('c_dist'), a.centerId, b.centerId, distance);
+		c.circleIds = [circle1Id, circle2Id];
+		c.leaderOffset = -Math.abs(a.radius - b.radius) / 2;
+		c.entityIds = [...new Set([a.centerId, b.centerId, circle1Id, circle2Id])];
+		c.name = c.displayName;
+		this.addConstraint(c);
+		return c;
+	}
+
+	canAddCircleToLineDistanceConstraint(radialId: string, lineId: string): boolean {
+		const radial = this.circles.get(radialId) ?? this.arcs.get(radialId);
+		const line = this.getLine(lineId);
+		return !!radial && !!line && radial.centerId !== line.p1Id && radial.centerId !== line.p2Id;
+	}
+
+	addCircleToLineDistanceConstraint(
+		radialId: string,
+		lineId: string,
+		targetDistance?: number
+	): DistanceConstraint | PointToLineDistanceConstraint | null {
+		if (!this.canAddCircleToLineDistanceConstraint(radialId, lineId)) return null;
+		const radial = (this.circles.get(radialId) ?? this.arcs.get(radialId))!;
+		const c =
+			lineId === 'axis_x' || lineId === 'axis_y'
+				? this.addPointToAxisDistanceConstraint(radial.centerId, lineId === 'axis_x' ? 'x' : 'y', targetDistance)
+				: this.addPointToLineDistanceConstraint(radial.centerId, lineId, targetDistance);
+		if (c && !c.entityIds.includes(radialId)) c.entityIds.push(radialId);
 		return c;
 	}
 
@@ -1144,7 +1210,7 @@ export class SketchDocument {
 	): DistanceConstraint | CoincidentConstraint | undefined {
 		return [...this.constraints.values()].find(
 			(c): c is DistanceConstraint | CoincidentConstraint =>
-				(c instanceof DistanceConstraint || c instanceof CoincidentConstraint) &&
+				((c instanceof DistanceConstraint && !c.circleIds) || c instanceof CoincidentConstraint) &&
 				((c.p1Id === 'origin' && c.p2Id === pointId) || (c.p2Id === 'origin' && c.p1Id === pointId)) &&
 				(orientation === undefined ||
 					(c instanceof DistanceConstraint ? c.orientation === orientation : orientation === 'aligned'))
@@ -1629,7 +1695,7 @@ export class SketchDocument {
 				const mode = existing.displayMode ?? defaultMode;
 				const valStr = mode === 'diameter' ? Number((targetRadius * 2).toFixed(2)) : Number(targetRadius.toFixed(2));
 				existing.name = mode === 'diameter' ? `Diameter (${valStr})` : `Radius (${valStr})`;
-				this.solve();
+				this.withStableCircleCenters(() => this.solve());
 			}
 			return existing;
 		}
@@ -1637,7 +1703,7 @@ export class SketchDocument {
 		const r = targetRadius ?? Math.max(MIN_SOLVER_RADIUS, Number(entity.radius.toFixed(2)));
 		const c = new RadiusConstraint(this.nextId('c_rad'), circleOrArcId, r, 1.0, placement?.leaderAngle, defaultMode);
 		c.leaderOffset = placement?.leaderOffset;
-		this.addConstraint(c);
+		this.withStableCircleCenters(() => this.addConstraint(c));
 		return c;
 	}
 
@@ -3036,7 +3102,7 @@ export class SketchDocument {
 	private lockedRadiusError(constraints: IConstraint[], values: Map<string, number>, limit: number): number {
 		let sumSq = 0;
 		for (const c of constraints) {
-			if (c instanceof EqualRadiusConstraint) {
+			if (c instanceof EqualRadiusConstraint || (c instanceof DistanceConstraint && c.circleIds)) {
 				const [residual] = c.evaluate(values);
 				sumSq += residual * residual;
 			} else if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
@@ -3074,6 +3140,8 @@ export class SketchDocument {
 		for (const c of constraints) {
 			if (c instanceof EqualRadiusConstraint) {
 				link(`${c.circle1Id}.r`, `${c.circle2Id}.r`);
+			} else if (c instanceof DistanceConstraint && c.circleIds) {
+				link(`${c.circleIds[0]}.r`, `${c.circleIds[1]}.r`);
 			} else if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
 				const suppressed = new Set(c.suppressedIndices);
 				for (const copy of c.copies) {
@@ -3096,6 +3164,9 @@ export class SketchDocument {
 		const stiffness = new Map<string, number>();
 		for (const id of allRadii) {
 			if (!linked.has(id)) stiffness.set(id, 1000);
+		}
+		if (this.stableCenterEditDepth) {
+			for (const id of this.circularCenterParams()) stiffness.set(id, 1e6);
 		}
 		return stiffness;
 	}
@@ -3226,6 +3297,10 @@ export class SketchDocument {
 	}
 
 	solve(extraConstraints: IConstraint[] = []): SolverResult {
+		if (this.preserveCentersOnNextSolve && this.solveDeferred === 0) {
+			this.preserveCentersOnNextSolve = false;
+			return this.withStableCircleCenters(() => this.solve(extraConstraints));
+		}
 		if (this.solveDeferred > 0) {
 			return (
 				this.lastSolverResult ?? {
@@ -3257,11 +3332,83 @@ export class SketchDocument {
 		return res;
 	}
 
+	private stableCenterEditDepth = 0;
+	private preserveCentersOnNextSolve = false;
+
+	/** Editing radii/endpoints should move circular centers only if constraints require it. */
+	withStableCircleCenters<T>(edit: () => T): T {
+		this.stableCenterEditDepth++;
+		try {
+			return edit();
+		} finally {
+			this.stableCenterEditDepth--;
+		}
+	}
+
+	private circularCenterParams(): Set<string> {
+		return new Set(
+			[...this.circles.values(), ...this.arcs.values()].flatMap(entity => [
+				`${entity.centerId}.x`,
+				`${entity.centerId}.y`,
+			])
+		);
+	}
+
+	private tryStableCenterSolve(
+		constraints: IConstraint[],
+		drivenRadii: Set<string>,
+		skipDoF = false,
+		validator?: () => boolean
+	): SolverResult | null {
+		if (!this.stableCenterEditDepth) return null;
+		// Radius-only relations and pattern copies do not couple radius edits to center motion.
+		if (
+			!constraints.some(
+				c =>
+					c instanceof ArcEndpointsConstraint ||
+					c instanceof PointOnCircleConstraint ||
+					c instanceof TangentLineCircleConstraint ||
+					c instanceof TangentCircleCircleConstraint ||
+					c instanceof OffsetConstraint
+			)
+		)
+			return null;
+		const centers = this.circularCenterParams();
+		if (!centers.size) return null;
+		const initial = this.paramManager.getCurrentValues();
+		const trial = this.solver.solve(this.paramManager, constraints, {
+			lockedParams: new Set([...drivenRadii, ...centers]),
+			skipDoF: true,
+		});
+		// A solve with no free parameters can return without evaluating constant residuals.
+		const error =
+			this.paramManager.getFreeCount() > 0
+				? trial.finalError
+				: constraints.reduce(
+						(sum, c) =>
+							sum +
+							c.evaluate(this.paramManager.getCurrentValues()).reduce((total, value) => total + (value * value) / 2, 0),
+						0
+					);
+		if (trial.status !== 'OVER_CONSTRAINED' && error < 1e-8 && (!validator || validator())) {
+			// Restore the real free-parameter set for DoF; a satisfied system needs no further motion.
+			if (skipDoF) return trial;
+			return this.solver.solve(this.paramManager, constraints, {
+				lockedParams: drivenRadii,
+				paramStiffness: new Map([...centers].map(id => [id, 1e6])),
+			});
+		}
+		this.paramManager.restoreValues(initial);
+		return null;
+	}
+
 	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = this.prepareSplineConstraints(extraConstraints, drivenRadii, editedHandles);
 		for (const line of editedHandles) line.isAutomaticSplineHandle = false;
+		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii);
+		if (stable) return stable;
 
 		// Interactive drags keep the regular behaviour (radius may follow the drag)
 		if (extraConstraints.length > 0) {
@@ -3324,7 +3471,12 @@ export class SketchDocument {
 
 		// Soft spring constraint pulls point to mouse position while preserving hard constraints.
 		const dragConstraint = new DragPointConstraint(pointId, target.x, target.y, 0.005);
-		return this.solve([dragConstraint]);
+		const editsArcEndpoint = [...this.arcs.values()].some(
+			arc => arc.centerId !== pointId && (arc.startPointId === pointId || arc.endPointId === pointId)
+		);
+		return editsArcEndpoint
+			? this.withStableCircleCenters(() => this.solve([dragConstraint]))
+			: this.solve([dragConstraint]);
 	}
 
 	dragLine(lineId: string, p1TargetX: number, p1TargetY: number, p2TargetX: number, p2TargetY: number): SolverResult {
@@ -3374,7 +3526,10 @@ export class SketchDocument {
 		if (!entity) return this.solve();
 
 		entity.radius = Math.max(MIN_SOLVER_RADIUS, targetRadius);
-		return this.solve();
+		return this.withStableCircleCenters(() => {
+			this.tryHardSolve([new RadiusConstraint('__temp_drag_radius', circleOrArcId, entity.radius)]);
+			return this.solve();
+		});
 	}
 
 	applyConstraintValueDirectly(c: IConstraint, newValue: number, displayMode?: 'radius' | 'diameter'): boolean {
@@ -3478,6 +3633,7 @@ export class SketchDocument {
 			c.displayMode = mode;
 			const dispVal = mode === 'diameter' ? Number((targetRad * 2).toFixed(2)) : Number(targetRad.toFixed(2));
 			c.name = mode === 'diameter' ? `Diameter (${dispVal})` : `Radius (${dispVal})`;
+			this.preserveCentersOnNextSolve = true;
 
 			const arc = this.arcs.get(c.circleId);
 			if (arc) {
@@ -4165,6 +4321,12 @@ export class SketchDocument {
 					drivenRadii.add(`${c.circleId}.r`);
 				}
 			}
+		}
+
+		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii, true, extraValidator);
+		if (stable) {
+			for (const line of editedHandles) line.isAutomaticSplineHandle = false;
+			return true;
 		}
 
 		const allRadii = new Set<string>(drivenRadii);

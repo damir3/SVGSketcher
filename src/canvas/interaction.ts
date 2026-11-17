@@ -335,7 +335,10 @@ export class CanvasInteraction implements SelectInteractionHost {
 		if (tool === 'distance') {
 			const { circleIds, arcIds, pointIds, lineIds } = this.sketch.selection;
 			const radialIds = [...circleIds, ...arcIds];
-			if (!pointIds.size && !lineIds.size && radialIds.length === 1 && !this.sketch.hasRadiusConstraint(radialIds[0])) {
+			if (
+				(lineIds.size === 1 && (pointIds.size === 1 || radialIds.length === 1)) ||
+				(!pointIds.size && !lineIds.size && radialIds.length === 1 && !this.sketch.hasRadiusConstraint(radialIds[0]))
+			) {
 				tool = 'dimension';
 			}
 		}
@@ -348,6 +351,8 @@ export class CanvasInteraction implements SelectInteractionHost {
 			}
 
 			const prevTool = this.activeToolInstance;
+			const dimensionSelection =
+				tool === 'dimension' && prevTool instanceof ConstraintTool ? structuredClone(this.sketch.selection) : null;
 			this.activeToolInstance = null;
 			if (prevTool) {
 				prevTool.deactivate();
@@ -359,6 +364,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 				this.renderer.updateRegionHover(null);
 			}
 			this.cancelDrawing();
+			if (dimensionSelection) Object.assign(this.sketch.selection, dimensionSelection);
 
 			const nextTool = this.tools.get(tool) ?? null;
 			this.activeToolInstance = nextTool;
