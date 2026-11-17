@@ -326,7 +326,7 @@ function initApp(): void {
 	}
 	btnUndo.addEventListener('click', undo);
 
-	btnRedo.addEventListener('click', () => {
+	function redo(): void {
 		if (interaction.isDrawingSpline()) {
 			if (interaction.redoSplinePoint()) {
 				showToast('Spline: Redo point');
@@ -337,7 +337,9 @@ function initApp(): void {
 			renderer.render(sketch, viewport);
 			showToast('Redo');
 		}
-	});
+	}
+
+	btnRedo.addEventListener('click', redo);
 
 	function fitToView(smooth = true): void {
 		interaction.fitToView(smooth);
@@ -349,26 +351,18 @@ function initApp(): void {
 		interaction.toggleSnapping();
 	});
 
-	btnRegionsHeader?.addEventListener('click', () => {
-		const visible = btnRegionsHeader.getAttribute('aria-pressed') !== 'true';
-		btnRegionsHeader.setAttribute('aria-pressed', String(visible));
-		btnRegionsHeader.classList.toggle('active', visible);
-		renderer.setRegionsVisible(visible);
-	});
-
-	btnConstraintBadgesHeader?.addEventListener('click', () => {
-		const visible = btnConstraintBadgesHeader.getAttribute('aria-pressed') !== 'true';
-		btnConstraintBadgesHeader.setAttribute('aria-pressed', String(visible));
-		btnConstraintBadgesHeader.classList.toggle('active', visible);
-		renderer.setConstraintBadgesVisible(visible);
-	});
-
-	btnDimensionsHeader?.addEventListener('click', () => {
-		const visible = btnDimensionsHeader.getAttribute('aria-pressed') !== 'true';
-		btnDimensionsHeader.setAttribute('aria-pressed', String(visible));
-		btnDimensionsHeader.classList.toggle('active', visible);
-		renderer.setDimensionsVisible(visible);
-	});
+	for (const [btn, setVisible] of [
+		[btnRegionsHeader, (v: boolean) => renderer.setRegionsVisible(v)],
+		[btnConstraintBadgesHeader, (v: boolean) => renderer.setConstraintBadgesVisible(v)],
+		[btnDimensionsHeader, (v: boolean) => renderer.setDimensionsVisible(v)],
+	] as const) {
+		btn?.addEventListener('click', () => {
+			const visible = btn.getAttribute('aria-pressed') !== 'true';
+			btn.setAttribute('aria-pressed', String(visible));
+			btn.classList.toggle('active', visible);
+			setVisible(visible);
+		});
+	}
 
 	btnConstructionHeader?.addEventListener('click', () => {
 		interaction.toggleConstructionMode();
@@ -618,22 +612,17 @@ function initApp(): void {
 			return;
 		}
 		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
-		if (
-			(target &&
-				((typeof HTMLInputElement !== 'undefined' && target instanceof HTMLInputElement) ||
-					(typeof HTMLTextAreaElement !== 'undefined' && target instanceof HTMLTextAreaElement) ||
-					target.tagName === 'INPUT' ||
-					target.tagName === 'TEXTAREA' ||
-					target.tagName === 'SELECT' ||
-					target.isContentEditable)) ||
-			(activeEl &&
-				((typeof HTMLInputElement !== 'undefined' && activeEl instanceof HTMLInputElement) ||
-					(typeof HTMLTextAreaElement !== 'undefined' && activeEl instanceof HTMLTextAreaElement) ||
-					activeEl.tagName === 'INPUT' ||
-					activeEl.tagName === 'TEXTAREA' ||
-					activeEl.tagName === 'SELECT' ||
-					activeEl.isContentEditable))
-		) {
+		const isEditable = (el: HTMLElement | null) =>
+			Boolean(
+				el &&
+					((typeof HTMLInputElement !== 'undefined' && el instanceof HTMLInputElement) ||
+						(typeof HTMLTextAreaElement !== 'undefined' && el instanceof HTMLTextAreaElement) ||
+						el.tagName === 'INPUT' ||
+						el.tagName === 'TEXTAREA' ||
+						el.tagName === 'SELECT' ||
+						el.isContentEditable)
+			);
+		if (isEditable(target) || isEditable(activeEl)) {
 			return;
 		}
 
@@ -650,16 +639,7 @@ function initApp(): void {
 			const isRedoY = e.key === 'y' || e.key === 'Y' || e.code === 'KeyY';
 			if (isRedoZ || isRedoY) {
 				e.preventDefault();
-				if (interaction.isDrawingSpline()) {
-					if (interaction.redoSplinePoint()) {
-						showToast('Spline: Redo point');
-					}
-					return;
-				}
-				if (sketch.redo()) {
-					renderer.render(sketch, viewport);
-					showToast('Redo');
-				}
+				redo();
 				return;
 			}
 		}

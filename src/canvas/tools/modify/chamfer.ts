@@ -89,20 +89,19 @@ export class ChamferTool extends BaseTool {
 			],
 			onKeyDown: e => {
 				if (e.altKey && !e.ctrlKey && !e.metaKey) {
-					if (e.code === 'Digit1' || e.code === 'Numpad1') {
+					const modeByKey: Record<string, ChamferMode> = {
+						Digit1: 'equal_distance',
+						Numpad1: 'equal_distance',
+						Digit2: 'two_distance',
+						Numpad2: 'two_distance',
+						Digit3: 'distance_angle',
+						Numpad3: 'distance_angle',
+					};
+					const nextMode = modeByKey[e.code];
+					if (nextMode) {
 						e.preventDefault();
 						e.stopPropagation();
-						this.setMode('equal_distance');
-						return true;
-					} else if (e.code === 'Digit2' || e.code === 'Numpad2') {
-						e.preventDefault();
-						e.stopPropagation();
-						this.setMode('two_distance');
-						return true;
-					} else if (e.code === 'Digit3' || e.code === 'Numpad3') {
-						e.preventDefault();
-						e.stopPropagation();
-						this.setMode('distance_angle');
+						this.setMode(nextMode);
 						return true;
 					}
 				}
@@ -219,22 +218,16 @@ export class ChamferTool extends BaseTool {
 
 	setMode(mode: ChamferMode): void {
 		this.mode = mode;
-		if (mode === 'equal_distance') {
-			this.popup.setFieldLabel('dist1', 'Distance');
-			this.popup.setFieldVisible('dist2', false);
-			this.popup.setFieldVisible('angle', false);
-			this.popup.setFieldVisible('flip', false);
-		} else if (mode === 'two_distance') {
-			this.popup.setFieldLabel('dist1', 'Distance 1');
-			this.popup.setFieldVisible('dist2', true);
-			this.popup.setFieldVisible('angle', false);
-			this.popup.setFieldVisible('flip', true);
-		} else if (mode === 'distance_angle') {
-			this.popup.setFieldLabel('dist1', 'Distance');
-			this.popup.setFieldVisible('dist2', false);
-			this.popup.setFieldVisible('angle', true);
-			this.popup.setFieldVisible('flip', true);
-		}
+		const uiConfig: Record<ChamferMode, { label: string; dist2: boolean; angle: boolean; flip: boolean }> = {
+			equal_distance: { label: 'Distance', dist2: false, angle: false, flip: false },
+			two_distance: { label: 'Distance 1', dist2: true, angle: false, flip: true },
+			distance_angle: { label: 'Distance', dist2: false, angle: true, flip: true },
+		};
+		const cfg = uiConfig[mode];
+		this.popup.setFieldLabel('dist1', cfg.label);
+		this.popup.setFieldVisible('dist2', cfg.dist2);
+		this.popup.setFieldVisible('angle', cfg.angle);
+		this.popup.setFieldVisible('flip', cfg.flip);
 		this.recalculate();
 		dispatchToolModeChange('chamfer', mode);
 		this.onModeChange?.(mode);

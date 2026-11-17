@@ -12,6 +12,7 @@ import {
 	type PrimitiveSnapCandidate,
 	type PrimitiveTransformRenderOptions,
 } from './base';
+import { createEllipseSidebarFields } from './ellipse';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 import { createSvgLine, createSvgPath, getEllipticalArcSvgPath } from '../../canvas/svg';
 import { AUX_AXIS_ATTRS, AUX_RAY_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_STROKE_ATTRS } from '../../canvas/styles';
@@ -69,40 +70,35 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 		}
 	}
 
-	distanceTo(screen: Vec2, sketch: any, viewport: any, thresholdPx = 18): number | null {
+	private resolvePoints(sketch: any) {
 		const center = sketch.points.get(this.centerId);
 		const majorPt = sketch.points.get(this.majorAxisPointId);
 		const minorPt = sketch.points.get(this.minorAxisPointId);
 		const startPt = sketch.points.get(this.startPointId);
 		const endPt = sketch.points.get(this.endPointId);
-		if (!center || !majorPt || !minorPt || !startPt || !endPt) return null;
+		return center && majorPt && minorPt && startPt && endPt
+			? ([center, majorPt, minorPt, startPt, endPt] as const)
+			: null;
+	}
 
-		const sc = viewport.worldToScreen(center);
-		const smaj = viewport.worldToScreen(majorPt);
-		const smin = viewport.worldToScreen(minorPt);
-		const ss = viewport.worldToScreen(startPt);
-		const se = viewport.worldToScreen(endPt);
-
+	distanceTo(screen: Vec2, sketch: any, viewport: any, thresholdPx = 18): number | null {
+		const pts = this.resolvePoints(sketch);
+		if (!pts) return null;
+		const [sc, smaj, smin, ss, se] = pts.map(p => viewport.worldToScreen(p));
 		return distanceToEllipticalArc(screen, sc, smaj, smin, ss, se, !!this.clockwise, thresholdPx);
 	}
 
 	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
-		const center = sketch.points.get(this.centerId);
-		const majorPt = sketch.points.get(this.majorAxisPointId);
-		const minorPt = sketch.points.get(this.minorAxisPointId);
-		const startPt = sketch.points.get(this.startPointId);
-		const endPt = sketch.points.get(this.endPointId);
-		if (!center || !majorPt || !minorPt || !startPt || !endPt) return false;
-		return ellipticalArcIntersectsAABB(center, majorPt, minorPt, startPt, endPt, !!this.clockwise, min, max);
+		const pts = this.resolvePoints(sketch);
+		return pts
+			? ellipticalArcIntersectsAABB(pts[0], pts[1], pts[2], pts[3], pts[4], !!this.clockwise, min, max)
+			: false;
 	}
 
 	toGeoCurve(sketch: any): GeoEllipticalArc | null {
-		const center = sketch.points.get(this.centerId);
-		const maj = sketch.points.get(this.majorAxisPointId);
-		const min = sketch.points.get(this.minorAxisPointId);
-		const start = sketch.points.get(this.startPointId);
-		const end = sketch.points.get(this.endPointId);
-		if (!center || !maj || !min || !start || !end) return null;
+		const pts = this.resolvePoints(sketch);
+		if (!pts) return null;
+		const [center, maj, min, start, end] = pts;
 		return {
 			type: 'elliptical_arc',
 			id: this.id,
@@ -130,18 +126,10 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 	}
 
 	render(ctx: PrimitiveRenderContext): void {
-		const center = ctx.sketch.points.get(this.centerId);
-		const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-		const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
-		const startPt = ctx.sketch.points.get(this.startPointId);
-		const endPt = ctx.sketch.points.get(this.endPointId);
-		if (!center || !majorPt || !minorPt || !startPt || !endPt) return;
+		const pts = this.resolvePoints(ctx.sketch);
+		if (!pts) return;
 
-		const sc = ctx.viewport.worldToScreen(center);
-		const smaj = ctx.viewport.worldToScreen(majorPt);
-		const smin = ctx.viewport.worldToScreen(minorPt);
-		const ss = ctx.viewport.worldToScreen(startPt);
-		const se = ctx.viewport.worldToScreen(endPt);
+		const [sc, smaj, smin, ss, se] = pts.map(p => ctx.viewport.worldToScreen(p));
 
 		const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, se, !!this.clockwise);
 		const arcG = createPrimitiveSvgGroup(this, ctx.isSelected, ctx.geometryGroup);
@@ -165,25 +153,13 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 	}
 
 	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
-		const origCtr = opts.sketch.points.get(this.centerId);
-		const origMajor = opts.sketch.points.get(this.majorAxisPointId);
-		const origMinor = opts.sketch.points.get(this.minorAxisPointId);
-		const origStart = opts.sketch.points.get(this.startPointId);
-		const origEnd = opts.sketch.points.get(this.endPointId);
-		if (!origCtr || !origMajor || !origMinor || !origStart || !origEnd) return [];
+		const pts = this.resolvePoints(opts.sketch);
+		if (!pts) return [];
 
-		const rc = opts.transformPoint(origCtr.x, origCtr.y);
-		const rmaj = opts.transformPoint(origMajor.x, origMajor.y);
-		const rmin = opts.transformPoint(origMinor.x, origMinor.y);
-		const rs = opts.transformPoint(origStart.x, origStart.y);
-		const re = opts.transformPoint(origEnd.x, origEnd.y);
+		const [rc, rmaj, rmin, rs, re] = pts.map(p => opts.transformPoint(p.x, p.y));
 
 		if (opts.targetGroup && opts.strokeAttrs) {
-			const src = opts.viewport.worldToScreen(rc);
-			const srmaj = opts.viewport.worldToScreen(rmaj);
-			const srmin = opts.viewport.worldToScreen(rmin);
-			const srs = opts.viewport.worldToScreen(rs);
-			const sre = opts.viewport.worldToScreen(re);
+			const [src, srmaj, srmin, srs, sre] = [rc, rmaj, rmin, rs, re].map(p => opts.viewport.worldToScreen(p));
 			const clockwise = opts.invertWinding ? !this.clockwise : !!this.clockwise;
 			const d = getEllipticalArcSvgPath(src, srmaj, srmin, srs, sre, clockwise);
 
@@ -202,16 +178,10 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 		maxDistPx: number,
 		tolerancePx = maxDistPx
 	): PrimitiveSnapCandidate | null {
-		const center = sketch.points.get(this.centerId);
-		const majorPt = sketch.points.get(this.majorAxisPointId);
-		const minorPt = sketch.points.get(this.minorAxisPointId);
-		const startPt = sketch.points.get(this.startPointId);
-		const endPt = sketch.points.get(this.endPointId);
-		if (!center || !majorPt || !minorPt || !startPt || !endPt) return null;
+		const pts = this.resolvePoints(sketch);
+		if (!pts) return null;
 
-		const sc = viewport.worldToScreen(center);
-		const smaj = viewport.worldToScreen(majorPt);
-		const smin = viewport.worldToScreen(minorPt);
+		const [sc, smaj, smin, ss, se] = pts.map(p => viewport.worldToScreen(p));
 
 		const r = sc.distancesTo(smaj, smin);
 		if (r.x < 1 || r.y < 1) return null;
@@ -219,9 +189,6 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 		const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
 
 		const t = ellipseParameterAtPoint(screenPos, sc, r, axisU, axisV);
-
-		const ss = viewport.worldToScreen(startPt);
-		const se = viewport.worldToScreen(endPt);
 
 		const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
 		const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
@@ -259,43 +226,7 @@ export class SketchEllipticalArc implements ISketchPrimitive {
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
 		title: () => this.id,
-		fields: [
-			{
-				id: 'insp-ellipse-rx',
-				label: 'Major Radius (Rx)',
-				unit: 'mm',
-				getValue: ctx => {
-					const center = ctx.sketch.points.get(this.centerId);
-					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(center.distanceTo(majorPt).toFixed(2)) : 0;
-				},
-				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rx: val }),
-				validate: val => !isNaN(val) && isFinite(val) && val > 0,
-			},
-			{
-				id: 'insp-ellipse-ry',
-				label: 'Minor Radius (Ry)',
-				unit: 'mm',
-				getValue: ctx => {
-					const center = ctx.sketch.points.get(this.centerId);
-					const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
-					return center && minorPt ? Number(center.distanceTo(minorPt).toFixed(2)) : 0;
-				},
-				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { ry: val }),
-				validate: val => !isNaN(val) && isFinite(val) && val > 0,
-			},
-			{
-				id: 'insp-ellipse-rot',
-				label: 'Rotation',
-				unit: '°',
-				getValue: ctx => {
-					const center = ctx.sketch.points.get(this.centerId);
-					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(center.angleToPointDeg(majorPt).toFixed(2)) : 0;
-				},
-				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
-			},
-		],
+		fields: createEllipseSidebarFields(this),
 		rows: [
 			{
 				label: 'Direction:',

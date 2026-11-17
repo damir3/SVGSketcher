@@ -495,15 +495,10 @@ export class ToolPopup<TFieldId extends string = string> {
 		const field = this.fieldMap.get(id);
 		if (!field) return fallback;
 
-		if (field.config.type === 'integer') {
-			const val = parseInt(field.input.value, 10);
-			if (isNaN(val)) return fallback;
-			if (field.config.min !== undefined && val < field.config.min) return field.config.min;
-			if (field.config.max !== undefined && val > field.config.max) return field.config.max;
-			return val;
-		}
-
-		const val = parseNumericOrExpression(field.input.value, fallback, this.sketch?.getParameterValuesMap());
+		const val =
+			field.config.type === 'integer'
+				? parseInt(field.input.value, 10)
+				: parseNumericOrExpression(field.input.value, fallback, this.sketch?.getParameterValuesMap());
 		if (isNaN(val)) return fallback;
 		if (field.config.min !== undefined && val < field.config.min) return field.config.min;
 		if (field.config.max !== undefined && val > field.config.max) return field.config.max;
@@ -574,10 +569,7 @@ export class ToolPopup<TFieldId extends string = string> {
 				});
 			} else {
 				field.input.addEventListener('input', () => {
-					if (field.config.lockable) {
-						field.isLocked = true;
-						this.updateLockUI(field);
-					}
+					this.lockFieldIfLockable(field);
 					if (field.config.type === 'dimension') {
 						this.updateFieldEvalPreview(field);
 					}
@@ -602,10 +594,7 @@ export class ToolPopup<TFieldId extends string = string> {
 				} else if (e.key === 'Enter') {
 					e.preventDefault();
 					e.stopPropagation();
-					if (field.config.lockable) {
-						field.isLocked = true;
-						this.updateLockUI(field);
-					}
+					this.lockFieldIfLockable(field);
 					this.onCommit?.();
 				} else if (e.key === 'Escape') {
 					e.preventDefault();
@@ -627,17 +616,18 @@ export class ToolPopup<TFieldId extends string = string> {
 		});
 	}
 
+	private lockFieldIfLockable(field: FieldElements): void {
+		if (!field.config.lockable) return;
+		field.isLocked = true;
+		this.updateLockUI(field);
+	}
+
 	protected updateLockUI(field: FieldElements): void {
 		if (!field.lockBtn) return;
-		if (field.isLocked) {
-			field.lockBtn.classList.add('locked');
-			field.lockBtn.innerHTML = POPUP_LOCK_ICON;
-			field.lockBtn.title = `Unlock ${field.config.label.toLowerCase()}`;
-		} else {
-			field.lockBtn.classList.remove('locked');
-			field.lockBtn.innerHTML = POPUP_UNLOCK_ICON;
-			field.lockBtn.title = `Lock ${field.config.label.toLowerCase()}`;
-		}
+		if (field.isLocked) field.lockBtn.classList.add('locked');
+		else field.lockBtn.classList.remove('locked');
+		field.lockBtn.innerHTML = field.isLocked ? POPUP_LOCK_ICON : POPUP_UNLOCK_ICON;
+		field.lockBtn.title = `${field.isLocked ? 'Unlock' : 'Lock'} ${field.config.label.toLowerCase()}`;
 	}
 
 	protected updateAllEvalPreviews(): void {

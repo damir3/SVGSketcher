@@ -171,32 +171,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		return pt ? viewport.worldToScreen(pt) : null;
 	}
 
-	override render(ctx: ConstraintRenderContext): void {
-		const pt = this.displayPoint(ctx.sketch);
-		const p1 = ctx.sketch.points.get(this.lineP1Id);
-		const p2 = ctx.sketch.points.get(this.lineP2Id);
-		if (!pt || !p1 || !p2) return;
-
-		const sp = ctx.viewport.worldToScreen(pt);
-		const s1 = ctx.viewport.worldToScreen(p1);
-		const s2 = ctx.viewport.worldToScreen(p2);
-		const offsetScreen = this.offset !== undefined ? this.offset * ctx.viewport.zoom : 0;
-		const geom = computePointToLineDimensionGeometry(sp, s1, s2, offsetScreen);
-		if (!geom) return;
-
-		ctx.renderLinearDimensionVisual({
-			d1: this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y') ? geom.d2 : geom.d1,
-			d2: this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y') ? geom.d1 : geom.d2,
-			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
-			extensionLines: geom.extensionLines,
-			parent: ctx.targetGroup,
-			isSelected: ctx.isSelected,
-			constraintId: this.id,
-			labelPosition: this.labelPosition,
-		});
-	}
-
-	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+	private resolveDimensionVisual(sketch: SketchDocument, viewport: Viewport) {
 		const pt = this.displayPoint(sketch);
 		const p1 = sketch.points.get(this.lineP1Id);
 		const p2 = sketch.points.get(this.lineP2Id);
@@ -210,9 +185,33 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		if (!geom) return null;
 
 		const reverse = this.lineP1Id === 'origin' && (this.lineId === 'axis_x' || this.lineId === 'axis_y');
-		const d1 = reverse ? geom.d2 : geom.d1;
-		const d2 = reverse ? geom.d1 : geom.d2;
-		return distanceToLinearDimensionVisual(screen, d1, d2, this.labelPosition ?? 0.5);
+		return {
+			d1: reverse ? geom.d2 : geom.d1,
+			d2: reverse ? geom.d1 : geom.d2,
+			extensionLines: geom.extensionLines,
+		};
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const visual = this.resolveDimensionVisual(ctx.sketch, ctx.viewport);
+		if (!visual) return;
+
+		ctx.renderLinearDimensionVisual({
+			d1: visual.d1,
+			d2: visual.d2,
+			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
+			extensionLines: visual.extensionLines,
+			parent: ctx.targetGroup,
+			isSelected: ctx.isSelected,
+			constraintId: this.id,
+			labelPosition: this.labelPosition,
+		});
+	}
+
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const visual = this.resolveDimensionVisual(sketch, viewport);
+		if (!visual) return null;
+		return distanceToLinearDimensionVisual(screen, visual.d1, visual.d2, this.labelPosition ?? 0.5);
 	}
 
 	protected override createSidebarPanel(): ConstraintPanel {

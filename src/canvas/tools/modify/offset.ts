@@ -74,20 +74,19 @@ export class OffsetTool extends BaseTool {
 			],
 			onKeyDown: e => {
 				if (e.altKey && !e.ctrlKey && !e.metaKey) {
-					if (e.code === 'Digit1' || e.code === 'Numpad1') {
+					const dirByKey: Record<string, OffsetDirection> = {
+						Digit1: 'one_side',
+						Numpad1: 'one_side',
+						Digit2: 'two_sides',
+						Numpad2: 'two_sides',
+						Digit3: 'symmetric',
+						Numpad3: 'symmetric',
+					};
+					const nextDir = dirByKey[e.code];
+					if (nextDir) {
 						e.preventDefault();
 						e.stopPropagation();
-						this.setDirection('one_side');
-						return true;
-					} else if (e.code === 'Digit2' || e.code === 'Numpad2') {
-						e.preventDefault();
-						e.stopPropagation();
-						this.setDirection('two_sides');
-						return true;
-					} else if (e.code === 'Digit3' || e.code === 'Numpad3') {
-						e.preventDefault();
-						e.stopPropagation();
-						this.setDirection('symmetric');
+						this.setDirection(nextDir);
 						return true;
 					}
 				}
@@ -249,20 +248,19 @@ export class OffsetTool extends BaseTool {
 
 	setDirection(direction: OffsetDirection): void {
 		this.direction = direction;
-		if (direction === 'one_side') {
-			this.popup.setFieldLabel('dist1', 'Distance');
-			this.popup.setFieldVisible('dist2', false);
-			this.popup.setFieldVisible('flip', true);
-		} else if (direction === 'two_sides') {
-			this.popup.setFieldLabel('dist1', 'Distance 1');
-			this.popup.setFieldLabel('dist2', 'Distance 2');
-			this.popup.setFieldVisible('dist2', true);
-			this.popup.setFieldVisible('flip', true);
-		} else if (direction === 'symmetric') {
-			this.popup.setFieldLabel('dist1', 'Distance');
-			this.popup.setFieldVisible('dist2', false);
-			this.popup.setFieldVisible('flip', false);
-		}
+		const uiConfig: Record<
+			OffsetDirection,
+			{ dist1Label: string; dist2Label?: string; dist2: boolean; flip: boolean }
+		> = {
+			one_side: { dist1Label: 'Distance', dist2: false, flip: true },
+			two_sides: { dist1Label: 'Distance 1', dist2Label: 'Distance 2', dist2: true, flip: true },
+			symmetric: { dist1Label: 'Distance', dist2: false, flip: false },
+		};
+		const cfg = uiConfig[direction];
+		this.popup.setFieldLabel('dist1', cfg.dist1Label);
+		if (cfg.dist2Label) this.popup.setFieldLabel('dist2', cfg.dist2Label);
+		this.popup.setFieldVisible('dist2', cfg.dist2);
+		this.popup.setFieldVisible('flip', cfg.flip);
 		this.recalculate();
 		const bbox = this.getGizmoBoundingBox();
 		if (bbox) {

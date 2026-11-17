@@ -12,9 +12,51 @@ import {
 	type PrimitiveSnapCandidate,
 	type PrimitiveTransformRenderOptions,
 } from './base';
-import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
+import { PrimitivePanel, type IPrimitivePanel, type PrimitiveFieldConfig } from '../../ui/panels/primitives';
 import { createSvgEllipse, createSvgLine } from '../../canvas/svg';
 import { AUX_AXIS_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_RING_ATTRS } from '../../canvas/styles';
+
+export function createEllipseSidebarFields(entity: {
+	id: string;
+	centerId: string;
+	majorAxisPointId: string;
+	minorAxisPointId: string;
+}): PrimitiveFieldConfig[] {
+	const axisDist = (ctx: { sketch: any }, targetId: string) => {
+		const center = ctx.sketch.points.get(entity.centerId);
+		const target = ctx.sketch.points.get(targetId);
+		return center && target ? Number(center.distanceTo(target).toFixed(2)) : 0;
+	};
+	return [
+		{
+			id: 'insp-ellipse-rx',
+			label: 'Major Radius (Rx)',
+			unit: 'mm',
+			getValue: ctx => axisDist(ctx, entity.majorAxisPointId),
+			onCommit: (val, ctx) => ctx.sketch.setEllipseParams(entity.id, { rx: val }),
+			validate: val => !isNaN(val) && isFinite(val) && val > 0,
+		},
+		{
+			id: 'insp-ellipse-ry',
+			label: 'Minor Radius (Ry)',
+			unit: 'mm',
+			getValue: ctx => axisDist(ctx, entity.minorAxisPointId),
+			onCommit: (val, ctx) => ctx.sketch.setEllipseParams(entity.id, { ry: val }),
+			validate: val => !isNaN(val) && isFinite(val) && val > 0,
+		},
+		{
+			id: 'insp-ellipse-rot',
+			label: 'Rotation',
+			unit: '°',
+			getValue: ctx => {
+				const center = ctx.sketch.points.get(entity.centerId);
+				const majorPt = ctx.sketch.points.get(entity.majorAxisPointId);
+				return center && majorPt ? Number(center.angleToPointDeg(majorPt).toFixed(2)) : 0;
+			},
+			onCommit: (val, ctx) => ctx.sketch.setEllipseParams(entity.id, { rotationDeg: val }),
+		},
+	];
+}
 
 export class SketchEllipse implements ISketchPrimitive {
 	readonly type = 'ellipse' as const;
@@ -54,32 +96,29 @@ export class SketchEllipse implements ISketchPrimitive {
 		}
 	}
 
-	distanceTo(screen: Vec2, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+	private resolvePoints(sketch: any) {
 		const center = sketch.points.get(this.centerId);
 		const majorPt = sketch.points.get(this.majorAxisPointId);
 		const minorPt = sketch.points.get(this.minorAxisPointId);
-		if (!center || !majorPt || !minorPt) return null;
+		return center && majorPt && minorPt ? ([center, majorPt, minorPt] as const) : null;
+	}
 
-		const sc = viewport.worldToScreen(center);
-		const smaj = viewport.worldToScreen(majorPt);
-		const smin = viewport.worldToScreen(minorPt);
-
+	distanceTo(screen: Vec2, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const pts = this.resolvePoints(sketch);
+		if (!pts) return null;
+		const [sc, smaj, smin] = pts.map(p => viewport.worldToScreen(p));
 		return distanceToEllipse(screen, sc, smaj, smin);
 	}
 
 	intersectsAABB(min: Vec2, max: Vec2, sketch: any): boolean {
-		const center = sketch.points.get(this.centerId);
-		const majorPt = sketch.points.get(this.majorAxisPointId);
-		const minorPt = sketch.points.get(this.minorAxisPointId);
-		if (!center || !majorPt || !minorPt) return false;
-		return ellipseIntersectsAABB(center, majorPt, minorPt, min, max);
+		const pts = this.resolvePoints(sketch);
+		return pts ? ellipseIntersectsAABB(pts[0], pts[1], pts[2], min, max) : false;
 	}
 
 	toGeoCurve(sketch: any): GeoEllipse | null {
-		const center = sketch.points.get(this.centerId);
-		const maj = sketch.points.get(this.majorAxisPointId);
-		const min = sketch.points.get(this.minorAxisPointId);
-		if (!center || !maj || !min) return null;
+		const pts = this.resolvePoints(sketch);
+		if (!pts) return null;
+		const [center, maj, min] = pts;
 		return {
 			type: 'ellipse',
 			id: this.id,
@@ -102,14 +141,10 @@ export class SketchEllipse implements ISketchPrimitive {
 	}
 
 	render(ctx: PrimitiveRenderContext): void {
-		const center = ctx.sketch.points.get(this.centerId);
-		const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-		const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
-		if (!center || !majorPt || !minorPt) return;
+		const pts = this.resolvePoints(ctx.sketch);
+		if (!pts) return;
 
-		const sc = ctx.viewport.worldToScreen(center);
-		const smaj = ctx.viewport.worldToScreen(majorPt);
-		const smin = ctx.viewport.worldToScreen(minorPt);
+		const [sc, smaj, smin] = pts.map(p => ctx.viewport.worldToScreen(p));
 
 		const r = sc.distancesTo(smaj, smin);
 		if (r.x < 0.1 || r.y < 0.1) return;
@@ -137,19 +172,13 @@ export class SketchEllipse implements ISketchPrimitive {
 	}
 
 	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
-		const origCtr = opts.sketch.points.get(this.centerId);
-		const origMajor = opts.sketch.points.get(this.majorAxisPointId);
-		const origMinor = opts.sketch.points.get(this.minorAxisPointId);
-		if (!origCtr || !origMajor || !origMinor) return [];
+		const pts = this.resolvePoints(opts.sketch);
+		if (!pts) return [];
 
-		const rc = opts.transformPoint(origCtr.x, origCtr.y);
-		const rmaj = opts.transformPoint(origMajor.x, origMajor.y);
-		const rmin = opts.transformPoint(origMinor.x, origMinor.y);
+		const [rc, rmaj, rmin] = pts.map(p => opts.transformPoint(p.x, p.y));
 
 		if (opts.targetGroup && opts.strokeAttrs) {
-			const src = opts.viewport.worldToScreen(rc);
-			const srmaj = opts.viewport.worldToScreen(rmaj);
-			const srmin = opts.viewport.worldToScreen(rmin);
+			const [src, srmaj, srmin] = [rc, rmaj, rmin].map(p => opts.viewport.worldToScreen(p));
 			const r = src.distancesTo(srmaj, srmin);
 			const thetaDeg = src.angleToPointDeg(srmaj);
 
@@ -173,14 +202,10 @@ export class SketchEllipse implements ISketchPrimitive {
 	}
 
 	snapTo(screenPos: Vec2, sketch: any, viewport: any, maxDistPx: number): PrimitiveSnapCandidate | null {
-		const center = sketch.points.get(this.centerId);
-		const majorPt = sketch.points.get(this.majorAxisPointId);
-		const minorPt = sketch.points.get(this.minorAxisPointId);
-		if (!center || !majorPt || !minorPt) return null;
+		const pts = this.resolvePoints(sketch);
+		if (!pts) return null;
 
-		const sc = viewport.worldToScreen(center);
-		const smaj = viewport.worldToScreen(majorPt);
-		const smin = viewport.worldToScreen(minorPt);
+		const [sc, smaj, smin] = pts.map(p => viewport.worldToScreen(p));
 
 		const axisU = new Vec2().subVectors(smaj, sc);
 		const axisV = new Vec2().subVectors(smin, sc);
@@ -211,43 +236,7 @@ export class SketchEllipse implements ISketchPrimitive {
 
 	readonly sidebarPanel: IPrimitivePanel = new PrimitivePanel({
 		title: () => this.id,
-		fields: [
-			{
-				id: 'insp-ellipse-rx',
-				label: 'Major Radius (Rx)',
-				unit: 'mm',
-				getValue: ctx => {
-					const center = ctx.sketch.points.get(this.centerId);
-					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(center.distanceTo(majorPt).toFixed(2)) : 0;
-				},
-				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rx: val }),
-				validate: val => !isNaN(val) && isFinite(val) && val > 0,
-			},
-			{
-				id: 'insp-ellipse-ry',
-				label: 'Minor Radius (Ry)',
-				unit: 'mm',
-				getValue: ctx => {
-					const center = ctx.sketch.points.get(this.centerId);
-					const minorPt = ctx.sketch.points.get(this.minorAxisPointId);
-					return center && minorPt ? Number(center.distanceTo(minorPt).toFixed(2)) : 0;
-				},
-				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { ry: val }),
-				validate: val => !isNaN(val) && isFinite(val) && val > 0,
-			},
-			{
-				id: 'insp-ellipse-rot',
-				label: 'Rotation',
-				unit: '°',
-				getValue: ctx => {
-					const center = ctx.sketch.points.get(this.centerId);
-					const majorPt = ctx.sketch.points.get(this.majorAxisPointId);
-					return center && majorPt ? Number(center.angleToPointDeg(majorPt).toFixed(2)) : 0;
-				},
-				onCommit: (val, ctx) => ctx.sketch.setEllipseParams(this.id, { rotationDeg: val }),
-			},
-		],
+		fields: createEllipseSidebarFields(this),
 		getConstraints: ctx => ctx.sketch.getConstraintsForEntity('ellipse', this.id),
 		constraintsLabel: 'this ellipse',
 		entityIds: () => [this.id],

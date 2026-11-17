@@ -12,6 +12,14 @@ import {
 } from '../math/offset';
 import { resizeOffsetSpline } from '../math/offsetSpline';
 
+function moveUnfixedPoint(sketch: SketchDocument, id: string, pos: { x: number; y: number }): void {
+	const pt = sketch.points.get(id);
+	if (pt && !sketch.isPointFixed(id)) {
+		pt.x = pos.x;
+		pt.y = pos.y;
+	}
+}
+
 const offsetSourceStates = new WeakMap<OffsetConstraint, Array<string | number | boolean | undefined>>();
 
 export function syncOffsetSources(sketch: SketchDocument, offsets: OffsetConstraint[], onRecompute: () => void): void {
@@ -64,11 +72,10 @@ export function applyOffsetConstraintValue(sketch: SketchDocument, c: OffsetCons
 			for (const pair of c.pairs) {
 				if (pair.kind === 'spline') {
 					for (const sp of pair.points) {
-						const pt = sketch.points.get(sp.pointId);
-						if (pt && !sketch.isPointFixed(sp.pointId)) {
-							pt.x = sp.basePos.x + sp.side * c.targetDistance * sp.normal.x;
-							pt.y = sp.basePos.y + sp.side * c.targetDistance * sp.normal.y;
-						}
+						moveUnfixedPoint(sketch, sp.pointId, {
+							x: sp.basePos.x + sp.side * c.targetDistance * sp.normal.x,
+							y: sp.basePos.y + sp.side * c.targetDistance * sp.normal.y,
+						});
 					}
 				}
 			}
@@ -364,16 +371,8 @@ function applyOffsetGeometryUpdate(sketch: SketchDocument, c: OffsetConstraint, 
 
 		if (pair.kind === 'line') {
 			if (prim.p1 && prim.p2) {
-				const p1 = sketch.points.get(pair.offP1Id);
-				const p2 = sketch.points.get(pair.offP2Id);
-				if (p1 && !sketch.isPointFixed(p1.id)) {
-					p1.x = prim.p1.x;
-					p1.y = prim.p1.y;
-				}
-				if (p2 && !sketch.isPointFixed(p2.id)) {
-					p2.x = prim.p2.x;
-					p2.y = prim.p2.y;
-				}
+				moveUnfixedPoint(sketch, pair.offP1Id, prim.p1);
+				moveUnfixedPoint(sketch, pair.offP2Id, prim.p2);
 			}
 		} else if (pair.kind === 'circle') {
 			const circ = sketch.circles.get(pair.offId);
@@ -381,16 +380,8 @@ function applyOffsetGeometryUpdate(sketch: SketchDocument, c: OffsetConstraint, 
 			const arc = sketch.arcs.get(pair.offId);
 			if (arc && prim.radius) arc.radius = prim.radius;
 			if (arc && prim.start && prim.end) {
-				for (const [id, pos] of [
-					[arc.startPointId, prim.start],
-					[arc.endPointId, prim.end],
-				] as const) {
-					const pt = sketch.points.get(id);
-					if (pt && !sketch.isPointFixed(id)) {
-						pt.x = pos.x;
-						pt.y = pos.y;
-					}
-				}
+				moveUnfixedPoint(sketch, arc.startPointId, prim.start);
+				moveUnfixedPoint(sketch, arc.endPointId, prim.end);
 			}
 		} else if (pair.kind === 'spline') {
 			const spline = sketch.splines.get(pair.offSplineId);
@@ -410,11 +401,7 @@ function applyOffsetGeometryUpdate(sketch: SketchDocument, c: OffsetConstraint, 
 					}
 				}
 				for (let k = 0; k < ptsCount; k++) {
-					const pt = sketch.points.get(spline.pointIds[k]);
-					if (pt && !sketch.isPointFixed(pt.id) && prim.fitPoints[k]) {
-						pt.x = prim.fitPoints[k].x;
-						pt.y = prim.fitPoints[k].y;
-					}
+					if (prim.fitPoints[k]) moveUnfixedPoint(sketch, spline.pointIds[k], prim.fitPoints[k]);
 				}
 				// Update tangent handle points
 				const fitPts = spline.pointIds.map(pid => sketch.points.get(pid)).filter((p): p is SketchPoint => !!p);
@@ -438,16 +425,8 @@ function applyOffsetGeometryUpdate(sketch: SketchDocument, c: OffsetConstraint, 
 									new MidpointConstraint(mid.id, mid.midId, mid.p1Id, mid.p2Id, mid.weight, ratio)
 								);
 							}
-							const h1 = sketch.points.get(tLine.p1Id);
-							const h2 = sketch.points.get(tLine.p2Id);
-							if (h1 && !sketch.isPointFixed(h1.id)) {
-								h1.x = handles[h].h1.x;
-								h1.y = handles[h].h1.y;
-							}
-							if (h2 && !sketch.isPointFixed(h2.id)) {
-								h2.x = handles[h].h2.x;
-								h2.y = handles[h].h2.y;
-							}
+							moveUnfixedPoint(sketch, tLine.p1Id, handles[h].h1);
+							moveUnfixedPoint(sketch, tLine.p2Id, handles[h].h2);
 						}
 					}
 				}

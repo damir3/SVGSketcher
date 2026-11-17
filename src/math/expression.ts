@@ -81,6 +81,47 @@ interface Token {
 	pos: number;
 }
 
+const SINGLE_CHAR_TOKENS: Record<string, TokenType> = {
+	'+': 'PLUS',
+	'-': 'MINUS',
+	'*': 'STAR',
+	'/': 'SLASH',
+	'%': 'PERCENT',
+	'^': 'CARET',
+	'(': 'LPAREN',
+	')': 'RPAREN',
+	',': 'COMMA',
+};
+
+const toRad = (deg: number) => (deg * Math.PI) / 180;
+const toDeg = (rad: number) => (rad * 180) / Math.PI;
+
+const UNARY_FUNCTIONS: Record<string, (x: number, pos: number) => number> = {
+	sin: x => Math.sin(toRad(x)),
+	cos: x => Math.cos(toRad(x)),
+	tan: x => Math.tan(toRad(x)),
+	asin: (x, pos) => {
+		if (x < -1 || x > 1) throw new Error(`asin argument out of range [-1, 1] at index ${pos}`);
+		return toDeg(Math.asin(x));
+	},
+	acos: (x, pos) => {
+		if (x < -1 || x > 1) throw new Error(`acos argument out of range [-1, 1] at index ${pos}`);
+		return toDeg(Math.acos(x));
+	},
+	atan: x => toDeg(Math.atan(x)),
+	deg: toDeg,
+	rad: toRad,
+	sqrt: (x, pos) => {
+		if (x < 0) throw new Error(`Square root of negative number at index ${pos}`);
+		return Math.sqrt(x);
+	},
+	abs: Math.abs,
+	round: Math.round,
+	floor: Math.floor,
+	ceil: Math.ceil,
+	sign: Math.sign,
+};
+
 export class Lexer {
 	private src: string;
 	private pos = 0;
@@ -174,37 +215,11 @@ export class Lexer {
 				continue;
 			}
 
-			switch (ch) {
-				case '+':
-					tokens.push({ type: 'PLUS', pos: this.pos++ });
-					break;
-				case '-':
-					tokens.push({ type: 'MINUS', pos: this.pos++ });
-					break;
-				case '*':
-					tokens.push({ type: 'STAR', pos: this.pos++ });
-					break;
-				case '/':
-					tokens.push({ type: 'SLASH', pos: this.pos++ });
-					break;
-				case '%':
-					tokens.push({ type: 'PERCENT', pos: this.pos++ });
-					break;
-				case '^':
-					tokens.push({ type: 'CARET', pos: this.pos++ });
-					break;
-				case '(':
-					tokens.push({ type: 'LPAREN', pos: this.pos++ });
-					break;
-				case ')':
-					tokens.push({ type: 'RPAREN', pos: this.pos++ });
-					break;
-				case ',':
-					tokens.push({ type: 'COMMA', pos: this.pos++ });
-					break;
-				default:
-					throw new Error(`Unexpected character '${ch}' at index ${this.pos}`);
+			if (Object.hasOwn(SINGLE_CHAR_TOKENS, ch)) {
+				tokens.push({ type: SINGLE_CHAR_TOKENS[ch], pos: this.pos++ });
+				continue;
 			}
+			throw new Error(`Unexpected character '${ch}' at index ${this.pos}`);
 		}
 
 		tokens.push({ type: 'EOF', pos: this.pos });
@@ -328,36 +343,30 @@ export class ExpressionParser {
 		return this.parsePrimary();
 	}
 
+	private applyTrailingUnit(val: number): number {
+		if (this.current().type === 'IDENT') {
+			const nextIdent = String(this.current().value).toLowerCase();
+			if (nextIdent in UNITS && this.peekNext().type !== 'LPAREN') {
+				this.consume();
+				return val * UNITS[nextIdent];
+			}
+		}
+		return val;
+	}
+
 	private parsePrimary(): number {
 		const tok = this.current();
 
 		if (tok.type === 'NUMBER') {
 			this.consume();
-			let numVal = tok.value as number;
-			// Check if followed by unit token separated by space: e.g. "10 mm", "45 deg"
-			if (this.current().type === 'IDENT') {
-				const nextIdent = String(this.current().value).toLowerCase();
-				if (nextIdent in UNITS && this.peekNext().type !== 'LPAREN') {
-					this.consume();
-					numVal *= UNITS[nextIdent];
-				}
-			}
-			return numVal;
+			return this.applyTrailingUnit(tok.value as number);
 		}
 
 		if (tok.type === 'LPAREN') {
 			this.consume('LPAREN');
 			const val = this.parseExpression();
 			this.consume('RPAREN');
-			// Check if parenthesized expression is followed by unit: e.g. "(10 + 2) mm"
-			if (this.current().type === 'IDENT') {
-				const nextIdent = String(this.current().value).toLowerCase();
-				if (nextIdent in UNITS && this.peekNext().type !== 'LPAREN') {
-					this.consume();
-					return val * UNITS[nextIdent];
-				}
-			}
-			return val;
+			return this.applyTrailingUnit(val);
 		}
 
 		if (tok.type === 'IDENT') {
@@ -407,84 +416,26 @@ export class ExpressionParser {
 				throw new Error(`Unknown parameter '${rawIdent}' at index ${tok.pos}`);
 			}
 
-			// Check if variable is followed by unit (e.g. "param1 mm")
-			if (this.current().type === 'IDENT') {
-				const nextIdent = String(this.current().value).toLowerCase();
-				if (nextIdent in UNITS && this.peekNext().type !== 'LPAREN') {
-					this.consume();
-					val *= UNITS[nextIdent];
-				}
-			}
-
-			return val;
+			return this.applyTrailingUnit(val);
 		}
 
 		throw new Error(`Unexpected token '${this.tokenToString(tok)}' at index ${tok.pos}`);
 	}
 
 	private executeFunction(fnName: string, args: number[], pos: number): number {
-		switch (fnName) {
-			// Trigonometry (inputs in degrees by default, consistent with CAD standards)
-			case 'sin':
-				if (args.length !== 1) throw new Error(`sin() takes 1 argument at index ${pos}`);
-				return Math.sin((args[0] * Math.PI) / 180);
-			case 'cos':
-				if (args.length !== 1) throw new Error(`cos() takes 1 argument at index ${pos}`);
-				return Math.cos((args[0] * Math.PI) / 180);
-			case 'tan':
-				if (args.length !== 1) throw new Error(`tan() takes 1 argument at index ${pos}`);
-				return Math.tan((args[0] * Math.PI) / 180);
-			// Inverse trigonometry (outputs in degrees)
-			case 'asin':
-				if (args.length !== 1) throw new Error(`asin() takes 1 argument at index ${pos}`);
-				if (args[0] < -1 || args[0] > 1) throw new Error(`asin argument out of range [-1, 1] at index ${pos}`);
-				return (Math.asin(args[0]) * 180) / Math.PI;
-			case 'acos':
-				if (args.length !== 1) throw new Error(`acos() takes 1 argument at index ${pos}`);
-				if (args[0] < -1 || args[0] > 1) throw new Error(`acos argument out of range [-1, 1] at index ${pos}`);
-				return (Math.acos(args[0]) * 180) / Math.PI;
-			case 'atan':
-				if (args.length !== 1) throw new Error(`atan() takes 1 argument at index ${pos}`);
-				return (Math.atan(args[0]) * 180) / Math.PI;
-			case 'atan2':
-				if (args.length !== 2) throw new Error(`atan2() takes 2 arguments at index ${pos}`);
-				return (Math.atan2(args[0], args[1]) * 180) / Math.PI;
-			// Helpers to explicitly convert between degrees and radians
-			case 'deg':
-				if (args.length !== 1) throw new Error(`deg() takes 1 argument at index ${pos}`);
-				return (args[0] * 180) / Math.PI;
-			case 'rad':
-				if (args.length !== 1) throw new Error(`rad() takes 1 argument at index ${pos}`);
-				return (args[0] * Math.PI) / 180;
-			// Standard math functions
-			case 'sqrt':
-				if (args.length !== 1) throw new Error(`sqrt() takes 1 argument at index ${pos}`);
-				if (args[0] < 0) throw new Error(`Square root of negative number at index ${pos}`);
-				return Math.sqrt(args[0]);
-			case 'abs':
-				if (args.length !== 1) throw new Error(`abs() takes 1 argument at index ${pos}`);
-				return Math.abs(args[0]);
-			case 'round':
-				if (args.length !== 1) throw new Error(`round() takes 1 argument at index ${pos}`);
-				return Math.round(args[0]);
-			case 'floor':
-				if (args.length !== 1) throw new Error(`floor() takes 1 argument at index ${pos}`);
-				return Math.floor(args[0]);
-			case 'ceil':
-				if (args.length !== 1) throw new Error(`ceil() takes 1 argument at index ${pos}`);
-				return Math.ceil(args[0]);
-			case 'sign':
-				if (args.length !== 1) throw new Error(`sign() takes 1 argument at index ${pos}`);
-				return Math.sign(args[0]);
-			case 'min':
-				if (args.length < 1) throw new Error(`min() takes at least 1 argument at index ${pos}`);
-				return Math.min(...args);
-			case 'max':
-				if (args.length < 1) throw new Error(`max() takes at least 1 argument at index ${pos}`);
-				return Math.max(...args);
-			default:
-				throw new Error(`Unknown function '${fnName}()' at index ${pos}`);
+		if (Object.hasOwn(UNARY_FUNCTIONS, fnName)) {
+			if (args.length !== 1) throw new Error(`${fnName}() takes 1 argument at index ${pos}`);
+			return UNARY_FUNCTIONS[fnName](args[0], pos);
 		}
+		if (fnName === 'atan2') {
+			if (args.length !== 2) throw new Error(`atan2() takes 2 arguments at index ${pos}`);
+			return toDeg(Math.atan2(args[0], args[1]));
+		}
+		if (fnName === 'min' || fnName === 'max') {
+			if (args.length < 1) throw new Error(`${fnName}() takes at least 1 argument at index ${pos}`);
+			return fnName === 'min' ? Math.min(...args) : Math.max(...args);
+		}
+		throw new Error(`Unknown function '${fnName}()' at index ${pos}`);
 	}
 }
 

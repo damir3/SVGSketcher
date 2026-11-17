@@ -29,6 +29,23 @@ export interface ConnectedPrimitivesResult {
 	primitives: ConnectedPrimitiveInfo[];
 }
 
+function collectCoincidentPointIds(sketch: SketchDocument, startPointId: string): Set<string> {
+	const pointIds = new Set<string>([startPointId]);
+	const queue = [startPointId];
+	while (queue.length > 0) {
+		const curr = queue.pop()!;
+		for (const c of sketch.constraints.values()) {
+			if (!(c instanceof CoincidentConstraint)) continue;
+			const next = c.p1Id === curr ? c.p2Id : c.p2Id === curr ? c.p1Id : null;
+			if (next && !pointIds.has(next)) {
+				pointIds.add(next);
+				queue.push(next);
+			}
+		}
+	}
+	return pointIds;
+}
+
 /**
  * Finds all points coincident to startPointId and returns all non-construction, non-handle
  * primitives (line, arc, spline) connected to them.
@@ -42,87 +59,49 @@ export function getConnectedPrimitivesForPoint(
 		return { valid: false, pointIds: new Set(), primitives: [] };
 	}
 
-	// 1. Traverse CoincidentConstraint graph to find equivalence class
-	const pointIds = new Set<string>([startPointId]);
-	const queue = [startPointId];
-
-	while (queue.length > 0) {
-		const curr = queue.pop()!;
-		for (const c of sketch.constraints.values()) {
-			if (c instanceof CoincidentConstraint) {
-				if (c.p1Id === curr && !pointIds.has(c.p2Id)) {
-					pointIds.add(c.p2Id);
-					queue.push(c.p2Id);
-				} else if (c.p2Id === curr && !pointIds.has(c.p1Id)) {
-					pointIds.add(c.p1Id);
-					queue.push(c.p1Id);
-				}
-			}
-		}
-	}
-
-	// 2. Collect all primitives connected to any point in pointIds
+	const pointIds = collectCoincidentPointIds(sketch, startPointId);
 	const primitives: ConnectedPrimitiveInfo[] = [];
 	const seenIds = new Set<string>();
+	const addEndpointMatch = (
+		type: ConnectedPrimitiveInfo['type'],
+		id: string,
+		firstId: string,
+		secondId: string,
+		otherFirst = secondId,
+		otherSecond = firstId
+	) => {
+		const firstIn = pointIds.has(firstId);
+		const secondIn = pointIds.has(secondId);
+		if ((!firstIn && !secondIn) || seenIds.has(id)) return;
+		seenIds.add(id);
+		primitives.push({
+			type,
+			id,
+			endPointId: firstIn ? firstId : secondId,
+			otherPointId: firstIn ? otherFirst : otherSecond,
+		});
+	};
 
-	// Lines
 	for (const line of sketch.lines.values()) {
-		if (line.isSplineHandle) continue; // Skip spline tangent handles
-		const p1In = pointIds.has(line.p1Id);
-		const p2In = pointIds.has(line.p2Id);
-		if (p1In || p2In) {
-			if (!seenIds.has(line.id)) {
-				seenIds.add(line.id);
-				primitives.push({
-					type: 'line',
-					id: line.id,
-					endPointId: p1In ? line.p1Id : line.p2Id,
-					otherPointId: p1In ? line.p2Id : line.p1Id,
-				});
-			}
-		}
+		if (!line.isSplineHandle) addEndpointMatch('line', line.id, line.p1Id, line.p2Id);
 	}
-
-	// Arcs
 	for (const arc of sketch.arcs.values()) {
-		const startIn = pointIds.has(arc.startPointId);
-		const endIn = pointIds.has(arc.endPointId);
-		if (startIn || endIn) {
-			if (!seenIds.has(arc.id)) {
-				seenIds.add(arc.id);
-				primitives.push({
-					type: 'arc',
-					id: arc.id,
-					endPointId: startIn ? arc.startPointId : arc.endPointId,
-					otherPointId: startIn ? arc.endPointId : arc.startPointId,
-				});
-			}
-		}
+		addEndpointMatch('arc', arc.id, arc.startPointId, arc.endPointId);
 	}
-
-	// Splines
 	for (const spline of sketch.splines.values()) {
 		if (spline.pointIds.length >= 2) {
-			const startPt = spline.pointIds[0];
-			const endPt = spline.pointIds[spline.pointIds.length - 1];
-			const startIn = pointIds.has(startPt);
-			const endIn = pointIds.has(endPt);
-			if (startIn || endIn) {
-				if (!seenIds.has(spline.id)) {
-					seenIds.add(spline.id);
-					primitives.push({
-						type: 'spline',
-						id: spline.id,
-						endPointId: startIn ? startPt : endPt,
-						otherPointId: startIn ? spline.pointIds[1] : spline.pointIds[spline.pointIds.length - 2],
-					});
-				}
-			}
+			addEndpointMatch(
+				'spline',
+				spline.id,
+				spline.pointIds[0],
+				spline.pointIds[spline.pointIds.length - 1],
+				spline.pointIds[1],
+				spline.pointIds[spline.pointIds.length - 2]
+			);
 		}
 	}
 
-	const valid = primitives.length === 2;
-	return { valid, pointIds, primitives };
+	return { valid: primitives.length === 2, pointIds, primitives };
 }
 
 export interface FilletResult {
@@ -435,25 +414,7 @@ function commitFillet(
 }
 
 function isPointAtOrCoincident(sketch: SketchDocument, targetPointId: string, candidatePointId: string): boolean {
-	if (targetPointId === candidatePointId) return true;
-	const visited = new Set<string>([targetPointId]);
-	const queue = [targetPointId];
-	while (queue.length > 0) {
-		const curr = queue.pop()!;
-		for (const c of sketch.constraints.values()) {
-			if (c instanceof CoincidentConstraint) {
-				const next = c.p1Id === curr ? c.p2Id : c.p2Id === curr ? c.p1Id : null;
-				if (next) {
-					if (next === candidatePointId) return true;
-					if (!visited.has(next)) {
-						visited.add(next);
-						queue.push(next);
-					}
-				}
-			}
-		}
-	}
-	return false;
+	return targetPointId === candidatePointId || collectCoincidentPointIds(sketch, targetPointId).has(candidatePointId);
 }
 
 /** Resolve the replaced endpoint identically for document edits and previews. */

@@ -81,18 +81,11 @@ export class EllipseTool extends BaseTool {
 	}
 
 	getStepHint(): string {
-		const step = this.drawingStep;
-		if (this._mode === 'ellipse') {
-			if (step === 0) return '1. Click to place center point';
-			if (step === 1) return '2. Click to set major axis endpoint';
-			return '3. Click to set minor axis radius';
-		} else {
-			if (step === 0) return '1. Click to place center point';
-			if (step === 1) return '2. Click to set major axis endpoint';
-			if (step === 2) return '3. Click to set minor axis radius';
-			if (step === 3) return '4. Click to set arc start point';
-			return '5. Click to set arc end point';
-		}
+		if (this.drawingStep === 0) return '1. Click to place center point';
+		if (this.drawingStep === 1) return '2. Click to set major axis endpoint';
+		if (this.drawingStep === 2) return '3. Click to set minor axis radius';
+		if (this.drawingStep === 3) return '4. Click to set arc start point';
+		return '5. Click to set arc end point';
 	}
 
 	get mode(): EllipseMode {
@@ -151,18 +144,9 @@ export class EllipseTool extends BaseTool {
 
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
-			let cId: string;
-			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
-				cId = snap.id;
-				this.centerWorldPos = snap.worldPos;
-			} else {
-				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos);
-				cId = pt.id;
-				this.centerWorldPos = pt.clone();
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.centerId = cId;
+			const pt = this.acquirePoint(snap ? snap.worldPos : world, snap);
+			this.centerId = pt.id;
+			this.centerWorldPos = pt.pos;
 			this.drawingStep = 1;
 			this.popup.resetField('major', 0);
 			this.popup.resetField('minor', 0);
@@ -207,117 +191,32 @@ export class EllipseTool extends BaseTool {
 				this.ctx.requestRender();
 			}
 		} else if (this.drawingStep === 3) {
-			const centerWorld = this.centerWorldPos!;
-			const majWorld = this.majWorldPos!;
-			const minWorld = this.minWorldPos!;
 			const effectiveWorld = snap ? snap.worldPos : world;
+			const proj = this.projectOntoEllipseWorld(effectiveWorld);
+			if (!proj) return;
 
-			const rxVal = centerWorld.distanceTo(majWorld);
-			const ryVal = centerWorld.distanceTo(minWorld);
-			if (rxVal < 0.1 || ryVal < 0.1) return;
-
-			const axisU = new Vec2().subVectors(majWorld, centerWorld).divideScalar(rxVal);
-			const axisV = new Vec2().subVectors(minWorld, centerWorld).divideScalar(ryVal);
-
-			const radii = new Vec2(rxVal, ryVal);
-			const t = ellipseParameterAtPoint(effectiveWorld, centerWorld, radii, axisU, axisV);
-			const proj = ellipsePointAtParameter(t, centerWorld, radii, axisU, axisV);
-
-			let startPtId: string;
-			if (
-				snap &&
-				snap.type === 'point' &&
-				snap.id &&
-				snap.id !== this.centerId &&
-				snap.id !== this.majPtId &&
-				snap.id !== this.minPtId &&
-				sketch.points.has(snap.id)
-			) {
-				startPtId = snap.id;
-				this.startWorldPtPos = snap.worldPos;
-			} else {
-				const pt = sketch.addPoint(proj);
-				startPtId = pt.id;
-				this.startWorldPtPos = pt.clone();
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.startPtId = startPtId;
-			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
-			const sMaj = this.ctx.viewport.worldToScreen(majWorld);
-			const sMin = this.ctx.viewport.worldToScreen(minWorld);
-			const sStart = this.ctx.viewport.worldToScreen(this.startWorldPtPos);
-			const r = sCenter.distancesTo(sMaj, sMin);
-			const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
-			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(sCenter.angleToPoint(sMaj));
-			this.ellipticalArcPrevAngle = ellipseParameterAtPoint(sStart, sCenter, paramRadii, screenAxisU, screenAxisV);
+			const pt = this.acquirePoint(proj, snap, this.centerId, this.majPtId, this.minPtId);
+			this.startPtId = pt.id;
+			this.startWorldPtPos = pt.pos;
+			const params = this.getScreenArcParams(this.ctx.viewport, this.startWorldPtPos, this.startWorldPtPos);
+			this.ellipticalArcPrevAngle = params?.tA ?? null;
 			this.ellipticalArcTotalAngle = 0;
 			this.drawingStep = 4;
 			this.onStateChange?.();
 			this.ctx.requestRender();
 		} else if (this.drawingStep === 4) {
-			const centerWorld = this.centerWorldPos!;
-			const majWorld = this.majWorldPos!;
-			const minWorld = this.minWorldPos!;
-			const startWorld = this.startWorldPtPos!;
 			const effectiveWorld = snap ? snap.worldPos : world;
+			const proj = this.projectOntoEllipseWorld(effectiveWorld);
+			if (!proj) return;
 
-			const rxVal = centerWorld.distanceTo(majWorld);
-			const ryVal = centerWorld.distanceTo(minWorld);
-			if (rxVal < 0.1 || ryVal < 0.1) return;
-
-			const axisU = new Vec2().subVectors(majWorld, centerWorld).divideScalar(rxVal);
-			const axisV = new Vec2().subVectors(minWorld, centerWorld).divideScalar(ryVal);
-
-			const radii = new Vec2(rxVal, ryVal);
-			const te = ellipseParameterAtPoint(effectiveWorld, centerWorld, radii, axisU, axisV);
-			const proj = ellipsePointAtParameter(te, centerWorld, radii, axisU, axisV);
-
-			// Screen orientation calculation for clockwise flag
-			const sCenter = this.ctx.viewport.worldToScreen(centerWorld);
-			const sMaj = this.ctx.viewport.worldToScreen(majWorld);
-			const sMin = this.ctx.viewport.worldToScreen(minWorld);
-			const sStart = this.ctx.viewport.worldToScreen(startWorld);
-			const sCur = this.ctx.viewport.worldToScreen(effectiveWorld);
-
-			const r = sCenter.distancesTo(sMaj, sMin);
-			const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
-
-			const { axisU: screenAxisU, axisV: screenAxisV } = ellipseAxes(sCenter.angleToPoint(sMaj));
-
-			const ts_sc = ellipseParameterAtPoint(sStart, sCenter, paramRadii, screenAxisU, screenAxisV);
-			const te_sc = ellipseParameterAtPoint(sCur, sCenter, paramRadii, screenAxisU, screenAxisV);
+			const params = this.getScreenArcParams(this.ctx.viewport, this.startWorldPtPos!, effectiveWorld);
+			if (!params) return;
 			if (this.ellipticalArcPrevAngle !== null) {
-				let dAngle = te_sc - this.ellipticalArcPrevAngle;
-				while (dAngle > Math.PI) dAngle -= TWO_PI;
-				while (dAngle < -Math.PI) dAngle += TWO_PI;
-				this.ellipticalArcTotalAngle += dAngle;
+				this.ellipticalArcTotalAngle =
+					(this.ellipticalArcTotalAngle + this.normalizeAngle(params.tB - this.ellipticalArcPrevAngle)) % TWO_PI;
 			}
-			this.ellipticalArcTotalAngle = this.ellipticalArcTotalAngle % TWO_PI;
-			let clockwise = this.ellipticalArcTotalAngle >= 0;
-			if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {
-				let delta = te_sc - ts_sc;
-				while (delta > Math.PI) delta -= TWO_PI;
-				while (delta < -Math.PI) delta += TWO_PI;
-				clockwise = delta >= 0;
-			}
-
-			let endPtId: string;
-			if (
-				snap &&
-				snap.type === 'point' &&
-				snap.id &&
-				snap.id !== this.centerId &&
-				snap.id !== this.majPtId &&
-				snap.id !== this.minPtId &&
-				snap.id !== this.startPtId &&
-				sketch.points.has(snap.id)
-			) {
-				endPtId = snap.id;
-			} else {
-				const pt = sketch.addPoint(proj);
-				endPtId = pt.id;
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
+			const clockwise = this.resolveArcClockwise(params.tA, params.tB);
+			const endPtId = this.acquirePoint(proj, snap, this.centerId, this.majPtId, this.minPtId, this.startPtId).id;
 
 			sketch.addEllipticalArc(
 				this.centerId!,
@@ -349,41 +248,16 @@ export class EllipseTool extends BaseTool {
 		}
 		const effectiveWorld = this.shouldSnap() && e.snap ? e.snap.worldPos : e.world;
 
-		if (this.drawingStep === 4 && this.centerWorldPos && this.majWorldPos && this.minWorldPos && this.startWorldPtPos) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-			const minWorld = this.minWorldPos;
-			const startWorld = this.startWorldPtPos;
-
-			const rxVal = centerWorld.distanceTo(majWorld);
-			const ryVal = centerWorld.distanceTo(minWorld);
-			if (rxVal >= 0.1 && ryVal >= 0.1) {
-				const sc = this.ctx.viewport.worldToScreen(centerWorld);
-				const smaj = this.ctx.viewport.worldToScreen(majWorld);
-				const smin = this.ctx.viewport.worldToScreen(minWorld);
-				const ss = this.ctx.viewport.worldToScreen(startWorld);
-				const se = this.ctx.viewport.worldToScreen(effectiveWorld);
-
-				const r = sc.distancesTo(smaj, smin);
-				const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
-
-				const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
-
-				const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
-				const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
-
+		if (this.drawingStep === 4 && this.startWorldPtPos) {
+			const params = this.getScreenArcParams(this.ctx.viewport, this.startWorldPtPos, effectiveWorld);
+			if (params) {
 				if (this.ellipticalArcPrevAngle === null) {
-					this.ellipticalArcPrevAngle = ts;
+					this.ellipticalArcPrevAngle = params.tA;
 					this.ellipticalArcTotalAngle = 0;
 				}
-
-				let dAngle = te - this.ellipticalArcPrevAngle;
-				while (dAngle > Math.PI) dAngle -= TWO_PI;
-				while (dAngle < -Math.PI) dAngle += TWO_PI;
-
-				this.ellipticalArcTotalAngle += dAngle;
-				this.ellipticalArcPrevAngle = te;
-				this.ellipticalArcTotalAngle = this.ellipticalArcTotalAngle % TWO_PI;
+				this.ellipticalArcTotalAngle =
+					(this.ellipticalArcTotalAngle + this.normalizeAngle(params.tB - this.ellipticalArcPrevAngle)) % TWO_PI;
+				this.ellipticalArcPrevAngle = params.tB;
 			}
 		}
 	}
@@ -403,56 +277,93 @@ export class EllipseTool extends BaseTool {
 			);
 			renderEllipsePreviewVisual(ctx.targetGroup, center, major, minor, ctx.isConstruction);
 		} else if (this.drawingStep === 3 && this.centerWorldPos && this.majWorldPos && this.minWorldPos) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-			const minWorld = this.minWorldPos;
-
-			const sc = ctx.viewport.worldToScreen(centerWorld);
-			const smaj = ctx.viewport.worldToScreen(majWorld);
-			const smin = ctx.viewport.worldToScreen(minWorld);
-			const ss = ctx.viewport.worldToScreen(effectiveWorld);
-
-			renderEllipticalArcStartPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss);
-		} else if (
-			this.drawingStep === 4 &&
-			this.centerWorldPos &&
-			this.majWorldPos &&
-			this.minWorldPos &&
-			this.startWorldPtPos
-		) {
-			const centerWorld = this.centerWorldPos;
-			const majWorld = this.majWorldPos;
-			const minWorld = this.minWorldPos;
-			const startWorld = this.startWorldPtPos;
-
-			const rxVal = centerWorld.distanceTo(majWorld);
-			const ryVal = centerWorld.distanceTo(minWorld);
-			if (rxVal >= 0.1 && ryVal >= 0.1) {
-				const sc = ctx.viewport.worldToScreen(centerWorld);
-				const smaj = ctx.viewport.worldToScreen(majWorld);
-				const smin = ctx.viewport.worldToScreen(minWorld);
-				const ss = ctx.viewport.worldToScreen(startWorld);
-				const se = ctx.viewport.worldToScreen(effectiveWorld);
-
-				const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
-
-				const r = sc.distancesTo(smaj, smin);
-				const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
-
-				const ts = ellipseParameterAtPoint(ss, sc, paramRadii, axisU, axisV);
-				const te = ellipseParameterAtPoint(se, sc, paramRadii, axisU, axisV);
-
-				let clockwise = this.ellipticalArcTotalAngle >= 0;
-				if (Math.abs(this.ellipticalArcTotalAngle) < 0.001) {
-					let delta = te - ts;
-					while (delta > Math.PI) delta -= TWO_PI;
-					while (delta < -Math.PI) delta += TWO_PI;
-					clockwise = delta >= 0;
-				}
-
-				renderEllipticalArcPreviewVisual(ctx.targetGroup, sc, smaj, smin, ss, se, clockwise, ctx.isConstruction);
+			renderEllipticalArcStartPreviewVisual(
+				ctx.targetGroup,
+				ctx.viewport.worldToScreen(this.centerWorldPos),
+				ctx.viewport.worldToScreen(this.majWorldPos),
+				ctx.viewport.worldToScreen(this.minWorldPos),
+				ctx.viewport.worldToScreen(effectiveWorld)
+			);
+		} else if (this.drawingStep === 4 && this.startWorldPtPos) {
+			const params = this.getScreenArcParams(ctx.viewport, this.startWorldPtPos, effectiveWorld);
+			if (params) {
+				renderEllipticalArcPreviewVisual(
+					ctx.targetGroup,
+					params.sc,
+					params.smaj,
+					params.smin,
+					params.sA,
+					params.sB,
+					this.resolveArcClockwise(params.tA, params.tB),
+					ctx.isConstruction
+				);
 			}
 		}
+	}
+
+	private acquirePoint(
+		fallbackPos: Vec2,
+		snap: ToolMouseEvent['snap'],
+		...excludeIds: Array<string | null>
+	): { id: string; pos: Vec2 } {
+		const { sketch } = this.ctx;
+		if (snap?.type === 'point' && snap.id && !excludeIds.includes(snap.id) && sketch.points.has(snap.id)) {
+			return { id: snap.id, pos: snap.worldPos };
+		}
+		const pt = sketch.addPoint(fallbackPos);
+		this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
+		return { id: pt.id, pos: pt.clone() };
+	}
+
+	private projectOntoEllipseWorld(targetWorld: Vec2): Vec2 | null {
+		if (!this.centerWorldPos || !this.majWorldPos || !this.minWorldPos) return null;
+		const rx = this.centerWorldPos.distanceTo(this.majWorldPos);
+		const ry = this.centerWorldPos.distanceTo(this.minWorldPos);
+		if (rx < 0.1 || ry < 0.1) return null;
+		const axisU = new Vec2().subVectors(this.majWorldPos, this.centerWorldPos).divideScalar(rx);
+		const axisV = new Vec2().subVectors(this.minWorldPos, this.centerWorldPos).divideScalar(ry);
+		const radii = new Vec2(rx, ry);
+		const param = ellipseParameterAtPoint(targetWorld, this.centerWorldPos, radii, axisU, axisV);
+		return ellipsePointAtParameter(param, this.centerWorldPos, radii, axisU, axisV);
+	}
+
+	private getScreenArcParams(viewport: ToolRenderContext['viewport'], worldA: Vec2, worldB: Vec2) {
+		if (!this.centerWorldPos || !this.majWorldPos || !this.minWorldPos) return null;
+		if (
+			this.centerWorldPos.distanceTo(this.majWorldPos) < 0.1 ||
+			this.centerWorldPos.distanceTo(this.minWorldPos) < 0.1
+		) {
+			return null;
+		}
+		const sc = viewport.worldToScreen(this.centerWorldPos);
+		const smaj = viewport.worldToScreen(this.majWorldPos);
+		const smin = viewport.worldToScreen(this.minWorldPos);
+		const sA = viewport.worldToScreen(worldA);
+		const sB = viewport.worldToScreen(worldB);
+		const r = sc.distancesTo(smaj, smin);
+		const paramRadii = new Vec2(Math.max(r.x, 0.1), Math.max(r.y, 0.1));
+		const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
+		return {
+			sc,
+			smaj,
+			smin,
+			sA,
+			sB,
+			tA: ellipseParameterAtPoint(sA, sc, paramRadii, axisU, axisV),
+			tB: ellipseParameterAtPoint(sB, sc, paramRadii, axisU, axisV),
+		};
+	}
+
+	private normalizeAngle(angle: number): number {
+		while (angle > Math.PI) angle -= TWO_PI;
+		while (angle < -Math.PI) angle += TWO_PI;
+		return angle;
+	}
+
+	private resolveArcClockwise(tStart: number, tEnd: number): boolean {
+		return Math.abs(this.ellipticalArcTotalAngle) < 0.001
+			? this.normalizeAngle(tEnd - tStart) >= 0
+			: this.ellipticalArcTotalAngle >= 0;
 	}
 
 	private getMajorPoint(center: Vec2, cursor: Vec2): Vec2 {
