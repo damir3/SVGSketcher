@@ -1,4 +1,5 @@
 import type { SketchDocument } from './sketch';
+import { deselectEntity } from './selection';
 import {
 	CircularPatternConstraint,
 	computePatternCopyAngle,
@@ -162,13 +163,7 @@ export function deletePatternCopy(sketch: SketchDocument, copy: PatternCopyData)
 		else if (item.type === 'spline') sketch.splines.delete(item.id);
 		else if (item.type === 'point') sketch.points.delete(item.id);
 
-		sketch.selection.pointIds.delete(item.id);
-		sketch.selection.lineIds.delete(item.id);
-		sketch.selection.circleIds.delete(item.id);
-		sketch.selection.arcIds.delete(item.id);
-		sketch.selection.ellipseIds.delete(item.id);
-		sketch.selection.ellipticalArcIds.delete(item.id);
-		sketch.selection.splineIds.delete(item.id);
+		deselectEntity(sketch, item.id, item.type, false);
 	}
 	const hasSpline = copy.createdEntityIds.some(item => item.type === 'spline');
 	if (hasSpline) {

@@ -1,4 +1,5 @@
 import type { SketchDocument } from '../../model/sketch';
+import { getSelectionCount } from '../../model/selection';
 import type { Viewport } from '../../canvas/viewport';
 import type { LinearDimensionVisualOptions } from '../../canvas/dimensionGeometry';
 import { Vec2 } from '../../math/vector';
@@ -165,15 +166,7 @@ export function renderPatternConstraintCopy(opts: {
 
 export function isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
 	const sel = sketch.selection;
-	return (
-		sel.constraintIds.has(constraintId) &&
-		sel.pointIds.size === 0 &&
-		sel.lineIds.size === 0 &&
-		sel.circleIds.size === 0 &&
-		sel.arcIds.size === 0 &&
-		sel.ellipseIds.size === 0 &&
-		sel.ellipticalArcIds.size === 0
-	);
+	return sel.constraintIds.has(constraintId) && getSelectionCount(sketch) === sel.constraintIds.size;
 }
 
 export function isAngleNearArc(

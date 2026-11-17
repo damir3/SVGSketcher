@@ -2,7 +2,7 @@ import { getImageBounds } from './image';
 import type { SketchDocument } from './sketch';
 import { Vec2 } from '../math/vector';
 import { AABB } from '../math/aabb';
-import type { SketchPoint } from './types';
+import type { SelectionState, SketchPoint } from './types';
 
 export type SelectableEntityType =
 	| 'point'
@@ -15,62 +15,43 @@ export type SelectableEntityType =
 	| 'text'
 	| 'constraint';
 
-export function isEntitySelected(sketch: SketchDocument, id: string, type: SelectableEntityType): boolean {
-	switch (type) {
-		case 'point':
-			return sketch.selection.pointIds.has(id);
-		case 'line':
-			return sketch.selection.lineIds.has(id);
-		case 'circle':
-			return sketch.selection.circleIds.has(id);
-		case 'arc':
-			return sketch.selection.arcIds.has(id);
-		case 'ellipse':
-			return sketch.selection.ellipseIds.has(id);
-		case 'elliptical_arc':
-			return sketch.selection.ellipticalArcIds.has(id);
-		case 'spline':
-			return sketch.selection.splineIds.has(id);
-		case 'text':
-			return sketch.selection.textIds.has(id);
-		case 'constraint':
-			return sketch.selection.constraintIds.has(id);
-		default:
-			return false;
+const SELECTION_KEYS: Record<SelectableEntityType, keyof SelectionState> = {
+	point: 'pointIds',
+	line: 'lineIds',
+	circle: 'circleIds',
+	arc: 'arcIds',
+	ellipse: 'ellipseIds',
+	elliptical_arc: 'ellipticalArcIds',
+	spline: 'splineIds',
+	text: 'textIds',
+	constraint: 'constraintIds',
+};
+
+export function getSelectionSet(sketch: SketchDocument, type: SelectableEntityType): Set<string> | undefined {
+	const key = SELECTION_KEYS[type];
+	return key ? sketch.selection[key] : undefined;
+}
+
+export function clearSelectionSets(sketch: SketchDocument): void {
+	for (const set of Object.values(sketch.selection) as Set<string>[]) {
+		set.clear();
 	}
 }
 
-export function deselectEntity(sketch: SketchDocument, id: string, type: SelectableEntityType, notify = true): void {
-	switch (type) {
-		case 'point':
-			sketch.selection.pointIds.delete(id);
-			break;
-		case 'line':
-			sketch.selection.lineIds.delete(id);
-			break;
-		case 'circle':
-			sketch.selection.circleIds.delete(id);
-			break;
-		case 'arc':
-			sketch.selection.arcIds.delete(id);
-			break;
-		case 'ellipse':
-			sketch.selection.ellipseIds.delete(id);
-			break;
-		case 'elliptical_arc':
-			sketch.selection.ellipticalArcIds.delete(id);
-			break;
-		case 'spline':
-			sketch.selection.splineIds.delete(id);
-			break;
-		case 'text':
-			sketch.selection.textIds.delete(id);
-			break;
-		case 'constraint':
-			sketch.selection.constraintIds.delete(id);
-			break;
+export function getSelectionCount(sketch: SketchDocument): number {
+	let count = 0;
+	for (const set of Object.values(sketch.selection) as Set<string>[]) {
+		count += set.size;
 	}
+	return count;
+}
 
+export function isEntitySelected(sketch: SketchDocument, id: string, type: SelectableEntityType): boolean {
+	return getSelectionSet(sketch, type)?.has(id) ?? false;
+}
+
+export function deselectEntity(sketch: SketchDocument, id: string, type: SelectableEntityType, notify = true): void {
+	getSelectionSet(sketch, type)?.delete(id);
 	if (notify) sketch.notify();
 }
 
@@ -91,38 +72,14 @@ export function selectEntities(
 	mode: boolean | 'toggle' = false
 ): void {
 	if (mode === false) {
-		sketch.selection.pointIds.clear();
-		sketch.selection.lineIds.clear();
-		sketch.selection.circleIds.clear();
-		sketch.selection.arcIds.clear();
-		sketch.selection.ellipseIds.clear();
-		sketch.selection.ellipticalArcIds.clear();
-		sketch.selection.splineIds.clear();
-		sketch.selection.textIds.clear();
-		sketch.selection.constraintIds.clear();
+		clearSelectionSets(sketch);
 	}
 
 	for (const item of items) {
 		if (mode === 'toggle' && isEntitySelected(sketch, item.id, item.type)) {
 			deselectEntity(sketch, item.id, item.type, false);
-		} else if (item.type === 'point') {
-			sketch.selection.pointIds.add(item.id);
-		} else if (item.type === 'line') {
-			sketch.selection.lineIds.add(item.id);
-		} else if (item.type === 'circle') {
-			sketch.selection.circleIds.add(item.id);
-		} else if (item.type === 'arc') {
-			sketch.selection.arcIds.add(item.id);
-		} else if (item.type === 'ellipse') {
-			sketch.selection.ellipseIds.add(item.id);
-		} else if (item.type === 'elliptical_arc') {
-			sketch.selection.ellipticalArcIds.add(item.id);
-		} else if (item.type === 'spline') {
-			sketch.selection.splineIds.add(item.id);
-		} else if (item.type === 'text') {
-			sketch.selection.textIds.add(item.id);
-		} else if (item.type === 'constraint') {
-			sketch.selection.constraintIds.add(item.id);
+		} else {
+			getSelectionSet(sketch, item.type)?.add(item.id);
 		}
 	}
 
@@ -139,48 +96,27 @@ export function selectEntity(
 }
 
 export function clearSelection(sketch: SketchDocument): void {
-	sketch.selection.pointIds.clear();
-	sketch.selection.lineIds.clear();
-	sketch.selection.circleIds.clear();
-	sketch.selection.arcIds.clear();
-	sketch.selection.ellipseIds.clear();
-	sketch.selection.ellipticalArcIds.clear();
-	sketch.selection.splineIds.clear();
-	sketch.selection.textIds.clear();
-	sketch.selection.constraintIds.clear();
+	clearSelectionSets(sketch);
 	sketch.notify();
 }
 
 export function getSelectedPrimitives(sketch: SketchDocument): Array<{ id: string; isConstruction?: boolean }> {
 	const list: Array<{ id: string; isConstruction?: boolean }> = [];
-	for (const id of sketch.selection.lineIds) {
-		const l = sketch.lines.get(id);
-		if (l) list.push(l);
-	}
-	for (const id of sketch.selection.circleIds) {
-		const c = sketch.circles.get(id);
-		if (c) list.push(c);
-	}
-	for (const id of sketch.selection.arcIds) {
-		const a = sketch.arcs.get(id);
-		if (a) list.push(a);
-	}
-	for (const id of sketch.selection.ellipseIds) {
-		const el = sketch.ellipses.get(id);
-		if (el) list.push(el);
-	}
-	for (const id of sketch.selection.ellipticalArcIds) {
-		const ea = sketch.ellipticalArcs.get(id);
-		if (ea) list.push(ea);
-	}
-	for (const id of sketch.selection.splineIds) {
-		const s = sketch.splines.get(id);
-		if (s) list.push(s);
-	}
-	for (const id of sketch.selection.pointIds) {
-		if (!sketch.points.has(id)) continue;
-		const p = sketch.points.get(id);
-		if (p) list.push(p);
+	const sources: Array<[Set<string>, Map<string, { id: string; isConstruction?: boolean }>, boolean?]> = [
+		[sketch.selection.lineIds, sketch.lines],
+		[sketch.selection.circleIds, sketch.circles],
+		[sketch.selection.arcIds, sketch.arcs],
+		[sketch.selection.ellipseIds, sketch.ellipses],
+		[sketch.selection.ellipticalArcIds, sketch.ellipticalArcs],
+		[sketch.selection.splineIds, sketch.splines],
+		[sketch.selection.pointIds, sketch.points, true],
+	];
+	for (const [ids, map, checkOwnHas] of sources) {
+		for (const id of ids) {
+			if (checkOwnHas && !map.has(id)) continue;
+			const item = map.get(id);
+			if (item) list.push(item);
+		}
 	}
 	return list;
 }
@@ -192,18 +128,7 @@ export function getSelectedConstructionState(sketch: SketchDocument): boolean | 
 }
 
 export function deleteSelected(sketch: SketchDocument): void {
-	const hasSelection =
-		sketch.selection.pointIds.size > 0 ||
-		sketch.selection.lineIds.size > 0 ||
-		sketch.selection.circleIds.size > 0 ||
-		sketch.selection.arcIds.size > 0 ||
-		sketch.selection.ellipseIds.size > 0 ||
-		sketch.selection.ellipticalArcIds.size > 0 ||
-		sketch.selection.splineIds.size > 0 ||
-		sketch.selection.textIds.size > 0 ||
-		sketch.selection.constraintIds.size > 0;
-
-	if (!hasSelection) return;
+	if (getSelectionCount(sketch) === 0) return;
 
 	sketch.beginTransaction();
 	const selectedPoints = [...sketch.selection.pointIds];
@@ -255,34 +180,24 @@ export function deleteSelected(sketch: SketchDocument): void {
 
 	// Collect all candidate points from all selected primitives before deleting
 	const candidatePointIds = new Set<string>();
-	for (const id of filteredLines) {
-		for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-	}
-	for (const id of selectedCircles) {
-		for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-	}
-	for (const id of selectedArcs) {
-		for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-	}
-	for (const id of selectedEllipses) {
-		for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-	}
-	for (const id of selectedEllipticalArcs) {
-		for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
-	}
-	for (const id of selectedSplines) {
-		for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+	const curveSelectionGroups = [
+		filteredLines,
+		selectedCircles,
+		selectedArcs,
+		selectedEllipses,
+		selectedEllipticalArcs,
+		selectedSplines,
+	];
+	for (const group of curveSelectionGroups) {
+		for (const id of group) {
+			for (const ptId of sketch.getPrimitivePointIds(id)) candidatePointIds.add(ptId);
+		}
 	}
 
 	for (const id of selectedConstraints) sketch.removeConstraint(id);
-	for (const id of filteredLines) sketch.removeEntity(id);
-	for (const id of selectedCircles) sketch.removeEntity(id);
-	for (const id of selectedArcs) sketch.removeEntity(id);
-	for (const id of selectedEllipses) sketch.removeEntity(id);
-	for (const id of selectedEllipticalArcs) sketch.removeEntity(id);
-	for (const id of selectedSplines) sketch.removeEntity(id);
-	for (const id of selectedTexts) sketch.removeEntity(id);
-	for (const id of filteredPoints) sketch.removeEntity(id);
+	for (const group of [...curveSelectionGroups, selectedTexts, filteredPoints]) {
+		for (const id of group) sketch.removeEntity(id);
+	}
 
 	sketch.resetFitSplineTangents(selectedLines, selectedPoints);
 
@@ -302,6 +217,36 @@ export function deleteSelected(sketch: SketchDocument): void {
 	sketch.commitTransaction();
 }
 
+function addCircleBounds(bounds: AABB, center: SketchPoint | undefined, radius: number): boolean {
+	if (!center) return false;
+	bounds.addPoint(center.clone().subScalar(radius));
+	bounds.addPoint(center.clone().addScalar(radius));
+	return true;
+}
+
+function addEllipseBounds(
+	bounds: AABB,
+	center: SketchPoint | undefined,
+	maj: SketchPoint | undefined,
+	min: SketchPoint | undefined,
+	exactExtents: boolean
+): boolean {
+	if (!center || !maj || !min) return false;
+	if (exactExtents) {
+		const u = new Vec2().subVectors(maj, center);
+		const v = new Vec2().subVectors(min, center);
+		const dir = new Vec2(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
+		bounds.addPoint(new Vec2().subVectors(center, dir));
+		bounds.addPoint(new Vec2().addVectors(center, dir));
+	} else {
+		const r = center.distancesTo(maj, min);
+		const rMax = Math.max(r.x, r.y);
+		bounds.addPoint(center.clone().subScalar(rMax));
+		bounds.addPoint(center.clone().addScalar(rMax));
+	}
+	return true;
+}
+
 export function getBoundingBox(sketch: SketchDocument): AABB | null {
 	if (sketch.points.size === 0 && sketch.images.size === 0) return null;
 	const bounds = new AABB();
@@ -312,44 +257,18 @@ export function getBoundingBox(sketch: SketchDocument): AABB | null {
 		bounds.addPoint(imageBounds.min).addPoint(imageBounds.max);
 	}
 
-	for (const c of sketch.circles.values()) {
-		const center = sketch.points.get(c.centerId);
-		if (center) {
-			bounds.addPoint(center.clone().subScalar(c.radius));
-			bounds.addPoint(center.clone().addScalar(c.radius));
-		}
+	for (const c of [...sketch.circles.values(), ...sketch.arcs.values()]) {
+		addCircleBounds(bounds, sketch.points.get(c.centerId), c.radius);
 	}
 
-	for (const a of sketch.arcs.values()) {
-		const center = sketch.points.get(a.centerId);
-		if (center) {
-			bounds.addPoint(center.clone().subScalar(a.radius));
-			bounds.addPoint(center.clone().addScalar(a.radius));
-		}
-	}
-
-	for (const e of sketch.ellipses.values()) {
-		const center = sketch.points.get(e.centerId);
-		const maj = sketch.points.get(e.majorAxisPointId);
-		const min = sketch.points.get(e.minorAxisPointId);
-		if (center && maj && min) {
-			const r = center.distancesTo(maj, min);
-			const rMax = Math.max(r.x, r.y);
-			bounds.addPoint(center.clone().subScalar(rMax));
-			bounds.addPoint(center.clone().addScalar(rMax));
-		}
-	}
-
-	for (const ea of sketch.ellipticalArcs.values()) {
-		const center = sketch.points.get(ea.centerId);
-		const maj = sketch.points.get(ea.majorAxisPointId);
-		const min = sketch.points.get(ea.minorAxisPointId);
-		if (center && maj && min) {
-			const r = center.distancesTo(maj, min);
-			const rMax = Math.max(r.x, r.y);
-			bounds.addPoint(center.clone().subScalar(rMax));
-			bounds.addPoint(center.clone().addScalar(rMax));
-		}
+	for (const e of [...sketch.ellipses.values(), ...sketch.ellipticalArcs.values()]) {
+		addEllipseBounds(
+			bounds,
+			sketch.points.get(e.centerId),
+			sketch.points.get(e.majorAxisPointId),
+			sketch.points.get(e.minorAxisPointId),
+			false
+		);
 	}
 
 	if (!isFinite(bounds.min.x) || !isFinite(bounds.max.x) || !isFinite(bounds.min.y) || !isFinite(bounds.max.y)) {
@@ -368,135 +287,91 @@ export function getSelectionBoundingBox(sketch: SketchDocument): AABB | null {
 		count++;
 	};
 
-	for (const pid of sketch.selection.pointIds) {
-		includePoint(sketch.points.get(pid));
-	}
-
-	for (const lid of sketch.selection.lineIds) {
-		const l = sketch.lines.get(lid);
-		if (l) {
-			includePoint(sketch.points.get(l.p1Id));
-			includePoint(sketch.points.get(l.p2Id));
-		}
-	}
-
-	for (const cid of sketch.selection.circleIds) {
-		const c = sketch.circles.get(cid);
-		if (c) {
-			const center = sketch.points.get(c.centerId);
-			if (center) {
-				bounds.addPoint(center.clone().subScalar(c.radius));
-				bounds.addPoint(center.clone().addScalar(c.radius));
-				count++;
+	const includeEntity = (
+		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
+		id: string
+	) => {
+		switch (type) {
+			case 'point':
+				includePoint(sketch.points.get(id));
+				break;
+			case 'line': {
+				const l = sketch.lines.get(id);
+				if (l) {
+					includePoint(sketch.points.get(l.p1Id));
+					includePoint(sketch.points.get(l.p2Id));
+				}
+				break;
 			}
-		}
-	}
-
-	for (const aid of sketch.selection.arcIds) {
-		const a = sketch.arcs.get(aid);
-		if (a) {
-			const center = sketch.points.get(a.centerId);
-			if (center) {
-				bounds.addPoint(center.clone().subScalar(a.radius));
-				bounds.addPoint(center.clone().addScalar(a.radius));
-				count++;
-			}
-			includePoint(sketch.points.get(a.startPointId));
-			includePoint(sketch.points.get(a.endPointId));
-		}
-	}
-
-	for (const eid of sketch.selection.ellipseIds) {
-		const e = sketch.ellipses.get(eid);
-		if (e) {
-			const center = sketch.points.get(e.centerId);
-			const maj = sketch.points.get(e.majorAxisPointId);
-			const min = sketch.points.get(e.minorAxisPointId);
-			if (center && maj && min) {
-				const u = new Vec2().subVectors(maj, center);
-				const v = new Vec2().subVectors(min, center);
-				const dir = new Vec2(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
-				bounds.addPoint(new Vec2().subVectors(center, dir));
-				bounds.addPoint(new Vec2().addVectors(center, dir));
-				count++;
-			}
-		}
-	}
-
-	for (const eaid of sketch.selection.ellipticalArcIds) {
-		const ea = sketch.ellipticalArcs.get(eaid);
-		if (ea) {
-			const center = sketch.points.get(ea.centerId);
-			const maj = sketch.points.get(ea.majorAxisPointId);
-			const min = sketch.points.get(ea.minorAxisPointId);
-			if (center && maj && min) {
-				const u = new Vec2().subVectors(maj, center);
-				const v = new Vec2().subVectors(min, center);
-				const dir = new Vec2(Math.sqrt(u.x * u.x + v.x * v.x), Math.sqrt(u.y * u.y + v.y * v.y));
-				bounds.addPoint(new Vec2().subVectors(center, dir));
-				bounds.addPoint(new Vec2().addVectors(center, dir));
-				count++;
-			}
-			includePoint(sketch.points.get(ea.startPointId));
-			includePoint(sketch.points.get(ea.endPointId));
-		}
-	}
-
-	for (const sid of sketch.selection.splineIds) {
-		const s = sketch.splines.get(sid);
-		if (s) {
-			for (const pid of s.pointIds) {
-				includePoint(sketch.points.get(pid));
-			}
-			if (s.tangentLineIds) {
-				for (const lid of s.tangentLineIds) {
-					const l = sketch.lines.get(lid);
-					if (l) {
-						includePoint(sketch.points.get(l.p1Id));
-						includePoint(sketch.points.get(l.p2Id));
+			case 'circle':
+			case 'arc': {
+				const radial = type === 'circle' ? sketch.circles.get(id) : sketch.arcs.get(id);
+				if (radial) {
+					if (addCircleBounds(bounds, sketch.points.get(radial.centerId), radial.radius)) count++;
+					if ('startPointId' in radial) {
+						includePoint(sketch.points.get(radial.startPointId));
+						includePoint(sketch.points.get(radial.endPointId));
 					}
 				}
+				break;
+			}
+			case 'ellipse':
+			case 'elliptical_arc': {
+				const el = type === 'ellipse' ? sketch.ellipses.get(id) : sketch.ellipticalArcs.get(id);
+				if (el) {
+					if (
+						addEllipseBounds(
+							bounds,
+							sketch.points.get(el.centerId),
+							sketch.points.get(el.majorAxisPointId),
+							sketch.points.get(el.minorAxisPointId),
+							true
+						)
+					) {
+						count++;
+					}
+					if ('startPointId' in el) {
+						includePoint(sketch.points.get(el.startPointId));
+						includePoint(sketch.points.get(el.endPointId));
+					}
+				}
+				break;
+			}
+			case 'spline': {
+				const s = sketch.splines.get(id);
+				if (s) {
+					for (const pid of s.pointIds) includePoint(sketch.points.get(pid));
+					if (s.tangentLineIds) {
+						for (const lid of s.tangentLineIds) includeEntity('line', lid);
+					}
+				}
+				break;
 			}
 		}
+	};
+
+	const selectionGroups: Array<
+		['point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline', Set<string>]
+	> = [
+		['point', sketch.selection.pointIds],
+		['line', sketch.selection.lineIds],
+		['circle', sketch.selection.circleIds],
+		['arc', sketch.selection.arcIds],
+		['ellipse', sketch.selection.ellipseIds],
+		['elliptical_arc', sketch.selection.ellipticalArcIds],
+		['spline', sketch.selection.splineIds],
+	];
+	for (const [type, ids] of selectionGroups) {
+		for (const id of ids) includeEntity(type, id);
 	}
 
 	if (count === 0 && sketch.selection.constraintIds.size > 0) {
 		for (const cid of sketch.selection.constraintIds) {
 			const c = sketch.constraints.get(cid);
-			if (c) {
-				const entities = sketch.getEntitiesForConstraint(c);
-				for (const ent of entities) {
-					if (ent.type === 'point') {
-						includePoint(sketch.points.get(ent.id));
-					} else if (ent.type === 'line') {
-						const l = sketch.lines.get(ent.id);
-						if (l) {
-							includePoint(sketch.points.get(l.p1Id));
-							includePoint(sketch.points.get(l.p2Id));
-						}
-					} else if (ent.type === 'circle') {
-						const circle = sketch.circles.get(ent.id);
-						if (circle) {
-							const center = sketch.points.get(circle.centerId);
-							if (center) {
-								bounds.addPoint(center.clone().subScalar(circle.radius));
-								bounds.addPoint(center.clone().addScalar(circle.radius));
-								count++;
-							}
-						}
-					} else if (ent.type === 'arc') {
-						const arc = sketch.arcs.get(ent.id);
-						if (arc) {
-							const center = sketch.points.get(arc.centerId);
-							if (center) {
-								bounds.addPoint(center.clone().subScalar(arc.radius));
-								bounds.addPoint(center.clone().addScalar(arc.radius));
-								count++;
-							}
-							includePoint(sketch.points.get(arc.startPointId));
-							includePoint(sketch.points.get(arc.endPointId));
-						}
-					}
+			if (!c) continue;
+			for (const ent of sketch.getEntitiesForConstraint(c)) {
+				if (ent.type === 'point' || ent.type === 'line' || ent.type === 'circle' || ent.type === 'arc') {
+					includeEntity(ent.type, ent.id);
 				}
 			}
 		}

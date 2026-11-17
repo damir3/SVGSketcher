@@ -1,5 +1,6 @@
 import type { SketchImage } from '../model/image';
 import type { SketchDocument } from '../model/sketch';
+import { getSelectionCount } from '../model/selection';
 import type { SketchSpline, SketchText } from '../model/types';
 import type { CanvasInteraction } from '../canvas/interaction';
 import type { HoverTarget } from '../canvas/tools/hoverTarget';
@@ -184,17 +185,7 @@ export class Sidebar {
 			return '';
 		}
 
-		const sel = this.sketch.selection;
-		const totalSelectedCount =
-			sel.pointIds.size +
-			sel.lineIds.size +
-			sel.circleIds.size +
-			sel.arcIds.size +
-			sel.ellipseIds.size +
-			sel.ellipticalArcIds.size +
-			sel.splineIds.size +
-			sel.textIds.size +
-			sel.constraintIds.size;
+		const totalSelectedCount = getSelectionCount(this.sketch);
 
 		if (totalSelectedCount === 0) return '';
 
@@ -305,64 +296,28 @@ export class Sidebar {
 	}
 
 	private getSelectedInspectableEntity(): IInspectable | null {
-		const sel = this.sketch.selection;
-		const totalCount =
-			sel.pointIds.size +
-			sel.lineIds.size +
-			sel.circleIds.size +
-			sel.arcIds.size +
-			sel.ellipseIds.size +
-			sel.ellipticalArcIds.size +
-			sel.splineIds.size +
-			sel.textIds.size +
-			sel.constraintIds.size;
-
-		if (totalCount !== 1) {
+		if (getSelectionCount(this.sketch) !== 1) {
 			return null;
 		}
 
-		if (sel.pointIds.size === 1) {
-			const pid = [...sel.pointIds][0];
-			if (pid === 'origin') {
-				return null;
-			}
-			return this.sketch.points.get(pid) ?? null;
-		}
+		const sel = this.sketch.selection;
+		const sources: Array<[Set<string>, Map<string, IInspectable>, ReadonlySet<string>?]> = [
+			[sel.pointIds, this.sketch.points, new Set(['origin'])],
+			[sel.lineIds, this.sketch.lines, new Set(['axis_x', 'axis_y'])],
+			[sel.circleIds, this.sketch.circles],
+			[sel.arcIds, this.sketch.arcs],
+			[sel.ellipseIds, this.sketch.ellipses],
+			[sel.ellipticalArcIds, this.sketch.ellipticalArcs],
+			[sel.splineIds, this.sketch.splines],
+			[sel.textIds, this.sketch.texts],
+			[sel.constraintIds, this.sketch.constraints],
+		];
 
-		if (sel.lineIds.size === 1) {
-			const lid = [...sel.lineIds][0];
-			if (lid === 'axis_x' || lid === 'axis_y') {
-				return null;
-			}
-			return this.sketch.lines.get(lid) ?? null;
-		}
-
-		if (sel.circleIds.size === 1) {
-			return this.sketch.circles.get([...sel.circleIds][0]) ?? null;
-		}
-
-		if (sel.arcIds.size === 1) {
-			return this.sketch.arcs.get([...sel.arcIds][0]) ?? null;
-		}
-
-		if (sel.ellipseIds.size === 1) {
-			return this.sketch.ellipses.get([...sel.ellipseIds][0]) ?? null;
-		}
-
-		if (sel.ellipticalArcIds.size === 1) {
-			return this.sketch.ellipticalArcs.get([...sel.ellipticalArcIds][0]) ?? null;
-		}
-
-		if (sel.splineIds.size === 1) {
-			return this.sketch.splines.get([...sel.splineIds][0]) ?? null;
-		}
-
-		if (sel.textIds.size === 1) {
-			return this.sketch.texts.get([...sel.textIds][0]) ?? null;
-		}
-
-		if (sel.constraintIds.size === 1) {
-			return this.sketch.constraints.get([...sel.constraintIds][0]) ?? null;
+		for (const [ids, map, ignoredIds] of sources) {
+			if (ids.size !== 1) continue;
+			const [id] = ids;
+			if (ignoredIds?.has(id)) return null;
+			return map.get(id) ?? null;
 		}
 
 		return null;

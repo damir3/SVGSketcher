@@ -1,5 +1,6 @@
 import { Vec2 } from '../../../math/vector';
 import type { SketchDocument } from '../../../model/sketch';
+import { deselectEntity } from '../../../model/selection';
 import type { Viewport } from '../../viewport';
 import { findAxisNear } from '../../hitTesting';
 import { BaseTool } from '../base';
@@ -154,13 +155,7 @@ export class ConstraintTool extends BaseTool {
 		}
 
 		const sel = this.ctx.sketch.selection;
-		const isAlreadySelected =
-			(type === 'point' && sel.pointIds.has(id)) ||
-			(type === 'line' && sel.lineIds.has(id)) ||
-			(type === 'circle' && sel.circleIds.has(id)) ||
-			(type === 'arc' && sel.arcIds.has(id)) ||
-			(type === 'ellipse' && sel.ellipseIds.has(id)) ||
-			(type === 'elliptical_arc' && sel.ellipticalArcIds.has(id));
+		const isAlreadySelected = this.ctx.sketch.isEntitySelected(id, type);
 
 		if (isAlreadySelected) {
 			this.deselectEntity(id, type);
@@ -408,14 +403,7 @@ export class ConstraintTool extends BaseTool {
 		id: string,
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline'
 	): void {
-		const sel = this.ctx.sketch.selection;
-		if (type === 'point') sel.pointIds.delete(id);
-		else if (type === 'line') sel.lineIds.delete(id);
-		else if (type === 'circle') sel.circleIds.delete(id);
-		else if (type === 'arc') sel.arcIds.delete(id);
-		else if (type === 'ellipse') sel.ellipseIds.delete(id);
-		else if (type === 'elliptical_arc') sel.ellipticalArcIds.delete(id);
-		else if (type === 'spline') sel.splineIds.delete(id);
+		deselectEntity(this.ctx.sketch, id, type, false);
 	}
 
 	private pruneIncompatibleSelection(): void {
