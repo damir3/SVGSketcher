@@ -17,6 +17,7 @@ pub mod regions;
 pub mod solver;
 pub mod spline;
 pub mod spline_editing;
+pub mod topology;
 
 pub use point::{
     add, add_scaled, angle, cross, distance, dot, middle, p, perp, polar, scale, step, sub, unit,

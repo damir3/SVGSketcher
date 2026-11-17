@@ -1,7 +1,6 @@
 import type { SketchDocument } from '../model/sketch';
 import type { SketchPoint } from '../model/types';
-import { POINT_TOLERANCE } from '../constants';
-import { CoincidentConstraint } from '../solver/constraints';
+import { createOffsetTopology, orderedCoincidentGroup, chainPointIds, type OffsetTopology } from './offsetTopology';
 import { Vec2 } from './vector';
 import { getGeometryKernel } from '../kernel';
 import * as reference from './offsetReference';
@@ -73,46 +72,7 @@ export interface OffsetGeometryResult {
  * by traversing CoincidentConstraint relationships and matching points within POINT_TOLERANCE.
  */
 export function getCoincidentPointGroup(sketch: SketchDocument, startPointId: string): Set<string> {
-	const group = new Set<string>([startPointId]);
-	const queue = [startPointId];
-	while (queue.length > 0) {
-		const curr = queue.pop()!;
-		for (const c of sketch.constraints.values()) {
-			if (c instanceof CoincidentConstraint) {
-				if (c.p1Id === curr && !group.has(c.p2Id)) {
-					group.add(c.p2Id);
-					queue.push(c.p2Id);
-				} else if (c.p2Id === curr && !group.has(c.p1Id)) {
-					group.add(c.p1Id);
-					queue.push(c.p1Id);
-				}
-			}
-		}
-		const currPt = sketch.points.get(curr);
-		if (currPt) {
-			for (const pt of sketch.points.values()) {
-				if (
-					!group.has(pt.id) &&
-					Math.abs(pt.x - currPt.x) <= POINT_TOLERANCE &&
-					Math.abs(pt.y - currPt.y) <= POINT_TOLERANCE &&
-					currPt.distanceTo(pt) <= POINT_TOLERANCE
-				) {
-					group.add(pt.id);
-					queue.push(pt.id);
-				}
-			}
-			if (
-				!group.has('origin') &&
-				Math.abs(currPt.x) <= POINT_TOLERANCE &&
-				Math.abs(currPt.y) <= POINT_TOLERANCE &&
-				Math.hypot(currPt.x, currPt.y) <= POINT_TOLERANCE
-			) {
-				group.add('origin');
-				queue.push('origin');
-			}
-		}
-	}
-	return group;
+	return orderedCoincidentGroup(sketch, startPointId);
 }
 
 /**
@@ -155,43 +115,7 @@ export function getConnectedPrimitivesAtVertex(
 	pointId: string,
 	excludePrimitiveId?: string
 ): Array<{ id: string; type: ChainItem['type']; connectedPointId: string; otherPointId: string }> {
-	const pGroup = getCoincidentPointGroup(sketch, pointId);
-	const res: Array<{
-		id: string;
-		type: ChainItem['type'];
-		connectedPointId: string;
-		otherPointId: string;
-	}> = [];
-
-	const check = (type: ChainItem['type'], id: string, p1Id: string, p2Id: string) => {
-		if (id === excludePrimitiveId) return;
-		const in1 = pGroup.has(p1Id);
-		const in2 = pGroup.has(p2Id);
-		if (in1 && !in2) {
-			res.push({ id, type, connectedPointId: p1Id, otherPointId: p2Id });
-		} else if (in2 && !in1) {
-			res.push({ id, type, connectedPointId: p2Id, otherPointId: p1Id });
-		}
-	};
-
-	for (const l of sketch.lines.values()) {
-		if (l.isSplineHandle || l.isConstruction) continue;
-		check('line', l.id, l.p1Id, l.p2Id);
-	}
-	for (const a of sketch.arcs.values()) {
-		if (a.isConstruction) continue;
-		check('arc', a.id, a.startPointId, a.endPointId);
-	}
-	for (const ea of sketch.ellipticalArcs.values()) {
-		if (ea.isConstruction) continue;
-		check('elliptical_arc', ea.id, ea.startPointId, ea.endPointId);
-	}
-	for (const s of sketch.splines.values()) {
-		if (s.isConstruction || s.isClosed || s.pointIds.length < 2) continue;
-		check('spline', s.id, s.pointIds[0], s.pointIds[s.pointIds.length - 1]);
-	}
-
-	return res;
+	return createOffsetTopology(sketch, [pointId]).connected(pointId, excludePrimitiveId);
 }
 
 /**
@@ -216,19 +140,20 @@ export function getValidChainContinuations(sketch: SketchDocument, chain: Offset
 		return valid;
 	}
 
+	const topology = createOffsetTopology(sketch, chainPointIds(chain));
 	const existingIds = new Set(chain.items.map(it => it.id));
 	const head = chain.items[0];
 	const tail = chain.items[chain.items.length - 1];
 
 	if (head.startPointId) {
-		const headConn = getConnectedPrimitivesAtVertex(sketch, head.startPointId);
+		const headConn = topology.connected(head.startPointId);
 		for (const c of headConn) {
 			if (!existingIds.has(c.id)) valid.add(c.id);
 		}
 	}
 
 	if (tail.endPointId) {
-		const tailConn = getConnectedPrimitivesAtVertex(sketch, tail.endPointId);
+		const tailConn = topology.connected(tail.endPointId);
 		for (const c of tailConn) {
 			if (!existingIds.has(c.id)) valid.add(c.id);
 		}
@@ -261,6 +186,7 @@ export function deselectChainSegment(
 	const idx = chain.items.findIndex(it => it.id === primitiveId);
 	if (idx === -1) return chain;
 
+	const topology = createOffsetTopology(sketch, chainPointIds(chain));
 	const n = chain.items.length;
 
 	// Traverse forward along chain
@@ -271,7 +197,7 @@ export function deselectChainSegment(
 		if (nextIdx === idx || toRemove.has(chain.items[nextIdx].id)) break;
 		const vPtId = curr.endPointId;
 		if (!vPtId) break;
-		const conn = getConnectedPrimitivesAtVertex(sketch, vPtId);
+		const conn = topology.connected(vPtId);
 		if (conn.length !== 2) break; // fork or open end! stop here
 		toRemove.add(chain.items[nextIdx].id);
 		currIdx = nextIdx;
@@ -287,7 +213,7 @@ export function deselectChainSegment(
 		const prev = chain.items[prevIdx];
 		const vPtId = prev.endPointId || curr.startPointId;
 		if (!vPtId) break;
-		const conn = getConnectedPrimitivesAtVertex(sketch, vPtId);
+		const conn = topology.connected(vPtId);
 		if (conn.length !== 2) break; // fork or open end! stop here
 		toRemove.add(chain.items[prevIdx].id);
 		currIdx = prevIdx;
@@ -307,15 +233,16 @@ function extendChainDirection(
 	items: ChainItem[],
 	startPtId: string,
 	startPrimId: string,
-	forward: boolean
+	forward: boolean,
+	topology: OffsetTopology
 ): boolean {
 	const oppositeEndId = forward ? items[0].startPointId! : items[items.length - 1].endPointId!;
-	const stopGroup = getCoincidentPointGroup(sketch, oppositeEndId);
+	const stopGroup = topology.group(oppositeEndId);
 	let currPt = startPtId;
 	let prevId = startPrimId;
 
 	while (true) {
-		const conn = getConnectedPrimitivesAtVertex(sketch, currPt, prevId);
+		const conn = topology.connected(currPt, prevId);
 		if (conn.length !== 1) return false;
 		const next = conn[0];
 		if (items.some(it => it.id === next.id)) {
@@ -324,7 +251,7 @@ function extendChainDirection(
 		const itemStartId = forward ? next.connectedPointId : next.otherPointId;
 		const itemEndId = forward ? next.otherPointId : next.connectedPointId;
 		const ep = getPrimitiveEndpoints(sketch, next.type, next.id);
-		const isRev = ep ? getCoincidentPointGroup(sketch, itemStartId).has(ep.p2Id) : false;
+		const isRev = ep ? topology.group(itemStartId).has(ep.p2Id) : false;
 		const nextItem: ChainItem = {
 			id: next.id,
 			type: next.type,
@@ -357,6 +284,13 @@ export function toggleOrExtendChain(
 	if (currentChain && currentChain.items.some(it => it.id === primitiveId)) {
 		return deselectChainSegment(sketch, currentChain, primitiveId, chainSelection);
 	}
+
+	let topology: OffsetTopology | undefined;
+	const graph = () =>
+		(topology ??= createOffsetTopology(sketch, [
+			...chainPointIds(currentChain),
+			...Object.values(getPrimitiveEndpoints(sketch, primitiveType, primitiveId) ?? {}),
+		]));
 
 	// 1. Initial selection (chain is empty)
 	if (!currentChain || currentChain.items.length === 0) {
@@ -396,11 +330,18 @@ export function toggleOrExtendChain(
 
 		// Auto-traverse along both directions
 		const chainItems = [startItem];
-		let isClosed = extendChainDirection(sketch, chainItems, startItem.endPointId!, startItem.id, true);
+		let isClosed = extendChainDirection(sketch, chainItems, startItem.endPointId!, startItem.id, true, graph());
 
 		// If not closed, traverse backward from startPointId
 		if (!isClosed) {
-			isClosed = extendChainDirection(sketch, chainItems, chainItems[0].startPointId!, chainItems[0].id, false);
+			isClosed = extendChainDirection(
+				sketch,
+				chainItems,
+				chainItems[0].startPointId!,
+				chainItems[0].id,
+				false,
+				graph()
+			);
 		}
 
 		return { items: chainItems, isClosed, firstSelectedId: primitiveId };
@@ -414,8 +355,8 @@ export function toggleOrExtendChain(
 
 	const head = currentChain.items[0];
 	const tail = currentChain.items[currentChain.items.length - 1];
-	const headGroup = getCoincidentPointGroup(sketch, head.startPointId!);
-	const tailGroup = getCoincidentPointGroup(sketch, tail.endPointId!);
+	const headGroup = graph().group(head.startPointId!);
+	const tailGroup = graph().group(tail.endPointId!);
 
 	const connectsToTailAsStart = tailGroup.has(endpoints.p1Id);
 	const connectsToTailAsEnd = tailGroup.has(endpoints.p2Id);
@@ -444,7 +385,7 @@ export function toggleOrExtendChain(
 		if (headGroup.has(attachEnd)) {
 			isClosed = true;
 		} else if (chainSelection) {
-			isClosed = extendChainDirection(sketch, newItems, attachEnd, primitiveId, true);
+			isClosed = extendChainDirection(sketch, newItems, attachEnd, primitiveId, true, graph());
 		}
 	} else {
 		// Connects to head
@@ -462,7 +403,7 @@ export function toggleOrExtendChain(
 		if (tailGroup.has(attachStart)) {
 			isClosed = true;
 		} else if (chainSelection) {
-			isClosed = extendChainDirection(sketch, newItems, attachStart, primitiveId, false);
+			isClosed = extendChainDirection(sketch, newItems, attachStart, primitiveId, false, graph());
 		}
 	}
 
@@ -484,7 +425,9 @@ export function calculateOffsetGeometry(
 	flip: boolean
 ): OffsetGeometryResult {
 	const api = getGeometryKernel().offset;
-	const items = (chain?.items ?? []).map(item => collectOffsetItem(sketch, item));
+	let topology: OffsetTopology | undefined;
+	const graph = () => (topology ??= createOffsetTopology(sketch, chainPointIds(chain)));
+	const items = (chain?.items ?? []).map(item => collectOffsetItem(sketch, item, graph));
 	const selected = chain?.firstSelectedId || chain?.items[0]?.id;
 	const ref = Math.max(
 		0,
@@ -522,15 +465,14 @@ function hydrateOffsetPrimitive(primitive: KernelOffsetPrimitive): OffsetPrimiti
 	return result as OffsetPrimitiveGeom;
 }
 
-function collectOffsetItem(sketch: SketchDocument, item: ChainItem): OffsetKernelItem {
+function collectOffsetItem(sketch: SketchDocument, item: ChainItem, graph: () => OffsetTopology): OffsetKernelItem {
 	const result: OffsetKernelItem = { sourceId: item.id, kind: item.type, curve: null };
 	if (item.type === 'spline') {
 		const spline = sketch.splines.get(item.id);
 		if (!spline || spline.pointIds.length < 2) return result;
 		result.curve = spline.toGeoCurve(sketch);
 		result.reversed =
-			!!item.reversed ||
-			!!(item.startPointId && getCoincidentPointGroup(sketch, item.startPointId).has(spline.pointIds.at(-1)!));
+			!!item.reversed || !!(item.startPointId && graph().group(item.startPointId).has(spline.pointIds.at(-1)!));
 		result.endpointReversed = !!item.reversed || (!spline.isClosed && result.reversed);
 		return result;
 	}
