@@ -610,24 +610,18 @@ export function createOffsetSideGeometry(
 		if (groups.at(-1) && (groups.at(-1)![0].contourIndex ?? 0) === (p.contourIndex ?? 0)) groups.at(-1)!.push(p);
 		else groups.push([p]);
 	}
-	if (groups.length > 1) {
-		const contours = groups.map(primitives => createOffsetSideGeometry(sketch, chain, { ...side, primitives }));
+	const flattenContours = (sides: OffsetPrimitiveGeom[][]) => {
+		const contours = sides.map(primitives => createOffsetSideGeometry(sketch, chain, { ...side, primitives }));
 		return {
 			createdIds: contours.flatMap(c => c.createdIds),
 			offsetPairs: contours.flatMap(c => c.offsetPairs),
 			cornerPointIds: contours.flatMap(c => c.cornerPointIds),
 		};
-	}
+	};
+	if (groups.length > 1) return flattenContours(groups);
 	// A split closed spline yields independent loops, each with its own seam and handles.
 	if (side.primitives.length > 1 && side.primitives.every(p => p.type === 'spline' && p.isSplineClosed)) {
-		const contours = side.primitives.map(prim =>
-			createOffsetSideGeometry(sketch, chain, { ...side, primitives: [prim] })
-		);
-		return {
-			createdIds: contours.flatMap(c => c.createdIds),
-			offsetPairs: contours.flatMap(c => c.offsetPairs),
-			cornerPointIds: contours.flatMap(c => c.cornerPointIds),
-		};
+		return flattenContours(side.primitives.map(prim => [prim]));
 	}
 	const createdIds: string[] = [];
 	const offsetPairs: OffsetPair[] = [];
@@ -727,23 +721,24 @@ export function createOffsetSideGeometry(
 		} else if (prim.type === 'spline') {
 			const ptIds: string[] = [];
 			const splinePoints: OffsetSplinePoint[] = [];
+			const pushSplinePoint = (k: number, pt: Vec2) => {
+				const sp = sketch.addPoint(pt);
+				ptIds.push(sp.id);
+				if (prim.fitBases && prim.fitNormals) {
+					splinePoints.push({
+						pointId: sp.id,
+						basePos: prim.fitBases[k],
+						normal: prim.fitNormals[k],
+						side: side.side,
+					});
+				}
+			};
 			if (numPrims > 1) {
 				ptIds.push(cornerPoints[i].id);
 				for (let k = 1; k < prim.fitPoints!.length - 1; k++) {
-					const pt = prim.fitPoints![k];
-					const sp = sketch.addPoint(pt);
-					ptIds.push(sp.id);
-					if (prim.fitBases && prim.fitNormals) {
-						splinePoints.push({
-							pointId: sp.id,
-							basePos: prim.fitBases[k],
-							normal: prim.fitNormals[k],
-							side: side.side,
-						});
-					}
+					pushSplinePoint(k, prim.fitPoints![k]);
 				}
-				const endCorner = cornerPoints[(i + 1) % cornerPoints.length];
-				ptIds.push(endCorner.id);
+				ptIds.push(cornerPoints[(i + 1) % cornerPoints.length].id);
 			} else {
 				for (let k = 0; k < prim.fitPoints!.length; k++) {
 					const pt = prim.fitPoints![k];
@@ -751,16 +746,7 @@ export function createOffsetSideGeometry(
 						ptIds.push(ptIds[0]);
 						continue;
 					}
-					const sp = sketch.addPoint(pt);
-					ptIds.push(sp.id);
-					if (prim.fitBases && prim.fitNormals) {
-						splinePoints.push({
-							pointId: sp.id,
-							basePos: prim.fitBases[k],
-							normal: prim.fitNormals[k],
-							side: side.side,
-						});
-					}
+					pushSplinePoint(k, pt);
 				}
 			}
 			const spline = sketch.addFitSpline(ptIds, undefined, false, undefined, !!prim.isSplineClosed, prim.handles);

@@ -207,14 +207,17 @@ export class SelectTool extends BaseTool {
 
 		if (!id || !type) return false;
 
+		const openConstraintEditor = (constraint: any): boolean => {
+			if (!onEditDimension) return false;
+			sketch.selectEntity(constraint.id, 'constraint', false);
+			host.render();
+			onEditDimension(constraint, clientPos);
+			return true;
+		};
+
 		if (type === 'constraint') {
 			const constraint = sketch.constraints.get(id);
-			if (constraint?.moveLabelTo && onEditDimension) {
-				sketch.selectEntity(constraint.id, 'constraint', false);
-				host.render();
-				onEditDimension(constraint, clientPos);
-				return true;
-			}
+			if (constraint?.moveLabelTo) return openConstraintEditor(constraint);
 		} else if (type === 'line') {
 			const line = sketch.lines.get(id);
 			if (line) {
@@ -226,12 +229,7 @@ export class SelectTool extends BaseTool {
 				if (!distConstraint) {
 					distConstraint = sketch.addDistanceConstraint(line.p1Id, line.p2Id) ?? undefined;
 				}
-				if (distConstraint && onEditDimension) {
-					sketch.selectEntity(distConstraint.id, 'constraint', false);
-					host.render();
-					onEditDimension(distConstraint, clientPos);
-					return true;
-				}
+				if (distConstraint) return openConstraintEditor(distConstraint);
 			}
 		} else if (type === 'circle' || type === 'arc') {
 			const entity = sketch.circles.get(id) ?? sketch.arcs.get(id);
@@ -247,12 +245,7 @@ export class SelectTool extends BaseTool {
 						return true;
 					}
 				}
-				if (radConstraint && onEditDimension) {
-					sketch.selectEntity(radConstraint.id, 'constraint', false);
-					host.render();
-					onEditDimension(radConstraint, clientPos);
-					return true;
-				}
+				if (radConstraint) return openConstraintEditor(radConstraint);
 			}
 		}
 		return false;
@@ -598,6 +591,12 @@ export class SelectTool extends BaseTool {
 		const primitiveMoved = Boolean((host.isDraggingPoint || host.curveDragState) && host.hasDragged);
 		host.svg?.classList?.remove('is-dragging');
 
+		const finishDragCleanup = () => {
+			if (host.preDragSnapshot) host.sketch.pushSnapshot(host.preDragSnapshot);
+			host.preDragSnapshot = null;
+			host.hasDragged = false;
+			host.updateCursor?.();
+		};
 		if (host.gizmoDragState) {
 			host.gizmoDragState = null;
 			host.render();
@@ -646,44 +645,26 @@ export class SelectTool extends BaseTool {
 					}
 				}
 				host.sketch.solve();
-				if (host.preDragSnapshot) {
-					host.sketch.pushSnapshot(host.preDragSnapshot);
-				}
+			} else {
+				host.preDragSnapshot = null;
 			}
-			host.preDragSnapshot = null;
-			host.hasDragged = false;
-			host.updateCursor?.();
+			finishDragCleanup();
 		}
 		if (host.curveDragState) {
 			host.curveDragState = null;
 			host.renderer?.clearPreviews?.();
-			if (host.hasDragged) {
-				host.sketch.solve();
-				if (host.preDragSnapshot) {
-					host.sketch.pushSnapshot(host.preDragSnapshot);
-				}
-			}
-			host.preDragSnapshot = null;
-			host.hasDragged = false;
-			host.updateCursor?.();
+			if (host.hasDragged) host.sketch.solve();
+			else host.preDragSnapshot = null;
+			finishDragCleanup();
 		}
 		if (host.isDraggingConstraint) {
 			const hadDragged = host.hasDragged;
 			host.isDraggingConstraint = false;
 			host.draggedConstraintId = null;
 			host.dragConstraintStartScreen = null;
-			if (hadDragged) {
-				if (host.preDragSnapshot) {
-					host.sketch.pushSnapshot(host.preDragSnapshot);
-				}
-				host.preDragSnapshot = null;
-				host.hasDragged = false;
-				host.render();
-			} else {
-				host.preDragSnapshot = null;
-				host.hasDragged = false;
-			}
-			host.updateCursor?.();
+			if (!hadDragged) host.preDragSnapshot = null;
+			finishDragCleanup();
+			if (hadDragged) host.render();
 		}
 
 		if (host.isBoxSelecting) {
