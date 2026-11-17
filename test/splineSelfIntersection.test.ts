@@ -128,7 +128,7 @@ test('native self-intersection decoder validates segment buffers, flags and unus
 		[10, 0, 1, 0],
 		[10, 0, 0, NaN],
 		[10, 0, 0],
-		[11, 0, 0, 0],
+		[14, 0, 0, 0],
 	])
 		assert.throws(() => query(points, empty, empty, new Float64Array(settings)), /spline/);
 	for (const bad of [[0, 0], [0, 0, 0], Array(8).fill(Infinity)])

@@ -4,6 +4,7 @@ import { typescriptSplineKernel } from '../kernel/splineReference';
 import * as reference from './splineReference';
 import type { BezierSegment } from './splineReference';
 import type { CubicBezier } from '../kernel/types';
+import type { SplinePiece } from '../kernel/splineTypes';
 export type { BezierSegment } from './splineReference';
 
 // The reference backend keeps the original Vec2 path without repacking its inputs.
@@ -12,6 +13,14 @@ function active() {
 	return api === typescriptSplineKernel ? undefined : api;
 }
 const hydrate = (b: CubicBezier): BezierSegment => b.map(Vec2.from) as BezierSegment;
+function hydratePiece(segments: BezierSegment[], piece: SplinePiece): BezierSegment {
+	const source = segments[piece.sourceIndex];
+	if (piece.originalPoints === 15) return source;
+	const result = hydrate(piece.curve);
+	if (piece.originalPoints & 1) result[0] = source[0];
+	if (piece.originalPoints & 8) result[3] = source[3];
+	return result;
+}
 
 export function evaluateBezier(b: BezierSegment, t: number): Vec2 {
 	const api = active();
@@ -75,81 +84,32 @@ export function splitSplineAtParam(
 	segments: BezierSegment[],
 	param: number
 ): { leftSegments: BezierSegment[]; rightSegments: BezierSegment[]; splitPoint: Vec2 } {
-	const count = segments.length;
-	const clampedParam = Math.max(0, Math.min(1, param));
-	const val = clampedParam * count;
-	const idx = Math.min(Math.floor(val), count - 1);
-	const localT = val - idx;
-
-	const { left, right } = splitBezier(segments[idx], localT);
-
-	const leftSegments: BezierSegment[] = [];
-	for (let i = 0; i < idx; i++) leftSegments.push(segments[i]);
-	leftSegments.push(left);
-
-	const rightSegments: BezierSegment[] = [];
-	rightSegments.push(right);
-	for (let i = idx + 1; i < count; i++) rightSegments.push(segments[i]);
-
-	return {
-		leftSegments,
-		rightSegments,
-		splitPoint: left[3],
-	};
+	const query = active()?.splitSpline;
+	if (!query) return reference.splitSplineAtParam(segments, param);
+	const result = query(segments, param);
+	const leftSegments = result.left.map(piece => hydratePiece(segments, piece));
+	const rightSegments = result.right.map(piece => hydratePiece(segments, piece));
+	const splitPoint = leftSegments.at(-1)![3];
+	rightSegments[0][0] = splitPoint;
+	return { leftSegments, rightSegments, splitPoint };
 }
 
 /**
  * Trims a single cubic Bezier curve to sub-interval [t0, t1] in [0, 1].
  */
 export function trimBezier(b: BezierSegment, t0: number, t1: number): BezierSegment {
-	let seg = b;
-	if (t1 < 1 - 1e-6) {
-		seg = splitBezier(seg, t1).left;
-	}
-	if (t0 > 1e-6) {
-		const newT0 = t0 / Math.max(t1, 1e-6);
-		seg = splitBezier(seg, Math.min(1, newT0)).right;
-	}
-	return seg;
+	const query = active()?.trimBezier;
+	return query ? hydratePiece([b], query(b, t0, t1)) : reference.trimBezier(b, t0, t1);
 }
 
 /**
  * Extracts a sub-interval [paramA, paramB] of a spline as Bezier segments.
  */
 export function extractSplineInterval(segments: BezierSegment[], paramA: number, paramB: number): BezierSegment[] {
-	if (Math.abs(paramA - paramB) < 1e-5) return [];
-
-	if (paramA > paramB) {
-		const part1 = extractSplineInterval(segments, paramA, 1.0);
-		const part2 = extractSplineInterval(segments, 0.0, paramB);
-		return [...part1, ...part2];
-	}
-
-	if (paramA <= 1e-5 && paramB >= 1 - 1e-5) return segments;
-
-	const count = segments.length;
-	const result: BezierSegment[] = [];
-
-	for (let i = 0; i < count; i++) {
-		const segStart = i / count;
-		const segEnd = (i + 1) / count;
-
-		if (segEnd <= paramA + 1e-6 || segStart >= paramB - 1e-6) {
-			continue;
-		}
-
-		const u0 = Math.max(segStart, paramA);
-		const u1 = Math.min(segEnd, paramB);
-
-		const t0 = Math.max(0, Math.min(1, (u0 - segStart) * count));
-		const t1 = Math.max(0, Math.min(1, (u1 - segStart) * count));
-
-		if (t1 - t0 < 1e-6) continue;
-
-		result.push(trimBezier(segments[i], t0, t1));
-	}
-
-	return result;
+	const query = active()?.extractInterval;
+	if (!query) return reference.extractSplineInterval(segments, paramA, paramB);
+	const result = query(segments, paramA, paramB);
+	return result.reuseSource ? segments : result.pieces.map(piece => hydratePiece(segments, piece));
 }
 
 /**

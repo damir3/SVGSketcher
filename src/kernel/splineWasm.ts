@@ -1,5 +1,5 @@
 import type { CubicBezier, Point2 } from './types';
-import type { SplineKernel } from './splineTypes';
+import type { SplineKernel, SplinePiece } from './splineTypes';
 import { nativeKnots, typescriptSplineKernel as reference } from './splineReference';
 
 export type SplineGeometryBinding = (
@@ -37,6 +37,33 @@ function curves(data: Float64Array, min: number, max = min): CubicBezier[] {
 	]);
 }
 
+function pieces(data: Float64Array, source: readonly CubicBezier[], min: number, max = min): SplinePiece[] {
+	if (data.length % 10 || data.length / 10 < min || data.length / 10 > max)
+		throw new Error('Invalid WASM spline cut count');
+	checked(data, data.length);
+	return Array.from({ length: data.length / 10 }, (_, i) => {
+		const at = i * 10,
+			sourceIndex = data[at],
+			originalPoints = data[at + 1];
+		if (
+			!Number.isInteger(sourceIndex) ||
+			sourceIndex < 0 ||
+			sourceIndex >= source.length ||
+			![0, 1, 8, 15].includes(originalPoints)
+		)
+			throw new Error('Invalid WASM spline cut provenance');
+		const curve: CubicBezier = [point(data, at + 2), point(data, at + 4), point(data, at + 6), point(data, at + 8)];
+		for (let p = 0; p < 4; p++) {
+			if (
+				originalPoints & (1 << p) &&
+				(curve[p].x !== source[sourceIndex][p].x || curve[p].y !== source[sourceIndex][p].y)
+			)
+				throw new Error('Invalid WASM spline cut source point');
+		}
+		return { curve, sourceIndex, originalPoints };
+	});
+}
+
 export function createWasmSplineKernel(binding: SplineGeometryBinding): SplineKernel {
 	const query = (
 		mode: number,
@@ -46,7 +73,42 @@ export function createWasmSplineKernel(binding: SplineGeometryBinding): SplineKe
 		handles = empty,
 		knots = empty
 	) => binding(data, handles, knots, new Float64Array([mode, target.x, target.y, param]));
+	const cut = (mode: number, segments: readonly CubicBezier[], start: number, end = 0) => {
+		const packed = packCurves(segments);
+		if (!packed || !Number.isFinite(start) || !Number.isFinite(end)) throw new Error('Non-finite spline cut input');
+		return binding(packed, empty, empty, new Float64Array([mode, start, end, 0]));
+	};
 	return {
+		splitSpline(segments, param) {
+			const data = cut(11, segments, param),
+				count = data[0];
+			if (!Number.isInteger(count) || count < 1 || count > segments.length)
+				throw new Error('Invalid WASM spline split count');
+			const result = pieces(data.subarray(1), segments, segments.length + 1);
+			for (const [i, piece] of result.entries()) {
+				const expectedMask = i === count - 1 ? 1 : i === count ? 8 : 15;
+				if (piece.sourceIndex !== i - Number(i >= count) || piece.originalPoints !== expectedMask)
+					throw new Error('Invalid WASM spline split provenance');
+			}
+			const a = result[count - 1].curve[3],
+				b = result[count].curve[0];
+			if (a.x !== b.x || a.y !== b.y) throw new Error('Invalid WASM spline split point');
+			return { left: result.slice(0, count), right: result.slice(count) };
+		},
+		trimBezier(curve, start, end) {
+			return pieces(cut(12, [curve], start, end), [curve], 1)[0];
+		},
+		extractInterval(segments, start, end) {
+			const data = cut(13, segments, start, end);
+			if (![0, 1].includes(data[0])) throw new Error('Invalid WASM spline interval flag');
+			const result = pieces(data.subarray(1), segments, 0, 2 * segments.length);
+			if (
+				data[0] === 1 &&
+				(result.length !== segments.length || result.some((p, i) => p.sourceIndex !== i || p.originalPoints !== 15))
+			)
+				throw new Error('Invalid WASM spline interval provenance');
+			return { pieces: result, reuseSource: data[0] === 1 };
+		},
 		selfIntersections(segments, closed) {
 			const packed = packCurves(segments);
 			if (!packed) throw new Error('Non-finite spline self-intersection input');

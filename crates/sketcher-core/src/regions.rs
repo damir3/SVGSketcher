@@ -506,41 +506,11 @@ fn inside(point: Point2, points: &[Point2]) -> bool {
 }
 
 fn extract(segments: &[CubicBezier], a: f64, b: f64) -> Vec<CubicBezier> {
-    if (a - b).abs() < 1e-5 {
-        return vec![];
-    }
-    if a > b {
-        let mut first = extract(segments, a, 1.0);
-        first.extend(extract(segments, 0.0, b));
-        return first;
-    }
-    if a <= 1e-5 && b >= 1.0 - 1e-5 {
-        return segments.to_vec();
-    }
-    let n = segments.len() as f64;
-    let mut out = vec![];
-    for (i, segment) in segments.iter().enumerate() {
-        let (start, end) = (i as f64 / n, (i + 1) as f64 / n);
-        if end <= a + 1e-6 || start >= b - 1e-6 {
-            continue;
-        }
-        let (t0, t1) = (
-            ((start.max(a) - start) * n).clamp(0.0, 1.0),
-            ((end.min(b) - start) * n).clamp(0.0, 1.0),
-        );
-        if t1 - t0 < 1e-6 {
-            continue;
-        }
-        let mut s = *segment;
-        if t1 < 1.0 - 1e-6 {
-            s = spline::split_at(&s, t1)[0]
-        }
-        if t0 > 1e-6 {
-            s = spline::split_at(&s, (t0 / t1.max(1e-6)).min(1.0))[1]
-        }
-        out.push(s)
-    }
-    out
+    crate::spline_editing::extract(segments, a, b)
+        .pieces
+        .into_iter()
+        .map(|p| p.curve)
+        .collect()
 }
 #[derive(Clone, Copy)]
 struct Run {
