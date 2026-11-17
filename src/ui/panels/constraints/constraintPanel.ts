@@ -19,43 +19,12 @@ export class ConstraintPanel implements ISidebarPanel {
 		}
 	}
 
-	private getAllSegmentedControls(): ConstraintSegmentedControl[] {
-		const list: ConstraintSegmentedControl[] = [];
-		if (this.options.segmentedControls) {
-			list.push(...this.options.segmentedControls);
-		}
-		if (this.options.sections) {
-			for (const s of this.options.sections) {
-				if (s.segmentedControls) list.push(...s.segmentedControls);
-			}
-		}
-		return list;
-	}
-
-	private getAllFields(): ConstraintFieldConfig[] {
-		const list: ConstraintFieldConfig[] = [];
-		if (this.options.fields) {
-			list.push(...this.options.fields);
-		}
-		if (this.options.sections) {
-			for (const s of this.options.sections) {
-				if (s.fields) list.push(...s.fields);
-			}
-		}
-		return list;
-	}
-
-	private getAllCheckboxes(): ConstraintCheckboxConfig[] {
-		const list: ConstraintCheckboxConfig[] = [];
-		if (this.options.checkboxes) {
-			list.push(...this.options.checkboxes);
-		}
-		if (this.options.sections) {
-			for (const s of this.options.sections) {
-				if (s.checkboxes) list.push(...s.checkboxes);
-			}
-		}
-		return list;
+	private collectOptions<K extends 'segmentedControls' | 'fields' | 'checkboxes'>(
+		key: K
+	): NonNullable<ConstraintPanelOptions[K]> {
+		return [...(this.options[key] ?? []), ...(this.options.sections?.flatMap(s => s[key] ?? []) ?? [])] as NonNullable<
+			ConstraintPanelOptions[K]
+		>;
 	}
 
 	private renderSegmentedControl(sc: ConstraintSegmentedControl, globalIdx: number, context: InspectorContext): string {
@@ -275,7 +244,7 @@ export class ConstraintPanel implements ISidebarPanel {
 		}
 
 		// Segmented controls events
-		const allSegmentedControls = this.getAllSegmentedControls();
+		const allSegmentedControls = this.collectOptions('segmentedControls');
 		if (allSegmentedControls.length > 0) {
 			container.querySelectorAll<HTMLButtonElement>('.insp-cpanel-seg-btn').forEach(btn => {
 				btn.addEventListener('click', () => {
@@ -298,54 +267,39 @@ export class ConstraintPanel implements ISidebarPanel {
 			const isVisible = dim.isVisible ? dim.isVisible(context) : true;
 			const isDisabled = dim.isDisabled ? dim.isDisabled(context) : false;
 			if (isVisible && !isDisabled) {
-				container
-					.querySelectorAll<HTMLButtonElement>(`.btn-insp-edit-dim[data-constraint-id="${c.id}"]`)
-					.forEach(btn => {
-						btn.addEventListener('click', e => {
+				const bindEditTrigger = (selector: string, eventName: 'click' | 'dblclick') => {
+					container.querySelectorAll<HTMLElement>(selector).forEach(el => {
+						el.addEventListener(eventName, e => {
 							e.stopPropagation();
-							const btnRect = btn.getBoundingClientRect();
-							const screenPos = new Vec2(btnRect.left - 240, btnRect.top - 10);
-							context.onEditDimension?.(c, screenPos);
+							const rect = el.getBoundingClientRect();
+							context.onEditDimension?.(c, new Vec2(rect.left - 240, rect.top - 10));
 						});
 					});
-
-				container
-					.querySelectorAll<HTMLElement>(`.inspector-value-display[data-constraint-id="${c.id}"]`)
-					.forEach(el => {
-						el.addEventListener('dblclick', e => {
-							e.stopPropagation();
-							const elRect = el.getBoundingClientRect();
-							const screenPos = new Vec2(elRect.left - 240, elRect.top - 10);
-							context.onEditDimension?.(c, screenPos);
-						});
-					});
+				};
+				bindEditTrigger(`.btn-insp-edit-dim[data-constraint-id="${c.id}"]`, 'click');
+				bindEditTrigger(`.inspector-value-display[data-constraint-id="${c.id}"]`, 'dblclick');
 			}
 		}
 
 		// Fields events
-		const allFields = this.getAllFields();
+		const allFields = this.collectOptions('fields');
 		for (const f of allFields) {
 			const input = container.querySelector<HTMLInputElement>(`#${f.id}`);
 			if (!input) continue;
 
-			if (f.onInput) {
-				input.addEventListener('input', () => {
+			const bindFieldEvent = (eventName: 'input' | 'change', handler?: (val: any, ctx: InspectorContext) => void) => {
+				if (!handler) return;
+				input.addEventListener(eventName, () => {
 					const val = f.type === 'number' || f.type === undefined ? parseFloat(input.value) : input.value;
-					f.onInput!(val, context);
+					handler(val, context);
 				});
-			}
-
-			if (f.onChange) {
-				input.addEventListener('change', () => {
-					const val = f.type === 'number' || f.type === undefined ? parseFloat(input.value) : input.value;
-					f.onChange!(val, context);
-				});
-			}
+			};
+			bindFieldEvent('input', f.onInput);
+			bindFieldEvent('change', f.onChange);
 		}
 
 		// Checkboxes events
-		const allCheckboxes = this.getAllCheckboxes();
-		for (const cb of allCheckboxes) {
+		for (const cb of this.collectOptions('checkboxes')) {
 			const input = container.querySelector<HTMLInputElement>(`#${cb.id}`);
 			if (!input) continue;
 

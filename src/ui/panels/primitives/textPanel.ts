@@ -42,6 +42,10 @@ export function escapeHtml(str: string): string {
 		.replace(/'/g, '&#039;');
 }
 
+function renderSegIconBtn(attrs: string, active: boolean, title: string, iconName: string, padX = 12): string {
+	return `<button type="button" ${attrs} title="${title}" class="seg-btn ${active ? 'active' : ''}" style="padding: 3px ${padX}px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon(iconName)}</button>`;
+}
+
 export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: boolean } = {}): string {
 	const isTool = !!options.isToolMode;
 	const title = isTool ? 'Text Tool' : 'Text';
@@ -100,8 +104,8 @@ export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: b
 		<div class="pattern-param-row">
 			<span class="pattern-param-label">Typeface</span>
 			<div class="pattern-segmented-control">
-				<button type="button" id="text-tool-btn-bold" class="seg-btn ${data.bold ? 'active' : ''}" title="Bold" style="padding: 3px 12px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('bold')}</button>
-				<button type="button" id="text-tool-btn-italic" class="seg-btn ${data.italic ? 'active' : ''}" title="Italic" style="padding: 3px 12px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('italic')}</button>
+				${renderSegIconBtn('id="text-tool-btn-bold"', data.bold, 'Bold', 'bold')}
+				${renderSegIconBtn('id="text-tool-btn-italic"', data.italic, 'Italic', 'italic')}
 			</div>
 		</div>
 
@@ -146,17 +150,17 @@ export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: b
 			<span class="pattern-param-label" style="margin-top: 4px;">Alignment</span>
 			<div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-end;">
 				<div class="pattern-segmented-control">
-					<button type="button" class="seg-btn ${data.alignment === 'left' ? 'active' : ''}" data-align="left" title="Align Left" style="padding: 3px 8px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('align_left')}</button>
-					<button type="button" class="seg-btn ${data.alignment === 'center' ? 'active' : ''}" data-align="center" title="Align Center" style="padding: 3px 8px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('align_center')}</button>
-					<button type="button" class="seg-btn ${data.alignment === 'right' ? 'active' : ''}" data-align="right" title="Align Right" style="padding: 3px 8px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('align_right')}</button>
+					${renderSegIconBtn('data-align="left"', data.alignment === 'left', 'Align Left', 'align_left', 8)}
+					${renderSegIconBtn('data-align="center"', data.alignment === 'center', 'Align Center', 'align_center', 8)}
+					${renderSegIconBtn('data-align="right"', data.alignment === 'right', 'Align Right', 'align_right', 8)}
 				</div>
 				${
 					data.mode === 'text'
 						? `
 				<div class="pattern-segmented-control">
-					<button type="button" class="seg-btn ${data.verticalAlignment === 'top' ? 'active' : ''}" data-valign="top" title="Align Top" style="padding: 3px 8px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('align_top')}</button>
-					<button type="button" class="seg-btn ${data.verticalAlignment === 'middle' ? 'active' : ''}" data-valign="middle" title="Align Middle" style="padding: 3px 8px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('align_middle')}</button>
-					<button type="button" class="seg-btn ${data.verticalAlignment === 'bottom' ? 'active' : ''}" data-valign="bottom" title="Align Bottom" style="padding: 3px 8px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('align_bottom')}</button>
+					${renderSegIconBtn('data-valign="top"', data.verticalAlignment === 'top', 'Align Top', 'align_top', 8)}
+					${renderSegIconBtn('data-valign="middle"', data.verticalAlignment === 'middle', 'Align Middle', 'align_middle', 8)}
+					${renderSegIconBtn('data-valign="bottom"', data.verticalAlignment === 'bottom', 'Align Bottom', 'align_bottom', 8)}
 				</div>
 				`
 						: ''
@@ -171,8 +175,8 @@ export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: b
 		<div class="pattern-param-row">
 			<span class="pattern-param-label">Placement</span>
 			<div class="pattern-segmented-control">
-				<button type="button" class="seg-btn ${data.placement === 'above' ? 'active' : ''}" data-placement="above" title="Above Path" style="padding: 3px 12px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('placement_above')}</button>
-				<button type="button" class="seg-btn ${data.placement === 'below' ? 'active' : ''}" data-placement="below" title="Below Path" style="padding: 3px 12px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('placement_below')}</button>
+				${renderSegIconBtn('data-placement="above"', data.placement === 'above', 'Above Path', 'placement_above')}
+				${renderSegIconBtn('data-placement="below"', data.placement === 'below', 'Below Path', 'placement_below')}
 			</div>
 		</div>
 		`
@@ -183,8 +187,8 @@ export function renderTextCardHtml(data: TextCardData, options: { isToolMode?: b
 		<div class="pattern-param-row">
 			<span class="pattern-param-label">Flip</span>
 			<div class="pattern-segmented-control">
-				<button type="button" id="text-tool-btn-fliph" class="seg-btn ${data.flipHorizontal ? 'active' : ''}" title="Flip Horizontal" style="padding: 3px 12px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('flip_horizontal')}</button>
-				<button type="button" id="text-tool-btn-flipv" class="seg-btn ${data.flipVertical ? 'active' : ''}" title="Flip Vertical" style="padding: 3px 12px; display: inline-flex; align-items: center; justify-content: center;">${getToolIcon('flip_vertical')}</button>
+				${renderSegIconBtn('id="text-tool-btn-fliph"', data.flipHorizontal, 'Flip Horizontal', 'flip_horizontal')}
+				${renderSegIconBtn('id="text-tool-btn-flipv"', data.flipVertical, 'Flip Vertical', 'flip_vertical')}
 			</div>
 		</div>
 
@@ -211,16 +215,56 @@ export function bindTextCardEvents(cardEl: HTMLElement, callbacks: TextCardCallb
 		callbacks.onClose?.();
 	});
 
-	// Mode buttons
-	cardEl.querySelectorAll<HTMLButtonElement>('#text-tool-mode-control [data-mode]').forEach(btn => {
-		btn.addEventListener('click', () => {
-			const mode = btn.getAttribute('data-mode') as 'text' | 'text_on_path';
-			if (mode && callbacks.getData().mode !== mode) {
-				callbacks.setData(d => (d.mode = mode), true);
-				rerender();
+	const bindAttrSelect = <K extends 'mode' | 'alignment' | 'verticalAlignment' | 'placement'>(
+		selector: string,
+		attr: string,
+		key: K
+	) => {
+		cardEl.querySelectorAll<HTMLButtonElement>(selector).forEach(btn => {
+			btn.addEventListener('click', () => {
+				const value = btn.getAttribute(attr) as TextCardData[K] | null;
+				if (value && callbacks.getData()[key] !== value) {
+					callbacks.setData(d => {
+						d[key] = value;
+					}, true);
+					rerender();
+				}
+			});
+		});
+	};
+	const bindToggle = (selector: string, key: 'bold' | 'italic' | 'flipHorizontal' | 'flipVertical') => {
+		cardEl.querySelector(selector)?.addEventListener('click', () => {
+			callbacks.setData(d => {
+				d[key] = !d[key];
+			}, true);
+			rerender();
+		});
+	};
+	const bindFloatInput = (selector: string, key: 'height' | 'characterSpacing', isValid: (v: number) => boolean) => {
+		const input = cardEl.querySelector<HTMLInputElement>(selector);
+		if (!input) return;
+		input.addEventListener('keydown', e => e.stopPropagation());
+		input.addEventListener('change', () => {
+			const val = parseFloat(input.value);
+			if (!Number.isNaN(val) && isValid(val)) {
+				callbacks.setData(d => {
+					d[key] = val;
+				}, true);
+				callbacks.requestRender?.();
 			}
 		});
-	});
+	};
+
+	bindAttrSelect('#text-tool-mode-control [data-mode]', 'data-mode', 'mode');
+	bindAttrSelect('[data-align]', 'data-align', 'alignment');
+	bindAttrSelect('[data-valign]', 'data-valign', 'verticalAlignment');
+	bindAttrSelect('[data-placement]', 'data-placement', 'placement');
+	bindToggle('#text-tool-btn-bold', 'bold');
+	bindToggle('#text-tool-btn-italic', 'italic');
+	bindToggle('#text-tool-btn-fliph', 'flipHorizontal');
+	bindToggle('#text-tool-btn-flipv', 'flipVertical');
+	bindFloatInput('#text-tool-input-height', 'height', v => v > 0);
+	bindFloatInput('#text-tool-input-spacing', 'characterSpacing', () => true);
 
 	// Multiline textarea
 	const textarea = cardEl.querySelector<HTMLTextAreaElement>('#text-tool-input-text');
@@ -284,93 +328,10 @@ export function bindTextCardEvents(cardEl: HTMLElement, callbacks: TextCardCallb
 		}
 	});
 
-	// Bold toggle
-	cardEl.querySelector('#text-tool-btn-bold')?.addEventListener('click', () => {
-		callbacks.setData(d => (d.bold = !d.bold), true);
-		rerender();
-	});
-
-	// Italic toggle
-	cardEl.querySelector('#text-tool-btn-italic')?.addEventListener('click', () => {
-		callbacks.setData(d => (d.italic = !d.italic), true);
-		rerender();
-	});
-
-	// Height input
-	const heightInput = cardEl.querySelector<HTMLInputElement>('#text-tool-input-height');
-	if (heightInput) {
-		heightInput.addEventListener('keydown', e => e.stopPropagation());
-		heightInput.addEventListener('change', () => {
-			const val = parseFloat(heightInput.value);
-			if (!Number.isNaN(val) && val > 0) {
-				callbacks.setData(d => (d.height = val), true);
-				callbacks.requestRender?.();
-			}
-		});
-	}
-
-	// Spacing input
-	const spacingInput = cardEl.querySelector<HTMLInputElement>('#text-tool-input-spacing');
-	if (spacingInput) {
-		spacingInput.addEventListener('keydown', e => e.stopPropagation());
-		spacingInput.addEventListener('change', () => {
-			const val = parseFloat(spacingInput.value);
-			if (!Number.isNaN(val)) {
-				callbacks.setData(d => (d.characterSpacing = val), true);
-				callbacks.requestRender?.();
-			}
-		});
-	}
-
-	// Horizontal Alignment
-	cardEl.querySelectorAll<HTMLButtonElement>('[data-align]').forEach(btn => {
-		btn.addEventListener('click', () => {
-			const a = btn.getAttribute('data-align') as 'left' | 'center' | 'right';
-			if (a && callbacks.getData().alignment !== a) {
-				callbacks.setData(d => (d.alignment = a), true);
-				rerender();
-			}
-		});
-	});
-
-	// Vertical Alignment (mode === 'text')
-	cardEl.querySelectorAll<HTMLButtonElement>('[data-valign]').forEach(btn => {
-		btn.addEventListener('click', () => {
-			const va = btn.getAttribute('data-valign') as 'top' | 'middle' | 'bottom';
-			if (va && callbacks.getData().verticalAlignment !== va) {
-				callbacks.setData(d => (d.verticalAlignment = va), true);
-				rerender();
-			}
-		});
-	});
-
-	// Placement (mode === 'text_on_path')
-	cardEl.querySelectorAll<HTMLButtonElement>('[data-placement]').forEach(btn => {
-		btn.addEventListener('click', () => {
-			const p = btn.getAttribute('data-placement') as 'above' | 'below';
-			if (p && callbacks.getData().placement !== p) {
-				callbacks.setData(d => (d.placement = p), true);
-				rerender();
-			}
-		});
-	});
-
 	// Fit to path checkbox (mode === 'text_on_path')
 	const fitCheckbox = cardEl.querySelector<HTMLInputElement>('#text-tool-cb-fittopath');
 	fitCheckbox?.addEventListener('change', () => {
 		callbacks.setData(d => (d.fitToPath = fitCheckbox.checked), true);
-		rerender();
-	});
-
-	// Flip Horizontal
-	cardEl.querySelector('#text-tool-btn-fliph')?.addEventListener('click', () => {
-		callbacks.setData(d => (d.flipHorizontal = !d.flipHorizontal), true);
-		rerender();
-	});
-
-	// Flip Vertical
-	cardEl.querySelector('#text-tool-btn-flipv')?.addEventListener('click', () => {
-		callbacks.setData(d => (d.flipVertical = !d.flipVertical), true);
 		rerender();
 	});
 }
