@@ -127,18 +127,18 @@ export class SketchText implements IInspectable {
 		};
 	}
 
+	private resolveRectanglePoints(sketch: SketchDocument) {
+		if (this.mode !== 'text' || !this.rectanglePointIds) return null;
+		const pts = this.rectanglePointIds.map(id => sketch.points.get(id));
+		return pts.every(Boolean) ? (pts as [any, any, any, any]) : null;
+	}
+
 	/**
 	 * Returns 4 corners of rectangle in world coordinates if in 'text' mode and valid.
 	 */
 	getRectangleCorners(sketch: SketchDocument): [Vec2, Vec2, Vec2, Vec2] | null {
-		if (this.mode !== 'text' || !this.rectanglePointIds) return null;
-		const [p0Id, p1Id, p2Id, p3Id] = this.rectanglePointIds;
-		const p0 = sketch.points.get(p0Id);
-		const p1 = sketch.points.get(p1Id);
-		const p2 = sketch.points.get(p2Id);
-		const p3 = sketch.points.get(p3Id);
-		if (!p0 || !p1 || !p2 || !p3) return null;
-		return [p0.clone(), p1.clone(), p2.clone(), p3.clone()];
+		const pts = this.resolveRectanglePoints(sketch);
+		return pts ? (pts.map(p => p.clone()) as [Vec2, Vec2, Vec2, Vec2]) : null;
 	}
 
 	captureRectanglePoints(sketch: SketchDocument): Map<string, Vec2> {
@@ -169,22 +169,11 @@ export class SketchText implements IInspectable {
 	}
 
 	rotateRectangleTo(sketch: SketchDocument, centerWorld: Vec2, mouseWorld: Vec2): boolean {
-		if (!this.rectanglePointIds) return false;
-		const corners = this.getRectangleCorners(sketch);
-		if (!corners) return false;
-		const [p0, p1, p2, p3] = corners;
-		const pt0 = sketch.points.get(this.rectanglePointIds[0]);
-		const pt1 = sketch.points.get(this.rectanglePointIds[1]);
-		const pt2 = sketch.points.get(this.rectanglePointIds[2]);
-		const pt3 = sketch.points.get(this.rectanglePointIds[3]);
-		if (!pt0 || !pt1 || !pt2 || !pt3) return false;
-
+		const pts = this.resolveRectanglePoints(sketch);
+		if (!pts) return false;
 		const targetAngle = centerWorld.angleToPoint(mouseWorld) - Math.PI / 2;
-		const deltaAngle = targetAngle - p0.angleToPoint(p1);
-		pt0.copy(p0.clone().rotateAround(centerWorld, deltaAngle));
-		pt1.copy(p1.clone().rotateAround(centerWorld, deltaAngle));
-		pt2.copy(p2.clone().rotateAround(centerWorld, deltaAngle));
-		pt3.copy(p3.clone().rotateAround(centerWorld, deltaAngle));
+		const deltaAngle = targetAngle - pts[0].angleToPoint(pts[1]);
+		for (const pt of pts) pt.copy(pt.clone().rotateAround(centerWorld, deltaAngle));
 		sketch.solve();
 		return true;
 	}

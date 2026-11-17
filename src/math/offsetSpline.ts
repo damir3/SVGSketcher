@@ -5,7 +5,7 @@ import { Vec2 } from './vector';
 import { fitOffsetNodes, OFFSET_FIT_TOLERANCE } from './offsetFit';
 import { splitOffsetContours, arcNode } from './offsetContours';
 import { isOffsetCollapsed } from './offsetCollapse';
-import { offsetSourceCounterClockwise } from './offsetRadius';
+import { offsetPrimitiveEnd, offsetPrimitiveStart, offsetSourceCounterClockwise } from './offsetRadius';
 import {
 	getSplinePointAtParam,
 	getSplineTangentAtParam,
@@ -526,9 +526,7 @@ function connectConsumedArcs(
 	joined: boolean[]
 ): void {
 	const ccw = offsetSourceCounterClockwise(items);
-	const start = (p: KernelOffsetPrimitive) => Vec2.from(p.p1 ?? p.start ?? p.fitPoints![0]);
-	const end = (p: KernelOffsetPrimitive) => Vec2.from(p.p2 ?? p.end ?? p.fitPoints!.at(-1)!);
-	const poles = primitives.map(p => [start(p), end(p)]);
+	const poles = primitives.map(p => [offsetPrimitiveStart(p), offsetPrimitiveEnd(p)]);
 	for (let i = 0; i < items.length; i++) {
 		const c = items[i].curve;
 		if (c?.type !== 'arc' || !consumed[i]) continue;
@@ -550,8 +548,8 @@ function connectConsumedArcs(
 						? existing.nodes[0].p
 						: existing.nodes.at(-1)!.p
 					: first
-						? start(primitives[j])
-						: end(primitives[j]);
+						? offsetPrimitiveStart(primitives[j])
+						: offsetPrimitiveEnd(primitives[j]);
 			if (near.distanceTo(pole) < 1e-8) {
 				joined[junction] = true;
 				continue;
@@ -576,8 +574,6 @@ function connectCornerGaps(
 	joined: boolean[]
 ): void {
 	const ccw = offsetSourceCounterClockwise(items);
-	const start = (p: KernelOffsetPrimitive) => Vec2.from(p.p1 ?? p.start ?? p.fitPoints![0]);
-	const end = (p: KernelOffsetPrimitive) => Vec2.from(p.p2 ?? p.end ?? p.fitPoints!.at(-1)!);
 	for (let i = 0; i < items.length; i++) {
 		const j = (i + 1) % items.length;
 		if (i === j || joined[i] || consumed[i] || consumed[j]) continue;
@@ -585,8 +581,8 @@ function connectCornerGaps(
 			cj = items[j].curve;
 		if (!ci || !cj || (ci.type !== 'segment' && ci.type !== 'arc') || (cj.type !== 'segment' && cj.type !== 'arc'))
 			continue;
-		const from = paths[i] ? paths[i]!.nodes.at(-1)!.p : end(primitives[i]),
-			to = paths[j] ? paths[j]!.nodes[0].p : start(primitives[j]);
+		const from = paths[i] ? paths[i]!.nodes.at(-1)!.p : offsetPrimitiveEnd(primitives[i]),
+			to = paths[j] ? paths[j]!.nodes[0].p : offsetPrimitiveStart(primitives[j]);
 		if (from.distanceTo(to) < 1e-8) continue;
 		const ve = ci.type === 'segment' ? ci.p2 : ci.end,
 			vs = cj.type === 'segment' ? cj.p1 : cj.start,

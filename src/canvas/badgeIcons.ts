@@ -7,11 +7,10 @@ import badgeTangentRaw from '../assets/icons/badge-tangent.svg?raw';
 import { Vec2 } from '../math/vector';
 import type { SketchDocument } from '../model/sketch';
 import type { Viewport } from './viewport';
-import { createSvgElement, createSvgRect, createSvgText } from './svg';
+import { createSvgElement, createSvgRect, createSvgText, getArcSweep } from './svg';
 import { COLORS, STROKE_WIDTH } from './styles';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const TWO_PI = 2 * Math.PI;
 
 interface BadgeIconDef {
 	viewBox: string;
@@ -185,23 +184,11 @@ export function renderBadgeOnCircle(
 			const ss = viewport.worldToScreen(start);
 			const se = viewport.worldToScreen(end);
 			const as = sc.angleToPoint(ss);
-			const ae = sc.angleToPoint(se);
 			const clockwise = !!arc.clockwise;
-
-			let sweepAngle = 0;
-			if (clockwise) {
-				sweepAngle = (ae - as) % TWO_PI;
-				if (sweepAngle < 0) sweepAngle += TWO_PI;
-				const midAngle = as + sweepAngle / 2;
-				bx = sc.x + Math.cos(midAngle) * rScreen;
-				by = sc.y + Math.sin(midAngle) * rScreen;
-			} else {
-				sweepAngle = (as - ae) % TWO_PI;
-				if (sweepAngle < 0) sweepAngle += TWO_PI;
-				const midAngle = as - sweepAngle / 2;
-				bx = sc.x + Math.cos(midAngle) * rScreen;
-				by = sc.y + Math.sin(midAngle) * rScreen;
-			}
+			const sweepAngle = getArcSweep(as, sc.angleToPoint(se), clockwise);
+			const midAngle = as + (clockwise ? 0.5 : -0.5) * sweepAngle;
+			bx = sc.x + Math.cos(midAngle) * rScreen;
+			by = sc.y + Math.sin(midAngle) * rScreen;
 		}
 	}
 

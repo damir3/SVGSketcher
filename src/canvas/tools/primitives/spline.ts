@@ -128,14 +128,10 @@ export class SplineTool extends BaseTool {
 
 		// Check if clicking first point to close spline (only for fit splines; needs at least 3 points placed)
 		if (this._mode === 'fit' && this.points.length >= 3) {
-			const firstPointId = this.points[0].id;
-			if (snap && snap.type === 'point' && snap.id === firstPointId) {
-				this.finishSpline(true);
-				this.ctx.showToast('Closed spline created');
-				return;
-			}
-			const firstPtPos = this.ctx.viewport.worldToScreen(this.points[0]);
-			if (screen.distanceTo(firstPtPos) <= POINT_DISTANCE_PX) {
+			const isFirstPoint =
+				(snap?.type === 'point' && snap.id === this.points[0].id) ||
+				screen.distanceTo(this.ctx.viewport.worldToScreen(this.points[0])) <= POINT_DISTANCE_PX;
+			if (isFirstPoint) {
 				this.finishSpline(true);
 				this.ctx.showToast('Closed spline created');
 				return;
@@ -249,21 +245,23 @@ export class SplineTool extends BaseTool {
 		this.finishSpline(false);
 	}
 
-	override cancel(): void {
-		const hadPoints = this.points.length > 0;
-		if (this.transactionStarted) {
-			this.transactionStarted = false;
-			this.ctx.sketch.rollbackTransaction();
-		}
+	private resetSplineState(notifyStateChange: boolean): void {
+		this.transactionStarted = false;
 		this.createdPointIds.clear();
 		this.points = [];
 		this.undonePoints = [];
 		this.checkmarkPos = undefined;
 		this.ctx?.renderer.clearPreviews();
-		if (hadPoints) {
-			this.onStateChange?.();
-		}
+		if (notifyStateChange) this.onStateChange?.();
 		this.ctx?.requestRender();
+	}
+
+	override cancel(): void {
+		const hadPoints = this.points.length > 0;
+		if (this.transactionStarted) {
+			this.ctx.sketch.rollbackTransaction();
+		}
+		this.resetSplineState(hadPoints);
 	}
 
 	finishSpline(isClosed = false): void {
@@ -277,14 +275,7 @@ export class SplineTool extends BaseTool {
 		} else {
 			this.ctx.sketch.addControlSpline(pointIds, this.ctx.isConstructionMode, undefined, false);
 		}
-		this.transactionStarted = false;
-		this.createdPointIds.clear();
-		this.points = [];
-		this.undonePoints = [];
-		this.checkmarkPos = undefined;
 		this.ctx.sketch.commitTransaction();
-		this.ctx.renderer.clearPreviews();
-		this.onStateChange?.();
-		this.ctx.requestRender();
+		this.resetSplineState(true);
 	}
 }

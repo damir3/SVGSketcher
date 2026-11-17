@@ -461,7 +461,7 @@ export class ToolPopup<TFieldId extends string = string> {
 		}
 	}
 
-	public resetField(id: TFieldId, value?: number | string | boolean): void {
+	public resetField(id: TFieldId, value?: number | string | boolean | null): void {
 		this.setLocked(id, false);
 		if (value !== undefined) {
 			this.setValue(id, value);

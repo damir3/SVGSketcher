@@ -67,13 +67,13 @@ export class SlotTool extends BaseTool {
 	private arcCenterWorld: Vec2 | null = null;
 	private arcStartWorld: Vec2 | null = null;
 	private arcEndWorld: Vec2 | null = null;
-	private arcRadius = 50;
+	private arcRadius = 0;
 	private arcCenterPrevAngle: number | null = null;
 	private arcCenterTotalAngle = 0;
 	private arcWorldSweepSign = 1;
 
-	distance = 50;
-	angle = 90;
+	distance = 0;
+	angle = 0;
 	radius: number | null = null;
 	distanceExpression?: string;
 	angleExpression?: string;
@@ -99,7 +99,7 @@ export class SlotTool extends BaseTool {
 					type: 'dimension',
 					unit: 'mm',
 					lockable: true,
-					defaultValue: 50.0,
+					placeholder: '—',
 				},
 				{
 					id: 'angle',
@@ -107,7 +107,7 @@ export class SlotTool extends BaseTool {
 					type: 'dimension',
 					unit: '°',
 					lockable: true,
-					defaultValue: 90.0,
+					placeholder: '—',
 					visible: isArc,
 				},
 				{
@@ -124,8 +124,8 @@ export class SlotTool extends BaseTool {
 		});
 
 		this.popup.onChange = () => {
-			this.distance = this.popup.getNumericValue('distance', 50);
-			this.angle = this.popup.getNumericValue('angle', 90);
+			this.distance = this.popup.getNumericValue('distance', 0);
+			this.angle = this.popup.getNumericValue('angle', 0);
 			this.radius = this.getPopupRadius();
 			this.distanceExpression = this.popup.getExpression('distance');
 			this.angleExpression = this.popup.getExpression('angle');
@@ -250,10 +250,17 @@ export class SlotTool extends BaseTool {
 		}
 	}
 
-	private resetPopupValues(distVal = 50, angleVal = 90, radVal: number | null = null): void {
-		this.popup.resetField('distance', distVal);
-		this.popup.resetField('angle', angleVal);
-		this.popup.resetField('radius', radVal);
+	private resetDimFields(): void {
+		this.arcRadius = 0;
+		this.isDistanceLocked = false;
+		this.isAngleLocked = false;
+		this.isRadiusLocked = false;
+		this.distance = 0;
+		this.angle = 0;
+		this.radius = null;
+		this.popup.resetField('distance', null);
+		this.popup.resetField('angle', null);
+		this.popup.resetField('radius', null);
 		this.popup.setFieldVisible('radius', false);
 	}
 
@@ -628,16 +635,8 @@ export class SlotTool extends BaseTool {
 		this.lastEffectiveWorld = this.firstWorldPos;
 		if (isCenterArc) {
 			this.arcCenterWorld = this.firstWorldPos;
-			this.arcRadius = 50;
-			this.angle = 90;
 		}
-
-		this.isDistanceLocked = false;
-		this.isAngleLocked = false;
-		this.isRadiusLocked = false;
-		this.distance = 50;
-		this.radius = null;
-		this.resetPopupValues(50, 90, null);
+		this.resetDimFields();
 
 		this.drawingStep = 1;
 		this.popup.show(e.screen);
@@ -1221,18 +1220,10 @@ export class SlotTool extends BaseTool {
 		this.arcCenterWorld = null;
 		this.arcStartWorld = null;
 		this.arcEndWorld = null;
-		this.arcRadius = 50;
 		this.arcCenterPrevAngle = null;
 		this.arcCenterTotalAngle = 0;
 		this.arcWorldSweepSign = 1;
-
-		this.isDistanceLocked = false;
-		this.isAngleLocked = false;
-		this.isRadiusLocked = false;
-		this.distance = 50;
-		this.angle = 90;
-		this.radius = null;
-		this.resetPopupValues(50, 90, null);
+		this.resetDimFields();
 		this.updateToastHint();
 		this.onStateChange?.();
 	}
@@ -1243,6 +1234,7 @@ export class SlotTool extends BaseTool {
 		if (this.isLinearMode()) {
 			if (!this.firstWorldPos) return;
 			if (!this.secondWorldPos) {
+				if (this.distance <= 0) return;
 				const eff = this.lastEffectiveWorld ?? new Vec2(this.firstWorldPos.x + this.distance, this.firstWorldPos.y);
 				this.secondWorldPos = this.computeLinearSecondPoint(eff);
 			}

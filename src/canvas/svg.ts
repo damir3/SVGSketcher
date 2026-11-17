@@ -221,28 +221,34 @@ export function renderDimensionLabel(
 
 const TWO_PI = 2 * Math.PI;
 
+export function getArcSweep(startAngle: number, endAngle: number, clockwise: boolean): number {
+	const sweep = (clockwise ? endAngle - startAngle : startAngle - endAngle) % TWO_PI;
+	return sweep < 0 ? sweep + TWO_PI : sweep;
+}
+
+function formatArcSvgPath(
+	ss: XY,
+	se: XY,
+	rx: number,
+	ry: number,
+	xAxisRotationDeg: string,
+	sweepFlag: 0 | 1,
+	midpoint?: XY
+): string {
+	const arc = (to: XY) =>
+		`A ${rx.toFixed(2)} ${ry.toFixed(2)} ${xAxisRotationDeg} 0 ${sweepFlag} ${to.x.toFixed(2)} ${to.y.toFixed(2)}`;
+	return midpoint
+		? `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} ${arc(midpoint)} ${arc(se)}`
+		: `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} ${arc(se)}`;
+}
+
 export function getArcSvgPath(sc: Vec2, ss: Vec2, se: Vec2, sr: number, clockwise: boolean): string {
 	const as = sc.angleToPoint(ss);
-	const ae = sc.angleToPoint(se);
-
-	let sweepAngle = 0;
+	const sweepAngle = getArcSweep(as, sc.angleToPoint(se), clockwise);
 	const sweepFlag = clockwise ? 1 : 0;
-	if (clockwise) {
-		sweepAngle = (ae - as) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	} else {
-		sweepAngle = (as - ae) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	}
-
-	if (sweepAngle <= Math.PI * 0.75) {
-		return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
-	}
-
-	const midAngle = clockwise ? as + sweepAngle * 0.5 : as - sweepAngle * 0.5;
-	const midpoint = Vec2.fromPolar(sr, midAngle).add(sc);
-
-	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${midpoint.x.toFixed(2)} ${midpoint.y.toFixed(2)} A ${sr.toFixed(2)} ${sr.toFixed(2)} 0 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	const midpoint =
+		sweepAngle > Math.PI * 0.75 ? Vec2.fromPolar(sr, as + (clockwise ? 0.5 : -0.5) * sweepAngle).add(sc) : undefined;
+	return formatArcSvgPath(ss, se, sr, sr, '0', sweepFlag, midpoint);
 }
 
 export function getEllipticalArcSvgPath(
@@ -257,29 +263,13 @@ export function getEllipticalArcSvgPath(
 	if (r.x < 0.1 || r.y < 0.1) return '';
 
 	const theta = sc.angleToPoint(smaj);
-	const thetaDeg = (theta * 180) / Math.PI;
-
 	const { axisU: u, axisV: v } = ellipseAxes(theta);
-
 	const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
-	const te = ellipseParameterAtPoint(se, sc, r, u, v);
-
-	let sweepAngle = 0;
+	const sweepAngle = getArcSweep(ts, ellipseParameterAtPoint(se, sc, r, u, v), clockwise);
 	const sweepFlag = clockwise ? 1 : 0;
-	if (clockwise) {
-		sweepAngle = (te - ts) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	} else {
-		sweepAngle = (ts - te) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
-	}
-
-	if (sweepAngle <= Math.PI * 0.75) {
-		return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
-	}
-
-	const tmid = clockwise ? ts + sweepAngle * 0.5 : ts - sweepAngle * 0.5;
-	const midpoint = ellipsePointAtParameter(tmid, sc, r, u, v);
-
-	return `M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${midpoint.x.toFixed(2)} ${midpoint.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} 0 ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}`;
+	const midpoint =
+		sweepAngle > Math.PI * 0.75
+			? ellipsePointAtParameter(ts + (clockwise ? 0.5 : -0.5) * sweepAngle, sc, r, u, v)
+			: undefined;
+	return formatArcSvgPath(ss, se, r.x, r.y, ((theta * 180) / Math.PI).toFixed(2), sweepFlag, midpoint);
 }

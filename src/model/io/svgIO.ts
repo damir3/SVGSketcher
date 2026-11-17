@@ -745,6 +745,16 @@ export function exportSketchToSVG(
 		return [sweepAngle > Math.PI ? 1 : 0, clockwise ? 1 : 0];
 	};
 	const usedPoints = new Set<string>();
+	const useSvgPoints = (...ids: string[]): Vec2[] | null => {
+		for (const id of ids) usedPoints.add(id);
+		const pts: Vec2[] = [];
+		for (const id of ids) {
+			const pt = sketch.points.get(id);
+			if (!pt) return null;
+			pts.push(new Vec2(pt.x, -pt.y));
+		}
+		return pts;
+	};
 	const scaleTransform = `scale(${scale})`;
 
 	for (const image of layers.images === false ? [] : (metadataPayload.snapshot.images ?? [])) {
@@ -781,49 +791,34 @@ export function exportSketchToSVG(
 
 	for (const line of sketch.lines.values()) {
 		if (line.isSplineHandle || textRectLineIds.has(line.id)) continue;
-		usedPoints.add(line.p1Id);
-		usedPoints.add(line.p2Id);
-		const p1 = sketch.points.get(line.p1Id);
-		const p2 = sketch.points.get(line.p2Id);
-		if (p1 && p2) {
+		const pts = useSvgPoints(line.p1Id, line.p2Id);
+		if (pts) {
+			const [p1, p2] = pts;
 			pushShape(
 				line.isConstruction,
 				stroke =>
-					`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" />`
+					`<line x1="${p1.x.toFixed(2)}" y1="${p1.y.toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${p2.y.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" />`
 			);
 		}
 	}
 
 	for (const circ of sketch.circles.values()) {
-		usedPoints.add(circ.centerId);
-		const center = sketch.points.get(circ.centerId);
-		if (center) {
+		const pts = useSvgPoints(circ.centerId);
+		if (pts) {
+			const [center] = pts;
 			pushShape(
 				circ.isConstruction,
 				stroke =>
-					`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+					`<circle cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="${circ.radius.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
 
 	for (const arc of sketch.arcs.values()) {
-		usedPoints.add(arc.centerId);
-		usedPoints.add(arc.startPointId);
-		usedPoints.add(arc.endPointId);
-		const center = sketch.points.get(arc.centerId);
-		const start = sketch.points.get(arc.startPointId);
-		const end = sketch.points.get(arc.endPointId);
-		if (center && start && end) {
-			// Convert to SVG coordinates (Y-down)
-			const sc = new Vec2(center.x, -center.y);
-			const ss = new Vec2(start.x, -start.y);
-			const se = new Vec2(end.x, -end.y);
-
-			const [largeArcFlag, sweepFlag] = svgArcFlags(
-				Vec2.from(sc).angleToPoint(ss),
-				Vec2.from(sc).angleToPoint(se),
-				arc.clockwise
-			);
+		const pts = useSvgPoints(arc.centerId, arc.startPointId, arc.endPointId);
+		if (pts) {
+			const [sc, ss, se] = pts;
+			const [largeArcFlag, sweepFlag] = svgArcFlags(sc.angleToPoint(ss), sc.angleToPoint(se), arc.clockwise);
 			pushShape(
 				arc.isConstruction,
 				stroke =>
@@ -833,18 +828,11 @@ export function exportSketchToSVG(
 	}
 
 	for (const el of sketch.ellipses.values()) {
-		usedPoints.add(el.centerId);
-		usedPoints.add(el.majorAxisPointId);
-		usedPoints.add(el.minorAxisPointId);
-		const center = sketch.points.get(el.centerId);
-		const maj = sketch.points.get(el.majorAxisPointId);
-		const min = sketch.points.get(el.minorAxisPointId);
-		if (center && maj && min) {
-			const sc = new Vec2(center.x, -center.y);
-			const smaj = new Vec2(maj.x, -maj.y);
-			const smin = new Vec2(min.x, -min.y);
-			const r = Vec2.from(sc).distancesTo(smaj, smin);
-			const deg = Vec2.from(sc).angleToPointDeg(smaj);
+		const pts = useSvgPoints(el.centerId, el.majorAxisPointId, el.minorAxisPointId);
+		if (pts) {
+			const [sc, smaj, smin] = pts;
+			const r = sc.distancesTo(smaj, smin);
+			const deg = sc.angleToPointDeg(smaj);
 			pushShape(
 				el.isConstruction,
 				stroke =>
@@ -854,25 +842,17 @@ export function exportSketchToSVG(
 	}
 
 	for (const elarc of sketch.ellipticalArcs.values()) {
-		usedPoints.add(elarc.centerId);
-		usedPoints.add(elarc.majorAxisPointId);
-		usedPoints.add(elarc.minorAxisPointId);
-		usedPoints.add(elarc.startPointId);
-		usedPoints.add(elarc.endPointId);
-		const center = sketch.points.get(elarc.centerId);
-		const maj = sketch.points.get(elarc.majorAxisPointId);
-		const min = sketch.points.get(elarc.minorAxisPointId);
-		const start = sketch.points.get(elarc.startPointId);
-		const end = sketch.points.get(elarc.endPointId);
-		if (center && maj && min && start && end) {
-			const sc = new Vec2(center.x, -center.y);
-			const smaj = new Vec2(maj.x, -maj.y);
-			const smin = new Vec2(min.x, -min.y);
-			const ss = new Vec2(start.x, -start.y);
-			const se = new Vec2(end.x, -end.y);
-
-			const r = Vec2.from(sc).distancesTo(smaj, smin);
-			const theta = Vec2.from(sc).angleToPoint(smaj);
+		const pts = useSvgPoints(
+			elarc.centerId,
+			elarc.majorAxisPointId,
+			elarc.minorAxisPointId,
+			elarc.startPointId,
+			elarc.endPointId
+		);
+		if (pts) {
+			const [sc, smaj, smin, ss, se] = pts;
+			const r = sc.distancesTo(smaj, smin);
+			const theta = sc.angleToPoint(smaj);
 			const thetaDeg = (theta * 180) / Math.PI;
 			const { axisU: u, axisV: v } = ellipseAxes(theta);
 			const [largeArc, sweepFlag] = svgArcFlags(

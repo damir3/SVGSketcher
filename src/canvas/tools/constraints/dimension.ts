@@ -337,13 +337,40 @@ export class DimensionTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
+	private setState(partial: Partial<DimensionState> = {}): void {
+		this.state = { ...EMPTY_STATE, ...partial };
+	}
+
+	private distanceToast(existed: boolean, orientation: 'aligned' | 'horizontal' | 'vertical', suffix = ''): string {
+		if (existed) return `Editing distance${suffix ? ` ${suffix}` : ' constraint'}`;
+		const prefix = orientation === 'horizontal' ? 'Horizontal ' : orientation === 'vertical' ? 'Vertical ' : '';
+		const label = prefix ? `${prefix}distance` : 'Distance';
+		return suffix ? `${label} ${suffix} applied` : `${label} constraint applied`;
+	}
+
+	private placePointDistance(p1Id: string, p2Id: string, screen: Vec2, clientPos: Vec2): void {
+		const p1 = this.ctx.sketch.points.get(p1Id);
+		const p2 = this.ctx.sketch.points.get(p2Id);
+		if (!p1 || !p2) return;
+		const s1 = this.ctx.viewport.worldToScreen(p1);
+		const s2 = this.ctx.viewport.worldToScreen(p2);
+		const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
+		const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
+		const existed = this.ctx.sketch.hasDistanceConstraint(p1Id, p2Id, orientation);
+		const c = this.ctx.sketch.addDistanceConstraint(p1Id, p2Id, undefined, offsetWorld, orientation);
+		if (!c) return;
+		const t = computeLabelPosition(s1, s2, screen, orientation);
+		if (t !== undefined) c.labelPosition = t;
+		this.finishDimensionPlacement(c, this.distanceToast(existed, orientation), clientPos);
+	}
+
 	override deactivate(): void {
 		this.cancel();
 	}
 
 	override cancel(): void {
 		this.radialDraft = null;
-		this.state = { step: 0, line1Id: null, line2Id: null, point1Id: null, point2Id: null };
+		this.setState();
 		this.ctx.renderer.clearPreviews();
 		this.ctx.sketch.clearSelection();
 		this.ctx.requestRender();
@@ -536,36 +563,18 @@ export class DimensionTool extends BaseTool {
 			if (type === 'point' && id) {
 				this.ctx.sketch.clearSelection();
 				this.ctx.sketch.selectEntity(id, 'point', false);
-				this.state = {
-					step: 1,
-					line1Id: null,
-					line2Id: null,
-					point1Id: id,
-					point2Id: null,
-				};
+				this.setState({ step: 1, point1Id: id });
 				this.ctx.requestRender();
 			} else if (type === 'line' && id) {
 				this.ctx.sketch.clearSelection();
 				this.ctx.sketch.selectEntity(id, 'line', false);
-				this.state = {
-					step: 1,
-					line1Id: id,
-					line2Id: null,
-					point1Id: null,
-					point2Id: null,
-				};
+				this.setState({ step: 1, line1Id: id });
 				this.ctx.requestRender();
 			} else if ((type === 'circle' || type === 'arc') && id) {
 				this.beginRadiusPlacement(id);
 			} else {
 				this.ctx.sketch.clearSelection();
-				this.state = {
-					step: 0,
-					line1Id: null,
-					line2Id: null,
-					point1Id: null,
-					point2Id: null,
-				};
+				this.setState();
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
 			}
@@ -578,13 +587,7 @@ export class DimensionTool extends BaseTool {
 			if (this.state.point1Id) {
 				if (type === 'point' && id && id !== this.state.point1Id) {
 					this.ctx.sketch.selectEntity(id, 'point', true);
-					this.state = {
-						step: 2,
-						line1Id: null,
-						line2Id: null,
-						point1Id: this.state.point1Id,
-						point2Id: id,
-					};
+					this.setState({ step: 2, point1Id: this.state.point1Id, point2Id: id });
 					this.ctx.requestRender();
 				} else if (type === 'line' && (id === 'axis_x' || id === 'axis_y')) {
 					return this.beginPointLinePlacement(this.state.point1Id, id);
@@ -594,13 +597,7 @@ export class DimensionTool extends BaseTool {
 					if (l && (l.p1Id === this.state.point1Id || l.p2Id === this.state.point1Id)) {
 						const otherPtId = l.p1Id === this.state.point1Id ? l.p2Id : l.p1Id;
 						this.ctx.sketch.selectEntity(otherPtId, 'point', true);
-						this.state = {
-							step: 2,
-							line1Id: null,
-							line2Id: null,
-							point1Id: this.state.point1Id,
-							point2Id: otherPtId,
-						};
+						this.setState({ step: 2, point1Id: this.state.point1Id, point2Id: otherPtId });
 						this.ctx.requestRender();
 					} else if (l) {
 						return this.beginPointLinePlacement(this.state.point1Id, id);
@@ -617,13 +614,7 @@ export class DimensionTool extends BaseTool {
 				}
 				if (type === 'line' && id && id !== 'axis_x' && id !== 'axis_y') {
 					this.ctx.sketch.selectEntity(id, 'line', true);
-					this.state = {
-						step: 2,
-						line1Id: this.state.line1Id,
-						line2Id: id,
-						point1Id: null,
-						point2Id: null,
-					};
+					this.setState({ step: 2, line1Id: this.state.line1Id, line2Id: id });
 					this.ctx.requestRender();
 					return true;
 				}
@@ -632,13 +623,7 @@ export class DimensionTool extends BaseTool {
 
 			const l1 = this.state.line1Id ? this.ctx.sketch.lines.get(this.state.line1Id) : null;
 			if (!l1) {
-				this.state = {
-					step: 0,
-					line1Id: null,
-					line2Id: null,
-					point1Id: null,
-					point2Id: null,
-				};
+				this.setState();
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
 				return true;
@@ -647,13 +632,7 @@ export class DimensionTool extends BaseTool {
 			// If clicked on an axis line or another line -> switch to Angle constraint mode!
 			if (type === 'line' && id && (id === 'axis_x' || id === 'axis_y' || id !== l1.id)) {
 				this.ctx.sketch.selectEntity(id, 'line', true);
-				this.state = {
-					step: 2,
-					line1Id: l1.id,
-					line2Id: id,
-					point1Id: null,
-					point2Id: null,
-				};
+				this.setState({ step: 2, line1Id: l1.id, line2Id: id });
 				this.ctx.requestRender();
 				return true;
 			}
@@ -663,29 +642,7 @@ export class DimensionTool extends BaseTool {
 			}
 
 			// Second click sets offset & orientation for line distance constraint
-			const p1 = this.ctx.sketch.points.get(l1.p1Id);
-			const p2 = this.ctx.sketch.points.get(l1.p2Id);
-			if (p1 && p2) {
-				const s1 = this.ctx.viewport.worldToScreen(p1);
-				const s2 = this.ctx.viewport.worldToScreen(p2);
-				const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
-				const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
-
-				const existed = this.ctx.sketch.hasDistanceConstraint(l1.p1Id, l1.p2Id, orientation);
-				const c = this.ctx.sketch.addDistanceConstraint(l1.p1Id, l1.p2Id, undefined, offsetWorld, orientation);
-				if (c) {
-					const t = computeLabelPosition(s1, s2, screen, orientation);
-					if (t !== undefined) c.labelPosition = t;
-					const toastMsg = existed
-						? 'Editing distance constraint'
-						: orientation === 'horizontal'
-							? 'Horizontal distance constraint applied'
-							: orientation === 'vertical'
-								? 'Vertical distance constraint applied'
-								: 'Distance constraint applied';
-					this.finishDimensionPlacement(c, toastMsg, e.client);
-				}
-			}
+			this.placePointDistance(l1.p1Id, l1.p2Id, screen, e.client);
 			return true;
 		}
 
@@ -726,14 +683,7 @@ export class DimensionTool extends BaseTool {
 			if (this.state.point1Id && this.state.point2Id) {
 				if (type === 'point' && id && id !== this.state.point1Id && id !== this.state.point2Id) {
 					this.ctx.sketch.selectEntity(id, 'point', true);
-					this.state = {
-						step: 2,
-						line1Id: null,
-						line2Id: null,
-						point1Id: this.state.point1Id,
-						point2Id: this.state.point2Id,
-						point3Id: id,
-					};
+					this.setState({ step: 2, point1Id: this.state.point1Id, point2Id: this.state.point2Id, point3Id: id });
 					this.ctx.requestRender();
 					return true;
 				}
@@ -759,48 +709,13 @@ export class DimensionTool extends BaseTool {
 						const existed = this.ctx.sketch.hasOriginConstraint(userPtId);
 						const c = this.ctx.sketch.addOriginDistanceConstraint(userPtId, undefined, orientation, offsetWorld);
 						if (c) {
-							const toastMsg = existed
-								? 'Editing distance to (0,0)'
-								: orientation === 'horizontal'
-									? 'Horizontal distance to (0,0) applied'
-									: orientation === 'vertical'
-										? 'Vertical distance to (0,0) applied'
-										: 'Distance to (0,0) applied';
-							this.finishDimensionPlacement(c, toastMsg, e.client);
+							this.finishDimensionPlacement(c, this.distanceToast(existed, orientation, 'to (0,0)'), e.client);
 						}
 					}
 					return true;
 				}
 
-				const p1 = this.ctx.sketch.points.get(this.state.point1Id);
-				const p2 = this.ctx.sketch.points.get(this.state.point2Id);
-				if (p1 && p2) {
-					const s1 = this.ctx.viewport.worldToScreen(p1);
-					const s2 = this.ctx.viewport.worldToScreen(p2);
-					const { orientation, offsetScreen } = determineDistanceOrientation(s1, s2, screen);
-					const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
-
-					const existed = this.ctx.sketch.hasDistanceConstraint(this.state.point1Id, this.state.point2Id, orientation);
-					const c = this.ctx.sketch.addDistanceConstraint(
-						this.state.point1Id,
-						this.state.point2Id,
-						undefined,
-						offsetWorld,
-						orientation
-					);
-					if (c) {
-						const t = computeLabelPosition(s1, s2, screen, orientation);
-						if (t !== undefined) c.labelPosition = t;
-						const toastMsg = existed
-							? 'Editing distance constraint'
-							: orientation === 'horizontal'
-								? 'Horizontal distance constraint applied'
-								: orientation === 'vertical'
-									? 'Vertical distance constraint applied'
-									: 'Distance constraint applied';
-						this.finishDimensionPlacement(c, toastMsg, e.client);
-					}
-				}
+				this.placePointDistance(this.state.point1Id, this.state.point2Id, screen, e.client);
 				return true;
 			}
 

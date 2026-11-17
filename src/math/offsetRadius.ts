@@ -63,8 +63,8 @@ export function offsetSourceCounterClockwise(items: readonly OffsetKernelItem[])
 	return points.reduce((s, p, i) => s + p.cross(points[(i + 1) % points.length]), 0) > 0;
 }
 
-const start = (p: KernelOffsetPrimitive) => Vec2.from(p.p1 ?? p.start ?? p.fitPoints![0]);
-const end = (p: KernelOffsetPrimitive) => Vec2.from(p.p2 ?? p.end ?? p.fitPoints!.at(-1)!);
+export const offsetPrimitiveStart = (p: KernelOffsetPrimitive) => Vec2.from(p.p1 ?? p.start ?? p.fitPoints![0]);
+export const offsetPrimitiveEnd = (p: KernelOffsetPrimitive) => Vec2.from(p.p2 ?? p.end ?? p.fitPoints!.at(-1)!);
 function setEnd(p: KernelOffsetPrimitive, q: Vec2, first: boolean): void {
 	if (p.type === 'line') {
 		if (first) p.p1 = q;
@@ -97,15 +97,16 @@ function join(
 	dirs: Map<string, Vec2>,
 	d: number
 ): Vec2 | undefined {
-	const ae = end(a),
-		bs = start(b);
-	if (a.type === 'line' && b.type === 'line') return lines(start(a), dirs.get(a.sourceId)!, bs, dirs.get(b.sourceId)!);
-	if (a.type === 'line' && b.type === 'arc') return lineCircle(start(a), dirs.get(a.sourceId)!, b, ae);
+	const ae = offsetPrimitiveEnd(a),
+		bs = offsetPrimitiveStart(b);
+	if (a.type === 'line' && b.type === 'line')
+		return lines(offsetPrimitiveStart(a), dirs.get(a.sourceId)!, bs, dirs.get(b.sourceId)!);
+	if (a.type === 'line' && b.type === 'arc') return lineCircle(offsetPrimitiveStart(a), dirs.get(a.sourceId)!, b, ae);
 	if (a.type === 'arc' && b.type === 'line') return lineCircle(bs, dirs.get(b.sourceId)!, a, ae);
 	if ((a.type === 'line' && b.type === 'spline') || (a.type === 'spline' && b.type === 'line')) {
 		const p =
 			a.type === 'line'
-				? lines(start(a), dirs.get(a.sourceId)!, bs, Vec2.from(b.startTangent!))
+				? lines(offsetPrimitiveStart(a), dirs.get(a.sourceId)!, bs, Vec2.from(b.startTangent!))
 				: lines(bs, dirs.get(b.sourceId)!, ae, Vec2.from(a.endTangent!));
 		return p && p.distanceTo(a.type === 'line' ? ae : bs) <= 4 * Math.abs(d) ? p : ae.midpoint(ae, bs);
 	}
@@ -158,17 +159,20 @@ function joinArcsValid(a: KernelOffsetPrimitive, b: KernelOffsetPrimitive, d: nu
 	if (vertex && vertex.distanceTo(hit) > 2.5 * Math.abs(d)) return undefined;
 	return hit;
 }
-function sourceEnd(item: OffsetKernelItem): Vec2 | undefined {
-	const c = item.curve;
-	if (c?.type === 'segment') return Vec2.from(c.p2);
-	if (c?.type === 'arc') return Vec2.from(c.end);
-	return undefined;
-}
-function sourceStart(item: OffsetKernelItem): Vec2 | undefined {
-	const c = item.curve;
-	if (c?.type === 'segment') return Vec2.from(c.p1);
-	if (c?.type === 'arc') return Vec2.from(c.start);
-	return undefined;
+function joinVertex(prev: OffsetKernelItem, next: OffsetKernelItem): Vec2 | undefined {
+	const se =
+		prev.curve?.type === 'segment'
+			? Vec2.from(prev.curve.p2)
+			: prev.curve?.type === 'arc'
+				? Vec2.from(prev.curve.end)
+				: undefined;
+	const ss =
+		next.curve?.type === 'segment'
+			? Vec2.from(next.curve.p1)
+			: next.curve?.type === 'arc'
+				? Vec2.from(next.curve.start)
+				: undefined;
+	return se && ss ? se.midpoint(se, ss) : (se ?? ss);
 }
 function untrimmedEnds(
 	item: OffsetKernelItem,
@@ -274,23 +278,10 @@ export function recoverOffsetRadii(
 				if (consumed(i) || consumed(j)) continue;
 				const a = primitives[i],
 					b = primitives[j];
-				if (
-					closed &&
-					((a.type === 'arc' && b.type === 'arc') ||
-						(a.type === 'line' && b.type === 'arc') ||
-						(a.type === 'arc' && b.type === 'line'))
-				) {
-					const se = sourceEnd(items[i]),
-						ss = sourceStart(items[j]),
-						vertex = se && ss ? se.midpoint(se, ss) : (se ?? ss);
-					const p = a.type === 'arc' && b.type === 'arc' ? joinArcsValid(a, b, d, vertex) : join(a, b, dirs, d);
-					if (p) {
-						setEnd(a, p, false);
-						setEnd(b, p, true);
-					}
-					continue;
-				}
-				const p = join(a, b, dirs, d);
+				const p =
+					closed && a.type === 'arc' && b.type === 'arc'
+						? joinArcsValid(a, b, d, joinVertex(items[i], items[j]))
+						: join(a, b, dirs, d);
 				if (p) {
 					setEnd(a, p, false);
 					setEnd(b, p, true);
@@ -324,9 +315,7 @@ export function recoverOffsetRadii(
 				const ra = rawEnds[i],
 					rb = rawEnds[j];
 				if (!ra || !rb) continue;
-				const se = sourceEnd(items[i]),
-					ss = sourceStart(items[j]),
-					vertex = se && ss ? se.midpoint(se, ss) : (se ?? ss);
+				const vertex = joinVertex(items[i], items[j]);
 				if (a.type === 'arc' && b.type === 'arc') {
 					const tmpA: KernelOffsetPrimitive = { ...a, start: ra[0], end: ra[1] };
 					const tmpB: KernelOffsetPrimitive = { ...b, start: rb[0], end: rb[1] };

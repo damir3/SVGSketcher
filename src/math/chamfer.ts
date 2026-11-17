@@ -1,7 +1,7 @@
 import { Vec2 } from './vector';
 import type { SketchDocument } from '../model/sketch';
 import { remapLineConstraints } from '../model/constraintLinks';
-import { CoincidentConstraint } from '../solver/constraints';
+import { getConnectedPrimitivesForPoint } from './fillet';
 
 import { getGeometryKernel } from '../kernel';
 import * as reference from './chamferReference';
@@ -53,66 +53,12 @@ export function getConnectedLinesForPoint(
 	sketch: SketchDocument,
 	startPointId: string
 ): { valid: boolean; pointIds: Set<string>; lineIds: string[] } {
-	if (!sketch.points.has(startPointId)) {
-		return { valid: false, pointIds: new Set(), lineIds: [] };
+	const { pointIds, primitives } = getConnectedPrimitivesForPoint(sketch, startPointId);
+	if (primitives.some(p => p.type !== 'line')) {
+		return { valid: false, pointIds, lineIds: [] };
 	}
-
-	// 1. Traverse CoincidentConstraint graph to find equivalence class
-	const pointIds = new Set<string>([startPointId]);
-	const queue = [startPointId];
-
-	while (queue.length > 0) {
-		const curr = queue.pop()!;
-		for (const c of sketch.constraints.values()) {
-			if (c instanceof CoincidentConstraint) {
-				if (c.p1Id === curr && !pointIds.has(c.p2Id)) {
-					pointIds.add(c.p2Id);
-					queue.push(c.p2Id);
-				} else if (c.p2Id === curr && !pointIds.has(c.p1Id)) {
-					pointIds.add(c.p1Id);
-					queue.push(c.p1Id);
-				}
-			}
-		}
-	}
-
-	// 2. Ensure NO arcs or splines are connected to this vertex
-	for (const arc of sketch.arcs.values()) {
-		if (pointIds.has(arc.startPointId) || pointIds.has(arc.endPointId)) {
-			return { valid: false, pointIds, lineIds: [] };
-		}
-	}
-	for (const spline of sketch.splines.values()) {
-		if (spline.pointIds.length >= 2) {
-			const pStart = spline.pointIds[0];
-			const pEnd = spline.pointIds[spline.pointIds.length - 1];
-			if (pointIds.has(pStart) || pointIds.has(pEnd)) {
-				return { valid: false, pointIds, lineIds: [] };
-			}
-		}
-	}
-
-	// 3. Collect non-handle lines connected to pointIds
-	const lineIds: string[] = [];
-	const seenIds = new Set<string>();
-
-	for (const line of sketch.lines.values()) {
-		if (line.isSplineHandle) continue;
-		const p1In = pointIds.has(line.p1Id);
-		const p2In = pointIds.has(line.p2Id);
-		if (p1In || p2In) {
-			if (!seenIds.has(line.id)) {
-				seenIds.add(line.id);
-				lineIds.push(line.id);
-			}
-		}
-	}
-
-	return {
-		valid: lineIds.length === 2,
-		pointIds,
-		lineIds,
-	};
+	const lineIds = primitives.map(p => p.id);
+	return { valid: lineIds.length === 2, pointIds, lineIds };
 }
 
 /**
@@ -255,76 +201,46 @@ export function commitChamferToSketch(
 	// 2. Add the chamfer line
 	const chamferLine = sketch.addLine(pA.id, pB.id);
 
-	// 3. Shorten line 1 by replacing corner point with pA
+	// 3-4. Shorten both lines by replacing their corner endpoints with pA / pB
 	const l1 = sketch.lines.get(candidate.line1.id);
-	if (l1) {
-		remapLineConstraints(sketch, l1, candidate.line1.cornerPointId, pA.id);
-		if (l1.p1Id === candidate.line1.cornerPointId) {
-			l1.p1Id = pA.id;
-		} else {
-			l1.p2Id = pA.id;
-		}
-	}
-
-	// 4. Shorten line 2 by replacing corner point with pB
 	const l2 = sketch.lines.get(candidate.line2.id);
-	if (l2) {
-		remapLineConstraints(sketch, l2, candidate.line2.cornerPointId, pB.id);
-		if (l2.p1Id === candidate.line2.cornerPointId) {
-			l2.p1Id = pB.id;
-		} else {
-			l2.p2Id = pB.id;
-		}
-	}
+	const shortenLine = (line: typeof l1, cornerId: string, newPointId: string) => {
+		if (!line) return;
+		remapLineConstraints(sketch, line, cornerId, newPointId);
+		if (line.p1Id === cornerId) line.p1Id = newPointId;
+		else line.p2Id = newPointId;
+	};
+	shortenLine(l1, candidate.line1.cornerPointId, pA.id);
+	shortenLine(l2, candidate.line2.cornerPointId, pB.id);
 
 	sketch.rebuildParamManager();
 
 	const VId = candidate.vertexPointId;
 
 	// 5. Shortened lines must have PointOnLine (coincident line-point) constraint to V
-	if (l1) {
-		sketch.addPointOnLineConstraint(VId, l1.id);
-	}
-	if (l2) {
-		sketch.addPointOnLineConstraint(VId, l2.id);
-	}
+	if (l1) sketch.addPointOnLineConstraint(VId, l1.id);
+	if (l2) sketch.addPointOnLineConstraint(VId, l2.id);
 
-	// 6. Add Distance / Angle constraints
-	// Positive dimension offsets use the clockwise normal in world coordinates.
+	// 6. Add Distance / Angle constraints (positive offsets use clockwise normal in world coordinates)
 	const offset1 = candidate.dir1.cross(candidate.dir2) > 0 ? 10 : -10;
 	const offset2 = -offset1;
+	const addDist = (ptId: string, dist: number, offset: number, expr?: string) => {
+		const c = sketch.addDistanceConstraint(VId, ptId, dist, offset);
+		if (c && expr) c.expression = expr;
+	};
 	if (mode === 'equal_distance') {
-		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
-		if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
-		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
-		if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
+		addDist(pA.id, res.dist1, offset1, expressions?.dist1);
+		addDist(pB.id, res.dist2, offset2, expressions?.dist1);
 	} else if (mode === 'two_distance') {
-		const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
-		const expr1 = flip ? expressions?.dist2 : expressions?.dist1;
-		if (c1 && expr1) c1.expression = expr1;
-		const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
-		const expr2 = flip ? expressions?.dist1 : expressions?.dist2;
-		if (c2 && expr2) c2.expression = expr2;
+		addDist(pA.id, res.dist1, offset1, flip ? expressions?.dist2 : expressions?.dist1);
+		addDist(pB.id, res.dist2, offset2, flip ? expressions?.dist1 : expressions?.dist2);
 	} else if (mode === 'distance_angle') {
 		const cornerCentroid = Vec2.centroid([candidate.vertexPos, res.t1, res.t2]);
-		if (!flip) {
-			// Distance along line 1
-			const c1 = sketch.addDistanceConstraint(VId, pA.id, res.dist1, offset1);
-			if (c1 && expressions?.dist1) c1.expression = expressions.dist1;
-			// Angle between chamfer line and line 1
-			if (l1) {
-				const cAng = sketch.addAngleConstraint(chamferLine.id, l1.id, res.angleDeg, 30, cornerCentroid);
-				if (cAng && expressions?.angle) cAng.expression = expressions.angle;
-			}
-		} else {
-			// Distance along line 2 (offset on other side of line)
-			const c2 = sketch.addDistanceConstraint(VId, pB.id, res.dist2, offset2);
-			if (c2 && expressions?.dist1) c2.expression = expressions.dist1;
-			// Angle between chamfer line and line 2
-			if (l2) {
-				const cAng = sketch.addAngleConstraint(chamferLine.id, l2.id, res.angleDeg, 30, cornerCentroid);
-				if (cAng && expressions?.angle) cAng.expression = expressions.angle;
-			}
+		const [ptId, line, dist, offset] = flip ? [pB.id, l2, res.dist2, offset2] : [pA.id, l1, res.dist1, offset1];
+		addDist(ptId, dist, offset, expressions?.dist1);
+		if (line) {
+			const cAng = sketch.addAngleConstraint(chamferLine.id, line.id, res.angleDeg, 30, cornerCentroid);
+			if (cAng && expressions?.angle) cAng.expression = expressions.angle;
 		}
 	}
 

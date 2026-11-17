@@ -22,8 +22,8 @@ export class RectangleTool extends BaseTool {
 	private startSnap: SnapResult | null = null;
 	private secondSnap: SnapResult | null = null;
 
-	width = 50;
-	height = 30;
+	width = 0;
+	height = 0;
 	radius = 0;
 	isWidthLocked = false;
 	isHeightLocked = false;
@@ -45,7 +45,7 @@ export class RectangleTool extends BaseTool {
 					type: 'dimension',
 					unit: 'mm',
 					lockable: true,
-					defaultValue: 50.0,
+					placeholder: '—',
 				},
 				{
 					id: 'height',
@@ -53,7 +53,7 @@ export class RectangleTool extends BaseTool {
 					type: 'dimension',
 					unit: 'mm',
 					lockable: true,
-					defaultValue: 30.0,
+					placeholder: '—',
 				},
 				{
 					id: 'radius',
@@ -61,7 +61,7 @@ export class RectangleTool extends BaseTool {
 					type: 'dimension',
 					unit: 'mm',
 					lockable: true,
-					defaultValue: 0.0,
+					placeholder: '—',
 					visible: this._mode === 'rounded',
 				},
 			],
@@ -69,8 +69,8 @@ export class RectangleTool extends BaseTool {
 		});
 
 		const syncValuesFromPopup = () => {
-			this.width = this.popup.getNumericValue('width', 50);
-			this.height = this.popup.getNumericValue('height', 30);
+			this.width = this.popup.getNumericValue('width', 0);
+			this.height = this.popup.getNumericValue('height', 0);
 			this.radius = this.popup.getNumericValue('radius', 0);
 			this.isWidthLocked = this.popup.isLocked('width');
 			this.isHeightLocked = this.popup.isLocked('height');
@@ -221,16 +221,7 @@ export class RectangleTool extends BaseTool {
 			this.startWorldPos = snap ? snap.worldPos : world;
 			this.startSnap = snap ?? null;
 
-			// Reset locks and initial dimensions for the new rectangle
-			this.isWidthLocked = false;
-			this.isHeightLocked = false;
-			this.isRadiusLocked = false;
-			this.width = 0.1;
-			this.height = 0.1;
-			this.radius = 0;
-			this.popup.resetField('width', 0.1);
-			this.popup.resetField('height', 0.1);
-			this.popup.resetField('radius', 0);
+			this.resetDimFields();
 
 			this.drawingStep = 1;
 			this.popup.setFieldVisible('radius', this._mode === 'rounded');
@@ -508,6 +499,18 @@ export class RectangleTool extends BaseTool {
 		this.popup.hide();
 	}
 
+	private resetDimFields(): void {
+		this.isWidthLocked = false;
+		this.isHeightLocked = false;
+		this.isRadiusLocked = false;
+		this.width = 0;
+		this.height = 0;
+		this.radius = 0;
+		this.popup.resetField('width', null);
+		this.popup.resetField('height', null);
+		this.popup.resetField('radius', null);
+	}
+
 	private resetState(): void {
 		this.drawingStep = 0;
 		this.startWorldPos = null;
@@ -515,15 +518,7 @@ export class RectangleTool extends BaseTool {
 		this.lastEffectiveWorld = null;
 		this.startSnap = null;
 		this.secondSnap = null;
-		this.isWidthLocked = false;
-		this.isHeightLocked = false;
-		this.isRadiusLocked = false;
-		this.width = 50;
-		this.height = 30;
-		this.radius = 0;
-		this.popup.resetField('width', 50);
-		this.popup.resetField('height', 30);
-		this.popup.resetField('radius', 0);
+		this.resetDimFields();
 		this.updateToastHint();
 		this.onStateChange?.();
 	}
@@ -575,6 +570,7 @@ export class RectangleTool extends BaseTool {
 	}
 
 	private commitFromCurrentValues(): void {
+		if (this.width <= 0 || this.height <= 0) return;
 		if (this._mode === 'corner' || this._mode === 'rounded') {
 			const c1 = this.startWorldPos!;
 			const eff = this.lastEffectiveWorld ?? new Vec2(c1.x + this.width, c1.y + this.height);
