@@ -246,9 +246,6 @@ export class ArcTool extends BaseTool {
 		if (this._mode === 'three_point') {
 			return this.drawingStep < 2 ? 'no-grid' : false;
 		}
-		if (this._mode === 'tangent') {
-			return this.drawingStep === 0 ? true : 'no-grid';
-		}
 		return this.drawingStep === 0 ? true : 'no-grid';
 	}
 
@@ -338,18 +335,9 @@ export class ArcTool extends BaseTool {
 
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
-			let pId: string;
-			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
-				pId = snap.id;
-				this.startWorldPos = snap.worldPos;
-			} else {
-				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos);
-				pId = pt.id;
-				this.startWorldPos = pt.clone();
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.startPointId = pId;
+			const pt = this.acquirePoint(snap?.worldPos ?? world, snap);
+			this.startPointId = pt.id;
+			this.startWorldPos = pt.pos;
 			this.drawingStep = 1;
 			this.onStateChange?.();
 			this.ctx.requestRender();
@@ -360,17 +348,9 @@ export class ArcTool extends BaseTool {
 				return;
 			}
 
-			let p2Id: string;
-			if (snap && snap.type === 'point' && snap.id && snap.id !== this.startPointId && sketch.points.has(snap.id)) {
-				p2Id = snap.id;
-				this.arcPoint2WorldPos = snap.worldPos;
-			} else {
-				const pt = sketch.addPoint(effectiveWorld);
-				p2Id = pt.id;
-				this.arcPoint2WorldPos = pt.clone();
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.arcPoint2Id = p2Id;
+			const pt = this.acquirePoint(effectiveWorld, snap, true, this.startPointId);
+			this.arcPoint2Id = pt.id;
+			this.arcPoint2WorldPos = pt.pos;
 			this.drawingStep = 2;
 			this.openPopup(e);
 			this.onStateChange?.();
@@ -391,11 +371,7 @@ export class ArcTool extends BaseTool {
 				geometry.clockwise,
 				this.ctx.isConstructionMode
 			);
-			this.constrainDimensions(arc);
-			sketch.commitTransaction();
-			this.resetState();
-			this.ctx.requestRender();
-			this.ctx.showToast('3-point arc created');
+			this.finalizeArcCommit(arc, '3-point arc created');
 		}
 	}
 
@@ -477,18 +453,9 @@ export class ArcTool extends BaseTool {
 
 		if (this.drawingStep === 0) {
 			sketch.beginTransaction();
-			let cId: string;
-			if (snap && snap.type === 'point' && snap.id && sketch.points.has(snap.id)) {
-				cId = snap.id;
-				this.centerWorldPos = snap.worldPos;
-			} else {
-				const ptPos = snap ? snap.worldPos : world;
-				const pt = sketch.addPoint(ptPos);
-				cId = pt.id;
-				this.centerWorldPos = pt.clone();
-				this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
-			this.centerId = cId;
+			const pt = this.acquirePoint(snap?.worldPos ?? world, snap);
+			this.centerId = pt.id;
+			this.centerWorldPos = pt.pos;
 			this.drawingStep = 1;
 			this.openPopup(e);
 			this.onStateChange?.();
@@ -500,13 +467,7 @@ export class ArcTool extends BaseTool {
 			if (!locked && center.distanceTo(cursor) < 2) return;
 
 			const start = this.getCenterStart(center, cursor);
-			let startId: string;
-			if (!locked && snap?.type === 'point' && snap.id && snap.id !== this.centerId && sketch.points.has(snap.id)) {
-				startId = snap.id;
-			} else {
-				startId = sketch.addPoint(start).id;
-				if (!locked) this.ctx.applySnapConstraintIfNeeded?.(startId, snap);
-			}
+			const startId = this.acquirePoint(start, snap, !locked, this.centerId).id;
 			this.arcPoint1Id = startId;
 			this.arcPoint1WorldPos = start;
 			this.arcCenterPrevAngle = this.ctx.viewport
@@ -529,21 +490,7 @@ export class ArcTool extends BaseTool {
 			const useSnap =
 				!this.popup.isLocked('angle') && (!this.popup.isLocked('radius') || end.distanceTo(cursor) < 1e-6);
 
-			let endId: string;
-			if (
-				useSnap &&
-				snap?.type === 'point' &&
-				snap.id &&
-				snap.id !== this.centerId &&
-				snap.id !== this.arcPoint1Id &&
-				sketch.points.has(snap.id)
-			) {
-				endId = snap.id;
-			} else {
-				endId = sketch.addPoint(end).id;
-				if (useSnap) this.ctx.applySnapConstraintIfNeeded?.(endId, snap);
-			}
-
+			const endId = this.acquirePoint(end, snap, useSnap, this.centerId, this.arcPoint1Id).id;
 			const arc = sketch.addArc(
 				this.centerId!,
 				this.arcPoint1Id!,
@@ -552,11 +499,7 @@ export class ArcTool extends BaseTool {
 				clockwise,
 				this.ctx.isConstructionMode
 			);
-			this.constrainDimensions(arc);
-			sketch.commitTransaction();
-			this.resetState();
-			this.ctx.requestRender();
-			this.ctx.showToast('Centerpoint arc created');
+			this.finalizeArcCommit(arc, 'Centerpoint arc created');
 		}
 	}
 
@@ -696,21 +639,7 @@ export class ArcTool extends BaseTool {
 			}
 
 			const useSnap = !this.popup.isLocked('radius') && !this.popup.isLocked('angle');
-			let endPointId: string;
-			if (
-				useSnap &&
-				snap &&
-				snap.type === 'point' &&
-				snap.id &&
-				snap.id !== this.tangentStartPointId &&
-				sketch.points.has(snap.id)
-			) {
-				endPointId = snap.id;
-			} else {
-				const pt = sketch.addPoint(geom.end);
-				endPointId = pt.id;
-				if (useSnap) this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
-			}
+			const endPointId = this.acquirePoint(geom.end, snap, useSnap, this.tangentStartPointId).id;
 
 			const centerPt = sketch.addPoint(geom.center);
 			const arc = sketch.addArc(
@@ -727,11 +656,7 @@ export class ArcTool extends BaseTool {
 				sketch.addTangentConstraint(this.connectedEntityId, arc.id);
 			}
 
-			this.constrainDimensions(arc);
-			sketch.commitTransaction();
-			this.resetState();
-			this.ctx.requestRender();
-			this.ctx.showToast('Tangent arc created');
+			this.finalizeArcCommit(arc, 'Tangent arc created');
 		}
 	}
 
@@ -861,5 +786,28 @@ export class ArcTool extends BaseTool {
 			const expression = this.popup.getExpression('angle');
 			if (constraint && expression) constraint.expression = expression;
 		}
+	}
+
+	private acquirePoint(
+		fallbackPos: Vec2,
+		snap: ToolMouseEvent['snap'],
+		allowSnap = true,
+		...excludeIds: Array<string | null>
+	): { id: string; pos: Vec2 } {
+		const { sketch } = this.ctx;
+		if (allowSnap && snap?.type === 'point' && snap.id && !excludeIds.includes(snap.id) && sketch.points.has(snap.id)) {
+			return { id: snap.id, pos: snap.worldPos };
+		}
+		const pt = sketch.addPoint(fallbackPos);
+		if (allowSnap) this.ctx.applySnapConstraintIfNeeded?.(pt.id, snap);
+		return { id: pt.id, pos: pt.clone() };
+	}
+
+	private finalizeArcCommit(arc: SketchArc, toastMessage: string): void {
+		this.constrainDimensions(arc);
+		this.ctx.sketch.commitTransaction();
+		this.resetState();
+		this.ctx.requestRender();
+		this.ctx.showToast(toastMessage);
 	}
 }

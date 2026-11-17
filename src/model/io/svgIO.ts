@@ -424,6 +424,32 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 		return [m[0] * x + m[2] * y + m[4], -(m[1] * x + m[3] * y + m[5])];
 	};
 
+	const transformEllipse = (cx: number, cy: number, rx: number, ry: number, phi = 0) => {
+		const center = point(cx, cy, activeMatrix);
+		const m = multiplySvgMatrices(viewMatrix, activeMatrix);
+		const cos = Math.cos(phi);
+		const sin = Math.sin(phi);
+		const u = new Vec2(rx * (m[0] * cos + m[2] * sin), -rx * (m[1] * cos + m[3] * sin));
+		const v = new Vec2(ry * (-m[0] * sin + m[2] * cos), ry * (m[1] * sin - m[3] * cos));
+		const qxx = u.x * u.x + v.x * v.x;
+		const qxy = u.x * u.y + v.x * v.y;
+		const qyy = u.y * u.y + v.y * v.y;
+		const angle = 0.5 * Math.atan2(2 * qxy, qxx - qyy);
+		const trace = qxx + qyy;
+		const root = Math.hypot(qxx - qyy, 2 * qxy);
+		const majorRadius = Math.sqrt(Math.max(0, (trace + root) / 2));
+		const minorRadius = Math.sqrt(Math.max(0, (trace - root) / 2));
+		const major: [number, number] = [
+			center[0] + majorRadius * Math.cos(angle),
+			center[1] + majorRadius * Math.sin(angle),
+		];
+		const minor: [number, number] = [
+			center[0] - minorRadius * Math.sin(angle),
+			center[1] + minorRadius * Math.cos(angle),
+		];
+		return { center, u, v, majorRadius, minorRadius, major, minor };
+	};
+
 	const num = (attrs: Record<string, string>, key: string, fallback = 0) => Number(attrs[key] ?? fallback);
 
 	const pathPointIds = new Map<string, string>();
@@ -488,31 +514,13 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 				}
 
 				const arc = getSvgArcCenter(segment);
-				const m = multiplySvgMatrices(viewMatrix, activeMatrix);
-				const center = point(arc.cx, arc.cy, activeMatrix);
-				const cos = Math.cos(arc.phi);
-				const sin = Math.sin(arc.phi);
-
-				const u = new Vec2(arc.rx * (m[0] * cos + m[2] * sin), -arc.rx * (m[1] * cos + m[3] * sin));
-				const v = new Vec2(arc.ry * (-m[0] * sin + m[2] * cos), arc.ry * (m[1] * sin - m[3] * cos));
-
-				const qxx = u.x * u.x + v.x * v.x;
-				const qxy = u.x * u.y + v.x * v.y;
-				const qyy = u.y * u.y + v.y * v.y;
-				const axisAngle = 0.5 * Math.atan2(2 * qxy, qxx - qyy);
-				const trace = qxx + qyy;
-				const rootValue = Math.hypot(qxx - qyy, 2 * qxy);
-				const majorRadius = Math.sqrt(Math.max(0, (trace + rootValue) / 2));
-				const minorRadius = Math.sqrt(Math.max(0, (trace - rootValue) / 2));
-
-				const major: [number, number] = [
-					center[0] + majorRadius * Math.cos(axisAngle),
-					center[1] + majorRadius * Math.sin(axisAngle),
-				];
-				const minor: [number, number] = [
-					center[0] - minorRadius * Math.sin(axisAngle),
-					center[1] + minorRadius * Math.cos(axisAngle),
-				];
+				const { center, u, v, majorRadius, minorRadius, major, minor } = transformEllipse(
+					arc.cx,
+					arc.cy,
+					arc.rx,
+					arc.ry,
+					arc.phi
+				);
 
 				const start = getPathPointId(segment.start);
 				const end = getPathPointId(segment.end);
@@ -603,28 +611,7 @@ function importPlainSvg(sketch: SketchDocument, doc: Document): { success: boole
 					const ry = num(a, shape.tag === 'circle' ? 'r' : 'ry', rx);
 					if (rx <= 0 || ry <= 0) break;
 
-					const center = point(cx, cy, activeMatrix);
-					const matrix = multiplySvgMatrices(viewMatrix, activeMatrix);
-					const u = new Vec2(matrix[0] * rx, -matrix[1] * rx);
-					const v = new Vec2(matrix[2] * ry, -matrix[3] * ry);
-
-					const qxx = u.x * u.x + v.x * v.x;
-					const qxy = u.x * u.y + v.x * v.y;
-					const qyy = u.y * u.y + v.y * v.y;
-					const angle = 0.5 * Math.atan2(2 * qxy, qxx - qyy);
-					const trace = qxx + qyy;
-					const root = Math.hypot(qxx - qyy, 2 * qxy);
-					const majorRadius = Math.sqrt(Math.max(0, (trace + root) / 2));
-					const minorRadius = Math.sqrt(Math.max(0, (trace - root) / 2));
-
-					const major: [number, number] = [
-						center[0] + majorRadius * Math.cos(angle),
-						center[1] + majorRadius * Math.sin(angle),
-					];
-					const minor: [number, number] = [
-						center[0] - minorRadius * Math.sin(angle),
-						center[1] + minorRadius * Math.cos(angle),
-					];
+					const { center, majorRadius, minorRadius, major, minor } = transformEllipse(cx, cy, rx, ry);
 
 					const c = sketch.addPoint(new Vec2(center[0], center[1]));
 					if (Math.abs(majorRadius - minorRadius) < 1e-8 && shape.tag === 'circle') {
@@ -729,6 +716,8 @@ export function exportSketchToSVG(
 		throw new RangeError('SVG export line width must be finite and positive');
 	}
 	const constructionDashArray = `${strokeWidth * 5},${strokeWidth * 5}`;
+	const solidStroke = ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
+	const constructionStroke = ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`;
 
 	const metadataPayload: SketchFileMetadata = {
 		format: 'svg-sketcher',
@@ -747,6 +736,14 @@ export function exportSketchToSVG(
 	const regions: string[] = [];
 	const solid: string[] = [];
 	const construction: string[] = [];
+	const pushShape = (isConstruction: boolean | undefined, render: (stroke: string) => string): void => {
+		(isConstruction ? construction : solid).push(render(isConstruction ? constructionStroke : solidStroke));
+	};
+	const svgArcFlags = (startAngle: number, endAngle: number, clockwise?: boolean): [number, number] => {
+		const twoPi = 2 * Math.PI;
+		const sweepAngle = (((clockwise ? endAngle - startAngle : startAngle - endAngle) % twoPi) + twoPi) % twoPi;
+		return [sweepAngle > Math.PI ? 1 : 0, clockwise ? 1 : 0];
+	};
 	const usedPoints = new Set<string>();
 	const scaleTransform = `scale(${scale})`;
 
@@ -789,12 +786,10 @@ export function exportSketchToSVG(
 		const p1 = sketch.points.get(line.p1Id);
 		const p2 = sketch.points.get(line.p2Id);
 		if (p1 && p2) {
-			const dash = line.isConstruction
-				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
-				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			const group = line.isConstruction ? construction : solid;
-			group.push(
-				`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" />`
+			pushShape(
+				line.isConstruction,
+				stroke =>
+					`<line x1="${p1.x.toFixed(2)}" y1="${(-p1.y).toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${(-p2.y).toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" />`
 			);
 		}
 	}
@@ -803,12 +798,10 @@ export function exportSketchToSVG(
 		usedPoints.add(circ.centerId);
 		const center = sketch.points.get(circ.centerId);
 		if (center) {
-			const dash = circ.isConstruction
-				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
-				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			const group = circ.isConstruction ? construction : solid;
-			group.push(
-				`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${dash} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+			pushShape(
+				circ.isConstruction,
+				stroke =>
+					`<circle cx="${center.x.toFixed(2)}" cy="${(-center.y).toFixed(2)}" r="${circ.radius.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -826,28 +819,15 @@ export function exportSketchToSVG(
 			const ss = new Vec2(start.x, -start.y);
 			const se = new Vec2(end.x, -end.y);
 
-			const as = Vec2.from(sc).angleToPoint(ss);
-			const ae = Vec2.from(sc).angleToPoint(se);
-			const clockwise = !!arc.clockwise;
-
-			let sweepAngle = 0;
-			let sweepFlag = 0;
-			if (clockwise) {
-				sweepAngle = (ae - as) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 1;
-			} else {
-				sweepAngle = (as - ae) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 0;
-			}
-			const largeArcFlag = sweepAngle > Math.PI ? 1 : 0;
-			const dash = arc.isConstruction
-				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
-				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			const group = arc.isConstruction ? construction : solid;
-			group.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+			const [largeArcFlag, sweepFlag] = svgArcFlags(
+				Vec2.from(sc).angleToPoint(ss),
+				Vec2.from(sc).angleToPoint(se),
+				arc.clockwise
+			);
+			pushShape(
+				arc.isConstruction,
+				stroke =>
+					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -865,12 +845,10 @@ export function exportSketchToSVG(
 			const smin = new Vec2(min.x, -min.y);
 			const r = Vec2.from(sc).distancesTo(smaj, smin);
 			const deg = Vec2.from(sc).angleToPointDeg(smaj);
-			const dash = el.isConstruction
-				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
-				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			const group = el.isConstruction ? construction : solid;
-			group.push(
-				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${dash} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+			pushShape(
+				el.isConstruction,
+				stroke =>
+					`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${stroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -896,31 +874,16 @@ export function exportSketchToSVG(
 			const r = Vec2.from(sc).distancesTo(smaj, smin);
 			const theta = Vec2.from(sc).angleToPoint(smaj);
 			const thetaDeg = (theta * 180) / Math.PI;
-
 			const { axisU: u, axisV: v } = ellipseAxes(theta);
-
-			const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
-			const te = ellipseParameterAtPoint(se, sc, r, u, v);
-
-			const clockwise = !!elarc.clockwise;
-			let sweepAngle = 0;
-			let sweepFlag = 0;
-			if (clockwise) {
-				sweepAngle = (te - ts) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 1;
-			} else {
-				sweepAngle = (ts - te) % (2 * Math.PI);
-				if (sweepAngle < 0) sweepAngle += 2 * Math.PI;
-				sweepFlag = 0;
-			}
-			const largeArc = sweepAngle > Math.PI ? 1 : 0;
-			const dash = elarc.isConstruction
-				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
-				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			const group = elarc.isConstruction ? construction : solid;
-			group.push(
-				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+			const [largeArc, sweepFlag] = svgArcFlags(
+				ellipseParameterAtPoint(ss, sc, r, u, v),
+				ellipseParameterAtPoint(se, sc, r, u, v),
+				elarc.clockwise
+			);
+			pushShape(
+				elarc.isConstruction,
+				stroke =>
+					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -962,12 +925,10 @@ export function exportSketchToSVG(
 				);
 			}
 			const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
-			const dash = spline.isConstruction
-				? ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`
-				: ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-			const group = spline.isConstruction ? construction : solid;
-			group.push(
-				`<path d="${d}"${dash} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+			pushShape(
+				spline.isConstruction,
+				stroke =>
+					`<path d="${d}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
@@ -1067,6 +1028,18 @@ export function importSketchFromSVG(
 	exportSettings?: SvgExportSettings;
 	error?: string;
 } {
+	const restoreMetadata = (rawJson: string) => {
+		const data = JSON.parse(rawJson) as SketchFileMetadata;
+		if (data.format !== 'svg-sketcher' || !data.snapshot) return null;
+		sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
+		sketch.clearHistory();
+		return {
+			success: true,
+			viewport: data.viewport,
+			exportSettings: readExportSettings(data.exportSettings),
+		};
+	};
+
 	try {
 		if (typeof DOMParser !== 'undefined') {
 			const parser = new DOMParser();
@@ -1094,21 +1067,9 @@ export function importSketchFromSVG(
 				return importPlainSvg(sketch, doc);
 			}
 
-			const rawText = metaEl.textContent.trim();
-			const data = JSON.parse(rawText) as SketchFileMetadata;
-
-			if (data.format !== 'svg-sketcher' || !data.snapshot) {
-				return { success: false, error: 'Unsupported sketch metadata format' };
-			}
-
-			sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
-			sketch.clearHistory();
-
-			return {
-				success: true,
-				viewport: data.viewport,
-				exportSettings: readExportSettings(data.exportSettings),
-			};
+			return (
+				restoreMetadata(metaEl.textContent.trim()) ?? { success: false, error: 'Unsupported sketch metadata format' }
+			);
 		}
 
 		// Fallback (e.g. Node.js environment where DOMParser is not in global scope)
@@ -1121,12 +1082,8 @@ export function importSketchFromSVG(
 			if (cdataMatch) {
 				text = cdataMatch[1].trim();
 			}
-			const data = JSON.parse(text) as SketchFileMetadata;
-			if (data.format === 'svg-sketcher' && data.snapshot) {
-				sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
-				sketch.clearHistory();
-				return { success: true, viewport: data.viewport, exportSettings: readExportSettings(data.exportSettings) };
-			}
+			const restored = restoreMetadata(text);
+			if (restored) return restored;
 		}
 		return { success: false, error: 'No parametric CAD metadata found in SVG' };
 	} catch (err) {

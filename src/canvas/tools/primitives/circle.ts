@@ -251,9 +251,7 @@ export class CircleTool extends BaseTool {
 				}
 
 				this.drawingStep = 1;
-				this.popup.setFieldLabel('radius', 'Diameter');
-				this.popup.resetField('radius', 20);
-				this.popup.show(e.screen);
+				this.openRadiusPopup(e.screen);
 				this.notify();
 			} else {
 				const locked = this.popup.isLocked('radius');
@@ -271,16 +269,11 @@ export class CircleTool extends BaseTool {
 			this.points.push(e.snap?.worldPos ?? e.world);
 			this.drawingStep++;
 
-			if (this._mode === 'two_point' && this.drawingStep === 1) {
-				this.popup.setFieldLabel('radius', 'Diameter');
-				this.popup.resetField('radius', 20);
-				this.popup.show(e.screen);
-			}
-
-			if (this._mode === 'three_point' && this.drawingStep === 2) {
-				this.popup.setFieldLabel('radius', 'Diameter');
-				this.popup.resetField('radius', 20);
-				this.popup.show(e.screen);
+			if (
+				(this._mode === 'two_point' && this.drawingStep === 1) ||
+				(this._mode === 'three_point' && this.drawingStep === 2)
+			) {
+				this.openRadiusPopup(e.screen);
 			}
 
 			if (this._mode === 'two_point' && this.points.length === 2) {
@@ -321,13 +314,7 @@ export class CircleTool extends BaseTool {
 
 		if (this._mode === 'two_tangent' && this.drawingStep === 2) {
 			const locked = this.popup.isLocked('radius');
-			const circle = locked
-				? (() => {
-						const radius = this.popup.getNumericValue('radius', 10);
-						const center = this.twoLineCenter(radius, e.world);
-						return center ? { center, radius } : null;
-					})()
-				: this.getTwoTangentCircle(e.world);
+			const circle = this.resolveTwoTangentCircle(e.world);
 
 			if (!circle) {
 				this.ctx.showToast('The selected lines are parallel');
@@ -352,9 +339,7 @@ export class CircleTool extends BaseTool {
 		this.drawingStep++;
 
 		if (this._mode === 'two_tangent' && this.lineIds.length === 2) {
-			this.popup.setFieldLabel('radius', 'Radius');
-			this.popup.resetField('radius', 10);
-			this.popup.show(e.screen);
+			this.openRadiusPopup(e.screen, 'Radius', 10);
 		}
 
 		if (this._mode === 'three_tangent' && this.lineIds.length === 3) {
@@ -590,13 +575,7 @@ export class CircleTool extends BaseTool {
 	}
 
 	private renderTwoTangentPreview(ctx: ToolRenderContext): void {
-		const circle = this.popup.isLocked('radius')
-			? (() => {
-					const radius = this.popup.getNumericValue('radius', 10);
-					const center = this.twoLineCenter(radius, ctx.cursorWorld);
-					return center ? { center, radius } : null;
-				})()
-			: this.getTwoTangentCircle(ctx.cursorWorld);
+		const circle = this.resolveTwoTangentCircle(ctx.cursorWorld);
 		if (!circle) return;
 
 		this.drawPreviewCircle(ctx, circle.center, circle.radius);
@@ -692,7 +671,20 @@ export class CircleTool extends BaseTool {
 		createSvgCircle(screenCenter, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
 	}
 
-	private lineIntersection(): Vec2 | null {
+	private openRadiusPopup(screen: Vec2, label = 'Diameter', defaultValue = 20): void {
+		this.popup.setFieldLabel('radius', label);
+		this.popup.resetField('radius', defaultValue);
+		this.popup.show(screen);
+	}
+
+	private resolveTwoTangentCircle(cursor: Vec2): CircleGeometry | null {
+		if (!this.popup.isLocked('radius')) return this.getTwoTangentCircle(cursor);
+		const radius = this.popup.getNumericValue('radius', 10);
+		const center = this.twoLineCenter(radius, cursor);
+		return center ? { center, radius } : null;
+	}
+
+	private lineIntersection(offsetA = 0, offsetB = 0): Vec2 | null {
 		const lineA = this.getLine(this.lineIds[0]);
 		const lineB = this.getLine(this.lineIds[1]);
 		if (!lineA || !lineB) return null;
@@ -700,8 +692,8 @@ export class CircleTool extends BaseTool {
 		const determinant = lineA.n.cross(lineB.n);
 		if (Math.abs(determinant) < 1e-8) return null;
 
-		const h1 = lineA.p.dot(lineA.n);
-		const h2 = lineB.p.dot(lineB.n);
+		const h1 = lineA.p.dot(lineA.n) + offsetA;
+		const h2 = lineB.p.dot(lineB.n) + offsetB;
 		return new Vec2((h1 * lineB.n.y - lineA.n.y * h2) / determinant, (lineA.n.x * h2 - h1 * lineB.n.x) / determinant);
 	}
 
@@ -734,24 +726,13 @@ export class CircleTool extends BaseTool {
 	}
 
 	private twoLineCenter(radius: number, cursor: Vec2): Vec2 | null {
-		const lineA = this.getLine(this.lineIds[0]);
-		const lineB = this.getLine(this.lineIds[1]);
-		if (!lineA || !lineB) return null;
-
-		const determinant = lineA.n.cross(lineB.n);
-		if (Math.abs(determinant) < 1e-8) return null;
-
 		let best: Vec2 | null = null;
 		let bestDistance = Infinity;
 
 		for (const signA of [-1, 1]) {
 			for (const signB of [-1, 1]) {
-				const q1 = lineA.p.dot(lineA.n) + signA * radius;
-				const q2 = lineB.p.dot(lineB.n) + signB * radius;
-				const center = new Vec2(
-					(q1 * lineB.n.y - lineA.n.y * q2) / determinant,
-					(lineA.n.x * q2 - q1 * lineB.n.x) / determinant
-				);
+				const center = this.lineIntersection(signA * radius, signB * radius);
+				if (!center) return null;
 				const distance = center.distanceTo(cursor);
 
 				if (distance < bestDistance) {
