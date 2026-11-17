@@ -2421,35 +2421,22 @@ export class SketchDocument {
 						this.deleteSplineWithHandles(sid, spline, candidatePointIds);
 					}
 				} else if (spline.splineType === 'fit') {
-					if (spline.isClosed) {
-						const unique = spline.pointIds.slice(0, -1);
-						if (unique.length <= 3) {
-							this.deleteSplineWithHandles(sid, spline, candidatePointIds);
-						} else {
-							const idx = unique.indexOf(id);
-							if (idx !== -1) {
-								if (spline.tangentLineIds?.[idx]) {
-									this.deleteSplineTangentLine(spline.tangentLineIds[idx], candidatePointIds);
-								}
-								const newUnique = unique.filter((_, i) => i !== idx);
-								spline.pointIds = [...newUnique, newUnique[0]];
-								if (spline.tangentLineIds) {
-									const uniqueTangents = spline.tangentLineIds.slice(0, -1).filter((_, i) => i !== idx);
-									spline.tangentLineIds = [...uniqueTangents, uniqueTangents[0]];
-								}
-							}
-						}
+					const unique = spline.isClosed ? spline.pointIds.slice(0, -1) : spline.pointIds;
+					if (unique.length <= (spline.isClosed ? 3 : 2)) {
+						this.deleteSplineWithHandles(sid, spline, candidatePointIds);
 					} else {
-						const remaining = spline.pointIds.filter(pid => pid !== id);
-						if (remaining.length < 2) {
-							this.deleteSplineWithHandles(sid, spline, candidatePointIds);
-						} else {
-							const idx = spline.pointIds.indexOf(id);
-							if (idx !== -1 && spline.tangentLineIds?.[idx]) {
+						const idx = unique.indexOf(id);
+						if (idx !== -1) {
+							if (spline.tangentLineIds?.[idx]) {
 								this.deleteSplineTangentLine(spline.tangentLineIds[idx], candidatePointIds);
-								spline.tangentLineIds.splice(idx, 1);
 							}
-							spline.pointIds = remaining;
+							const nextUnique = unique.filter((_, i) => i !== idx);
+							spline.pointIds = spline.isClosed ? [...nextUnique, nextUnique[0]] : nextUnique;
+							if (spline.tangentLineIds) {
+								const baseTangents = spline.isClosed ? spline.tangentLineIds.slice(0, -1) : spline.tangentLineIds;
+								const nextTangents = baseTangents.filter((_, i) => i !== idx);
+								spline.tangentLineIds = spline.isClosed ? [...nextTangents, nextTangents[0]] : nextTangents;
+							}
 						}
 					}
 				}

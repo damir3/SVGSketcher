@@ -36,21 +36,20 @@ export function createTransform(center: Vec2, values: TransformValues) {
 	};
 }
 
-function getEntity(sketch: SketchDocument, id: string) {
-	if (!sketch.points.has(id) && (id === 'origin' || id === 'axis_x' || id === 'axis_y')) return undefined;
-	return (
-		sketch.points.get(id) ??
-		sketch.lines.get(id) ??
-		sketch.circles.get(id) ??
-		sketch.arcs.get(id) ??
-		sketch.ellipses.get(id) ??
-		sketch.ellipticalArcs.get(id) ??
-		sketch.splines.get(id) ??
-		sketch.texts.get(id)
-	);
-}
+type Entity =
+	| SketchPoint
+	| SketchLine
+	| SketchCircle
+	| SketchArc
+	| SketchEllipse
+	| SketchEllipticalArc
+	| SketchSpline
+	| SketchText;
 
-type Entity = NonNullable<ReturnType<typeof getEntity>>;
+function getEntity(sketch: SketchDocument, id: string): Entity | undefined {
+	if (!sketch.points.has(id) && (id === 'origin' || id === 'axis_x' || id === 'axis_y')) return undefined;
+	return (sketch.getPrimitive(id) as Entity | undefined) ?? sketch.texts.get(id);
+}
 
 export function getTransformSelection(sketch: SketchDocument) {
 	const entities = new Map<string, Entity>();

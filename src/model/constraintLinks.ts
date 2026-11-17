@@ -169,37 +169,8 @@ export function getLineBetween(sketch: SketchDocument, p1Id: string, p2Id: strin
 }
 
 export function isPointUsed(sketch: SketchDocument, pointId: string): boolean {
-	for (const line of sketch.lines.values()) {
-		if (line.p1Id === pointId || line.p2Id === pointId) return true;
-	}
-	for (const circle of sketch.circles.values()) {
-		if (circle.centerId === pointId) return true;
-	}
-	for (const arc of sketch.arcs.values()) {
-		if (arc.centerId === pointId || arc.startPointId === pointId || arc.endPointId === pointId) return true;
-	}
-	for (const el of sketch.ellipses.values()) {
-		if (el.centerId === pointId || el.majorAxisPointId === pointId || el.minorAxisPointId === pointId) return true;
-	}
-	for (const elarc of sketch.ellipticalArcs.values()) {
-		if (
-			elarc.centerId === pointId ||
-			elarc.majorAxisPointId === pointId ||
-			elarc.minorAxisPointId === pointId ||
-			elarc.startPointId === pointId ||
-			elarc.endPointId === pointId
-		) {
-			return true;
-		}
-	}
-	for (const spline of sketch.splines.values()) {
-		if (spline.pointIds.includes(pointId)) return true;
-		if (spline.tangentLineIds) {
-			for (const lid of spline.tangentLineIds) {
-				const line = sketch.lines.get(lid);
-				if (line && (line.p1Id === pointId || line.p2Id === pointId)) return true;
-			}
-		}
+	for (const prim of sketch.getCurvePrimitives()) {
+		if (prim.getPointIds(sketch).includes(pointId)) return true;
 	}
 	return false;
 }
