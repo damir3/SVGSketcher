@@ -2,9 +2,13 @@ import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
-import { formatDimensionValue } from '../../canvas/dimensionGeometry';
-import { distanceToLinearDimension } from '../../math/hitTest';
-import { Vec2, type XY } from '../../math/vector';
+import { distanceToLinearDimensionVisual, formatDimensionValue } from '../../canvas/dimensionGeometry';
+import { Vec2, projectPointOntoSegment, projectPointOntoLine, type XY } from '../../math/vector';
+import type { SketchDocument } from '../../model/sketch';
+import type { Viewport } from '../../canvas/viewport';
+import type { QueryCurve } from '../../kernel/queryTypes';
+import { getQueryKernel } from '../../math/queries';
+import { createSvgElement } from '../../canvas/svg';
 
 /**
  * Line pair: both endpoints of the offset line lie at signed distance `side * d`
@@ -58,6 +62,7 @@ export class OffsetConstraint extends BaseConstraint {
 	pairs: OffsetPair[];
 	/** Index of the pair used to place the visual dimension */
 	dimPairIndex: number;
+	declare labelWorld?: XY;
 	sourceChain?: any;
 	direction?: any;
 	flip?: boolean;
@@ -197,8 +202,89 @@ export class OffsetConstraint extends BaseConstraint {
 		return res;
 	}
 
+	moveLabelTo(screen: Vec2, _sketch: SketchDocument, viewport: Viewport): void {
+		this.labelWorld = viewport.screenToWorld(screen);
+	}
+
+	/** Closest point on a finite curve, including arc endpoints outside its sweep. */
+	private closestPoint(curve: QueryCurve, world: Vec2): Vec2 | null {
+		if (curve.type === 'segment') return projectPointOntoSegment(world, curve.p1, curve.p2).point;
+		if (curve.type === 'arc' || curve.type === 'circle') {
+			const center = Vec2.from(curve.center);
+			let angle = center.angleToPoint(world);
+			if (curve.type === 'arc') {
+				const start = center.angleToPoint(curve.start);
+				const end = center.angleToPoint(curve.end);
+				const sign = curve.clockwise ? -1 : 1;
+				const positive = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+				if (positive(sign * (angle - start)) > positive(sign * (end - start))) {
+					return Vec2.from(world.distanceTo(curve.start) <= world.distanceTo(curve.end) ? curve.start : curve.end);
+				}
+			}
+			return center.add(Vec2.fromPolar(curve.radius, angle));
+		}
+		const match = getQueryKernel().closest([curve], world, Number.MAX_VALUE, true, 0);
+		return match?.point ? Vec2.from(match.point) : null;
+	}
+
+	/** Restrict the normal to the span shared by both finite sides of a corner. */
+	private lineDimensionPoints(
+		original: Extract<QueryCurve, { type: 'segment' }>,
+		offset: Extract<QueryCurve, { type: 'segment' }>,
+		world: Vec2
+	): { a: Vec2; b: Vec2 } | null {
+		const tangent = Vec2.from(original.p2).sub(original.p1);
+		const length = tangent.length();
+		if (length < 1e-9) return null;
+		tangent.divideScalar(length);
+		const along = (p: XY) => Vec2.from(p).sub(original.p1).dot(tangent);
+		const offStart = along(offset.p1);
+		const offEnd = along(offset.p2);
+		const start = Math.max(0, Math.min(offStart, offEnd));
+		const end = Math.min(length, Math.max(offStart, offEnd));
+		if (start > end + 1e-9) return null;
+		const a = Vec2.from(original.p1).addScaledVector(tangent, Math.max(start, Math.min(end, along(world))));
+		const b = projectPointOntoLine(a, offset.p1, offset.p2).point;
+		return { a, b };
+	}
+
+	private nearestDimensionPoints(sketch: SketchDocument): { a: Vec2; b: Vec2 } | null {
+		if (!this.labelWorld) return null;
+		const world = Vec2.from(this.labelWorld);
+		let best: { a: Vec2; b: Vec2 } | null = null;
+		let distance = Infinity;
+		let lineDistance = Infinity;
+		for (const pair of this.pairs) {
+			const origId = pair.kind === 'line' ? pair.origLineId : pair.kind === 'circle' ? pair.origId : pair.origSplineId;
+			const offId = pair.kind === 'line' ? pair.offLineId : pair.kind === 'circle' ? pair.offId : pair.offSplineId;
+			const original = sketch.getPrimitive(origId)?.toGeoCurve(sketch);
+			const offset = sketch.getPrimitive(offId)?.toGeoCurve(sketch);
+			if (!original || !offset) continue;
+			let points: { a: Vec2; b: Vec2 } | null;
+			if (original.type === 'segment' && offset.type === 'segment') {
+				points = this.lineDimensionPoints(original, offset, world);
+			} else {
+				const b = this.closestPoint(offset, world);
+				const a = b && this.closestPoint(original, b);
+				points = a && b ? { a, b } : null;
+			}
+			if (!points) continue;
+			const { a, b } = points;
+			const d = projectPointOntoSegment(world, a, b).dist;
+			const ld = projectPointOntoLine(world, a, b).dist;
+			if (d < distance - 1e-9 || (Math.abs(d - distance) <= 1e-9 && ld < lineDistance)) {
+				distance = d;
+				lineDistance = ld;
+				best = points;
+			}
+		}
+		return best;
+	}
+
 	/** World-space endpoints of the visual dimension (on original and on offset curve) */
 	getDimensionWorldPoints(sketch: any): { a: Vec2; b: Vec2 } | null {
+		const nearest = this.nearestDimensionPoints(sketch);
+		if (nearest) return nearest;
 		const p = this.pairs[this.dimPairIndex] ?? this.pairs[0];
 		if (!p) {
 			if (!this.emptyDimension) return null;
@@ -258,7 +344,43 @@ export class OffsetConstraint extends BaseConstraint {
 		if (!pts) return null;
 		const d1 = viewport.worldToScreen(pts.a);
 		const d2 = viewport.worldToScreen(pts.b);
-		return d1.clone().lerp(d2, 0.5);
+		const angle = this.labelAngle(d1, d2);
+		return d1
+			.clone()
+			.lerp(d2, this.labelPosition(d1, d2, viewport))
+			.add(new Vec2(Math.sin(angle) * 8.5, -Math.cos(angle) * 8.5));
+	}
+
+	private labelPosition(d1: Vec2, d2: Vec2, viewport: Viewport): number {
+		if (!this.labelWorld) return 0.5;
+		const delta = new Vec2().subVectors(d2, d1);
+		if (delta.lengthSq() < 1e-12) return 0.5;
+		return viewport.worldToScreen(this.labelWorld).sub(d1).dot(delta) / delta.lengthSq();
+	}
+
+	private labelAngle(d1: Vec2, d2: Vec2): number {
+		let angle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
+		if (angle > Math.PI / 2 - 1e-4) angle -= Math.PI;
+		else if (angle <= -Math.PI / 2) angle += Math.PI;
+		return angle;
+	}
+
+	private renderLabelHitArea(parent: SVGElement, center: Vec2, angle: number): void {
+		const text = (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance);
+		const halfWidth = Math.max(12, text.length * 3.75 + 6);
+		createSvgElement(
+			'polygon',
+			{
+				class: 'dimension-item',
+				points: `${-halfWidth},-10 ${halfWidth},-10 ${halfWidth},10 ${-halfWidth},10`,
+				fill: 'transparent',
+				'pointer-events': 'all',
+				'data-id': this.id,
+				'data-type': 'constraint',
+				transform: `translate(${center.x}, ${center.y}) rotate(${(angle * 180) / Math.PI})`,
+			},
+			parent
+		);
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
@@ -275,7 +397,13 @@ export class OffsetConstraint extends BaseConstraint {
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
+			labelPosition: this.labelPosition(d1, d2, ctx.viewport),
 		});
+		this.renderLabelHitArea(
+			ctx.targetGroup,
+			this.getLabelScreenPos(ctx.sketch, ctx.viewport)!,
+			this.labelAngle(d1, d2)
+		);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
@@ -283,7 +411,16 @@ export class OffsetConstraint extends BaseConstraint {
 		if (!pts) return null;
 		const d1 = viewport.worldToScreen(pts.a);
 		const d2 = viewport.worldToScreen(pts.b);
-		return distanceToLinearDimension(screen, d1, d2);
+		const center = this.getLabelScreenPos(sketch, viewport)!;
+		const local = Vec2.from(screen).sub(center).rotateAround(new Vec2(), -this.labelAngle(d1, d2));
+		const text = (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance);
+		const halfWidth = Math.max(12, text.length * 3.75 + 6);
+		const textDistance = Math.hypot(Math.max(0, Math.abs(local.x) - halfWidth), Math.max(0, Math.abs(local.y) - 10));
+		const distance = Math.min(
+			textDistance,
+			distanceToLinearDimensionVisual(screen, d1, d2, this.labelPosition(d1, d2, viewport))
+		);
+		return distance;
 	}
 
 	/** Ids of all curves (original + offset) referenced by this constraint */

@@ -215,6 +215,7 @@ type ConstraintSnapshotData =
 	  }
 	| {
 			type: 'offset';
+			labelWorld?: { x: number; y: number };
 			targetDistance: number;
 			pairs: any[];
 			dimPairIndex: number;
