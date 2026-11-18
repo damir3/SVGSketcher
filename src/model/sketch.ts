@@ -86,6 +86,9 @@ import {
 	getPointToLineDistanceConstraint,
 	hasPointToLineDistanceConstraint,
 	addPointToLineDistanceConstraint,
+	getLineToLineDistanceConstraint,
+	canAddLineToLineDistanceConstraint,
+	addLineToLineDistanceConstraint,
 	getOriginConstraint,
 	hasOriginConstraint,
 	addOriginDistanceConstraint,
@@ -844,6 +847,23 @@ export class SketchDocument {
 		offset?: number
 	): PointToLineDistanceConstraint | null {
 		return addPointToLineDistanceConstraint(this, pointId, lineId, targetDist, offset);
+	}
+
+	getLineToLineDistanceConstraint(line1Id: string, line2Id: string): PointToLineDistanceConstraint | undefined {
+		return getLineToLineDistanceConstraint(this, line1Id, line2Id);
+	}
+
+	canAddLineToLineDistanceConstraint(line1Id: string, line2Id: string): boolean {
+		return canAddLineToLineDistanceConstraint(this, line1Id, line2Id);
+	}
+
+	addLineToLineDistanceConstraint(
+		line1Id: string,
+		line2Id: string,
+		targetDist?: number,
+		offset?: number
+	): PointToLineDistanceConstraint | null {
+		return addLineToLineDistanceConstraint(this, line1Id, line2Id, targetDist, offset);
 	}
 
 	getOriginConstraint(

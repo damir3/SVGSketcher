@@ -156,6 +156,27 @@ export class DimensionTool extends BaseTool {
 		return true;
 	}
 
+	private renderLineToLinePreview(line1Id: string, line2Id: string, screen: Vec2): boolean {
+		const { sketch, viewport, renderer } = this.ctx;
+		if (!sketch.canAddLineToLineDistanceConstraint(line1Id, line2Id)) return false;
+		if (line2Id === 'axis_x' || line2Id === 'axis_y') [line1Id, line2Id] = [line2Id, line1Id];
+		const reference = sketch.getLine(line1Id)!;
+		const line = sketch.getLine(line2Id)!;
+		const a = sketch.points.get(reference.p1Id)!;
+		const b = sketch.points.get(reference.p2Id)!;
+		const mid = new Vec2().midpoint(sketch.points.get(line.p1Id)!, sketch.points.get(line.p2Id)!);
+		const dir = new Vec2().subVectors(b, a);
+		const distance = Math.abs(new Vec2().subVectors(mid, a).cross(dir)) / dir.length();
+		renderer.renderPointToLineDistancePreview(
+			viewport.worldToScreen(mid),
+			viewport.worldToScreen(a),
+			viewport.worldToScreen(b),
+			screen,
+			distance
+		);
+		return true;
+	}
+
 	private renderThreePointAnglePreview(p1Id: string, vertexId: string, p3Id: string, screen: Vec2): boolean {
 		const { sketch, viewport, renderer } = this.ctx;
 		const p1 = sketch.points.get(p1Id);
@@ -629,7 +650,7 @@ export class DimensionTool extends BaseTool {
 				return true;
 			}
 
-			// If clicked on an axis line or another line -> switch to Angle constraint mode!
+			// Select a second line for a distance or angle dimension.
 			if (type === 'line' && id && (id === 'axis_x' || id === 'axis_y' || id !== l1.id)) {
 				this.ctx.sketch.selectEntity(id, 'line', true);
 				this.setState({ step: 2, line1Id: l1.id, line2Id: id });
@@ -719,7 +740,7 @@ export class DimensionTool extends BaseTool {
 				return true;
 			}
 
-			// Subcase 3: Two lines selected (Angle mode)
+			// Subcase 3: Two lines selected (distance for parallel lines, angle otherwise)
 			const line1Id = this.state.line1Id!;
 			const line2Id = this.state.line2Id!;
 			const l1 = this.ctx.sketch.getLine(line1Id);
@@ -728,6 +749,20 @@ export class DimensionTool extends BaseTool {
 				this.state = { ...EMPTY_STATE };
 				this.ctx.renderer.clearPreviews();
 				this.ctx.requestRender();
+				return true;
+			}
+
+			if (this.ctx.sketch.canAddLineToLineDistanceConstraint(line1Id, line2Id)) {
+				const existed = !!this.ctx.sketch.getLineToLineDistanceConstraint(line1Id, line2Id);
+				const c = this.ctx.sketch.addLineToLineDistanceConstraint(line1Id, line2Id);
+				if (c) {
+					c.moveLabelTo(screen, this.ctx.sketch, this.ctx.viewport);
+					this.finishDimensionPlacement(
+						c,
+						existed ? 'Editing distance constraint' : 'Distance constraint applied',
+						e.client
+					);
+				}
 				return true;
 			}
 
@@ -778,6 +813,8 @@ export class DimensionTool extends BaseTool {
 					(ctx.sketch.circles.size ? this.ctx.findCircleNear(screen) : null) ??
 					(ctx.sketch.arcs.size ? this.ctx.findArcNear(screen) : null);
 				if (radial && this.renderCenterLinePreview(radial.id, l1.id, screen)) return;
+				const hitLine = this.ctx.findLineNear(screen, undefined, true);
+				if (hitLine && this.renderLineToLinePreview(l1.id, hitLine.id, screen)) return;
 
 				p1Id = l1.p1Id;
 				p2Id = l1.p2Id;
@@ -867,6 +904,7 @@ export class DimensionTool extends BaseTool {
 			const hasUserLine1 = ctx.sketch.lines.has(line1Id);
 			const hasUserLine2 = ctx.sketch.lines.has(line2Id);
 			if (l1 && l2 && (hasUserLine1 || hasUserLine2)) {
+				if (this.renderLineToLinePreview(line1Id, line2Id, screen)) return;
 				const p1 = ctx.sketch.points.get(l1.p1Id);
 				const p2 = ctx.sketch.points.get(l1.p2Id);
 				const p3 = ctx.sketch.points.get(l2.p1Id);

@@ -294,6 +294,73 @@ export function addPointToLineDistanceConstraint(
 	return c;
 }
 
+export function getLineToLineDistanceConstraint(
+	sketch: SketchDocument,
+	line1Id: string,
+	line2Id: string
+): PointToLineDistanceConstraint | undefined {
+	return findConstraint(
+		sketch,
+		PointToLineDistanceConstraint,
+		c => !!c.constrainedLineId && matchesEndpoints(c.lineId, c.constrainedLineId, line1Id, line2Id)
+	);
+}
+
+export function canAddLineToLineDistanceConstraint(sketch: SketchDocument, line1Id: string, line2Id: string): boolean {
+	if (line1Id === line2Id || (isBuiltInLineId(sketch, line1Id) && isBuiltInLineId(sketch, line2Id))) return false;
+	const l1 = sketch.getLine(line1Id);
+	const l2 = sketch.getLine(line2Id);
+	if (!l1 || !l2) return false;
+	const p1 = sketch.points.get(l1.p1Id),
+		p2 = sketch.points.get(l1.p2Id);
+	const p3 = sketch.points.get(l2.p1Id),
+		p4 = sketch.points.get(l2.p2Id);
+	if (!p1 || !p2 || !p3 || !p4) return false;
+	const d1 = new Vec2().subVectors(p2, p1);
+	const d2 = new Vec2().subVectors(p4, p3);
+	const len1 = d1.length(),
+		len2 = d2.length();
+	// Normalize the cross product so the parallel tolerance is independent of line length and direction.
+	return len1 > 1e-7 && len2 > 1e-7 && Math.abs(d1.cross(d2)) / len1 / len2 < 1e-5;
+}
+
+export function addLineToLineDistanceConstraint(
+	sketch: SketchDocument,
+	line1Id: string,
+	line2Id: string,
+	targetDist?: number,
+	offset?: number
+): PointToLineDistanceConstraint | null {
+	const existing = getLineToLineDistanceConstraint(sketch, line1Id, line2Id);
+	if (existing) return updateExistingDistanceConstraint(sketch, existing, targetDist, offset);
+	if (!canAddLineToLineDistanceConstraint(sketch, line1Id, line2Id)) return null;
+	// An axis is always the reference, regardless of selection order.
+	if (isBuiltInLineId(sketch, line2Id)) [line1Id, line2Id] = [line2Id, line1Id];
+	const reference = sketch.getLine(line1Id)!;
+	const line = sketch.getLine(line2Id)!;
+	const a = sketch.points.get(reference.p1Id)!;
+	const b = sketch.points.get(reference.p2Id)!;
+	const mid = new Vec2().midpoint(sketch.points.get(line.p1Id)!, sketch.points.get(line.p2Id)!);
+	const dir = new Vec2().subVectors(b, a);
+	const signedDistance = new Vec2().subVectors(mid, a).cross(dir) / dir.length();
+	const c = new PointToLineDistanceConstraint(
+		sketch.nextId('c_pt_line_dist'),
+		line.p1Id,
+		line1Id,
+		reference.p1Id,
+		reference.p2Id,
+		targetDist ?? roundDimensionDefault(Math.abs(signedDistance), 0),
+		signedDistance >= 0 ? 1 : -1,
+		1,
+		offset,
+		undefined,
+		line.p2Id,
+		line2Id
+	);
+	addConstraint(sketch, c);
+	return c;
+}
+
 export function getOriginConstraint(
 	sketch: SketchDocument,
 	pointId: string,

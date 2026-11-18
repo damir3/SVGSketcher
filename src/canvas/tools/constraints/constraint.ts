@@ -695,6 +695,16 @@ export class ConstraintTool extends BaseTool {
 					const l = sketch.lines.get(lIds[0])!;
 					applyDistancePair(l.p1Id, l.p2Id);
 				} else if (lIds.length === 2) {
+					if (sketch.canAddLineToLineDistanceConstraint(lIds[0], lIds[1])) {
+						const existed = !!sketch.getLineToLineDistanceConstraint(lIds[0], lIds[1]);
+						applyDim(
+							sketch.addLineToLineDistanceConstraint(lIds[0], lIds[1]),
+							'Distance constraint applied',
+							'Editing distance constraint',
+							existed
+						);
+						break;
+					}
 					const existed = sketch.hasAngleConstraint(lIds[0], lIds[1]);
 					applyDim(
 						sketch.addAngleConstraint(lIds[0], lIds[1]),
