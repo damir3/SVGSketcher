@@ -1,7 +1,7 @@
 import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
+import { renderPointBadge, type ConstraintRenderContext } from './renderContext';
 import { COLORS } from '../../canvas/styles';
 
 /**
@@ -43,9 +43,6 @@ export class FixedConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pt = ctx.sketch.points.get(this.pointId);
-		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, new Vec2(s.x + 12, s.y - 12), 'fixed', COLORS.fixed);
+		renderPointBadge(ctx, this.id, this.pointId, 'fixed', 12, -12, COLORS.fixed);
 	}
 }

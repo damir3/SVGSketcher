@@ -1,8 +1,7 @@
 import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation } from './base';
-import type { ConstraintRenderContext } from './renderContext';
-import { COLORS } from '../../canvas/styles';
+import { renderPointBadge, type ConstraintRenderContext } from './renderContext';
 import {
 	bsplineToBezier,
 	fitPointsToBezier,
@@ -114,9 +113,6 @@ export class PointOnSplineConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pt = ctx.sketch.points.get(this.pointId);
-		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, new Vec2(s.x, s.y + 14), '⚲', COLORS.primary);
+		renderPointBadge(ctx, this.id, this.pointId, '⚲');
 	}
 }

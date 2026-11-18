@@ -90,20 +90,19 @@ export function renderPatternSuppressionCheckbox(
 
 	// Outer halo / shadow
 	createSvgRect(Vec2.from(centroid).subScalar(11), new Vec2(22, 22), CHECKBOX_HALO_ATTRS, cbG);
-
+	createSvgRect(
+		Vec2.from(centroid).subScalar(9),
+		new Vec2(18, 18),
+		isSuppressed ? CHECKBOX_SUPPRESSED_ATTRS : CHECKBOX_ACTIVE_ATTRS,
+		cbG
+	);
 	if (!isSuppressed) {
-		// Active checkbox (blue filled with white checkmark)
-		createSvgRect(Vec2.from(centroid).subScalar(9), new Vec2(18, 18), CHECKBOX_ACTIVE_ATTRS, cbG);
-
 		createSvgPath(
 			`M ${centroid.x - 4.5} ${centroid.y} L ${centroid.x - 1.5} ${centroid.y + 3.5} L ${centroid.x + 5} ${centroid.y - 3.5}`,
 			CHECKBOX_CHECKMARK_ATTRS,
 			cbG
 		);
 	} else {
-		// Suppressed checkbox (grey outline with red dash)
-		createSvgRect(Vec2.from(centroid).subScalar(9), new Vec2(18, 18), CHECKBOX_SUPPRESSED_ATTRS, cbG);
-
 		createSvgLine(
 			new Vec2(centroid.x - 4, centroid.y),
 			new Vec2(centroid.x + 4, centroid.y),
@@ -126,42 +125,58 @@ export function renderPatternConstraintCopy(opts: {
 }): void {
 	const { ctx, constraintId, copyIndex, isSuppressed, copy, sourceObjectIds, transform, baseColor } = opts;
 
-	let copyCentroid: { x: number; y: number };
+	let copyWorldPoints: Array<{ x: number; y: number }> = [];
 	if (copy && copy.pointPairs.length > 0 && !isSuppressed) {
-		const pts: Vec2[] = [];
 		for (const pair of copy.pointPairs) {
 			const pt = ctx.sketch.points.get(pair.patternPtId);
-			if (pt) pts.push(pt);
+			if (pt) copyWorldPoints.push(pt);
 		}
-		copyCentroid = pts.length > 0 ? ctx.viewport.worldToScreen(Vec2.centroid(pts)) : opts.fallbackScreenCentroid();
 	} else if (ctx.renderTransformedObjects) {
-		const copyWorldPoints = ctx.renderTransformedObjects(sourceObjectIds, transform, {
+		copyWorldPoints = ctx.renderTransformedObjects(sourceObjectIds, transform, {
 			targetGroup: ctx.targetGroup,
 			baseColor,
 			opacity: 0.25,
 			drawVertices: true,
 			skipRender: !isSuppressed,
 		});
-		copyCentroid =
-			copyWorldPoints.length > 0
-				? ctx.viewport.worldToScreen(Vec2.centroid(copyWorldPoints))
-				: opts.fallbackScreenCentroid();
-	} else {
-		copyCentroid = opts.fallbackScreenCentroid();
 	}
+	const copyCentroid = copyWorldPoints.length
+		? ctx.viewport.worldToScreen(Vec2.centroid(copyWorldPoints))
+		: opts.fallbackScreenCentroid();
 
-	if (ctx.patternCheckboxPositions) {
-		ctx.patternCheckboxPositions.set(`c-${constraintId}-${copyIndex}`, {
-			x: copyCentroid.x,
-			y: copyCentroid.y,
-			copyIndex,
-			constraintId,
-		});
-	}
-
+	ctx.patternCheckboxPositions?.set(`c-${constraintId}-${copyIndex}`, {
+		x: copyCentroid.x,
+		y: copyCentroid.y,
+		copyIndex,
+		constraintId,
+	});
 	if (ctx.patternCheckboxGroup) {
 		renderPatternSuppressionCheckbox(ctx.patternCheckboxGroup, copyCentroid, copyIndex, isSuppressed, constraintId);
 	}
+}
+
+export function pointBadgePos(
+	sketch: SketchDocument,
+	viewport: Viewport,
+	pointId: string,
+	dx = 0,
+	dy = 14
+): Vec2 | null {
+	const pt = sketch.points.get(pointId);
+	return pt ? viewport.worldToScreen(pt).add({ x: dx, y: dy }) : null;
+}
+
+export function renderPointBadge(
+	ctx: ConstraintRenderContext,
+	id: string,
+	pointId: string,
+	label: string,
+	dx = 0,
+	dy = 14,
+	color: string = COLORS.primary
+): void {
+	const pos = pointBadgePos(ctx.sketch, ctx.viewport, pointId, dx, dy);
+	if (pos) ctx.renderBadge(id, pos, label, color);
 }
 
 export function isConstraintOnlySelected(constraintId: string, sketch: SketchDocument): boolean {
@@ -182,32 +197,13 @@ export function isAngleNearArc(
 	if (!start || !end) return true;
 
 	const sCenter = viewport.worldToScreen(center);
-	const ss = viewport.worldToScreen(start);
-	const se = viewport.worldToScreen(end);
-	const as = sCenter.angleToPoint(ss);
-	const ae = sCenter.angleToPoint(se);
+	const as = sCenter.angleToPoint(viewport.worldToScreen(start));
+	const ae = sCenter.angleToPoint(viewport.worldToScreen(end));
 	const aPt = sCenter.angleToPoint(point);
-	const clockwise = !!arc.clockwise;
+	const sign = arc.clockwise ? 1 : -1;
+	const positive = (a: number) => ((a % TWO_PI) + TWO_PI) % TWO_PI;
+	const totalSweep = positive(sign * (ae - as));
+	const ptSweep = positive(sign * (aPt - as));
 
-	let totalSweep = 0;
-	let ptSweep = 0;
-	if (clockwise) {
-		totalSweep = (ae - as) % TWO_PI;
-		if (totalSweep < 0) totalSweep += TWO_PI;
-		ptSweep = (aPt - as) % TWO_PI;
-		if (ptSweep < 0) ptSweep += TWO_PI;
-	} else {
-		totalSweep = (as - ae) % TWO_PI;
-		if (totalSweep < 0) totalSweep += TWO_PI;
-		ptSweep = (as - aPt) % TWO_PI;
-		if (ptSweep < 0) ptSweep += TWO_PI;
-	}
-
-	if (ptSweep > totalSweep) {
-		const excessAngle = Math.min(ptSweep - totalSweep, TWO_PI - ptSweep);
-		if (excessAngle * rScreen > 60) {
-			return false;
-		}
-	}
-	return true;
+	return !(ptSweep > totalSweep && Math.min(ptSweep - totalSweep, TWO_PI - ptSweep) * rScreen > 60);
 }

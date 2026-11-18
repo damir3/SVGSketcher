@@ -28,7 +28,8 @@ export interface SketchSnapshot {
 }
 
 type Entity = { id: string };
-type EntityChange = { before: Entity | null; after: Entity | null };
+type Change<T = Entity> = { before: T | null; after: T | null };
+type DeltaMap<T = Entity> = Record<string, Change<T>>;
 type SnapshotCollection =
 	| 'points'
 	| 'lines'
@@ -41,59 +42,86 @@ type SnapshotCollection =
 	| 'images'
 	| 'constraints';
 type HistoryPatch = {
-	collections: Partial<Record<SnapshotCollection, Record<string, EntityChange>>>;
-	parameters?: Record<string, { before: SketchParameter | null; after: SketchParameter | null }>;
+	collections: Partial<Record<SnapshotCollection, DeltaMap>>;
+	parameters?: DeltaMap<SketchParameter>;
 	idCounter?: { before: number; after: number };
 	changedKeys: string[];
 	coalesce?: boolean;
 };
 
+const SNAPSHOT_COLLECTIONS: readonly SnapshotCollection[] = [
+	'points',
+	'lines',
+	'circles',
+	'arcs',
+	'ellipses',
+	'ellipticalArcs',
+	'splines',
+	'texts',
+	'images',
+	'constraints',
+];
+
 function equalValue(a: unknown, b: unknown): boolean {
 	return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function diffEntries<T>(
+	oldList: T[] | undefined,
+	newList: T[] | undefined,
+	getKey: (item: T) => string,
+	prefix: string,
+	changedKeys: string[]
+): DeltaMap<T> {
+	const oldMap = new Map((oldList ?? []).map(item => [getKey(item), item]));
+	const newMap = new Map((newList ?? []).map(item => [getKey(item), item]));
+	const delta: DeltaMap<T> = {};
+	for (const key of new Set([...oldMap.keys(), ...newMap.keys()])) {
+		const before = oldMap.get(key) ?? null;
+		const after = newMap.get(key) ?? null;
+		if (!equalValue(before, after)) {
+			delta[key] = { before, after };
+			changedKeys.push(`${prefix}:${key}`);
+		}
+	}
+	return delta;
+}
+
+function applyDelta<T>(
+	list: T[] | undefined,
+	delta: DeltaMap<T>,
+	getKey: (item: T) => string,
+	direction: 'before' | 'after'
+): T[] {
+	const map = new Map((list ?? []).map(item => [getKey(item), item]));
+	for (const [key, change] of Object.entries(delta)) {
+		const value = change[direction];
+		if (value) map.set(key, value);
+		else map.delete(key);
+	}
+	return [...map.values()];
+}
+
+function mergeDelta<T>(target: DeltaMap<T>, source: DeltaMap<T>): void {
+	for (const [key, change] of Object.entries(source)) {
+		target[key] = { before: target[key] ? target[key].before : change.before, after: change.after };
+	}
+}
+
 function makePatch(before: SketchSnapshot, after: SketchSnapshot): HistoryPatch | null {
-	const collections: SnapshotCollection[] = [
-		'points',
-		'lines',
-		'circles',
-		'arcs',
-		'ellipses',
-		'ellipticalArcs',
-		'splines',
-		'texts',
-		'images',
-		'constraints',
-	];
 	const changes: HistoryPatch['collections'] = {};
 	const changedKeys: string[] = [];
-	for (const name of collections) {
-		const oldList = (before[name] ?? []) as Entity[];
-		const newList = (after[name] ?? []) as Entity[];
-		const oldMap = new Map(oldList.map(item => [item.id, item]));
-		const newMap = new Map(newList.map(item => [item.id, item]));
-		const delta: Record<string, EntityChange> = {};
-		for (const id of new Set([...oldMap.keys(), ...newMap.keys()])) {
-			const oldItem = oldMap.get(id) ?? null;
-			const newItem = newMap.get(id) ?? null;
-			if (!equalValue(oldItem, newItem)) {
-				delta[id] = { before: oldItem, after: newItem };
-				changedKeys.push(`${name}:${id}`);
-			}
-		}
+	for (const name of SNAPSHOT_COLLECTIONS) {
+		const delta = diffEntries(
+			before[name] as Entity[] | undefined,
+			after[name] as Entity[] | undefined,
+			item => item.id,
+			name,
+			changedKeys
+		);
 		if (Object.keys(delta).length) changes[name] = delta;
 	}
-	const oldParameters = new Map((before.parameters ?? []).map(item => [item.name, item]));
-	const newParameters = new Map((after.parameters ?? []).map(item => [item.name, item]));
-	const parameterChanges: NonNullable<HistoryPatch['parameters']> = {};
-	for (const name of new Set([...oldParameters.keys(), ...newParameters.keys()])) {
-		const oldItem = oldParameters.get(name) ?? null;
-		const newItem = newParameters.get(name) ?? null;
-		if (!equalValue(oldItem, newItem)) {
-			parameterChanges[name] = { before: oldItem, after: newItem };
-			changedKeys.push(`parameters:${name}`);
-		}
-	}
+	const parameterChanges = diffEntries(before.parameters, after.parameters, p => p.name, 'parameters', changedKeys);
 	const patch: HistoryPatch = { collections: changes, changedKeys };
 	if (Object.keys(parameterChanges).length) patch.parameters = parameterChanges;
 	if (before.idCounter !== after.idCounter) {
@@ -114,46 +142,22 @@ function applyPatch(snapshot: SketchSnapshot, patch: HistoryPatch, direction: 'b
 		ellipticalArcs: [...(snapshot.ellipticalArcs ?? [])],
 		constraints: [...snapshot.constraints],
 	};
-	if (snapshot.splines || patch.collections.splines) result.splines = [...(snapshot.splines ?? [])];
-	if (snapshot.texts || patch.collections.texts) result.texts = [...(snapshot.texts ?? [])];
-	if (snapshot.images || patch.collections.images) result.images = [...(snapshot.images ?? [])];
-	if (snapshot.parameters || patch.parameters) result.parameters = [...(snapshot.parameters ?? [])];
-	for (const [name, delta] of Object.entries(patch.collections) as [
-		SnapshotCollection,
-		Record<string, EntityChange>,
-	][]) {
-		const list = result[name] as Entity[];
-		const map = new Map(list.map(item => [item.id, item]));
-		for (const [id, change] of Object.entries(delta)) {
-			const value = change[direction];
-			if (value) map.set(id, value);
-			else map.delete(id);
-		}
-		(result as any)[name] = [...map.values()];
+	for (const [name, delta] of Object.entries(patch.collections) as [SnapshotCollection, DeltaMap][]) {
+		(result as any)[name] = applyDelta(result[name] as Entity[] | undefined, delta, item => item.id, direction);
 	}
-	if (patch.parameters) {
-		const map = new Map((result.parameters ?? []).map(item => [item.name, item]));
-		for (const [name, change] of Object.entries(patch.parameters)) {
-			const value = change[direction];
-			if (value) map.set(name, value);
-			else map.delete(name);
-		}
-		result.parameters = [...map.values()];
-	}
+	if (patch.parameters) result.parameters = applyDelta(result.parameters, patch.parameters, p => p.name, direction);
 	if (patch.idCounter) result.idCounter = patch.idCounter[direction];
 	return result;
 }
 
 function patchHasChanges(patch: HistoryPatch): boolean {
-	for (const delta of Object.values(patch.collections)) {
-		for (const change of Object.values(delta ?? {})) {
-			if (!equalValue(change.before, change.after)) return true;
-		}
-	}
-	for (const change of Object.values(patch.parameters ?? {})) {
-		if (!equalValue(change.before, change.after)) return true;
-	}
-	return !!patch.idCounter && patch.idCounter.before !== patch.idCounter.after;
+	const hasDeltaChanges = (delta?: DeltaMap<unknown>) =>
+		Object.values(delta ?? {}).some(change => !equalValue(change.before, change.after));
+	return (
+		Object.values(patch.collections).some(hasDeltaChanges) ||
+		hasDeltaChanges(patch.parameters) ||
+		(!!patch.idCounter && patch.idCounter.before !== patch.idCounter.after)
+	);
 }
 
 export class HistoryManager {
@@ -183,24 +187,10 @@ export class HistoryManager {
 			previous.changedKeys.length === patch.changedKeys.length &&
 			previous.changedKeys.every(key => patch.changedKeys.includes(key))
 		) {
-			for (const [name, entities] of Object.entries(patch.collections) as [
-				SnapshotCollection,
-				Record<string, EntityChange>,
-			][]) {
-				const target = previous.collections[name] ?? (previous.collections[name] = {});
-				for (const [id, change] of Object.entries(entities))
-					target[id] = {
-						before: target[id] ? target[id].before : change.before,
-						after: change.after,
-					};
+			for (const [name, entities] of Object.entries(patch.collections) as [SnapshotCollection, DeltaMap][]) {
+				mergeDelta(previous.collections[name] ?? (previous.collections[name] = {}), entities);
 			}
-			for (const [name, change] of Object.entries(patch.parameters ?? {})) {
-				const target = previous.parameters ?? (previous.parameters = {});
-				target[name] = {
-					before: target[name] ? target[name].before : change.before,
-					after: change.after,
-				};
-			}
+			if (patch.parameters) mergeDelta(previous.parameters ?? (previous.parameters = {}), patch.parameters);
 			if (patch.idCounter)
 				previous.idCounter = {
 					before: previous.idCounter?.before ?? patch.idCounter.before,

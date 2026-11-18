@@ -4,8 +4,7 @@ import type { Viewport } from '../../canvas/viewport';
 import { distanceToPoint } from '../../math/hitTest';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
-import { COLORS } from '../../canvas/styles';
+import { pointBadgePos, renderPointBadge, type ConstraintRenderContext } from './renderContext';
 
 /**
  * Makes two points coincide
@@ -52,16 +51,11 @@ export class CoincidentConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): number | null {
-		const point = sketch.points.get(this.p1Id);
-		if (!point) return null;
-		const position = viewport.worldToScreen(point);
-		return distanceToPoint(screen, position.subScalar(12));
+		const pos = pointBadgePos(sketch, viewport, this.p1Id, -12, -12);
+		return pos ? distanceToPoint(screen, pos) : null;
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pt = ctx.sketch.points.get(this.p1Id);
-		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, s.clone().subScalar(12), '●', COLORS.primary);
+		renderPointBadge(ctx, this.id, this.p1Id, '●', -12, -12);
 	}
 }

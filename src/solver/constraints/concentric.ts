@@ -1,7 +1,6 @@
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
-import { COLORS } from '../../canvas/styles';
+import { renderPointBadge, type ConstraintRenderContext } from './renderContext';
 
 /**
  * Concentric circles: centers coincide
@@ -42,9 +41,6 @@ export class ConcentricConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pt = ctx.sketch.points.get(this.c1CenterId);
-		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, s.clone().addScalar(12), '◎', COLORS.primary);
+		renderPointBadge(ctx, this.id, this.c1CenterId, '◎', 12, 12);
 	}
 }

@@ -4,8 +4,7 @@ import { distanceToPoint } from '../../math/hitTest';
 import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
-import { COLORS } from '../../canvas/styles';
+import { pointBadgePos, renderPointBadge, type ConstraintRenderContext } from './renderContext';
 
 export function signedDistanceToLine(point: Vec2, start: Vec2, end: Vec2): number {
 	const dir = new Vec2().subVectors(end, start);
@@ -73,16 +72,11 @@ export class PointOnLineConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): number | null {
-		const point = sketch.points.get(this.pointId);
-		if (!point) return null;
-		const position = viewport.worldToScreen(point);
-		return distanceToPoint(screen, new Vec2(position.x, position.y + 14));
+		const pos = pointBadgePos(sketch, viewport, this.pointId);
+		return pos ? distanceToPoint(screen, pos) : null;
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const pt = ctx.sketch.points.get(this.pointId);
-		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, new Vec2(s.x, s.y + 14), '⚲', COLORS.primary);
+		renderPointBadge(ctx, this.id, this.pointId, '⚲');
 	}
 }

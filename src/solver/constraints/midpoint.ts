@@ -1,8 +1,6 @@
-import { Vec2 } from '../../math/vector';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
-import type { ConstraintRenderContext } from './renderContext';
-import { COLORS } from '../../canvas/styles';
+import { pointBadgePos, renderPointBadge, type ConstraintRenderContext } from './renderContext';
 import { distanceToPoint } from '../../math/hitTest';
 
 /**
@@ -70,16 +68,11 @@ export class MidpointConstraint extends BaseConstraint {
 
 	override render(ctx: ConstraintRenderContext): void {
 		if (this.isInternalConstraint(ctx.sketch)) return;
-		const pt = ctx.sketch.points.get(this.midId);
-		if (!pt) return;
-		const s = ctx.viewport.worldToScreen(pt);
-		ctx.renderBadge(this.id, new Vec2(s.x, s.y - 14), 'M', COLORS.primary);
+		renderPointBadge(ctx, this.id, this.midId, 'M', 0, -14);
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const pt = sketch.points.get(this.midId);
-		if (!pt) return null;
-		const s = viewport.worldToScreen(pt);
-		return distanceToPoint(screen, new Vec2(s.x, s.y - 14));
+		const pos = pointBadgePos(sketch, viewport, this.midId, 0, -14);
+		return pos ? distanceToPoint(screen, pos) : null;
 	}
 }
