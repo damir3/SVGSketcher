@@ -13,25 +13,18 @@ export const AVAILABLE_FONTS: FontInfo[] = [
 ];
 
 const fontCache = new Map<string, opentype.Font>();
+const FONT_STYLES = [
+	[false, false],
+	[true, false],
+	[false, true],
+	[true, true],
+] as const;
 
 function getFontFileName(family: string, bold: boolean, italic: boolean): string {
 	const fam = family.toLowerCase();
-	if (fam.includes('times')) {
-		if (bold && italic) return 'TimesNewRoman-BoldItalic.ttf';
-		if (bold) return 'TimesNewRoman-Bold.ttf';
-		if (italic) return 'TimesNewRoman-Italic.ttf';
-		return 'TimesNewRoman.ttf';
-	}
-	if (fam.includes('courier')) {
-		if (bold && italic) return 'CourierNew-BoldItalic.ttf';
-		if (bold) return 'CourierNew-Bold.ttf';
-		if (italic) return 'CourierNew-Italic.ttf';
-		return 'CourierNew.ttf';
-	}
-	if (bold && italic) return 'Arial-BoldItalic.ttf';
-	if (bold) return 'Arial-Bold.ttf';
-	if (italic) return 'Arial-Italic.ttf';
-	return 'Arial.ttf';
+	const base = fam.includes('times') ? 'TimesNewRoman' : fam.includes('courier') ? 'CourierNew' : 'Arial';
+	const suffix = bold && italic ? '-BoldItalic' : bold ? '-Bold' : italic ? '-Italic' : '';
+	return `${base}${suffix}.ttf`;
 }
 
 function getCacheKey(family: string, bold: boolean, italic: boolean): string {
@@ -56,8 +49,7 @@ export function getFontSync(family = 'Arial', bold = false, italic = false): ope
 
 	// If in Node.js environment
 	const proc = (globalThis as any).process;
-	const isNode = typeof proc !== 'undefined' && Boolean(proc?.versions?.node);
-	if (isNode) {
+	if (typeof proc !== 'undefined' && Boolean(proc?.versions?.node)) {
 		try {
 			const fs = proc?.getBuiltinModule?.('fs') ?? proc?.mainModule?.require?.('fs');
 			const path = proc?.getBuiltinModule?.('path') ?? proc?.mainModule?.require?.('path');
@@ -143,10 +135,9 @@ export async function loadFontFromFile(file: File | Blob, nameHint?: string): Pr
 		(typeof File !== 'undefined' && file instanceof File ? file.name.replace(/\.[^/.]+$/, '') : 'Custom Font');
 
 	const id = familyName;
-	fontCache.set(getCacheKey(id, false, false), font);
-	fontCache.set(getCacheKey(id, true, false), font);
-	fontCache.set(getCacheKey(id, false, true), font);
-	fontCache.set(getCacheKey(id, true, true), font);
+	for (const [b, i] of FONT_STYLES) {
+		fontCache.set(getCacheKey(id, b, i), font);
+	}
 
 	let info = AVAILABLE_FONTS.find(f => f.id === id);
 	if (!info) {
@@ -252,18 +243,7 @@ export async function loadSystemFontBlob(family: string, bold = false, italic = 
  * Preload standard fonts on app startup.
  */
 export async function preloadFonts(): Promise<void> {
-	await Promise.all([
-		loadFontAsync('Arial', false, false),
-		loadFontAsync('Arial', true, false),
-		loadFontAsync('Arial', false, true),
-		loadFontAsync('Arial', true, true),
-		loadFontAsync('Times New Roman', false, false),
-		loadFontAsync('Times New Roman', true, false),
-		loadFontAsync('Times New Roman', false, true),
-		loadFontAsync('Times New Roman', true, true),
-		loadFontAsync('Courier New', false, false),
-		loadFontAsync('Courier New', true, false),
-		loadFontAsync('Courier New', false, true),
-		loadFontAsync('Courier New', true, true),
-	]);
+	await Promise.all(
+		['Arial', 'Times New Roman', 'Courier New'].flatMap(fam => FONT_STYLES.map(([b, i]) => loadFontAsync(fam, b, i)))
+	);
 }

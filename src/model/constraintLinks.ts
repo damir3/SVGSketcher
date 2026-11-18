@@ -504,6 +504,9 @@ export function getEntitiesForConstraint(
 	const addPoint = (id?: string) => {
 		if (id && sketch.points.get(id)) add(id, 'point');
 	};
+	const addResolvedLine = (line: SketchLine | undefined) => {
+		if (line) add(line.id, 'line');
+	};
 	const addLineOrPoints = (p1Id: string, p2Id: string) => {
 		const line = sketch.getLineBetween(p1Id, p2Id);
 		if (line) add(line.id, 'line');
@@ -535,27 +538,22 @@ export function getEntitiesForConstraint(
 	} else if (c.type === 'point_to_line_distance') {
 		if (anyC.constrainedLineId) add(anyC.constrainedLineId, 'line');
 		addPoint(anyC.pointId);
-		if (anyC.lineId && sketch.lines.has(anyC.lineId)) {
-			add(anyC.lineId, 'line');
-		} else {
-			const line = lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id);
-			if (line) add(line.id, 'line');
-		}
+		addResolvedLine(
+			anyC.lineId && sketch.lines.has(anyC.lineId)
+				? sketch.lines.get(anyC.lineId)
+				: lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id)
+		);
 	} else if (c.type === 'radius') {
 		addRadial(anyC.circleId);
 	} else if (c.type === 'equal_radius' || c.type === 'tangent_circle_circle') {
 		addRadial(anyC.circle1Id);
 		addRadial(anyC.circle2Id);
 	} else if (c.type === 'equal_length') {
-		const l1 = sketch.getLineBetween(anyC.line1P1, anyC.line1P2);
-		const l2 = sketch.getLineBetween(anyC.line2P1, anyC.line2P2);
-		if (l1) add(l1.id, 'line');
-		if (l2) add(l2.id, 'line');
+		addResolvedLine(sketch.getLineBetween(anyC.line1P1, anyC.line1P2));
+		addResolvedLine(sketch.getLineBetween(anyC.line2P1, anyC.line2P2));
 	} else if (c.type === 'parallel' || c.type === 'perpendicular') {
-		const l1 = lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
-		const l2 = lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
-		if (l1) add(l1.id, 'line');
-		if (l2) add(l2.id, 'line');
+		addResolvedLine(lineFromPoints(sketch, anyC.l1P1, anyC.l1P2));
+		addResolvedLine(lineFromPoints(sketch, anyC.l2P1, anyC.l2P2));
 	} else if (c.type === 'collinear') {
 		const l1 = lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
 		const l2 = lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
@@ -568,13 +566,11 @@ export function getEntitiesForConstraint(
 	} else if (c.type === 'symmetry') {
 		addPoint(anyC.p1Id);
 		addPoint(anyC.p2Id);
-		if (anyC.lineId === 'origin') {
-			add('origin', 'point');
-		} else {
-			const line =
-				(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id);
-			if (line) add(line.id, 'line');
-		}
+		if (anyC.lineId === 'origin') add('origin', 'point');
+		else
+			addResolvedLine(
+				(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id)
+			);
 	} else if (c.type === 'circular_pattern') {
 		const cpat = c as CircularPatternConstraint;
 		const links = cpat.isReadOnly ? 'all' : patternLinks;
@@ -596,18 +592,13 @@ export function getEntitiesForConstraint(
 				[anyC.line1Id, anyC.l1P1, anyC.l1P2],
 				[anyC.line2Id, anyC.l2P1, anyC.l2P2],
 			] as const) {
-				if (lineId && sketch.arcs.has(lineId)) {
-					add(lineId, 'arc');
-				} else {
-					const l = sketch.getLine(lineId) ?? lineFromPoints(sketch, pA, pB);
-					if (l) add(l.id, 'line');
-				}
+				if (lineId && sketch.arcs.has(lineId)) add(lineId, 'arc');
+				else addResolvedLine(sketch.getLine(lineId) ?? lineFromPoints(sketch, pA, pB));
 			}
 		}
 	} else if (c.type === 'point_on_line') {
 		addPoint(anyC.pointId);
-		const line = lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id);
-		if (line) add(line.id, 'line');
+		addResolvedLine(lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id));
 	} else if (c.type === 'point_on_circle') {
 		addPoint(anyC.pointId);
 		addRadial(anyC.circleId);
@@ -618,9 +609,9 @@ export function getEntitiesForConstraint(
 		addPoint(anyC.pointId);
 		if (sketch.splines.has(anyC.splineId)) add(anyC.splineId, 'spline');
 	} else if (c.type === 'tangent_line_circle') {
-		const line =
-			(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id);
-		if (line) add(line.id, 'line');
+		addResolvedLine(
+			(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id)
+		);
 		addRadial(anyC.circleId);
 	} else if (c.type === 'concentric') {
 		addConcentricEnd(anyC.c1CenterId);

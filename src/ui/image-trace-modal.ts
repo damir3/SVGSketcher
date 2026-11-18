@@ -242,6 +242,14 @@ export class ImageTraceModal {
 		this.dialogEl = this.container.querySelector('.trace-modal-dialog');
 	}
 
+	private getShownMinSegment(): number {
+		const s = this.settings;
+		if (!s.autoMinSegment) return s.minSegment;
+		const refW = this.latestResult?.width ?? this.currentImage?.naturalWidth ?? 1000;
+		const refH = this.latestResult?.height ?? this.currentImage?.naturalHeight ?? 1000;
+		return Math.round(getAutoMinSegment(s, refW, refH));
+	}
+
 	private syncControlsFromSettings(): void {
 		if (!this.container) return;
 		const s = this.settings;
@@ -258,39 +266,40 @@ export class ImageTraceModal {
 		this.setSelectValue('#trace-outline-algo', s.outlineAlgorithm);
 		this.setSelectValue('#trace-centerline-algo', s.centerlineAlgorithm);
 		this.setSelectValue('#trace-max-res', String(s.maxResolution));
-
-		this.setCheckbox('#trace-auto-threshold', s.autoThreshold);
-		const shownThreshold = this.latestResult && s.autoThreshold ? this.latestResult.threshold : s.threshold;
-		this.setSliderAndNumber('#trace-threshold-range', '#trace-threshold', shownThreshold);
-
-		this.setCheckbox('#trace-invert', s.invert);
-		this.setSliderAndNumber('#trace-blur-range', '#trace-blur', s.blur);
-		this.setSliderAndNumber('#trace-despeckle-range', '#trace-despeckle', s.despeckle);
-		this.setSliderAndNumber('#trace-tolerance-range', '#trace-tolerance', s.tolerance);
-
-		this.setCheckbox('#trace-auto-min-segment', s.autoMinSegment);
-		const refW = this.latestResult?.width ?? image?.naturalWidth ?? 1000;
-		const refH = this.latestResult?.height ?? image?.naturalHeight ?? 1000;
-		const shownMinSeg = s.autoMinSegment ? Math.round(getAutoMinSegment(s, refW, refH)) : s.minSegment;
-		this.setSliderAndNumber('#trace-min-segment-range', '#trace-min-segment', shownMinSeg);
-
-		this.setSliderAndNumber('#trace-smoothing-range', '#trace-smoothing', s.smoothing);
-		this.setSliderAndNumber('#trace-corner-angle-range', '#trace-corner-angle', s.cornerAngle);
-		this.setCheckbox('#trace-use-splines', s.useSplines);
-		this.setCheckbox('#trace-use-lines', s.useLines, s.useSplines);
-		this.setCheckbox('#trace-use-arcs', s.useArcs, s.useSplines);
-		this.setCheckbox('#trace-use-circles', s.useCircles, s.useSplines);
-		this.setCheckbox('#trace-include-splines', s.useSplines || s.includeSplines, s.useSplines);
-
-		this.setCheckbox('#trace-c-tangent', s.constraints.tangent);
-		this.setCheckbox('#trace-c-hv', s.constraints.horizontalVertical);
-		this.setCheckbox('#trace-c-pp', s.constraints.parallelPerpendicular);
-		this.setCheckbox('#trace-c-equal', s.constraints.equal);
-		this.setCheckbox('#trace-c-concentric', s.constraints.concentric);
-		this.setSliderAndNumber('#trace-angle-tol-range', '#trace-angle-tol', s.angleTolerance);
-
-		this.setCheckbox('#trace-construction', s.construction);
 		this.setSelectValue('#trace-after-convert', s.afterConvert);
+
+		const shownThreshold = this.latestResult && s.autoThreshold ? this.latestResult.threshold : s.threshold;
+		for (const [id, value] of [
+			['#trace-threshold', shownThreshold],
+			['#trace-blur', s.blur],
+			['#trace-despeckle', s.despeckle],
+			['#trace-tolerance', s.tolerance],
+			['#trace-min-segment', this.getShownMinSegment()],
+			['#trace-smoothing', s.smoothing],
+			['#trace-corner-angle', s.cornerAngle],
+			['#trace-angle-tol', s.angleTolerance],
+		] as const) {
+			this.setSliderAndNumber(id, value);
+		}
+
+		for (const [id, checked, disabled] of [
+			['#trace-auto-threshold', s.autoThreshold, false],
+			['#trace-invert', s.invert, false],
+			['#trace-auto-min-segment', s.autoMinSegment, false],
+			['#trace-use-splines', s.useSplines, false],
+			['#trace-use-lines', s.useLines, s.useSplines],
+			['#trace-use-arcs', s.useArcs, s.useSplines],
+			['#trace-use-circles', s.useCircles, s.useSplines],
+			['#trace-include-splines', s.useSplines || s.includeSplines, s.useSplines],
+			['#trace-c-tangent', s.constraints.tangent, false],
+			['#trace-c-hv', s.constraints.horizontalVertical, false],
+			['#trace-c-pp', s.constraints.parallelPerpendicular, false],
+			['#trace-c-equal', s.constraints.equal, false],
+			['#trace-c-concentric', s.constraints.concentric, false],
+			['#trace-construction', s.construction, false],
+		] as const) {
+			this.setCheckbox(id, checked, disabled);
+		}
 	}
 
 	private setSelectValue(selector: string, value: string): void {
@@ -306,10 +315,10 @@ export class ImageTraceModal {
 		}
 	}
 
-	private setSliderAndNumber(rangeSelector: string, numSelector: string, value: number): void {
+	private setSliderAndNumber(selector: string, value: number): void {
 		const str = String(Number(value.toFixed(2)));
-		const rangeEl = this.container?.querySelector<HTMLInputElement>(rangeSelector);
-		const numEl = this.container?.querySelector<HTMLInputElement>(numSelector);
+		const rangeEl = this.container?.querySelector<HTMLInputElement>(`${selector}-range`);
+		const numEl = this.container?.querySelector<HTMLInputElement>(selector);
 		if (rangeEl) rangeEl.value = str;
 		if (numEl) numEl.value = str;
 	}
@@ -317,6 +326,14 @@ export class ImageTraceModal {
 	private bindEvents(): void {
 		if (!this.container) return;
 		const c = this.container;
+		const bindSelect = (selector: string, onChange: (val: string) => void) =>
+			c.querySelector<HTMLSelectElement>(selector)?.addEventListener('change', e => {
+				onChange((e.target as HTMLSelectElement).value);
+			});
+		const bindCheck = (selector: string, onChange: (checked: boolean) => void) =>
+			c.querySelector<HTMLInputElement>(selector)?.addEventListener('change', e => {
+				onChange((e.target as HTMLInputElement).checked);
+			});
 
 		c.querySelector('#btn-close-trace-modal')?.addEventListener('click', () => this.close());
 		c.querySelector('#btn-trace-cancel')?.addEventListener('click', () => this.close());
@@ -337,89 +354,80 @@ export class ImageTraceModal {
 			});
 		});
 
-		c.querySelector<HTMLSelectElement>('#trace-outline-algo')?.addEventListener('change', e => {
-			this.settings.outlineAlgorithm = (e.target as HTMLSelectElement).value as OutlineAlgorithm;
+		bindSelect('#trace-outline-algo', val => {
+			this.settings.outlineAlgorithm = val as OutlineAlgorithm;
 			this.scheduleTrace();
 		});
-
-		c.querySelector<HTMLSelectElement>('#trace-centerline-algo')?.addEventListener('change', e => {
-			this.settings.centerlineAlgorithm = (e.target as HTMLSelectElement).value as CenterlineAlgorithm;
+		bindSelect('#trace-centerline-algo', val => {
+			this.settings.centerlineAlgorithm = val as CenterlineAlgorithm;
 			this.scheduleTrace();
 		});
-
-		c.querySelector<HTMLSelectElement>('#trace-max-res')?.addEventListener('change', e => {
-			this.settings.maxResolution = Number((e.target as HTMLSelectElement).value) || 1000;
+		bindSelect('#trace-max-res', val => {
+			this.settings.maxResolution = Number(val) || 1000;
 			this.scheduleTrace();
 		});
-
-		c.querySelector<HTMLInputElement>('#trace-auto-threshold')?.addEventListener('change', e => {
-			this.settings.autoThreshold = (e.target as HTMLInputElement).checked;
-			this.scheduleTrace();
+		bindSelect('#trace-after-convert', val => {
+			this.settings.afterConvert = val as ImageAfterConvert;
 		});
 
-		this.bindLinkedSlider('#trace-threshold-range', '#trace-threshold', 1, 255, val => {
+		bindCheck('#trace-auto-threshold', checked => {
+			this.settings.autoThreshold = checked;
+			this.scheduleTrace();
+		});
+		bindCheck('#trace-invert', checked => {
+			this.settings.invert = checked;
+			this.scheduleTrace();
+		});
+		bindCheck('#trace-auto-min-segment', checked => {
+			this.settings.autoMinSegment = checked;
+			this.syncControlsFromSettings();
+			this.scheduleTrace();
+		});
+		bindCheck('#trace-use-splines', checked => {
+			this.settings.useSplines = checked;
+			this.syncControlsFromSettings();
+			this.scheduleTrace();
+		});
+		bindCheck('#trace-construction', checked => {
+			this.settings.construction = checked;
+			this.notifyPreview();
+		});
+
+		this.bindLinkedSlider('#trace-threshold', 1, 255, val => {
 			this.settings.autoThreshold = false;
 			this.settings.threshold = Math.round(val);
 			this.setCheckbox('#trace-auto-threshold', false);
 			this.scheduleTrace();
 		});
-
-		c.querySelector<HTMLInputElement>('#trace-invert')?.addEventListener('change', e => {
-			this.settings.invert = (e.target as HTMLInputElement).checked;
-			this.scheduleTrace();
-		});
-
-		this.bindLinkedSlider('#trace-blur-range', '#trace-blur', 0, 5, val => {
+		this.bindLinkedSlider('#trace-blur', 0, 5, val => {
 			this.settings.blur = val;
 			this.scheduleTrace();
 		});
-
-		this.bindLinkedSlider('#trace-despeckle-range', '#trace-despeckle', 0, 500, val => {
+		this.bindLinkedSlider('#trace-despeckle', 0, 500, val => {
 			this.settings.despeckle = Math.round(val);
 			this.scheduleTrace();
 		});
-
-		this.bindLinkedSlider('#trace-tolerance-range', '#trace-tolerance', 0.1, 25, val => {
+		this.bindLinkedSlider('#trace-tolerance', 0.1, 25, val => {
 			this.settings.tolerance = val;
-			if (this.settings.autoMinSegment) {
-				const refW = this.latestResult?.width ?? this.currentImage?.naturalWidth ?? 1000;
-				const refH = this.latestResult?.height ?? this.currentImage?.naturalHeight ?? 1000;
-				this.setSliderAndNumber(
-					'#trace-min-segment-range',
-					'#trace-min-segment',
-					Math.round(getAutoMinSegment(this.settings, refW, refH))
-				);
-			}
+			if (this.settings.autoMinSegment) this.setSliderAndNumber('#trace-min-segment', this.getShownMinSegment());
 			this.scheduleTrace();
 		});
-
-		c.querySelector<HTMLInputElement>('#trace-auto-min-segment')?.addEventListener('change', e => {
-			this.settings.autoMinSegment = (e.target as HTMLInputElement).checked;
-			this.syncControlsFromSettings();
-			this.scheduleTrace();
-		});
-
-		this.bindLinkedSlider('#trace-min-segment-range', '#trace-min-segment', 2, 300, val => {
+		this.bindLinkedSlider('#trace-min-segment', 2, 300, val => {
 			this.settings.autoMinSegment = false;
 			this.settings.minSegment = Math.round(val);
 			this.setCheckbox('#trace-auto-min-segment', false);
 			this.scheduleTrace();
 		});
-
-		this.bindLinkedSlider('#trace-smoothing-range', '#trace-smoothing', 0, 10, val => {
+		this.bindLinkedSlider('#trace-smoothing', 0, 10, val => {
 			this.settings.smoothing = val;
 			this.scheduleTrace();
 		});
-
-		this.bindLinkedSlider('#trace-corner-angle-range', '#trace-corner-angle', 10, 120, val => {
+		this.bindLinkedSlider('#trace-corner-angle', 10, 120, val => {
 			this.settings.cornerAngle = Math.round(val);
 			this.scheduleTrace();
 		});
-
-		c.querySelector<HTMLInputElement>('#trace-use-splines')?.addEventListener('change', e => {
-			this.settings.useSplines = (e.target as HTMLInputElement).checked;
-			this.syncControlsFromSettings();
-			this.scheduleTrace();
+		this.bindLinkedSlider('#trace-angle-tol', 0.5, 15, val => {
+			this.settings.angleTolerance = val;
 		});
 
 		for (const [selector, key] of [
@@ -428,8 +436,8 @@ export class ImageTraceModal {
 			['#trace-use-arcs', 'useArcs'],
 			['#trace-use-circles', 'useCircles'],
 		] as const) {
-			c.querySelector<HTMLInputElement>(selector)?.addEventListener('change', e => {
-				this.settings[key] = (e.target as HTMLInputElement).checked;
+			bindCheck(selector, checked => {
+				this.settings[key] = checked;
 				this.updatePrimitiveFilter();
 			});
 		}
@@ -441,23 +449,10 @@ export class ImageTraceModal {
 			['#trace-c-equal', 'equal'],
 			['#trace-c-concentric', 'concentric'],
 		] as const) {
-			c.querySelector<HTMLInputElement>(selector)?.addEventListener('change', e => {
-				this.settings.constraints[key] = (e.target as HTMLInputElement).checked;
+			bindCheck(selector, checked => {
+				this.settings.constraints[key] = checked;
 			});
 		}
-
-		this.bindLinkedSlider('#trace-angle-tol-range', '#trace-angle-tol', 0.5, 15, val => {
-			this.settings.angleTolerance = val;
-		});
-
-		c.querySelector<HTMLInputElement>('#trace-construction')?.addEventListener('change', e => {
-			this.settings.construction = (e.target as HTMLInputElement).checked;
-			this.notifyPreview();
-		});
-
-		c.querySelector<HTMLSelectElement>('#trace-after-convert')?.addEventListener('change', e => {
-			this.settings.afterConvert = (e.target as HTMLSelectElement).value as ImageAfterConvert;
-		});
 
 		// Dragging by header so the user can move the dialog freely around the canvas
 		const handle = c.querySelector<HTMLElement>('[data-trace-drag-handle]');
@@ -494,15 +489,9 @@ export class ImageTraceModal {
 		});
 	}
 
-	private bindLinkedSlider(
-		rangeSelector: string,
-		numSelector: string,
-		min: number,
-		max: number,
-		onChange: (val: number) => void
-	): void {
-		const rangeEl = this.container?.querySelector<HTMLInputElement>(rangeSelector);
-		const numEl = this.container?.querySelector<HTMLInputElement>(numSelector);
+	private bindLinkedSlider(selector: string, min: number, max: number, onChange: (val: number) => void): void {
+		const rangeEl = this.container?.querySelector<HTMLInputElement>(`${selector}-range`);
+		const numEl = this.container?.querySelector<HTMLInputElement>(selector);
 		if (!rangeEl || !numEl) return;
 
 		rangeEl.addEventListener('input', () => {
@@ -564,11 +553,10 @@ export class ImageTraceModal {
 			this.unfilteredResult = result;
 			this.isTracing = false;
 			if (this.settings.autoThreshold) {
-				this.setSliderAndNumber('#trace-threshold-range', '#trace-threshold', result.threshold);
+				this.setSliderAndNumber('#trace-threshold', result.threshold);
 			}
 			if (this.settings.autoMinSegment) {
 				this.setSliderAndNumber(
-					'#trace-min-segment-range',
 					'#trace-min-segment',
 					Math.round(getAutoMinSegment(this.settings, result.width, result.height))
 				);

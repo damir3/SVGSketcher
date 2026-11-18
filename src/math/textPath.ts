@@ -21,6 +21,16 @@ export interface TextLayoutOptions {
 export { type CurveSample, type PathEvaluator } from './curvePath';
 export { createCurvePath as createPathEvaluator } from './curvePath';
 
+function measureGlyphRun(glyphs: opentype.Glyph[], scale: number, spacingRatio: number) {
+	const rawWidths = glyphs.map(g => (g.advanceWidth || 0) * scale);
+	const charSpacings = rawWidths.map(w => w * spacingRatio);
+	let totalWidth = 0;
+	for (let i = 0; i < rawWidths.length; i++) {
+		totalWidth += rawWidths[i] + (i < rawWidths.length - 1 ? charSpacings[i] : 0);
+	}
+	return { rawWidths, charSpacings, totalWidth };
+}
+
 /**
  * Generates an SVG path data string (d="...") representing the text.
  */
@@ -34,6 +44,7 @@ export function generateTextSvgPathData(
 	}
 
 	const isSvgCoord = options.coordSystem === 'svg';
+	const toOut = (cad: Vec2) => (isSvgCoord ? new Vec2(cad.x, -cad.y) : cad);
 	let effectiveHeight = options.height;
 	let scale = effectiveHeight / font.unitsPerEm;
 	const spacingRatio = options.characterSpacing / 100;
@@ -80,12 +91,11 @@ export function generateTextSvgPathData(
 			const lineGlyphs = font.stringToGlyphs(lineStr);
 			if (lineGlyphs.length === 0) continue;
 
-			const lineRawWidths = lineGlyphs.map(g => (g.advanceWidth || 0) * scale);
-			const lineCharSpacings = lineRawWidths.map(w => w * spacingRatio);
-			let lineTotalWidth = 0;
-			for (let i = 0; i < lineRawWidths.length; i++) {
-				lineTotalWidth += lineRawWidths[i] + (i < lineRawWidths.length - 1 ? lineCharSpacings[i] : 0);
-			}
+			const {
+				rawWidths: lineRawWidths,
+				charSpacings: lineCharSpacings,
+				totalWidth: lineTotalWidth,
+			} = measureGlyphRun(lineGlyphs, scale, spacingRatio);
 
 			let startX = 0;
 			if (options.alignment === 'center') {
@@ -117,13 +127,7 @@ export function generateTextSvgPathData(
 							ly = 2 * blockCenterY - ly;
 						}
 
-						// Map to CAD coordinates
-						const cad = center.clone().addScaledVector(ux, lx).addScaledVector(uy, ly);
-
-						if (isSvgCoord) {
-							return new Vec2(cad.x, -cad.y);
-						}
-						return cad;
+						return toOut(center.clone().addScaledVector(ux, lx).addScaledVector(uy, ly));
 					};
 
 					appendTransformedCommand(pathObj, cmd, transformLocal);
@@ -137,12 +141,9 @@ export function generateTextSvgPathData(
 		const glyphs = font.stringToGlyphs(singleLineText);
 		if (glyphs.length === 0) return '';
 
-		const rawWidths = glyphs.map(g => (g.advanceWidth || 0) * scale);
-		const charSpacings = rawWidths.map(w => w * spacingRatio);
-		let totalTextWidth = 0;
-		for (let i = 0; i < rawWidths.length; i++) {
-			totalTextWidth += rawWidths[i] + (i < rawWidths.length - 1 ? charSpacings[i] : 0);
-		}
+		const run = measureGlyphRun(glyphs, scale, spacingRatio);
+		const { rawWidths, charSpacings } = run;
+		let totalTextWidth = run.totalWidth;
 		const evaluator = createPathEvaluator(targetCurve);
 		const curveLen = evaluator.length;
 		if (curveLen <= 1e-3) return '';
@@ -204,13 +205,7 @@ export function generateTextSvgPathData(
 				const transformCurve = (x: number, y: number): Vec2 => {
 					const dx = x - w / 2;
 					const dy = normalOffset + normalDirection * y;
-
-					const cad = sample.point.clone().addScaledVector(tan, dx).addScaledVector(norm, dy);
-
-					if (isSvgCoord) {
-						return new Vec2(cad.x, -cad.y);
-					}
-					return cad;
+					return toOut(sample.point.clone().addScaledVector(tan, dx).addScaledVector(norm, dy));
 				};
 
 				appendTransformedCommand(pathObj, cmd, transformCurve);

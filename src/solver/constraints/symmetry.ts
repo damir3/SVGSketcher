@@ -87,31 +87,25 @@ export class SymmetryConstraint extends BaseConstraint {
 		return [...j0, ...j1];
 	}
 
-	override render(ctx: ConstraintRenderContext): void {
-		const p1 = ctx.sketch.points.get(this.p1Id);
-		const p2 = ctx.sketch.points.get(this.p2Id);
-		if (!p1 || !p2) return;
-
-		const s1 = ctx.viewport.worldToScreen(p1);
-		const s2 = ctx.viewport.worldToScreen(p2);
-
-		if (ctx.isSelected) {
-			createSvgLine(s1, s2, SYMMETRY_CHORD_ATTRS, ctx.targetGroup);
-		}
-
-		ctx.renderBadge(this.id, new Vec2(s1.x + 12, s1.y - 12), 'symmetry', COLORS.primary);
-		ctx.renderBadge(this.id, new Vec2(s2.x + 12, s2.y - 12), 'symmetry', COLORS.primary);
-	}
-
-	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+	private getBadgeGeometry(sketch: any, viewport: any) {
 		const p1 = sketch.points.get(this.p1Id);
 		const p2 = sketch.points.get(this.p2Id);
 		if (!p1 || !p2) return null;
-
 		const s1 = viewport.worldToScreen(p1);
 		const s2 = viewport.worldToScreen(p2);
-		const d1 = distanceToPoint(screen, new Vec2(s1.x + 12, s1.y - 12));
-		const d2 = distanceToPoint(screen, new Vec2(s2.x + 12, s2.y - 12));
-		return Math.min(d1, d2);
+		return { s1, s2, b1: new Vec2(s1.x + 12, s1.y - 12), b2: new Vec2(s2.x + 12, s2.y - 12) };
+	}
+
+	override render(ctx: ConstraintRenderContext): void {
+		const g = this.getBadgeGeometry(ctx.sketch, ctx.viewport);
+		if (!g) return;
+		if (ctx.isSelected) createSvgLine(g.s1, g.s2, SYMMETRY_CHORD_ATTRS, ctx.targetGroup);
+		ctx.renderBadge(this.id, g.b1, 'symmetry', COLORS.primary);
+		ctx.renderBadge(this.id, g.b2, 'symmetry', COLORS.primary);
+	}
+
+	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
+		const g = this.getBadgeGeometry(sketch, viewport);
+		return g ? Math.min(distanceToPoint(screen, g.b1), distanceToPoint(screen, g.b2)) : null;
 	}
 }
