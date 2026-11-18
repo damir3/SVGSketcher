@@ -1,3 +1,4 @@
+import { polygonEdge, pointAtDistance } from '../../../math/construction';
 import { BaseTool } from '../base';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
@@ -300,9 +301,7 @@ export class PolygonTool extends BaseTool {
 	}
 
 	private getEdgeEnd(start: Vec2, target: Vec2): Vec2 {
-		if (!this.sizeLocked) return target;
-		const angle = start.angleToPoint(target);
-		return start.clone().addScaledVector(Vec2.fromPolar(1, angle), this.size);
+		return this.sizeLocked ? pointAtDistance(start, target, this.size) : target;
 	}
 
 	private getEdgeSide(start: Vec2, end: Vec2, toward: Vec2): number {
@@ -313,14 +312,7 @@ export class PolygonTool extends BaseTool {
 	}
 
 	private getEdgeGeometry(start: Vec2, end: Vec2, reversed: boolean) {
-		const edge = new Vec2().subVectors(end, start);
-		const length = start.distanceTo(end);
-		const halfAngle = Math.PI / this.sides;
-		const normal = edge.clone().perpendicular().divideScalar(length);
-		const apothem = length / (2 * Math.tan(halfAngle));
-		const center = new Vec2().midpoint(start, end).addScaledVector(normal, reversed ? -apothem : apothem);
-		const angle = center.angleToPoint(reversed ? end : start);
-		return { center, radius: length / (2 * Math.sin(halfAngle)), angle };
+		return polygonEdge(start, end, this.sides, reversed);
 	}
 
 	private commitEdgePolygon(direction?: Vec2): boolean {

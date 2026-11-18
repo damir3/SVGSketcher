@@ -1,3 +1,4 @@
+import { polygonVertices } from '../math/construction';
 import type { SketchDocument } from './sketch';
 import { deselectEntity } from './selection';
 import type { SketchLine, SketchPoint } from './types';
@@ -555,17 +556,9 @@ export function addPolygon(
 
 	sketch.beginTransaction();
 
-	const R = options.radiusToVertex ? radius : radius / Math.cos(Math.PI / N);
-	const baseAngle = options.radiusToVertex ? angleRad : angleRad - Math.PI / N;
-	const step = (2 * Math.PI) / N;
-
-	const vertices: SketchPoint[] = [];
-	for (let k = 0; k < N; k++) {
-		const a = baseAngle + k * step;
-		const v = Vec2.fromPolar(R, a).add(centerPt);
-		const pt = existingVertices[k] ?? sketch.addPoint(v, false);
-		vertices.push(pt);
-	}
+	const vertices: SketchPoint[] = polygonVertices(centerPt, radius, N, angleRad, !!options.radiusToVertex).map(
+		(v, k) => existingVertices[k] ?? sketch.addPoint(v, false)
+	);
 
 	const lines: SketchLine[] = [];
 	for (let k = 0; k < N; k++) {

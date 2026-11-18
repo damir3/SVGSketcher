@@ -1,3 +1,4 @@
+import { circumcircle } from './construction';
 /** Coordinates accepted at data boundaries and as read-only vector operands. */
 export type XY = Readonly<{ x: number; y: number }>;
 
@@ -223,19 +224,5 @@ function projectPoint(p: XY, a: XY, b: XY, clampToSegment: boolean): { point: Ve
 }
 
 export function getCircumcircle(p1: Vec2, p2: Vec2, p3: Vec2): { center: Vec2; radius: number } | null {
-	const d = 2 * (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y));
-	if (Math.abs(d) < 1e-6) return null;
-
-	const p1Sq = p1.lengthSq();
-	const p2Sq = p2.lengthSq();
-	const p3Sq = p3.lengthSq();
-
-	const center = new Vec2(
-		(p1Sq * (p2.y - p3.y) + p2Sq * (p3.y - p1.y) + p3Sq * (p1.y - p2.y)) / d,
-		(p1Sq * (p3.x - p2.x) + p2Sq * (p1.x - p3.x) + p3Sq * (p2.x - p1.x)) / d
-	);
-	const radius = center.distanceTo(p1);
-	if (!isFinite(radius) || radius < 1e-3 || radius > 1e6) return null;
-
-	return { center, radius };
+	return circumcircle(p1, p2, p3);
 }

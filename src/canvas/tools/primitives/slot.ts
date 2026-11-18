@@ -1,6 +1,15 @@
+import {
+	slotCenters,
+	slotOutline,
+	slotRadius,
+	arcSlot,
+	arcSlotRadius,
+	pointAtDistance,
+	arcThrough,
+} from '../../../math/construction';
 import { BaseTool } from '../base';
 import type { SnapResult, ToolMouseEvent, ToolRenderContext } from '../types';
-import { projectPointOntoSegment, getCircumcircle, Vec2 } from '../../../math/vector';
+import { getCircumcircle, Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine, createSvgPath, getArcSvgPath } from '../../svg';
 import {
 	AUX_AXIS_ATTRS,
@@ -31,21 +40,12 @@ function isArcClockwiseThroughPoint(
 	end: Vec2,
 	midPoint: Vec2
 ): boolean {
-	const sc = viewport.worldToScreen(center);
-	const ss = viewport.worldToScreen(start);
-	const se = viewport.worldToScreen(end);
-	const sm = viewport.worldToScreen(midPoint);
-
-	const as = sc.angleToPoint(ss);
-	const ae = sc.angleToPoint(se);
-	const am = sc.angleToPoint(sm);
-
-	let sweepCW = (ae - as) % TWO_PI;
-	if (sweepCW < 0) sweepCW += TWO_PI;
-	let testCW = (am - as) % TWO_PI;
-	if (testCW < 0) testCW += TWO_PI;
-
-	return testCW > 0 && testCW < sweepCW;
+	return arcThrough(
+		viewport.worldToScreen(center),
+		viewport.worldToScreen(start),
+		viewport.worldToScreen(end),
+		viewport.worldToScreen(midPoint)
+	);
 }
 
 export class SlotTool extends BaseTool {
@@ -797,15 +797,9 @@ export class SlotTool extends BaseTool {
 	// =========================================================================
 
 	private computeLinearSecondPoint(effectiveWorld: Vec2): Vec2 {
-		const p1 = this.firstWorldPos!;
-		const v = new Vec2().subVectors(effectiveWorld, p1);
-		const d = v.length();
-
-		if (this.isFieldLocked('distance')) {
-			const dir = d > 1e-4 ? v.divideScalar(d) : new Vec2(1, 0);
-			return p1.clone().addScaledVector(dir, this.distance);
-		}
-		return effectiveWorld;
+		return this.isFieldLocked('distance')
+			? pointAtDistance(this.firstWorldPos!, effectiveWorld, this.distance, 1e-4)
+			: effectiveWorld;
 	}
 
 	private computeLinearCenters(
@@ -813,44 +807,17 @@ export class SlotTool extends BaseTool {
 		p2: Vec2,
 		radius: number
 	): { c1: Vec2; c2: Vec2; u: Vec2; n: Vec2; effectiveR: number } {
-		const v = new Vec2().subVectors(p2, p1);
-		const len = v.length();
-		const u = len > 1e-4 ? v.clone().divideScalar(len) : new Vec2(1, 0);
-		const n = u.clone().perpendicular();
-
-		if (this._mode === 'center_to_center') {
-			return { c1: p1, c2: p2, u, n, effectiveR: Math.max(0.1, radius) };
-		} else if (this._mode === 'center_point') {
-			// p1 is midpoint M, p2 is C1; C2 is 2*M - C1
-			const c2 = p1.clone().multiplyScalar(2).sub(p2);
-			return { c1: c2, c2: p2, u, n, effectiveR: Math.max(0.1, radius) };
-		} else {
-			// overall mode: p1 is outer edge E1, p2 is outer edge E2
-			const maxR = Math.max(0.1, len / 2 - 0.1);
-			const effectiveR = Math.max(0.1, Math.min(radius, maxR));
-			const c1 = p1.clone().addScaledVector(u, effectiveR);
-			const c2 = p2.clone().addScaledVector(u, -effectiveR);
-			return { c1, c2, u, n, effectiveR };
-		}
+		return slotCenters(p1, p2, radius, this._mode === 'center_to_center' ? 0 : this._mode === 'center_point' ? 1 : 2);
 	}
 
 	private computeLinearRadiusFromCursor(effectiveWorld: Vec2): number {
-		const p1 = this.firstWorldPos!;
-		const p2 = this.secondWorldPos!;
-
-		if (this._mode === 'overall') {
-			const v = new Vec2().subVectors(p2, p1);
-			const len = v.length();
-			const u = len > 1e-4 ? v.clone().divideScalar(len) : new Vec2(1, 0);
-			const n = u.clone().perpendicular();
-			const perpDist = Math.abs(new Vec2().subVectors(effectiveWorld, p1).dot(n));
-			const maxR = Math.max(0.1, len / 2 - 0.1);
-			return Math.max(0.1, Math.min(perpDist > 0.1 ? perpDist : p2.distanceTo(effectiveWorld), maxR));
-		}
-
-		const { c1, c2 } = this.computeLinearCenters(p1, p2, this.radius ?? 10);
-		const { dist: d } = projectPointOntoSegment(effectiveWorld, c1, c2);
-		return Math.max(0.1, d);
+		return slotRadius(
+			this.firstWorldPos!,
+			this.secondWorldPos!,
+			effectiveWorld,
+			this._mode === 'center_to_center' ? 0 : this._mode === 'center_point' ? 1 : 2,
+			this.radius ?? 10
+		);
 	}
 
 	private updateCenterArcSweep(effectiveWorld: Vec2): void {
@@ -907,28 +874,17 @@ export class SlotTool extends BaseTool {
 	}
 
 	private computeLinearOutline(c1: Vec2, c2: Vec2, u: Vec2, n: Vec2, r: number, vp: any) {
-		const [pt1, pt2, pt3, pt4] = [
-			c1.clone().addScaledVector(n, r),
-			c2.clone().addScaledVector(n, r),
-			c2.clone().addScaledVector(n, -r),
-			c1.clone().addScaledVector(n, -r),
-		];
+		const outline = slotOutline(c1, c2, u, n, r);
+		const { pt1, pt2, pt3, pt4 } = outline;
 		return {
-			pt1,
-			pt2,
-			pt3,
-			pt4,
+			...outline,
 			cw1: isArcClockwiseThroughPoint(vp, c1, pt4, pt1, c1.clone().addScaledVector(u, -r)),
 			cw2: isArcClockwiseThroughPoint(vp, c2, pt2, pt3, c2.clone().addScaledVector(u, r)),
 		};
 	}
 
 	private computeArcSlotRadiusFromCursor(effectiveWorld: Vec2): number {
-		const center = this.arcCenterWorld!;
-		const d = center.distanceTo(effectiveWorld);
-		const rawR = Math.abs(d - this.arcRadius);
-		const maxR = Math.max(0.1, this.arcRadius - 0.5);
-		return Math.max(0.1, Math.min(rawR, maxR));
+		return arcSlotRadius(this.arcCenterWorld!, effectiveWorld, this.arcRadius);
 	}
 
 	private computeArcSlotGeometry(
@@ -950,47 +906,7 @@ export class SlotTool extends BaseTool {
 		midCap1: Vec2;
 		midCap2: Vec2;
 	} {
-		const maxR = Math.max(0.1, rArc - 0.5);
-		const effectiveR = Math.max(0.1, Math.min(slotRadius, maxR));
-
-		const theta1 = center.angleToPoint(c1);
-		const theta2 = center.angleToPoint(c2);
-
-		const ccwSpan = (((theta2 - theta1) % TWO_PI) + TWO_PI) % TWO_PI;
-		const span = sweepSign > 0 ? ccwSpan : (TWO_PI - ccwSpan) % TWO_PI;
-		const thetaMid = theta1 + sweepSign * (span * 0.5);
-
-		const r1 = Vec2.fromPolar(1, theta1);
-		const r2 = Vec2.fromPolar(1, theta2);
-		const rMid = Vec2.fromPolar(1, thetaMid);
-
-		// Unit tangents pointing from C1 toward C2 along the arc
-		const t1 = r1.clone().perpendicular().multiplyScalar(sweepSign);
-		const t2 = r2.clone().perpendicular().multiplyScalar(sweepSign);
-
-		const p1Outer = center.clone().addScaledVector(r1, rArc + effectiveR);
-		const p1Inner = center.clone().addScaledVector(r1, rArc - effectiveR);
-		const p2Outer = center.clone().addScaledVector(r2, rArc + effectiveR);
-		const p2Inner = center.clone().addScaledVector(r2, rArc - effectiveR);
-
-		const midCenterArc = center.clone().addScaledVector(rMid, rArc);
-		const midOuterArc = center.clone().addScaledVector(rMid, rArc + effectiveR);
-		const midInnerArc = center.clone().addScaledVector(rMid, rArc - effectiveR);
-		const midCap1 = c1.clone().addScaledVector(t1, -effectiveR);
-		const midCap2 = c2.clone().addScaledVector(t2, effectiveR);
-
-		return {
-			effectiveR,
-			p1Inner,
-			p1Outer,
-			p2Inner,
-			p2Outer,
-			midCenterArc,
-			midOuterArc,
-			midInnerArc,
-			midCap1,
-			midCap2,
-		};
+		return arcSlot(center, c1, c2, rArc, sweepSign, slotRadius);
 	}
 
 	// =========================================================================

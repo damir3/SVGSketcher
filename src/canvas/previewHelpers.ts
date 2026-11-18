@@ -1,3 +1,4 @@
+import { polygonVertices } from '../math/construction';
 import { ellipseAxes, ellipseParameterAtPoint, ellipsePointAtParameter } from '../math/ellipse';
 import { Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
@@ -71,23 +72,13 @@ export function renderPolygonPreviewVisual(
 	viewport: Viewport,
 	{ radiusToVertex = false, showGuide = true } = {}
 ): void {
-	const N = Math.max(3, Math.round(sides));
-	const R = radiusToVertex ? radius : radius / Math.cos(Math.PI / N);
-	const baseAngle = radiusToVertex ? angleRad : angleRad - Math.PI / N;
-
 	const handle = showGuide ? viewport.worldToScreen(Vec2.fromPolar(radius, angleRad).add(centerWorld)) : null;
 	if (handle) {
 		createSvgCircle(sCtr, radius * viewport.zoom, GUIDE_OUTLINE_ATTRS, parent);
 		createSvgLine(sCtr, handle, AUX_RAY_ATTRS, parent);
 	}
 
-	const step = (2 * Math.PI) / N;
-	const pts: Vec2[] = [];
-	for (let i = 0; i < N; i++) {
-		const a = baseAngle + i * step;
-		const w = Vec2.fromPolar(R, a).add(centerWorld);
-		pts.push(viewport.worldToScreen(w));
-	}
+	const pts = polygonVertices(centerWorld, radius, sides, angleRad, radiusToVertex).map(w => viewport.worldToScreen(w));
 
 	if (pts.length >= 3) {
 		let d = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;

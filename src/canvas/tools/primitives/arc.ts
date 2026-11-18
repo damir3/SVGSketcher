@@ -1,8 +1,9 @@
+import { arcThreePoint, arcTangent, arcCenter, pointAtDistance, viewOrientation } from '../../../math/construction';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
-import { getCircumcircle, Vec2 } from '../../../math/vector';
+import { Vec2 } from '../../../math/vector';
 import { renderArcPreviewVisual } from '../../previewHelpers';
-import { createSvgCircle, createSvgLine, getArcSweep } from '../../svg';
+import { createSvgCircle, createSvgLine } from '../../svg';
 import { AUX_RAY_ATTRS, GUIDE_OUTLINE_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
 import type { SketchDocument } from '../../../model/sketch';
@@ -11,10 +12,6 @@ import { VariationToolPanel } from '../../../ui/panels/tools';
 import { dispatchToolModeChange } from '../modeChangeEvent';
 
 const TWO_PI = 2 * Math.PI;
-
-function positiveAngle(angle: number): number {
-	return (angle + TWO_PI) % TWO_PI;
-}
 
 export type ArcMode = 'three_point' | 'center' | 'tangent';
 
@@ -376,46 +373,21 @@ export class ArcTool extends BaseTool {
 	}
 
 	private getThreePointGeometry(cursor: Vec2) {
-		const start = this.startWorldPos;
-		const end = this.arcPoint2WorldPos;
+		const start = this.startWorldPos,
+			end = this.arcPoint2WorldPos;
 		if (!start || !end) return null;
-
-		let bulge = cursor;
-		const radiusLocked = this.popup.isLocked('radius');
-		const angleLocked = this.popup.isLocked('angle');
-		if (radiusLocked || angleLocked) {
-			const chord = new Vec2().subVectors(end, start);
-			const halfChord = start.distanceTo(end) / 2;
-			const normal = chord
-				.clone()
-				.perpendicular()
-				.divideScalar(2 * halfChord);
-			const midpoint = new Vec2().midpoint(start, end);
-			const side = new Vec2().subVectors(cursor, midpoint).dot(normal) < 0 ? -1 : 1;
-			let angle: number;
-			if (angleLocked) {
-				angle = (this.popup.getNumericValue('angle', 90) * Math.PI) / 180;
-			} else {
-				const radius = this.popup.getNumericValue('radius', halfChord);
-				if (radius < halfChord) return null;
-				const minorSweep = 2 * Math.asin(halfChord / radius);
-				const toStart = new Vec2().subVectors(start, cursor);
-				const toEnd = new Vec2().subVectors(end, cursor);
-				// An acute inscribed angle at the cursor selects the major arc.
-				angle = toStart.dot(toEnd) > 0 ? TWO_PI - minorSweep : minorSweep;
-			}
-			bulge = midpoint.clone().addScaledVector(normal, side * halfChord * Math.tan(angle / 4));
-		}
-
-		const circle = getCircumcircle(start, end, bulge);
-		if (!circle || circle.radius < 1 || circle.radius > 50000) return null;
-		const { viewport } = this.ctx;
-		const center = viewport.worldToScreen(circle.center);
-		const startAngle = center.angleToPoint(viewport.worldToScreen(start));
-		const cwSweep = positiveAngle(center.angleToPoint(viewport.worldToScreen(end)) - startAngle);
-		const cwBulge = positiveAngle(center.angleToPoint(viewport.worldToScreen(bulge)) - startAngle);
-		const clockwise = cwBulge > 0 && cwBulge < cwSweep;
-		return { ...circle, clockwise, sweepAngle: clockwise ? cwSweep : TWO_PI - cwSweep };
+		return arcThreePoint(
+			start,
+			end,
+			cursor,
+			{
+				radius: this.popup.isLocked('radius')
+					? this.popup.getNumericValue('radius', start.distanceTo(end) / 2)
+					: undefined,
+				angle: this.popup.isLocked('angle') ? (this.popup.getNumericValue('angle', 90) * Math.PI) / 180 : undefined,
+			},
+			viewOrientation(this.ctx.viewport)
+		);
 	}
 
 	private renderPreviewThreePoint(ctx: ToolRenderContext): void {
@@ -504,37 +476,20 @@ export class ArcTool extends BaseTool {
 	}
 
 	private getCenterStart(center: Vec2, cursor: Vec2): Vec2 {
-		if (!this.popup.isLocked('radius')) return cursor;
-		const angle = center.angleToPoint(cursor);
-		return center.clone().addScaledVector(Vec2.fromPolar(1, angle), this.popup.getNumericValue('radius', 0.1));
+		return this.popup.isLocked('radius')
+			? pointAtDistance(center, cursor, this.popup.getNumericValue('radius', 0.1))
+			: cursor;
 	}
 
 	private getCenterEnd(cursor: Vec2) {
-		const center = this.centerWorldPos!;
-		const start = this.arcPoint1WorldPos!;
-		const radius = center.distanceTo(start);
-		const { viewport } = this.ctx;
-		const sc = viewport.worldToScreen(center);
-		const startAngle = sc.angleToPoint(viewport.worldToScreen(start));
-		const cursorAngle = sc.angleToPoint(viewport.worldToScreen(cursor));
-		const delta = positiveAngle(cursorAngle - startAngle + Math.PI) - Math.PI;
-		const clockwise = Math.abs(this.arcCenterTotalAngle) >= 0.001 ? this.arcCenterTotalAngle >= 0 : delta >= 0;
-		if (!this.popup.isLocked('angle')) {
-			const angle = center.angleToPoint(cursor);
-			const end = center.clone().addScaledVector(Vec2.fromPolar(1, angle), radius);
-			return {
-				end,
-				radius,
-				clockwise,
-				sweep: getArcSweep(startAngle, cursorAngle, clockwise),
-			};
-		}
-
-		const sweep = (this.popup.getNumericValue('angle', 90) * Math.PI) / 180;
-		const screenAngle = startAngle + (clockwise ? sweep : -sweep);
-		const screenRadius = sc.distanceTo(viewport.worldToScreen(start));
-		const end = viewport.screenToWorld(sc.clone().addScaledVector(Vec2.fromPolar(1, screenAngle), screenRadius));
-		return { end, radius, clockwise, sweep };
+		return arcCenter(
+			this.centerWorldPos!,
+			this.arcPoint1WorldPos!,
+			cursor,
+			this.arcCenterTotalAngle,
+			this.popup.isLocked('angle') ? (this.popup.getNumericValue('angle', 90) * Math.PI) / 180 : undefined,
+			viewOrientation(this.ctx.viewport)
+		);
 	}
 
 	private updateCenterArcAngle(effectiveWorld: Vec2): void {
@@ -661,77 +616,26 @@ export class ArcTool extends BaseTool {
 	}
 
 	private getTangentGeometry(cursor: Vec2) {
-		const start = this.tangentStartWorldPos;
-		const tangent = this.tangentDir;
+		const start = this.tangentStartWorldPos,
+			tangent = this.tangentDir;
 		if (!start || !tangent) return null;
-		const natural = this.computeTangentArcGeometry(start, cursor, tangent);
-		const radiusLocked = this.popup.isLocked('radius');
-		const angleLocked = this.popup.isLocked('angle');
-		if (!radiusLocked && !angleLocked) return natural && { ...natural, end: cursor };
-
-		const sweep = angleLocked
-			? (this.popup.getNumericValue('angle', 90) * Math.PI) / 180
-			: (natural?.sweepAngle ?? Math.PI / 2);
-		const radius = radiusLocked
-			? this.popup.getNumericValue('radius', 1)
-			: (natural?.radius ?? Math.max(1, start.distanceTo(cursor) / (2 * Math.sin(sweep / 2))));
-		const normal = tangent.clone().perpendicular();
-		const side = new Vec2().subVectors(cursor, start).dot(normal) < 0 ? -1 : 1;
-		const end = start
-			.clone()
-			.addScaledVector(tangent, radius * Math.sin(sweep))
-			.clone()
-			.addScaledVector(normal, side * radius * (1 - Math.cos(sweep)));
-		const center = start.clone().addScaledVector(normal, side * radius);
-		return { ...this.describeTangentArc(start, end, tangent, center, radius), end };
-	}
-
-	private computeTangentArcGeometry(p1: Vec2, p2: Vec2, tangentDir: Vec2) {
-		const v = new Vec2().subVectors(p2, p1);
-		const L = v.length();
-		if (L < 1e-3) return null;
-
-		// Unit tangent leaving p1 in the direction of the connected curve
-		const tangent = tangentDir;
-
-		// Unit normal 90 degrees CCW from tangent in Cartesian coordinates
-		const normal = tangent.clone().perpendicular();
-
-		const denom = 2 * v.dot(normal);
-		if (Math.abs(denom) < 1e-4) {
-			return null;
-		}
-
-		const s = (L * L) / denom;
-		const radius = Math.abs(s);
-		if (radius < 0.5 || radius > 50000) {
-			return null;
-		}
-
-		return this.describeTangentArc(p1, p2, tangent, p1.clone().addScaledVector(normal, s), radius);
-	}
-
-	private describeTangentArc(p1: Vec2, p2: Vec2, tangent: Vec2, center: Vec2, radius: number) {
-		const sCenter = this.ctx.viewport.worldToScreen(center);
-		const s1 = this.ctx.viewport.worldToScreen(p1);
-		const s2 = this.ctx.viewport.worldToScreen(p2);
-		const sT = new Vec2().subVectors(this.ctx.viewport.worldToScreen(p1.clone().addScaledVector(tangent, 1)), s1);
-
-		// In 2D screen coords (Y down), cross product of (s1 - sCenter) and tangent indicates rotation direction
-		const u = new Vec2().subVectors(s1, sCenter);
-		const cp = u.cross(sT);
-		const clockwise = cp > 0;
-
-		const sweepAngle = getArcSweep(sCenter.angleToPoint(s1), sCenter.angleToPoint(s2), clockwise);
-
+		const geometry = arcTangent(
+			start,
+			cursor,
+			tangent,
+			{
+				radius: this.popup.isLocked('radius') ? this.popup.getNumericValue('radius', 1) : undefined,
+				angle: this.popup.isLocked('angle') ? (this.popup.getNumericValue('angle', 90) * Math.PI) / 180 : undefined,
+			},
+			viewOrientation(this.ctx.viewport)
+		);
+		if (!geometry) return null;
+		const vp = this.ctx.viewport;
 		return {
-			center,
-			radius,
-			clockwise,
-			sweepAngle,
-			sCenter,
-			s1,
-			s2,
+			...geometry,
+			sCenter: vp.worldToScreen(geometry.center),
+			s1: vp.worldToScreen(start),
+			s2: vp.worldToScreen(geometry.end),
 		};
 	}
 

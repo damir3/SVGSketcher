@@ -1,3 +1,10 @@
+import {
+	circlePreview,
+	circleChord,
+	lineIntersection,
+	circleTwoTangent,
+	circleThreeTangent,
+} from '../../../math/construction';
 import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { getCircumcircle, Vec2 } from '../../../math/vector';
@@ -417,90 +424,15 @@ export class CircleTool extends BaseTool {
 	}
 
 	private solveThreeLines(lines: TangentLine[]): CircleGeometry | null {
-		let best: CircleGeometry | null = null;
-
-		for (const s1 of [-1, 1]) {
-			for (const s2 of [-1, 1]) {
-				for (const s3 of [-1, 1]) {
-					const [a, b, c] = lines;
-					const h1 = a.p.dot(a.n);
-					const h2 = b.p.dot(b.n);
-					const h3 = c.p.dot(c.n);
-					const rows = [
-						[a.n.x, a.n.y, -s1],
-						[b.n.x, b.n.y, -s2],
-						[c.n.x, c.n.y, -s3],
-					];
-					const values = [h1, h2, h3];
-					const matrix = rows.map((row, index) => [...row, values[index]]);
-
-					for (let column = 0; column < 3; column++) {
-						let pivot = column;
-						for (let row = column + 1; row < 3; row++) {
-							if (Math.abs(matrix[row][column]) > Math.abs(matrix[pivot][column])) {
-								pivot = row;
-							}
-						}
-
-						if (Math.abs(matrix[pivot][column]) < 1e-8) break;
-						[matrix[column], matrix[pivot]] = [matrix[pivot], matrix[column]];
-
-						const divisor = matrix[column][column];
-						for (let j = column; j < 4; j++) matrix[column][j] /= divisor;
-
-						for (let row = 0; row < 3; row++) {
-							if (row === column) continue;
-							const factor = matrix[row][column];
-							for (let j = column; j < 4; j++) {
-								matrix[row][j] -= factor * matrix[column][j];
-							}
-						}
-					}
-
-					if (matrix.some((row, index) => Math.abs(row[index]) < 1e-8)) continue;
-
-					const center = new Vec2(matrix[0][3], matrix[1][3]);
-					const radius = Math.abs(matrix[2][3]);
-					if (radius > 0.01 && (!best || radius < best.radius)) {
-						best = { center, radius };
-					}
-				}
-			}
-		}
-
-		return best;
+		return circleThreeTangent(lines);
 	}
 
 	private getThreePointCircle(cursor: Vec2): CircleGeometry | null {
-		const circle = getCircumcircle(this.points[0], this.points[1], cursor);
-		if (circle) return circle;
-
-		const [a, b] = this.points;
-		const dir = new Vec2().subVectors(b, a);
-		const length = dir.length();
-		if (length < 1e-8) return null;
-
-		const offset = Math.max(10, length / 2);
-		const normal = dir.perpendicular().divideScalar(length);
-		const fallbackPoint = new Vec2().midpoint(a, b).addScaledVector(normal, offset);
-		return getCircumcircle(a, b, fallbackPoint);
+		return circlePreview(this.points[0], this.points[1], cursor);
 	}
 
 	private getThreePointCircleForDiameter(diameter: number, cursor: Vec2): CircleGeometry | null {
-		const [a, b] = this.points;
-		const dir = new Vec2().subVectors(b, a);
-		const chord = dir.length();
-		const radius = diameter / 2;
-		if (chord < 1e-8 || radius < chord / 2) return null;
-
-		const h = Math.sqrt(Math.max(0, radius * radius - (chord * chord) / 4));
-		const midpoint = new Vec2().midpoint(a, b);
-		const normal = dir.clone().perpendicular().divideScalar(chord);
-		const centerA = midpoint.clone().addScaledVector(normal, h);
-		const centerB = midpoint.clone().addScaledVector(normal, -h);
-		const center = centerA.distanceTo(cursor) <= centerB.distanceTo(cursor) ? centerA : centerB;
-
-		return { center, radius };
+		return circleChord(this.points[0], this.points[1], cursor, diameter);
 	}
 
 	override renderPreview(ctx: ToolRenderContext): void {
@@ -683,64 +615,21 @@ export class CircleTool extends BaseTool {
 	}
 
 	private lineIntersection(offsetA = 0, offsetB = 0): Vec2 | null {
-		const lineA = this.getLine(this.lineIds[0]);
-		const lineB = this.getLine(this.lineIds[1]);
-		if (!lineA || !lineB) return null;
-
-		const determinant = lineA.n.cross(lineB.n);
-		if (Math.abs(determinant) < 1e-8) return null;
-
-		const h1 = lineA.p.dot(lineA.n) + offsetA;
-		const h2 = lineB.p.dot(lineB.n) + offsetB;
-		return new Vec2((h1 * lineB.n.y - lineA.n.y * h2) / determinant, (lineA.n.x * h2 - h1 * lineB.n.x) / determinant);
+		const a = this.getLine(this.lineIds[0]),
+			b = this.getLine(this.lineIds[1]);
+		return a && b ? lineIntersection(a, b, offsetA, offsetB) : null;
 	}
 
 	private getTwoTangentCircle(cursor: Vec2): CircleGeometry | null {
-		const lineA = this.getLine(this.lineIds[0]);
-		const lineB = this.getLine(this.lineIds[1]);
-		const intersection = this.lineIntersection();
-		if (!lineA || !lineB || !intersection) return null;
-
-		const candidates = [new Vec2().addVectors(lineA.n, lineB.n), new Vec2().subVectors(lineA.n, lineB.n)].filter(
-			vector => vector.length() > 1e-8
-		);
-		let best: (CircleGeometry & { distance: number }) | null = null;
-		const cursorOffset = new Vec2().subVectors(cursor, intersection);
-
-		for (const raw of candidates) {
-			const length = raw.length();
-			const axis = raw.clone().divideScalar(length);
-			const t = cursorOffset.dot(axis);
-			const center = intersection.clone().addScaledVector(axis, t);
-			const radius = Math.abs(new Vec2().subVectors(center, lineA.p).dot(lineA.n));
-			const distance = center.distanceTo(cursor);
-
-			if (radius > 1e-6 && (!best || distance < best.distance)) {
-				best = { center, radius, distance };
-			}
-		}
-
-		return best;
+		const a = this.getLine(this.lineIds[0]),
+			b = this.getLine(this.lineIds[1]);
+		return a && b ? circleTwoTangent(a, b, cursor) : null;
 	}
 
 	private twoLineCenter(radius: number, cursor: Vec2): Vec2 | null {
-		let best: Vec2 | null = null;
-		let bestDistance = Infinity;
-
-		for (const signA of [-1, 1]) {
-			for (const signB of [-1, 1]) {
-				const center = this.lineIntersection(signA * radius, signB * radius);
-				if (!center) return null;
-				const distance = center.distanceTo(cursor);
-
-				if (distance < bestDistance) {
-					best = center;
-					bestDistance = distance;
-				}
-			}
-		}
-
-		return best;
+		const a = this.getLine(this.lineIds[0]),
+			b = this.getLine(this.lineIds[1]);
+		return a && b ? (circleTwoTangent(a, b, cursor, radius)?.center ?? null) : null;
 	}
 
 	override cancel(): void {
