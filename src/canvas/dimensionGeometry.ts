@@ -232,6 +232,12 @@ export function distanceToLinearDimensionVisual(screen: Vec2, d1: Vec2, d2: Vec2
 	return minDist;
 }
 
+function normalizeReadableAngle(angle: number): number {
+	if (angle > Math.PI / 2 - 1e-4) return angle - Math.PI;
+	if (angle <= -Math.PI / 2) return angle + Math.PI;
+	return angle;
+}
+
 function createDimensionGroup(parent: SVGElement, constraintId?: string): SVGElement {
 	return constraintId
 		? createSvgElement('g', { class: 'dimension-item', 'data-id': constraintId, 'data-type': 'constraint' }, parent)
@@ -332,17 +338,8 @@ export function renderLinearDimensionVisual(opts: LinearDimensionVisualOptions):
 		createSvgLine(d1, d2, lineAttrs, g);
 	}
 
-	// Dimension number placed above the dimension line
-	let angle = 0;
-	if (screenDist > 1e-4) {
-		angle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
-	}
-	// Normalize angle so text reads from left to right (or bottom to top from the right side, GOST 2.307)
-	if (angle > Math.PI / 2 - 1e-4) {
-		angle -= Math.PI;
-	} else if (angle <= -Math.PI / 2) {
-		angle += Math.PI;
-	}
+	// Dimension number placed above the dimension line (GOST 2.307 readability)
+	const angle = normalizeReadableAngle(screenDist > 1e-4 ? Math.atan2(d2.y - d1.y, d2.x - d1.x) : 0);
 	const uText = Vec2.fromPolar(1, angle);
 	const up = new Vec2(uText.y, -uText.x);
 
@@ -487,9 +484,7 @@ export function renderAngleDimensionVisual(opts: AngleDimensionVisualOptions): v
 		// Above arc on convex side
 		const textPos = midPoint.clone().addScaledVector(uRad, 8.5);
 		const uTan = uRad.perpendicular();
-		let textAngle = Math.atan2(uTan.y, uTan.x);
-		if (textAngle > Math.PI / 2 - 1e-4) textAngle -= Math.PI;
-		else if (textAngle <= -Math.PI / 2) textAngle += Math.PI;
+		const textAngle = normalizeReadableAngle(Math.atan2(uTan.y, uTan.x));
 		renderDimensionLabel(g, textPos, label, color, 'angle', {
 			angleDeg: (textAngle * 180) / Math.PI,
 		});

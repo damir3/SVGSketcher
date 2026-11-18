@@ -318,8 +318,8 @@ export class ChamferTool extends BaseTool {
 			}
 
 			// 3. Line selection (first line)
-			const hitLine = this.ctx.findLineNear(screen);
-			if (hitLine && !hitLine.isSplineHandle) {
+			const hitLine = this.findChamferLineNear(screen);
+			if (hitLine) {
 				this.firstLine = {
 					id: hitLine.id,
 					clickPos: world,
@@ -331,8 +331,8 @@ export class ChamferTool extends BaseTool {
 			}
 		} else {
 			// Second line selection
-			const hitLine = this.ctx.findLineNear(screen);
-			if (hitLine && !hitLine.isSplineHandle) {
+			const hitLine = this.findChamferLineNear(screen);
+			if (hitLine) {
 				if (hitLine.id === this.firstLine.id) {
 					// Deselect
 					this.firstLine = null;
@@ -406,6 +406,18 @@ export class ChamferTool extends BaseTool {
 		this.ctx.requestRender();
 	}
 
+	private findChamferLineNear(screen: Vec2) {
+		const hitLine = this.ctx.findLineNear(screen);
+		return hitLine && !hitLine.isSplineHandle ? hitLine : null;
+	}
+
+	private syncPopupAndRender(): void {
+		this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
+		this.updatePopupPosition();
+		this.recalculate();
+		this.ctx.requestRender();
+	}
+
 	override onMouseMove(e: ToolMouseEvent): void {
 		const screen = e.screen;
 		const world = e.world;
@@ -417,42 +429,21 @@ export class ChamferTool extends BaseTool {
 
 			if (handle.type === 'dist1' || handle.type === 'dist2') {
 				if (this.mode === 'equal_distance') {
-					// Drag along angle bisector
 					const bisector = new Vec2().addVectors(this.candidate.dir1, this.candidate.dir2).normalizeOrUnitX();
-					const halfAngle = this.candidate.cornerAngleRad / 2;
-					const cosHalf = Math.max(0.05, Math.cos(halfAngle));
-					const delta = new Vec2().subVectors(world, startMouseWorld).dot(bisector);
-					const deltaD = delta / cosHalf;
-					const newDist = Math.max(0.5, Math.round((startValue + deltaD) * 2) / 2);
-					this.dist1 = newDist;
-					this.dist2 = newDist;
+					const cosHalf = Math.max(0.05, Math.cos(this.candidate.cornerAngleRad / 2));
+					const deltaD = new Vec2().subVectors(world, startMouseWorld).dot(bisector) / cosHalf;
+					this.dist1 = this.dist2 = Math.max(0.5, Math.round((startValue + deltaD) * 2) / 2);
 				} else if (this.mode === 'two_distance') {
 					const dir = handle.dir || (handle.type === 'dist1' ? this.candidate.dir1 : this.candidate.dir2);
 					const delta = new Vec2().subVectors(world, startMouseWorld).dot(dir);
 					const newDist = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
-					if (handle.type === 'dist1') {
-						if (!this.flip) {
-							this.dist1 = newDist;
-						} else {
-							this.dist2 = newDist;
-						}
-					} else {
-						if (!this.flip) {
-							this.dist2 = newDist;
-						} else {
-							this.dist1 = newDist;
-						}
-					}
+					this[(handle.type === 'dist1') !== this.flip ? 'dist1' : 'dist2'] = newDist;
 				} else if (this.mode === 'distance_angle') {
 					const dir = handle.dir || (!this.flip ? this.candidate.dir1 : this.candidate.dir2);
 					const delta = new Vec2().subVectors(world, startMouseWorld).dot(dir);
-					const newDist = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
-					this.dist1 = newDist;
+					this.dist1 = Math.max(0.5, Math.round((startValue + delta) * 2) / 2);
 				}
-				this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
-				this.updatePopupPosition();
-				this.recalculate();
-				this.ctx.requestRender();
+				this.syncPopupAndRender();
 				return;
 			} else if (handle.type === 'angle') {
 				// Angle drag around vertex A (or B if flipped)
@@ -464,23 +455,13 @@ export class ChamferTool extends BaseTool {
 				const interiorSign = !this.flip ? (cross12 >= 0 ? -1 : 1) : cross12 >= 0 ? 1 : -1;
 
 				const toMouse = new Vec2().subVectors(world, refVertex);
-				const toMouseLen = toMouse.length();
-				if (toMouseLen > 1e-4) {
-					const crossMouse = refDir.cross(toMouse);
-					const dotMouse = refDir.dot(toMouse);
-					const signedCross = crossMouse * interiorSign;
-					const signedAngleRad = Math.atan2(signedCross, dotMouse);
-					const signedAngleDeg = (signedAngleRad * 180) / Math.PI;
-
+				if (toMouse.length() > 1e-4) {
+					const signedAngleDeg =
+						(Math.atan2(refDir.cross(toMouse) * interiorSign, refDir.dot(toMouse)) * 180) / Math.PI;
 					const cornerDeg = (this.candidate.cornerAngleRad * 180) / Math.PI;
-					// In triangle VAB: theta + alpha + beta = 180 => alpha < 180 - theta
 					const maxAngle = Math.max(0, Math.floor(180 - cornerDeg - 1));
-					const newAngle = Math.max(0, Math.min(maxAngle, Math.round(signedAngleDeg)));
-					this.angleDeg = newAngle;
-					this.popup.updateValues(this.dist1, this.dist2, this.angleDeg);
-					this.updatePopupPosition();
-					this.recalculate();
-					this.ctx.requestRender();
+					this.angleDeg = Math.max(0, Math.min(maxAngle, Math.round(signedAngleDeg)));
+					this.syncPopupAndRender();
 				}
 				return;
 			}

@@ -366,17 +366,13 @@ export class ParametersPopup {
 		this.container.addEventListener('pointermove', e => e.stopPropagation());
 		this.setupDragging();
 
-		// Header close button
-		this.container.querySelector('#btn-close-param-modal')?.addEventListener('click', e => {
-			e.stopPropagation();
-			this.hide();
-		});
-
-		// Footer close button
-		this.container.querySelector('#btn-close-param-footer')?.addEventListener('click', e => {
-			e.stopPropagation();
-			this.hide();
-		});
+		// Close buttons (header & footer)
+		for (const id of ['#btn-close-param-modal', '#btn-close-param-footer']) {
+			this.container.querySelector(id)?.addEventListener('click', e => {
+				e.stopPropagation();
+				this.hide();
+			});
+		}
 
 		// Add Parameter button
 		const onAdd = (e: Event) => {
@@ -454,6 +450,15 @@ export class ParametersPopup {
 		nameInp?.focus();
 	}
 
+	private markInputError(input: HTMLInputElement | null | undefined, message?: string, focus = false): false {
+		if (input) {
+			input.classList.add('error');
+			if (message) input.title = message;
+			if (focus) input.focus();
+		}
+		return false;
+	}
+
 	private commitDraftRow(): boolean {
 		if (!this.draftRow) return true;
 		const draftRowEl = this.container.querySelector<HTMLTableRowElement>('tr[data-draft="true"]');
@@ -464,48 +469,23 @@ export class ParametersPopup {
 		const expr = this.draftRow.expression.trim();
 		const comment = this.draftRow.comment.trim();
 
-		if (!name) {
-			nameInput?.classList.add('error');
-			nameInput?.focus();
-			return false;
-		}
+		if (!name) return this.markInputError(nameInput, undefined, true);
 
 		const nameCheck = isValidParameterName(name);
-		if (!nameCheck.isValid) {
-			if (nameInput) {
-				nameInput.classList.add('error');
-				nameInput.title = nameCheck.error || 'Invalid name';
-				nameInput.focus();
-			}
-			return false;
-		}
+		if (!nameCheck.isValid) return this.markInputError(nameInput, nameCheck.error || 'Invalid name', true);
 
 		if (this.sketch.parameters.has(name)) {
-			if (nameInput) {
-				nameInput.classList.add('error');
-				nameInput.title = `Parameter '${name}' already exists`;
-				nameInput.focus();
-			}
-			return false;
+			return this.markInputError(nameInput, `Parameter '${name}' already exists`, true);
 		}
 
-		if (!expr) {
-			exprInput?.classList.add('error');
-			exprInput?.focus();
-			return false;
-		}
+		if (!expr) return this.markInputError(exprInput, undefined, true);
 
 		const res = this.sketch.addParameter(name, expr, comment);
 		if (res.success) {
 			this.draftRow = null;
 			this.renderTableContent();
 			return true;
-		} else {
-			if (nameInput) {
-				nameInput.classList.add('error');
-				nameInput.title = res.error || 'Error adding parameter';
-			}
-			return false;
 		}
+		return this.markInputError(nameInput, res.error || 'Error adding parameter');
 	}
 }

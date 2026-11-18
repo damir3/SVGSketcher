@@ -369,38 +369,21 @@ export class Sidebar {
 		id: string;
 		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
 	}): string {
-		switch (entityRef.type) {
-			case 'line': {
-				const line = this.sketch.lines.get(entityRef.id);
-				return line ? this.renderLineItem(line, false) : '';
-			}
-			case 'circle': {
-				const circle = this.sketch.circles.get(entityRef.id);
-				return circle ? this.renderCircleItem(circle, false) : '';
-			}
-			case 'arc': {
-				const arc = this.sketch.arcs.get(entityRef.id);
-				return arc ? this.renderArcItem(arc, false) : '';
-			}
-			case 'ellipse': {
-				const ellipse = this.sketch.ellipses.get(entityRef.id);
-				return ellipse ? this.renderEllipseItem(ellipse, false) : '';
-			}
-			case 'elliptical_arc': {
-				const elArc = this.sketch.ellipticalArcs.get(entityRef.id);
-				return elArc ? this.renderEllipticalArcItem(elArc, false) : '';
-			}
-			case 'spline': {
-				const spline = this.sketch.splines.get(entityRef.id);
-				return spline ? this.renderSplineItem(spline, false) : '';
-			}
-			case 'point': {
-				const pt = this.sketch.points.get(entityRef.id);
-				return pt ? this.renderPointItem(pt, false) : '';
-			}
-			default:
-				return '';
-		}
+		const entries: Record<
+			typeof entityRef.type,
+			[ReadonlyMap<string, any>, (ent: any, showDelete?: boolean) => string]
+		> = {
+			line: [this.sketch.lines, (e, d) => this.renderLineItem(e, d)],
+			circle: [this.sketch.circles, (e, d) => this.renderCircleItem(e, d)],
+			arc: [this.sketch.arcs, (e, d) => this.renderArcItem(e, d)],
+			ellipse: [this.sketch.ellipses, (e, d) => this.renderEllipseItem(e, d)],
+			elliptical_arc: [this.sketch.ellipticalArcs, (e, d) => this.renderEllipticalArcItem(e, d)],
+			spline: [this.sketch.splines, (e, d) => this.renderSplineItem(e, d)],
+			point: [this.sketch.points, (e, d) => this.renderPointItem(e, d)],
+		};
+		const entry = entries[entityRef.type];
+		const ent = entry?.[0].get(entityRef.id);
+		return ent ? entry[1](ent, false) : '';
 	}
 
 	private renderConstraintsSublist(constraints: any[], entityName: string, currentEntityIds: string[] = []): string {
@@ -657,12 +640,15 @@ export class Sidebar {
 
 		// Hover highlight on canvas when hovering items in Selected Primitives
 		const selectedList = this.container.querySelector<HTMLElement>('.inspector-selected-list');
+		const clearHoveredTarget = () => {
+			this.hoveredSelectedTargetId = null;
+			this.interaction?.highlightManager?.setExternalTarget(null);
+		};
 		if (
 			this.hoveredSelectedTargetId &&
 			!selectedList?.querySelector(`.tree-item[data-id="${this.hoveredSelectedTargetId}"]`)
 		) {
-			this.hoveredSelectedTargetId = null;
-			this.interaction?.highlightManager?.setExternalTarget(null);
+			clearHoveredTarget();
 		}
 		if (selectedList) {
 			selectedList.querySelectorAll<HTMLElement>('.tree-item[data-type]').forEach(item => {
@@ -673,17 +659,11 @@ export class Sidebar {
 					this.interaction?.highlightManager?.setExternalTarget({ id, type });
 				});
 				item.addEventListener('mouseleave', () => {
-					if (this.hoveredSelectedTargetId === id) {
-						this.hoveredSelectedTargetId = null;
-						this.interaction?.highlightManager?.setExternalTarget(null);
-					}
+					if (this.hoveredSelectedTargetId === id) clearHoveredTarget();
 				});
 			});
 			selectedList.addEventListener('mouseleave', () => {
-				if (this.hoveredSelectedTargetId !== null) {
-					this.hoveredSelectedTargetId = null;
-					this.interaction?.highlightManager?.setExternalTarget(null);
-				}
+				if (this.hoveredSelectedTargetId !== null) clearHoveredTarget();
 			});
 		}
 

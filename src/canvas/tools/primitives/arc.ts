@@ -2,7 +2,7 @@ import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import { getCircumcircle, Vec2 } from '../../../math/vector';
 import { renderArcPreviewVisual } from '../../previewHelpers';
-import { createSvgCircle, createSvgLine } from '../../svg';
+import { createSvgCircle, createSvgLine, getArcSweep } from '../../svg';
 import { AUX_RAY_ATTRS, GUIDE_OUTLINE_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
 import type { SketchDocument } from '../../../model/sketch';
@@ -526,7 +526,7 @@ export class ArcTool extends BaseTool {
 				end,
 				radius,
 				clockwise,
-				sweep: positiveAngle(clockwise ? cursorAngle - startAngle : startAngle - cursorAngle),
+				sweep: getArcSweep(startAngle, cursorAngle, clockwise),
 			};
 		}
 
@@ -722,11 +722,7 @@ export class ArcTool extends BaseTool {
 		const cp = u.cross(sT);
 		const clockwise = cp > 0;
 
-		const a1 = sCenter.angleToPoint(s1);
-		const a2 = sCenter.angleToPoint(s2);
-
-		let sweepAngle = clockwise ? (a2 - a1) % TWO_PI : (a1 - a2) % TWO_PI;
-		if (sweepAngle < 0) sweepAngle += TWO_PI;
+		const sweepAngle = getArcSweep(sCenter.angleToPoint(s1), sCenter.angleToPoint(s2), clockwise);
 
 		return {
 			center,

@@ -258,62 +258,62 @@ export function updateCircularPattern(
 	c.suppression = newSuppression;
 	c.suppressedIndices = Array.from(newSuppressed);
 
-	// 1. Delete excess copies if quantity decreased
-	for (let i = c.copies.length - 1; i >= 0; i--) {
-		const copy = c.copies[i];
-		if (copy.copyIndex >= newQty) {
-			removedSplineCopy = deletePatternCopy(sketch, copy) || removedSplineCopy;
-			c.copies.splice(i, 1);
-		}
-	}
-
-	// 2. Add or remove copies based on quantity and suppression
+	// 1-2. Prune unneeded/suppressed copies and add new ones
+	const neededKeys = new Set<number>();
 	for (let k = 1; k < newQty; k++) {
-		const shouldBeSuppressed = newSuppression && newSuppressed.has(k);
-		const existingIndex = c.copies.findIndex(cp => cp.copyIndex === k);
-
-		if (shouldBeSuppressed) {
-			if (existingIndex >= 0) {
-				removedSplineCopy = deletePatternCopy(sketch, c.copies[existingIndex]) || removedSplineCopy;
-				c.copies.splice(existingIndex, 1);
-			}
-		} else {
-			if (existingIndex < 0) {
-				const newCopy = generateCircularPatternCopy(
-					sketch,
-					c.centerPtId,
-					c.sourceObjectIds,
-					k,
-					newQty,
-					newDist,
-					newAngle
-				);
-				if (newCopy) {
-					c.copies.push(newCopy);
-				}
-			}
-		}
+		if (!newSuppression || !newSuppressed.has(k)) neededKeys.add(k);
 	}
+	removedSplineCopy = syncPatternCopies(sketch, c.copies, neededKeys, k =>
+		generateCircularPatternCopy(sketch, c.centerPtId, c.sourceObjectIds, k, newQty, newDist, newAngle)
+	);
 
 	// 3. Update coordinates of existing copies to new angle/distribution positions
 	const centerPt = sketch.points.get(c.centerPtId);
 	if (centerPt) {
-		for (const copy of c.copies) {
-			const aDeg = computePatternCopyAngle(copy.copyIndex, newQty, newDist, newAngle);
-			const rad = (aDeg * Math.PI) / 180;
-
-			for (const pair of copy.pointPairs) {
-				const sPt = sketch.points.get(pair.sourcePtId);
-				const pPt = sketch.points.get(pair.patternPtId);
-				if (sPt && pPt) {
-					pPt.copy(sPt.clone().rotateAround(centerPt, rad));
-				}
-			}
-		}
+		updateCopyPointPositions(sketch, c.copies, (copy, sPt) => {
+			const rad = (computePatternCopyAngle(copy.copyIndex, newQty, newDist, newAngle) * Math.PI) / 180;
+			return sPt.clone().rotateAround(centerPt, rad);
+		});
 	}
 
 	// 4. Update pointIds on BaseConstraint
 	return finalizePatternUpdate(sketch, c, [c.centerPtId], false, removedSplineCopy);
+}
+
+function syncPatternCopies<T extends PatternCopyData>(
+	sketch: SketchDocument,
+	copies: T[],
+	neededKeys: Iterable<number>,
+	createCopy: (copyIndex: number) => T | null
+): boolean {
+	const needed = new Set(neededKeys);
+	let removedSplineCopy = false;
+	for (let i = copies.length - 1; i >= 0; i--) {
+		if (!needed.has(copies[i].copyIndex)) {
+			removedSplineCopy = deletePatternCopy(sketch, copies[i]) || removedSplineCopy;
+			copies.splice(i, 1);
+		}
+	}
+	for (const key of needed) {
+		if (copies.some(cp => cp.copyIndex === key)) continue;
+		const newCopy = createCopy(key);
+		if (newCopy) copies.push(newCopy);
+	}
+	return removedSplineCopy;
+}
+
+function updateCopyPointPositions<T extends PatternCopyData>(
+	sketch: SketchDocument,
+	copies: T[],
+	mapPoint: (copy: T, sourcePt: SketchPoint) => Vec2
+): void {
+	for (const copy of copies) {
+		for (const pair of copy.pointPairs) {
+			const sPt = sketch.points.get(pair.sourcePtId);
+			const pPt = sketch.points.get(pair.patternPtId);
+			if (sPt && pPt) pPt.copy(mapPoint(copy, sPt));
+		}
+	}
 }
 
 function finalizePatternUpdate(
@@ -503,48 +503,27 @@ export function updateRectangularPattern(
 		}
 	}
 
-	// 1. Remove copies that are no longer needed
-	for (let idx = c.copies.length - 1; idx >= 0; idx--) {
-		const copy = c.copies[idx];
-		if (!neededKeys.has(copy.copyIndex)) {
-			removedSplineCopy = deletePatternCopy(sketch, copy) || removedSplineCopy;
-			c.copies.splice(idx, 1);
-		}
-	}
-
-	// 2. Add newly needed copies
-	for (const [key, coords] of neededKeys.entries()) {
-		const existingIndex = c.copies.findIndex(cp => cp.copyIndex === key);
-		if (existingIndex < 0) {
-			const newCopy = generateRectangularPatternCopy(
-				sketch,
-				c.sourceObjectIds,
-				coords.i,
-				coords.j,
-				newDist1,
-				newDir1,
-				newDist2,
-				newDir2,
-				u1,
-				u2
-			);
-			if (newCopy) {
-				c.copies.push(newCopy);
-			}
-		}
-	}
+	// 1-2. Sync pattern copies
+	removedSplineCopy = syncPatternCopies(sketch, c.copies, neededKeys.keys(), key => {
+		const { i, j } = neededKeys.get(key)!;
+		return generateRectangularPatternCopy(
+			sketch,
+			c.sourceObjectIds,
+			i,
+			j,
+			newDist1,
+			newDir1,
+			newDist2,
+			newDir2,
+			u1,
+			u2
+		);
+	});
 
 	// 3. Update coordinates of existing copies
-	for (const copy of c.copies) {
-		const offset = computeRectangularPatternOffset(copy.i, copy.j, newDist1, newDir1, newDist2, newDir2, u1, u2);
-		for (const pair of copy.pointPairs) {
-			const sPt = sketch.points.get(pair.sourcePtId);
-			const pPt = sketch.points.get(pair.patternPtId);
-			if (sPt && pPt) {
-				pPt.addVectors(sPt, offset);
-			}
-		}
-	}
+	updateCopyPointPositions(sketch, c.copies, (copy, sPt) =>
+		sPt.clone().add(computeRectangularPatternOffset(copy.i, copy.j, newDist1, newDir1, newDist2, newDir2, u1, u2))
+	);
 
 	// 4. Update entityIds on BaseConstraint
 	return finalizePatternUpdate(

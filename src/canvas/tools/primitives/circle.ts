@@ -185,10 +185,8 @@ export class CircleTool extends BaseTool {
 		}
 
 		sketch.commitTransaction();
-		for (const id of this.lineIds) this.markLine(id, false);
-		this.popup.hide();
+		this.resetToolState();
 		this.popup.resetField('radius', dimensionMode === 'diameter' ? 20 : 10);
-		this.reset();
 		this.notify();
 	}
 
@@ -747,14 +745,14 @@ export class CircleTool extends BaseTool {
 
 	override cancel(): void {
 		if (this.drawingStep > 0) this.ctx.sketch.rollbackTransaction();
-		for (const id of this.lineIds) this.markLine(id, false);
-		this.popup.hide();
-		this.reset();
+		this.resetToolState();
 		this.ctx?.renderer.clearPreviews();
 		this.ctx?.requestRender();
 	}
 
-	private reset(): void {
+	private resetToolState(): void {
+		for (const id of this.lineIds) this.markLine(id, false);
+		this.popup.hide();
 		this.drawingStep = 0;
 		this.points = [];
 		this.centerId = null;

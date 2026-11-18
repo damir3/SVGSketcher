@@ -178,15 +178,15 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 			return [u.cross(new Vec2().subVectors(point2, point1))];
 		},
 		jacobian: (paramIndices, baseRow) => {
-			const entries = [];
-			const idxX1 = paramIndices.get(`${line.p1Id}.x`);
-			if (idxX1 !== undefined) entries.push({ row: baseRow, col: idxX1, val: u.y });
-			const idxY1 = paramIndices.get(`${line.p1Id}.y`);
-			if (idxY1 !== undefined) entries.push({ row: baseRow, col: idxY1, val: -u.x });
-			const idxX2 = paramIndices.get(`${line.p2Id}.x`);
-			if (idxX2 !== undefined) entries.push({ row: baseRow, col: idxX2, val: -u.y });
-			const idxY2 = paramIndices.get(`${line.p2Id}.y`);
-			if (idxY2 !== undefined) entries.push({ row: baseRow, col: idxY2, val: u.x });
+			const entries: Array<{ row: number; col: number; val: number }> = [];
+			const push = (id: string, axis: 'x' | 'y', val: number) => {
+				const col = paramIndices.get(`${id}.${axis}`);
+				if (col !== undefined) entries.push({ row: baseRow, col, val });
+			};
+			push(line.p1Id, 'x', u.y);
+			push(line.p1Id, 'y', -u.x);
+			push(line.p2Id, 'x', -u.y);
+			push(line.p2Id, 'y', u.x);
 			return entries;
 		},
 	};
@@ -197,18 +197,21 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 	};
 
 	const fallbackDrags = [dragPoint(line.p1Id, targetP1), dragPoint(line.p2Id, targetP2)];
-
-	// 1. Try preserving both the requested angle and the current line length (works when DoF >= 2)
-	let solved = sketch.tryHardSolve(
-		[tempAngleConstraint, new DistanceConstraint('__temp_dist', line.p1Id, line.p2Id, len, 1.0)],
-		checkDirection
-	);
-
-	// 2. If over-constrained, solve with the angle constraint alone
-	if (!solved) {
+	const tryAngleSolve = () => {
+		if (
+			sketch.tryHardSolve(
+				[tempAngleConstraint, new DistanceConstraint('__temp_dist', line.p1Id, line.p2Id, len, 1.0)],
+				checkDirection
+			)
+		) {
+			return true;
+		}
 		sketch.paramManager.restoreValues(origValues);
-		solved = sketch.tryHardSolve([tempAngleConstraint], checkDirection);
-	}
+		return sketch.tryHardSolve([tempAngleConstraint], checkDirection);
+	};
+
+	// 1-2. Try preserving both angle & length, or fall back to angle alone
+	let solved = tryAngleSolve();
 
 	// 3. If still not solved and the line has an AngleConstraint with another line, update that AngleConstraint
 	if (!solved) {
@@ -229,11 +232,7 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 						const newRelAngle = Math.min(179.9, Math.max(0.1, relAngleDeg));
 						c.targetAngle = newRelAngle;
 						c.value = newRelAngle;
-						solved =
-							sketch.tryHardSolve(
-								[tempAngleConstraint, new DistanceConstraint('__temp_dist', line.p1Id, line.p2Id, len, 1.0)],
-								checkDirection
-							) || sketch.tryHardSolve([tempAngleConstraint], checkDirection);
+						solved = tryAngleSolve();
 						if (solved) break;
 					}
 				}

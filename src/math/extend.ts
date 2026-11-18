@@ -1,4 +1,5 @@
 import type { SketchDocument } from '../model/sketch';
+import { matchesEndpoints } from '../model/constraintLinks';
 import type { SketchPoint } from '../model/types';
 import {
 	DistanceConstraint,
@@ -204,6 +205,29 @@ function attachExtendIntersectionConstraint(
 	}
 }
 
+function isEndpointConnected(
+	sketch: SketchDocument,
+	excludeId: string,
+	pointId: string,
+	checkCoincident = false
+): boolean {
+	for (const l of sketch.lines.values()) {
+		if (l.id !== excludeId && (l.p1Id === pointId || l.p2Id === pointId)) return true;
+	}
+	for (const a of sketch.arcs.values()) {
+		if (a.id !== excludeId && (a.startPointId === pointId || a.endPointId === pointId)) return true;
+	}
+	for (const s of sketch.splines.values()) {
+		if (s.pointIds.includes(pointId)) return true;
+	}
+	if (checkCoincident) {
+		for (const c of sketch.constraints.values()) {
+			if (c instanceof CoincidentConstraint && (c.p1Id === pointId || c.p2Id === pointId)) return true;
+		}
+	}
+	return false;
+}
+
 /**
  * Executes the extension into the SketchDocument.
  */
@@ -222,122 +246,68 @@ export function executeExtend(
 		const movingPt = sketch.points.get(movingEndId);
 		if (!movingPt) return null;
 
-		const otherLines = Array.from(sketch.lines.values()).filter(
-			l => l.id !== line.id && (l.p1Id === movingEndId || l.p2Id === movingEndId)
-		);
-		const otherArcs = Array.from(sketch.arcs.values()).filter(
-			a => a.startPointId === movingEndId || a.endPointId === movingEndId
-		);
-		const otherSplines = Array.from(sketch.splines.values()).filter(s => s.pointIds.includes(movingEndId));
-		const otherCoincidents = Array.from(sketch.constraints.values()).filter(
-			c => c instanceof CoincidentConstraint && (c.p1Id === movingEndId || c.p2Id === movingEndId)
-		);
-
-		const isSharedEndpoint =
-			otherLines.length > 0 || otherArcs.length > 0 || otherSplines.length > 0 || otherCoincidents.length > 0;
+		const isSharedEndpoint = isEndpointConnected(sketch, line.id, movingEndId, true);
 
 		// Remove conflicting EqualLengthConstraint on this line if present
-		// (since extending the line explicitly changes its length)
 		for (const c of Array.from(sketch.constraints.values())) {
-			if (c instanceof EqualLengthConstraint) {
-				const matches =
-					(c.line1P1 === line.p1Id && c.line1P2 === line.p2Id) ||
-					(c.line1P1 === line.p2Id && c.line1P2 === line.p1Id) ||
-					(c.line2P1 === line.p1Id && c.line2P2 === line.p2Id) ||
-					(c.line2P1 === line.p2Id && c.line2P2 === line.p1Id);
-				if (matches) {
-					sketch.removeConstraint(c.id);
-				}
+			if (
+				c instanceof EqualLengthConstraint &&
+				(matchesEndpoints(c.line1P1, c.line1P2, line.p1Id, line.p2Id) ||
+					matchesEndpoints(c.line2P1, c.line2P2, line.p1Id, line.p2Id))
+			) {
+				sketch.removeConstraint(c.id);
 			}
 		}
 
 		let newEndPtId = movingEndId;
-
 		if (isSharedEndpoint || movingPt.fixed) {
-			const newPt = sketch.addPoint(toPoint);
-			newEndPtId = newPt.id;
-			if (edge === 'end') {
-				line.p2Id = newEndPtId;
-			} else {
-				line.p1Id = newEndPtId;
-			}
+			newEndPtId = sketch.addPoint(toPoint).id;
+			if (edge === 'end') line.p2Id = newEndPtId;
+			else line.p1Id = newEndPtId;
 			sketch.addPointOnLineConstraint(movingPt.id, line.id);
 
-			// Transfer line orientation and distance constraints from movingEndId to newEndPtId
+			const swapEndpoint = (obj: any, f1: string, f2: string) => {
+				if (obj[f1] === movingEndId) obj[f1] = newEndPtId;
+				if (obj[f2] === movingEndId) obj[f2] = newEndPtId;
+			};
 			for (const c of Array.from(sketch.constraints.values())) {
-				if (c instanceof HorizontalConstraint || c instanceof VerticalConstraint) {
-					if ((c.p1Id === fixedEndId && c.p2Id === movingEndId) || (c.p2Id === fixedEndId && c.p1Id === movingEndId)) {
-						if (c.p1Id === movingEndId) {
-							(c as any).p1Id = newEndPtId;
-							(c as any).entityIds = [newEndPtId, c.p2Id];
-						} else {
-							(c as any).p2Id = newEndPtId;
-							(c as any).entityIds = [c.p1Id, newEndPtId];
-						}
-					}
-				} else if (c instanceof DistanceConstraint) {
-					if ((c.p1Id === fixedEndId && c.p2Id === movingEndId) || (c.p2Id === fixedEndId && c.p1Id === movingEndId)) {
-						if (c.p1Id === movingEndId) {
-							(c as any).p1Id = newEndPtId;
-							(c as any).entityIds = [newEndPtId, fixedEndId];
-						} else {
-							(c as any).p2Id = newEndPtId;
-							(c as any).entityIds = [fixedEndId, newEndPtId];
-						}
-						const fixedPt = sketch.points.get(fixedEndId);
-						if (fixedPt) {
-							const newLen = fixedPt.distanceTo(toPoint);
-							c.targetDistance = newLen;
-							c.value = newLen;
-						}
-					}
+				const anyC = c as any;
+				if (
+					(c instanceof HorizontalConstraint || c instanceof VerticalConstraint || c instanceof DistanceConstraint) &&
+					matchesEndpoints(c.p1Id, c.p2Id, fixedEndId, movingEndId)
+				) {
+					swapEndpoint(anyC, 'p1Id', 'p2Id');
+					anyC.entityIds = [c.p1Id, c.p2Id];
 				} else if (
 					c instanceof ParallelConstraint ||
 					c instanceof PerpendicularConstraint ||
 					c instanceof CollinearConstraint
 				) {
-					if ((c as any).l1P1 === movingEndId) (c as any).l1P1 = newEndPtId;
-					if ((c as any).l1P2 === movingEndId) (c as any).l1P2 = newEndPtId;
-					if ((c as any).l2P1 === movingEndId) (c as any).l2P1 = newEndPtId;
-					if ((c as any).l2P2 === movingEndId) (c as any).l2P2 = newEndPtId;
-					c.entityIds = [(c as any).l1P1, (c as any).l1P2, (c as any).l2P1, (c as any).l2P2];
-				} else if (c instanceof AngleConstraint) {
-					if (c.line1Id === line.id || c.line2Id === line.id) {
-						if ((c as any).l1P1 === movingEndId) (c as any).l1P1 = newEndPtId;
-						if ((c as any).l1P2 === movingEndId) (c as any).l1P2 = newEndPtId;
-						if ((c as any).l2P1 === movingEndId) (c as any).l2P1 = newEndPtId;
-						if ((c as any).l2P2 === movingEndId) (c as any).l2P2 = newEndPtId;
-						c.entityIds = Array.from(
-							new Set([c.line1Id, c.line2Id, (c as any).l1P1, (c as any).l1P2, (c as any).l2P1, (c as any).l2P2])
-						);
-					}
-				} else if (c instanceof TangentLineCircleConstraint) {
-					if (c.lineP1Id === movingEndId || c.lineP2Id === movingEndId) {
-						if (c.lineP1Id === movingEndId) (c as any).lineP1Id = newEndPtId;
-						if (c.lineP2Id === movingEndId) (c as any).lineP2Id = newEndPtId;
-						c.entityIds = [c.lineP1Id, c.lineP2Id, c.circleCenterId, c.circleId];
-					}
-				} else if (c instanceof PointToLineDistanceConstraint) {
-					if (c.lineId === line.id) {
-						if (c.lineP1Id === movingEndId) (c as any).lineP1Id = newEndPtId;
-						if (c.lineP2Id === movingEndId) (c as any).lineP2Id = newEndPtId;
-						c.entityIds = [c.pointId, c.lineP1Id, c.lineP2Id];
-					}
+					swapEndpoint(anyC, 'l1P1', 'l1P2');
+					swapEndpoint(anyC, 'l2P1', 'l2P2');
+					c.entityIds = [anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2];
+				} else if (c instanceof AngleConstraint && (c.line1Id === line.id || c.line2Id === line.id)) {
+					swapEndpoint(anyC, 'l1P1', 'l1P2');
+					swapEndpoint(anyC, 'l2P1', 'l2P2');
+					c.entityIds = Array.from(new Set([c.line1Id, c.line2Id, anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2]));
+				} else if (
+					c instanceof TangentLineCircleConstraint &&
+					(c.lineP1Id === movingEndId || c.lineP2Id === movingEndId)
+				) {
+					swapEndpoint(anyC, 'lineP1Id', 'lineP2Id');
+					c.entityIds = [c.lineP1Id, c.lineP2Id, c.circleCenterId, c.circleId];
+				} else if (c instanceof PointToLineDistanceConstraint && c.lineId === line.id) {
+					swapEndpoint(anyC, 'lineP1Id', 'lineP2Id');
+					c.entityIds = [c.pointId, c.lineP1Id, c.lineP2Id];
 				} else if (c instanceof OffsetConstraint) {
 					for (const p of c.pairs) {
-						if (p.kind === 'line' && p.offLineId === line.id) {
-							if (p.offP1Id === movingEndId) p.offP1Id = newEndPtId;
-							if (p.offP2Id === movingEndId) p.offP2Id = newEndPtId;
-						}
+						if (p.kind === 'line' && p.offLineId === line.id) swapEndpoint(p, 'offP1Id', 'offP2Id');
 					}
 				}
 			}
 		} else {
-			// Remove conflicting constraints tying movingEndId to external entities FIRST
-			// while movingPt is still at its current valid position
+			// Remove external constraints before moving point to target position
 			removeExternalPointConstraints(sketch, movingEndId, fixedEndId);
-
-			// Now move point to target position
 			movingPt.x = toPoint.x;
 			movingPt.y = toPoint.y;
 		}
@@ -347,10 +317,7 @@ export function executeExtend(
 		if (fixedPt) {
 			const newLen = fixedPt.distanceTo(toPoint);
 			for (const c of sketch.constraints.values()) {
-				if (
-					c instanceof DistanceConstraint &&
-					((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
-				) {
+				if (c instanceof DistanceConstraint && matchesEndpoints(c.p1Id, c.p2Id, line.p1Id, line.p2Id)) {
 					c.targetDistance = newLen;
 					c.value = newLen;
 				}
@@ -383,22 +350,12 @@ export function executeExtend(
 		const movingPt = sketch.points.get(movingEndId);
 		if (!movingPt) return null;
 
-		const otherEntities = [
-			...Array.from(sketch.lines.values()).filter(l => l.p1Id === movingEndId || l.p2Id === movingEndId),
-			...Array.from(sketch.arcs.values()).filter(
-				a => a.id !== arc.id && (a.startPointId === movingEndId || a.endPointId === movingEndId)
-			),
-			...Array.from(sketch.splines.values()).filter(s => s.pointIds.includes(movingEndId)),
-		];
-
 		let newEndPtId = movingEndId;
-		if (otherEntities.length > 0 || movingPt.fixed) {
-			const newPt = sketch.addPoint(toPoint);
-			newEndPtId = newPt.id;
+		if (isEndpointConnected(sketch, arc.id, movingEndId) || movingPt.fixed) {
+			newEndPtId = sketch.addPoint(toPoint).id;
 			sketch.replaceArcEndpoint(arc, edge, newEndPtId);
 		} else {
 			removeExternalPointConstraints(sketch, movingEndId);
-
 			movingPt.x = toPoint.x;
 			movingPt.y = toPoint.y;
 		}
@@ -557,25 +514,19 @@ function extendControlSpline(
 			: defaultClampedKnots(oldPtIds.length);
 
 	if (!spline.tangentLineIds) spline.tangentLineIds = [];
+	const spanPts =
+		edge === 'end' ? [oldBoundaryId, e1Pt.id, e2Pt.id, newPt.id] : [newPt.id, e1Pt.id, e2Pt.id, oldBoundaryId];
+	const spanLines = [0, 1, 2].map(i => addHandlePolygonLine(sketch, spline.id, spanPts[i], spanPts[i + 1]));
 	if (edge === 'end') {
-		const kEnd = baseKnots[baseKnots.length - 1];
-		const kNew = kEnd + 1;
+		const kNew = baseKnots[baseKnots.length - 1] + 1;
 		spline.knots = [...baseKnots.slice(0, -1), kNew, kNew, kNew, kNew];
 		spline.pointIds.push(e1Pt.id, e2Pt.id, newPt.id);
-		spline.tangentLineIds.push(
-			addHandlePolygonLine(sketch, spline.id, oldBoundaryId, e1Pt.id),
-			addHandlePolygonLine(sketch, spline.id, e1Pt.id, e2Pt.id),
-			addHandlePolygonLine(sketch, spline.id, e2Pt.id, newPt.id)
-		);
+		spline.tangentLineIds.push(...spanLines);
 	} else {
 		const kStart = baseKnots[0];
 		spline.knots = [kStart, kStart, kStart, kStart, ...baseKnots.slice(1).map(k => k + 1)];
 		spline.pointIds.unshift(newPt.id, e1Pt.id, e2Pt.id);
-		spline.tangentLineIds.unshift(
-			addHandlePolygonLine(sketch, spline.id, newPt.id, e1Pt.id),
-			addHandlePolygonLine(sketch, spline.id, e1Pt.id, e2Pt.id),
-			addHandlePolygonLine(sketch, spline.id, e2Pt.id, oldBoundaryId)
-		);
+		spline.tangentLineIds.unshift(...spanLines);
 	}
 }
 
@@ -652,14 +603,9 @@ function extendFitSpline(
 
 	const dir = tHat ?? new Vec2(1, 0);
 	const dNew = extLen > 1e-6 ? Math.min(dIn > 1e-6 ? dIn : extLen / 3, extLen / 3) : 1;
-	const newH1Pos =
-		edge === 'end'
-			? new Vec2(toPoint.x - dir.x * dNew, toPoint.y - dir.y * dNew)
-			: new Vec2(toPoint.x + dir.x * dNew, toPoint.y + dir.y * dNew);
-	const newH2Pos =
-		edge === 'end'
-			? new Vec2(toPoint.x + dir.x * dNew, toPoint.y + dir.y * dNew)
-			: new Vec2(toPoint.x - dir.x * dNew, toPoint.y - dir.y * dNew);
+	const dirSign = edge === 'end' ? 1 : -1;
+	const newH1Pos = toPoint.clone().addScaledVector(dir, -dirSign * dNew);
+	const newH2Pos = toPoint.clone().addScaledVector(dir, dirSign * dNew);
 	const newHLineId = addFitHandle(sketch, spline.id, newPt, newH1Pos, newH2Pos, false);
 
 	if (edge === 'end') {
