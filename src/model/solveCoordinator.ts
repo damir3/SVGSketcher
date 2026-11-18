@@ -25,7 +25,7 @@ import { MIN_OFFSET_RADIUS as MIN_SOLVER_RADIUS } from '../kernel/offsetTypes';
 export class SolveCoordinator {
 	private readonly sketch: SketchDocument;
 	readonly paramManager = new ParamManager();
-	private solver = new NumericalSolver({ gradRelTolerance: 1e-6 });
+	private readonly solver: NumericalSolver;
 	lastSolverResult: SolverResult | null = null;
 	lastSolveTimeMs = 0;
 
@@ -33,8 +33,9 @@ export class SolveCoordinator {
 	private stableCenterEditDepth = 0;
 	private preserveCentersOnNextSolve = false;
 
-	constructor(sketch: SketchDocument) {
+	constructor(sketch: SketchDocument, solver?: NumericalSolver) {
 		this.sketch = sketch;
+		this.solver = solver ?? new NumericalSolver({ gradRelTolerance: 1e-6 });
 	}
 
 	markPreserveCentersOnNextSolve(): void {

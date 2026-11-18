@@ -1,5 +1,5 @@
 import type { SketchImage } from './image';
-import type { ParamManager } from '../solver/solver';
+import type { NumericalSolver, ParamManager } from '../solver/solver';
 import type { IConstraint, SolverResult } from '../solver/types';
 import {
 	ArcEndpointsConstraint,
@@ -170,7 +170,6 @@ import {
 	recomputeParametersAndConstraints,
 } from './parameterOperations';
 import {
-	createControlSplineHandleLines,
 	addFitSpline,
 	addControlSpline,
 	copySpline,
@@ -179,6 +178,8 @@ import {
 	resetFitSplineTangents,
 	isSplineInternalConstraint,
 	restoreAutomaticSplineHandles,
+	deleteSplineWithHandles,
+	removePointFromSplines,
 } from './splineOperations';
 import {
 	exportSketchToSVG,
@@ -206,6 +207,10 @@ export class PointMap extends Map<string, SketchPoint> {
 	override get(key: string): SketchPoint | undefined {
 		return super.get(key) ?? BUILT_IN_POINTS.get(key);
 	}
+}
+
+export interface SketchDocumentOptions {
+	solver?: NumericalSolver;
 }
 
 export class SketchDocument {
@@ -252,7 +257,11 @@ export class SketchDocument {
 	private readonly primitiveCollectionMap = new Map(this.primitiveCollections.map(col => [col.type, col]));
 
 	private idCounter = 1;
-	readonly solverCoordinator = new SolveCoordinator(this);
+	readonly solverCoordinator: SolveCoordinator;
+
+	constructor(options?: SketchDocumentOptions) {
+		this.solverCoordinator = new SolveCoordinator(this, options?.solver);
+	}
 
 	get paramManager(): ParamManager {
 		return this.solverCoordinator.paramManager;
@@ -1223,28 +1232,6 @@ export class SketchDocument {
 		return isSplineInternalConstraint(this, c);
 	}
 
-	private deleteSplineTangentLine(lid: string, candidatePointIds?: Set<string>): void {
-		const line = this.lines.get(lid);
-		if (!line) return;
-		if (candidatePointIds) {
-			candidatePointIds.add(line.p1Id);
-			candidatePointIds.add(line.p2Id);
-		}
-		this.lines.delete(lid);
-		this.selection.lineIds.delete(lid);
-	}
-
-	private deleteSplineWithHandles(sid: string, spline: SketchSpline, candidatePointIds: Set<string>): void {
-		for (const ptId of spline.pointIds) candidatePointIds.add(ptId);
-		if (spline.tangentLineIds) {
-			for (const lid of spline.tangentLineIds) {
-				this.deleteSplineTangentLine(lid, spline.splineType === 'fit' ? candidatePointIds : undefined);
-			}
-		}
-		this.splines.delete(sid);
-		this.selection.splineIds.delete(sid);
-	}
-
 	getPrimitivePointIds(primitiveId: string): string[] {
 		for (const col of this.primitiveCollections) {
 			if (!col.isCurve) continue;
@@ -1304,44 +1291,9 @@ export class SketchDocument {
 				}
 			}
 
-			// Update splines referencing this point
-			for (const [sid, spline] of this.splines.entries()) {
-				if (!spline.pointIds.includes(id)) continue;
-				if (spline.splineType === 'control') {
-					const remaining = spline.pointIds.filter(pid => pid !== id);
-					if (remaining.length >= 2) {
-						spline.pointIds = remaining;
-						delete spline.knots;
-						if (spline.tangentLineIds) {
-							for (const lid of spline.tangentLineIds) this.deleteSplineTangentLine(lid);
-						}
-						spline.tangentLineIds = createControlSplineHandleLines(this, sid, remaining);
-					} else {
-						this.deleteSplineWithHandles(sid, spline, candidatePointIds);
-					}
-				} else if (spline.splineType === 'fit') {
-					const unique = spline.isClosed ? spline.pointIds.slice(0, -1) : spline.pointIds;
-					if (unique.length <= (spline.isClosed ? 3 : 2)) {
-						this.deleteSplineWithHandles(sid, spline, candidatePointIds);
-					} else {
-						const idx = unique.indexOf(id);
-						if (idx !== -1) {
-							if (spline.tangentLineIds?.[idx]) {
-								this.deleteSplineTangentLine(spline.tangentLineIds[idx], candidatePointIds);
-							}
-							const nextUnique = unique.filter((_, i) => i !== idx);
-							spline.pointIds = spline.isClosed ? [...nextUnique, nextUnique[0]] : nextUnique;
-							if (spline.tangentLineIds) {
-								const baseTangents = spline.isClosed ? spline.tangentLineIds.slice(0, -1) : spline.tangentLineIds;
-								const nextTangents = baseTangents.filter((_, i) => i !== idx);
-								spline.tangentLineIds = spline.isClosed ? [...nextTangents, nextTangents[0]] : nextTangents;
-							}
-						}
-					}
-				}
-			}
+			removePointFromSplines(this, id, candidatePointIds);
 		} else if (targetCol.type === 'spline') {
-			this.deleteSplineWithHandles(id, this.splines.get(id)!, candidatePointIds);
+			deleteSplineWithHandles(this, id, this.splines.get(id)!, candidatePointIds);
 		} else {
 			const prim = targetCol.map.get(id)!;
 			for (const ptId of prim.getPointIds(this)) {

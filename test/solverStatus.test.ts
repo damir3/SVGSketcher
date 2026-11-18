@@ -64,7 +64,8 @@ it('solves a 0.1 mm radius and propagates it through an equal radius constraint'
 });
 
 it('goes directly to the free-radius pass when a pattern copy must change radius', t => {
-	const sketch = new SketchDocument();
+	const solver = new NumericalSolver({ gradRelTolerance: 1e-6 });
+	const sketch = new SketchDocument({ solver });
 	const pivot = sketch.addPoint({ x: 0, y: 0 }, true);
 	const sourceCenter = sketch.addPoint({ x: 10, y: 0 });
 	const source = sketch.addCircle(sourceCenter.id, 1);
@@ -79,7 +80,7 @@ it('goes directly to the free-radius pass when a pattern copy must change radius
 		},
 	]);
 	const dimension = sketch.addRadiusConstraint(source.id, 1, 'radius')!;
-	const solve = t.mock.method(sketch.solverCoordinator['solver'], 'solve');
+	const solve = t.mock.method(solver, 'solve');
 
 	assert.ok(sketch.updateDimensionalConstraint(dimension.id, 2));
 
@@ -90,10 +91,9 @@ it('goes directly to the free-radius pass when a pattern copy must change radius
 
 it('keeps iterating past small ill-conditioned gradients to close a shallow loop', () => {
 	const createShallowLoop = (gradRelTolerance?: number) => {
-		const sketch = new SketchDocument();
-		if (gradRelTolerance !== undefined) {
-			sketch.solverCoordinator['solver'] = new NumericalSolver({ gradRelTolerance });
-		}
+		const sketch = new SketchDocument(
+			gradRelTolerance !== undefined ? { solver: new NumericalSolver({ gradRelTolerance }) } : undefined
+		);
 		let pMidAId = '';
 		let pMidBId = '';
 		sketch.withDeferredSolve(() => {

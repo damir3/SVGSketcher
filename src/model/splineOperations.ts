@@ -416,3 +416,68 @@ export function prepareSplineConstraints(
 	}
 	return [...constraints.filter(c => !replaced.has(c)), ...splineConstraints];
 }
+
+function deleteSplineTangentLine(sketch: SketchDocument, lid: string, candidatePointIds?: Set<string>): void {
+	const line = sketch.lines.get(lid);
+	if (!line) return;
+	if (candidatePointIds) {
+		candidatePointIds.add(line.p1Id);
+		candidatePointIds.add(line.p2Id);
+	}
+	sketch.lines.delete(lid);
+	sketch.selection.lineIds.delete(lid);
+}
+
+export function deleteSplineWithHandles(
+	sketch: SketchDocument,
+	sid: string,
+	spline: SketchSpline,
+	candidatePointIds: Set<string>
+): void {
+	for (const ptId of spline.pointIds) candidatePointIds.add(ptId);
+	if (spline.tangentLineIds) {
+		for (const lid of spline.tangentLineIds) {
+			deleteSplineTangentLine(sketch, lid, spline.splineType === 'fit' ? candidatePointIds : undefined);
+		}
+	}
+	sketch.splines.delete(sid);
+	sketch.selection.splineIds.delete(sid);
+}
+
+export function removePointFromSplines(sketch: SketchDocument, pointId: string, candidatePointIds: Set<string>): void {
+	for (const [sid, spline] of sketch.splines.entries()) {
+		if (!spline.pointIds.includes(pointId)) continue;
+		if (spline.splineType === 'control') {
+			const remaining = spline.pointIds.filter(pid => pid !== pointId);
+			if (remaining.length >= 2) {
+				spline.pointIds = remaining;
+				delete spline.knots;
+				if (spline.tangentLineIds) {
+					for (const lid of spline.tangentLineIds) deleteSplineTangentLine(sketch, lid);
+				}
+				spline.tangentLineIds = createControlSplineHandleLines(sketch, sid, remaining);
+			} else {
+				deleteSplineWithHandles(sketch, sid, spline, candidatePointIds);
+			}
+		} else if (spline.splineType === 'fit') {
+			const unique = spline.isClosed ? spline.pointIds.slice(0, -1) : spline.pointIds;
+			if (unique.length <= (spline.isClosed ? 3 : 2)) {
+				deleteSplineWithHandles(sketch, sid, spline, candidatePointIds);
+			} else {
+				const idx = unique.indexOf(pointId);
+				if (idx !== -1) {
+					if (spline.tangentLineIds?.[idx]) {
+						deleteSplineTangentLine(sketch, spline.tangentLineIds[idx], candidatePointIds);
+					}
+					const nextUnique = unique.filter((_, i) => i !== idx);
+					spline.pointIds = spline.isClosed ? [...nextUnique, nextUnique[0]] : nextUnique;
+					if (spline.tangentLineIds) {
+						const baseTangents = spline.isClosed ? spline.tangentLineIds.slice(0, -1) : spline.tangentLineIds;
+						const nextTangents = baseTangents.filter((_, i) => i !== idx);
+						spline.tangentLineIds = spline.isClosed ? [...nextTangents, nextTangents[0]] : nextTangents;
+					}
+				}
+			}
+		}
+	}
+}
