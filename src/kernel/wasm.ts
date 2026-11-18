@@ -23,9 +23,11 @@ import { createWasmOffsetKernel, type OffsetBinding } from './offsetWasm';
 import { createWasmCurveKernel, type CurvePathBinding } from './curveWasm';
 import { createWasmQueryKernel, type QueryBinding } from './queryWasm';
 import { createWasmTopologyKernel, type TopologyBinding } from './topologyWasm';
+import { createWasmTextGeometry, type TextGeometryBinding } from './textWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	text_geometry: TextGeometryBinding;
 	topology_queries: TopologyBinding;
 	trace_image: ImageTraceBinding;
 	resize_offset_spline: OffsetSplineResizeBinding;
@@ -146,7 +148,9 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.resize_offset_spline !== 'function') throw new Error('WASM kernel has no offset spline resizing');
 	if (typeof bindings.trace_image !== 'function') throw new Error('WASM kernel has no image tracing');
 	if (typeof bindings.topology_queries !== 'function') throw new Error('WASM kernel has no topology operations');
+	if (typeof bindings.text_geometry !== 'function') throw new Error('WASM kernel has no text geometry');
 	return {
+		textGeometry: createWasmTextGeometry((...args) => bindings.text_geometry(...args)),
 		topology: createWasmTopologyKernel((...args) => bindings.topology_queries(...args)),
 		traceImage: createWasmImageTrace((gray, settings) => bindings.trace_image(gray, settings)),
 		backend: 'wasm',

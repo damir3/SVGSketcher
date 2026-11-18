@@ -1,6 +1,6 @@
 {
   "sourceHashes": {
-    "src/math/textPathReference.ts": "ff3786a21a9cd56d206ce3aff161358a5b3eb1aef56b86c966fa26cdbe268790",
+    "src/math/textPathReference.ts": "14efe638bb107092a17b1365dbf929cc675b157ea7f31434bd146233f142a5c8",
     "src/math/curveParameterReference.ts": "9ed1ca5258e5310bfa3ad597a6f935b01d7d66c90e64ef69cb6bc20f96ac5684",
     "src/math/curvePathReference.ts": "4eb13ad3c7ae7a9ad629ffb870aea238a481c13cf6fd3929c6ba9a9978015181"
   },

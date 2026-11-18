@@ -130,6 +130,7 @@ it('validates the numerical solver packed result before exposing it to the model
 			resize_offset_spline: () => new Float64Array(),
 			trace_image: () => new Float64Array(),
 			topology_queries: () => new Float64Array(),
+			text_geometry: () => new Float64Array(),
 			solve_system: () => new Float64Array(data),
 		});
 		assert.throws(() => kernel.solveSystem!(simpleProblem(), evaluateSimple), /WASM solver/);

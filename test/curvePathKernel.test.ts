@@ -8,7 +8,8 @@ import { createWasmCurveKernel } from '../src/kernel/curveWasm';
 import { createCurvePath, pointsAtCurveParameters, parametersAtCurvePoints } from '../src/math/curvePath';
 import { getPointAtParam, getParamAtPoint } from '../src/math/intersection';
 import { generateTextSvgPathData } from '../src/math/textPath';
-import { generateTextSvgPathData as oldText, createPathEvaluator as oldPath } from '../src/math/textPathReference';
+import { createPathEvaluator as oldPath } from '../src/math/textPathReference';
+import { generateTextSvgPathData as oldText } from '../src/math/textPlacementReference';
 import { hydrateQueryCurve } from '../src/kernel/queryReference';
 import { getFontSync } from '../src/canvas/fonts';
 import { Vec2 } from '../src/math/vector';
@@ -109,11 +110,12 @@ test('text SVG stays equal to the pre-native layout for all curve types and layo
 	}
 });
 
-test('WASM builds the path table once and samples the entire text in one call, without spline callbacks', {
+test('WASM lays out complete text in one call and keeps reusable standalone path tables', {
 	skip: !getGeometryKernel().curves,
 }, async () => {
 	const bindings = await import('../public/kernel/sketcher_wasm.js'),
 		previous = getGeometryKernel();
+	let textCalls = 0;
 	const modes: number[] = [],
 		f = fixture.cases.find(f => f.curve.id === 'spline'),
 		c = hydrateQueryCurve(f.curve),
@@ -134,6 +136,10 @@ test('WASM builds the path table once and samples the entire text in one call, w
 		setGeometryKernel(
 			createWasmGeometryKernel({
 				...bindings,
+				text_geometry(...args) {
+					textCalls++;
+					return bindings.text_geometry(...args);
+				},
 				curve_path(data, table, values, mode) {
 					modes.push(mode);
 					return bindings.curve_path(data, table, values, mode);
@@ -145,7 +151,8 @@ test('WASM builds the path table once and samples the entire text in one call, w
 		);
 		const before = plain(c);
 		const actual = generateTextSvgPathData(options, font, c);
-		assert.deepEqual(modes, [0, 1]);
+		assert.deepEqual(modes, []);
+		assert.equal(textCalls, 1);
 		assert.deepEqual(plain(c), before);
 		assert.equal(actual, expected);
 		modes.length = 0;

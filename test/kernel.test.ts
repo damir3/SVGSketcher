@@ -203,6 +203,7 @@ it('rejects malformed packed results at the WASM boundary', () => {
 			resize_offset_spline: () => new Float64Array(),
 			trace_image: () => new Float64Array(),
 			topology_queries: () => new Float64Array(),
+			text_geometry: () => new Float64Array(),
 			solve_system: () => new Float64Array(),
 		});
 		assert.throws(() => kernel.intersectPairs([pair]), /WASM intersection/);

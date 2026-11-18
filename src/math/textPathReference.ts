@@ -23,11 +23,13 @@ export { createPathEvaluator, type CurveSample, type PathEvaluator } from './cur
 
 /**
  * Generates an SVG path data string (d="...") representing the text.
+ * The optional formatter lets the fallback repair SVG output without changing frozen placement math.
  */
 export function generateTextSvgPathData(
 	options: TextLayoutOptions,
 	font: opentype.Font,
-	targetCurve?: GeoCurve | null
+	targetCurve?: GeoCurve | null,
+	serialize?: (path: opentype.Path) => string
 ): string {
 	if (!options.text || options.height <= 0) {
 		return '';
@@ -221,7 +223,7 @@ export function generateTextSvgPathData(
 		}
 	}
 
-	return pathObj.toPathData(2);
+	return serialize ? serialize(pathObj) : pathObj.toPathData(2);
 }
 
 function appendTransformedCommand(

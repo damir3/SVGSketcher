@@ -12,6 +12,7 @@ mod queries;
 mod regions;
 mod solver;
 mod spline;
+mod text_geometry;
 mod topology;
 
 const CURVE_STRIDE: usize = 9;
@@ -19,7 +20,7 @@ const PAIR_STRIDE: usize = CURVE_STRIDE * 2;
 
 #[wasm_bindgen]
 pub fn api_version() -> u32 {
-    29
+    32
 }
 
 fn decode_curve(data: &[f64]) -> Result<Curve, &'static str> {

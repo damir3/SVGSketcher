@@ -9,9 +9,10 @@ import type { OffsetKernel } from './offsetTypes';
 import type { CurveEvaluationKernel } from './curveTypes';
 import type { GeometryQueryKernel } from './queryTypes';
 import type { TopologyKernel } from './topologyTypes';
+import type { TextGeometryKernel } from './textTypes';
 
 /** Versioned, UI-independent boundary for migrated kernel operations. */
-export const GEOMETRY_KERNEL_API_VERSION = 29;
+export const GEOMETRY_KERNEL_API_VERSION = 32;
 export const KERNEL_CURVE_STRIDE = 9;
 export const MAX_BEZIER_INTERSECTION_CANDIDATES = 17;
 // The existing sampled conic algorithm can emit one candidate per interval, including coincident curves.
@@ -52,4 +53,5 @@ export interface GeometryKernel {
 	queries?: GeometryQueryKernel;
 	curves?: CurveEvaluationKernel;
 	topology?: TopologyKernel;
+	textGeometry?: TextGeometryKernel;
 }

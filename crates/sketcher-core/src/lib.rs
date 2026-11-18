@@ -17,6 +17,7 @@ pub mod regions;
 pub mod solver;
 pub mod spline;
 pub mod spline_editing;
+pub mod text_geometry;
 pub mod topology;
 
 pub use point::{
