@@ -1,10 +1,31 @@
 import type { SketchDocument } from './sketch';
 import type { IConstraint } from '../solver/types';
-import type { SketchLine } from './types';
+import type { PrimitiveType, SketchLine } from './types';
 import {
-	RadiusConstraint,
-	AngleConstraint,
 	FixedConstraint,
+	CoincidentConstraint,
+	HorizontalConstraint,
+	VerticalConstraint,
+	DistanceConstraint,
+	PointToLineDistanceConstraint,
+	RadiusConstraint,
+	EqualLengthConstraint,
+	EqualRadiusConstraint,
+	ParallelConstraint,
+	PerpendicularConstraint,
+	CollinearConstraint,
+	SymmetryConstraint,
+	AngleConstraint,
+	PointOnLineConstraint,
+	PointOnCircleConstraint,
+	PointOnEllipseConstraint,
+	PointOnSplineConstraint,
+	TangentLineCircleConstraint,
+	TangentCircleCircleConstraint,
+	ConcentricConstraint,
+	MidpointConstraint,
+	EllipseAxisConstraint,
+	EllipticalArcEndpointsConstraint,
 	OffsetConstraint,
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
@@ -175,83 +196,87 @@ export function isPointUsed(sketch: SketchDocument, pointId: string): boolean {
 	return false;
 }
 
-export function getConstraintsForEntity(
-	sketch: SketchDocument,
-	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline',
-	id: string
-): IConstraint[] {
+function isPointOnCurveConstraint(
+	c: IConstraint
+): c is PointOnLineConstraint | PointOnCircleConstraint | PointOnEllipseConstraint | PointOnSplineConstraint {
+	return (
+		c instanceof PointOnLineConstraint ||
+		c instanceof PointOnCircleConstraint ||
+		c instanceof PointOnEllipseConstraint ||
+		c instanceof PointOnSplineConstraint
+	);
+}
+
+function usesLineEndpoint(c: CollinearConstraint | AngleConstraint, targetId: string): boolean {
+	return c.l1P1 === targetId || c.l1P2 === targetId || c.l2P1 === targetId || c.l2P2 === targetId;
+}
+
+export function getConstraintsForEntity(sketch: SketchDocument, type: PrimitiveType, id: string): IConstraint[] {
 	const res: IConstraint[] = [];
 	if (type === 'point') {
-		const isPointOnCurveType = (t: string) =>
-			t === 'point_on_line' || t === 'point_on_circle' || t === 'point_on_ellipse' || t === 'point_on_spline';
-		const usesPointEndpoint = (c: any, targetId: string) =>
-			c.l1P1 === targetId || c.l1P2 === targetId || c.l2P1 === targetId || c.l2P2 === targetId;
-
 		if (id === 'origin') {
 			for (const c of sketch.constraints.values()) {
-				const anyC = c as any;
-				if (c.type === 'midpoint') {
-					if (anyC.midId === 'origin' || anyC.p1Id === 'origin' || anyC.p2Id === 'origin') res.push(c);
-				} else if (c.type === 'symmetry') {
-					if (anyC.p1Id === 'origin' || anyC.p2Id === 'origin' || anyC.lineId === 'origin') res.push(c);
-				} else if (isPointOnCurveType(c.type) || c.type === 'point_to_line_distance') {
-					if (anyC.pointId === 'origin') res.push(c);
+				if (c instanceof MidpointConstraint) {
+					if (c.midId === 'origin' || c.p1Id === 'origin' || c.p2Id === 'origin') res.push(c);
+				} else if (c instanceof SymmetryConstraint) {
+					if (c.p1Id === 'origin' || c.p2Id === 'origin' || c.lineId === 'origin') res.push(c);
+				} else if (isPointOnCurveConstraint(c) || c instanceof PointToLineDistanceConstraint) {
+					if (c.pointId === 'origin') res.push(c);
 				} else if (
-					c.type === 'coincident' ||
-					c.type === 'horizontal' ||
-					c.type === 'vertical' ||
-					c.type === 'distance'
+					c instanceof CoincidentConstraint ||
+					c instanceof HorizontalConstraint ||
+					c instanceof VerticalConstraint ||
+					c instanceof DistanceConstraint
 				) {
 					if (
-						(anyC.p1Id === 'origin' || anyC.p2Id === 'origin') &&
-						!(c.type === 'distance' && anyC.orientation !== 'aligned')
+						(c.p1Id === 'origin' || c.p2Id === 'origin') &&
+						!(c instanceof DistanceConstraint && c.orientation !== 'aligned')
 					) {
 						res.push(c);
 					}
-				} else if (c.type === 'circular_pattern') {
-					if ((c as CircularPatternConstraint).centerPtId === 'origin') res.push(c);
-				} else if (c.type === 'collinear') {
-					const l1 = lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
-					const l2 = lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
-					if ((!l1 || !l2) && usesPointEndpoint(anyC, 'origin')) res.push(c);
-				} else if (c.type === 'angle') {
-					if (!anyC.line1Id && !anyC.line2Id && usesPointEndpoint(anyC, 'origin')) res.push(c);
+				} else if (c instanceof CircularPatternConstraint) {
+					if (c.centerPtId === 'origin') res.push(c);
+				} else if (c instanceof CollinearConstraint) {
+					const l1 = lineFromPoints(sketch, c.l1P1, c.l1P2);
+					const l2 = lineFromPoints(sketch, c.l2P1, c.l2P2);
+					if ((!l1 || !l2) && usesLineEndpoint(c, 'origin')) res.push(c);
+				} else if (c instanceof AngleConstraint) {
+					if (!c.line1Id && !c.line2Id && usesLineEndpoint(c, 'origin')) res.push(c);
 				}
 			}
 			return res;
 		}
 		for (const c of sketch.constraints.values()) {
 			if (sketch.isSplineInternalConstraint(c)) continue;
-			const anyC = c as any;
-			if (c.type === 'fixed' || isPointOnCurveType(c.type)) {
-				if (anyC.pointId === id) res.push(c);
-			} else if (c.type === 'coincident' || c.type === 'symmetry') {
-				if (anyC.p1Id === id || anyC.p2Id === id) res.push(c);
-			} else if (c.type === 'point_to_line_distance') {
-				if (anyC.pointId === id || anyC.secondPointId === id) res.push(c);
-			} else if (c.type === 'midpoint') {
-				if (
-					anyC.midId === id ||
-					((anyC.p1Id === id || anyC.p2Id === id) && !sketch.getLineBetween(anyC.p1Id, anyC.p2Id))
-				) {
+			if (c instanceof FixedConstraint || isPointOnCurveConstraint(c)) {
+				if (c.pointId === id) res.push(c);
+			} else if (c instanceof CoincidentConstraint || c instanceof SymmetryConstraint) {
+				if (c.p1Id === id || c.p2Id === id) res.push(c);
+			} else if (c instanceof PointToLineDistanceConstraint) {
+				if (c.pointId === id || c.secondPointId === id) res.push(c);
+			} else if (c instanceof MidpointConstraint) {
+				if (c.midId === id || ((c.p1Id === id || c.p2Id === id) && !sketch.getLineBetween(c.p1Id, c.p2Id))) {
 					res.push(c);
 				}
-			} else if (c.type === 'collinear') {
-				const l1 = lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
-				const l2 = lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
-				if ((!l1 || !l2) && usesPointEndpoint(anyC, id)) res.push(c);
-			} else if (c.type === 'angle') {
-				if (!anyC.line1Id && !anyC.line2Id && usesPointEndpoint(anyC, id)) res.push(c);
-			} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
-				if ((anyC.p1Id === id || anyC.p2Id === id) && !sketch.getLineBetween(anyC.p1Id, anyC.p2Id)) {
+			} else if (c instanceof CollinearConstraint) {
+				const l1 = lineFromPoints(sketch, c.l1P1, c.l1P2);
+				const l2 = lineFromPoints(sketch, c.l2P1, c.l2P2);
+				if ((!l1 || !l2) && usesLineEndpoint(c, id)) res.push(c);
+			} else if (c instanceof AngleConstraint) {
+				if (!c.line1Id && !c.line2Id && usesLineEndpoint(c, id)) res.push(c);
+			} else if (
+				c instanceof HorizontalConstraint ||
+				c instanceof VerticalConstraint ||
+				c instanceof DistanceConstraint
+			) {
+				if ((c.p1Id === id || c.p2Id === id) && !sketch.getLineBetween(c.p1Id, c.p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'circular_pattern' || c.type === 'rectangular_pattern') {
-				const pat = c as CircularPatternConstraint | RectangularPatternConstraint;
+			} else if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
 				if (
 					(c instanceof CircularPatternConstraint && c.centerPtId === id) ||
-					pat.sourceObjectIds?.includes(id) ||
-					pat.copies?.some(cp => cp.createdEntityIds.some(e => e.type === 'point' && e.id === id))
+					c.sourceObjectIds?.includes(id) ||
+					c.copies?.some(cp => cp.createdEntityIds.some(e => e.type === 'point' && e.id === id))
 				) {
 					res.push(c);
 				}
@@ -261,23 +286,23 @@ export function getConstraintsForEntity(
 		if (id === 'axis_x' || id === 'axis_y') {
 			const axis = id === 'axis_x' ? 'x' : 'y';
 			for (const c of sketch.constraints.values()) {
-				const anyC = c as any;
 				if (
-					((c.type === 'point_on_line' || c.type === 'point_to_line_distance') &&
-						anyC.lineP1Id === 'origin' &&
-						anyC.lineP2Id === id) ||
-					((c.type === 'collinear' || c.type === 'parallel' || c.type === 'perpendicular') &&
-						((anyC.l1P1 === 'origin' && anyC.l1P2 === id) || (anyC.l2P1 === 'origin' && anyC.l2P2 === id))) ||
-					(c.type === 'distance' &&
-						anyC.p1Id === 'origin' &&
-						anyC.orientation === (axis === 'x' ? 'vertical' : 'horizontal'))
+					((c instanceof PointOnLineConstraint || c instanceof PointToLineDistanceConstraint) &&
+						c.lineP1Id === 'origin' &&
+						c.lineP2Id === id) ||
+					((c instanceof CollinearConstraint ||
+						c instanceof ParallelConstraint ||
+						c instanceof PerpendicularConstraint) &&
+						((c.l1P1 === 'origin' && c.l1P2 === id) || (c.l2P1 === 'origin' && c.l2P2 === id))) ||
+					(c instanceof DistanceConstraint &&
+						c.p1Id === 'origin' &&
+						c.orientation === (axis === 'x' ? 'vertical' : 'horizontal'))
 				) {
 					res.push(c);
-				} else if (c.type === 'angle') {
-					const ac = c as AngleConstraint;
-					if (ac.line1Id === id || ac.line2Id === id) res.push(c);
-				} else if (c.type === 'symmetry' || c.type === 'tangent_line_circle') {
-					if (anyC.lineId === id || anyC.lineP1Id === id) res.push(c);
+				} else if (c instanceof AngleConstraint) {
+					if (c.line1Id === id || c.line2Id === id) res.push(c);
+				} else if (c instanceof SymmetryConstraint || c instanceof TangentLineCircleConstraint) {
+					if (c.lineId === id || c.lineP1Id === id) res.push(c);
 				}
 			}
 			return res;
@@ -287,7 +312,6 @@ export function getConstraintsForEntity(
 		const { p1Id, p2Id } = line;
 		for (const c of sketch.constraints.values()) {
 			if (sketch.isSplineInternalConstraint(c)) continue;
-			const anyC = c as any;
 			if (c.entityIds.includes(id)) {
 				res.push(c);
 				continue;
@@ -299,54 +323,54 @@ export function getConstraintsForEntity(
 				) {
 					res.push(c);
 				}
-			} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
-				if (matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
+			} else if (
+				c instanceof HorizontalConstraint ||
+				c instanceof VerticalConstraint ||
+				c instanceof DistanceConstraint
+			) {
+				if (matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'point_to_line_distance') {
-				if (anyC.constrainedLineId === id) res.push(c);
-				if (anyC.lineId === id || matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
+			} else if (c instanceof PointToLineDistanceConstraint) {
+				if (c.constrainedLineId === id || c.lineId === id || matchesEndpoints(c.lineP1Id, c.lineP2Id, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'equal_length') {
-				if (
-					matchesEndpoints(anyC.line1P1, anyC.line1P2, p1Id, p2Id) ||
-					matchesEndpoints(anyC.line2P1, anyC.line2P2, p1Id, p2Id)
-				) {
+			} else if (c instanceof EqualLengthConstraint) {
+				if (matchesEndpoints(c.line1P1, c.line1P2, p1Id, p2Id) || matchesEndpoints(c.line2P1, c.line2P2, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'parallel' || c.type === 'perpendicular') {
-				if (matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) || matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id)) {
+			} else if (c instanceof ParallelConstraint || c instanceof PerpendicularConstraint) {
+				if (matchesEndpoints(c.l1P1, c.l1P2, p1Id, p2Id) || matchesEndpoints(c.l2P1, c.l2P2, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'collinear') {
-				const l1 = lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
-				const l2 = lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
+			} else if (c instanceof CollinearConstraint) {
+				const l1 = lineFromPoints(sketch, c.l1P1, c.l1P2);
+				const l2 = lineFromPoints(sketch, c.l2P1, c.l2P2);
 				if (
 					l1 &&
 					l2 &&
-					(matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id) || matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id))
+					(matchesEndpoints(c.l1P1, c.l1P2, p1Id, p2Id) || matchesEndpoints(c.l2P1, c.l2P2, p1Id, p2Id))
 				) {
 					res.push(c);
 				}
-			} else if (c.type === 'point_on_line' || c.type === 'tangent_line_circle') {
-				if (matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
+			} else if (c instanceof PointOnLineConstraint || c instanceof TangentLineCircleConstraint) {
+				if (matchesEndpoints(c.lineP1Id, c.lineP2Id, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'midpoint') {
-				if (matchesEndpoints(anyC.p1Id, anyC.p2Id, p1Id, p2Id)) {
+			} else if (c instanceof MidpointConstraint) {
+				if (matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'symmetry') {
-				if (anyC.lineId === id || matchesEndpoints(anyC.lineP1Id, anyC.lineP2Id, p1Id, p2Id)) {
+			} else if (c instanceof SymmetryConstraint) {
+				if (c.lineId === id || matchesEndpoints(c.lineP1Id, c.lineP2Id, p1Id, p2Id)) {
 					res.push(c);
 				}
-			} else if (c.type === 'angle') {
+			} else if (c instanceof AngleConstraint) {
 				if (
-					anyC.line1Id === id ||
-					anyC.line2Id === id ||
-					(Boolean(anyC.line1Id) && matchesEndpoints(anyC.l1P1, anyC.l1P2, p1Id, p2Id)) ||
-					(Boolean(anyC.line2Id) && matchesEndpoints(anyC.l2P1, anyC.l2P2, p1Id, p2Id))
+					c.line1Id === id ||
+					c.line2Id === id ||
+					(Boolean(c.line1Id) && matchesEndpoints(c.l1P1, c.l1P2, p1Id, p2Id)) ||
+					(Boolean(c.line2Id) && matchesEndpoints(c.l2P1, c.l2P2, p1Id, p2Id))
 				) {
 					res.push(c);
 				}
@@ -356,15 +380,18 @@ export function getConstraintsForEntity(
 		const radial = type === 'circle' ? sketch.circles.get(id) : sketch.arcs.get(id);
 		if (!radial) return [];
 		for (const c of sketch.constraints.values()) {
-			const anyC = c as any;
-			if (c.type === 'radius' || c.type === 'tangent_line_circle' || c.type === 'point_on_circle') {
-				if (anyC.circleId === id) res.push(c);
-			} else if (c.type === 'equal_radius' || c.type === 'tangent_circle_circle') {
-				if (anyC.circle1Id === id || anyC.circle2Id === id) res.push(c);
-			} else if (c.type === 'concentric') {
-				if (anyC.c1CenterId === radial.centerId || anyC.c2CenterId === radial.centerId) res.push(c);
-			} else if (type === 'arc' && c.type === 'angle') {
-				if (anyC.line1Id === id || anyC.line2Id === id) res.push(c);
+			if (
+				c instanceof RadiusConstraint ||
+				c instanceof TangentLineCircleConstraint ||
+				c instanceof PointOnCircleConstraint
+			) {
+				if (c.circleId === id) res.push(c);
+			} else if (c instanceof EqualRadiusConstraint || c instanceof TangentCircleCircleConstraint) {
+				if (c.circle1Id === id || c.circle2Id === id) res.push(c);
+			} else if (c instanceof ConcentricConstraint) {
+				if (c.c1CenterId === radial.centerId || c.c2CenterId === radial.centerId) res.push(c);
+			} else if (type === 'arc' && c instanceof AngleConstraint) {
+				if (c.line1Id === id || c.line2Id === id) res.push(c);
 			} else if (c.entityIds.includes(id)) {
 				res.push(c);
 			}
@@ -373,8 +400,10 @@ export function getConstraintsForEntity(
 		const el = sketch.ellipses.get(id);
 		if (!el) return [];
 		for (const c of sketch.constraints.values()) {
-			const anyC = c as any;
-			if (anyC.ellipseId === id || c.entityIds.includes(id)) {
+			if (
+				((c instanceof PointOnEllipseConstraint || c instanceof EllipseAxisConstraint) && c.ellipseId === id) ||
+				c.entityIds.includes(id)
+			) {
 				res.push(c);
 			}
 		}
@@ -382,8 +411,11 @@ export function getConstraintsForEntity(
 		const elarc = sketch.ellipticalArcs.get(id);
 		if (!elarc) return [];
 		for (const c of sketch.constraints.values()) {
-			const anyC = c as any;
-			if (anyC.arcId === id || anyC.ellipseId === id || c.entityIds.includes(id)) {
+			if (
+				(c instanceof EllipticalArcEndpointsConstraint && c.arcId === id) ||
+				((c instanceof PointOnEllipseConstraint || c instanceof EllipseAxisConstraint) && c.ellipseId === id) ||
+				c.entityIds.includes(id)
+			) {
 				res.push(c);
 			}
 		}
@@ -406,15 +438,10 @@ export function getConstraintsForEntity(
 		}
 		for (const c of sketch.constraints.values()) {
 			if (sketch.isSplineInternalConstraint(c)) continue;
-			const anyC = c as any;
-			if (anyC.splineId === id || c.entityIds.includes(id)) {
+			if ((c instanceof PointOnSplineConstraint && c.splineId === id) || c.entityIds.includes(id)) {
 				pushUnique(c);
-			} else if (c.type === 'circular_pattern') {
-				const cpat = c as CircularPatternConstraint;
-				if (cpat.sourceObjectIds?.includes(id)) pushUnique(c);
-			} else if (c.type === 'rectangular_pattern') {
-				const rpat = c as RectangularPatternConstraint;
-				if (rpat.sourceObjectIds?.includes(id)) pushUnique(c);
+			} else if (c instanceof CircularPatternConstraint || c instanceof RectangularPatternConstraint) {
+				if (c.sourceObjectIds?.includes(id)) pushUnique(c);
 			}
 		}
 	}
@@ -429,25 +456,16 @@ export function getEntitiesForConstraint(
 	patternLinks: PatternLinks = 'all'
 ): Array<{
 	id: string;
-	type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
+	type: PrimitiveType;
 }> {
 	const res: Array<{
 		id: string;
-		type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
+		type: PrimitiveType;
 	}> = [];
 	const seen = new Set<string>();
-	const collections = [
-		['line', sketch.lines],
-		['circle', sketch.circles],
-		['arc', sketch.arcs],
-		['ellipse', sketch.ellipses],
-		['elliptical_arc', sketch.ellipticalArcs],
-		['spline', sketch.splines],
-		['point', sketch.points],
-	] as const;
-	const collectionByType = new Map<string, Map<string, unknown>>(collections);
+	const collections = sketch.getPrimitiveCollections();
 
-	const add = (id: string, type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline') => {
+	const add = (id: string, type: PrimitiveType) => {
 		if (type === 'line') {
 			const l = sketch.lines.get(id);
 			if (l?.isSplineHandle && l.parentSplineId && sketch.splines.has(l.parentSplineId)) {
@@ -463,9 +481,9 @@ export function getEntitiesForConstraint(
 	};
 
 	const addAny = (id: string) => {
-		for (const [primType, map] of collections) {
-			if (map.has(id)) {
-				add(id, primType);
+		for (const col of collections) {
+			if (col.map.has(id)) {
+				add(id, col.type);
 				return;
 			}
 		}
@@ -495,7 +513,7 @@ export function getEntitiesForConstraint(
 		if (links === 'sources') return true;
 		for (const copy of pattern.copies ?? []) {
 			for (const item of copy.createdEntityIds) {
-				if (collectionByType.get(item.type)?.has(item.id)) add(item.id, item.type);
+				if (sketch.hasOwnPrimitive(item.id, item.type)) add(item.id, item.type);
 			}
 		}
 		return false;
@@ -521,116 +539,112 @@ export function getEntitiesForConstraint(
 		else if (sketch.ellipticalArcs.has(id)) add(id, 'elliptical_arc');
 	};
 
-	const anyC = c as any;
-
-	if (c.type === 'fixed') {
-		addPoint(anyC.pointId);
-	} else if (c.type === 'coincident') {
-		addPoint(anyC.p1Id);
-		addPoint(anyC.p2Id);
-	} else if (c.type === 'distance' && anyC.circleIds) {
-		for (const id of anyC.circleIds) addRadial(id);
-	} else if (c.type === 'distance' && anyC.p1Id === 'origin' && anyC.orientation !== 'aligned') {
-		add(anyC.p2Id, 'point');
-		add(anyC.orientation === 'vertical' ? 'axis_x' : 'axis_y', 'line');
-	} else if (c.type === 'horizontal' || c.type === 'vertical' || c.type === 'distance') {
-		addLineOrPoints(anyC.p1Id, anyC.p2Id);
-	} else if (c.type === 'point_to_line_distance') {
-		if (anyC.constrainedLineId) add(anyC.constrainedLineId, 'line');
-		addPoint(anyC.pointId);
+	if (c instanceof FixedConstraint) {
+		addPoint(c.pointId);
+	} else if (c instanceof CoincidentConstraint) {
+		addPoint(c.p1Id);
+		addPoint(c.p2Id);
+	} else if (c instanceof DistanceConstraint && c.circleIds) {
+		for (const id of c.circleIds) addRadial(id);
+	} else if (c instanceof DistanceConstraint && c.p1Id === 'origin' && c.orientation !== 'aligned') {
+		add(c.p2Id, 'point');
+		add(c.orientation === 'vertical' ? 'axis_x' : 'axis_y', 'line');
+	} else if (c instanceof HorizontalConstraint || c instanceof VerticalConstraint || c instanceof DistanceConstraint) {
+		addLineOrPoints(c.p1Id, c.p2Id);
+	} else if (c instanceof PointToLineDistanceConstraint) {
+		if (c.constrainedLineId) add(c.constrainedLineId, 'line');
+		addPoint(c.pointId);
 		addResolvedLine(
-			anyC.lineId && sketch.lines.has(anyC.lineId)
-				? sketch.lines.get(anyC.lineId)
-				: lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id)
+			c.lineId && sketch.lines.has(c.lineId)
+				? sketch.lines.get(c.lineId)
+				: lineFromPoints(sketch, c.lineP1Id, c.lineP2Id)
 		);
-	} else if (c.type === 'radius') {
-		addRadial(anyC.circleId);
-	} else if (c.type === 'equal_radius' || c.type === 'tangent_circle_circle') {
-		addRadial(anyC.circle1Id);
-		addRadial(anyC.circle2Id);
-	} else if (c.type === 'equal_length') {
-		addResolvedLine(sketch.getLineBetween(anyC.line1P1, anyC.line1P2));
-		addResolvedLine(sketch.getLineBetween(anyC.line2P1, anyC.line2P2));
-	} else if (c.type === 'parallel' || c.type === 'perpendicular') {
-		addResolvedLine(lineFromPoints(sketch, anyC.l1P1, anyC.l1P2));
-		addResolvedLine(lineFromPoints(sketch, anyC.l2P1, anyC.l2P2));
-	} else if (c.type === 'collinear') {
-		const l1 = lineFromPoints(sketch, anyC.l1P1, anyC.l1P2);
-		const l2 = lineFromPoints(sketch, anyC.l2P1, anyC.l2P2);
+	} else if (c instanceof RadiusConstraint) {
+		addRadial(c.circleId);
+	} else if (c instanceof EqualRadiusConstraint || c instanceof TangentCircleCircleConstraint) {
+		addRadial(c.circle1Id);
+		addRadial(c.circle2Id);
+	} else if (c instanceof EqualLengthConstraint) {
+		addResolvedLine(sketch.getLineBetween(c.line1P1, c.line1P2));
+		addResolvedLine(sketch.getLineBetween(c.line2P1, c.line2P2));
+	} else if (c instanceof ParallelConstraint || c instanceof PerpendicularConstraint) {
+		addResolvedLine(lineFromPoints(sketch, c.l1P1, c.l1P2));
+		addResolvedLine(lineFromPoints(sketch, c.l2P1, c.l2P2));
+	} else if (c instanceof CollinearConstraint) {
+		const l1 = lineFromPoints(sketch, c.l1P1, c.l1P2);
+		const l2 = lineFromPoints(sketch, c.l2P1, c.l2P2);
 		if (l1 && l2) {
 			add(l1.id, 'line');
 			add(l2.id, 'line');
 		} else {
-			for (const pid of [anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2]) addPoint(pid);
+			for (const pid of [c.l1P1, c.l1P2, c.l2P1, c.l2P2]) addPoint(pid);
 		}
-	} else if (c.type === 'symmetry') {
-		addPoint(anyC.p1Id);
-		addPoint(anyC.p2Id);
-		if (anyC.lineId === 'origin') add('origin', 'point');
+	} else if (c instanceof SymmetryConstraint) {
+		addPoint(c.p1Id);
+		addPoint(c.p2Id);
+		if (c.lineId === 'origin') add('origin', 'point');
 		else
 			addResolvedLine(
-				(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id)
+				(c.lineId ? sketch.getLine(c.lineId) : undefined) ?? lineFromPoints(sketch, c.lineP1Id, c.lineP2Id)
 			);
-	} else if (c.type === 'circular_pattern') {
-		const cpat = c as CircularPatternConstraint;
-		const links = cpat.isReadOnly ? 'all' : patternLinks;
-		if (links !== 'sources') addPoint(cpat.centerPtId);
+	} else if (c instanceof CircularPatternConstraint) {
+		const links = c.isReadOnly ? 'all' : patternLinks;
+		if (links !== 'sources') addPoint(c.centerPtId);
 		// The fallback below would add copies back to the inspector list.
-		if (addPatternEntities(cpat, links)) return res;
-	} else if (c.type === 'rectangular_pattern') {
-		const rpat = c as RectangularPatternConstraint;
+		if (addPatternEntities(c, links)) return res;
+	} else if (c instanceof RectangularPatternConstraint) {
 		if (patternLinks === 'all') {
-			if (rpat.line1Id && sketch.lines.has(rpat.line1Id)) add(rpat.line1Id, 'line');
-			if (rpat.line2Id && sketch.lines.has(rpat.line2Id)) add(rpat.line2Id, 'line');
+			if (c.line1Id && sketch.lines.has(c.line1Id)) add(c.line1Id, 'line');
+			if (c.line2Id && sketch.lines.has(c.line2Id)) add(c.line2Id, 'line');
 		}
-		if (addPatternEntities(rpat, patternLinks)) return res;
-	} else if (c.type === 'angle') {
-		if (!anyC.line1Id && !anyC.line2Id) {
-			for (const pid of [anyC.l1P1, anyC.l1P2, anyC.l2P1, anyC.l2P2]) addPoint(pid);
+		if (addPatternEntities(c, patternLinks)) return res;
+	} else if (c instanceof AngleConstraint) {
+		if (!c.line1Id && !c.line2Id) {
+			for (const pid of [c.l1P1, c.l1P2, c.l2P1, c.l2P2]) addPoint(pid);
 		} else {
 			for (const [lineId, pA, pB] of [
-				[anyC.line1Id, anyC.l1P1, anyC.l1P2],
-				[anyC.line2Id, anyC.l2P1, anyC.l2P2],
+				[c.line1Id, c.l1P1, c.l1P2],
+				[c.line2Id, c.l2P1, c.l2P2],
 			] as const) {
 				if (lineId && sketch.arcs.has(lineId)) add(lineId, 'arc');
 				else addResolvedLine(sketch.getLine(lineId) ?? lineFromPoints(sketch, pA, pB));
 			}
 		}
-	} else if (c.type === 'point_on_line') {
-		addPoint(anyC.pointId);
-		addResolvedLine(lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id));
-	} else if (c.type === 'point_on_circle') {
-		addPoint(anyC.pointId);
-		addRadial(anyC.circleId);
-	} else if (c.type === 'point_on_ellipse') {
-		addPoint(anyC.pointId);
-		addEllipseLike(anyC.ellipseId);
-	} else if (c.type === 'point_on_spline') {
-		addPoint(anyC.pointId);
-		if (sketch.splines.has(anyC.splineId)) add(anyC.splineId, 'spline');
-	} else if (c.type === 'tangent_line_circle') {
+	} else if (c instanceof PointOnLineConstraint) {
+		addPoint(c.pointId);
+		addResolvedLine(lineFromPoints(sketch, c.lineP1Id, c.lineP2Id));
+	} else if (c instanceof PointOnCircleConstraint) {
+		addPoint(c.pointId);
+		addRadial(c.circleId);
+	} else if (c instanceof PointOnEllipseConstraint) {
+		addPoint(c.pointId);
+		addEllipseLike(c.ellipseId);
+	} else if (c instanceof PointOnSplineConstraint) {
+		addPoint(c.pointId);
+		if (sketch.splines.has(c.splineId)) add(c.splineId, 'spline');
+	} else if (c instanceof TangentLineCircleConstraint) {
 		addResolvedLine(
-			(anyC.lineId ? sketch.getLine(anyC.lineId) : undefined) ?? lineFromPoints(sketch, anyC.lineP1Id, anyC.lineP2Id)
+			(c.lineId ? sketch.getLine(c.lineId) : undefined) ?? lineFromPoints(sketch, c.lineP1Id, c.lineP2Id)
 		);
-		addRadial(anyC.circleId);
-	} else if (c.type === 'concentric') {
-		addConcentricEnd(anyC.c1CenterId);
-		addConcentricEnd(anyC.c2CenterId);
-	} else if (c.type === 'midpoint') {
-		addPoint(anyC.midId);
-		addLineOrPoints(anyC.p1Id, anyC.p2Id);
-	} else if (c.type === 'ellipse_axis') {
-		addEllipseLike(anyC.ellipseId);
-	} else if (c.type === 'elliptical_arc_endpoints') {
-		if (anyC.arcId && sketch.ellipticalArcs.has(anyC.arcId)) add(anyC.arcId, 'elliptical_arc');
-	} else if (c.type === 'offset') {
+		addRadial(c.circleId);
+	} else if (c instanceof ConcentricConstraint) {
+		addConcentricEnd(c.c1CenterId);
+		addConcentricEnd(c.c2CenterId);
+	} else if (c instanceof MidpointConstraint) {
+		addPoint(c.midId);
+		addLineOrPoints(c.p1Id, c.p2Id);
+	} else if (c instanceof EllipseAxisConstraint) {
+		addEllipseLike(c.ellipseId);
+	} else if (c instanceof EllipticalArcEndpointsConstraint) {
+		if (c.arcId && sketch.ellipticalArcs.has(c.arcId)) add(c.arcId, 'elliptical_arc');
+	} else if (c instanceof OffsetConstraint) {
 		for (const id of c.entityIds) addAny(id);
 	}
 
 	// Safety net: check if any primitive in the sketch considers this constraint related
-	for (const [primType, map] of collections) {
-		for (const id of map.keys()) {
-			if (sketch.getConstraintsForEntity(primType, id).some(sc => sc.id === c.id)) add(id, primType);
+	for (const col of collections) {
+		for (const id of col.map.keys()) {
+			if (sketch.getConstraintsForEntity(col.type, id).some(sc => sc.id === c.id)) add(id, col.type);
 		}
 	}
 

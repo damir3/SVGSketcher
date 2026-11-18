@@ -102,19 +102,10 @@ export function clearSelection(sketch: SketchDocument): void {
 
 export function getSelectedPrimitives(sketch: SketchDocument): Array<{ id: string; isConstruction?: boolean }> {
 	const list: Array<{ id: string; isConstruction?: boolean }> = [];
-	const sources: Array<[Set<string>, Map<string, { id: string; isConstruction?: boolean }>, boolean?]> = [
-		[sketch.selection.lineIds, sketch.lines],
-		[sketch.selection.circleIds, sketch.circles],
-		[sketch.selection.arcIds, sketch.arcs],
-		[sketch.selection.ellipseIds, sketch.ellipses],
-		[sketch.selection.ellipticalArcIds, sketch.ellipticalArcs],
-		[sketch.selection.splineIds, sketch.splines],
-		[sketch.selection.pointIds, sketch.points, true],
-	];
-	for (const [ids, map, checkOwnHas] of sources) {
-		for (const id of ids) {
-			if (checkOwnHas && !map.has(id)) continue;
-			const item = map.get(id);
+	for (const col of sketch.getPrimitiveCollections()) {
+		for (const id of sketch.selection[col.selectionKey]) {
+			if (!col.map.has(id)) continue;
+			const item = col.map.get(id);
 			if (item) list.push(item);
 		}
 	}

@@ -1,7 +1,7 @@
 import type { SketchDocument } from './sketch';
 import { deselectEntity } from './selection';
-import type { SketchPoint } from './types';
-import type { Vec2 } from '../math/vector';
+import type { SketchLine, SketchPoint } from './types';
+import { Vec2 } from '../math/vector';
 import {
 	CircularPatternConstraint,
 	computePatternCopyAngle,
@@ -12,6 +12,8 @@ import {
 	computeRectangularPatternOffset,
 	computeRectangularPatternDirections,
 	type RectangularPatternCopyData,
+	type DistanceConstraint,
+	type PointToLineDistanceConstraint,
 } from '../solver/constraints';
 
 function buildPatternCopyEntities(
@@ -155,17 +157,8 @@ export function generateCircularPatternCopy(
 }
 
 export function deletePatternCopy(sketch: SketchDocument, copy: PatternCopyData): boolean {
-	const maps: Record<string, Map<string, unknown>> = {
-		line: sketch.lines,
-		circle: sketch.circles,
-		arc: sketch.arcs,
-		ellipse: sketch.ellipses,
-		elliptical_arc: sketch.ellipticalArcs,
-		spline: sketch.splines,
-		point: sketch.points,
-	};
 	for (const item of copy.createdEntityIds) {
-		maps[item.type]?.delete(item.id);
+		sketch.getPrimitiveMap(item.type)?.delete(item.id);
 		deselectEntity(sketch, item.id, item.type, false);
 	}
 	const hasSpline = copy.createdEntityIds.some(item => item.type === 'spline');
@@ -533,4 +526,109 @@ export function updateRectangularPattern(
 		true,
 		removedSplineCopy
 	);
+}
+
+export function addPolygon(
+	sketch: SketchDocument,
+	centerPointId: string,
+	radius: number,
+	sides: number,
+	angleRad: number,
+	isConstruction = false,
+	addDistanceConstraint = false,
+	options: { radiusToVertex?: boolean; vertexIds?: readonly string[]; radiusExpression?: string } = {}
+): {
+	centerPoint: SketchPoint;
+	vertices: SketchPoint[];
+	lines: SketchLine[];
+	constraint: CircularPatternConstraint;
+	distanceConstraint?: PointToLineDistanceConstraint;
+	vertexDistanceConstraint?: DistanceConstraint;
+} | null {
+	const centerPt = sketch.points.get(centerPointId);
+	if (!centerPt) return null;
+
+	const N = Math.max(3, Math.round(sides));
+	if (!Number.isFinite(radius) || radius <= 1e-4) return null;
+	const existingVertices = (options.vertexIds ?? []).map(id => sketch.points.get(id));
+	if (existingVertices.some(point => !point)) return null;
+
+	sketch.beginTransaction();
+
+	const R = options.radiusToVertex ? radius : radius / Math.cos(Math.PI / N);
+	const baseAngle = options.radiusToVertex ? angleRad : angleRad - Math.PI / N;
+	const step = (2 * Math.PI) / N;
+
+	const vertices: SketchPoint[] = [];
+	for (let k = 0; k < N; k++) {
+		const a = baseAngle + k * step;
+		const v = Vec2.fromPolar(R, a).add(centerPt);
+		const pt = existingVertices[k] ?? sketch.addPoint(v, false);
+		vertices.push(pt);
+	}
+
+	const lines: SketchLine[] = [];
+	for (let k = 0; k < N; k++) {
+		const nextK = (k + 1) % N;
+		const p1Id = vertices[k].id;
+		const p2Id = vertices[nextK].id;
+		const existingEdge =
+			k === 0 && existingVertices.length === 2
+				? [...sketch.lines.values()].find(
+						line =>
+							line.isConstruction === isConstruction &&
+							((line.p1Id === p1Id && line.p2Id === p2Id) || (line.p1Id === p2Id && line.p2Id === p1Id))
+					)
+				: undefined;
+		lines.push(existingEdge ?? sketch.addLine(p1Id, p2Id, isConstruction));
+	}
+
+	const copies: PatternCopyData[] = [];
+	for (let k = 1; k < N; k++) {
+		copies.push({
+			copyIndex: k,
+			pointPairs: [{ sourcePtId: vertices[0].id, patternPtId: vertices[k].id }],
+			createdEntityIds: existingVertices[k] ? [] : [{ id: vertices[k].id, type: 'point' }],
+		});
+	}
+
+	const constraint = addCircularPatternConstraint(
+		sketch,
+		centerPointId,
+		[vertices[0].id],
+		'full',
+		360,
+		N,
+		false,
+		[],
+		copies,
+		undefined,
+		true // isReadOnly
+	);
+
+	let distanceConstraint: PointToLineDistanceConstraint | undefined;
+	let vertexDistanceConstraint: DistanceConstraint | undefined;
+	if (addDistanceConstraint) {
+		if (options.radiusToVertex) {
+			vertexDistanceConstraint = sketch.addDistanceConstraint(centerPointId, vertices[0].id, radius) ?? undefined;
+		} else {
+			distanceConstraint = sketch.addPointToLineDistanceConstraint(centerPointId, lines[0].id, radius) ?? undefined;
+		}
+		const radiusConstraint = vertexDistanceConstraint ?? distanceConstraint;
+		if (radiusConstraint && options.radiusExpression) radiusConstraint.expression = options.radiusExpression;
+	}
+
+	sketch.commitTransaction();
+	sketch.solve();
+
+	if (!constraint) return null;
+
+	return {
+		centerPoint: centerPt,
+		vertices,
+		lines,
+		constraint,
+		distanceConstraint,
+		vertexDistanceConstraint,
+	};
 }
