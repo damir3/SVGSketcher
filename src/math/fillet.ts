@@ -9,7 +9,12 @@ import {
 	MidpointConstraint,
 	RectangularPatternConstraint,
 } from '../solver/constraints';
-import type { GeoCurve, GeoSpline } from './intersection';
+import {
+	buildControlSplineInterval,
+	extractFitSplineIntervalHandles,
+	type GeoCurve,
+	type GeoSpline,
+} from './intersection';
 import { extractSplineInterval } from './spline';
 import { getGeometryKernel } from '../kernel';
 import * as reference from './filletReference';
@@ -560,20 +565,9 @@ function trimOrExtendPrimitive(
 			const handleLineId = isNearStart
 				? spline.tangentLineIds[0]
 				: spline.tangentLineIds[spline.tangentLineIds.length - 1];
-			if (handleLineId) {
-				const hLine = sketch.lines.get(handleLineId);
-				if (hLine) {
-					const hp1 = sketch.points.get(hLine.p1Id);
-					const hp2 = sketch.points.get(hLine.p2Id);
-					if (hp1) {
-						hp1.x += dir.x;
-						hp1.y += dir.y;
-					}
-					if (hp2) {
-						hp2.x += dir.x;
-						hp2.y += dir.y;
-					}
-				}
+			const hLine = handleLineId ? sketch.lines.get(handleLineId) : undefined;
+			if (hLine) {
+				for (const hId of [hLine.p1Id, hLine.p2Id]) sketch.points.get(hId)?.add(dir);
 			}
 		}
 
@@ -609,86 +603,21 @@ function replaceSplineWithInterval(
 	const subSegments = extractSplineInterval(curve.bezierSegments, uA, uB);
 	if (subSegments.length === 0) return null;
 
-	const M = subSegments.length;
-
 	if (curve.splineType === 'control') {
-		const controlRawPoints: Vec2[] = [subSegments[0][0]];
-		for (let s = 0; s < M; s++) {
-			controlRawPoints.push(subSegments[s][1]);
-			controlRawPoints.push(subSegments[s][2]);
-			controlRawPoints.push(subSegments[s][3]);
-		}
-
-		const controlPtIds: string[] = [startPointId];
-		for (let k = 1; k < controlRawPoints.length - 1; k++) {
-			const pos = controlRawPoints[k];
-			let matchedId: string | null = null;
-			for (const pid of curve.pointIds) {
-				const pt = sketch.points.get(pid);
-				if (pt && pos.distanceTo(pt) < 1e-2) {
-					matchedId = pid;
-					break;
-				}
-			}
-			if (!matchedId) {
-				const newPt = sketch.addPoint(pos);
-				matchedId = newPt.id;
-			}
-			controlPtIds.push(matchedId);
-		}
-		controlPtIds.push(endPointId);
-
-		const knots: number[] = [0, 0, 0, 0];
-		for (let i = 1; i < M; i++) knots.push(i, i, i);
-		knots.push(M, M, M, M);
-
-		return sketch.addControlSpline(controlPtIds, curve.isConstruction, undefined, false, knots);
+		return buildControlSplineInterval(
+			sketch,
+			curve.pointIds,
+			subSegments,
+			startPointId,
+			endPointId,
+			curve.isConstruction
+		);
 	}
 
-	const rawPoints: Vec2[] = [];
-	const rawHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
-
-	for (let j = 0; j <= M; j++) {
-		if (j === 0) {
-			const p0 = subSegments[0][0];
-			rawPoints.push(p0);
-			const v = new Vec2().subVectors(subSegments[0][1], p0);
-			rawHandles.push({
-				h1: new Vec2().subVectors(p0, v),
-				h2: new Vec2().addVectors(p0, v),
-			});
-		} else if (j === M) {
-			const pM = subSegments[M - 1][3];
-			rawPoints.push(pM);
-			const v = new Vec2().subVectors(pM, subSegments[M - 1][2]);
-			rawHandles.push({
-				h1: new Vec2().subVectors(pM, v),
-				h2: new Vec2().addVectors(pM, v),
-			});
-		} else {
-			const pJ = subSegments[j][0];
-			rawPoints.push(pJ);
-			// A partial cubic has a shorter handle at its join with the next span.
-			// Preserve both handles; averaging them changes the retained curve.
-			rawHandles.push({
-				h1: subSegments[j - 1][2],
-				h2: subSegments[j][1],
-			});
-		}
-	}
-
-	const newPointIds: string[] = [];
-	for (let j = 0; j <= M; j++) {
-		if (j === 0) {
-			newPointIds.push(startPointId);
-		} else if (j === M) {
-			newPointIds.push(endPointId);
-		} else {
-			const pt = sketch.addPoint(rawPoints[j]);
-			newPointIds.push(pt.id);
-		}
-	}
-
+	const { rawPoints, rawHandles } = extractFitSplineIntervalHandles(subSegments);
+	const newPointIds = rawPoints.map((pt, j) =>
+		j === 0 ? startPointId : j === rawPoints.length - 1 ? endPointId : sketch.addPoint(pt).id
+	);
 	return sketch.addFitSpline(newPointIds, undefined, false, undefined, false, rawHandles);
 }
 

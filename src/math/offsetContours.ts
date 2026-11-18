@@ -183,6 +183,16 @@ function sourceBoundary(items: readonly OffsetKernelItem[], paths: (Path | undef
 	});
 }
 
+export function isPointInsidePolygon(polygon: readonly Vec2[], p: Vec2): boolean {
+	let odd = false;
+	for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+		const a = polygon[i],
+			b = polygon[j];
+		if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) odd = !odd;
+	}
+	return odd;
+}
+
 // Point pinches and retraced edges at a consumed arc require tracing surviving
 // edge fragments rather than deciding whether to retain an entire raw ring.
 function survivingLoops(
@@ -203,15 +213,6 @@ function survivingLoops(
 				cuts[j].push(Math.max(0, Math.min(1, fraction(b, p, primitives))));
 			}
 		}
-	const inside = (p: Vec2) => {
-		let odd = false;
-		for (let i = 0, j = source.length - 1; i < source.length; j = i++) {
-			const a = source[i],
-				b = source[j];
-			if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) odd = !odd;
-		}
-		return odd;
-	};
 	const valid = (e: Edge) => {
 		if (items[e.source].kind === 'arc' && primitives[e.source].type === 'line') return false;
 		const p = at(e, 0.5, primitives).p;
@@ -220,7 +221,7 @@ function survivingLoops(
 		if (c?.type === 'arc' && -d >= c.radius && p.distanceToSquared(c.center) <= (-d - c.radius) ** 2 + 1e-20)
 			return false;
 		return (
-			inside(p) &&
+			isPointInsidePolygon(source, p) &&
 			source.every(
 				(a, i) =>
 					projectPointOntoSegment(p, a, source[(i + 1) % source.length]).dist >= Math.abs(d) - OFFSET_FIT_TOLERANCE
@@ -389,15 +390,6 @@ export function splitOffsetContours(
 	}
 	if (loops.length < 2 && !consumedArc) return;
 	const sourceArea = source.reduce((s, p, i) => s + p.cross(source[(i + 1) % source.length]), 0);
-	const inside = (p: Vec2) => {
-		let odd = false;
-		for (let i = 0, j = source.length - 1; i < source.length; j = i++) {
-			const a = source[i],
-				b = source[j];
-			if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) odd = !odd;
-		}
-		return odd;
-	};
 	const minDist = Math.abs(d) - OFFSET_FIT_TOLERANCE;
 	let valid = loops.filter(ring => {
 		const a = area(ring, primitives);
@@ -405,7 +397,7 @@ export function splitOffsetContours(
 		const stride = Math.max(1, Math.floor(ring.length / 64));
 		for (let i = 0; i < ring.length; i += stride) {
 			const p = at(ring[i], 0.5, primitives).p;
-			if (inside(p) !== d < 0) return false;
+			if (isPointInsidePolygon(source, p) !== d < 0) return false;
 			for (let j = 0; j < source.length; j++) {
 				const sa = source[j],
 					sb = source[(j + 1) % source.length];

@@ -215,27 +215,20 @@ export function findSnapTarget(
 	);
 	const nearestScreen = viewport.worldToScreen(nearestWorld);
 
-	if (dAxisX < geomSnapDistPx && dAxisX <= dAxisY) {
-		const snapToGrid = Math.abs(screenPos.x - nearestScreen.x) <= SNAP_GRID_DISTANCE_PX;
-		const snapX = snapToGrid ? nearestWorld.x : world.x;
-		const snapScreenX = snapToGrid ? nearestScreen.x : screenPos.x;
+	const axis = dAxisX < geomSnapDistPx && dAxisX <= dAxisY ? 'x' : dAxisY < geomSnapDistPx ? 'y' : null;
+	if (axis) {
+		const isX = axis === 'x';
+		const snapToGrid =
+			Math.abs(isX ? screenPos.x - nearestScreen.x : screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX;
 		return {
 			type: 'line',
-			id: 'axis_x',
-			worldPos: new Vec2(snapX, 0),
-			screenPos: new Vec2(snapScreenX, sOrigin.y),
-		};
-	}
-
-	if (dAxisY < geomSnapDistPx) {
-		const snapToGrid = Math.abs(screenPos.y - nearestScreen.y) <= SNAP_GRID_DISTANCE_PX;
-		const snapY = snapToGrid ? nearestWorld.y : world.y;
-		const snapScreenY = snapToGrid ? nearestScreen.y : screenPos.y;
-		return {
-			type: 'line',
-			id: 'axis_y',
-			worldPos: new Vec2(0, snapY),
-			screenPos: new Vec2(sOrigin.x, snapScreenY),
+			id: isX ? 'axis_x' : 'axis_y',
+			worldPos: isX
+				? new Vec2(snapToGrid ? nearestWorld.x : world.x, 0)
+				: new Vec2(0, snapToGrid ? nearestWorld.y : world.y),
+			screenPos: isX
+				? new Vec2(snapToGrid ? nearestScreen.x : screenPos.x, sOrigin.y)
+				: new Vec2(sOrigin.x, snapToGrid ? nearestScreen.y : screenPos.y),
 		};
 	}
 
@@ -285,39 +278,31 @@ export function applySnapConstraint(sketch: SketchDocument, pointId: string, sna
 	}
 }
 
+function detectAxisAlignment(p1: Vec2, p2: Vec2): 'horizontal' | 'vertical' | null {
+	const dir = new Vec2().subVectors(p2, p1);
+	if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) return null;
+	const angleDeg = dir.angleToXAxisDeg();
+	if (angleDeg < 1.0) return 'horizontal';
+	return 90 - angleDeg < 1.0 ? 'vertical' : null;
+}
+
 export function applyAutoOrientation(sketch: SketchDocument, p1Id: string, p2Id: string): void {
 	const p1 = sketch.getPoint(p1Id);
 	const p2 = sketch.getPoint(p2Id);
 	if (!p1 || !p2) return;
 
-	const dir = new Vec2().subVectors(p2, p1);
-	if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) return;
+	const axis = detectAxisAlignment(p1, p2);
+	if (!axis) return;
 
-	const angleDeg = dir.angleToXAxisDeg();
-
-	if (angleDeg < 1.0) {
-		const alreadyHoriz = [...sketch.constraints.values()].some(
-			c =>
-				c instanceof HorizontalConstraint &&
-				((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
-		);
-		if (!alreadyHoriz) {
-			sketch.addHorizontalConstraint(p1Id, p2Id);
-			showToast('Horizontal constraint applied');
-		}
-		return;
-	}
-
-	if (90 - angleDeg < 1.0) {
-		const alreadyVert = [...sketch.constraints.values()].some(
-			c =>
-				c instanceof VerticalConstraint &&
-				((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
-		);
-		if (!alreadyVert) {
-			sketch.addVerticalConstraint(p1Id, p2Id);
-			showToast('Vertical constraint applied');
-		}
+	const isHoriz = axis === 'horizontal';
+	const Ctor = isHoriz ? HorizontalConstraint : VerticalConstraint;
+	const exists = [...sketch.constraints.values()].some(
+		c => c instanceof Ctor && ((c.p1Id === p1Id && c.p2Id === p2Id) || (c.p1Id === p2Id && c.p2Id === p1Id))
+	);
+	if (!exists) {
+		if (isHoriz) sketch.addHorizontalConstraint(p1Id, p2Id);
+		else sketch.addVerticalConstraint(p1Id, p2Id);
+		showToast(`${isHoriz ? 'Horizontal' : 'Vertical'} constraint applied`);
 	}
 }
 
@@ -327,21 +312,8 @@ export function computeAxisSnappedWorldPos(
 	snap: SnapResult | null,
 	isSnapModifierPressed: boolean
 ): { pos: Vec2; axis: 'horizontal' | 'vertical' | null } {
-	if (isSnapModifierPressed || snap) {
-		return { pos: targetPos, axis: null };
-	}
-
-	const dir = new Vec2().subVectors(targetPos, startPos);
-	if (Math.abs(dir.x) < 1e-6 && Math.abs(dir.y) < 1e-6) {
-		return { pos: targetPos, axis: null };
-	}
-
-	const angleDeg = dir.angleToXAxisDeg();
-	if (angleDeg < 1.0) {
-		return { pos: new Vec2(targetPos.x, startPos.y), axis: 'horizontal' };
-	}
-	if (90 - angleDeg < 1.0) {
-		return { pos: new Vec2(startPos.x, targetPos.y), axis: 'vertical' };
-	}
+	const axis = isSnapModifierPressed || snap ? null : detectAxisAlignment(startPos, targetPos);
+	if (axis === 'horizontal') return { pos: new Vec2(targetPos.x, startPos.y), axis };
+	if (axis === 'vertical') return { pos: new Vec2(startPos.x, targetPos.y), axis };
 	return { pos: targetPos, axis: null };
 }

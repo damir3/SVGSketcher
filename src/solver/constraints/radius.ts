@@ -1,5 +1,5 @@
 import { DIMENSION_EXTERNAL_ARROW_TAIL_PX } from '../../canvas/distances';
-import { formatDimensionValue } from '../../canvas/dimensionGeometry';
+import { distanceToArcDimensionExtension, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -7,7 +7,7 @@ import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { COLORS, STROKE_WIDTH, DIM_ARROWS } from '../../canvas/styles';
 import { createSvgElement, createSvgLine, createSvgPath, getArcSvgPath, renderDimensionLabel } from '../../canvas/svg';
 import type { Viewport } from '../../canvas/viewport';
-import { distanceToArc, distanceToSegment } from '../../math/hitTest';
+import { distanceToSegment } from '../../math/hitTest';
 import { Vec2 } from '../../math/vector';
 import type { SketchDocument } from '../../model/sketch';
 
@@ -253,9 +253,7 @@ export class RadiusConstraint extends BaseConstraint {
 			createSvgLine(anchor, edge, { ...radialAttrs, ...(externalArrow ? { 'marker-end': arrowUrl } : {}) }, g);
 
 			// 3. Horizontal shelf at anchor (Engineering CAD style)
-			const dirX = dir.x >= 0 ? 1 : -1;
-			const shelfLen = labelSize.x;
-			const shelfEnd = new Vec2(anchor.x + dirX * shelfLen, anchor.y);
+			const shelfEnd = this.getShelfEnd(anchor, dir, labelSize);
 			createSvgLine(
 				anchor,
 				shelfEnd,
@@ -269,6 +267,10 @@ export class RadiusConstraint extends BaseConstraint {
 			// 4. Dimension text placed above the shelf without background fill
 			renderDimensionLabel(g, labelCenter, text, color, 'linear');
 		}
+	}
+
+	private getShelfEnd(anchor: Vec2, dir: Vec2, labelSize: Vec2): Vec2 {
+		return new Vec2(anchor.x + (dir.x >= 0 ? 1 : -1) * labelSize.x, anchor.y);
 	}
 
 	getLabelScreenPos(sketch: SketchDocument, viewport: Viewport): Vec2 {
@@ -302,24 +304,16 @@ export class RadiusConstraint extends BaseConstraint {
 				)
 			: Infinity;
 		const extensionDistance = extension
-			? Math.min(
-					distanceToArc(
-						screen,
-						layout.screenCenter,
-						layout.screenRadius,
-						extension.from,
-						extension.to,
-						extension.clockwise
-					) ?? Infinity,
-					screen.distanceTo(extension.from),
-					screen.distanceTo(extension.to)
-				)
+			? distanceToArcDimensionExtension(screen, {
+					center: layout.screenCenter,
+					radius: layout.screenRadius,
+					...extension,
+				})
 			: Infinity;
 		if (isInside) {
 			return Math.min(labelDistance, extensionDistance, arrowTailDistance, distanceToSegment(screen, start, edge));
 		}
-		const dirX = dir.x >= 0 ? 1 : -1;
-		const shelfEnd = new Vec2(anchor.x + dirX * labelSize.x, anchor.y);
+		const shelfEnd = this.getShelfEnd(anchor, dir, labelSize);
 		const leaderDistance = Math.min(
 			extensionDistance,
 			arrowTailDistance,

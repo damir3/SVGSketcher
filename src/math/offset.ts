@@ -370,41 +370,26 @@ export function toggleOrExtendChain(
 	const newItems = [...currentChain.items];
 	let isClosed = false;
 
-	if (connectsToTailAsStart || connectsToTailAsEnd) {
-		const attachStart = connectsToTailAsStart ? endpoints.p1Id : endpoints.p2Id;
-		const attachEnd = connectsToTailAsStart ? endpoints.p2Id : endpoints.p1Id;
-		const item: ChainItem = {
-			id: primitiveId,
-			type: primitiveType,
-			startPointId: attachStart,
-			endPointId: attachEnd,
-			reversed: !connectsToTailAsStart,
-		};
-		newItems.push(item);
+	const toTail = connectsToTailAsStart || connectsToTailAsEnd;
+	const normalOrder = toTail ? connectsToTailAsStart : connectsToHeadAsEnd;
+	const attachStart = normalOrder ? endpoints.p1Id : endpoints.p2Id;
+	const attachEnd = normalOrder ? endpoints.p2Id : endpoints.p1Id;
+	const item: ChainItem = {
+		id: primitiveId,
+		type: primitiveType,
+		startPointId: attachStart,
+		endPointId: attachEnd,
+		reversed: !normalOrder,
+	};
+	if (toTail) newItems.push(item);
+	else newItems.unshift(item);
 
-		if (headGroup.has(attachEnd)) {
-			isClosed = true;
-		} else if (chainSelection) {
-			isClosed = extendChainDirection(sketch, newItems, attachEnd, primitiveId, true, graph());
-		}
-	} else {
-		// Connects to head
-		const attachStart = connectsToHeadAsEnd ? endpoints.p1Id : endpoints.p2Id;
-		const attachEnd = connectsToHeadAsEnd ? endpoints.p2Id : endpoints.p1Id;
-		const item: ChainItem = {
-			id: primitiveId,
-			type: primitiveType,
-			startPointId: attachStart,
-			endPointId: attachEnd,
-			reversed: !connectsToHeadAsEnd,
-		};
-		newItems.unshift(item);
-
-		if (tailGroup.has(attachStart)) {
-			isClosed = true;
-		} else if (chainSelection) {
-			isClosed = extendChainDirection(sketch, newItems, attachStart, primitiveId, false, graph());
-		}
+	const freeEnd = toTail ? attachEnd : attachStart;
+	const oppositeGroup = toTail ? headGroup : tailGroup;
+	if (oppositeGroup.has(freeEnd)) {
+		isClosed = true;
+	} else if (chainSelection) {
+		isClosed = extendChainDirection(sketch, newItems, freeEnd, primitiveId, toTail, graph());
 	}
 
 	return {
@@ -579,6 +564,26 @@ export function createOffsetSideGeometry(
 		}
 	}
 
+	const getSpanEndpoints = (i: number, startPos: Vec2, endPos: Vec2): [SketchPoint, SketchPoint] =>
+		numPrims > 1
+			? [cornerPoints[i], cornerPoints[(i + 1) % cornerPoints.length]]
+			: [sketch.addPoint(startPos), sketch.addPoint(endPos)];
+	const pushCircleOffsetPair = (
+		orig: { id: string; centerId: string; radius: number } | undefined,
+		off: { id: string; centerId: string; radius: number },
+		offRadius: number
+	) => {
+		if (!orig) return;
+		offsetPairs.push({
+			kind: 'circle',
+			origId: orig.id,
+			origCenterId: orig.centerId,
+			offId: off.id,
+			offCenterId: off.centerId,
+			side: offRadius >= orig.radius ? 1 : -1,
+		});
+	};
+
 	for (let i = 0; i < numPrims; i++) {
 		const prim = side.primitives[i];
 		const pairCount = offsetPairs.length;
@@ -587,29 +592,9 @@ export function createOffsetSideGeometry(
 			const centerPt = sketch.addPoint(prim.circleCenter!);
 			const circle = sketch.addCircle(centerPt.id, prim.circleRadius!);
 			createdIds.push(circle.id);
-
-			const origC = sketch.circles.get(prim.sourceId);
-			if (origC) {
-				const cSide = (prim.circleRadius ?? circle.radius) >= origC.radius ? 1 : -1;
-				offsetPairs.push({
-					kind: 'circle',
-					origId: origC.id,
-					origCenterId: origC.centerId,
-					offId: circle.id,
-					offCenterId: circle.centerId,
-					side: cSide,
-				});
-			}
+			pushCircleOffsetPair(sketch.circles.get(prim.sourceId), circle, prim.circleRadius ?? circle.radius);
 		} else if (prim.type === 'line') {
-			let p1: SketchPoint;
-			let p2: SketchPoint;
-			if (numPrims > 1) {
-				p1 = cornerPoints[i];
-				p2 = cornerPoints[(i + 1) % cornerPoints.length];
-			} else {
-				p1 = sketch.addPoint(prim.p1!);
-				p2 = sketch.addPoint(prim.p2!);
-			}
+			const [p1, p2] = getSpanEndpoints(i, prim.p1!, prim.p2!);
 			const line = sketch.addLine(p1.id, p2.id);
 			createdIds.push(line.id);
 
@@ -636,30 +621,10 @@ export function createOffsetSideGeometry(
 			}
 		} else if (prim.type === 'arc') {
 			const centerPt = sketch.addPoint(prim.center!);
-			let pStart: SketchPoint;
-			let pEnd: SketchPoint;
-			if (numPrims > 1) {
-				pStart = cornerPoints[i];
-				pEnd = cornerPoints[(i + 1) % cornerPoints.length];
-			} else {
-				pStart = sketch.addPoint(prim.start!);
-				pEnd = sketch.addPoint(prim.end!);
-			}
+			const [pStart, pEnd] = getSpanEndpoints(i, prim.start!, prim.end!);
 			const arc = sketch.addArc(centerPt.id, pStart.id, pEnd.id, prim.radius!, !!prim.clockwise);
 			createdIds.push(arc.id);
-
-			const origArc = sketch.arcs.get(prim.sourceId);
-			if (origArc) {
-				const aSide = (prim.radius ?? arc.radius) >= origArc.radius ? 1 : -1;
-				offsetPairs.push({
-					kind: 'circle',
-					origId: origArc.id,
-					origCenterId: origArc.centerId,
-					offId: arc.id,
-					offCenterId: arc.centerId,
-					side: aSide,
-				});
-			}
+			pushCircleOffsetPair(sketch.arcs.get(prim.sourceId), arc, prim.radius ?? arc.radius);
 		} else if (prim.type === 'spline') {
 			const ptIds: string[] = [];
 			const splinePoints: OffsetSplinePoint[] = [];

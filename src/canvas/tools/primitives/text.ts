@@ -111,12 +111,16 @@ export class TextTool extends BaseTool {
 		}
 	}
 
-	override activate(ctx: any): void {
-		super.activate(ctx);
+	private clearDrawingState(): void {
 		this.drawingStep = 0;
 		this.startWorld = null;
 		this.currentWorld = null;
 		this.isDragDown = false;
+	}
+
+	override activate(ctx: any): void {
+		super.activate(ctx);
+		this.clearDrawingState();
 		this.hoverCandidate = null;
 		this.isRotating = false;
 		this.activeTextId = null;
@@ -124,10 +128,7 @@ export class TextTool extends BaseTool {
 
 	override deactivate(): void {
 		super.deactivate();
-		this.drawingStep = 0;
-		this.startWorld = null;
-		this.currentWorld = null;
-		this.isDragDown = false;
+		this.clearDrawingState();
 		this.hoverCandidate = null;
 		this.isRotating = false;
 		this.isDraggingCenter = false;
@@ -285,6 +286,51 @@ export class TextTool extends BaseTool {
 		}
 	}
 
+	private getTextStyleProps() {
+		return {
+			text: this.text,
+			fontFamily: this.fontFamily,
+			bold: this.bold,
+			italic: this.italic,
+			height: this.height,
+			characterSpacing: this.characterSpacing,
+			placement: this.placement,
+			fitToPath: this.fitToPath,
+			flipHorizontal: this.flipHorizontal,
+			flipVertical: this.flipVertical,
+			alignment: this.alignment,
+		};
+	}
+
+	private removeTextRectangle(sketch: typeof this.ctx.sketch, target: SketchText): void {
+		for (const lid of target.rectangleLineIds ?? []) sketch.removeEntity(lid);
+		for (const pid of target.rectanglePointIds ?? []) sketch.removeEntity(pid);
+		target.rectangleLineIds = undefined;
+		target.rectanglePointIds = undefined;
+	}
+
+	private createTextRectangle(sketch: typeof this.ctx.sketch, min: Vec2, max: Vec2) {
+		// Corner order: TL, TR, BR, BL in CAD Y-up coordinates
+		const p0 = sketch.addPoint(new Vec2(min.x, max.y), false);
+		const p1 = sketch.addPoint(max, false);
+		const p2 = sketch.addPoint(new Vec2(max.x, min.y), false);
+		const p3 = sketch.addPoint(min, false);
+
+		const l0 = sketch.addLine(p0.id, p1.id, true);
+		const l1 = sketch.addLine(p1.id, p2.id, true);
+		const l2 = sketch.addLine(p2.id, p3.id, true);
+		const l3 = sketch.addLine(p3.id, p0.id, true);
+
+		sketch.addParallelConstraint(l0.id, l2.id);
+		sketch.addParallelConstraint(l1.id, l3.id);
+		sketch.addPerpendicularConstraint(l0.id, l1.id);
+
+		return {
+			rectanglePointIds: [p0.id, p1.id, p2.id, p3.id] as [string, string, string, string],
+			rectangleLineIds: [l0.id, l1.id, l2.id, l3.id] as [string, string, string, string],
+		};
+	}
+
 	private commitRectangle(secondPos: Vec2): void {
 		if (!this.startWorld) return;
 		const sketch = this.ctx.sketch;
@@ -300,21 +346,19 @@ export class TextTool extends BaseTool {
 		sketch.beginTransaction();
 
 		const existingText = this.activeTextId ? sketch.texts.get(this.activeTextId) : null;
+		let resultText: SketchText;
 
 		if (existingText) {
 			existingText.targetPrimitiveId = undefined;
 			existingText.targetPrimitiveType = undefined;
 
-			let hasAllPointsAndLines = false;
+			let reusedRect = false;
 			if (existingText.rectanglePointIds && existingText.rectangleLineIds) {
-				const [p0Id, p1Id, p2Id, p3Id] = existingText.rectanglePointIds;
-				const pt0 = sketch.points.get(p0Id);
-				const pt1 = sketch.points.get(p1Id);
-				const pt2 = sketch.points.get(p2Id);
-				const pt3 = sketch.points.get(p3Id);
+				const pts = existingText.rectanglePointIds.map(id => sketch.points.get(id));
 				const hasAllLines = existingText.rectangleLineIds.every(lid => sketch.lines.has(lid));
-				if (pt0 && pt1 && pt2 && pt3 && hasAllLines) {
-					hasAllPointsAndLines = true;
+				if (pts.every(Boolean) && hasAllLines) {
+					reusedRect = true;
+					const [pt0, pt1, pt2, pt3] = pts as NonNullable<(typeof pts)[number]>[];
 					pt0.x = min.x;
 					pt0.y = max.y;
 					pt1.x = max.x;
@@ -327,106 +371,28 @@ export class TextTool extends BaseTool {
 				}
 			}
 
-			if (!hasAllPointsAndLines) {
-				if (existingText.rectangleLineIds) {
-					for (const lid of existingText.rectangleLineIds) {
-						sketch.removeEntity(lid);
-					}
-				}
-				if (existingText.rectanglePointIds) {
-					for (const pid of existingText.rectanglePointIds) {
-						sketch.removeEntity(pid);
-					}
-				}
-
-				const p0 = sketch.addPoint(new Vec2(min.x, max.y), false);
-				const p1 = sketch.addPoint(max, false);
-				const p2 = sketch.addPoint(new Vec2(max.x, min.y), false);
-				const p3 = sketch.addPoint(min, false);
-
-				const l0 = sketch.addLine(p0.id, p1.id, true);
-				const l1 = sketch.addLine(p1.id, p2.id, true);
-				const l2 = sketch.addLine(p2.id, p3.id, true);
-				const l3 = sketch.addLine(p3.id, p0.id, true);
-
-				sketch.addParallelConstraint(l0.id, l2.id);
-				sketch.addParallelConstraint(l1.id, l3.id);
-				sketch.addPerpendicularConstraint(l0.id, l1.id);
-
-				existingText.rectanglePointIds = [p0.id, p1.id, p2.id, p3.id];
-				existingText.rectangleLineIds = [l0.id, l1.id, l2.id, l3.id];
+			if (!reusedRect) {
+				this.removeTextRectangle(sketch, existingText);
+				Object.assign(existingText, this.createTextRectangle(sketch, min, max));
 			}
 
-			existingText.mode = 'text';
-			existingText.text = this.text;
-			existingText.fontFamily = this.fontFamily;
-			existingText.bold = this.bold;
-			existingText.italic = this.italic;
-			existingText.height = this.height;
-			existingText.characterSpacing = this.characterSpacing;
-			existingText.verticalAlignment = this.verticalAlignment;
-			existingText.placement = this.placement;
-			existingText.fitToPath = this.fitToPath;
-			existingText.flipHorizontal = this.flipHorizontal;
-			existingText.flipVertical = this.flipVertical;
-			existingText.alignment = this.alignment;
-
-			sketch.commitTransaction();
-
-			this.drawingStep = 0;
-			this.startWorld = null;
-			this.currentWorld = null;
-			this.isDragDown = false;
-
-			this.setActiveText(existingText);
-			this.ctx.requestRender();
-			return;
+			Object.assign(existingText, this.getTextStyleProps(), {
+				mode: 'text' as const,
+				verticalAlignment: this.verticalAlignment,
+			});
+			resultText = existingText;
+		} else {
+			resultText = sketch.addText({
+				mode: 'text',
+				verticalAlignment: this.verticalAlignment,
+				...this.getTextStyleProps(),
+				...this.createTextRectangle(sketch, min, max),
+			});
 		}
 
-		// Add 4 construction points: p0(TL), p1(TR), p2(BR), p3(BL) in CAD Y-up
-		const p0 = sketch.addPoint(new Vec2(min.x, max.y), false);
-		const p1 = sketch.addPoint(max, false);
-		const p2 = sketch.addPoint(new Vec2(max.x, min.y), false);
-		const p3 = sketch.addPoint(min, false);
-
-		// Add 4 construction lines
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
-
-		// Add constraints enforcing a rigid rotatable rectangle
-		sketch.addParallelConstraint(l0.id, l2.id);
-		sketch.addParallelConstraint(l1.id, l3.id);
-		sketch.addPerpendicularConstraint(l0.id, l1.id);
-
-		// Add text entity
-		const newText = sketch.addText({
-			mode: 'text',
-			text: this.text,
-			fontFamily: this.fontFamily,
-			bold: this.bold,
-			italic: this.italic,
-			height: this.height,
-			characterSpacing: this.characterSpacing,
-			verticalAlignment: this.verticalAlignment,
-			placement: this.placement,
-			fitToPath: this.fitToPath,
-			flipHorizontal: this.flipHorizontal,
-			flipVertical: this.flipVertical,
-			alignment: this.alignment,
-			rectanglePointIds: [p0.id, p1.id, p2.id, p3.id],
-			rectangleLineIds: [l0.id, l1.id, l2.id, l3.id],
-		});
-
 		sketch.commitTransaction();
-
-		this.drawingStep = 0;
-		this.startWorld = null;
-		this.currentWorld = null;
-		this.isDragDown = false;
-
-		this.setActiveText(newText);
+		this.clearDrawingState();
+		this.setActiveText(resultText);
 		this.ctx.requestRender();
 	}
 
@@ -436,41 +402,14 @@ export class TextTool extends BaseTool {
 
 		if (existingText) {
 			sketch.beginTransaction();
-
-			// If transitioning from text mode with a rectangle, clean up rectangle points and lines
 			if (existingText.mode === 'text' && (existingText.rectanglePointIds || existingText.rectangleLineIds)) {
-				const oldPointIds = existingText.rectanglePointIds;
-				const oldLineIds = existingText.rectangleLineIds;
-				existingText.rectanglePointIds = undefined;
-				existingText.rectangleLineIds = undefined;
-				existingText.mode = 'text_on_path';
-				if (oldLineIds) {
-					for (const lid of oldLineIds) {
-						sketch.removeEntity(lid);
-					}
-				}
-				if (oldPointIds) {
-					for (const pid of oldPointIds) {
-						sketch.removeEntity(pid);
-					}
-				}
+				this.removeTextRectangle(sketch, existingText);
 			}
-
-			existingText.mode = 'text_on_path';
-			existingText.targetPrimitiveId = primId;
-			existingText.targetPrimitiveType = primType;
-			existingText.text = this.text;
-			existingText.fontFamily = this.fontFamily;
-			existingText.bold = this.bold;
-			existingText.italic = this.italic;
-			existingText.height = this.height;
-			existingText.characterSpacing = this.characterSpacing;
-			existingText.placement = this.placement;
-			existingText.fitToPath = this.fitToPath;
-			existingText.flipHorizontal = this.flipHorizontal;
-			existingText.flipVertical = this.flipVertical;
-			existingText.alignment = this.alignment;
-
+			Object.assign(existingText, this.getTextStyleProps(), {
+				mode: 'text_on_path' as const,
+				targetPrimitiveId: primId,
+				targetPrimitiveType: primType,
+			});
 			sketch.commitTransaction();
 			this.setActiveText(existingText);
 			this.ctx.requestRender();
@@ -479,17 +418,7 @@ export class TextTool extends BaseTool {
 
 		const newText = sketch.addText({
 			mode: 'text_on_path',
-			text: this.text,
-			fontFamily: this.fontFamily,
-			bold: this.bold,
-			italic: this.italic,
-			height: this.height,
-			characterSpacing: this.characterSpacing,
-			placement: this.placement,
-			fitToPath: this.fitToPath,
-			flipHorizontal: this.flipHorizontal,
-			flipVertical: this.flipVertical,
-			alignment: this.alignment,
+			...this.getTextStyleProps(),
 			targetPrimitiveId: primId,
 			targetPrimitiveType: primType,
 		});

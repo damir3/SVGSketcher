@@ -81,16 +81,25 @@ export class HighlightManager implements IHighlightManager {
 		this.currentClass = highlightClass;
 		this.currentColor = highlightColor;
 
-		if (this.svg && typeof this.svg.querySelectorAll === 'function') {
-			const elements = this.svg.querySelectorAll(`[data-id="${target.id}"]`);
-			const classes = highlightClass.split(/\s+/).filter(Boolean);
-			for (const el of Array.from(elements)) {
-				for (const cls of classes) {
-					el.classList?.add?.(cls);
-				}
-				if (highlightColor) {
-					(el as HTMLElement).style?.setProperty?.('--custom-hover-color', highlightColor);
-				}
+		this.applyHighlightToElements(target.id, highlightClass, highlightColor, true);
+	}
+
+	private applyHighlightToElements(
+		targetId: string,
+		classStr: string | null,
+		color: string | null,
+		add: boolean
+	): void {
+		if (!this.svg || typeof this.svg.querySelectorAll !== 'function') return;
+		const elements = this.svg.querySelectorAll(`[data-id="${targetId}"]`);
+		const classes = classStr ? classStr.split(/\s+/).filter(Boolean) : [];
+		for (const el of Array.from(elements)) {
+			for (const cls of classes) {
+				add ? el.classList?.add?.(cls) : el.classList?.remove?.(cls);
+			}
+			if (color) {
+				const style = (el as HTMLElement).style;
+				add ? style?.setProperty?.('--custom-hover-color', color) : style?.removeProperty?.('--custom-hover-color');
 			}
 		}
 	}
@@ -98,18 +107,7 @@ export class HighlightManager implements IHighlightManager {
 	private clearHighlightElements(): void {
 		if (!this.currentTarget) return;
 
-		if (this.svg && typeof this.svg.querySelectorAll === 'function') {
-			const elements = this.svg.querySelectorAll(`[data-id="${this.currentTarget.id}"]`);
-			const classes = this.currentClass ? this.currentClass.split(/\s+/).filter(Boolean) : [];
-			for (const el of Array.from(elements)) {
-				for (const cls of classes) {
-					el.classList?.remove?.(cls);
-				}
-				if (this.currentColor) {
-					(el as HTMLElement).style?.removeProperty?.('--custom-hover-color');
-				}
-			}
-		}
+		this.applyHighlightToElements(this.currentTarget.id, this.currentClass, this.currentColor, false);
 
 		this.currentTarget = null;
 		this.currentClass = null;
@@ -157,18 +155,7 @@ export class HighlightManager implements IHighlightManager {
 			}
 		}
 
-		if (this.svg && typeof this.svg.querySelectorAll === 'function') {
-			const elements = this.svg.querySelectorAll(`[data-id="${this.currentTarget.id}"]`);
-			const classes = this.currentClass.split(/\s+/).filter(Boolean);
-			for (const el of Array.from(elements)) {
-				for (const cls of classes) {
-					el.classList?.add?.(cls);
-				}
-				if (this.currentColor) {
-					(el as HTMLElement).style?.setProperty?.('--custom-hover-color', this.currentColor);
-				}
-			}
-		}
+		this.applyHighlightToElements(this.currentTarget.id, this.currentClass, this.currentColor, true);
 	}
 
 	getHoveredTarget(): HoverTarget | null {

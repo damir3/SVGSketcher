@@ -220,16 +220,15 @@ export class DimensionModal {
 	}
 
 	private bindInnerButtons(isRadius: boolean): void {
-		if (isRadius) {
-			this.modalEl.querySelector('#btn-mode-radius')?.addEventListener('click', e => {
+		if (!isRadius) return;
+		for (const [selector, mode] of [
+			['#btn-mode-radius', 'radius'],
+			['#btn-mode-diameter', 'diameter'],
+		] as const) {
+			this.modalEl.querySelector(selector)?.addEventListener('click', e => {
 				e.preventDefault();
 				e.stopPropagation();
-				this.setMode('radius');
-			});
-			this.modalEl.querySelector('#btn-mode-diameter')?.addEventListener('click', e => {
-				e.preventDefault();
-				e.stopPropagation();
-				this.setMode('diameter');
+				this.setMode(mode);
 			});
 		}
 	}

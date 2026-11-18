@@ -118,6 +118,28 @@ export function renderEllipseMajorAxisPreviewVisual(parent: SVGElement, sc: Vec2
 	);
 }
 
+function drawScreenRotatedEllipse(
+	parent: SVGElement,
+	sc: Vec2,
+	smaj: Vec2,
+	smin: Vec2,
+	attrs: SvgAttrs
+): { r: Vec2; theta: number } {
+	const r = sc.distancesTo(smaj, smin);
+	const theta = sc.angleToPoint(smaj);
+	const thetaDeg = (theta * 180) / Math.PI;
+	createSvgEllipse(
+		sc,
+		r,
+		{
+			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
+			...attrs,
+		},
+		parent
+	);
+	return { r, theta };
+}
+
 export function renderEllipsePreviewVisual(
 	parent: SVGElement,
 	sc: Vec2,
@@ -126,19 +148,7 @@ export function renderEllipsePreviewVisual(
 	isConstruction = false,
 	isGuide = false
 ): void {
-	const r = sc.distancesTo(smaj, smin);
-	const thetaDeg = sc.angleToPointDeg(smaj);
-
-	createSvgEllipse(
-		sc,
-		r,
-		{
-			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			...getPreviewStrokeAttrs(isConstruction, isGuide),
-		},
-		parent
-	);
-
+	drawScreenRotatedEllipse(parent, sc, smaj, smin, getPreviewStrokeAttrs(isConstruction, isGuide));
 	createSvgLine(sc, smaj, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc, smin, AUX_RAY_ATTRS, parent);
 }
@@ -150,29 +160,15 @@ export function renderEllipticalArcStartPreviewVisual(
 	smin: Vec2,
 	ss: Vec2
 ): void {
-	const r = sc.distancesTo(smaj, smin);
-	const theta = sc.angleToPoint(smaj);
-	const thetaDeg = (theta * 180) / Math.PI;
-
-	createSvgEllipse(
-		sc,
-		r,
-		{
-			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			stroke: COLORS.guideStartEllipse,
-			'stroke-width': STROKE_WIDTH.dimension,
-			'stroke-dasharray': DASH_ARRAY.axis,
-			fill: 'none',
-		},
-		parent
-	);
-
+	const { r, theta } = drawScreenRotatedEllipse(parent, sc, smaj, smin, {
+		stroke: COLORS.guideStartEllipse,
+		'stroke-width': STROKE_WIDTH.dimension,
+		'stroke-dasharray': DASH_ARRAY.axis,
+		fill: 'none',
+	});
 	const { axisU: u, axisV: v } = ellipseAxes(theta);
-
 	const ts = ellipseParameterAtPoint(ss, sc, r, u, v);
-
 	const projSs = ellipsePointAtParameter(ts, sc, r, u, v);
-
 	createSvgLine(sc, projSs, AUX_RAY_ATTRS, parent);
 	createSvgCircle(projSs, 4, { fill: COLORS.primary }, parent);
 }
@@ -190,28 +186,12 @@ export function renderEllipticalArcPreviewVisual(
 	const r = sc.distancesTo(smaj, smin);
 	if (r.x < 0.1 || r.y < 0.1) return;
 
-	const theta = sc.angleToPoint(smaj);
-	const thetaDeg = (theta * 180) / Math.PI;
-
-	createSvgEllipse(
-		sc,
-		r,
-		{
-			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			...GUIDE_OUTLINE_ATTRS,
-		},
-		parent
-	);
-
+	const { theta } = drawScreenRotatedEllipse(parent, sc, smaj, smin, GUIDE_OUTLINE_ATTRS);
 	const { axisU: u, axisV: v } = ellipseAxes(theta);
-
 	const te = ellipseParameterAtPoint(se, sc, r, u, v);
-
 	const projSe = ellipsePointAtParameter(te, sc, r, u, v);
-
 	const d = getEllipticalArcSvgPath(sc, smaj, smin, ss, projSe, clockwise);
 	createSvgPath(d, getPreviewStrokeAttrs(isConstruction, false, true), parent);
-
 	createSvgLine(sc, ss, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc, projSe, AUX_RAY_ATTRS, parent);
 }
@@ -274,19 +254,12 @@ function drawRotatedScreenEllipse(
 	minorAxisPoint: Vec2,
 	attrs: SvgAttrs
 ): void {
-	const sc = viewport.worldToScreen(center);
-	const smaj = viewport.worldToScreen(majorAxisPoint);
-	const smin = viewport.worldToScreen(minorAxisPoint);
-	const r = sc.distancesTo(smaj, smin);
-	const thetaDeg = sc.angleToPointDeg(smaj);
-	createSvgEllipse(
-		sc,
-		r,
-		{
-			transform: `rotate(${thetaDeg.toFixed(2)} ${sc.x.toFixed(1)} ${sc.y.toFixed(1)})`,
-			...attrs,
-		},
-		parent
+	drawScreenRotatedEllipse(
+		parent,
+		viewport.worldToScreen(center),
+		viewport.worldToScreen(majorAxisPoint),
+		viewport.worldToScreen(minorAxisPoint),
+		attrs
 	);
 }
 

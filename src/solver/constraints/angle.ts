@@ -107,15 +107,21 @@ export class AngleConstraint extends BaseConstraint {
 		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
 	}
 
-	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
-		const world = viewport.screenToWorld(screen);
+	private resolveLinePoints(sketch: SketchDocument) {
 		const l1 = sketch.getLine(this.line1Id);
 		const l2 = sketch.getLine(this.line2Id);
 		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
 		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
 		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
 		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
-		if (!p1 || !p2 || !p3 || !p4) return;
+		return p1 && p2 && p3 && p4 ? { l1, l2, p1, p2, p3, p4 } : null;
+	}
+
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
+		const world = viewport.screenToWorld(screen);
+		const resolved = this.resolveLinePoints(sketch);
+		if (!resolved) return;
+		const { l1, l2, p1, p2, p3, p4 } = resolved;
 		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, world, this.line1Id, this.line2Id);
 		const arcRadiusWorld = Math.max(10, world.distanceTo(geom.pInt));
 		this.arcRadius = arcRadiusWorld;
@@ -133,13 +139,9 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	private computeScreenArcLayout(sketch: SketchDocument, viewport: Viewport) {
-		const l1 = sketch.getLine(this.line1Id);
-		const l2 = sketch.getLine(this.line2Id);
-		const p1 = sketch.points.get(l1 ? l1.p1Id : this.l1P1);
-		const p2 = sketch.points.get(l1 ? l1.p2Id : this.l1P2);
-		const p3 = sketch.points.get(l2 ? l2.p1Id : this.l2P1);
-		const p4 = sketch.points.get(l2 ? l2.p2Id : this.l2P2);
-		if (!p1 || !p2 || !p3 || !p4) return null;
+		const resolved = this.resolveLinePoints(sketch);
+		if (!resolved) return null;
+		const { p1, p2, p3, p4 } = resolved;
 
 		const geom = sketch.calculateLinesAngleGeometry(p1, p2, p3, p4, undefined, this.line1Id, this.line2Id);
 
@@ -184,25 +186,21 @@ export class AngleConstraint extends BaseConstraint {
 		const { p1, p2, p3, p4, sCenter, a1, a2, delta, rScreen } = layout;
 
 		// Extension lines if arc points extend beyond the physical line segments
-		const sp1 = ctx.viewport.worldToScreen(p1);
-		const sp2 = ctx.viewport.worldToScreen(p2);
-		const sp3 = ctx.viewport.worldToScreen(p3);
-		const sp4 = ctx.viewport.worldToScreen(p4);
-
-		const isUserLine1 = Boolean(this.line1Id && ctx.sketch.lines.has(this.line1Id));
-		const isUserLine2 = Boolean(this.line2Id && ctx.sketch.lines.has(this.line2Id));
-		const isArc1 = Boolean(this.line1Id && ctx.sketch.arcs.has(this.line1Id));
-		const isArc2 = Boolean(this.line2Id && ctx.sketch.arcs.has(this.line2Id));
-		const hasSeg1 = Boolean(isUserLine1 || isArc1 || ctx.sketch.getLineBetween(this.l1P1, this.l1P2));
-		const hasSeg2 = Boolean(isUserLine2 || isArc2 || ctx.sketch.getLineBetween(this.l2P1, this.l2P2));
-
 		const extensionLines: Array<{ angle: number; pA: Vec2; pB: Vec2 }> = [];
-		if (!this.line1Id || isUserLine1 || isArc1) {
-			extensionLines.push({ angle: a1, pA: sp1, pB: hasSeg1 ? sp2 : sp1 });
-		}
-		if (!this.line2Id || isUserLine2 || isArc2) {
-			extensionLines.push({ angle: a2, pA: sp3, pB: hasSeg2 ? sp4 : sp3 });
-		}
+		const addExt = (lineId: string, lp1: string, lp2: string, angle: number, pA: Vec2, pB: Vec2) => {
+			const isUser = Boolean(lineId && ctx.sketch.lines.has(lineId));
+			const isArc = Boolean(lineId && ctx.sketch.arcs.has(lineId));
+			if (!lineId || isUser || isArc) {
+				const hasSeg = Boolean(isUser || isArc || ctx.sketch.getLineBetween(lp1, lp2));
+				extensionLines.push({
+					angle,
+					pA: ctx.viewport.worldToScreen(pA),
+					pB: ctx.viewport.worldToScreen(hasSeg ? pB : pA),
+				});
+			}
+		};
+		addExt(this.line1Id, this.l1P1, this.l1P2, a1, p1, p2);
+		addExt(this.line2Id, this.l2P1, this.l2P2, a2, p3, p4);
 
 		const prefix = this.expression ? 'fx: ' : '';
 		renderAngleDimensionVisual({
@@ -223,7 +221,6 @@ export class AngleConstraint extends BaseConstraint {
 		const layout = this.computeScreenArcLayout(sketch, viewport);
 		if (!layout) return null;
 		const { sCenter, a1, delta, rScreen, midPoint } = layout;
-		const TWO_PI = 2 * Math.PI;
 
 		// 1. Check distance to badge / text box
 		const dLabel = midPoint.distanceTo(screen);
@@ -233,18 +230,10 @@ export class AngleConstraint extends BaseConstraint {
 		const dCenter = Math.hypot(screen.x - sCenter.x, screen.y - sCenter.y);
 		const dRadial = Math.abs(dCenter - rScreen);
 		if (dRadial <= LINE_DISTANCE_PX) {
-			const pAngle = Vec2.from(sCenter).angleToPoint(screen);
-			const sweepAngle = delta;
-			let ptSweep = pAngle - a1;
-			if (sweepAngle > 0) {
-				while (ptSweep < 0) ptSweep += TWO_PI;
-				while (ptSweep > TWO_PI) ptSweep -= TWO_PI;
-				if (ptSweep <= sweepAngle) return dRadial;
-			} else {
-				while (ptSweep > 0) ptSweep -= TWO_PI;
-				while (ptSweep < -TWO_PI) ptSweep += TWO_PI;
-				if (ptSweep >= sweepAngle) return dRadial;
-			}
+			const TWO_PI = 2 * Math.PI;
+			const sign = delta >= 0 ? 1 : -1;
+			const ptSweep = ((((Vec2.from(sCenter).angleToPoint(screen) - a1) * sign) % TWO_PI) + TWO_PI) % TWO_PI;
+			if (ptSweep <= Math.abs(delta)) return dRadial;
 		}
 
 		return null;

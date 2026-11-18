@@ -3,7 +3,7 @@ import { resizeOffsetSpline as resizeOffsetSplineReference } from './offsetSplin
 import type { OffsetKernelItem, KernelOffsetResult, KernelOffsetPrimitive } from '../kernel/offsetTypes';
 import { Vec2 } from './vector';
 import { fitOffsetNodes, OFFSET_FIT_TOLERANCE } from './offsetFit';
-import { splitOffsetContours, arcNode } from './offsetContours';
+import { splitOffsetContours, arcNode, isPointInsidePolygon } from './offsetContours';
 import { isOffsetCollapsed } from './offsetCollapse';
 import { offsetPrimitiveEnd, offsetPrimitiveStart, offsetSourceCounterClockwise } from './offsetRadius';
 import {
@@ -116,15 +116,6 @@ function closedContours(nodes: Node[], d: number): Node[][] {
 	const area = (v: Vec2[]) => v.reduce((sum, p, i) => sum + p.cross(v[(i + 1) % v.length]), 0);
 	const sourceArea = area(source),
 		inward = sourceArea * nodes[0].t.clone().perpendicular().dot(nodes[0].n) * d > 0;
-	const inside = (p: Vec2) => {
-		let odd = false;
-		for (let i = 0, j = source.length - 1; i < source.length; j = i++) {
-			const a = source[i],
-				b = source[j];
-			if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) odd = !odd;
-		}
-		return odd;
-	};
 	const valid = loops.filter(loop => {
 		const loopArea = area(loop.map(n => n.p));
 		if (Math.abs(loopArea) < 1e-10 || (inward && loopArea * sourceArea <= 0)) return false;
@@ -132,7 +123,7 @@ function closedContours(nodes: Node[], d: number): Node[][] {
 			minDist = Math.abs(d) - OFFSET_FIT_TOLERANCE;
 		for (let i = 0; i + 1 < loop.length; i += stride) {
 			const p = loop[i].p.clone().lerp(loop[i + 1].p, 0.5);
-			if (inside(p) !== inward) return false;
+			if (isPointInsidePolygon(source, p) !== inward) return false;
 			for (let j = 0; j + 1 < source.length; j++) {
 				const a = source[j],
 					b = source[j + 1];

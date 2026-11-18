@@ -12,7 +12,7 @@ import {
 	type PrimitiveTransformRenderOptions,
 } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
-import { createSvgLine, createSvgPath, getArcSvgPath } from '../../canvas/svg';
+import { createSvgLine, createSvgPath, getArcSvgPath, getArcSweep } from '../../canvas/svg';
 import { AUX_AXIS_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_STROKE_ATTRS } from '../../canvas/styles';
 
 export class SketchArc implements ISketchPrimitive {
@@ -205,24 +205,10 @@ export class SketchArc implements ISketchPrimitive {
 		if (dToPerimeter >= maxDistPx) return null;
 
 		const as = sc.angleToPoint(ss);
-		const ae = sc.angleToPoint(se);
-		const ap = sc.angleToPoint(screenPos);
 		const clockwise = !!this.clockwise;
 		const TWO_PI = 2 * Math.PI;
-
-		let sweepAngle = 0;
-		let pAngle = 0;
-		if (clockwise) {
-			sweepAngle = (ae - as) % TWO_PI;
-			if (sweepAngle < 0) sweepAngle += TWO_PI;
-			pAngle = (ap - as) % TWO_PI;
-			if (pAngle < 0) pAngle += TWO_PI;
-		} else {
-			sweepAngle = (as - ae) % TWO_PI;
-			if (sweepAngle < 0) sweepAngle += TWO_PI;
-			pAngle = (as - ap) % TWO_PI;
-			if (pAngle < 0) pAngle += TWO_PI;
-		}
+		const sweepAngle = getArcSweep(as, sc.angleToPoint(se), clockwise);
+		const pAngle = getArcSweep(as, sc.angleToPoint(screenPos), clockwise);
 
 		const angTolerance = tolerancePx / Math.max(sr, 1);
 		if (pAngle <= sweepAngle + angTolerance || pAngle >= TWO_PI - angTolerance) {
@@ -264,10 +250,7 @@ export class SketchArc implements ISketchPrimitive {
 					const start = ctx.sketch.points.get(this.startPointId);
 					const end = ctx.sketch.points.get(this.endPointId);
 					if (center && start && end) {
-						const as = center.angleToPoint(start);
-						const ae = center.angleToPoint(end);
-						let sweep = this.clockwise ? (as - ae) % (2 * Math.PI) : (ae - as) % (2 * Math.PI);
-						if (sweep < 0) sweep += 2 * Math.PI;
+						const sweep = getArcSweep(center.angleToPoint(start), center.angleToPoint(end), !this.clockwise);
 						return Number(((sweep * 180) / Math.PI).toFixed(2));
 					}
 					return 0;

@@ -281,7 +281,6 @@ export class MirrorTool extends BaseTool {
 			return newPt.id;
 		};
 
-		let createdCount = 0;
 		const newCreatedItems: Array<{
 			id: string;
 			type: 'point' | 'line' | 'circle' | 'arc' | 'ellipse' | 'elliptical_arc' | 'spline';
@@ -299,7 +298,6 @@ export class MirrorTool extends BaseTool {
 				if (np1Id !== np2Id) {
 					const newLine = this.ctx.sketch.addLine(np1Id, np2Id, line.isConstruction);
 					newCreatedItems.push({ id: newLine.id, type: 'line' });
-					createdCount++;
 				}
 				continue;
 			}
@@ -311,7 +309,6 @@ export class MirrorTool extends BaseTool {
 				const newCircle = this.ctx.sketch.addCircle(nCenterId, circle.radius, circle.isConstruction);
 				this.ctx.sketch.addEqualRadiusConstraint(circle.id, newCircle.id);
 				newCreatedItems.push({ id: newCircle.id, type: 'circle' });
-				createdCount++;
 				continue;
 			}
 
@@ -331,7 +328,6 @@ export class MirrorTool extends BaseTool {
 				);
 				this.ctx.sketch.addEqualRadiusConstraint(arc.id, newArc.id);
 				newCreatedItems.push({ id: newArc.id, type: 'arc' });
-				createdCount++;
 				continue;
 			}
 
@@ -343,7 +339,6 @@ export class MirrorTool extends BaseTool {
 				const nMinorId = getOrReflectPoint(ellipse.minorAxisPointId);
 				const newEllipse = this.ctx.sketch.addEllipse(nCenterId, nMajorId, nMinorId, ellipse.isConstruction);
 				newCreatedItems.push({ id: newEllipse.id, type: 'ellipse' });
-				createdCount++;
 				continue;
 			}
 
@@ -365,7 +360,6 @@ export class MirrorTool extends BaseTool {
 					elArc.isConstruction
 				);
 				newCreatedItems.push({ id: newElArc.id, type: 'elliptical_arc' });
-				createdCount++;
 				continue;
 			}
 
@@ -373,7 +367,6 @@ export class MirrorTool extends BaseTool {
 			if (spline) {
 				const copy = this.ctx.sketch.copySpline(spline, getOrReflectPoint);
 				newCreatedItems.push({ id: copy.id, type: 'spline' });
-				createdCount++;
 				continue;
 			}
 
@@ -383,7 +376,6 @@ export class MirrorTool extends BaseTool {
 				const nPtId = getOrReflectPoint(pt.id);
 				if (nPtId !== pt.id) {
 					newCreatedItems.push({ id: nPtId, type: 'point' });
-					createdCount++;
 				}
 				continue;
 			}
@@ -400,7 +392,7 @@ export class MirrorTool extends BaseTool {
 			this.ctx.sketch.selectEntities(newCreatedItems, false);
 		}
 
-		this.ctx.showToast(`Mirrored ${createdCount} object${createdCount !== 1 ? 's' : ''}`);
+		this.ctx.showToast(`Mirrored ${newCreatedItems.length} object${newCreatedItems.length !== 1 ? 's' : ''}`);
 		this.ctx.requestRender();
 		return true;
 	}

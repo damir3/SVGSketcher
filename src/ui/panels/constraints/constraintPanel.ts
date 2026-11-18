@@ -111,13 +111,15 @@ export class ConstraintPanel implements ISidebarPanel {
 		// Controls inside params card
 		let paramsInnerHtml = '';
 		let segCtrlCounter = 0;
+		const renderSeg = (items?: ConstraintPanelOptions['segmentedControls']) =>
+			(items ?? []).map(sc => this.renderSegmentedControl(sc, segCtrlCounter++, context)).join('');
+		const renderFields = (items?: ConstraintPanelOptions['fields']) =>
+			(items ?? []).map(f => this.renderField(f, context)).join('');
+		const renderCheckboxes = (items?: ConstraintPanelOptions['checkboxes']) =>
+			(items ?? []).map(cb => this.renderCheckbox(cb, context)).join('');
 
 		// Top-level Segmented controls
-		if (this.options.segmentedControls) {
-			for (const sc of this.options.segmentedControls) {
-				paramsInnerHtml += this.renderSegmentedControl(sc, segCtrlCounter++, context);
-			}
-		}
+		paramsInnerHtml += renderSeg(this.options.segmentedControls);
 
 		// Dimension row
 		if (this.options.dimension) {
@@ -154,44 +156,22 @@ export class ConstraintPanel implements ISidebarPanel {
 		}
 
 		// Top-level Fields
-		if (this.options.fields) {
-			for (const f of this.options.fields) {
-				paramsInnerHtml += this.renderField(f, context);
-			}
-		}
+		paramsInnerHtml += renderFields(this.options.fields);
 
 		// Sections
-		if (this.options.sections) {
-			for (const section of this.options.sections) {
-				if (section.title) {
-					paramsInnerHtml += `
+		for (const section of this.options.sections ?? []) {
+			if (section.title) {
+				paramsInnerHtml += `
 						<div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-top: 6px; margin-bottom: 2px;">${section.title}</div>
 					`;
-				}
-				if (section.segmentedControls) {
-					for (const sc of section.segmentedControls) {
-						paramsInnerHtml += this.renderSegmentedControl(sc, segCtrlCounter++, context);
-					}
-				}
-				if (section.fields) {
-					for (const f of section.fields) {
-						paramsInnerHtml += this.renderField(f, context);
-					}
-				}
-				if (section.checkboxes) {
-					for (const cb of section.checkboxes) {
-						paramsInnerHtml += this.renderCheckbox(cb, context);
-					}
-				}
 			}
+			paramsInnerHtml += renderSeg(section.segmentedControls);
+			paramsInnerHtml += renderFields(section.fields);
+			paramsInnerHtml += renderCheckboxes(section.checkboxes);
 		}
 
 		// Top-level Checkboxes
-		if (this.options.checkboxes) {
-			for (const cb of this.options.checkboxes) {
-				paramsInnerHtml += this.renderCheckbox(cb, context);
-			}
-		}
+		paramsInnerHtml += renderCheckboxes(this.options.checkboxes);
 
 		// Extra content (if any)
 		if (this.options.extraContent) {

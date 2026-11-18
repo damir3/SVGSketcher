@@ -130,29 +130,9 @@ export function sketchPrimitiveToGeoCurve(
 
 export function getAllGeoCurves(sketch: SketchDocument): GeoCurve[] {
 	const curves: GeoCurve[] = [];
-	for (const line of sketch.lines.values()) {
-		if (line.isSplineHandle) continue; // Skip tangent handles
-		const c = line.toGeoCurve(sketch);
-		if (c) curves.push(c);
-	}
-	for (const circle of sketch.circles.values()) {
-		const c = circle.toGeoCurve(sketch);
-		if (c) curves.push(c);
-	}
-	for (const arc of sketch.arcs.values()) {
-		const c = arc.toGeoCurve(sketch);
-		if (c) curves.push(c);
-	}
-	for (const ellipse of sketch.ellipses.values()) {
-		const c = ellipse.toGeoCurve(sketch);
-		if (c) curves.push(c);
-	}
-	for (const elArc of sketch.ellipticalArcs.values()) {
-		const c = elArc.toGeoCurve(sketch);
-		if (c) curves.push(c);
-	}
-	for (const spline of sketch.splines.values()) {
-		const c = spline.toGeoCurve(sketch);
+	for (const prim of sketch.getCurvePrimitives()) {
+		if (prim.type === 'line' && (prim as SketchLine).isSplineHandle) continue;
+		const c = prim.toGeoCurve(sketch);
 		if (c) curves.push(c);
 	}
 	return curves;
@@ -172,23 +152,31 @@ export function getParamAtPoint(curve: GeoCurve, point: Vec2): number {
 	return parametersAtCurvePoints(curve, [point])[0];
 }
 
+function isAngleWithinSweep(
+	startAngle: number,
+	endAngle: number,
+	testAngle: number,
+	clockwise: boolean,
+	angTol: number
+): boolean {
+	const wrap = (diff: number) => ((diff % TWO_PI) + TWO_PI) % TWO_PI;
+	const sweep = wrap(clockwise ? endAngle - startAngle : startAngle - endAngle);
+	const delta = wrap(clockwise ? testAngle - startAngle : startAngle - testAngle);
+	return delta <= sweep + angTol || delta >= TWO_PI - angTol;
+}
+
 /**
  * Checks if point pt (in world coords) lies on an arc within tolerance.
  */
 function isPointOnArc(pt: Vec2, arc: GeoArc, tol = POINT_TOLERANCE): boolean {
 	const sc = new Vec2(arc.center.x, -arc.center.y);
-	const ss = new Vec2(arc.start.x, -arc.start.y);
-	const se = new Vec2(arc.end.x, -arc.end.y);
-	const sp = new Vec2(pt.x, -pt.y);
-	const as = Vec2.from(sc).angleToPoint(ss);
-	const ae = Vec2.from(sc).angleToPoint(se);
-	const ap = Vec2.from(sc).angleToPoint(sp);
-	let sweep = arc.clockwise ? (ae - as) % TWO_PI : (as - ae) % TWO_PI;
-	if (sweep < 0) sweep += TWO_PI;
-	let delta = arc.clockwise ? (ap - as) % TWO_PI : (as - ap) % TWO_PI;
-	if (delta < 0) delta += TWO_PI;
-	const angTol = tol / Math.max(arc.radius, 1);
-	return delta <= sweep + angTol || delta >= TWO_PI - angTol;
+	return isAngleWithinSweep(
+		sc.angleToPoint(new Vec2(arc.start.x, -arc.start.y)),
+		sc.angleToPoint(new Vec2(arc.end.x, -arc.end.y)),
+		sc.angleToPoint(new Vec2(pt.x, -pt.y)),
+		arc.clockwise,
+		tol / Math.max(arc.radius, 1)
+	);
 }
 
 /**
@@ -198,21 +186,16 @@ function isPointOnEllipticalArc(pt: Vec2, arc: GeoEllipticalArc, tol = POINT_TOL
 	const sc = new Vec2(arc.center.x, -arc.center.y);
 	const smaj = new Vec2(arc.majorAxisPoint.x, -arc.majorAxisPoint.y);
 	const smin = new Vec2(arc.minorAxisPoint.x, -arc.minorAxisPoint.y);
-	const ss = new Vec2(arc.start.x, -arc.start.y);
-	const se = new Vec2(arc.end.x, -arc.end.y);
-	const sp = new Vec2(pt.x, -pt.y);
-	const r = Vec2.from(sc).distancesTo(smaj, smin);
+	const r = sc.distancesTo(smaj, smin);
 	if (r.x < 1e-6 || r.y < 1e-6) return false;
-	const { axisU, axisV } = ellipseAxes(Vec2.from(sc).angleToPoint(smaj));
-	const ts = ellipseParameterAtPoint(ss, sc, r, axisU, axisV);
-	const te = ellipseParameterAtPoint(se, sc, r, axisU, axisV);
-	const tp = ellipseParameterAtPoint(sp, sc, r, axisU, axisV);
-	let sweep = arc.clockwise ? (te - ts) % TWO_PI : (ts - te) % TWO_PI;
-	if (sweep < 0) sweep += TWO_PI;
-	let delta = arc.clockwise ? (tp - ts) % TWO_PI : (ts - tp) % TWO_PI;
-	if (delta < 0) delta += TWO_PI;
-	const angTol = tol / Math.max(Math.min(r.x, r.y), 1);
-	return delta <= sweep + angTol || delta >= TWO_PI - angTol;
+	const { axisU, axisV } = ellipseAxes(sc.angleToPoint(smaj));
+	return isAngleWithinSweep(
+		ellipseParameterAtPoint(new Vec2(arc.start.x, -arc.start.y), sc, r, axisU, axisV),
+		ellipseParameterAtPoint(new Vec2(arc.end.x, -arc.end.y), sc, r, axisU, axisV),
+		ellipseParameterAtPoint(new Vec2(pt.x, -pt.y), sc, r, axisU, axisV),
+		arc.clockwise,
+		tol / Math.max(Math.min(r.x, r.y), 1)
+	);
 }
 
 function deduplicatePoints(pts: Vec2[], eps = 1e-4): Vec2[] {
@@ -605,29 +588,17 @@ function transferLineConstraints(
 			sketch.addHorizontalConstraint(newLine.p1Id, newLine.p2Id);
 		} else if (c instanceof VerticalConstraint) {
 			sketch.addVerticalConstraint(newLine.p1Id, newLine.p2Id);
-		} else if (c instanceof ParallelConstraint) {
+		} else if (
+			c instanceof ParallelConstraint ||
+			c instanceof CollinearConstraint ||
+			c instanceof PerpendicularConstraint
+		) {
 			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
-			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
-			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
-			const otherLine = sketch.getLineBetween(otherP1, otherP2);
+			const otherLine = sketch.getLineBetween(isL1 ? c.l2P1 : c.l1P1, isL1 ? c.l2P2 : c.l1P2);
 			if (otherLine && otherLine.id !== oldLine.id) {
-				sketch.addParallelConstraint(newLine.id, otherLine.id);
-			}
-		} else if (c instanceof CollinearConstraint) {
-			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
-			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
-			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
-			const otherLine = sketch.getLineBetween(otherP1, otherP2);
-			if (otherLine && otherLine.id !== oldLine.id) {
-				sketch.addCollinearConstraint(newLine.id, otherLine.id);
-			}
-		} else if (c instanceof PerpendicularConstraint) {
-			const isL1 = matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
-			const otherP1 = isL1 ? c.l2P1 : c.l1P1;
-			const otherP2 = isL1 ? c.l2P2 : c.l1P2;
-			const otherLine = sketch.getLineBetween(otherP1, otherP2);
-			if (otherLine && otherLine.id !== oldLine.id) {
-				sketch.addPerpendicularConstraint(newLine.id, otherLine.id);
+				if (c instanceof ParallelConstraint) sketch.addParallelConstraint(newLine.id, otherLine.id);
+				else if (c instanceof CollinearConstraint) sketch.addCollinearConstraint(newLine.id, otherLine.id);
+				else sketch.addPerpendicularConstraint(newLine.id, otherLine.id);
 			}
 		} else if (c instanceof AngleConstraint) {
 			const isL1 = c.line1Id === oldLine.id || matchesEndpoints(c.l1P1, c.l1P2, oldLine.p1Id, oldLine.p2Id);
@@ -666,6 +637,78 @@ function transferLineConstraints(
 	}
 }
 
+export function mapSplineIntervalPointIds(
+	sketch: SketchDocument,
+	existingIds: readonly string[],
+	raw: readonly Vec2[],
+	startPointId: string,
+	endPointId: string
+): string[] {
+	const ids = [startPointId];
+	for (let k = 1; k < raw.length - 1; k++) {
+		const pos = raw[k];
+		const matchedId = existingIds.find(pid => {
+			const pt = sketch.points.get(pid);
+			return pt && pos.distanceTo(pt) < 1e-2;
+		});
+		ids.push(matchedId ?? sketch.addPoint(pos).id);
+	}
+	ids.push(endPointId);
+	return ids;
+}
+
+export function buildControlSplineInterval(
+	sketch: SketchDocument,
+	sourcePointIds: readonly string[],
+	subSegments: readonly BezierSegment[],
+	startPointId: string,
+	endPointId: string,
+	isConstruction?: boolean
+): SketchSpline {
+	const M = subSegments.length;
+	const controlRawPoints: Vec2[] = [subSegments[0][0]];
+	const knots: number[] = [0, 0, 0, 0];
+	for (let s = 0; s < M; s++) {
+		controlRawPoints.push(subSegments[s][1], subSegments[s][2], subSegments[s][3]);
+		if (s > 0) knots.push(s, s, s);
+	}
+	knots.push(M, M, M, M);
+	return sketch.addControlSpline(
+		mapSplineIntervalPointIds(sketch, sourcePointIds, controlRawPoints, startPointId, endPointId),
+		isConstruction,
+		undefined,
+		false,
+		knots
+	);
+}
+
+export function extractFitSplineIntervalHandles(subSegments: readonly BezierSegment[]): {
+	rawPoints: Vec2[];
+	rawHandles: Array<{ h1: Vec2; h2: Vec2 }>;
+} {
+	const M = subSegments.length;
+	const rawPoints: Vec2[] = [];
+	const rawHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
+	for (let j = 0; j <= M; j++) {
+		if (j === 0) {
+			const p0 = subSegments[0][0];
+			const v = new Vec2().subVectors(subSegments[0][1], p0);
+			rawPoints.push(p0);
+			rawHandles.push({ h1: new Vec2().subVectors(p0, v), h2: new Vec2().addVectors(p0, v) });
+		} else if (j === M) {
+			const pM = subSegments[M - 1][3];
+			const v = new Vec2().subVectors(pM, subSegments[M - 1][2]);
+			rawPoints.push(pM);
+			rawHandles.push({ h1: new Vec2().subVectors(pM, v), h2: new Vec2().addVectors(pM, v) });
+		} else {
+			rawPoints.push(subSegments[j][0]);
+			// Preserve both handles at the join; averaging them alters the retained cubic span.
+			rawHandles.push({ h1: subSegments[j - 1][2], h2: subSegments[j][1] });
+		}
+	}
+	return { rawPoints, rawHandles };
+}
+
 function replaceSplineWithInterval(
 	sketch: SketchDocument,
 	originalSpline: SketchSpline,
@@ -680,38 +723,21 @@ function replaceSplineWithInterval(
 	const subSegments = extractSplineInterval(curve.bezierSegments, uA, uB);
 	if (subSegments.length === 0) return;
 
-	const M = subSegments.length;
-	const rawPoints: Vec2[] = [];
-	const rawHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
-
-	for (let j = 0; j <= M; j++) {
-		if (j === 0) {
-			const p0 = subSegments[0][0];
-			rawPoints.push(p0);
-			const v = new Vec2().subVectors(subSegments[0][1], p0);
-			rawHandles.push({
-				h1: new Vec2().subVectors(p0, v),
-				h2: new Vec2().addVectors(p0, v),
-			});
-		} else if (j === M) {
-			const pM = subSegments[M - 1][3];
-			rawPoints.push(pM);
-			const v = new Vec2().subVectors(pM, subSegments[M - 1][2]);
-			rawHandles.push({
-				h1: new Vec2().subVectors(pM, v),
-				h2: new Vec2().addVectors(pM, v),
-			});
-		} else {
-			const pJ = subSegments[j][0];
-			rawPoints.push(pJ);
-			rawHandles.push({
-				h1: subSegments[j - 1][2],
-				h2: subSegments[j][1],
-			});
-		}
+	if (originalSpline.splineType === 'control') {
+		buildControlSplineInterval(
+			sketch,
+			originalSpline.pointIds,
+			subSegments,
+			startPointId,
+			endPointId,
+			originalSpline.isConstruction
+		);
+		return;
 	}
 
-	// Filter any degenerate segments (points closer than POINT_TOLERANCE)
+	const { rawPoints, rawHandles } = extractFitSplineIntervalHandles(subSegments);
+
+	// Filter degenerate segments and duplicate consecutive IDs
 	const points: Vec2[] = [];
 	const handles: Array<{ h1: Vec2; h2: Vec2 }> = [];
 	for (let k = 0; k < rawPoints.length; k++) {
@@ -722,27 +748,7 @@ function replaceSplineWithInterval(
 	}
 	if (points.length < 2) return;
 
-	// Assign startPointId, matched intermediate IDs, and endPointId
-	const ptIds: string[] = [startPointId];
-	for (let k = 1; k < points.length - 1; k++) {
-		const pos = points[k];
-		let matchedId: string | null = null;
-		for (const pid of originalSpline.pointIds) {
-			const pt = sketch.points.get(pid);
-			if (pt && pos.distanceTo(pt) < 1e-2) {
-				matchedId = pid;
-				break;
-			}
-		}
-		if (!matchedId) {
-			const newPt = sketch.addPoint(pos);
-			matchedId = newPt.id;
-		}
-		ptIds.push(matchedId);
-	}
-	ptIds.push(endPointId);
-
-	// Deduplicate consecutive identical IDs if any
+	const ptIds = mapSplineIntervalPointIds(sketch, originalSpline.pointIds, points, startPointId, endPointId);
 	const cleanPtIds: string[] = [];
 	const cleanHandles: Array<{ h1: Vec2; h2: Vec2 }> = [];
 	for (let k = 0; k < ptIds.length; k++) {
@@ -752,44 +758,7 @@ function replaceSplineWithInterval(
 		}
 	}
 
-	if (cleanPtIds.length < 2) return;
-
-	if (originalSpline.splineType === 'control') {
-		const controlRawPoints: Vec2[] = [subSegments[0][0]];
-		for (let s = 0; s < M; s++) {
-			controlRawPoints.push(subSegments[s][1]);
-			controlRawPoints.push(subSegments[s][2]);
-			controlRawPoints.push(subSegments[s][3]);
-		}
-
-		const controlPtIds: string[] = [startPointId];
-		for (let k = 1; k < controlRawPoints.length - 1; k++) {
-			const pos = controlRawPoints[k];
-			let matchedId: string | null = null;
-			for (const pid of originalSpline.pointIds) {
-				const pt = sketch.points.get(pid);
-				if (pt && pos.distanceTo(pt) < 1e-2) {
-					matchedId = pid;
-					break;
-				}
-			}
-			if (!matchedId) {
-				const newPt = sketch.addPoint(pos);
-				matchedId = newPt.id;
-			}
-			controlPtIds.push(matchedId);
-		}
-		controlPtIds.push(endPointId);
-
-		const knots: number[] = [0, 0, 0, 0];
-		for (let i = 1; i < M; i++) knots.push(i, i, i);
-		knots.push(M, M, M, M);
-
-		sketch.addControlSpline(controlPtIds, originalSpline.isConstruction, undefined, false, knots);
-		return;
-	}
-
-	if (originalSpline.splineType === 'fit') {
+	if (cleanPtIds.length >= 2 && originalSpline.splineType === 'fit') {
 		sketch.addFitSpline(cleanPtIds, undefined, originalSpline.isConstruction, undefined, false, cleanHandles);
 	}
 }
