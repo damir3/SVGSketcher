@@ -1,6 +1,7 @@
 //! Native residuals and Jacobians. Tags and reference order match nativeConstraints.ts.
 use crate::matrix::SparseRows;
 use crate::solver::Evaluation;
+mod dependency;
 mod splines;
 
 struct Ref {

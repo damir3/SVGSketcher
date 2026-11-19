@@ -79,7 +79,7 @@ const classes = new Set<Function>([
 ]);
 const isAxis = (id: string) => id === 'axis_x' || id === 'axis_y';
 
-function describe(c: IConstraint): Description | Description[] | null {
+export function describeNativeConstraint(c: IConstraint): Description | Description[] | null {
 	const constructor = c.constructor as Function & { prototype: IConstraint };
 	// Overridden methods and custom/subclassed constraints retain their JS semantics.
 	if (
@@ -304,7 +304,8 @@ function describe(c: IConstraint): Description | Description[] | null {
 export function compileNativeConstraints(
 	constraints: IConstraint[],
 	values: ReadonlyMap<string, number>,
-	indices: ReadonlyMap<string, number>
+	indices: ReadonlyMap<string, number>,
+	descriptions?: ReadonlyMap<IConstraint, Description | Description[] | null>
 ): CompiledConstraints {
 	const data: number[] = [],
 		fallbackAll: ConstraintRow[] = [],
@@ -314,7 +315,7 @@ export function compileNativeConstraints(
 		nativeCount = 0;
 	for (const constraint of constraints) {
 		if (constraint.isReference) continue;
-		const description = describe(constraint);
+		const description = descriptions?.get(constraint) ?? describeNativeConstraint(constraint);
 		const count = constraint.getEquationsCount();
 		const parts = Array.isArray(description) ? description : description ? [description] : null;
 		const records: number[][] = [];
@@ -338,10 +339,13 @@ export function compileNativeConstraints(
 				part.a,
 				part.b,
 				part.refs.length,
-				...part.refs.flatMap(ref =>
-					ref.id === null ? [-1, ref.fallback] : [indices.get(ref.id) ?? -1, values.get(ref.id) ?? ref.fallback]
-				),
 			];
+			for (const ref of part.refs) {
+				record.push(
+					ref.id === null ? -1 : (indices.get(ref.id) ?? -1),
+					ref.id === null ? ref.fallback : (values.get(ref.id) ?? ref.fallback)
+				);
+			}
 			offset += part.equations ?? count;
 			records.push(record);
 			return record.every(Number.isFinite);

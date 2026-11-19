@@ -132,6 +132,7 @@ it('validates the numerical solver packed result before exposing it to the model
 			topology_queries: () => new Float64Array(),
 			text_geometry: () => new Float64Array(),
 			construct_geometry: () => new Float64Array(),
+			constraint_dependency: () => new Float64Array(),
 			solve_system: () => new Float64Array(data),
 		});
 		assert.throws(() => kernel.solveSystem!(simpleProblem(), evaluateSimple), /WASM solver/);

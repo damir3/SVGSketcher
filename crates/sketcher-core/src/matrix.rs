@@ -281,9 +281,23 @@ pub(super) fn solve_linear_system(matrix: &[f64], rhs: &[f64]) -> Option<Vec<f64
 }
 
 pub(super) fn analyze_nullspace_sparse(
-    mut a_rows: Vec<Vec<(usize, f64)>>,
+    a_rows: Vec<Vec<(usize, f64)>>,
     cols: usize,
     tolerance: f64,
+) -> (usize, Vec<usize>) {
+    analyze_sparse(a_rows, cols, tolerance, true)
+}
+
+/// Dependency analysis needs only the rank, without solving for fixed columns of the nullspace.
+pub(crate) fn sparse_rank(a_rows: SparseRows, cols: usize, tolerance: f64) -> usize {
+    analyze_sparse(a_rows, cols, tolerance, false).0
+}
+
+fn analyze_sparse(
+    mut a_rows: SparseRows,
+    cols: usize,
+    tolerance: f64,
+    fixed_columns: bool,
 ) -> (usize, Vec<usize>) {
     let rows = a_rows.len();
     let mut pivots = Vec::new();
@@ -371,6 +385,9 @@ pub(super) fn analyze_nullspace_sparse(
         row += 1;
     }
     let rank = pivots.len();
+    if !fixed_columns {
+        return (rank, Vec::new());
+    }
     if rank == cols {
         return (rank, pivots);
     }
