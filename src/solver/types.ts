@@ -69,6 +69,9 @@ export interface IConstraint extends IInspectable {
 	weight: number;
 	isSoft?: boolean;
 	isDimensional?: boolean;
+	/** A measured dimension that never contributes equations or moves geometry. */
+	isReference?: boolean;
+	updateReferenceValue?(paramMap: Map<string, number>, sketch?: SketchDocument): void;
 	value?: number;
 	expression?: string;
 	entityIds: string[];
@@ -76,6 +79,8 @@ export interface IConstraint extends IInspectable {
 	getEquationsCount(): number;
 	evaluate(paramMap: Map<string, number>): number[];
 	jacobian(paramIndices: Map<string, number>, baseRow: number, paramMap: Map<string, number>): JacobianEntry[];
+	/** Verify the geometric meaning when small residuals alone can hide a degenerate solution. */
+	isSatisfied?(paramMap: Map<string, number>): boolean;
 	/** Move a dimension label using a canvas position in screen pixels. */
 	moveLabelTo?(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void;
 	/** Screen position for opening the dimension editor on this constraint. */

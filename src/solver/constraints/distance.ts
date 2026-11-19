@@ -68,6 +68,7 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	get displayName(): string {
+		if (this.isReference) return 'Reference Distance';
 		if (this.circleIds) return 'Radial Distance';
 		if (this.p1Id === 'origin')
 			return this.orientation === 'horizontal'
@@ -83,10 +84,12 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
+		if (this.isReference) return 0;
 		return this.circleIds && this.p1Id !== this.p2Id ? 3 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.isReference) return [];
 		if (this.circleIds) {
 			const [a, b] = this.circleIds.map(id => paramMap.get(`${id}.r`) ?? 0);
 			const residuals = [(Math.abs(b - a) - this.targetDistance) * this.weight];
@@ -123,6 +126,7 @@ export class DistanceConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
+		if (this.isReference) return [];
 		const res: JacobianEntry[] = [];
 		if (this.circleIds) {
 			const [a, b] = this.circleIds;
@@ -169,6 +173,22 @@ export class DistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
+	updateReferenceValue(paramMap: Map<string, number>): void {
+		if (!this.isReference) return;
+		const p1 = readParamPoint(paramMap, this.p1Id);
+		const p2 = readParamPoint(paramMap, this.p2Id);
+		this.targetDistance = this.circleIds
+			? Math.abs((paramMap.get(`${this.circleIds[1]}.r`) ?? 0) - (paramMap.get(`${this.circleIds[0]}.r`) ?? 0))
+			: this.orientation === 'horizontal'
+				? Math.abs(p2.x - p1.x)
+				: this.orientation === 'vertical'
+					? Math.abs(p2.y - p1.y)
+					: p1.distanceTo(p2);
+		this.value = this.targetDistance;
+		this.name = this.displayName;
+		this.expression = undefined;
+	}
+
 	private dimensionPoints(sketch: SketchDocument): [Vec2 | undefined, Vec2 | undefined] {
 		const p1 = sketch.points.get(this.p1Id);
 		const p2 = sketch.points.get(this.p2Id);
@@ -212,7 +232,7 @@ export class DistanceConstraint extends BaseConstraint {
 	private axisDimension(): PointToLineDistanceConstraint | undefined {
 		if (this.p1Id !== 'origin' || this.orientation === 'aligned') return undefined;
 		const axis = this.orientation === 'vertical' ? 'axis_x' : 'axis_y';
-		return new PointToLineDistanceConstraint(
+		const dimension = new PointToLineDistanceConstraint(
 			this.id,
 			this.p2Id,
 			axis,
@@ -224,6 +244,8 @@ export class DistanceConstraint extends BaseConstraint {
 			this.offset,
 			this.labelPosition
 		);
+		dimension.isReference = this.isReference;
+		return dimension;
 	}
 
 	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
@@ -333,13 +355,16 @@ export class DistanceConstraint extends BaseConstraint {
 		isSelected = false,
 		renderVisual = renderLinearDimensionVisual
 	): void {
+		this.updateReferenceValue(sketch.paramManager.getCurrentValues());
 		const visual = this.resolveDimensionVisual(sketch, viewport);
 		if (!visual) return;
 
 		renderVisual({
 			d1: visual.geom.d1,
 			d2: visual.geom.d2,
-			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
+			label: this.isReference
+				? `(${formatDimensionValue(this.targetDistance)})`
+				: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
 			extensionLines: visual.geom.extensionLines,
 			arcExtensions: visual.arcExtensions,
 			parent: targetGroup,
@@ -368,6 +393,9 @@ export class DistanceConstraint extends BaseConstraint {
 			dimension: {
 				label: 'Distance',
 				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+				isDisabled: () => !!this.isReference,
+				disabledContent: () =>
+					`<div class="inspector-row"><span>Reference</span><strong>(${formatDimensionValue(this.targetDistance)}) mm</strong></div>`,
 			},
 		});
 	}

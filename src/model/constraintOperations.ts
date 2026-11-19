@@ -55,8 +55,7 @@ export function addUniqueConstraint<T extends IConstraint>(
 	const existing = findConstraint(sketch, Ctor, predicate);
 	if (existing) return onExisting === 'return' ? existing : null;
 	const c = create();
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 function addOrientationConstraint<T extends HorizontalConstraint | VerticalConstraint>(
@@ -65,13 +64,13 @@ function addOrientationConstraint<T extends HorizontalConstraint | VerticalConst
 	prefix: string,
 	p1Id: string,
 	p2Id: string
-): T {
+): T | null {
 	return addUniqueConstraint(
 		sketch,
 		Ctor,
 		c => matchesEndpoints(c.p1Id, c.p2Id, p1Id, p2Id),
 		() => new Ctor(sketch.nextId(prefix), p1Id, p2Id)
-	)!;
+	);
 }
 
 function matchesLinePair(a1: string, a2: string, b1: string, b2: string, l1: SketchLine, l2: SketchLine): boolean {
@@ -144,10 +143,8 @@ function hasConstraintEntity(sketch: SketchDocument, id: string): boolean {
 	return !!sketch.points.get(id) || !!sketch.getLine(id) || sketch.hasOwnPrimitive(id);
 }
 
-export function addConstraint(sketch: SketchDocument, constraint: IConstraint): void {
-	sketch.pushHistory();
-	sketch.constraints.set(constraint.id, constraint);
-	sketch.solve();
+export function addConstraint(sketch: SketchDocument, constraint: IConstraint): boolean {
+	return sketch.solverCoordinator.addConstraint(constraint);
 }
 
 export function removeConstraint(sketch: SketchDocument, id: string): void {
@@ -288,11 +285,15 @@ export function addOriginCoincidentConstraint(sketch: SketchDocument, pointId: s
 	);
 }
 
-export function addHorizontalConstraint(sketch: SketchDocument, p1Id: string, p2Id: string): HorizontalConstraint {
+export function addHorizontalConstraint(
+	sketch: SketchDocument,
+	p1Id: string,
+	p2Id: string
+): HorizontalConstraint | null {
 	return addOrientationConstraint(sketch, HorizontalConstraint, 'c_horiz', p1Id, p2Id);
 }
 
-export function addVerticalConstraint(sketch: SketchDocument, p1Id: string, p2Id: string): VerticalConstraint {
+export function addVerticalConstraint(sketch: SketchDocument, p1Id: string, p2Id: string): VerticalConstraint | null {
 	return addOrientationConstraint(sketch, VerticalConstraint, 'c_vert', p1Id, p2Id);
 }
 
@@ -313,13 +314,13 @@ export function addEqualRadiusConstraint(
 	sketch: SketchDocument,
 	circle1Id: string,
 	circle2Id: string
-): EqualRadiusConstraint {
+): EqualRadiusConstraint | null {
 	return addUniqueConstraint(
 		sketch,
 		EqualRadiusConstraint,
 		c => matchesEndpoints(c.circle1Id, c.circle2Id, circle1Id, circle2Id),
 		() => new EqualRadiusConstraint(sketch.nextId('c_eqrad'), circle1Id, circle2Id)
-	)!;
+	);
 }
 
 export function addParallelConstraint(
@@ -718,8 +719,7 @@ export function addTangentConstraint(
 			1.0,
 			sharedPointId
 		);
-		addConstraint(sketch, c);
-		return c;
+		return addConstraint(sketch, c) ? c : null;
 	}
 
 	return null;
@@ -744,8 +744,7 @@ export function addConcentricConstraint(
 	if (!circ1 || !circ2) return null;
 
 	const c = new ConcentricConstraint(sketch.nextId('c_concen'), circ1.centerId, circ2.centerId);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 export function addMidpointConstraint(

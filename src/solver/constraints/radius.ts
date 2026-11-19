@@ -44,10 +44,11 @@ export class RadiusConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
-		return 1;
+		return this.isReference ? 0 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.isReference) return [];
 		const r = paramMap.get(`${this.circleId}.r`) ?? this.targetRadius;
 		return [(r - this.targetRadius) * this.weight];
 	}
@@ -57,12 +58,22 @@ export class RadiusConstraint extends BaseConstraint {
 		baseRow: number,
 		_paramMap: Map<string, number>
 	): JacobianEntry[] {
+		if (this.isReference) return [];
 		const res: JacobianEntry[] = [];
 		this.addJacobianEntry(res, paramIndices, `${this.circleId}.r`, baseRow, this.weight);
 		return res;
 	}
 
+	updateReferenceValue(paramMap: Map<string, number>): void {
+		if (!this.isReference) return;
+		this.targetRadius = paramMap.get(`${this.circleId}.r`) ?? 0;
+		this.value = this.targetRadius;
+		this.name = this.displayMode === 'diameter' ? 'Reference Diameter' : 'Reference Radius';
+		this.expression = undefined;
+	}
+
 	private getLayout(sketch: SketchDocument, viewport: Viewport, labelTarget?: Vec2) {
+		this.updateReferenceValue(sketch.paramManager.getCurrentValues());
 		const arc = sketch.arcs.get(this.circleId);
 		const entity = sketch.circles.get(this.circleId) ?? arc;
 		const center = entity && sketch.points.get(entity.centerId);
@@ -109,7 +120,9 @@ export class RadiusConstraint extends BaseConstraint {
 		const num = isDiameter ? this.targetRadius * 2 : this.targetRadius;
 		const numStr = formatDimensionValue(num);
 		const prefix = this.expression ? 'fx: ' : '';
-		const text = `${prefix}${isDiameter ? 'Ø' : 'R'}${numStr}`;
+		const text = this.isReference
+			? `(${isDiameter ? 'Ø' : 'R'}${numStr})`
+			: `${prefix}${isDiameter ? 'Ø' : 'R'}${numStr}`;
 		const labelSize = new Vec2(text.length * 8 + 14, LABEL_HEIGHT);
 
 		let offset =
@@ -327,7 +340,7 @@ export class RadiusConstraint extends BaseConstraint {
 	protected override createSidebarPanel(): ConstraintPanel {
 		return new ConstraintPanel({
 			constraint: this,
-			title: () => (this.displayMode === 'diameter' ? 'Diameter' : 'Radius'),
+			title: () => `${this.isReference ? 'Reference ' : ''}${this.displayMode === 'diameter' ? 'Diameter' : 'Radius'}`,
 			segmentedControls: [
 				{
 					label: 'Mode',
@@ -338,6 +351,12 @@ export class RadiusConstraint extends BaseConstraint {
 					getCurrent: () => this.displayMode ?? 'radius',
 					onSelect: (mode, context) => {
 						context.sketch.pushHistory();
+						if (this.isReference) {
+							this.displayMode = mode as 'radius' | 'diameter';
+							context.sketch.notify();
+							context.requestRender?.();
+							return;
+						}
 						const val = mode === 'diameter' ? this.targetRadius * 2 : this.targetRadius;
 						context.sketch.updateDimensionalConstraint(this.id, val, mode as any);
 						context.requestRender?.();
@@ -348,6 +367,9 @@ export class RadiusConstraint extends BaseConstraint {
 				label: () => (this.displayMode === 'diameter' ? 'Diameter' : 'Radius'),
 				getValue: () =>
 					`${this.displayMode === 'diameter' ? Number((this.targetRadius * 2).toFixed(2)) : Number(this.targetRadius.toFixed(2))} mm`,
+				isDisabled: () => !!this.isReference,
+				disabledContent: () =>
+					`<div class="inspector-row"><span>Reference</span><strong>(${this.displayMode === 'diameter' ? 'Ø' : 'R'}${formatDimensionValue(this.targetRadius * (this.displayMode === 'diameter' ? 2 : 1))}) mm</strong></div>`,
 			},
 		});
 	}

@@ -2,7 +2,7 @@
   "coordinateTolerance": 1e-8,
   "coordinateToleranceReason": "Finite differences amplify floating-point rounding differences between JavaScript Math.hypot and Rust hypot in under-constrained systems. Status, iteration counts, setter writes, DoF and errors retain the existing strict checks.",
   "sourceSha256": {
-    "src/solver/constraints/angle.ts": "4950381d20d8ee5138a280587d58d553a0b533219ccef25462a9d76bc2afeceb",
+    "src/solver/constraints/angle.ts": "39c0ae5632c07a99a2520951aeb5f181b7be9ba9ec19b4db17177ea8a94244d6",
     "src/solver/constraints/tangentLineCircle.ts": "f0f721a73d31aecfab04a82d0527659d8ed81bf97b54b88bf14ffb881b8884b9",
     "src/solver/constraints/tangentCircleCircle.ts": "7f1f1fcc259a0f5293bb38232f6b684a55d138d22e26f1e47dac5f921dde6e7f",
     "src/solver/constraints/ellipseAxis.ts": "32eda10b01457b9ffc8b2bfd53fbf4dbd24aff8aa8b2501b00946bc4e7fb3438",
@@ -92,7 +92,7 @@
         "status": "UNDER_CONSTRAINED",
         "iterations": 3,
         "initialError": 2.0833320986915367,
-        "finalError": 5.20099966500792e-20,
+        "finalError": 5.2617879508516135e-20,
         "degreesOfFreedom": 1,
         "constrainedParams": [
           "a.x",
@@ -117,8 +117,8 @@
           "b.y": 0,
           "c.x": 2,
           "c.y": 1,
-          "d.x": 9.642428282723738,
-          "d.y": 8.642428282249911
+          "d.x": 9.642428157393917,
+          "d.y": 8.642428156917328
         },
         "writes": 6
       }
@@ -195,7 +195,7 @@
         "status": "UNDER_CONSTRAINED",
         "iterations": 3,
         "initialError": 47.007685902179865,
-        "finalError": 1.1446351802963834e-20,
+        "finalError": 1.1446432322691957e-20,
         "degreesOfFreedom": 5,
         "constrainedParams": [
           "axis_x.x",
@@ -216,8 +216,8 @@
           "b.y": 0,
           "c.x": 2,
           "c.y": 1,
-          "d.x": -0.39711431837390904,
-          "d.y": 5.151923791277056
+          "d.x": -0.3971143168987656,
+          "d.y": 5.1519237887220335
         },
         "writes": 18
       }
@@ -931,7 +931,7 @@
         "status": "UNDER_CONSTRAINED",
         "iterations": 4,
         "initialError": 39.65567797676425,
-        "finalError": 1.7696575073511332e-17,
+        "finalError": 1.7692758362516673e-17,
         "degreesOfFreedom": 3,
         "constrainedParams": [
           "a.x",
@@ -951,10 +951,10 @@
           "a.y": 0,
           "b.x": 10,
           "b.y": 0,
-          "c.x": 5.994489550572742,
-          "c.y": 0.25708963218498654,
-          "d.x": 2.77459862281774,
-          "d.y": 5.3199250495001715,
+          "c.x": 5.994489585903583,
+          "c.y": 0.2570888083829585,
+          "d.x": 2.7745993538752374,
+          "d.y": 5.319924668218162,
           "arc.r": 6
         },
         "writes": 24

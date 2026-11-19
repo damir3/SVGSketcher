@@ -40,6 +40,7 @@ interface ConstraintSnapshotBase {
 	weight: number;
 	isSoft?: boolean;
 	isDimensional?: boolean;
+	isReference?: boolean;
 	value?: number;
 	expression?: string;
 }

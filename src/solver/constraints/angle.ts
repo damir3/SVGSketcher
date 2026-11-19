@@ -2,7 +2,7 @@ import { formatDimensionValue, renderAngleDimensionVisual } from '../../canvas/d
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
 import type { JacobianEntry } from '../types';
-import { BaseConstraint, computeNumericJacobianForEquation, readParamPoint } from './base';
+import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
 import { LABEL_DISTANCE_PX, LINE_DISTANCE_PX } from '../../canvas/distances';
@@ -69,10 +69,11 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
-		return 1;
+		return this.isReference ? 0 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.isReference) return [];
 		const isAxis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
 		const isAxis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
 
@@ -104,7 +105,76 @@ export class AngleConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
-		return computeNumericJacobianForEquation(this, paramIndices, baseRow, 0, paramMap);
+		if (this.isReference) return [];
+		const d1 = readParamPoint(paramMap, this.l1P2).sub(readParamPoint(paramMap, this.l1P1)).multiplyScalar(this.s1);
+		const d2 = readParamPoint(paramMap, this.l2P2).sub(readParamPoint(paramMap, this.l2P1)).multiplyScalar(this.s2);
+		const length1 = d1.length(),
+			length2 = d2.length();
+		const l1 = Math.max(length1, 1e-7),
+			l2 = Math.max(length2, 1e-7);
+		const u1 = d1.divideScalar(l1),
+			u2 = d2.divideScalar(l2);
+		const angle = (this.sign * this.targetAngle * Math.PI) / 180;
+		const rotated = u1.clone().rotateAround(ORIGIN, angle);
+		const cross = rotated.cross(u2);
+		const axis1 = this.line1Id === 'axis_x' || this.line1Id === 'axis_y';
+		const axis2 = this.line2Id === 'axis_x' || this.line2Id === 'axis_y';
+		const average = axis1 ? l2 : axis2 ? l1 : (l1 + l2) * 0.5;
+		const gradient = (u: Vec2, length: number, actualLength: number, g: Vec2, averageFactor: number) => {
+			if (actualLength > 1e-7) g.addScaledVector(u, -u.dot(g));
+			g.multiplyScalar(average / length);
+			if (actualLength > 1e-7) g.addScaledVector(u, cross * averageFactor);
+			return g.multiplyScalar(this.weight);
+		};
+		const g1 = gradient(
+			u1,
+			l1,
+			length1,
+			new Vec2(u2.y, -u2.x).rotateAround(ORIGIN, -angle),
+			axis1 ? 0 : axis2 ? 1 : 0.5
+		).multiplyScalar(this.s1);
+		const g2 = gradient(u2, l2, length2, new Vec2(-rotated.y, rotated.x), axis1 ? 1 : axis2 ? 0 : 0.5).multiplyScalar(
+			this.s2
+		);
+		const entries: JacobianEntry[] = [];
+		for (const [id, g, sign] of [
+			[this.l1P1, g1, -1],
+			[this.l1P2, g1, 1],
+			[this.l2P1, g2, -1],
+			[this.l2P2, g2, 1],
+		] as const) {
+			this.addJacobianEntry(entries, paramIndices, `${id}.x`, baseRow, g.x * sign);
+			this.addJacobianEntry(entries, paramIndices, `${id}.y`, baseRow, g.y * sign);
+		}
+		return entries;
+	}
+
+	isSatisfied(paramMap: Map<string, number>): boolean {
+		if (this.isReference) return true;
+		const dir1 = readParamPoint(paramMap, this.l1P2).sub(readParamPoint(paramMap, this.l1P1)).multiplyScalar(this.s1);
+		const dir2 = readParamPoint(paramMap, this.l2P2).sub(readParamPoint(paramMap, this.l2P1)).multiplyScalar(this.s2);
+		const length1 = dir1.length();
+		const length2 = dir2.length();
+		if (!Number.isFinite(length1) || !Number.isFinite(length2) || length1 === 0 || length2 === 0) return false;
+		const rotated = dir1.divideScalar(length1).rotateAround(ORIGIN, (this.sign * this.targetAngle * Math.PI) / 180);
+		const actual = dir2.divideScalar(length2);
+		// The weighted residual shrinks with the lines, even if their angle remains wrong.
+		const angularError = Math.atan2(rotated.cross(actual), rotated.dot(actual));
+		return Math.abs(angularError) <= 1e-3;
+	}
+
+	updateReferenceValue(paramMap: Map<string, number>, sketch?: SketchDocument): void {
+		if (!this.isReference) return;
+		const dir1 = readParamPoint(paramMap, this.l1P2).sub(readParamPoint(paramMap, this.l1P1)).multiplyScalar(this.s1);
+		const dir2 = readParamPoint(paramMap, this.l2P2).sub(readParamPoint(paramMap, this.l2P1)).multiplyScalar(this.s2);
+		const angle = Math.atan2(dir1.cross(dir2), dir1.dot(dir2));
+		const arc = this.line1Id === this.line2Id ? sketch?.arcs.get(this.line1Id) : undefined;
+		this.targetAngle = arc
+			? (((((angle * (arc.clockwise ? -1 : 1)) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) * 180) / Math.PI
+			: (Math.abs(angle) * 180) / Math.PI;
+		this.value = this.targetAngle;
+		this.name = 'Reference Angle';
+		this.expression = undefined;
 	}
 
 	private resolveLinePoints(sketch: SketchDocument) {
@@ -134,11 +204,17 @@ export class AngleConstraint extends BaseConstraint {
 			this.targetAngle = newAngle;
 			this.value = newAngle;
 			this.name = 'Angle';
-			sketch.solve();
+			if (this.isReference) {
+				this.updateReferenceValue(sketch.paramManager.getCurrentValues(), sketch);
+				sketch.notify();
+			} else {
+				sketch.solve();
+			}
 		}
 	}
 
 	private computeScreenArcLayout(sketch: SketchDocument, viewport: Viewport) {
+		this.updateReferenceValue(sketch.paramManager.getCurrentValues(), sketch);
 		const resolved = this.resolveLinePoints(sketch);
 		if (!resolved) return null;
 		const { p1, p2, p3, p4 } = resolved;
@@ -167,6 +243,8 @@ export class AngleConstraint extends BaseConstraint {
 		let delta = a2 - a1;
 		while (delta > Math.PI) delta -= TWO_PI;
 		while (delta < -Math.PI) delta += TWO_PI;
+		const arc = this.line1Id === this.line2Id ? sketch.arcs.get(this.line1Id) : undefined;
+		if (this.isReference && arc) delta = ((arc.clockwise ? 1 : -1) * this.targetAngle * Math.PI) / 180;
 
 		const rWorld = this.arcRadius ?? 40;
 		const rScreen = Math.max(28, rWorld * viewport.zoom);
@@ -181,6 +259,7 @@ export class AngleConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
+		this.updateReferenceValue(ctx.sketch.paramManager.getCurrentValues(), ctx.sketch);
 		const layout = this.computeScreenArcLayout(ctx.sketch, ctx.viewport);
 		if (!layout) return;
 		const { p1, p2, p3, p4, sCenter, a1, a2, delta, rScreen } = layout;
@@ -210,7 +289,9 @@ export class AngleConstraint extends BaseConstraint {
 			a2,
 			delta,
 			rScreen,
-			label: `${prefix}${formatDimensionValue(this.targetAngle, 1)}°`,
+			label: this.isReference
+				? `(${formatDimensionValue(this.targetAngle, 1)}°)`
+				: `${prefix}${formatDimensionValue(this.targetAngle, 1)}°`,
 			isSelected: ctx.isSelected,
 			constraintId: this.id,
 			extensionLines,
@@ -242,10 +323,13 @@ export class AngleConstraint extends BaseConstraint {
 	protected override createSidebarPanel(): ConstraintPanel {
 		return new ConstraintPanel({
 			constraint: this,
-			title: 'Angle',
+			title: () => (this.isReference ? 'Reference Angle' : 'Angle'),
 			dimension: {
 				label: 'Angle',
 				getValue: () => `${Number(this.targetAngle.toFixed(2))}°`,
+				isDisabled: () => !!this.isReference,
+				disabledContent: () =>
+					`<div class="inspector-row"><span>Reference</span><strong>(${formatDimensionValue(this.targetAngle, 1)}°)</strong></div>`,
 			},
 		});
 	}

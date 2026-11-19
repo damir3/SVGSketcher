@@ -195,6 +195,12 @@ function initApp(): void {
 
 	// Initialization of Architecture
 	const sketch = new SketchDocument();
+	sketch.solverCoordinator.onConstraintRejected(() => {
+		queueMicrotask(() => showToast('Failed to solve'));
+	});
+	sketch.solverCoordinator.onReferenceCreated(() => {
+		queueMicrotask(() => showToast('Reference dimension created'));
+	});
 	const canvasRect = svg.getBoundingClientRect();
 	const viewport = new Viewport(canvasRect.width || 800, canvasRect.height || 600);
 	const renderer = new SVGRenderer(svg);
@@ -213,8 +219,9 @@ function initApp(): void {
 	});
 
 	// Connect callbacks
-	interaction.onEditDimension = (constraint, screenPos) => {
-		dimModal.open(constraint, screenPos);
+	interaction.onEditDimension = (constraint, screenPos, isNew) => {
+		dimModal.open(constraint, screenPos, isNew);
+		return isNew && !constraint.isReference;
 	};
 
 	sidebar.onEditDimension = (constraint, screenPos) => {

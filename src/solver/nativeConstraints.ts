@@ -201,7 +201,6 @@ function describe(c: IConstraint): Description | Description[] | null {
 			],
 			a: c.targetAngle,
 			b: isAxis(c.line1Id) ? 1 : isAxis(c.line2Id) ? 2 : 0,
-			numeric: true,
 		};
 	if (c instanceof TangentLineCircleConstraint)
 		return {
@@ -314,6 +313,7 @@ export function compileNativeConstraints(
 		hardRow = 0,
 		nativeCount = 0;
 	for (const constraint of constraints) {
+		if (constraint.isReference) continue;
 		const description = describe(constraint);
 		const count = constraint.getEquationsCount();
 		const parts = Array.isArray(description) ? description : description ? [description] : null;

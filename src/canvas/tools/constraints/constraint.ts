@@ -6,6 +6,7 @@ import { findAxisNear } from '../../hitTesting';
 import { BaseTool } from '../base';
 import type { ConstraintToolType, ToolContext, ToolMouseEvent, ToolType } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
+import { withDimensionCreation } from './dimensionCreation';
 
 const COMPATIBLE_ENTITY_TYPES: Record<string, ReadonlySet<string>> = {
 	fixed: new Set(['point']),
@@ -514,6 +515,38 @@ export class ConstraintTool extends BaseTool {
 
 	static applyConstraintToSelection(
 		type: string,
+		opts: Parameters<typeof ConstraintTool.applyConstraintToSelectionUnchecked>[1]
+	): boolean {
+		let rejected = false;
+		const unsubscribe = opts.sketch.solverCoordinator.onConstraintRejected(() => {
+			rejected = true;
+		});
+		try {
+			const apply = (onEditDimension: ToolContext['onEditDimension']) =>
+				ConstraintTool.applyConstraintToSelectionUnchecked(type, {
+					...opts,
+					onEditDimension,
+					showToast: message => {
+						if (!rejected) opts.showToast(message);
+					},
+				});
+			const applied =
+				type === 'distance' || type === 'dimension'
+					? withDimensionCreation(opts.sketch, opts.onEditDimension, apply)
+					: apply(opts.onEditDimension);
+			if (rejected) {
+				opts.showToast('Failed to solve');
+				opts.requestRender?.();
+				return false;
+			}
+			return applied;
+		} finally {
+			unsubscribe();
+		}
+	}
+
+	private static applyConstraintToSelectionUnchecked(
+		type: string,
 		opts: {
 			sketch: SketchDocument;
 			viewport?: Viewport;
@@ -521,7 +554,7 @@ export class ConstraintTool extends BaseTool {
 			showToast: (msg: string) => void;
 			requestRender?: () => void;
 			setTool?: (tool: ToolType) => void;
-			onEditDimension?: (constraint: any, screenPos: Vec2) => void;
+			onEditDimension?: ToolContext['onEditDimension'];
 		}
 	): boolean {
 		const { sketch } = opts;
@@ -533,12 +566,13 @@ export class ConstraintTool extends BaseTool {
 		const sIds = [...sel.splineIds];
 
 		let applied = false;
+		let referenceDimensionApplied = false;
 		let toastMsg = '';
 
 		const openDimensionEditor = (
-			c: { getLabelScreenPos?(sketch: SketchDocument, viewport: Viewport): Vec2 | null } | null
+			c: { isReference?: boolean; getLabelScreenPos?(sketch: SketchDocument, viewport: Viewport): Vec2 | null } | null
 		) => {
-			if (!c || !opts.onEditDimension || !opts.viewport || !opts.svg) return;
+			if (!c || c.isReference || !opts.onEditDimension || !opts.viewport || !opts.svg) return;
 			const s = c.getLabelScreenPos?.(sketch, opts.viewport);
 			if (!s) return;
 			const rect = opts.svg.getBoundingClientRect();
@@ -547,7 +581,8 @@ export class ConstraintTool extends BaseTool {
 		const applyDim = (c: any, appliedMsg: string, editingMsg?: string, existed = false) => {
 			if (!c) return;
 			applied = true;
-			toastMsg = existed && editingMsg ? editingMsg : appliedMsg;
+			referenceDimensionApplied = !!c.isReference;
+			toastMsg = c.isReference ? 'Reference dimension created' : existed && editingMsg ? editingMsg : appliedMsg;
 			openDimensionEditor(c);
 		};
 		const applyResult = (res: unknown, okMsg: string, failMsg?: string) => {
@@ -865,7 +900,7 @@ export class ConstraintTool extends BaseTool {
 
 		if (applied) {
 			if (toastMsg) opts.showToast(toastMsg);
-			sketch.solve();
+			if (!referenceDimensionApplied) sketch.solve();
 			opts.requestRender?.();
 		}
 

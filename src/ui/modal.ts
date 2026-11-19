@@ -22,6 +22,7 @@ export class DimensionModal {
 	private currentConstraint: EditableConstraint | null = null;
 	private currentMode: 'radius' | 'diameter' = 'radius';
 	private openedTime = 0;
+	private pendingCreation = false;
 
 	constructor(sketch: SketchDocument) {
 		this.sketch = sketch;
@@ -33,8 +34,11 @@ export class DimensionModal {
 		this.bindEvents();
 	}
 
-	open(constraint: EditableConstraint, screenPos?: Vec2): void {
+	open(constraint: EditableConstraint, screenPos?: Vec2, isNew = false): void {
+		if (this.currentConstraint) this.close();
+		if ('isReference' in constraint && constraint.isReference) return;
 		this.currentConstraint = constraint;
+		this.pendingCreation = isNew;
 		this.openedTime = performance.now();
 
 		const isDistance = 'targetDistance' in constraint;
@@ -191,6 +195,10 @@ export class DimensionModal {
 	close(): void {
 		this.modalEl.classList.add('hidden');
 		this.currentConstraint = null;
+		if (this.pendingCreation) {
+			this.pendingCreation = false;
+			this.sketch.commitTransaction();
+		}
 	}
 
 	private apply(): void {
@@ -202,9 +210,28 @@ export class DimensionModal {
 		const text = input.value.trim();
 		const evalRes = this.sketch.evaluateExpression(text);
 		if (evalRes.isValid && evalRes.value !== undefined && Number.isFinite(evalRes.value) && evalRes.value > 0) {
-			this.sketch.pushHistory();
-			this.sketch.updateDimensionalConstraint(this.currentConstraint.id, text, this.currentMode);
-			this.close();
+			if (this.sketch.updateDimensionalConstraint(this.currentConstraint.id, text, this.currentMode)) {
+				if (this.pendingCreation && this.currentConstraint.isReference) {
+					this.sketch.restoreReferenceCreation(this.currentConstraint);
+				}
+				this.close();
+			} else {
+				if (this.pendingCreation) {
+					this.pendingCreation = false;
+					this.sketch.rollbackTransaction();
+					this.close();
+					return;
+				}
+				const wrapper = this.modalEl.querySelector<HTMLElement>('.dim-input-wrapper');
+				wrapper?.classList.add('error');
+				const previewEl = this.modalEl.querySelector<HTMLElement>('#dim-eval-preview');
+				if (previewEl) {
+					previewEl.textContent = 'Failed to solve';
+					previewEl.classList.remove('hidden');
+					previewEl.classList.add('error');
+				}
+				this.focusAndSelect();
+			}
 		} else {
 			// Do not close if expression is invalid; show error in UI
 			const wrapper = this.modalEl.querySelector<HTMLElement>('.dim-input-wrapper');

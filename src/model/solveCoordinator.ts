@@ -1,4 +1,7 @@
 import type { SketchDocument } from './sketch';
+import type { SketchSnapshot } from './history';
+import { serializeConstraint } from '../solver/constraints/serialization';
+import { isDependentDimension } from '../solver/constraintDependency';
 import { getRadial } from './constraintOperations';
 import { syncOffsetSources } from './offsetSync';
 import { prepareSplineConstraints } from './splineOperations';
@@ -30,9 +33,96 @@ export class SolveCoordinator {
 	lastSolveTimeMs = 0;
 
 	private solveDeferred = 0;
+	private solveSuppressed = 0;
+	private pendingConstraints = new Map<string, IConstraint | undefined>();
+	private pendingConstraintSnapshot: SketchSnapshot | null = null;
+	private pendingConstraintRestores = new Map<string, () => void>();
+	private pendingEditValues: Map<string, number> | null = null;
+	private constraintRejectedListeners = new Set<() => void>();
+	private referenceCreatedListeners = new Set<() => void>();
 	private stableCenterEditDepth = 0;
 	private preserveCentersOnNextSolve = false;
 
+	onConstraintRejected(listener: () => void): () => void {
+		this.constraintRejectedListeners.add(listener);
+		return () => this.constraintRejectedListeners.delete(listener);
+	}
+
+	onReferenceCreated(listener: () => void): () => void {
+		this.referenceCreatedListeners.add(listener);
+		return () => this.referenceCreatedListeners.delete(listener);
+	}
+
+	refreshReferenceDimensions(): void {
+		const references = [...this.sketch.constraints.values()].filter(c => c.isReference);
+		if (!references.length) return;
+		const values = this.paramManager.getCurrentValues();
+		for (const c of references) c.updateReferenceValue?.(values, this.sketch);
+	}
+
+	addConstraint(constraint: IConstraint): boolean {
+		if (this.solveSuppressed > 0) {
+			this.sketch.constraints.set(constraint.id, constraint);
+			return true;
+		}
+		const referenceDetected =
+			!constraint.isReference &&
+			!this.sketch.constraints.has(constraint.id) &&
+			this.solveDeferred === 0 &&
+			isDependentDimension(this.paramManager, this.sketch.constraints.values(), constraint, this.sketch);
+		if (referenceDetected) constraint.isReference = true;
+		if (constraint.isReference) {
+			this.sketch.pushHistory();
+			this.sketch.constraints.set(constraint.id, constraint);
+			this.sketch.notify();
+			if (referenceDetected) for (const listener of this.referenceCreatedListeners) listener();
+			return true;
+		}
+		if (!this.pendingConstraints.size && !this.sketch.isInTransaction()) {
+			this.pendingConstraintSnapshot = this.sketch.takeSnapshot();
+		}
+		if (!this.pendingConstraints.has(constraint.id)) {
+			this.pendingConstraints.set(constraint.id, this.sketch.constraints.get(constraint.id));
+		}
+		this.sketch.constraints.set(constraint.id, constraint);
+		this.solve();
+		return this.sketch.constraints.get(constraint.id) === constraint;
+	}
+
+	updateConstraint(constraint: IConstraint, edit: () => boolean, restoreScene?: () => void): boolean {
+		if (constraint.isReference) return false;
+		if (!this.pendingConstraints.size && !this.sketch.isInTransaction()) {
+			this.pendingConstraintSnapshot = this.sketch.takeSnapshot();
+		}
+		const before = serializeConstraint(constraint);
+		const initialValues = this.paramManager.getCurrentValues();
+		let rejected = false;
+		const restore = () => {
+			for (const key of Object.keys(constraint)) {
+				if (key !== 'sidebarPanel' && !(key in before)) delete (constraint as any)[key];
+			}
+			Object.assign(constraint, before);
+			restoreScene?.();
+			rejected = true;
+		};
+		if (!this.pendingConstraints.has(constraint.id)) {
+			this.pendingConstraints.set(constraint.id, constraint);
+			this.pendingConstraintRestores.set(constraint.id, restore);
+		}
+		this.pendingEditValues ??= initialValues;
+		if (!edit()) {
+			restore();
+			this.pendingConstraints.delete(constraint.id);
+			this.pendingConstraintRestores.delete(constraint.id);
+			if (!this.pendingConstraints.size) {
+				this.pendingConstraintSnapshot = null;
+				this.pendingEditValues = null;
+			}
+			return false;
+		}
+		this.solve();
+		return !rejected || !!constraint.isReference;
+	}
 	constructor(sketch: SketchDocument, solver?: NumericalSolver) {
 		this.sketch = sketch;
 		this.solver = solver ?? new NumericalSolver({ gradRelTolerance: 1e-6 });
@@ -44,10 +134,12 @@ export class SolveCoordinator {
 
 	runWithSuppressedSolve(fn: () => void): void {
 		this.solveDeferred++;
+		this.solveSuppressed++;
 		try {
 			fn();
 		} finally {
 			this.solveDeferred--;
+			this.solveSuppressed--;
 		}
 	}
 
@@ -95,7 +187,7 @@ export class SolveCoordinator {
 		locked = new Set<string>()
 	): Set<string> {
 		for (const c of constraints) {
-			if (!(c instanceof RadiusConstraint)) continue;
+			if (!(c instanceof RadiusConstraint) || c.isReference) continue;
 			const entity = getRadial(this.sketch, c.circleId);
 			if (!entity) continue;
 			entity.radius = Math.max(MIN_SOLVER_RADIUS, c.targetRadius);
@@ -220,16 +312,78 @@ export class SolveCoordinator {
 			);
 		}
 		const start = performance.now();
+		const pending = this.pendingConstraints;
+		const snapshot = this.pendingConstraintSnapshot;
+		const restores = this.pendingConstraintRestores;
+		const editValues = this.pendingEditValues;
+		this.pendingConstraints = new Map();
+		this.pendingConstraintSnapshot = null;
+		this.pendingConstraintRestores = new Map();
+		this.pendingEditValues = null;
+		const initialValues = pending.size ? this.paramManager.getCurrentValues() : null;
+		const automaticHandles = pending.size
+			? new Map([...this.sketch.lines.values()].map(line => [line, line.isAutomaticSplineHandle]))
+			: null;
 		const offsets = [...this.sketch.constraints.values()].filter(
-			(c): c is OffsetConstraint => c instanceof OffsetConstraint && !!c.sourceChain
+			(c): c is OffsetConstraint => c instanceof OffsetConstraint && !c.isReference && !!c.sourceChain
 		);
 		let res!: SolverResult;
+		let rejected = false;
+		let referenceCreated = false;
 		syncOffsetSources(this.sketch, offsets, () => {
 			res = this.solveConstraints(extraConstraints);
+			if (!pending.size) return;
+			// Solvers can skip residual evaluation when every parameter is fixed.
+			const values = this.paramManager.getCurrentValues();
+			const hardConstraints = [...this.sketch.constraints.values()].filter(c => !c.isSoft && !c.isReference);
+			const hardError = hardConstraints.reduce(
+				(sum, c) => sum + c.evaluate(values).reduce((error, r) => error + (r * r) / 2, 0),
+				0
+			);
+			const geometryValid = hardConstraints.every(c => !c.isSatisfied || c.isSatisfied(values));
+			if (res.status !== 'OVER_CONSTRAINED' && Number.isFinite(res.finalError) && hardError <= 1e-2 && geometryValid)
+				return;
+			let converted = 0;
+			for (const [id, previous] of pending) {
+				const candidate = this.sketch.constraints.get(id);
+				restores.get(id)?.();
+				if (candidate?.isDimensional && candidate.updateReferenceValue && (!previous || previous === candidate)) {
+					candidate.isReference = true;
+					candidate.expression = undefined;
+					this.sketch.constraints.set(id, candidate);
+					converted++;
+				} else if (previous) this.sketch.constraints.set(id, previous);
+				else this.sketch.constraints.delete(id);
+			}
+			rejected = converted !== pending.size;
+			referenceCreated = converted > 0;
+			pending.clear();
+			this.paramManager.restoreValues(initialValues!);
+			if (editValues) this.paramManager.restoreValues(editValues);
+			for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
+			res = this.solveConstraints(extraConstraints);
+			if (referenceCreated) {
+				// A measured dimension must preserve the geometry from before the trial.
+				this.paramManager.restoreValues(initialValues!);
+				if (editValues) this.paramManager.restoreValues(editValues);
+				for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
+			}
 		});
+		if (referenceCreated) {
+			this.paramManager.restoreValues(initialValues!);
+			if (editValues) this.paramManager.restoreValues(editValues);
+			for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
+		}
 		this.lastSolverResult = res;
 		this.lastSolveTimeMs = performance.now() - start;
-		this.sketch.notify();
+		if (!rejected && snapshot) this.sketch.pushSnapshot(snapshot);
+		else this.sketch.notify();
+		if (rejected) {
+			for (const listener of this.constraintRejectedListeners) listener();
+		}
+		if (referenceCreated) {
+			for (const listener of this.referenceCreatedListeners) listener();
+		}
 		return res;
 	}
 
@@ -424,7 +578,10 @@ export class SolveCoordinator {
 	getPointDragTarget(pointId: string, target: Vec2): Vec2 {
 		const onAxis = (axis: 'x' | 'y') => {
 			const c = this.sketch.getPointToAxisConstraint(pointId, axis);
-			return c instanceof PointOnLineConstraint || (c instanceof DistanceConstraint && c.targetDistance === 0);
+			return (
+				!c?.isReference &&
+				(c instanceof PointOnLineConstraint || (c instanceof DistanceConstraint && c.targetDistance === 0))
+			);
 		};
 		return new Vec2(onAxis('y') ? 0 : target.x, onAxis('x') ? 0 : target.y);
 	}

@@ -122,6 +122,7 @@ export class NumericalSolver {
 	}
 
 	solve(paramMgr: ParamManager, constraints: IConstraint[], callOptions: SolveCallOptions = {}): SolverResult {
+		constraints = constraints.filter(c => !c.isReference);
 		const kernel = getGeometryKernel();
 		if (kernel.solveSystem) {
 			return solveWithKernel(paramMgr, constraints, callOptions, this.options, (problem, evaluate) =>

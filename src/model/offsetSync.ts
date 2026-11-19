@@ -35,6 +35,7 @@ export function syncOffsetSources(sketch: SketchDocument, offsets: OffsetConstra
 }
 
 export function applyOffsetConstraintValue(sketch: SketchDocument, c: OffsetConstraint, newValue: number): boolean {
+	if (c.isReference) return false;
 	const value = Math.abs(newValue);
 	const geom = c.sourceChain
 		? calculateOffsetGeometry(sketch, c.sourceChain, c.direction || 'one_side', value, value, c.flip || false)
@@ -111,7 +112,7 @@ function refreshOffsetSources(sketch: SketchDocument, offsets: OffsetConstraint[
 	let changed = false;
 	sketch.runSilentDerivedUpdate(() => {
 		for (const c of offsets) {
-			if (sketch.constraints.get(c.id) !== c) continue;
+			if (c.isReference || sketch.constraints.get(c.id) !== c) continue;
 			const state = offsetSourceState(sketch, c);
 			const previous = offsetSourceStates.get(c);
 			if (

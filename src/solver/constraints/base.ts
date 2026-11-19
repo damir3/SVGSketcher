@@ -18,6 +18,7 @@ export class BaseConstraint implements IConstraint {
 	weight: number;
 	isSoft: boolean;
 	isDimensional: boolean;
+	declare isReference?: boolean;
 	value?: number;
 	expression?: string;
 	entityIds: string[];

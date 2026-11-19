@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
 import { Viewport } from '../src/canvas/viewport';
@@ -8,6 +9,82 @@ import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { AngleConstraint, PointToLineDistanceConstraint } from '../src/solver/constraints';
 import { deserializeConstraint, serializeConstraint } from '../src/solver/constraints/serialization';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../src/canvas/tools/types';
+
+function offsetRectangle() {
+	const sketch = new SketchDocument();
+	sketch.restoreSnapshot(
+		JSON.parse(readFileSync(new URL('./fixtures/offset-rectangle-reference-distance.json', import.meta.url), 'utf8'))
+	);
+	sketch.clearHistory();
+	return sketch;
+}
+
+for (const [source, child] of [
+	['Line-2', 'Line-5'],
+	['Line-3', 'Line-6'],
+	['Line-4', 'Line-7'],
+	['Line-1', 'Line-8'],
+]) {
+	for (const reversed of [false, true]) {
+		test(`offset line distance is reference before editing (${source}/${child}, reversed=${reversed})`, () => {
+			const sketch = offsetRectangle();
+			const before = sketch.paramManager.getCurrentValues();
+			const dof = sketch.lastSolverResult!.degreesOfFreedom;
+			const c = sketch.addLineToLineDistanceConstraint(reversed ? child : source, reversed ? source : child)!;
+			assert.equal(c.isReference, true);
+			assert.ok(Math.abs(c.targetDistance - 10) < 1e-6);
+			assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
+			assert.equal(sketch.lastSolverResult!.degreesOfFreedom, dof);
+			assert.equal(sketch.updateDimensionalConstraint(c.id, 20), false);
+		});
+	}
+}
+
+test('dependent offset distance skips the editor and supports undo/redo', () => {
+	const sketch = offsetRectangle();
+	const before = sketch.paramManager.getCurrentValues();
+	sketch.selectEntity('Line-4', 'line');
+	sketch.selectEntity('Line-7', 'line', true);
+	const messages: string[] = [];
+	assert.equal(
+		ConstraintTool.applyConstraintToSelection('distance', {
+			sketch,
+			viewport: new Viewport(800, 600),
+			svg: { getBoundingClientRect: () => ({ left: 0, top: 0 }) } as SVGSVGElement,
+			showToast: message => messages.push(message),
+			onEditDimension: () => assert.fail('reference distances must not open an editor'),
+		}),
+		true
+	);
+	assert.deepEqual(messages, ['Reference dimension created']);
+	assert.equal(sketch.getLineToLineDistanceConstraint('Line-4', 'Line-7')!.isReference, true);
+	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
+	assert.equal(sketch.undo(), true);
+	assert.equal(sketch.getLineToLineDistanceConstraint('Line-4', 'Line-7'), undefined);
+	assert.equal(sketch.canUndo(), false);
+	assert.equal(sketch.redo(), true);
+	assert.equal(sketch.getLineToLineDistanceConstraint('Line-4', 'Line-7')!.isReference, true);
+});
+
+test('independent source lengths on offset geometry remain driving', () => {
+	const sketch = offsetRectangle();
+	const c = sketch.addLineToLineDistanceConstraint('Line-4', 'Line-2', 60)!;
+	assert.ok(!c.isReference);
+	assert.equal(c.targetDistance, 60);
+	const line = sketch.lines.get('Line-4')!;
+	const length = sketch.addDistanceConstraint(line.p1Id, line.p2Id, 80)!;
+	assert.ok(!length.isReference);
+	assert.equal(length.targetDistance, 80);
+});
+
+test('reference line distance follows edits to the driving offset', () => {
+	const sketch = offsetRectangle();
+	const c = sketch.addLineToLineDistanceConstraint('Line-4', 'Line-7')!;
+	assert.equal(c.isReference, true);
+	assert.equal(sketch.updateDimensionalConstraint('c_offset-1', 20), true);
+	assert.ok(Math.abs(c.targetDistance - 20) < 1e-6);
+	assert.equal(c.isReference, true);
+});
 
 function scene(angle = 0, reversed = false, gap = 30) {
 	const sketch = new SketchDocument();

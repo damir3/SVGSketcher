@@ -147,8 +147,9 @@ export class CanvasInteraction implements SelectInteractionHost {
 			| AngleConstraint
 			| PointToLineDistanceConstraint
 			| OffsetConstraint,
-		screenPos: Vec2
-	) => void;
+		screenPos: Vec2,
+		isNew?: boolean
+	) => boolean | void;
 	onToolChange?: (tool: ToolType) => void;
 	onReplaceImage?: (id: string) => void;
 	onConstructionChange?: (isConstruction: boolean) => void;
@@ -228,7 +229,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 				this.svg.style.cursor = cursor;
 			},
 			showToast: (msg: string) => showToast(msg),
-			onEditDimension: (c, screenPos) => this.onEditDimension?.(c, screenPos),
+			onEditDimension: (c, screenPos, isNew) => this.onEditDimension?.(c, screenPos, isNew),
 			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
 				this.findSnap(screen, excludePointId, allowGrid),
 			findPointNear: (screen, thresholdPx) => findPointNear(this.sketch, this.viewport, screen, thresholdPx),

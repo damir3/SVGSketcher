@@ -313,6 +313,7 @@ export class SketchDocument {
 
 	notify(): void {
 		if (this.updatingOffsets) return;
+		this.solverCoordinator.refreshReferenceDimensions();
 		for (const listener of this.changeListeners) {
 			listener();
 		}
@@ -371,6 +372,17 @@ export class SketchDocument {
 			this.batchSnapshot = null;
 			this.restoreSnapshot(snap);
 		}
+	}
+
+	/** Discard the initial driving dimension's edits while retaining its measured replacement. */
+	restoreReferenceCreation(reference: IConstraint): void {
+		if (!this.batchSnapshot || !reference.isReference) return;
+		const snapshot = this.batchSnapshot;
+		this.runSilentDerivedUpdate(() => {
+			this.restoreSnapshot(snapshot);
+			this.constraints.set(reference.id, reference);
+		});
+		this.notify();
 	}
 
 	pushHistory(coalesce = true): void {
@@ -438,6 +450,7 @@ export class SketchDocument {
 	}
 
 	takeSnapshot(): SketchSnapshot {
+		this.solverCoordinator.refreshReferenceDimensions();
 		return {
 			points: [...this.points.values()].map(point => serializePrimitive(point)),
 			lines: [...this.lines.values()].map(line => serializePrimitive(line)),
@@ -746,8 +759,8 @@ export class SketchDocument {
 	}
 
 	// --- Constraint methods ---
-	addConstraint(constraint: IConstraint): void {
-		addConstraint(this, constraint);
+	addConstraint(constraint: IConstraint): boolean {
+		return addConstraint(this, constraint);
 	}
 
 	removeConstraint(id: string): void {
@@ -778,11 +791,11 @@ export class SketchDocument {
 		return addCoincidentConstraints(this, pointIds);
 	}
 
-	addHorizontalConstraint(p1Id: string, p2Id: string): HorizontalConstraint {
+	addHorizontalConstraint(p1Id: string, p2Id: string): HorizontalConstraint | null {
 		return addHorizontalConstraint(this, p1Id, p2Id);
 	}
 
-	addVerticalConstraint(p1Id: string, p2Id: string): VerticalConstraint {
+	addVerticalConstraint(p1Id: string, p2Id: string): VerticalConstraint | null {
 		return addVerticalConstraint(this, p1Id, p2Id);
 	}
 
@@ -997,7 +1010,7 @@ export class SketchDocument {
 		return addEqualLengthConstraint(this, line1Id, line2Id);
 	}
 
-	addEqualRadiusConstraint(circle1Id: string, circle2Id: string): EqualRadiusConstraint {
+	addEqualRadiusConstraint(circle1Id: string, circle2Id: string): EqualRadiusConstraint | null {
 		return addEqualRadiusConstraint(this, circle1Id, circle2Id);
 	}
 

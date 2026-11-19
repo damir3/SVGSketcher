@@ -133,7 +133,8 @@ export interface ToolContext {
 	showToast(message: string): void;
 
 	/** Dimension edit callback */
-	onEditDimension?(constraint: any, screenPos: Vec2): void;
+	/** Return true to own confirmation of a newly created dimension's transaction. */
+	onEditDimension?(constraint: any, screenPos: Vec2, isNew?: boolean): boolean | void;
 
 	/** Snapping helper */
 	findSnap(screen: Vec2, excludePointId?: string, allowGrid?: boolean): SnapResult | null;

@@ -115,6 +115,7 @@ export function setLineLength(sketch: SketchDocument, lineId: string, newLength:
 	for (const c of sketch.constraints.values()) {
 		if (
 			c instanceof DistanceConstraint &&
+			!c.isReference &&
 			((c.p1Id === line.p1Id && c.p2Id === line.p2Id) || (c.p1Id === line.p2Id && c.p2Id === line.p1Id))
 		) {
 			const orient = c.orientation ?? 'aligned';
@@ -216,7 +217,12 @@ export function setLineAngle(sketch: SketchDocument, lineId: string, newAngleDeg
 	// 3. If still not solved and the line has an AngleConstraint with another line, update that AngleConstraint
 	if (!solved) {
 		for (const c of sketch.constraints.values()) {
-			if (c instanceof AngleConstraint && c.line1Id !== c.line2Id && (c.line1Id === lineId || c.line2Id === lineId)) {
+			if (
+				c instanceof AngleConstraint &&
+				!c.isReference &&
+				c.line1Id !== c.line2Id &&
+				(c.line1Id === lineId || c.line2Id === lineId)
+			) {
 				sketch.paramManager.restoreValues(origValues);
 				const otherLineId = c.line1Id === lineId ? c.line2Id : c.line1Id;
 				const otherLine = sketch.lines.get(otherLineId);
@@ -267,6 +273,7 @@ export function setLinesRelativeAngle(
 	const existing = [...sketch.constraints.values()].find(
 		c =>
 			c instanceof AngleConstraint &&
+			!c.isReference &&
 			((c.line1Id === line1Id && c.line2Id === line2Id) || (c.line1Id === line2Id && c.line2Id === line1Id))
 	) as AngleConstraint | undefined;
 	if (existing) {
@@ -357,7 +364,7 @@ function setCircleOrArcRadiusImpl(sketch: SketchDocument, entityId: string, newR
 
 	let updatedExisting = false;
 	for (const c of sketch.constraints.values()) {
-		if (c instanceof RadiusConstraint && c.circleId === entityId) {
+		if (c instanceof RadiusConstraint && !c.isReference && c.circleId === entityId) {
 			c.targetRadius = newRadius;
 			c.value = newRadius;
 			const dispVal = c.displayMode === 'diameter' ? Number((newRadius * 2).toFixed(2)) : Number(newRadius.toFixed(2));
@@ -418,6 +425,7 @@ function setArcAngleImpl(sketch: SketchDocument, arcId: string, newSweepDeg: num
 	for (const c of sketch.constraints.values()) {
 		if (
 			c instanceof AngleConstraint &&
+			!c.isReference &&
 			((c.line1Id === arcId && c.line2Id === arcId) ||
 				(c.l1P1 === arc.centerId &&
 					c.l1P2 === arc.startPointId &&

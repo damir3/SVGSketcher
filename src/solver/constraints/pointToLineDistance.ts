@@ -67,6 +67,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	}
 
 	get displayName(): string {
+		if (this.isReference) return 'Reference Distance';
 		if (this.lineId === 'axis_x' || this.lineId === 'axis_y')
 			return `Distance to ${this.lineId === 'axis_x' ? 'X' : 'Y'}-Axis`;
 		return this.secondPointId ? 'Line-to-Line Distance' : 'Point-to-Line Distance';
@@ -83,10 +84,12 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
+		if (this.isReference) return 0;
 		return this.secondPointId ? 2 : 1;
 	}
 
 	override evaluate(paramMap: Map<string, number>): number[] {
+		if (this.isReference) return [];
 		if (this.axisCoordinate)
 			return [this.pointId, this.secondPointId!].map(
 				id =>
@@ -119,6 +122,7 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		baseRow: number,
 		paramMap: Map<string, number>
 	): JacobianEntry[] {
+		if (this.isReference) return [];
 		if (this.axisCoordinate) {
 			const entries: JacobianEntry[] = [];
 			[this.pointId, this.secondPointId!].forEach((id, row) =>
@@ -129,6 +133,18 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		return Array.from({ length: this.getEquationsCount() }, (_, row) =>
 			computeNumericJacobianForEquation(this, paramIndices, baseRow, row, paramMap)
 		).flat();
+	}
+
+	updateReferenceValue(paramMap: Map<string, number>): void {
+		if (!this.isReference) return;
+		const point = readParamPoint(paramMap, this.pointId);
+		if (this.secondPointId) point.lerp(readParamPoint(paramMap, this.secondPointId), 0.5);
+		const p1 = readParamPoint(paramMap, this.lineP1Id);
+		const dir = readParamPoint(paramMap, this.lineP2Id).sub(p1);
+		this.targetDistance = Math.abs(point.sub(p1).cross(dir)) / Math.max(dir.length(), 1e-7);
+		this.value = this.targetDistance;
+		this.name = this.displayName;
+		this.expression = undefined;
 	}
 
 	private displayPoint(sketch: SketchDocument): Vec2 | undefined {
@@ -193,13 +209,16 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
+		this.updateReferenceValue(ctx.sketch.paramManager.getCurrentValues());
 		const visual = this.resolveDimensionVisual(ctx.sketch, ctx.viewport);
 		if (!visual) return;
 
 		ctx.renderLinearDimensionVisual({
 			d1: visual.d1,
 			d2: visual.d2,
-			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
+			label: this.isReference
+				? `(${formatDimensionValue(this.targetDistance)})`
+				: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
 			extensionLines: visual.extensionLines,
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
@@ -221,6 +240,9 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 			dimension: {
 				label: 'Distance',
 				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+				isDisabled: () => !!this.isReference,
+				disabledContent: () =>
+					`<div class="inspector-row"><span>Reference</span><strong>(${formatDimensionValue(this.targetDistance)}) mm</strong></div>`,
 			},
 		});
 	}

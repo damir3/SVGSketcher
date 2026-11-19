@@ -288,6 +288,56 @@ impl Constraint {
                 add(0, 3, -y);
                 add(0, 4, -w);
             }
+            14 => {
+                let d1 = [(p[2] - p[0]) * p[8], (p[3] - p[1]) * p[8]];
+                let d2 = [(p[6] - p[4]) * p[9], (p[7] - p[5]) * p[9]];
+                let lengths = [d1[0].hypot(d1[1]), d2[0].hypot(d2[1])];
+                let l1 = lengths[0].max(1e-7);
+                let l2 = lengths[1].max(1e-7);
+                let u1 = [d1[0] / l1, d1[1] / l1];
+                let u2 = [d2[0] / l2, d2[1] / l2];
+                let angle = p[10] * self.a * std::f64::consts::PI / 180.0;
+                let (sin, cos) = (angle.sin(), angle.cos());
+                let rotated = [u1[0] * cos - u1[1] * sin, u1[1] * cos + u1[0] * sin];
+                let cross = rotated[0] * u2[1] - rotated[1] * u2[0];
+                let (average, factors) = if self.b == 1.0 {
+                    (l2, [0.0, 1.0])
+                } else if self.b == 2.0 {
+                    (l1, [1.0, 0.0])
+                } else {
+                    ((l1 + l2) * 0.5, [0.5, 0.5])
+                };
+                let gradient =
+                    |u: [f64; 2], length: f64, actual: f64, mut g: [f64; 2], factor: f64| {
+                        if actual > 1e-7 {
+                            let dot = u[0] * g[0] + u[1] * g[1];
+                            g[0] -= u[0] * dot;
+                            g[1] -= u[1] * dot;
+                        }
+                        for axis in 0..2 {
+                            g[axis] *= average / length;
+                            if actual > 1e-7 {
+                                g[axis] += u[axis] * cross * factor;
+                            }
+                            g[axis] *= w;
+                        }
+                        g
+                    };
+                let g1 = gradient(
+                    u1,
+                    l1,
+                    lengths[0],
+                    [u2[1] * cos - u2[0] * sin, -u2[1] * sin - u2[0] * cos],
+                    factors[0],
+                );
+                let g2 = gradient(u2, l2, lengths[1], [-rotated[1], rotated[0]], factors[1]);
+                for (slot, gradient, sign) in
+                    [(0, g1, -p[8]), (2, g1, p[8]), (4, g2, -p[9]), (6, g2, p[9])]
+                {
+                    add(0, slot, gradient[0] * sign);
+                    add(0, slot + 1, gradient[1] * sign);
+                }
+            }
             19 => {
                 for (row, slot) in [(0, 2), (1, 4)] {
                     let (dx, dy) = (p[slot] - p[0], p[slot + 1] - p[1]);
@@ -369,7 +419,7 @@ impl Constraint {
                 add(1, 1, w);
             }
             30 => return self.automatic_jacobian(p),
-            10..=18 | 20..=21 | 29 => return self.numeric_jacobian(p),
+            10..=13 | 15..=18 | 20..=21 | 29 => return self.numeric_jacobian(p),
             _ => unreachable!(),
         }
         entries
@@ -854,6 +904,54 @@ mod tests {
         assert!((c.residuals(&p)[0] + 5.0).abs() < 1e-14);
         c.b = 0.0;
         assert!((c.residuals(&p)[0] + 3.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn analytic_angle_jacobian_matches_central_differences_and_preserves_scale() {
+        let refs = [
+            Some(0),
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(0),
+            Some(1),
+            Some(4),
+            Some(5),
+            None,
+            None,
+            None,
+        ];
+        let mut c = constraint(14, 67.0, 0.0, &refs);
+        let mut p = [2.0, 3.0, 12.0, -1.0, 2.0, 3.0, -4.0, 15.0, -1.0, 1.0, -1.0];
+        for axis in [0.0, 1.0, 2.0] {
+            c.b = axis;
+            let mut actual = [0.0; 6];
+            for (_, col, value) in c.jacobian(&p) {
+                actual[col] += value;
+            }
+            for (col, derivative) in actual.iter().enumerate() {
+                let mut plus = p;
+                let mut minus = p;
+                for (local, reference) in c.refs.iter().enumerate() {
+                    if reference.index == Some(col) {
+                        plus[local] += 1e-5;
+                        minus[local] -= 1e-5;
+                    }
+                }
+                let numeric = (c.residuals(&plus)[0] - c.residuals(&minus)[0]) / 2e-5;
+                assert!((derivative - numeric).abs() < 1e-8);
+            }
+        }
+        c.b = 0.0;
+        c.a = 90.0;
+        p = [0.0, 0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 20.0, 1.0, 1.0, 1.0];
+        let coordinates = [0.0, 0.0, 10.0, 0.0, 0.0, 20.0];
+        let scaling_derivative: f64 = c
+            .jacobian(&p)
+            .iter()
+            .map(|(_, col, value)| coordinates[*col] * value)
+            .sum();
+        assert!(scaling_derivative.abs() < 1e-12);
     }
 
     #[test]

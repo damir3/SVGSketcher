@@ -5,6 +5,7 @@ import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { ORIGIN, Vec2 } from '../../../math/vector';
 import { DistanceConstraint } from '../../../solver/constraints/distance';
 import { RadiusConstraint } from '../../../solver/constraints/radius';
+import { withDimensionCreation } from './dimensionCreation';
 
 export interface DimensionState {
 	step: number;
@@ -123,16 +124,17 @@ function computeLabelPosition(
 export class DimensionTool extends BaseTool {
 	readonly id = 'dimension' as const;
 	private radialDraft: { constraint: RadiusConstraint | DistanceConstraint; returnToSelect: boolean } | null = null;
+	private dimensionEditor?: ToolContext['onEditDimension'];
 
 	state: DimensionState = { ...EMPTY_STATE };
 
 	private finishDimensionPlacement(c: any, toastMsg: string, clientPos?: Vec2, keepSelection = false): void {
-		this.ctx.showToast(toastMsg);
+		this.ctx.showToast(c.isReference ? 'Reference dimension created' : toastMsg);
 		this.state = { ...EMPTY_STATE };
 		this.ctx.renderer.clearPreviews();
 		if (!keepSelection) this.ctx.sketch.clearSelection();
 		this.ctx.requestRender();
-		this.ctx.onEditDimension?.(c, clientPos);
+		if (!c.isReference) (this.dimensionEditor ?? this.ctx.onEditDimension)?.(c, clientPos);
 	}
 
 	private renderPointToLinePreview(pointId: string, lineId: string, screen: Vec2, minPerpDist = 0): boolean {
@@ -454,6 +456,17 @@ export class DimensionTool extends BaseTool {
 	}
 
 	override onMouseDown(e: ToolMouseEvent): boolean | void {
+		return withDimensionCreation(this.ctx.sketch, this.ctx.onEditDimension, edit => {
+			this.dimensionEditor = edit;
+			try {
+				return this.handleDimensionMouseDown(e);
+			} finally {
+				this.dimensionEditor = undefined;
+			}
+		});
+	}
+
+	private handleDimensionMouseDown(e: ToolMouseEvent): boolean | void {
 		const screen = e.screen;
 		if (this.state.step === 2 && this.state.point1Id && this.state.line1Id && !this.state.point2Id) {
 			return this.placePointLineDistance(e);
@@ -498,7 +511,7 @@ export class DimensionTool extends BaseTool {
 							: 'Radius constraint applied'
 				);
 				this.ctx.requestRender();
-				this.ctx.onEditDimension?.(constraint, e.client);
+				if (!constraint.isReference) (this.dimensionEditor ?? this.ctx.onEditDimension)?.(constraint, e.client);
 			}
 			return true;
 		}

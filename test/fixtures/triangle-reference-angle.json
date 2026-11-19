@@ -1,0 +1,184 @@
+{
+  "points": [
+    {
+      "x": 1.0579263822306692e-10,
+      "y": 40.00000066245872,
+      "type": "point",
+      "id": "Point-8",
+      "fixed": false
+    },
+    {
+      "x": 4.88409706340142e-10,
+      "y": -7.090564563064063e-10,
+      "type": "point",
+      "id": "Point-9",
+      "fixed": false
+    },
+    {
+      "x": 47.67014449525293,
+      "y": 40.000000663456824,
+      "type": "point",
+      "id": "Point-10",
+      "fixed": false
+    }
+  ],
+  "lines": [
+    {
+      "type": "line",
+      "id": "Line-7",
+      "p1Id": "Point-8",
+      "p2Id": "Point-9",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-8",
+      "p1Id": "Point-9",
+      "p2Id": "Point-10",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-9",
+      "p1Id": "Point-10",
+      "p2Id": "Point-8",
+      "isConstruction": false
+    }
+  ],
+  "circles": [],
+  "arcs": [],
+  "ellipses": [],
+  "ellipticalArcs": [],
+  "splines": [],
+  "texts": [],
+  "images": [],
+  "constraints": [
+    {
+      "id": "c_vert-1",
+      "type": "vertical",
+      "name": "Vertical",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-8",
+        "Point-9"
+      ],
+      "p1Id": "Point-8",
+      "p2Id": "Point-9"
+    },
+    {
+      "id": "c_ang-1",
+      "type": "angle",
+      "name": "Angle",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": true,
+      "value": 50,
+      "entityIds": [
+        "Line-7",
+        "Line-8",
+        "Point-8",
+        "Point-9",
+        "Point-10"
+      ],
+      "line1Id": "Line-7",
+      "line2Id": "Line-8",
+      "l1P1": "Point-8",
+      "l1P2": "Point-9",
+      "l2P1": "Point-9",
+      "l2P2": "Point-10",
+      "targetAngle": 50,
+      "arcRadius": 12.701912232440353,
+      "s1": -1,
+      "s2": 1,
+      "sign": -1
+    },
+    {
+      "id": "c_ang-3",
+      "type": "angle",
+      "name": "Angle",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": true,
+      "value": 90,
+      "entityIds": [
+        "Line-7",
+        "Line-9",
+        "Point-8",
+        "Point-9",
+        "Point-10"
+      ],
+      "line1Id": "Line-7",
+      "line2Id": "Line-9",
+      "l1P1": "Point-8",
+      "l1P2": "Point-9",
+      "l2P1": "Point-10",
+      "l2P2": "Point-8",
+      "targetAngle": 90,
+      "arcRadius": 11.553898852561701,
+      "s1": 1,
+      "s2": -1,
+      "sign": 1
+    },
+    {
+      "id": "c_coinc-1",
+      "type": "coincident",
+      "name": "Coincident with (0,0)",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "origin",
+        "Point-9"
+      ],
+      "p1Id": "origin",
+      "p2Id": "Point-9"
+    },
+    {
+      "id": "c_ptline-1",
+      "type": "point_on_line",
+      "name": "Point on Y-Axis",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-8",
+        "origin",
+        "axis_y"
+      ],
+      "pointId": "Point-8",
+      "lineP1Id": "origin",
+      "lineP2Id": "axis_y"
+    },
+    {
+      "id": "c_ang-4",
+      "type": "angle",
+      "name": "Angle",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": true,
+      "value": 40,
+      "entityIds": [
+        "Line-8",
+        "Line-9",
+        "Point-9",
+        "Point-10",
+        "Point-8"
+      ],
+      "line1Id": "Line-8",
+      "line2Id": "Line-9",
+      "l1P1": "Point-9",
+      "l1P2": "Point-10",
+      "l2P1": "Point-10",
+      "l2P2": "Point-8",
+      "targetAngle": 40,
+      "arcRadius": 21.656063252938555,
+      "s1": -1,
+      "s2": 1,
+      "sign": -1
+    }
+  ],
+  "parameters": [],
+  "idCounter": 29
+}

@@ -26,15 +26,12 @@ function updateExistingDistanceConstraint<T extends DistanceConstraint | PointTo
 	existing: T,
 	targetDist?: number,
 	offset?: number
-): T {
+): T | null {
 	if (offset !== undefined && existing.offset !== offset) {
 		existing.offset = offset;
 	}
 	if (targetDist !== undefined && existing.targetDistance !== targetDist) {
-		sketch.pushHistory();
-		existing.targetDistance = targetDist;
-		existing.value = targetDist;
-		sketch.solve();
+		if (!updateDimensionalConstraint(sketch, existing.id, targetDist)) return null;
 	}
 	return existing;
 }
@@ -48,7 +45,7 @@ function upsertPointDistance(
 	targetDist?: number,
 	offset?: number,
 	sign?: number
-): DistanceConstraint {
+): DistanceConstraint | null {
 	const existing = getDistanceConstraint(sketch, p1Id, p2Id, orientation);
 	if (existing) return updateExistingDistanceConstraint(sketch, existing, targetDist, offset);
 	const dist = targetDist ?? roundDimensionDefault(measured);
@@ -63,8 +60,7 @@ function upsertPointDistance(
 		undefined,
 		sign
 	);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 function updateExistingAngleConstraint(
@@ -72,15 +68,12 @@ function updateExistingAngleConstraint(
 	existing: AngleConstraint,
 	targetAngleDeg?: number,
 	arcRadius?: number
-): AngleConstraint {
+): AngleConstraint | null {
 	if (arcRadius !== undefined && existing.arcRadius !== arcRadius) {
 		existing.arcRadius = arcRadius;
 	}
 	if (targetAngleDeg !== undefined && existing.targetAngle !== targetAngleDeg) {
-		sketch.pushHistory();
-		existing.targetAngle = targetAngleDeg;
-		existing.value = targetAngleDeg;
-		sketch.solve();
+		if (!updateDimensionalConstraint(sketch, existing.id, targetAngleDeg)) return null;
 	}
 	return existing;
 }
@@ -99,7 +92,7 @@ function createAngleConstraint(
 	s1Override?: number,
 	s2Override?: number,
 	signOverride?: number
-): AngleConstraint {
+): AngleConstraint | null {
 	const geom = calculateLinesAngleGeometry(
 		sketch,
 		p1,
@@ -125,8 +118,7 @@ function createAngleConstraint(
 		s2Override ?? geom.s2,
 		signOverride ?? geom.sign
 	);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 function formatRadiusConstraintName(radius: number, mode: 'radius' | 'diameter'): string {
@@ -209,8 +201,7 @@ export function addCircleDistanceConstraint(
 	c.leaderOffset = -Math.abs(a.radius - b.radius) / 2;
 	c.entityIds = [...new Set([a.centerId, b.centerId, circle1Id, circle2Id])];
 	c.name = c.displayName;
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 export function canAddCircleToLineDistanceConstraint(
@@ -290,8 +281,7 @@ export function addPointToLineDistanceConstraint(
 		1.0,
 		offset
 	);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 export function getLineToLineDistanceConstraint(
@@ -357,8 +347,7 @@ export function addLineToLineDistanceConstraint(
 		line.p2Id,
 		line2Id
 	);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 export function getOriginConstraint(
@@ -498,8 +487,7 @@ export function addLineToAxisDistanceConstraint(
 		line.p2Id,
 		lineId
 	);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 export function calculateLinesAngleGeometry(
@@ -740,8 +728,7 @@ export function addArcAngleConstraint(
 		1,
 		sweepSign >= 0 ? 1 : -1
 	);
-	addConstraint(sketch, c);
-	return c;
+	return addConstraint(sketch, c) ? c : null;
 }
 
 export function addRadiusConstraint(
@@ -768,11 +755,9 @@ export function addRadiusConstraint(
 		}
 
 		if (targetRadius !== undefined) {
-			sketch.pushHistory();
-			existing.targetRadius = targetRadius;
-			existing.value = targetRadius;
-			existing.name = formatRadiusConstraintName(targetRadius, existing.displayMode ?? defaultMode);
-			sketch.withStableCircleCenters(() => sketch.solve());
+			const mode = existing.displayMode ?? defaultMode;
+			const value = mode === 'diameter' ? targetRadius * 2 : targetRadius;
+			if (!updateDimensionalConstraint(sketch, existing.id, value, mode)) return null;
 		}
 		return existing;
 	}
@@ -780,8 +765,7 @@ export function addRadiusConstraint(
 	const r = targetRadius ?? roundDimensionDefault(entity.radius, MIN_SOLVER_RADIUS);
 	const c = new RadiusConstraint(sketch.nextId('c_rad'), circleOrArcId, r, 1.0, placement?.leaderAngle, defaultMode);
 	c.leaderOffset = placement?.leaderOffset;
-	sketch.withStableCircleCenters(() => addConstraint(sketch, c));
-	return c;
+	return sketch.withStableCircleCenters(() => addConstraint(sketch, c)) ? c : null;
 }
 
 export function applyConstraintValueDirectly(
@@ -790,7 +774,7 @@ export function applyConstraintValueDirectly(
 	newValue: number,
 	displayMode?: 'radius' | 'diameter'
 ): boolean {
-	if (!isFinite(newValue) || newValue <= 0) return false;
+	if (c.isReference || !isFinite(newValue) || newValue <= 0) return false;
 
 	if (c instanceof DistanceConstraint || c instanceof PointToLineDistanceConstraint) {
 		c.targetDistance = newValue;
@@ -864,7 +848,7 @@ export function updateDimensionalConstraint(
 	displayMode?: 'radius' | 'diameter'
 ): boolean {
 	const c = sketch.constraints.get(constraintId);
-	if (!c) return false;
+	if (!c || c.isReference) return false;
 
 	let val: number;
 	let expr: string | undefined;
@@ -886,15 +870,25 @@ export function updateDimensionalConstraint(
 	}
 
 	const offsetTransaction = c instanceof OffsetConstraint;
+	const offsetSnapshot = offsetTransaction ? sketch.takeSnapshot() : null;
 	if (offsetTransaction) sketch.beginTransaction();
 	try {
-		const applied = applyConstraintValueDirectly(sketch, c, val, displayMode);
-		if (applied) {
-			c.expression = expr;
-			sketch.solve();
-			return true;
-		}
-		return false;
+		return sketch.solverCoordinator.updateConstraint(
+			c,
+			() => {
+				let applied = false;
+				if (offsetTransaction) {
+					// Topology changes are part of the trial; validate only after the complete edit.
+					sketch.runSilentDerivedUpdate(() => {
+						applied = applyConstraintValueDirectly(sketch, c, val, displayMode);
+					});
+				} else applied = applyConstraintValueDirectly(sketch, c, val, displayMode);
+				if (!applied) return false;
+				c.expression = expr;
+				return true;
+			},
+			offsetSnapshot ? () => sketch.runSilentDerivedUpdate(() => sketch.restoreSnapshot(offsetSnapshot)) : undefined
+		);
 	} finally {
 		if (offsetTransaction) sketch.commitTransaction(false);
 	}

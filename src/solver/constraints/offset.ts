@@ -114,6 +114,7 @@ export class OffsetConstraint extends BaseConstraint {
 	}
 
 	override getEquationsCount(): number {
+		if (this.isReference) return 0;
 		let n = 0;
 		for (const p of this.pairs) {
 			if (p.kind === 'line') n += 2;
@@ -134,6 +135,7 @@ export class OffsetConstraint extends BaseConstraint {
 	}
 
 	override evaluate(pm: Map<string, number>): number[] {
+		if (this.isReference) return [];
 		const res: number[] = [];
 		for (const p of this.pairs) {
 			if (p.kind === 'line') {
@@ -160,6 +162,7 @@ export class OffsetConstraint extends BaseConstraint {
 	}
 
 	override jacobian(paramIndices: Map<string, number>, baseRow: number, pm: Map<string, number>): JacobianEntry[] {
+		if (this.isReference) return [];
 		const res: JacobianEntry[] = [];
 		let row = baseRow;
 		const eps = 1e-6;
@@ -202,8 +205,30 @@ export class OffsetConstraint extends BaseConstraint {
 		return res;
 	}
 
-	moveLabelTo(screen: Vec2, _sketch: SketchDocument, viewport: Viewport): void {
+	updateReferenceValue(pm: Map<string, number>, sketch?: SketchDocument): void {
+		if (!this.isReference) return;
+		const pair = this.pairs[this.dimPairIndex] ?? this.pairs[0];
+		const points = pair && sketch ? this.getDimensionWorldPoints(sketch) : null;
+		if (points) this.targetDistance = points.a.distanceTo(points.b);
+		else if (pair?.kind === 'line') {
+			const a = readParamPoint(pm, pair.origP1Id);
+			const dir = readParamPoint(pm, pair.origP2Id).sub(a);
+			const mid = readParamPoint(pm, pair.offP1Id).lerp(readParamPoint(pm, pair.offP2Id), 0.5);
+			this.targetDistance = Math.abs(dir.cross(mid.sub(a))) / Math.max(dir.length(), 1e-9);
+		} else if (pair?.kind === 'circle') {
+			this.targetDistance = Math.abs((pm.get(`${pair.offId}.r`) ?? 0) - (pm.get(`${pair.origId}.r`) ?? 0));
+		} else if (pair?.kind === 'spline' && pair.points.length) {
+			const p = pair.points[Math.floor(pair.points.length / 2)];
+			this.targetDistance = readParamPoint(pm, p.pointId).distanceTo(p.basePos);
+		} else this.targetDistance = 0;
+		this.value = this.targetDistance;
+		this.name = 'Reference Offset';
+		this.expression = undefined;
+	}
+
+	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
 		this.labelWorld = viewport.screenToWorld(screen);
+		this.updateReferenceValue(sketch.paramManager.getCurrentValues(), sketch);
 	}
 
 	/** Closest point on a finite curve, including arc endpoints outside its sweep. */
@@ -224,7 +249,16 @@ export class OffsetConstraint extends BaseConstraint {
 			return center.add(Vec2.fromPolar(curve.radius, angle));
 		}
 		const match = getQueryKernel().closest([curve], world, Number.MAX_VALUE, true, 0);
-		return match?.point ? Vec2.from(match.point) : null;
+		let closest = match?.point ? Vec2.from(match.point) : null;
+		if (curve.type === 'spline') {
+			// The kernel samples splines; retain exact span endpoints when they are closer.
+			for (const segment of curve.bezierSegments) {
+				for (const endpoint of [segment[0], segment[3]]) {
+					if (!closest || world.distanceTo(endpoint) < world.distanceTo(closest)) closest = Vec2.from(endpoint);
+				}
+			}
+		}
+		return closest;
 	}
 
 	/** Restrict the normal to the span shared by both finite sides of a corner. */
@@ -309,6 +343,11 @@ export class OffsetConstraint extends BaseConstraint {
 			if (!midSp) return null;
 			const pt = sketch.points.get(midSp.pointId);
 			if (!pt) return null;
+			if (this.isReference) {
+				const original = sketch.getPrimitive(p.origSplineId)?.toGeoCurve(sketch);
+				const a = original && this.closestPoint(original, Vec2.from(pt));
+				return a ? { a, b: Vec2.from(pt) } : null;
+			}
 			return {
 				a: Vec2.from(midSp.basePos),
 				b: new Vec2(pt.x, pt.y),
@@ -366,7 +405,7 @@ export class OffsetConstraint extends BaseConstraint {
 	}
 
 	private renderLabelHitArea(parent: SVGElement, center: Vec2, angle: number): void {
-		const text = (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance);
+		const text = this.dimensionText();
 		const halfWidth = Math.max(12, text.length * 3.75 + 6);
 		createSvgElement(
 			'polygon',
@@ -384,6 +423,7 @@ export class OffsetConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
+		this.updateReferenceValue(ctx.sketch.paramManager.getCurrentValues(), ctx.sketch);
 		const pts = this.getDimensionWorldPoints(ctx.sketch);
 		if (!pts) return;
 		const d1 = ctx.viewport.worldToScreen(pts.a);
@@ -392,7 +432,7 @@ export class OffsetConstraint extends BaseConstraint {
 		ctx.renderLinearDimensionVisual({
 			d1,
 			d2,
-			label: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance),
+			label: this.dimensionText(),
 			extensionLines: [],
 			parent: ctx.targetGroup,
 			isSelected: ctx.isSelected,
@@ -413,7 +453,7 @@ export class OffsetConstraint extends BaseConstraint {
 		const d2 = viewport.worldToScreen(pts.b);
 		const center = this.getLabelScreenPos(sketch, viewport)!;
 		const local = Vec2.from(screen).sub(center).rotateAround(new Vec2(), -this.labelAngle(d1, d2));
-		const text = (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance);
+		const text = this.dimensionText();
 		const halfWidth = Math.max(12, text.length * 3.75 + 6);
 		const textDistance = Math.hypot(Math.max(0, Math.abs(local.x) - halfWidth), Math.max(0, Math.abs(local.y) - 10));
 		const distance = Math.min(
@@ -438,13 +478,22 @@ export class OffsetConstraint extends BaseConstraint {
 		return res;
 	}
 
+	private dimensionText(): string {
+		return this.isReference
+			? `(${formatDimensionValue(this.targetDistance)})`
+			: (this.expression ? 'fx: ' : '') + formatDimensionValue(this.targetDistance);
+	}
+
 	protected override createSidebarPanel(): ConstraintPanel {
 		return new ConstraintPanel({
 			constraint: this,
-			title: 'Offset Distance',
+			title: () => (this.isReference ? 'Reference Offset' : 'Offset Distance'),
 			dimension: {
 				label: 'Distance',
 				getValue: () => `${Number(this.targetDistance.toFixed(2))} mm`,
+				isDisabled: () => !!this.isReference,
+				disabledContent: () =>
+					`<div class="inspector-row"><span>Reference</span><strong>(${formatDimensionValue(this.targetDistance)}) mm</strong></div>`,
 			},
 		});
 	}

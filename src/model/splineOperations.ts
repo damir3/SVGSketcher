@@ -330,7 +330,7 @@ export function prepareSplineConstraints(
 	lockedParams: Set<string>,
 	editedHandles: SketchLine[]
 ): IConstraint[] {
-	const constraints = [...sketch.constraints.values(), ...extraConstraints];
+	const constraints = [...sketch.constraints.values(), ...extraConstraints].filter(c => !c.isReference);
 	if (sketch.splines.size === 0) return constraints;
 	const splineConstraints: IConstraint[] = [];
 	const replaced = new Set<IConstraint>();
