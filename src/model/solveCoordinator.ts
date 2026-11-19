@@ -6,7 +6,7 @@ import { getRadial } from './constraintOperations';
 import { syncOffsetSources } from './offsetSync';
 import { prepareSplineConstraints } from './splineOperations';
 import { ParamManager, NumericalSolver } from '../solver/solver';
-import type { IConstraint, SolverResult } from '../solver/types';
+import type { IConstraint, SolveCallOptions, SolverResult } from '../solver/types';
 import {
 	RadiusConstraint,
 	DistanceConstraint,
@@ -481,6 +481,28 @@ export class SolveCoordinator {
 		return ok;
 	}
 
+	private solveWithOffsetSourceRetry(
+		constraints: IConstraint[],
+		options: SolveCallOptions,
+		maxError = 1e-2
+	): SolverResult {
+		const offsets = new Set(constraints.filter(c => c instanceof OffsetConstraint && !c.isReference && c.sourceChain));
+		const initial = offsets.size ? this.paramManager.getCurrentValues() : null;
+		const result = this.solver.solve(this.paramManager, constraints, options);
+		if (!offsets.size || this.isSolveAccepted(result, maxError)) return result;
+
+		// Child-only offset Jacobians cannot guide a large source edit while
+		// their residuals still describe the old source. Solve the driving
+		// geometry first, then let the offsets follow that solved geometry.
+		this.paramManager.restoreValues(initial!);
+		this.solver.solve(
+			this.paramManager,
+			constraints.filter(c => !offsets.has(c)),
+			options
+		);
+		return this.solver.solve(this.paramManager, constraints, options);
+	}
+
 	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
@@ -491,7 +513,7 @@ export class SolveCoordinator {
 
 		// Interactive drags keep the regular behaviour (radius may follow the drag)
 		if (extraConstraints.length > 0) {
-			return this.solver.solve(this.paramManager, activeConstraints, {
+			return this.solveWithOffsetSourceRetry(activeConstraints, {
 				lockedParams: drivenRadii,
 			});
 		}
@@ -505,7 +527,7 @@ export class SolveCoordinator {
 		// that the solver prefers moving geometry over resizing circles. When stage 1
 		// succeeded this is a no-op / polish step that also computes the DoF.
 		const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
-		return this.solver.solve(this.paramManager, activeConstraints, {
+		return this.solveWithOffsetSourceRetry(activeConstraints, {
 			lockedParams: drivenRadii,
 			paramStiffness: stiffness,
 		});
@@ -538,11 +560,15 @@ export class SolveCoordinator {
 		if (!solvedOk) {
 			const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
 			const solveStiff = () =>
-				this.solver.solve(this.paramManager, activeConstraints, {
-					lockedParams: drivenRadii,
-					paramStiffness: stiffness,
-					skipDoF: true,
-				});
+				this.solveWithOffsetSourceRetry(
+					activeConstraints,
+					{
+						lockedParams: drivenRadii,
+						paramStiffness: stiffness,
+						skipDoF: true,
+					},
+					maxError
+				);
 			let stage2 = solveStiff();
 			if (
 				stage2.status !== 'OVER_CONSTRAINED' &&

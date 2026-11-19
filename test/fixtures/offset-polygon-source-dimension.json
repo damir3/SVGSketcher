@@ -1,0 +1,457 @@
+{
+  "points": [
+    {
+      "x": -57.61691957001236,
+      "y": 27.925446806029594,
+      "type": "point",
+      "id": "Point-1",
+      "fixed": false
+    },
+    {
+      "x": -44.52997253412344,
+      "y": 19.222391910181525,
+      "type": "point",
+      "id": "Point-2",
+      "fixed": false
+    },
+    {
+      "x": -43.53637847235396,
+      "y": 34.90754882548861,
+      "type": "point",
+      "id": "Point-3",
+      "fixed": false
+    },
+    {
+      "x": -56.62332643362453,
+      "y": 43.610602551233534,
+      "type": "point",
+      "id": "Point-4",
+      "fixed": false
+    },
+    {
+      "x": -70.70386645859645,
+      "y": 36.62850153831605,
+      "type": "point",
+      "id": "Point-5",
+      "fixed": false
+    },
+    {
+      "x": -71.69745962210682,
+      "y": 20.943345671228066,
+      "type": "point",
+      "id": "Point-6",
+      "fixed": false
+    },
+    {
+      "x": -58.61051276064526,
+      "y": 12.24029081705754,
+      "type": "point",
+      "id": "Point-7",
+      "fixed": false
+    },
+    {
+      "x": -55.16333912064596,
+      "y": 66.65841652804403,
+      "type": "point",
+      "id": "Point-10",
+      "fixed": false
+    },
+    {
+      "x": -89.9338651332624,
+      "y": 49.41679625878517,
+      "type": "point",
+      "id": "Point-11",
+      "fixed": false
+    },
+    {
+      "x": -92.38744708803924,
+      "y": 10.683825655091049,
+      "type": "point",
+      "id": "Point-12",
+      "fixed": false
+    },
+    {
+      "x": -60.07050156165467,
+      "y": -10.807523947875723,
+      "type": "point",
+      "id": "Point-13",
+      "fixed": false
+    },
+    {
+      "x": -25.299974672172258,
+      "y": 6.434096743901386,
+      "type": "point",
+      "id": "Point-8",
+      "fixed": false
+    },
+    {
+      "x": -22.84638988491648,
+      "y": 45.167070197341424,
+      "type": "point",
+      "id": "Point-9",
+      "fixed": false
+    }
+  ],
+  "lines": [
+    {
+      "type": "line",
+      "id": "Line-1",
+      "p1Id": "Point-2",
+      "p2Id": "Point-3",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-2",
+      "p1Id": "Point-3",
+      "p2Id": "Point-4",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-3",
+      "p1Id": "Point-4",
+      "p2Id": "Point-5",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-4",
+      "p1Id": "Point-5",
+      "p2Id": "Point-6",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-5",
+      "p1Id": "Point-6",
+      "p2Id": "Point-7",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-6",
+      "p1Id": "Point-7",
+      "p2Id": "Point-2",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-9",
+      "p1Id": "Point-10",
+      "p2Id": "Point-11",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-10",
+      "p1Id": "Point-11",
+      "p2Id": "Point-12",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-11",
+      "p1Id": "Point-12",
+      "p2Id": "Point-13",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-7",
+      "p1Id": "Point-8",
+      "p2Id": "Point-9",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-8",
+      "p1Id": "Point-9",
+      "p2Id": "Point-10",
+      "isConstruction": false
+    },
+    {
+      "type": "line",
+      "id": "Line-12",
+      "p1Id": "Point-13",
+      "p2Id": "Point-8",
+      "isConstruction": false
+    }
+  ],
+  "circles": [],
+  "arcs": [],
+  "ellipses": [],
+  "ellipticalArcs": [],
+  "splines": [],
+  "texts": [],
+  "images": [],
+  "constraints": [
+    {
+      "id": "c_cpat-1",
+      "type": "circular_pattern",
+      "name": "Circular Pattern",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": false,
+      "entityIds": [
+        "Point-1",
+        "Point-2",
+        "Point-3",
+        "Point-4",
+        "Point-5",
+        "Point-6",
+        "Point-7"
+      ],
+      "suppression": false,
+      "suppressedIndices": [],
+      "copies": [
+        {
+          "copyIndex": 1,
+          "pointPairs": [
+            {
+              "sourcePtId": "Point-2",
+              "patternPtId": "Point-3"
+            }
+          ],
+          "createdEntityIds": [
+            {
+              "id": "Point-3",
+              "type": "point"
+            }
+          ]
+        },
+        {
+          "copyIndex": 2,
+          "pointPairs": [
+            {
+              "sourcePtId": "Point-2",
+              "patternPtId": "Point-4"
+            }
+          ],
+          "createdEntityIds": [
+            {
+              "id": "Point-4",
+              "type": "point"
+            }
+          ]
+        },
+        {
+          "copyIndex": 3,
+          "pointPairs": [
+            {
+              "sourcePtId": "Point-2",
+              "patternPtId": "Point-5"
+            }
+          ],
+          "createdEntityIds": [
+            {
+              "id": "Point-5",
+              "type": "point"
+            }
+          ]
+        },
+        {
+          "copyIndex": 4,
+          "pointPairs": [
+            {
+              "sourcePtId": "Point-2",
+              "patternPtId": "Point-6"
+            }
+          ],
+          "createdEntityIds": [
+            {
+              "id": "Point-6",
+              "type": "point"
+            }
+          ]
+        },
+        {
+          "copyIndex": 5,
+          "pointPairs": [
+            {
+              "sourcePtId": "Point-2",
+              "patternPtId": "Point-7"
+            }
+          ],
+          "createdEntityIds": [
+            {
+              "id": "Point-7",
+              "type": "point"
+            }
+          ]
+        }
+      ],
+      "centerPtId": "Point-1",
+      "sourceObjectIds": [
+        "Point-2"
+      ],
+      "distribution": "full",
+      "totalAngle": 360,
+      "quantity": 6,
+      "isReadOnly": true
+    },
+    {
+      "id": "c_offset-1",
+      "type": "offset",
+      "name": "Offset",
+      "weight": 1,
+      "isSoft": false,
+      "isDimensional": true,
+      "value": 20,
+      "entityIds": [
+        "Line-1",
+        "Line-2",
+        "Line-3",
+        "Line-4",
+        "Line-5",
+        "Line-6",
+        "Point-2",
+        "Point-3",
+        "Line-7",
+        "Point-8",
+        "Point-9",
+        "Point-4",
+        "Line-8",
+        "Point-10",
+        "Point-5",
+        "Line-9",
+        "Point-11",
+        "Point-6",
+        "Line-10",
+        "Point-12",
+        "Point-7",
+        "Line-11",
+        "Point-13",
+        "Line-12"
+      ],
+      "targetDistance": 20,
+      "pairs": [
+        {
+          "kind": "line",
+          "origLineId": "Line-1",
+          "origP1Id": "Point-2",
+          "origP2Id": "Point-3",
+          "offLineId": "Line-7",
+          "offP1Id": "Point-8",
+          "offP2Id": "Point-9",
+          "side": -1
+        },
+        {
+          "kind": "line",
+          "origLineId": "Line-2",
+          "origP1Id": "Point-3",
+          "origP2Id": "Point-4",
+          "offLineId": "Line-8",
+          "offP1Id": "Point-9",
+          "offP2Id": "Point-10",
+          "side": -1
+        },
+        {
+          "kind": "line",
+          "origLineId": "Line-3",
+          "origP1Id": "Point-4",
+          "origP2Id": "Point-5",
+          "offLineId": "Line-9",
+          "offP1Id": "Point-10",
+          "offP2Id": "Point-11",
+          "side": -1
+        },
+        {
+          "kind": "line",
+          "origLineId": "Line-4",
+          "origP1Id": "Point-5",
+          "origP2Id": "Point-6",
+          "offLineId": "Line-10",
+          "offP1Id": "Point-11",
+          "offP2Id": "Point-12",
+          "side": -1
+        },
+        {
+          "kind": "line",
+          "origLineId": "Line-5",
+          "origP1Id": "Point-6",
+          "origP2Id": "Point-7",
+          "offLineId": "Line-11",
+          "offP1Id": "Point-12",
+          "offP2Id": "Point-13",
+          "side": -1
+        },
+        {
+          "kind": "line",
+          "origLineId": "Line-6",
+          "origP1Id": "Point-7",
+          "origP2Id": "Point-2",
+          "offLineId": "Line-12",
+          "offP1Id": "Point-13",
+          "offP2Id": "Point-8",
+          "side": -1
+        }
+      ],
+      "dimPairIndex": 0,
+      "sourceChain": {
+        "items": [
+          {
+            "id": "Line-1",
+            "type": "line",
+            "startPointId": "Point-2",
+            "endPointId": "Point-3",
+            "reversed": false
+          },
+          {
+            "id": "Line-2",
+            "type": "line",
+            "startPointId": "Point-3",
+            "endPointId": "Point-4",
+            "reversed": false
+          },
+          {
+            "id": "Line-3",
+            "type": "line",
+            "startPointId": "Point-4",
+            "endPointId": "Point-5",
+            "reversed": false
+          },
+          {
+            "id": "Line-4",
+            "type": "line",
+            "startPointId": "Point-5",
+            "endPointId": "Point-6",
+            "reversed": false
+          },
+          {
+            "id": "Line-5",
+            "type": "line",
+            "startPointId": "Point-6",
+            "endPointId": "Point-7",
+            "reversed": false
+          },
+          {
+            "id": "Line-6",
+            "type": "line",
+            "startPointId": "Point-7",
+            "endPointId": "Point-2",
+            "reversed": false
+          }
+        ],
+        "isClosed": true,
+        "firstSelectedId": "Line-1"
+      },
+      "direction": "one_side",
+      "flip": false,
+      "cornerPointIds": [
+        "Point-8",
+        "Point-9",
+        "Point-10",
+        "Point-11",
+        "Point-12",
+        "Point-13"
+      ],
+      "labelWorld": {
+        "x": -12,
+        "y": 25.5
+      }
+    }
+  ],
+  "parameters": [],
+  "idCounter": 57
+}
