@@ -1,40 +1,18 @@
-import { getGeometryKernel } from '../../kernel';
 import type {
 	TracePlacementInput,
-	TracePlacementResult,
+	TracePostprocessKernel,
 	TraceRelationInput,
 	TracePair,
 } from '../../kernel/tracePostprocessTypes';
 import { Vec2, type XY } from '../../math/vector';
-import type { TracePlacement } from './build';
 import type { TraceResult, ImageTraceSettings } from './types';
 import type { SketchDocument } from '../sketch';
 import type { IConstraint } from '../../solver/types';
-import * as reference from './buildReference';
-const finite = (p: XY) => Number.isFinite(p.x) && Number.isFinite(p.y);
-export function placeTrace(input: TracePlacementInput): TracePlacementResult {
-	const api = getGeometryKernel().tracePostprocess;
-	const p = input.placement;
-	if (
-		api &&
-		[input.width, input.height, input.yScale].every(v => Number.isFinite(v) && v > 0) &&
-		[p.x, p.y, p.width, p.height, p.angle, ...input.radii].every(Number.isFinite) &&
-		input.points.every(finite)
-	)
-		return api.place(input);
-	const transform = reference.createTraceTransform(input, p),
-		points = input.points.map(transform.toWorld);
-	return {
-		scale: transform.scale,
-		points,
-		radii: input.radii.map(r => r * transform.scale),
-		clockwise: input.arcs.map(
-			([a, m, b]) => new Vec2().subVectors(points[m], points[a]).cross(new Vec2().subVectors(points[b], points[m])) < 0
-		),
-	};
-}
+
+export type TracePlacement = TracePlacementInput['placement'];
+
 /** Snapshot all source coordinates, widths and arc turns in one query, without modifying the trace result. */
-export function prepareTracePlacement(result: TraceResult, placement: TracePlacement) {
+export function prepareTracePlacement(result: TraceResult, placement: TracePlacement, kernel: TracePostprocessKernel) {
 	const points: XY[] = [],
 		indices = new Map<XY, number>(),
 		radii: number[] = [],
@@ -81,7 +59,7 @@ export function prepareTracePlacement(result: TraceResult, placement: TracePlace
 		spline.points.forEach(add);
 		handles(spline.handles);
 	}
-	const out = placeTrace({ ...result, placement, points, radii, arcs });
+	const out = kernel.place({ ...result, placement, points, radii, arcs });
 	return {
 		scale: out.scale,
 		toWorld: (p: XY) => {
@@ -103,9 +81,9 @@ export function inferTraceConstraints(
 	scale: number,
 	lineIds: string[],
 	radial: Array<{ id: string; centerId: string; radius: number }>,
-	inferred: Inferred[]
+	inferred: Inferred[],
+	kernel: TracePostprocessKernel
 ): void {
-	const api = getGeometryKernel().tracePostprocess;
 	const lines = lineIds.map(id => {
 		const line = sketch.lines.get(id),
 			a = line && sketch.points.get(line.p1Id),
@@ -120,14 +98,7 @@ export function inferTraceConstraints(
 		scale,
 		...settings.constraints,
 	};
-	if (
-		!api ||
-		![input.angleTolerance, input.tolerance, scale].every(Number.isFinite) ||
-		!lines.every(line => !line || line.every(finite)) ||
-		!input.radial.every(r => Number.isFinite(r.radius) && (!r.center || finite(r.center)))
-	)
-		return reference.inferAxisAndRelations(sketch, settings, scale, lineIds, radial, inferred);
-	let plan = api.relations(input);
+	let plan = kernel.relations(input);
 	for (const { line: index, vertical } of plan.axes) {
 		const line = sketch.lines.get(lineIds[index])!;
 		inferred.push({
@@ -161,7 +132,7 @@ export function inferTraceConstraints(
 					rejected.push(pair);
 					if (kind === 'perpendicular') input.rejectedPerpendicular = rejected;
 					else input.rejectedConcentric = rejected;
-					plan = api.relations(input);
+					plan = kernel.relations(input);
 					retry = true;
 					break;
 				}
@@ -181,7 +152,8 @@ export function inferTraceConstraints(
 export function movedTracePoints(
 	sketch: SketchDocument,
 	original: ReadonlyMap<string, Vec2>,
-	threshold: number
+	threshold: number,
+	kernel: TracePostprocessKernel
 ): Set<string> {
 	const ids: string[] = [],
 		before: Vec2[] = [],
@@ -194,10 +166,6 @@ export function movedTracePoints(
 			after.push(current);
 		}
 	}
-	const api = getGeometryKernel().tracePostprocess;
-	const moved =
-		api && Number.isFinite(threshold) && before.every(finite) && after.every(finite)
-			? api.moved(before, after, threshold)
-			: before.flatMap((p, i) => (p.distanceTo(after[i]) > threshold ? [i] : []));
+	const moved = kernel.moved(before, after, threshold);
 	return new Set(moved.map(i => ids[i]));
 }

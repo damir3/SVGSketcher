@@ -44,7 +44,9 @@ import {
 	extractSplineInterval,
 	type BezierSegment,
 } from '../math/spline';
-import { createTraceTransform, type TracePlacement, type TraceResult } from '../model/imageTrace';
+import type { TracePostprocessKernel } from '../kernel/tracePostprocessTypes';
+import type { TraceResult } from '../model/imageTrace';
+import { prepareTracePlacement, type TracePlacement } from '../model/imageTrace/postprocess';
 
 export function renderArcPreviewVisual(
 	parent: SVGElement,
@@ -414,9 +416,10 @@ export function renderTracePreviewVisual(
 	viewport: Viewport,
 	result: TraceResult,
 	placement: TracePlacement,
-	isConstruction: boolean
+	isConstruction: boolean,
+	kernel: TracePostprocessKernel
 ): void {
-	const { toWorld, scale } = createTraceTransform(result, placement);
+	const { toWorld, radius, clockwise } = prepareTracePlacement(result, placement, kernel);
 	const strokeAttrs = getPreviewStrokeAttrs(isConstruction, false, true);
 	const group = createSvgElement('g', { class: 'image-trace-preview', 'pointer-events': 'none' }, parent);
 
@@ -431,13 +434,9 @@ export function renderTracePreviewVisual(
 			if (segment.kind === 'line') {
 				createSvgLine(screenVertices[segment.a], screenVertices[segment.b], strokeAttrs, group);
 			} else if (segment.kind === 'arc') {
-				const start = worldVertices[segment.a];
-				const mid = toWorld(segment.mid);
-				const end = worldVertices[segment.b];
-				const turn = (mid.x - start.x) * (end.y - mid.y) - (mid.y - start.y) * (end.x - mid.x);
 				const sc = viewport.worldToScreen(toWorld(segment.center));
-				const sr = segment.radius * scale * viewport.zoom;
-				const d = getArcSvgPath(sc, screenVertices[segment.a], screenVertices[segment.b], sr, turn < 0);
+				const sr = radius(segment) * viewport.zoom;
+				const d = getArcSvgPath(sc, screenVertices[segment.a], screenVertices[segment.b], sr, clockwise(segment));
 				createSvgPath(d, strokeAttrs, group);
 			} else {
 				const fitPoints = [worldVertices[segment.a], ...segment.points.map(toWorld), worldVertices[segment.b]];
@@ -451,7 +450,7 @@ export function renderTracePreviewVisual(
 
 	for (const circle of result.circles) {
 		const sc = viewport.worldToScreen(toWorld(circle.center));
-		const sr = circle.radius * scale * viewport.zoom;
+		const sr = radius(circle) * viewport.zoom;
 		createSvgCircle(sc, sr, strokeAttrs, group);
 		createSvgCircle(sc, 2.5, PREVIEW_POINT_ATTRS, group);
 	}

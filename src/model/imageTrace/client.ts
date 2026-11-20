@@ -1,7 +1,8 @@
 import { getGeometryKernel } from '../../kernel';
 import type { SketchImage } from '../image';
 import type { TraceInput } from './types';
-import { loadImageTraceKernel } from '../../kernel/imageTraceLoader';
+import { loadImageTraceKernel, loadTracePostprocessKernel } from '../../kernel/imageTraceLoader';
+import type { TracePostprocessKernel } from '../../kernel/tracePostprocessTypes';
 import type { ImageTraceSettings, TraceResult } from './types';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './worker';
 
@@ -154,6 +155,10 @@ export class ImageTraceRunner {
 
 	private kernelUrl(): string {
 		return new URL(`${import.meta.env?.BASE_URL ?? '/'}kernel/sketcher_wasm.js`, document.baseURI).href;
+	}
+
+	async loadPostprocess(): Promise<TracePostprocessKernel> {
+		return getGeometryKernel().tracePostprocess ?? loadTracePostprocessKernel(this.kernelUrl());
 	}
 
 	private async traceInline(input: TraceInput, settings: ImageTraceSettings): Promise<TraceResult> {

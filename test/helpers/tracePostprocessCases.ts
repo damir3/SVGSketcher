@@ -1,20 +1,13 @@
 import { Vec2 } from '../../src/math/vector';
-import { createTraceTransform, inferAxisAndRelations } from '../../src/model/imageTrace/buildReference';
-import type { TraceRelationInput, TraceRelations, TracePlacementInput } from '../../src/kernel/tracePostprocessTypes';
+import type {
+	TraceRelationInput,
+	TraceRelations,
+	TracePostprocessKernel,
+} from '../../src/kernel/tracePostprocessTypes';
+import { inferTraceConstraints } from '../../src/model/imageTrace/postprocess';
 import type { SketchDocument } from '../../src/model/sketch';
-export function referencePlacement(input: TracePlacementInput) {
-	const transform = createTraceTransform(input, input.placement),
-		points = input.points.map(transform.toWorld);
-	return {
-		scale: transform.scale,
-		points,
-		radii: input.radii.map(r => r * transform.scale),
-		clockwise: input.arcs.map(
-			([a, m, b]) => new Vec2().subVectors(points[m], points[a]).cross(new Vec2().subVectors(points[b], points[m])) < 0
-		),
-	};
-}
-export function referenceRelations(input: TraceRelationInput, infer = inferAxisAndRelations): TraceRelations {
+
+export function applyTraceRelations(input: TraceRelationInput, kernel: TracePostprocessKernel): TraceRelations {
 	const out: TraceRelations = {
 		axes: [],
 		parallel: [],
@@ -76,7 +69,7 @@ export function referenceRelations(input: TraceRelationInput, infer = inferAxisA
 			return c();
 		},
 	} as unknown as SketchDocument;
-	infer(
+	inferTraceConstraints(
 		sketch,
 		{
 			angleTolerance: input.angleTolerance,
@@ -91,89 +84,8 @@ export function referenceRelations(input: TraceRelationInput, infer = inferAxisA
 		input.scale,
 		input.lines.map((_, i) => 'L' + i),
 		input.radial.map((r, i) => ({ id: 'R' + i, centerId: 'C' + i, radius: r.radius })),
-		[]
+		[],
+		kernel
 	);
 	return out;
-}
-export function tracePostprocessCases() {
-	const placements = [];
-	for (const angle of [0, 90, -27.5, 725])
-		for (const yScale of [0.75, 1, 1.3])
-			for (const size of [
-				[100, 60],
-				[60, 100],
-			]) {
-				const input = {
-					width: 80,
-					height: 40,
-					yScale,
-					placement: { x: 13, y: -27, width: size[0], height: size[1], angle },
-					points: [
-						{ x: 0, y: 0 },
-						{ x: 40, y: 20 },
-						{ x: 80, y: 40 },
-						{ x: 10, y: 35 },
-						{ x: 1e90, y: -2e90 },
-					],
-					radii: [1, 17.5],
-					arcs: [
-						[0, 1, 3],
-						[1, 2, 3],
-					] as const,
-				};
-				placements.push({ input, expected: referencePlacement(input) });
-			}
-	const relations = [];
-	let seed = 831235;
-	const random = () => {
-		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-		return seed / 2 ** 32;
-	};
-	for (let scene = 0; scene < 48; scene++)
-		for (const flags of [0, 1, 2, 4, 8, 15]) {
-			const angles = [0, 0.4, 179.6, 179.8, 10, 99.6, 100.4, 35, 125, 35.2];
-			const lines = angles.map((angle, i) => {
-				const length = 10 + Math.floor(random() * 4) * 0.06;
-				return [
-					{ x: i, y: -i },
-					{ x: i + Math.cos((angle * Math.PI) / 180) * length, y: -i + Math.sin((angle * Math.PI) / 180) * length },
-				] as const;
-			});
-			const input: TraceRelationInput = {
-				lines: scene % 3 === 0 ? [...lines, null] : lines,
-				radial: Array.from({ length: 8 }, (_, i) => ({
-					center: i === 7 ? null : { x: Math.floor(i / 3) * 20 + (i % 3) * 0.04, y: i % 3 === 0 ? 0 : 0.03 },
-					radius: 3 + Math.floor(random() * 3) * 0.02,
-				})),
-				angleTolerance: [0, 0.5, 1, 3][scene % 4],
-				tolerance: [0, 0.01, 0.1, 1][scene % 4],
-				scale: [0.1, 1, 10][scene % 3],
-				horizontalVertical: !!(flags & 1),
-				parallelPerpendicular: !!(flags & 2),
-				equal: !!(flags & 4),
-				concentric: !!(flags & 8),
-			};
-			const expected = referenceRelations(input);
-			relations.push({ input, expected });
-			if (flags === 15 && (expected.perpendicular.length || expected.concentric.length)) {
-				const rejected = {
-					...input,
-					rejectedPerpendicular: expected.perpendicular.slice(0, 1),
-					rejectedConcentric: expected.concentric.slice(0, 1),
-				};
-				relations.push({ input: rejected, expected: referenceRelations(rejected) });
-			}
-		}
-	const displacements = [];
-	for (const threshold of [0, 0.001, 1, 1e20]) {
-		const original = [new Vec2(), new Vec2(2, 3), new Vec2(10, 10), new Vec2(-1e308, 0)],
-			current = [new Vec2(), new Vec2(2 + threshold, 3), new Vec2(10 + threshold * 1.01, 10), new Vec2(1e308, 0)];
-		displacements.push({
-			original,
-			current,
-			threshold,
-			expected: original.flatMap((p, i) => (p.distanceTo(current[i]) > threshold ? [i] : [])),
-		});
-	}
-	return { placements, relations, displacements };
 }

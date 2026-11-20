@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
+import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { createWasmTracePostprocess } from '../src/kernel/tracePostprocessWasm';
-import { placeTrace, inferTraceConstraints } from '../src/model/imageTrace/postprocess';
-import { buildTraceGeometry, createTraceTransform } from '../src/model/imageTrace/build';
-import { buildTraceGeometry as buildReference } from '../src/model/imageTrace/buildReference';
-import { referenceRelations, referencePlacement, tracePostprocessCases } from './helpers/tracePostprocessCases';
+import { loadTracePostprocessKernel } from '../src/kernel/imageTraceLoader';
+import { buildTraceGeometry } from '../src/model/imageTrace/build';
+import { applyTraceRelations } from './helpers/tracePostprocessCases';
 import { SketchDocument } from '../src/model/sketch';
 import { DEFAULT_TRACE_SETTINGS, cloneTraceSettings } from '../src/model/imageTrace/types';
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelTracePostprocess.json', import.meta.url), 'utf8'));
@@ -22,39 +21,18 @@ function compare(a: any, b: any, path = '', tolerance = 1e-10) {
 		for (const key of Object.keys(b)) compare(a[key], b[key], path + '/' + key, tolerance);
 	} else assert.deepEqual(a, b, path);
 }
-test('trace postprocess fixture identifies the independent original build', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/model/imageTrace/buildReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixture.referenceHash
-	);
-	const expected = tracePostprocessCases();
-	compare(plain(expected), {
-		placements: fixture.placements,
-		relations: fixture.relations,
-		displacements: fixture.displacements,
-	});
-});
 for (const [i, f] of fixture.placements.entries())
-	test(`trace placement preserves original coordinates and winding ${i}`, () => {
+	test(`trace placement preserves original coordinates and winding ${i}`, { skip: !native }, () => {
 		const before = plain(f.input);
-		compare(plain(referencePlacement(f.input)), f.expected);
-		compare(plain(placeTrace(f.input)), f.expected);
-		const transform = createTraceTransform(f.input, f.input.placement);
-		assert.equal(transform.scale, f.expected.scale);
-		f.input.points.forEach((p: any, j: number) => compare(plain(transform.toWorld(p)), f.expected.points[j]));
+		compare(plain(native!.place(f.input)), f.expected);
 		assert.deepEqual(f.input, before);
 	});
 for (const [i, f] of fixture.relations.entries())
-	test(`trace relation grouping and rejection feedback preserve order ${i}`, () => {
-		assert.deepEqual(referenceRelations(f.input), f.expected);
-		assert.deepEqual(referenceRelations(f.input, inferTraceConstraints), f.expected);
-		if (native) {
-			const before = plain(f.input);
-			assert.deepEqual(native.relations(f.input), f.expected);
-			assert.deepEqual(f.input, before);
-		}
+	test(`trace relation grouping and rejection feedback preserve order ${i}`, { skip: !native }, () => {
+		const before = plain(f.input);
+		assert.deepEqual(applyTraceRelations(f.input, native!), f.expected);
+		assert.deepEqual(native!.relations(f.input), f.expected);
+		assert.deepEqual(f.input, before);
 	});
 for (const [i, f] of fixture.displacements.entries())
 	test(`trace displacement keeps strict threshold ${i}`, { skip: !native }, () =>
@@ -69,10 +47,45 @@ const sources = [
 	traceFixture.cases.find((f: any) => f.shape === 'ellipse' && f.settings.useSplines),
 	traceFixture.cases.find((f: any) => f.shape === 'disk'),
 ];
+
+test('an independently loaded Rust postprocessor works with the TypeScript geometry backend', {
+	skip: !native,
+}, async () => {
+	const previous = getGeometryKernel();
+	const doc = new SketchDocument();
+	const image = doc.addImage({
+		fileName: 'trace.png',
+		x: 0,
+		y: 0,
+		width: 80,
+		height: 64,
+		angle: 0,
+		opacity: 1,
+	});
+	doc.clearHistory();
+	const before = doc.takeSnapshot();
+	const result = { ...structuredClone(sources[0].expected), elapsedMs: 0 };
+	const settings = cloneTraceSettings(DEFAULT_TRACE_SETTINGS);
+	try {
+		setGeometryKernel(typescriptGeometryKernel);
+		assert.throws(() => buildTraceGeometry(doc, result, image, settings), /requires the Rust\/WASM kernel/);
+		assert.deepEqual(doc.takeSnapshot(), before);
+		assert.equal(doc.canUndo(), false);
+		const kernel = await loadTracePostprocessKernel(new URL('../public/kernel/sketcher_wasm.js', import.meta.url).href);
+		compare(plain(kernel.place(fixture.placements[0].input)), fixture.placements[0].expected);
+		assert.equal(buildTraceGeometry(doc, result, image, settings, kernel).entities.length, result.stats.lines);
+		assert.equal(getGeometryKernel().backend, 'typescript');
+	} finally {
+		setGeometryKernel(previous);
+	}
+});
+
 for (const source of sources)
 	for (const angle of [0, 27.5, -90])
 		for (const allRelations of [false, true])
-			test(`trace build keeps geometry, constraints, image action and history: ${source.name}/${angle}/${allRelations}`, () => {
+			test(`trace build keeps geometry, image action and history: ${source.name}/${angle}/${allRelations}`, {
+				skip: !native,
+			}, () => {
 				const settings = {
 					...cloneTraceSettings(source.settings),
 					angleTolerance: 3,
@@ -86,36 +99,40 @@ for (const source of sources)
 						equal: true,
 						concentric: true,
 					};
-				const make = () => {
-					const doc = new SketchDocument(),
-						image = doc.addImage({
-							id: 'Image-1',
-							fileName: 'trace.png',
-							x: 13,
-							y: -21,
-							width: source.expected.width * 0.7,
-							height: source.expected.height * 0.7,
-							angle,
-							opacity: 1,
-						});
-					doc.clearHistory();
-					return { doc, image };
+				const doc = new SketchDocument();
+				const image = doc.addImage({
+					fileName: 'trace.png',
+					x: 13,
+					y: -21,
+					width: source.expected.width * 0.7,
+					height: source.expected.height * 0.7,
+					angle,
+					opacity: 1,
+				});
+				doc.clearHistory();
+				const snapshot = () => {
+					const state = doc.takeSnapshot();
+					return { ...state, constraints: state.constraints.sort((a, b) => a.id.localeCompare(b.id)) };
 				};
-				const a = make(),
-					b = make(),
-					result = { ...structuredClone(source.expected), elapsedMs: 0 },
-					before = plain(result);
-				compare(
-					buildTraceGeometry(a.doc, result, a.image, settings),
-					buildReference(b.doc, structuredClone(result), b.image, settings),
-					'build'
+				const before = snapshot();
+				const result = { ...structuredClone(source.expected), elapsedMs: 0 };
+				const built = buildTraceGeometry(doc, result, image, settings);
+				assert.deepEqual(result, { ...source.expected, elapsedMs: 0 });
+				assert.deepEqual(
+					{
+						lines: built.entities.filter(x => x.type === 'line').length,
+						arcs: doc.arcs.size,
+						circles: doc.circles.size,
+						splines: doc.splines.size,
+					},
+					result.stats
 				);
-				compare(plain(a.doc.takeSnapshot()), plain(b.doc.takeSnapshot()), 'snapshot', 1e-8);
-				assert.deepEqual(plain(result), before);
-				assert.equal(a.doc.undo(), b.doc.undo());
-				compare(plain(a.doc.takeSnapshot()), plain(b.doc.takeSnapshot()), 'undo', 1e-8);
-				assert.equal(a.doc.redo(), b.doc.redo());
-				compare(plain(a.doc.takeSnapshot()), plain(b.doc.takeSnapshot()), 'redo', 1e-8);
+				assert.equal(doc.images.get(image.id)?.opacity, angle === 0 ? 1 : angle > 0 ? 0.3 : undefined);
+				const converted = snapshot();
+				assert.equal(doc.undo(), true);
+				assert.deepEqual(snapshot(), before);
+				assert.equal(doc.redo(), true);
+				compare(plain(snapshot()), plain(converted), 'redo', 1e-8);
 			});
 
 test('trace build uses one placement query and grouped inference', { skip: !native }, () => {
@@ -247,7 +264,7 @@ test('trace postprocess rejects malformed native packets and outputs', { skip: !
 	);
 });
 
-test('excessive displacement drops inferred constraints and restores the traced shape', () => {
+test('excessive displacement drops inferred constraints and restores the traced shape', { skip: !native }, () => {
 	const settings = {
 		...cloneTraceSettings(DEFAULT_TRACE_SETTINGS),
 		tolerance: 1e-5,
@@ -300,15 +317,11 @@ test('excessive displacement drops inferred constraints and restores the traced 
 		doc.clearHistory();
 		return { doc, image };
 	};
-	const a = make(),
-		b = make(),
-		actual = buildTraceGeometry(a.doc, structuredClone(result), a.image, settings),
-		expected = buildReference(b.doc, structuredClone(result), b.image, settings);
-	assert.deepEqual(actual, expected);
+	const { doc, image } = make();
+	const actual = buildTraceGeometry(doc, result, image, settings);
 	assert.equal(actual.constraints.dropped, 2);
 	assert.equal(actual.constraints.added, 0);
-	compare(plain(a.doc.takeSnapshot()), plain(b.doc.takeSnapshot()), 'restored');
-	const points = [...a.doc.points.values()];
+	const points = [...doc.points.values()];
 	compare(
 		points.map(p => ({ x: p.x, y: p.y })),
 		[

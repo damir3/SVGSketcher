@@ -1,31 +1,12 @@
 import { getGeometryKernel } from '../../kernel';
-import { createTraceTransform as referenceTransform, buildTraceGeometry as referenceBuild } from './buildReference';
-import { placeTrace, prepareTracePlacement, inferTraceConstraints, movedTracePoints } from './postprocess';
-import { Vec2, type XY } from '../../math/vector';
+import type { TracePostprocessKernel } from '../../kernel/tracePostprocessTypes';
+import { prepareTracePlacement, inferTraceConstraints, movedTracePoints } from './postprocess';
+import type { Vec2, XY } from '../../math/vector';
 import type { SketchImage } from '../image';
 import type { SelectableEntityType } from '../selection';
 import type { SketchDocument } from '../sketch';
 import type { IConstraint } from '../../solver/types';
 import type { ImageTraceSettings, TraceResult } from './types';
-
-export interface TracePlacement {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-	angle: number;
-}
-
-/** Maps fitting coordinates (x pixels, y scaled by `yScale`) of a trace result to world coordinates. */
-export function createTraceTransform(
-	result: Pick<TraceResult, 'width' | 'height' | 'yScale'>,
-	placement: TracePlacement
-): { toWorld: (p: XY) => Vec2; scale: number } {
-	if (!getGeometryKernel().tracePostprocess) return referenceTransform(result, placement);
-	const base = { ...result, placement, radii: [], arcs: [] };
-	const scale = placeTrace({ ...base, points: [] }).scale;
-	return { scale, toWorld: (p: XY) => Vec2.from(placeTrace({ ...base, points: [p] }).points[0]) };
-}
 
 export interface TraceBuildResult {
 	entities: Array<{ id: string; type: SelectableEntityType }>;
@@ -47,10 +28,11 @@ export function buildTraceGeometry(
 	sketch: SketchDocument,
 	result: TraceResult,
 	image: SketchImage,
-	settings: ImageTraceSettings
+	settings: ImageTraceSettings,
+	kernel = getGeometryKernel().tracePostprocess
 ): TraceBuildResult {
-	if (!getGeometryKernel().tracePostprocess) return referenceBuild(sketch, result, image, settings);
-	const placement = prepareTracePlacement(result, image);
+	if (!kernel) throw new Error('Image trace postprocessing requires the Rust/WASM kernel');
+	const placement = prepareTracePlacement(result, image, kernel);
 	const { toWorld, scale } = placement;
 	const construction = settings.construction;
 	const entities: TraceBuildResult['entities'] = [];
@@ -151,7 +133,7 @@ export function buildTraceGeometry(
 				entities.push({ id: created.id, type: 'spline' });
 			}
 
-			inferTraceConstraints(sketch, settings, scale, lineIds, radial, inferred);
+			inferTraceConstraints(sketch, settings, scale, lineIds, radial, inferred, kernel);
 			for (const id of createdPoints) {
 				const point = sketch.points.get(id);
 				if (point) traced.points.set(id, point.clone());
@@ -159,7 +141,13 @@ export function buildTraceGeometry(
 			for (const item of radial) traced.radii.set(item.id, item.radius);
 		});
 
-		const dropped = validateConstraints(sketch, inferred, traced, Math.max(settings.tolerance * scale * 2, 1e-3));
+		const dropped = validateConstraints(
+			sketch,
+			inferred,
+			traced,
+			Math.max(settings.tolerance * scale * 2, 1e-3),
+			kernel
+		);
 
 		if (settings.afterConvert === 'delete') sketch.removeImage(image.id);
 		else if (settings.afterConvert === 'dim') sketch.updateImage(image.id, { opacity: Math.min(image.opacity, 0.3) });
@@ -181,7 +169,8 @@ function validateConstraints(
 	sketch: SketchDocument,
 	inferred: Array<{ constraint: IConstraint; group: ConstraintGroup }>,
 	original: TracedState,
-	maxDisplacement: number
+	maxDisplacement: number,
+	kernel: TracePostprocessKernel
 ): number {
 	if (!inferred.length) return 0;
 	const pointsOf = (constraint: IConstraint): string[] => {
@@ -205,7 +194,7 @@ function validateConstraints(
 			if (entity) entity.radius = r;
 		}
 	};
-	const measure = () => movedTracePoints(sketch, original.points, maxDisplacement);
+	const measure = () => movedTracePoints(sketch, original.points, maxDisplacement, kernel);
 
 	let remaining = [...inferred];
 	let dropped = 0;

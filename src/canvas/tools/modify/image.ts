@@ -1,7 +1,6 @@
 import { Vec2 } from '../../../math/vector';
 import { getImagePivotOffset, type SketchImage } from '../../../model/image';
-import type { ImageTraceSettings, TraceResult } from '../../../model/imageTrace';
-import { ImageTraceModal } from '../../../ui/image-trace-modal';
+import { ImageTraceModal, type ImageTracePreview } from '../../../ui/image-trace-modal';
 import { getToolIcon } from '../../../ui/panels/tools/iconProvider';
 import { renderTracePreviewVisual } from '../../previewHelpers';
 import { getTransformGizmo, hitTransformGizmo, renderTransformGizmo } from '../../transformGizmo';
@@ -42,7 +41,7 @@ export class ImageTool extends BaseTool {
 	private container?: HTMLElement;
 	private readonly replaceImage: (id: string) => void;
 	private traceModal?: ImageTraceModal;
-	private tracePreview: { imageId: string; result: TraceResult | null; settings: ImageTraceSettings } | null = null;
+	private tracePreview: ImageTracePreview | null = null;
 
 	constructor(replaceImage: (id: string) => void) {
 		super();
@@ -109,13 +108,14 @@ export class ImageTool extends BaseTool {
 		const image = this.draft ?? this.image;
 		if (!image) return;
 		renderTransformGizmo(this.getGizmo(image), ctx.targetGroup);
-		if (this.tracePreview?.imageId === image.id && this.tracePreview.result) {
+		if (this.tracePreview?.imageId === image.id && this.tracePreview.result && this.tracePreview.postprocess) {
 			renderTracePreviewVisual(
 				ctx.targetGroup,
 				ctx.viewport,
 				this.tracePreview.result,
 				image,
-				this.tracePreview.settings.construction
+				this.tracePreview.settings.construction,
+				this.tracePreview.postprocess
 			);
 		}
 	}

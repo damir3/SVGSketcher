@@ -2,6 +2,7 @@ import { getGeometryKernel } from '../src/kernel';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { buildTraceGeometry } from '../src/model/imageTrace/build';
+import { convertTraceToSplines } from '../src/model/imageTrace/splines';
 import { filterTracePrimitives, traceImage, type TraceInput } from '../src/model/imageTrace/trace';
 import { cloneTraceSettings, DEFAULT_TRACE_SETTINGS, type ImageTraceSettings } from '../src/model/imageTrace/types';
 import { SketchDocument } from '../src/model/sketch';
@@ -55,6 +56,20 @@ describe('image tracing', { skip: !getGeometryKernel().traceImage }, () => {
 		assert.equal(result.stats.lines, 4);
 		assert.equal(result.stats.arcs, 4);
 		assert.equal(result.paths[0].tangent.filter(Boolean).length, 8);
+
+		const converted = convertTraceToSplines(result);
+		assert.deepEqual(converted.stats, { lines: 0, arcs: 0, circles: 0, splines: 1 });
+		const { points, handles } = converted.closedSplines[0];
+		for (const segment of result.paths[0].segments) {
+			if (segment.kind !== 'line') continue;
+			const start = result.vertices[segment.a];
+			const end = result.vertices[segment.b];
+			const same = (a: typeof start, b: typeof end) => a.x === b.x && a.y === b.y;
+			const i = points.findIndex((p, index) => same(p, start) && same(points[(index + 1) % points.length], end));
+			assert.ok(i >= 0);
+			assert.ok(same(handles[i].h2, start));
+			assert.ok(same(handles[(i + 1) % points.length].h1, end));
+		}
 	});
 
 	it('traces a stroked line as a single centerline segment', () => {
@@ -90,6 +105,13 @@ describe('image tracing', { skip: !getGeometryKernel().traceImage }, () => {
 			}
 		}
 		assert.ok([...uses.values()].includes(3));
+		const converted = convertTraceToSplines(result);
+		assert.equal(converted.stats.splines, 3);
+		assert.equal(converted.vertices, result.vertices);
+		assert.deepEqual(
+			converted.paths.map(path => path.segments.map(({ a, b }) => [a, b])),
+			result.paths.map(path => path.segments.map(({ a, b }) => [a, b]))
+		);
 	});
 
 	it('supports the pixel-edge outline algorithm', () => {

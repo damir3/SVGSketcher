@@ -5,6 +5,7 @@ import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
 import { createWasmImageTrace } from '../src/kernel/imageTraceWasm';
 import { traceImage } from '../src/model/imageTrace/trace';
+import { convertTraceToSplines } from '../src/model/imageTrace/splines';
 import { createTraceWorkerHandler } from '../src/model/imageTrace/workerRuntime';
 import { traceScene, noisyTraceCases } from './helpers/imageTraceScenes';
 import { buildTraceGeometry } from '../src/model/imageTrace/build';
@@ -217,8 +218,8 @@ test('Convert to Paths accepts thin closed contours with two anchors and preserv
 		height = 32,
 		gray = new Float32Array(width * height).fill(255);
 	for (let y = 14; y < 16; y++) for (let x = 12; x < 84; x++) gray[y * width + x] = 0;
-	const settings = { ...fixture.cases[0].settings, useSplines: true };
-	const result = traceImage({ gray, width, height, pixelSize: 1, yScale: 1 }, settings);
+	const settings = { ...fixture.cases[0].settings, useSplines: false };
+	const result = convertTraceToSplines(traceImage({ gray, width, height, pixelSize: 1, yScale: 1 }, settings));
 	assert.equal(result.closedSplines.length, 1);
 	assert.equal(result.closedSplines[0].points.length, 2);
 	assert.equal(result.closedSplines[0].handles.length, 2);

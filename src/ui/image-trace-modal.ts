@@ -1,8 +1,10 @@
 import { Vec2 } from '../math/vector';
+import type { TracePostprocessKernel } from '../kernel/tracePostprocessTypes';
 import type { SketchImage } from '../model/image';
 import {
 	buildTraceGeometry,
 	cloneTraceSettings,
+	convertTraceToSplines,
 	decodeImageForTrace,
 	DEFAULT_TRACE_SETTINGS,
 	filterTracePrimitives,
@@ -21,10 +23,15 @@ import type { SketchDocument } from '../model/sketch';
 import { getToolIcon } from './panels/tools/iconProvider';
 import { showToast } from './toast';
 
+export interface ImageTracePreview {
+	imageId: string;
+	result: TraceResult | null;
+	settings: ImageTraceSettings;
+	postprocess: TracePostprocessKernel | null;
+}
+
 export interface ImageTraceModalCallbacks {
-	onPreviewChange: (
-		preview: { imageId: string; result: TraceResult | null; settings: ImageTraceSettings } | null
-	) => void;
+	onPreviewChange: (preview: ImageTracePreview | null) => void;
 	onConverted: (imageId: string) => void;
 }
 
@@ -39,7 +46,9 @@ export class ImageTraceModal {
 	private settings: ImageTraceSettings = cloneTraceSettings(DEFAULT_TRACE_SETTINGS);
 	private currentImageId: string | null = null;
 	private unfilteredResult: TraceResult | null = null;
+	private splineResult: TraceResult | null = null;
 	private latestResult: TraceResult | null = null;
+	private postprocess: TracePostprocessKernel | null = null;
 	private isTracing = false;
 	private isOpen = false;
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -70,7 +79,9 @@ export class ImageTraceModal {
 		}
 		this.currentImageId = imageId;
 		this.unfilteredResult = null;
+		this.splineResult = null;
 		this.latestResult = null;
+		this.postprocess = null;
 		this.isOpen = true;
 		this.container?.classList.remove('hidden');
 		this.syncControlsFromSettings();
@@ -88,7 +99,9 @@ export class ImageTraceModal {
 		this.runner.dispose();
 		this.currentImageId = null;
 		this.unfilteredResult = null;
+		this.splineResult = null;
 		this.latestResult = null;
+		this.postprocess = null;
 		this.isTracing = false;
 		this.container?.classList.add('hidden');
 		this.callbacks.onPreviewChange(null);
@@ -287,9 +300,9 @@ export class ImageTraceModal {
 			['#trace-invert', s.invert, false],
 			['#trace-auto-min-segment', s.autoMinSegment, false],
 			['#trace-use-splines', s.useSplines, false],
-			['#trace-use-lines', s.useLines, s.useSplines],
-			['#trace-use-arcs', s.useArcs, s.useSplines],
-			['#trace-use-circles', s.useCircles, s.useSplines],
+			['#trace-use-lines', !s.useSplines && s.useLines, s.useSplines],
+			['#trace-use-arcs', !s.useSplines && s.useArcs, s.useSplines],
+			['#trace-use-circles', !s.useSplines && s.useCircles, s.useSplines],
 			['#trace-include-splines', s.useSplines || s.includeSplines, s.useSplines],
 			['#trace-c-tangent', s.constraints.tangent, false],
 			['#trace-c-hv', s.constraints.horizontalVertical, false],
@@ -386,7 +399,7 @@ export class ImageTraceModal {
 		bindCheck('#trace-use-splines', checked => {
 			this.settings.useSplines = checked;
 			this.syncControlsFromSettings();
-			this.scheduleTrace();
+			this.updatePrimitiveFilter();
 		});
 		bindCheck('#trace-construction', checked => {
 			this.settings.construction = checked;
@@ -543,14 +556,20 @@ export class ImageTraceModal {
 				useArcs: true,
 				useCircles: true,
 				includeSplines: true,
+				useSplines: false,
 			});
 			const input = await decodeImageForTrace(image, settingsSnap.maxResolution);
 			if (!this.isOpen || epoch !== this.traceEpoch) return;
 
-			const result = await this.runner.trace(input, settingsSnap);
+			const [result, postprocess] = await Promise.all([
+				this.runner.trace(input, settingsSnap),
+				this.runner.loadPostprocess(),
+			]);
 			if (!this.isOpen || epoch !== this.traceEpoch || !result) return;
 
 			this.unfilteredResult = result;
+			this.postprocess = postprocess;
+			this.splineResult = null;
 			this.isTracing = false;
 			if (this.settings.autoThreshold) {
 				this.setSliderAndNumber('#trace-threshold', result.threshold);
@@ -566,7 +585,9 @@ export class ImageTraceModal {
 			if (!this.isOpen || epoch !== this.traceEpoch) return;
 			this.isTracing = false;
 			this.unfilteredResult = null;
+			this.splineResult = null;
 			this.latestResult = null;
+			this.postprocess = null;
 			this.notifyPreview();
 			this.updateFooterUI(err instanceof Error ? err.message : 'Failed to trace image');
 		}
@@ -574,7 +595,9 @@ export class ImageTraceModal {
 
 	private updatePrimitiveFilter(): void {
 		if (!this.unfilteredResult) return;
-		this.latestResult = filterTracePrimitives(this.unfilteredResult, this.settings);
+		this.latestResult = this.settings.useSplines
+			? (this.splineResult ??= convertTraceToSplines(this.unfilteredResult))
+			: filterTracePrimitives(this.unfilteredResult, this.settings);
 		this.updateFooterUI();
 		this.notifyPreview();
 	}
@@ -585,6 +608,7 @@ export class ImageTraceModal {
 			imageId: this.currentImageId,
 			result: this.latestResult,
 			settings: cloneTraceSettings(this.settings),
+			postprocess: this.postprocess,
 		});
 	}
 
@@ -635,7 +659,7 @@ export class ImageTraceModal {
 	private applyConversion(): void {
 		const image = this.currentImage;
 		const result = this.latestResult;
-		if (!image || !result || this.isTracing) return;
+		if (!image || !result || !this.postprocess || this.isTracing) return;
 		const total = getTracePrimitiveCount(result.stats);
 		if (total === 0) {
 			showToast('No primitives detected with the current settings.');
@@ -644,7 +668,13 @@ export class ImageTraceModal {
 
 		const imageId = image.id;
 		const settings = cloneTraceSettings(this.settings);
-		const built = buildTraceGeometry(this.sketch, result, image, settings);
+		let built: ReturnType<typeof buildTraceGeometry>;
+		try {
+			built = buildTraceGeometry(this.sketch, result, image, settings, this.postprocess);
+		} catch (error) {
+			showToast(error instanceof Error ? error.message : String(error));
+			return;
+		}
 		this.close();
 		this.sketch.selectEntities(built.entities, false);
 		this.callbacks.onConverted(imageId);
