@@ -1,3 +1,4 @@
+import { prepareCopies } from '../../../model/copyGeometry';
 import { LINE_DISTANCE_PX } from '../../distances';
 import { AABB } from '../../../math/aabb';
 import { BaseTool } from '../base';
@@ -537,6 +538,13 @@ export class CircularPatternTool extends BaseTool {
 			return false;
 		}
 
+		const keys = Array.from({ length: N - 1 }, (_, i) => i + 1).filter(k => !suppression || !suppressedIndices.has(k));
+		const prepared = prepareCopies(
+			this.ctx.sketch,
+			selectedObjectIds,
+			keys.map(index => ({ type: 'circular' as const, center: centerPt, index, quantity: N, distribution, angle }))
+		);
+		const byIndex = new Map(keys.map((key, i) => [key, prepared[i]]));
 		this.ctx.sketch.beginTransaction();
 
 		const copies = [];
@@ -550,7 +558,8 @@ export class CircularPatternTool extends BaseTool {
 				k,
 				N,
 				distribution,
-				angle
+				angle,
+				byIndex.get(k)
 			);
 			if (copy) {
 				copies.push(copy);

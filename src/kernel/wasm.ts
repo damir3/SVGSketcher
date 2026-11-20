@@ -1,3 +1,4 @@
+import { createWasmCopy, type CopyBinding } from './copyWasm';
 import { createWasmTransform, type TransformBinding } from './transformWasm';
 import {
 	createWasmInspection,
@@ -36,6 +37,7 @@ import { createWasmTextGeometry, type TextGeometryBinding } from './textWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	copy_geometry: CopyBinding;
 	transform_geometry: TransformBinding;
 	constraint_max_errors: ConstraintErrorBinding;
 	inspect_constraints: InspectionBinding;
@@ -162,6 +164,7 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.resize_offset_spline !== 'function') throw new Error('WASM kernel has no offset spline resizing');
 	if (typeof bindings.trace_image !== 'function') throw new Error('WASM kernel has no image tracing');
 	if (typeof bindings.topology_queries !== 'function') throw new Error('WASM kernel has no topology operations');
+	if (typeof bindings.copy_geometry !== 'function') throw new Error('WASM kernel has no copy geometry');
 	if (typeof bindings.transform_geometry !== 'function') throw new Error('WASM kernel has no transforms');
 	if (typeof bindings.constraint_max_errors !== 'function')
 		throw new Error('WASM kernel has no constraint error queries');
@@ -171,6 +174,7 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.construct_geometry !== 'function') throw new Error('WASM kernel has no primitive construction');
 	if (typeof bindings.text_geometry !== 'function') throw new Error('WASM kernel has no text geometry');
 	return {
+		copies: createWasmCopy((...args) => bindings.copy_geometry(...args)),
 		transform: createWasmTransform((...args) => bindings.transform_geometry(...args)),
 		constraintErrors: createWasmConstraintErrors((...args) => bindings.constraint_max_errors(...args)),
 		inspectConstraints: createWasmInspection((...args) => bindings.inspect_constraints(...args)),

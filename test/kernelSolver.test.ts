@@ -135,6 +135,7 @@ it('validates the numerical solver packed result before exposing it to the model
 			constraint_dependency: () => new Float64Array(),
 			inspect_constraints: () => new Float64Array(),
 			transform_geometry: () => new Float64Array(),
+			copy_geometry: () => new Float64Array(),
 			constraint_max_errors: () => new Float64Array(),
 			solve_system: () => new Float64Array(data),
 		});

@@ -1,3 +1,4 @@
+import type { PreparedCopy } from './copyGeometry';
 import type { SketchImage } from './image';
 import type { NumericalSolver, ParamManager } from '../solver/solver';
 import type { IConstraint, SolverResult } from '../solver/types';
@@ -1040,7 +1041,8 @@ export class SketchDocument {
 		copyIndex: number,
 		quantity: number,
 		distribution: 'full' | 'partial' | 'symmetric',
-		totalAngle: number
+		totalAngle: number,
+		prepared?: PreparedCopy
 	): PatternCopyData | null {
 		return generateCircularPatternCopy(
 			this,
@@ -1049,7 +1051,8 @@ export class SketchDocument {
 			copyIndex,
 			quantity,
 			distribution,
-			totalAngle
+			totalAngle,
+			prepared
 		);
 	}
 
@@ -1128,7 +1131,8 @@ export class SketchDocument {
 		distance2: number,
 		direction2: 'one_direction' | 'symmetric',
 		u1: { x: number; y: number },
-		u2: { x: number; y: number }
+		u2: { x: number; y: number },
+		prepared?: PreparedCopy
 	): RectangularPatternCopyData | null {
 		return generateRectangularPatternCopy(
 			this,
@@ -1140,7 +1144,8 @@ export class SketchDocument {
 			distance2,
 			direction2,
 			u1,
-			u2
+			u2,
+			prepared
 		);
 	}
 

@@ -4,6 +4,7 @@ mod bezier;
 pub mod chamfer;
 pub mod constraints;
 pub mod construction;
+pub mod copies;
 pub mod curve_path;
 pub mod dependency;
 pub mod editing;

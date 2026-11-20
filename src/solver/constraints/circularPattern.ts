@@ -1,3 +1,4 @@
+import { prepareCopies } from '../../model/copyGeometry';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import {
@@ -273,11 +274,26 @@ export class CircularPatternConstraint extends BasePatternConstraint<PatternCopy
 			const N = this.quantity;
 			const suppressedSet = new Set(this.suppressedIndices);
 			const baseColor = getPatternBaseColor(ctx.sketch);
+			const prepared = prepareCopies(
+				ctx.sketch,
+				this.sourceObjectIds,
+				Array.from({ length: Math.max(0, Math.ceil(N) - 1) }, (_, i) => ({
+					type: 'circular' as const,
+					center: pCtr,
+					index: i + 1,
+					quantity: N,
+					distribution: this.distribution,
+					angle: this.totalAngle,
+				})),
+				true
+			);
 
 			for (let k = 1; k < N; k++) {
-				const aDeg = computePatternCopyAngle(k, N, this.distribution, this.totalAngle);
+				const copy = prepared[k - 1],
+					aDeg = copy.result.angle;
 				const rad = (aDeg * Math.PI) / 180;
 				renderPatternConstraintCopy({
+					prepared: copy,
 					ctx,
 					constraintId: this.id,
 					copyIndex: k,

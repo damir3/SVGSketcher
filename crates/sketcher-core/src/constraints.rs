@@ -501,8 +501,12 @@ impl Constraint {
 }
 
 fn pattern_angle(index: f64, quantity: f64, distribution: f64, total: f64) -> f64 {
+    (pattern_degrees(index, quantity, distribution, total) * std::f64::consts::PI) / 180.0
+}
+
+pub(crate) fn pattern_degrees(index: f64, quantity: f64, distribution: f64, total: f64) -> f64 {
     let count = quantity.round().max(2.0);
-    let degrees = if distribution == 0.0 {
+    if distribution == 0.0 {
         (index * 360.0) / count
     } else {
         let step = total / (count - 1.0);
@@ -513,11 +517,10 @@ fn pattern_angle(index: f64, quantity: f64, distribution: f64, total: f64) -> f6
         } else {
             -(index / 2.0) * step
         }
-    };
-    (degrees * std::f64::consts::PI) / 180.0
+    }
 }
 
-fn axis_offset(index: f64, distance: f64, symmetric: f64) -> f64 {
+pub(crate) fn axis_offset(index: f64, distance: f64, symmetric: f64) -> f64 {
     if index == 0.0 {
         0.0
     } else if symmetric == 0.0 {

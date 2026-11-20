@@ -1,4 +1,6 @@
 import type { SketchDocument } from '../../model/sketch';
+import type { PreparedCopy } from '../../model/copyGeometry';
+import type { GeoCurve } from '../../math/intersection';
 import { getSelectionCount } from '../../model/selection';
 import type { Viewport } from '../../canvas/viewport';
 import type { LinearDimensionVisualOptions } from '../../canvas/dimensionGeometry';
@@ -40,6 +42,7 @@ export interface ConstraintRenderContext {
 			| Vec2
 			| ((x: number, y: number) => { x: number; y: number }),
 		options: {
+			geometries?: ReadonlyMap<string, GeoCurve | null>;
 			targetGroup?: SVGGElement;
 			baseColor?: string;
 			opacity?: number;
@@ -113,6 +116,7 @@ export function renderPatternSuppressionCheckbox(
 }
 
 export function renderPatternConstraintCopy(opts: {
+	prepared?: PreparedCopy;
 	ctx: ConstraintRenderContext;
 	constraintId: string;
 	copyIndex: number;
@@ -132,7 +136,8 @@ export function renderPatternConstraintCopy(opts: {
 			if (pt) copyWorldPoints.push(pt);
 		}
 	} else if (ctx.renderTransformedObjects) {
-		copyWorldPoints = ctx.renderTransformedObjects(sourceObjectIds, transform, {
+		copyWorldPoints = ctx.renderTransformedObjects(sourceObjectIds, opts.prepared?.transformPoint ?? transform, {
+			geometries: opts.prepared?.geometries,
 			targetGroup: ctx.targetGroup,
 			baseColor,
 			opacity: 0.25,

@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 
 mod chamfer;
 mod construction;
+mod copies;
 mod curve_path;
 mod dependency;
 mod editing;
@@ -24,7 +25,7 @@ const PAIR_STRIDE: usize = CURVE_STRIDE * 2;
 
 #[wasm_bindgen]
 pub fn api_version() -> u32 {
-    36
+    37
 }
 
 fn decode_curve(data: &[f64]) -> Result<Curve, &'static str> {

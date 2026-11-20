@@ -1,3 +1,5 @@
+import { prepareCopies } from '../model/copyGeometry';
+import { patternDirections as computeRectangularPatternDirections } from '../math/copyGeometry';
 import type { ChamferCandidate, ChamferMode } from '../math/chamfer';
 import type { FilletCandidate } from '../math/fillet';
 import type { OffsetChain, OffsetDirection, OffsetGeometryResult } from '../math/offset';
@@ -7,14 +9,7 @@ import type { SketchDocument } from '../model/sketch';
 import type { TransformValues } from '../model/transform';
 import { prepareTransformPreview } from '../model/transformPreview';
 import type { GeoCurve } from '../math/intersection';
-import {
-	buildPointParamMap,
-	computePatternCopyAngle,
-	computeRectangularPatternDirections,
-	computeRectangularPatternOffset,
-	getPatternBaseColor,
-	renderPatternSuppressionCheckbox,
-} from '../solver/constraints';
+import { buildPointParamMap, getPatternBaseColor, renderPatternSuppressionCheckbox } from '../solver/constraints';
 import { formatDimensionValue } from './dimensionGeometry';
 import { GIZMO_DISTANCE_PX } from './distances';
 import {
@@ -260,15 +255,19 @@ export function renderTransformedObjects(
 		| ((x: number, y: number) => { x: number; y: number }),
 	options: RenderTransformedOptions
 ): Array<{ x: number; y: number }> {
+	const objects = [...objectIds];
+	let geometries = options.geometries;
 	let transformPoint: (x: number, y: number) => { x: number; y: number };
 	if (typeof transform === 'function') {
 		transformPoint = transform;
-	} else if ('angleDeg' in transform) {
-		const rad = (transform.angleDeg * Math.PI) / 180;
-		const center = transform.center;
-		transformPoint = (x, y) => new Vec2(x, y).rotateAround(center, rad);
 	} else {
-		transformPoint = (x, y) => new Vec2(x, y).add(transform);
+		const operation =
+			'angleDeg' in transform
+				? { type: 'rotation' as const, center: transform.center, angle: transform.angleDeg }
+				: { type: 'translation' as const, offset: transform };
+		const prepared = prepareCopies(sketch, objects, [operation], true)[0];
+		transformPoint = prepared.transformPoint;
+		geometries = prepared.geometries;
 	}
 
 	const copyWorldPoints: Array<{ x: number; y: number }> = [];
@@ -304,11 +303,11 @@ export function renderTransformedObjects(
 		return options.transformScale === undefined ? attrs : { ...attrs, stroke: baseColor };
 	};
 
-	for (const objId of objectIds) {
+	for (const objId of objects) {
 		const prim = sketch.getPrimitive(objId);
 		if (!prim) continue;
 		const pts = prim.renderTransformed({
-			geometry: options.geometries?.get(objId),
+			geometry: geometries?.get(objId),
 			sketch,
 			viewport,
 			transformPoint,
@@ -475,11 +474,9 @@ export function renderMirrorPreview(
 	const sA = viewport.worldToScreen(pA);
 	const sB = viewport.worldToScreen(pB);
 
-	const dir = new Vec2().subVectors(pB, pA);
-	const lineLen = dir.length();
-	if (lineLen < 1e-6) return;
-
-	const normal = dir.clone().perpendicular().divideScalar(lineLen);
+	const idsToMirror = [...selectedObjectIds].filter(id => id !== mirrorLineId);
+	const prepared = prepareCopies(sketch, idsToMirror, [{ type: 'mirror', a: pA, b: pB }], true)[0];
+	if (!prepared.result.valid) return;
 
 	// Highlight mirror line: bright gold/amber centerline
 	const previewStart =
@@ -495,8 +492,8 @@ export function renderMirrorPreview(
 	if (selectedObjectIds.size === 0) return;
 
 	const baseColor = getPatternBaseColor(sketch);
-	const idsToMirror = [...selectedObjectIds].filter(id => id !== mirrorLineId);
-	renderTransformedObjects(sketch, viewport, idsToMirror, (x, y) => new Vec2(x, y).reflectAcrossLine(pA, normal), {
+	renderTransformedObjects(sketch, viewport, idsToMirror, prepared.transformPoint, {
+		geometries: prepared.geometries,
 		targetGroup,
 		baseColor,
 		opacity: 0.5,
@@ -574,27 +571,36 @@ export function renderPatternPreview(
 		while (lastVisibleCopyIndex > 0 && suppressedIndices.has(lastVisibleCopyIndex)) lastVisibleCopyIndex--;
 	}
 
+	const prepared = prepareCopies(
+		sketch,
+		selectedObjectIds,
+		Array.from({ length: N - 1 }, (_, i) => ({
+			type: 'circular' as const,
+			center: centerPt,
+			index: i + 1,
+			quantity: N,
+			distribution,
+			angle,
+		})),
+		true
+	);
 	let angleHandle: PatternAngleHandle | null = null;
 
 	for (let k = 1; k < N; k++) {
-		const aDeg = computePatternCopyAngle(k, N, distribution, angle);
+		const copy = prepared[k - 1],
+			aDeg = copy.result.angle;
 		const isSuppressed = suppressedIndices.has(k);
 		const copyOpacity = isSuppressed ? 0.15 : 0.5;
 
-		const copyWorldPoints = renderTransformedObjects(
-			sketch,
-			viewport,
-			selectedObjectIds,
-			{ center: centerPt, angleDeg: aDeg },
-			{
-				targetGroup,
-				baseColor,
-				opacity: copyOpacity,
-				isSuppressed,
-				drawVertices: true,
-				strokeWidth: STROKE_WIDTH.normal,
-			}
-		);
+		const copyWorldPoints = renderTransformedObjects(sketch, viewport, selectedObjectIds, copy.transformPoint, {
+			geometries: copy.geometries,
+			targetGroup,
+			baseColor,
+			opacity: copyOpacity,
+			isSuppressed,
+			drawVertices: true,
+			strokeWidth: STROKE_WIDTH.normal,
+		});
 
 		const worldCentroid =
 			copyWorldPoints.length > 0
@@ -666,6 +672,25 @@ export function renderRectangularPatternPreview(
 	const maxI = Math.abs(highlight.distance1) > 1e-6 ? highlight.quantity1 : 1;
 	const maxJ = Math.abs(highlight.distance2) > 1e-6 ? highlight.quantity2 : 1;
 	const baseColor = getPatternBaseColor(sketch);
+	const indices: Array<{ i: number; j: number }> = [];
+	for (let i = 0; i < maxI; i++) for (let j = 0; j < maxJ; j++) if (i || j) indices.push({ i, j });
+	const results = prepareCopies(
+		sketch,
+		highlight.selectedObjectIds,
+		indices.map(({ i, j }) => ({
+			type: 'rectangular' as const,
+			i,
+			j,
+			distance1: highlight.distance1,
+			direction1: highlight.direction1,
+			distance2: highlight.distance2,
+			direction2: highlight.direction2,
+			u1,
+			u2,
+		})),
+		true
+	);
+	const prepared = new Map(indices.map(({ i, j }, k) => [`${i},${j}`, results[k]]));
 
 	for (let i = 0; i < maxI; i++) {
 		for (let j = 0; j < maxJ; j++) {
@@ -673,25 +698,24 @@ export function renderRectangularPatternPreview(
 			const copyIndex = i * 1000 + j;
 			const isSuppressed = highlight.suppressedIndices.has(copyIndex);
 			const copyOpacity = isSuppressed ? 0.15 : 0.5;
-			const offset = computeRectangularPatternOffset(
-				i,
-				j,
-				highlight.distance1,
-				highlight.direction1,
-				highlight.distance2,
-				highlight.direction2,
-				u1,
-				u2
-			);
+			const copy = prepared.get(`${i},${j}`)!,
+				offset = Vec2.from(copy.result.offset);
 
-			const copyWorldPoints = renderTransformedObjects(sketch, viewport, highlight.selectedObjectIds, offset, {
-				targetGroup,
-				baseColor,
-				opacity: copyOpacity,
-				isSuppressed,
-				drawVertices: true,
-				strokeWidth: STROKE_WIDTH.normal,
-			});
+			const copyWorldPoints = renderTransformedObjects(
+				sketch,
+				viewport,
+				highlight.selectedObjectIds,
+				copy.transformPoint,
+				{
+					geometries: copy.geometries,
+					targetGroup,
+					baseColor,
+					opacity: copyOpacity,
+					isSuppressed,
+					drawVertices: true,
+					strokeWidth: STROKE_WIDTH.normal,
+				}
+			);
 
 			const copyCentroid = viewport.worldToScreen(
 				copyWorldPoints.length > 0 ? Vec2.centroid(copyWorldPoints) : centroidWorld.clone().add(offset)

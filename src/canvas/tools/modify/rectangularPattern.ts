@@ -1,3 +1,5 @@
+import { prepareCopies } from '../../../model/copyGeometry';
+import { patternDirections as computeRectangularPatternDirections } from '../../../math/copyGeometry';
 import { LINE_DISTANCE_PX } from '../../distances';
 import { hitGizmoHandle } from '../../modifyPreviews';
 import { AABB } from '../../../math/aabb';
@@ -5,10 +7,7 @@ import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { Vec2 } from '../../../math/vector';
-import {
-	computeRectangularPatternDirections,
-	type RectangularPatternCopyData,
-} from '../../../solver/constraints/rectangularPattern';
+import { type RectangularPatternCopyData } from '../../../solver/constraints/rectangularPattern';
 import {
 	calculateObjectsCentroid,
 	collectPatternCheckboxesToAABB,
@@ -662,6 +661,26 @@ export class RectangularPatternTool extends BaseTool {
 
 		const { u1, u2 } = this.computeDirections();
 
+		const indices: Array<{ i: number; j: number }> = [];
+		for (let i = 0; i < maxI; i++)
+			for (let j = 0; j < maxJ; j++)
+				if ((i || j) && (!state.suppression || !state.suppressedIndices.has(i * 1000 + j))) indices.push({ i, j });
+		const results = prepareCopies(
+			this.ctx.sketch,
+			state.selectedObjectIds,
+			indices.map(({ i, j }) => ({
+				type: 'rectangular' as const,
+				i,
+				j,
+				distance1: state.distance1,
+				direction1: state.direction1,
+				distance2: state.distance2,
+				direction2: state.direction2,
+				u1,
+				u2,
+			}))
+		);
+		const prepared = new Map(indices.map(({ i, j }, k) => [`${i},${j}`, results[k]]));
 		this.ctx.sketch.beginTransaction();
 
 		const copies: RectangularPatternCopyData[] = [];
@@ -680,7 +699,8 @@ export class RectangularPatternTool extends BaseTool {
 					state.distance2,
 					state.direction2,
 					u1,
-					u2
+					u2,
+					prepared.get(`${i},${j}`)
 				);
 				if (copy) {
 					copies.push(copy);

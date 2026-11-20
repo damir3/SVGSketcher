@@ -1,3 +1,5 @@
+import { prepareCopies } from '../../model/copyGeometry';
+import { patternDirections } from '../../math/copyGeometry';
 import { calculateObjectsCentroid } from '../../canvas/tools/modify/utils';
 import type { JacobianEntry } from '../types';
 import { readParamPoint } from './base';
@@ -287,7 +289,7 @@ export class RectangularPatternConstraint extends BasePatternConstraint<Rectangu
 		const paramMap = buildPointParamMap(ctx.sketch);
 		const line1 = this.line1P1Id && this.line1P2Id ? { p1Id: this.line1P1Id, p2Id: this.line1P2Id } : null;
 		const line2 = this.line2P1Id && this.line2P2Id ? { p1Id: this.line2P1Id, p2Id: this.line2P2Id } : null;
-		const { u1, u2 } = computeRectangularPatternDirections(paramMap, line1, line2);
+		const { u1, u2 } = patternDirections(paramMap, line1, line2);
 		const isConstraintActive = isConstraintOnlySelected(this.id, ctx.sketch);
 
 		if (isConstraintActive) {
@@ -303,22 +305,34 @@ export class RectangularPatternConstraint extends BasePatternConstraint<Rectangu
 				const baseColor = getPatternBaseColor(ctx.sketch);
 				const maxI = Math.abs(this.distance1) > 1e-6 ? this.quantity1 : 1;
 				const maxJ = Math.abs(this.distance2) > 1e-6 ? this.quantity2 : 1;
+				const indices: Array<{ i: number; j: number }> = [];
+				for (let i = 0; i < maxI; i++) for (let j = 0; j < maxJ; j++) if (i || j) indices.push({ i, j });
+				const results = prepareCopies(
+					ctx.sketch,
+					this.sourceObjectIds,
+					indices.map(({ i, j }) => ({
+						type: 'rectangular' as const,
+						i,
+						j,
+						distance1: this.distance1,
+						direction1: this.direction1,
+						distance2: this.distance2,
+						direction2: this.direction2,
+						u1,
+						u2,
+					})),
+					true
+				);
+				const prepared = new Map(indices.map(({ i, j }, k) => [`${i},${j}`, results[k]]));
 
 				for (let i = 0; i < maxI; i++) {
 					for (let j = 0; j < maxJ; j++) {
 						if (i === 0 && j === 0) continue;
 						const copyIndex = i * 1000 + j;
-						const offset = computeRectangularPatternOffset(
-							i,
-							j,
-							this.distance1,
-							this.direction1,
-							this.distance2,
-							this.direction2,
-							u1,
-							u2
-						);
+						const copy = prepared.get(`${i},${j}`)!,
+							offset = Vec2.from(copy.result.offset);
 						renderPatternConstraintCopy({
+							prepared: copy,
 							ctx,
 							constraintId: this.id,
 							copyIndex,

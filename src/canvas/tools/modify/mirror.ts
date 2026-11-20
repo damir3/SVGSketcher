@@ -1,9 +1,9 @@
+import { prepareCopies } from '../../../model/copyGeometry';
 import { findTransformObjectId, formatLineLengthLabel } from './utils';
 import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent } from '../types';
 import type { HoverTarget, FindHoverTargetOptions } from '../hoverTarget';
 import { ModifyToolPanel } from '../../../ui/panels/tools';
-import { Vec2 } from '../../../math/vector';
 
 export interface MirrorState {
 	phase: 'objects' | 'mirror_line';
@@ -228,17 +228,15 @@ export class MirrorTool extends BaseTool {
 		const pB = this.ctx.sketch.points.get(mirrorLine.p2Id);
 		if (!pA || !pB) return false;
 
-		const dir = new Vec2().subVectors(pB, pA);
-		const lineLen = dir.length();
-		if (lineLen < 1e-6) {
+		const prepared = prepareCopies(
+			this.ctx.sketch,
+			[...selectedObjectIds].filter(id => id !== mirrorLineId),
+			[{ type: 'mirror', a: pA, b: pB }]
+		)[0];
+		if (!prepared.result.valid) {
 			this.ctx.showToast('Mirror line length is zero');
 			return false;
 		}
-
-		// Unit normal to mirror line
-		const normal = dir.clone().perpendicular().divideScalar(lineLen);
-
-		const isPointOnMirrorLine = (p: Vec2): boolean => Math.abs(new Vec2().subVectors(p, pA).dot(normal)) < 1e-3;
 
 		this.ctx.sketch.beginTransaction();
 
@@ -256,7 +254,7 @@ export class MirrorTool extends BaseTool {
 			if (
 				origPtId === mirrorLine.p1Id ||
 				origPtId === mirrorLine.p2Id ||
-				(isPointOnMirrorLine(pt) && !this.ctx.sketch.isSplineHandlePoint(origPtId))
+				(prepared.near(origPtId, pt) && !this.ctx.sketch.isSplineHandlePoint(origPtId))
 			) {
 				pointMap.set(origPtId, origPtId);
 				if (origPtId !== mirrorLine.p1Id && origPtId !== mirrorLine.p2Id) {
@@ -272,7 +270,7 @@ export class MirrorTool extends BaseTool {
 			}
 
 			// Reflect point
-			const refPos = pt.clone().reflectAcrossLine(pA, normal);
+			const refPos = prepared.point(origPtId, pt);
 			const newPt = this.ctx.sketch.addPoint(refPos, false);
 			pointMap.set(origPtId, newPt.id);
 
