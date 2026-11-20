@@ -17,3 +17,10 @@ export interface InspectionResult {
 	measurements: Float64Array;
 }
 export type InspectionKernel = (input: InspectionInput) => InspectionResult;
+export interface ConstraintErrorInput {
+	nativeConstraints: Float64Array;
+	rowCounts: readonly number[];
+	weights: readonly number[];
+}
+/** Per-original-constraint maximum absolute residual, divided by abs(weight) or 1 for zero weight. */
+export type ConstraintErrorKernel = (input: ConstraintErrorInput) => Float64Array;

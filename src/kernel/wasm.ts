@@ -1,4 +1,10 @@
-import { createWasmInspection, type InspectionBinding } from './inspectionWasm';
+import { createWasmTransform, type TransformBinding } from './transformWasm';
+import {
+	createWasmInspection,
+	type InspectionBinding,
+	createWasmConstraintErrors,
+	type ConstraintErrorBinding,
+} from './inspectionWasm';
 import { createWasmDependency, type DependencyBinding } from './dependencyWasm';
 import { createWasmConstruction, type ConstructionBinding } from './constructionWasm';
 import { createWasmImageTrace, type ImageTraceBinding } from './imageTraceWasm';
@@ -30,6 +36,8 @@ import { createWasmTextGeometry, type TextGeometryBinding } from './textWasm';
 
 /** Structural interface to generated bindings; no generated code is required for TS-only builds. */
 export interface WasmKernelBindings {
+	transform_geometry: TransformBinding;
+	constraint_max_errors: ConstraintErrorBinding;
 	inspect_constraints: InspectionBinding;
 	constraint_dependency: DependencyBinding;
 	construct_geometry: ConstructionBinding;
@@ -154,12 +162,17 @@ export function createWasmGeometryKernel(bindings: WasmKernelBindings): Geometry
 	if (typeof bindings.resize_offset_spline !== 'function') throw new Error('WASM kernel has no offset spline resizing');
 	if (typeof bindings.trace_image !== 'function') throw new Error('WASM kernel has no image tracing');
 	if (typeof bindings.topology_queries !== 'function') throw new Error('WASM kernel has no topology operations');
+	if (typeof bindings.transform_geometry !== 'function') throw new Error('WASM kernel has no transforms');
+	if (typeof bindings.constraint_max_errors !== 'function')
+		throw new Error('WASM kernel has no constraint error queries');
 	if (typeof bindings.inspect_constraints !== 'function') throw new Error('WASM kernel has no constraint inspection');
 	if (typeof bindings.constraint_dependency !== 'function')
 		throw new Error('WASM kernel has no constraint dependency analysis');
 	if (typeof bindings.construct_geometry !== 'function') throw new Error('WASM kernel has no primitive construction');
 	if (typeof bindings.text_geometry !== 'function') throw new Error('WASM kernel has no text geometry');
 	return {
+		transform: createWasmTransform((...args) => bindings.transform_geometry(...args)),
+		constraintErrors: createWasmConstraintErrors((...args) => bindings.constraint_max_errors(...args)),
 		inspectConstraints: createWasmInspection((...args) => bindings.inspect_constraints(...args)),
 		dependency: createWasmDependency((...args) => bindings.constraint_dependency(...args)),
 		construction: createWasmConstruction((mode, data) => bindings.construct_geometry(mode, data)),

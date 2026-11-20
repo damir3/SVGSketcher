@@ -94,6 +94,24 @@ pub fn inspect(
     Ok(result)
 }
 
+pub fn max_errors(
+    data: &[f64],
+    groups: &[usize],
+    weights: &[f64],
+) -> Result<Vec<f64>, &'static str> {
+    if groups.len() != weights.len() || weights.iter().any(|v| !v.is_finite()) {
+        return Err("Invalid inspection weights");
+    }
+    let rows = groups
+        .iter()
+        .try_fold(0usize, |sum, &n| sum.checked_add(n))
+        .ok_or("Inspection row overflow")?;
+    if rows > data.len() {
+        return Err("Invalid inspection row count");
+    }
+    Program::decode(data, 0, rows, rows)?.max_errors(groups, weights)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

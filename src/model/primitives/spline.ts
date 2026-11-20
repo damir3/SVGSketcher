@@ -174,8 +174,9 @@ export class SketchSpline implements ISketchPrimitive {
 	}
 
 	renderTransformed(opts: PrimitiveTransformRenderOptions): Array<{ x: number; y: number }> {
-		const spline = this.toGeoCurve(opts.sketch);
+		const spline = opts.geometry === undefined ? this.toGeoCurve(opts.sketch) : opts.geometry;
 		if (!spline) return [];
+		if (spline.type !== 'spline') return [];
 
 		const points = spline.points.map(point => opts.transformPoint(point.x, point.y));
 		if (opts.targetGroup && opts.strokeAttrs) {

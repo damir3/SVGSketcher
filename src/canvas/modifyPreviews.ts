@@ -4,7 +4,9 @@ import type { OffsetChain, OffsetDirection, OffsetGeometryResult } from '../math
 import { fitPointsToBezier, getSplineSvgPath } from '../math/spline';
 import { Vec2 } from '../math/vector';
 import type { SketchDocument } from '../model/sketch';
-import { createTransform, type TransformValues } from '../model/transform';
+import type { TransformValues } from '../model/transform';
+import { prepareTransformPreview } from '../model/transformPreview';
+import type { GeoCurve } from '../math/intersection';
 import {
 	buildPointParamMap,
 	computePatternCopyAngle,
@@ -233,6 +235,7 @@ export interface OffsetPreviewState {
 }
 
 export interface RenderTransformedOptions {
+	geometries?: ReadonlyMap<string, GeoCurve | null>;
 	targetGroup?: SVGGElement;
 	baseColor?: string;
 	opacity?: number;
@@ -305,6 +308,7 @@ export function renderTransformedObjects(
 		const prim = sketch.getPrimitive(objId);
 		if (!prim) continue;
 		const pts = prim.renderTransformed({
+			geometry: options.geometries?.get(objId),
 			sketch,
 			viewport,
 			transformPoint,
@@ -330,8 +334,9 @@ export function renderTransformPreview(
 	color: string,
 	renderTextOverlay?: (textTargetGroup: SVGGElement) => void
 ): void {
-	const transform = createTransform(center, values);
-	renderTransformedObjects(sketch, viewport, ids, (x, y) => transform.point(new Vec2(x, y)), {
+	const transform = prepareTransformPreview(sketch, ids, center, values);
+	renderTransformedObjects(sketch, viewport, ids, transform.point, {
+		geometries: transform.geometries,
 		targetGroup,
 		baseColor: color,
 		transformScale: values.scale,
@@ -340,7 +345,7 @@ export function renderTransformPreview(
 
 	if (sketch.selection.textIds.size === 0 || !renderTextOverlay) return;
 	const from = viewport.worldToScreen(center);
-	const to = viewport.worldToScreen(transform.point(center));
+	const to = viewport.worldToScreen(transform.point(center.x, center.y));
 	const textPreview = createSvgElement(
 		'g',
 		{

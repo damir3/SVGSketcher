@@ -33,6 +33,8 @@ export interface PrimitiveRenderContext {
 }
 
 export interface PrimitiveTransformRenderOptions {
+	/** Optional curve snapshot prepared by a batched preview. */
+	readonly geometry?: GeoCurve | null;
 	readonly sketch: any;
 	readonly viewport: any;
 	readonly transformPoint: (x: number, y: number) => { x: number; y: number };

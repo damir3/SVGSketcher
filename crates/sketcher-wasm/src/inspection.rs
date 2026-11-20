@@ -34,3 +34,17 @@ pub fn inspect_constraints(
 ) -> Result<Vec<f64>, JsValue> {
     query(data, groups, measurements).map_err(JsValue::from_str)
 }
+
+#[wasm_bindgen]
+pub fn constraint_max_errors(
+    data: &[f64],
+    groups: &[f64],
+    weights: &[f64],
+) -> Result<Vec<f64>, JsValue> {
+    let groups = groups
+        .iter()
+        .map(|&v| integer(v))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(JsValue::from_str)?;
+    inspection::max_errors(data, &groups, weights).map_err(JsValue::from_str)
+}

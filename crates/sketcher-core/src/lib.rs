@@ -22,6 +22,7 @@ pub mod spline;
 pub mod spline_editing;
 pub mod text_geometry;
 pub mod topology;
+pub mod transform;
 
 pub use point::{
     add, add_scaled, angle, cross, distance, dot, middle, p, perp, polar, scale, step, sub, unit,

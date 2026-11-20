@@ -1,5 +1,10 @@
+import { getGeometryKernel } from '../kernel';
+import { transformGeometry } from '../math/transform';
+import { applyTransform as applyReference } from './transformReference';
+import { describeNativeConstraint } from '../solver/nativeConstraints';
+import { constraintMaxErrors } from '../solver/constraintMaxErrors';
 import { AABB, getCurveBoundingBox } from '../math/aabb';
-import { ORIGIN, Vec2, type XY } from '../math/vector';
+import { Vec2, type XY } from '../math/vector';
 import { FixedConstraint, OffsetConstraint } from '../solver/constraints';
 import { deserializeConstraint, serializeConstraint } from '../solver/constraints/serialization';
 import type { IConstraint } from '../solver/types';
@@ -23,16 +28,13 @@ export interface TransformValues {
 }
 
 export function createTransform(center: Vec2, values: TransformValues) {
-	const angle = ((values.angle % 360) * Math.PI) / 180;
-	const translation = new Vec2(values.x, values.y);
-	const rotate = (vector: XY) => Vec2.from(vector).rotateAround(ORIGIN, angle);
+	const translation = new Vec2(values.x, values.y),
+		angleDegrees = values.angle;
+	const batch = (points: readonly XY[], vectors: readonly XY[]) =>
+		transformGeometry({ center, translation, angleDegrees, scale: values.scale, points, vectors, sizes: [] });
 	return {
-		rotate,
-		point: (point: XY) =>
-			center
-				.clone()
-				.add(translation)
-				.addScaledVector(new Vec2().subVectors(point, center).rotateAround(ORIGIN, angle), values.scale),
+		point: (point: XY) => Vec2.from(batch([point], []).points[0]),
+		rotate: (vector: XY) => Vec2.from(batch([], [vector]).vectors[0]),
 	};
 }
 
@@ -117,11 +119,6 @@ function mapConstraintData(value: unknown, mapId: (id: string) => string): unkno
 	return value;
 }
 
-function constraintError(constraint: IConstraint, params: Map<string, number>): number {
-	const residuals = constraint.evaluate(params);
-	return residuals.reduce((max, residual) => Math.max(max, Math.abs(residual)), 0) / (Math.abs(constraint.weight) || 1);
-}
-
 export function applyTransform(
 	sketch: SketchDocument,
 	selection: TransformSelection,
@@ -131,26 +128,52 @@ export function applyTransform(
 	if (!Object.values(values).every(Number.isFinite) || values.scale < selection.minScale) {
 		throw new Error('Invalid transform parameters.');
 	}
-	const transform = createTransform(selection.center, values);
+	const constraints = [...sketch.constraints.values()];
+	if (
+		!getGeometryKernel().transform ||
+		!getGeometryKernel().constraintErrors ||
+		constraints.some(c => c.type !== 'drag_point' && !describeNativeConstraint(c))
+	)
+		return applyReference(sketch, selection, values, copy);
 	const { entities } = selection;
 	const before = sketch.paramManager.getCurrentValues();
 	const after = new Map(before);
 	const ids = new Map<string, string>();
 	const constraintUpdates = new Map<string, IConstraint | null>();
 	const points = new Map<string, Vec2>();
-	const constraints = [...sketch.constraints.values()];
 	const movedPoints = new Set<string>();
 
-	for (const entity of entities.values()) {
-		if (entity.type === 'point') {
-			const p = transform.point(entity);
-			if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) throw new Error('The transformed coordinates are too large.');
-			points.set(entity.id, p);
-			if (p.x !== entity.x || p.y !== entity.y) movedPoints.add(entity.id);
-		} else if ('radius' in entity || entity.type === 'text') {
-			const size = 'radius' in entity ? entity.radius : entity.height;
-			if (!Number.isFinite(size * values.scale)) throw new Error('The transformed size is too large.');
-		}
+	const pointEntities = [...entities.values()].filter((entity): entity is SketchPoint => entity.type === 'point');
+	const sizedEntities = [...entities.values()].filter(
+		(entity): entity is SketchCircle | SketchArc | SketchText => 'radius' in entity || entity.type === 'text'
+	);
+	const samples = new Map<OffsetConstraint, Array<{ basePos: Vec2; normal: Vec2 }>>();
+	const offsetSamples = constraints.flatMap(c =>
+		c instanceof OffsetConstraint
+			? c.pairs.flatMap(pair => (pair.kind === 'spline' ? pair.points.map(point => ({ constraint: c, point })) : []))
+			: []
+	);
+	const result = transformGeometry({
+		center: selection.center,
+		translation: { x: values.x, y: values.y },
+		angleDegrees: values.angle,
+		scale: values.scale,
+		points: [...pointEntities, ...offsetSamples.map(s => s.point.basePos)],
+		vectors: offsetSamples.map(s => s.point.normal),
+		sizes: sizedEntities.map(entity => ('radius' in entity ? entity.radius : entity.height)),
+	});
+	const sizes = new Map(sizedEntities.map((entity, i) => [entity.id, result.sizes[i]]));
+	for (const [i, entity] of pointEntities.entries()) {
+		const p = Vec2.from(result.points[i]);
+		if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) throw new Error('The transformed coordinates are too large.');
+		points.set(entity.id, p);
+		if (p.x !== entity.x || p.y !== entity.y) movedPoints.add(entity.id);
+	}
+	for (const size of result.sizes) if (!Number.isFinite(size)) throw new Error('The transformed size is too large.');
+	for (const [i, sample] of offsetSamples.entries()) {
+		let entries = samples.get(sample.constraint);
+		if (!entries) samples.set(sample.constraint, (entries = []));
+		entries.push({ basePos: Vec2.from(result.points[pointEntities.length + i]), normal: Vec2.from(result.vectors[i]) });
 	}
 
 	sketch.beginTransaction();
@@ -168,10 +191,11 @@ export function applyTransform(
 				after.set(`${id}.x`, point.x);
 				after.set(`${id}.y`, point.y);
 			}
-			if ('radius' in entity) after.set(`${id}.r`, entity.radius * values.scale);
+			if ('radius' in entity) after.set(`${id}.r`, sizes.get(entity.id)!);
 		}
 
 		let removed = 0;
+		const plans: Array<{ constraint: IConstraint; candidate: IConstraint }> = [];
 		for (const constraint of constraints) {
 			if (constraint.type === 'drag_point') continue;
 			let candidate = constraint;
@@ -189,18 +213,29 @@ export function applyTransform(
 				if (internal || copy) {
 					candidate = deserializeConstraint({ ...(mapped as typeof data), id } as typeof snapshot) ?? constraint;
 					if (candidate instanceof OffsetConstraint) {
+						let sampleIndex = 0;
 						for (const pair of candidate.pairs) {
 							if (pair.kind !== 'spline') continue;
 							for (const point of pair.points) {
-								point.basePos = transform.point(point.basePos);
-								point.normal = transform.rotate(point.normal);
+								const sample = samples.get(constraint as OffsetConstraint)![sampleIndex++];
+								point.basePos = sample.basePos;
+								point.normal = sample.normal;
 							}
 						}
 					}
 				}
 			}
-			const previousError = constraintError(constraint, before);
-			const error = constraintError(candidate, after);
+			plans.push({ constraint, candidate });
+		}
+		const errors = constraintMaxErrors(
+			plans.flatMap(({ constraint, candidate }) => [
+				{ constraint, values: before },
+				{ constraint: candidate, values: after },
+			])
+		);
+		for (const [i, { constraint, candidate }] of plans.entries()) {
+			const previousError = errors[2 * i],
+				error = errors[2 * i + 1];
 			if (error > Math.max(1e-6, previousError + 1e-8) || (!Number.isFinite(error) && Number.isFinite(previousError))) {
 				removed++;
 				if (!copy) constraintUpdates.set(constraint.id, null);
@@ -244,7 +279,7 @@ export function applyTransform(
 								...entity,
 								id,
 								centerId: mapId(entity.centerId),
-								radius: entity.radius * values.scale,
+								radius: sizes.get(entity.id)!,
 							})
 						);
 						break;
@@ -255,7 +290,7 @@ export function applyTransform(
 								...entity,
 								id,
 								centerId: mapId(entity.centerId),
-								radius: entity.radius * values.scale,
+								radius: sizes.get(entity.id)!,
 								startPointId: mapId(entity.startPointId),
 								endPointId: mapId(entity.endPointId),
 							})
@@ -300,7 +335,7 @@ export function applyTransform(
 							new SketchText({
 								...entity,
 								id,
-								height: entity.height * values.scale,
+								height: sizes.get(entity.id)!,
 								rectanglePointIds: entity.rectanglePointIds?.map(mapId) as SketchText['rectanglePointIds'],
 								rectangleLineIds: entity.rectangleLineIds?.map(mapId) as SketchText['rectangleLineIds'],
 								targetPrimitiveId: entity.targetPrimitiveId && mapId(entity.targetPrimitiveId),
@@ -309,9 +344,9 @@ export function applyTransform(
 						break;
 				}
 			} else if ('radius' in entity) {
-				entity.radius *= values.scale;
+				entity.radius = sizes.get(entity.id)!;
 			} else if (entity.type === 'text') {
-				entity.height *= values.scale;
+				entity.height = sizes.get(entity.id)!;
 			}
 		}
 		for (const [id, constraint] of constraintUpdates) {

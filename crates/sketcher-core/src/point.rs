@@ -158,6 +158,17 @@ impl Point2 {
         Self::new(self.x * cos - self.y * sin, self.x * sin + self.y * cos)
     }
 
+    /// Rotation about a center, preserving the editor's addition/subtraction order.
+    #[inline]
+    pub fn rotate_around(self, center: Self, angle: f64) -> Self {
+        let delta = self - center;
+        let (sin, cos) = (angle.sin(), angle.cos());
+        Self::new(
+            center.x + delta.x * cos - delta.y * sin,
+            center.y + delta.x * sin + delta.y * cos,
+        )
+    }
+
     /// Component-wise minimum.
     #[inline]
     pub fn min(self, other: Self) -> Self {

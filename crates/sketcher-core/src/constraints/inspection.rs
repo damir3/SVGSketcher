@@ -2,7 +2,7 @@ use super::Program;
 use crate::inspection::angle_valid;
 
 impl Program {
-    pub(crate) fn inspect(&self, groups: &[usize]) -> Result<(f64, bool), &'static str> {
+    fn inspection_residuals(&self, groups: &[usize]) -> Result<(Vec<f64>, bool), &'static str> {
         if self.covered.iter().any(|&v| !v) {
             return Err("Incomplete inspection program");
         }
@@ -32,6 +32,11 @@ impl Program {
                 satisfied &= angle_valid(&p, p[8], p[9], p[10], c.a);
             }
         }
+        Ok((residuals, satisfied))
+    }
+
+    pub(crate) fn inspect(&self, groups: &[usize]) -> Result<(f64, bool), &'static str> {
+        let (residuals, satisfied) = self.inspection_residuals(groups)?;
         let mut error = 0.0;
         let mut row = 0;
         for &count in groups {
@@ -43,5 +48,29 @@ impl Program {
             row += count;
         }
         Ok((error, satisfied))
+    }
+
+    pub(crate) fn max_errors(
+        &self,
+        groups: &[usize],
+        weights: &[f64],
+    ) -> Result<Vec<f64>, &'static str> {
+        let (residuals, _) = self.inspection_residuals(groups)?;
+        let mut row = 0;
+        Ok(groups
+            .iter()
+            .zip(weights)
+            .map(|(&count, &weight)| {
+                let maximum = residuals[row..row + count].iter().fold(0.0_f64, |max, &r| {
+                    if max.is_nan() || r.is_nan() {
+                        f64::NAN
+                    } else {
+                        max.max(r.abs())
+                    }
+                });
+                row += count;
+                maximum / if weight == 0.0 { 1.0 } else { weight.abs() }
+            })
+            .collect())
     }
 }
