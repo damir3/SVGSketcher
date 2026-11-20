@@ -1,3 +1,5 @@
+import { measure } from '../../math/measurement';
+import type { ReferenceMeasurement } from '../../kernel/inspectionTypes';
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
 import { Vec2 } from '../../math/vector';
@@ -135,13 +137,19 @@ export class PointToLineDistanceConstraint extends BaseConstraint {
 		).flat();
 	}
 
-	updateReferenceValue(paramMap: Map<string, number>): void {
-		if (!this.isReference) return;
+	getReferenceMeasurement(paramMap: Map<string, number>): ReferenceMeasurement {
 		const point = readParamPoint(paramMap, this.pointId);
-		if (this.secondPointId) point.lerp(readParamPoint(paramMap, this.secondPointId), 0.5);
+		const second = this.secondPointId ? readParamPoint(paramMap, this.secondPointId) : point;
 		const p1 = readParamPoint(paramMap, this.lineP1Id);
-		const dir = readParamPoint(paramMap, this.lineP2Id).sub(p1);
-		this.targetDistance = Math.abs(point.sub(p1).cross(dir)) / Math.max(dir.length(), 1e-7);
+		const p2 = readParamPoint(paramMap, this.lineP2Id);
+		return {
+			kind: 3,
+			data: [point.x, point.y, second.x, second.y, p1.x, p1.y, p2.x, p2.y, 1e-7, Number(!!this.secondPointId)],
+		};
+	}
+	updateReferenceValue(paramMap: Map<string, number>, _sketch?: SketchDocument, measured?: number): void {
+		if (!this.isReference) return;
+		this.targetDistance = measured ?? measure(this.getReferenceMeasurement(paramMap));
 		this.value = this.targetDistance;
 		this.name = this.displayName;
 		this.expression = undefined;

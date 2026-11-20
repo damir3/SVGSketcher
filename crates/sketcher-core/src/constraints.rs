@@ -2,6 +2,7 @@
 use crate::matrix::SparseRows;
 use crate::solver::Evaluation;
 mod dependency;
+mod inspection;
 mod splines;
 
 struct Ref {

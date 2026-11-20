@@ -1,3 +1,5 @@
+import { measure } from '../../math/measurement';
+import type { ReferenceMeasurement } from '../../kernel/inspectionTypes';
 import type { JacobianEntry } from '../types';
 import { BaseConstraint, readParamPoint } from './base';
 import type { ConstraintRenderContext } from './renderContext';
@@ -205,22 +207,29 @@ export class OffsetConstraint extends BaseConstraint {
 		return res;
 	}
 
-	updateReferenceValue(pm: Map<string, number>, sketch?: SketchDocument): void {
-		if (!this.isReference) return;
+	getReferenceMeasurement(pm: Map<string, number>, sketch?: SketchDocument): ReferenceMeasurement {
 		const pair = this.pairs[this.dimPairIndex] ?? this.pairs[0];
 		const points = pair && sketch ? this.getDimensionWorldPoints(sketch) : null;
-		if (points) this.targetDistance = points.a.distanceTo(points.b);
-		else if (pair?.kind === 'line') {
+		if (points) return { kind: 1, data: [points.a.x, points.a.y, points.b.x, points.b.y, 0] };
+		if (pair?.kind === 'line') {
 			const a = readParamPoint(pm, pair.origP1Id);
-			const dir = readParamPoint(pm, pair.origP2Id).sub(a);
-			const mid = readParamPoint(pm, pair.offP1Id).lerp(readParamPoint(pm, pair.offP2Id), 0.5);
-			this.targetDistance = Math.abs(dir.cross(mid.sub(a))) / Math.max(dir.length(), 1e-9);
-		} else if (pair?.kind === 'circle') {
-			this.targetDistance = Math.abs((pm.get(`${pair.offId}.r`) ?? 0) - (pm.get(`${pair.origId}.r`) ?? 0));
-		} else if (pair?.kind === 'spline' && pair.points.length) {
+			const b = readParamPoint(pm, pair.origP2Id),
+				p = readParamPoint(pm, pair.offP1Id),
+				q = readParamPoint(pm, pair.offP2Id);
+			return { kind: 3, data: [p.x, p.y, q.x, q.y, a.x, a.y, b.x, b.y, 1e-9, 1] };
+		}
+		if (pair?.kind === 'circle')
+			return { kind: 2, data: [pm.get(`${pair.origId}.r`) ?? 0, pm.get(`${pair.offId}.r`) ?? 0] };
+		if (pair?.kind === 'spline' && pair.points.length) {
 			const p = pair.points[Math.floor(pair.points.length / 2)];
-			this.targetDistance = readParamPoint(pm, p.pointId).distanceTo(p.basePos);
-		} else this.targetDistance = 0;
+			const point = readParamPoint(pm, p.pointId);
+			return { kind: 1, data: [point.x, point.y, p.basePos.x, p.basePos.y, 0] };
+		}
+		return { kind: 0, data: [0] };
+	}
+	updateReferenceValue(pm: Map<string, number>, sketch?: SketchDocument, measured?: number): void {
+		if (!this.isReference) return;
+		this.targetDistance = measured ?? measure(this.getReferenceMeasurement(pm, sketch));
 		this.value = this.targetDistance;
 		this.name = 'Reference Offset';
 		this.expression = undefined;

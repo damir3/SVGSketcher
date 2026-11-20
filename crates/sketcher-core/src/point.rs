@@ -151,6 +151,13 @@ impl Point2 {
         }
     }
 
+    /// Rotate a vector counterclockwise about the origin, in radians.
+    #[inline]
+    pub fn rotate(self, angle: f64) -> Self {
+        let (sin, cos) = (angle.sin(), angle.cos());
+        Self::new(self.x * cos - self.y * sin, self.x * sin + self.y * cos)
+    }
+
     /// Component-wise minimum.
     #[inline]
     pub fn min(self, other: Self) -> Self {

@@ -1,3 +1,4 @@
+import type { ReferenceMeasurement } from '../kernel/inspectionTypes';
 import type { Vec2 } from '../math/vector';
 import type { SketchDocument } from '../model/sketch';
 import type { Viewport } from '../canvas/viewport';
@@ -71,7 +72,8 @@ export interface IConstraint extends IInspectable {
 	isDimensional?: boolean;
 	/** A measured dimension that never contributes equations or moves geometry. */
 	isReference?: boolean;
-	updateReferenceValue?(paramMap: Map<string, number>, sketch?: SketchDocument): void;
+	getReferenceMeasurement?(paramMap: Map<string, number>, sketch?: SketchDocument): ReferenceMeasurement;
+	updateReferenceValue?(paramMap: Map<string, number>, sketch?: SketchDocument, measured?: number): void;
 	value?: number;
 	expression?: string;
 	entityIds: string[];

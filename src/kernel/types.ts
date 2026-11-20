@@ -1,3 +1,4 @@
+import type { InspectionKernel } from './inspectionTypes';
 import type { DependencyKernel } from './dependencyTypes';
 import type { ImageTraceKernel } from './imageTraceWasm';
 import type { KernelSolve } from './solverTypes';
@@ -14,7 +15,7 @@ import type { ConstructionKernel } from './constructionTypes';
 import type { TextGeometryKernel } from './textTypes';
 
 /** Versioned, UI-independent boundary for migrated kernel operations. */
-export const GEOMETRY_KERNEL_API_VERSION = 34;
+export const GEOMETRY_KERNEL_API_VERSION = 35;
 export const KERNEL_CURVE_STRIDE = 9;
 export const MAX_BEZIER_INTERSECTION_CANDIDATES = 17;
 // The existing sampled conic algorithm can emit one candidate per interval, including coincident curves.
@@ -39,6 +40,7 @@ export interface IntersectionPair {
 }
 
 export interface GeometryKernel {
+	inspectConstraints?: InspectionKernel;
 	readonly backend: 'typescript' | 'wasm';
 	traceImage?: ImageTraceKernel;
 	readonly apiVersion: typeof GEOMETRY_KERNEL_API_VERSION;

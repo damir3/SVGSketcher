@@ -1,3 +1,5 @@
+import { measure } from '../../math/measurement';
+import type { ReferenceMeasurement } from '../../kernel/inspectionTypes';
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
 import { Vec2 } from '../../math/vector';
@@ -173,17 +175,18 @@ export class DistanceConstraint extends BaseConstraint {
 		return res;
 	}
 
-	updateReferenceValue(paramMap: Map<string, number>): void {
-		if (!this.isReference) return;
+	getReferenceMeasurement(paramMap: Map<string, number>): ReferenceMeasurement {
+		if (this.circleIds) return { kind: 2, data: this.circleIds.map(id => paramMap.get(`${id}.r`) ?? 0) };
 		const p1 = readParamPoint(paramMap, this.p1Id);
 		const p2 = readParamPoint(paramMap, this.p2Id);
-		this.targetDistance = this.circleIds
-			? Math.abs((paramMap.get(`${this.circleIds[1]}.r`) ?? 0) - (paramMap.get(`${this.circleIds[0]}.r`) ?? 0))
-			: this.orientation === 'horizontal'
-				? Math.abs(p2.x - p1.x)
-				: this.orientation === 'vertical'
-					? Math.abs(p2.y - p1.y)
-					: p1.distanceTo(p2);
+		return {
+			kind: 1,
+			data: [p1.x, p1.y, p2.x, p2.y, this.orientation === 'horizontal' ? 1 : this.orientation === 'vertical' ? 2 : 0],
+		};
+	}
+	updateReferenceValue(paramMap: Map<string, number>, _sketch?: SketchDocument, measured?: number): void {
+		if (!this.isReference) return;
+		this.targetDistance = measured ?? measure(this.getReferenceMeasurement(paramMap));
 		this.value = this.targetDistance;
 		this.name = this.displayName;
 		this.expression = undefined;

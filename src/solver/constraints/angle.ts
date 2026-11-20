@@ -1,3 +1,5 @@
+import { measure } from '../../math/measurement';
+import type { ReferenceMeasurement } from '../../kernel/inspectionTypes';
 import { formatDimensionValue, renderAngleDimensionVisual } from '../../canvas/dimensionGeometry';
 import type { SketchDocument } from '../../model/sketch';
 import type { Viewport } from '../../canvas/viewport';
@@ -151,27 +153,23 @@ export class AngleConstraint extends BaseConstraint {
 
 	isSatisfied(paramMap: Map<string, number>): boolean {
 		if (this.isReference) return true;
-		const dir1 = readParamPoint(paramMap, this.l1P2).sub(readParamPoint(paramMap, this.l1P1)).multiplyScalar(this.s1);
-		const dir2 = readParamPoint(paramMap, this.l2P2).sub(readParamPoint(paramMap, this.l2P1)).multiplyScalar(this.s2);
-		const length1 = dir1.length();
-		const length2 = dir2.length();
-		if (!Number.isFinite(length1) || !Number.isFinite(length2) || length1 === 0 || length2 === 0) return false;
-		const rotated = dir1.divideScalar(length1).rotateAround(ORIGIN, (this.sign * this.targetAngle * Math.PI) / 180);
-		const actual = dir2.divideScalar(length2);
-		// The weighted residual shrinks with the lines, even if their angle remains wrong.
-		const angularError = Math.atan2(rotated.cross(actual), rotated.dot(actual));
-		return Math.abs(angularError) <= 1e-3;
+		return !!measure({
+			kind: 5,
+			data: [...this.getReferenceMeasurement(paramMap).data.slice(0, 10), this.sign, this.targetAngle],
+		});
 	}
 
-	updateReferenceValue(paramMap: Map<string, number>, sketch?: SketchDocument): void {
-		if (!this.isReference) return;
-		const dir1 = readParamPoint(paramMap, this.l1P2).sub(readParamPoint(paramMap, this.l1P1)).multiplyScalar(this.s1);
-		const dir2 = readParamPoint(paramMap, this.l2P2).sub(readParamPoint(paramMap, this.l2P1)).multiplyScalar(this.s2);
-		const angle = Math.atan2(dir1.cross(dir2), dir1.dot(dir2));
+	getReferenceMeasurement(paramMap: Map<string, number>, sketch?: SketchDocument): ReferenceMeasurement {
+		const points = [this.l1P1, this.l1P2, this.l2P1, this.l2P2].flatMap(id => {
+			const p = readParamPoint(paramMap, id);
+			return [p.x, p.y];
+		});
 		const arc = this.line1Id === this.line2Id ? sketch?.arcs.get(this.line1Id) : undefined;
-		this.targetAngle = arc
-			? (((((angle * (arc.clockwise ? -1 : 1)) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) * 180) / Math.PI
-			: (Math.abs(angle) * 180) / Math.PI;
+		return { kind: 4, data: [...points, this.s1, this.s2, arc ? (arc.clockwise ? -1 : 1) : 0] };
+	}
+	updateReferenceValue(paramMap: Map<string, number>, sketch?: SketchDocument, measured?: number): void {
+		if (!this.isReference) return;
+		this.targetAngle = measured ?? measure(this.getReferenceMeasurement(paramMap, sketch));
 		this.value = this.targetAngle;
 		this.name = 'Reference Angle';
 		this.expression = undefined;

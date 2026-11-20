@@ -1,4 +1,5 @@
 import { getGeometryKernel } from '../kernel';
+import { checkConstraints } from './constraintInspection';
 import { isDependentDimension as reference } from './constraintDependencyReference';
 import type { SketchDocument } from '../model/sketch';
 import type { ParamManager } from './solver';
@@ -52,10 +53,8 @@ export function isDependentDimension(
 		const hard = items.filter(c => c !== candidate && !c.isReference && !c.isSoft);
 		const descriptions = new Map([...hard, candidate].map(c => [c, describeNativeConstraint(c)] as const));
 		if ([...descriptions.values()].some(d => !d)) return reference(manager, items, candidate, sketch);
-		if (hard.some(c => c.isSatisfied && !c.isSatisfied(values))) return false;
-		// Keep the original one-time satisfaction gate, including its per-constraint summation order.
-		const error = hard.reduce((sum, c) => sum + c.evaluate(values).reduce((total, r) => total + (r * r) / 2, 0), 0);
-		if (!Number.isFinite(error) || error > 1e-2) return false;
+		const { error, satisfied } = checkConstraints(hard, values, true);
+		if (!satisfied || !Number.isFinite(error) || error > 1e-2) return false;
 		const measurement: IConstraint = Object.assign(
 			Object.create(Object.getPrototypeOf(candidate)),
 			serializeConstraint(candidate)

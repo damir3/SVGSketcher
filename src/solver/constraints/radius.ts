@@ -1,3 +1,5 @@
+import { measure } from '../../math/measurement';
+import type { ReferenceMeasurement } from '../../kernel/inspectionTypes';
 import { DIMENSION_EXTERNAL_ARROW_TAIL_PX } from '../../canvas/distances';
 import { distanceToArcDimensionExtension, formatDimensionValue } from '../../canvas/dimensionGeometry';
 import type { JacobianEntry } from '../types';
@@ -64,9 +66,12 @@ export class RadiusConstraint extends BaseConstraint {
 		return res;
 	}
 
-	updateReferenceValue(paramMap: Map<string, number>): void {
+	getReferenceMeasurement(paramMap: Map<string, number>): ReferenceMeasurement {
+		return { kind: 0, data: [paramMap.get(`${this.circleId}.r`) ?? 0] };
+	}
+	updateReferenceValue(paramMap: Map<string, number>, _sketch?: SketchDocument, measured?: number): void {
 		if (!this.isReference) return;
-		this.targetRadius = paramMap.get(`${this.circleId}.r`) ?? 0;
+		this.targetRadius = measured ?? measure(this.getReferenceMeasurement(paramMap));
 		this.value = this.targetRadius;
 		this.name = this.displayMode === 'diameter' ? 'Reference Diameter' : 'Reference Radius';
 		this.expression = undefined;

@@ -10,6 +10,7 @@ pub mod editing;
 mod ellipse;
 pub mod fillet;
 pub mod image_trace;
+pub mod inspection;
 mod matrix;
 pub mod offset;
 pub mod offset_resize;

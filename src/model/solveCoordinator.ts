@@ -2,6 +2,7 @@ import type { SketchDocument } from './sketch';
 import type { SketchSnapshot } from './history';
 import { serializeConstraint } from '../solver/constraints/serialization';
 import { isDependentDimension } from '../solver/constraintDependency';
+import { checkConstraints, updateReferenceValues } from '../solver/constraintInspection';
 import { getRadial } from './constraintOperations';
 import { syncOffsetSources } from './offsetSync';
 import { prepareSplineConstraints } from './splineOperations';
@@ -57,7 +58,7 @@ export class SolveCoordinator {
 		const references = [...this.sketch.constraints.values()].filter(c => c.isReference);
 		if (!references.length) return;
 		const values = this.paramManager.getCurrentValues();
-		for (const c of references) c.updateReferenceValue?.(values, this.sketch);
+		updateReferenceValues(references, values, this.sketch);
 	}
 
 	addConstraint(constraint: IConstraint): boolean {
@@ -336,11 +337,7 @@ export class SolveCoordinator {
 			// Solvers can skip residual evaluation when every parameter is fixed.
 			const values = this.paramManager.getCurrentValues();
 			const hardConstraints = [...this.sketch.constraints.values()].filter(c => !c.isSoft && !c.isReference);
-			const hardError = hardConstraints.reduce(
-				(sum, c) => sum + c.evaluate(values).reduce((error, r) => error + (r * r) / 2, 0),
-				0
-			);
-			const geometryValid = hardConstraints.every(c => !c.isSatisfied || c.isSatisfied(values));
+			const { error: hardError, satisfied: geometryValid } = checkConstraints(hardConstraints, values);
 			if (res.status !== 'OVER_CONSTRAINED' && Number.isFinite(res.finalError) && hardError <= 1e-2 && geometryValid)
 				return;
 			let converted = 0;
