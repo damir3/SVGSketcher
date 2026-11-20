@@ -209,6 +209,7 @@ it('rejects malformed packed results at the WASM boundary', () => {
 			inspect_constraints: () => new Float64Array(),
 			transform_geometry: () => new Float64Array(),
 			copy_geometry: () => new Float64Array(),
+			trace_postprocess: () => new Float64Array(),
 			constraint_max_errors: () => new Float64Array(),
 			solve_system: () => new Float64Array(),
 		});

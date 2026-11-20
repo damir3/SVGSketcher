@@ -1,4 +1,7 @@
-import { ORIGIN, Vec2, type XY } from '../../math/vector';
+import { getGeometryKernel } from '../../kernel';
+import { createTraceTransform as referenceTransform, buildTraceGeometry as referenceBuild } from './buildReference';
+import { placeTrace, prepareTracePlacement, inferTraceConstraints, movedTracePoints } from './postprocess';
+import { Vec2, type XY } from '../../math/vector';
 import type { SketchImage } from '../image';
 import type { SelectableEntityType } from '../selection';
 import type { SketchDocument } from '../sketch';
@@ -18,16 +21,10 @@ export function createTraceTransform(
 	result: Pick<TraceResult, 'width' | 'height' | 'yScale'>,
 	placement: TracePlacement
 ): { toWorld: (p: XY) => Vec2; scale: number } {
-	const radians = (placement.angle * Math.PI) / 180;
-	const scale = placement.width / result.width;
-	return {
-		scale,
-		toWorld: (p: XY) => {
-			const lx = (p.x / result.width - 0.5) * placement.width;
-			const ly = (0.5 - p.y / result.yScale / result.height) * placement.height;
-			return new Vec2(lx, ly).rotateAround(ORIGIN, radians).add(placement);
-		},
-	};
+	if (!getGeometryKernel().tracePostprocess) return referenceTransform(result, placement);
+	const base = { ...result, placement, radii: [], arcs: [] };
+	const scale = placeTrace({ ...base, points: [] }).scale;
+	return { scale, toWorld: (p: XY) => Vec2.from(placeTrace({ ...base, points: [p] }).points[0]) };
 }
 
 export interface TraceBuildResult {
@@ -52,7 +49,9 @@ export function buildTraceGeometry(
 	image: SketchImage,
 	settings: ImageTraceSettings
 ): TraceBuildResult {
-	const { toWorld, scale } = createTraceTransform(result, image);
+	if (!getGeometryKernel().tracePostprocess) return referenceBuild(sketch, result, image, settings);
+	const placement = prepareTracePlacement(result, image);
+	const { toWorld, scale } = placement;
 	const construction = settings.construction;
 	const entities: TraceBuildResult['entities'] = [];
 	const inferred: Array<{ constraint: IConstraint; group: ConstraintGroup }> = [];
@@ -96,13 +95,10 @@ export function buildTraceGeometry(
 						entities.push({ id: line.id, type: 'line' });
 						ids.push({ id: line.id, kind: 'line' });
 					} else if (segment.kind === 'arc') {
-						const start = toWorld(result.vertices[segment.a]);
-						const mid = toWorld(segment.mid);
-						const end = toWorld(result.vertices[segment.b]);
-						const turn = (mid.x - start.x) * (end.y - mid.y) - (mid.y - start.y) * (end.x - mid.x);
 						const centerId = addPoint(segment.center);
-						const radius = segment.radius * scale;
-						const arc = sketch.addArc(centerId, a, b, radius, turn < 0, construction);
+						const radius = placement.radius(segment),
+							clockwise = placement.clockwise(segment);
+						const arc = sketch.addArc(centerId, a, b, radius, clockwise, construction);
 						radial.push({ id: arc.id, centerId, radius });
 						entities.push({ id: arc.id, type: 'arc' });
 						ids.push({ id: arc.id, kind: 'arc' });
@@ -137,7 +133,7 @@ export function buildTraceGeometry(
 
 			for (const circle of result.circles) {
 				const centerId = addPoint(circle.center);
-				const created = sketch.addCircle(centerId, circle.radius * scale, construction);
+				const created = sketch.addCircle(centerId, placement.radius(circle), construction);
 				radial.push({ id: created.id, centerId, radius: created.radius });
 				entities.push({ id: created.id, type: 'circle' });
 			}
@@ -155,7 +151,7 @@ export function buildTraceGeometry(
 				entities.push({ id: created.id, type: 'spline' });
 			}
 
-			inferAxisAndRelations(sketch, settings, scale, lineIds, radial, inferred);
+			inferTraceConstraints(sketch, settings, scale, lineIds, radial, inferred);
 			for (const id of createdPoints) {
 				const point = sketch.points.get(id);
 				if (point) traced.points.set(id, point.clone());
@@ -173,151 +169,6 @@ export function buildTraceGeometry(
 	} catch (error) {
 		sketch.rollbackTransaction();
 		throw error;
-	}
-}
-
-function lineAngle(sketch: SketchDocument, lineId: string): number | null {
-	const line = sketch.lines.get(lineId);
-	const p1 = line && sketch.points.get(line.p1Id);
-	const p2 = line && sketch.points.get(line.p2Id);
-	if (!p1 || !p2) return null;
-	let angle = (p1.angleToPoint(p2) * 180) / Math.PI;
-	angle = ((angle % 180) + 180) % 180;
-	return angle;
-}
-
-function lineLength(sketch: SketchDocument, lineId: string): number {
-	const line = sketch.lines.get(lineId);
-	const p1 = line && sketch.points.get(line.p1Id);
-	const p2 = line && sketch.points.get(line.p2Id);
-	return p1 && p2 ? p1.distanceTo(p2) : 0;
-}
-
-const angleDifference = (a: number, b: number) => {
-	const d = Math.abs(a - b) % 180;
-	return Math.min(d, 180 - d);
-};
-
-/** Groups sorted values whose consecutive differences stay within `tolerance(value)`. */
-function clusterBy<T>(items: T[], value: (item: T) => number, tolerance: (v: number) => number): T[][] {
-	const sorted = [...items].sort((a, b) => value(a) - value(b));
-	const clusters: T[][] = [];
-	for (const item of sorted) {
-		const last = clusters[clusters.length - 1];
-		if (last && value(item) - value(last[0]) <= tolerance(value(last[0]))) last.push(item);
-		else clusters.push([item]);
-	}
-	return clusters.filter(cluster => cluster.length > 1);
-}
-
-function inferAxisAndRelations(
-	sketch: SketchDocument,
-	settings: ImageTraceSettings,
-	scale: number,
-	lineIds: string[],
-	radial: Array<{ id: string; centerId: string; radius: number }>,
-	inferred: Array<{ constraint: IConstraint; group: ConstraintGroup }>
-): void {
-	const tolerance = settings.angleTolerance;
-	const axisLines = new Set<string>();
-	if (settings.constraints.horizontalVertical) {
-		for (const id of lineIds) {
-			const angle = lineAngle(sketch, id);
-			const line = sketch.lines.get(id);
-			if (angle === null || !line) continue;
-			if (angleDifference(angle, 0) <= tolerance) {
-				inferred.push({ constraint: sketch.addHorizontalConstraint(line.p1Id, line.p2Id), group: 'axis' });
-				axisLines.add(id);
-			} else if (angleDifference(angle, 90) <= tolerance) {
-				inferred.push({ constraint: sketch.addVerticalConstraint(line.p1Id, line.p2Id), group: 'axis' });
-				axisLines.add(id);
-			}
-		}
-	}
-
-	if (settings.constraints.parallelPerpendicular) {
-		const free = lineIds.filter(id => !axisLines.has(id)).map(id => ({ id, angle: lineAngle(sketch, id) ?? 0 }));
-		// Directions wrap at 180°, so lines near 0° and near 180° are compared after shifting.
-		const clusters = clusterBy(
-			free,
-			item => item.angle,
-			() => tolerance
-		);
-		if (clusters.length > 1) {
-			const first = clusters[0];
-			const last = clusters[clusters.length - 1];
-			if (first[0].angle + 180 - last[last.length - 1].angle <= tolerance) {
-				first.push(...last);
-				clusters.pop();
-			}
-		}
-		for (const cluster of clusters) {
-			for (let i = 1; i < cluster.length; i++) {
-				const c = sketch.addParallelConstraint(cluster[0].id, cluster[i].id);
-				if (c) inferred.push({ constraint: c, group: 'relation' });
-			}
-		}
-		// Link perpendicular directions once per pair of direction groups.
-		const groups = [
-			...clusters.map(cluster => cluster[0]),
-			...free.filter(item => !clusters.some(c => c.includes(item))),
-		];
-		const linked = new Set<string>();
-		for (let i = 0; i < groups.length; i++) {
-			for (let j = i + 1; j < groups.length; j++) {
-				if (angleDifference(groups[i].angle, groups[j].angle + 90) > tolerance) continue;
-				if (linked.has(groups[i].id) || linked.has(groups[j].id)) continue;
-				const c = sketch.addPerpendicularConstraint(groups[i].id, groups[j].id);
-				if (c) {
-					inferred.push({ constraint: c, group: 'relation' });
-					linked.add(groups[i].id);
-					linked.add(groups[j].id);
-				}
-			}
-		}
-	}
-
-	const distanceTolerance = Math.max(settings.tolerance * scale, 1e-6);
-	if (settings.constraints.equal) {
-		const lengths = lineIds.map(id => ({ id, length: lineLength(sketch, id) }));
-		for (const cluster of clusterBy(
-			lengths,
-			item => item.length,
-			v => Math.max(distanceTolerance, v * 0.01)
-		)) {
-			for (let i = 1; i < cluster.length; i++) {
-				const c = sketch.addEqualLengthConstraint(cluster[0].id, cluster[i].id);
-				if (c) inferred.push({ constraint: c, group: 'relation' });
-			}
-		}
-		for (const cluster of clusterBy(
-			radial,
-			item => item.radius,
-			v => Math.max(distanceTolerance, v * 0.01)
-		)) {
-			for (let i = 1; i < cluster.length; i++) {
-				inferred.push({ constraint: sketch.addEqualRadiusConstraint(cluster[0].id, cluster[i].id), group: 'relation' });
-			}
-		}
-	}
-
-	if (settings.constraints.concentric) {
-		const used = new Set<number>();
-		for (let i = 0; i < radial.length; i++) {
-			if (used.has(i)) continue;
-			const center = sketch.points.get(radial[i].centerId);
-			if (!center) continue;
-			for (let j = i + 1; j < radial.length; j++) {
-				if (used.has(j)) continue;
-				const other = sketch.points.get(radial[j].centerId);
-				if (!other || center.distanceTo(other) > distanceTolerance * 2) continue;
-				const c = sketch.addConcentricConstraint(radial[i].id, radial[j].id);
-				if (c) {
-					inferred.push({ constraint: c, group: 'relation' });
-					used.add(j);
-				}
-			}
-		}
 	}
 }
 
@@ -354,16 +205,7 @@ function validateConstraints(
 			if (entity) entity.radius = r;
 		}
 	};
-	const measure = (): Map<string, number> => {
-		const moved = new Map<string, number>();
-		for (const [id, p] of original.points) {
-			const point = sketch.points.get(id);
-			if (!point) continue;
-			const d = p.distanceTo(point);
-			if (d > maxDisplacement) moved.set(id, d);
-		}
-		return moved;
-	};
+	const measure = () => movedTracePoints(sketch, original.points, maxDisplacement);
 
 	let remaining = [...inferred];
 	let dropped = 0;

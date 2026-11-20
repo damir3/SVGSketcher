@@ -1,3 +1,4 @@
+import type { TracePostprocessKernel } from './tracePostprocessTypes';
 import type { CopyKernel } from './copyTypes';
 import type { TransformKernel } from './transformTypes';
 import type { InspectionKernel, ConstraintErrorKernel } from './inspectionTypes';
@@ -17,7 +18,7 @@ import type { ConstructionKernel } from './constructionTypes';
 import type { TextGeometryKernel } from './textTypes';
 
 /** Versioned, UI-independent boundary for migrated kernel operations. */
-export const GEOMETRY_KERNEL_API_VERSION = 37;
+export const GEOMETRY_KERNEL_API_VERSION = 38;
 export const KERNEL_CURVE_STRIDE = 9;
 export const MAX_BEZIER_INTERSECTION_CANDIDATES = 17;
 // The existing sampled conic algorithm can emit one candidate per interval, including coincident curves.
@@ -46,6 +47,7 @@ export interface GeometryKernel {
 	constraintErrors?: ConstraintErrorKernel;
 	transform?: TransformKernel;
 	copies?: CopyKernel;
+	tracePostprocess?: TracePostprocessKernel;
 	readonly backend: 'typescript' | 'wasm';
 	traceImage?: ImageTraceKernel;
 	readonly apiVersion: typeof GEOMETRY_KERNEL_API_VERSION;

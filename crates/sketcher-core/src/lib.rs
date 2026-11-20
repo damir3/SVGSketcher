@@ -23,6 +23,7 @@ pub mod spline;
 pub mod spline_editing;
 pub mod text_geometry;
 pub mod topology;
+pub mod trace_postprocess;
 pub mod transform;
 
 pub use point::{
