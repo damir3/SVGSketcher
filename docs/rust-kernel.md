@@ -1,12 +1,6 @@
 # Rust geometry kernel
 
-The editor routes intersections between segments, circles, ellipses and cubic Bezier segments through a versioned `GeometryKernel` boundary. Circular and elliptical arcs use the same kernel calculations, with the existing arc-span filtering and point deduplication in the TypeScript adapter. Composite splines are expanded into cubic pairs in their original traversal order; their intersection calculations run in the active kernel.
-
-In WASM mode, the numerical constraint-solving loop also runs in Rust: sparse Jacobian rows and normal equations, sparse LU decomposition with partial pivoting, Levenberg–Marquardt damping, projected lower bounds and sparse nullspace analysis. Rust also evaluates residuals and Jacobians for 32 built-in constraint classes: fixed, drag point, coincident, concentric, horizontal, vertical, radius, equal radius, distance, equal length, midpoint, point on circle, point on line, parallel, perpendicular, collinear, angle, tangent line/circle, tangent circle/circle, ellipse axis, point on ellipse, circular arc endpoints, elliptical arc endpoints, point-to-line distance, symmetry, circular pattern, rectangular pattern, offset, origin distance, line-to-axis distance, point on spline and solve-time automatic spline handles. Customized constraints and unusual nonclamped B-spline knot vectors retain batched TypeScript evaluation. The spline constraints construct and project curves entirely in Rust. Standalone construction, evaluation, projection and cubic splitting used by rendering, snapping and editing now use the selected kernel too. Parameter ownership, document operations, SVG formatting and viewport transforms remain in TypeScript. The original spline arithmetic is retained in `src/math/splineReference.ts` as an independent reference.
-
-`getCurveIntersections` batches primitive pairs to reduce JS/WASM calls. A query containing composite splines submits all cubic combinations in the same batch, then filters spans and deduplicates the combined results. In WASM mode, region construction runs entirely in Rust through one `find_regions_packed` call: conservative bounds, exact intersections, cuts and spline projection, curve sampling, graph construction, iterative bridge removal, face traversal, nested holes and numeric boundary commands. Cubics use control hull bounds and arcs use full conics, padded for the existing contact tolerances. Segment/ellipse pairs retain exact evaluation because their discriminant tolerance is not a fixed world-space distance. The inexpensive bounds scan remains O(n²). Kernel data contains world-space coordinates and call-local identity tags, without DOM, viewport or document dependencies.
-
-`src/math/regionsReference.ts` retains the pre-native TypeScript algorithm, including the bounds filter. The public region API selects `GeometryKernel.findRegions` when available and otherwise uses this reference. Vec2 reconstruction and SVG string formatting remain in TypeScript; API 22 also routes point-in-region queries through Rust. Native failures propagate rather than silently running a second algorithm. The Rust graph uses numeric nodes and edges; insertion-order vectors preserve traversal order, while hash maps serve only lookup. Quantized keys retain JavaScript rounding at negative halves and the original neighboring-key merge behavior. The 10,000-edge face guard, sampling counts, thresholds, source-edge replacement and direct-child hole rules are preserved.
+The editor executes all geometry, curve editing, region construction, text layout, image tracing and numerical constraint-solving operations through the versioned Rust/WebAssembly `GeometryKernel` boundary (`src/kernel/`). The legacy TypeScript reference backend and fallback implementations have been removed; WASM initialization is required before the editor or test suite runs.
 
 ## Build and run
 
@@ -19,14 +13,14 @@ npm run build:kernel
 npm run dev
 ```
 
-For a production WASM build:
+For a production build (including kernel compilation):
 
 ```sh
 npm run build:wasm
 npm run preview
 ```
 
-`npm run dev` and `npm run build` load WASM by default. Build the kernel first, or use `build:wasm` to rebuild everything together. `VITE_GEOMETRY_KERNEL=typescript npm run dev` explicitly selects the partial reference backend; spline self-intersections and workflows that depend on them require WASM. WASM initialization completes before the editor starts. A loading, initialization or API-version failure leaves the TypeScript backend active and logs the cause to the browser console.
+`npm run dev` and `npm run build` require the compiled Rust/WASM kernel assets in `public/kernel/` (build them first with `npm run build:kernel`, or use `npm run build:wasm` to rebuild everything together). WASM initialization completes before the editor starts; if loading, initialization, or API-version verification fails, startup stops and reports the error.
 
 `WASM_BINDGEN=/path/to/wasm-bindgen` can select a CLI outside `PATH`. Generated bindings and the binary go into ignored `public/kernel/`; Vite copies them into the production build. Commit `Cargo.lock`, not the generated files. A deployment that builds only the browser bundle must also generate the kernel assets to use the default WASM backend.
 

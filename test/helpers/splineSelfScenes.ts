@@ -1,5 +1,5 @@
 import { Vec2 } from '../../src/math/vector';
-import { fitPointsToBezier, type BezierSegment } from '../../src/math/splineReference';
+import { fitPointsToBezier, type BezierSegment } from '../../src/math/spline';
 const pt = (x: number, y: number) => new Vec2(x, y);
 const line = (a: Vec2, b: Vec2): BezierSegment => [a, a.clone().lerp(b, 1 / 3), a.clone().lerp(b, 2 / 3), b];
 export function splineSelfScenes() {

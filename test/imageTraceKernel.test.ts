@@ -24,15 +24,6 @@ function compare(a: any, b: any, path = '') {
 	assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort(), path);
 	for (const k of Object.keys(b)) compare(a[k], b[k], `${path}.${k}`);
 }
-test('image tracing requires the native implementation', () => {
-	const previous = getGeometryKernel();
-	try {
-		setGeometryKernel({ ...previous, traceImage: undefined });
-		assert.throws(() => traceImage(traceScene('blank'), fixture.cases[0].settings), /requires the Rust\/WASM kernel/);
-	} finally {
-		setGeometryKernel(previous);
-	}
-});
 for (const c of fixture.cases)
 	test(`raster tracing matches the pre-native result: ${c.name}`, { skip: !native }, () => {
 		const input = { ...traceScene(c.shape), yScale: c.yScale, pixelSize: c.pixelSize },

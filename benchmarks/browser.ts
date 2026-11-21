@@ -3,8 +3,7 @@ import { SVGRenderer } from '../src/canvas/renderer';
 import { Viewport } from '../src/canvas/viewport';
 import { AABB } from '../src/math/aabb';
 import { SketchDocument } from '../src/model/sketch';
-import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
+import { setGeometryKernel } from '../src/kernel';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
 import type { GeometryKernel } from '../src/kernel/types';
 import {
@@ -154,15 +153,11 @@ function appendRow(result: NonNullable<Awaited<ReturnType<typeof measure>>>) {
 }
 
 async function initialize() {
-	// Explicitly load the release artifact: a failed WASM load must never silently benchmark TS twice.
 	const moduleUrl = new URL('kernel/sketcher_wasm.js', document.baseURI).href;
 	const bindings = await import(/* @vite-ignore */ moduleUrl);
 	await bindings.default();
 	const wasm = createWasmGeometryKernel(bindings);
-	const referenceKernel: GeometryKernel = {
-		...typescriptGeometryKernel,
-		spline: { ...typescriptGeometryKernel.spline!, selfIntersections: wasm.spline!.selfIntersections },
-	};
+	setGeometryKernel(wasm);
 	status.textContent = `Ready. Kernel API ${wasm.apiVersion}. Keep this tab visible during measurement.`;
 	run.disabled = false;
 	element<HTMLFormElement>('controls').onsubmit = async event => {
@@ -178,7 +173,6 @@ async function initialize() {
 			warmup > 30
 		)
 			return;
-		const previous = getGeometryKernel();
 		cancelled = false;
 		run.disabled = true;
 		stop.disabled = false;
@@ -188,7 +182,6 @@ async function initialize() {
 			schemaVersion: 1,
 			sceneVersion: SCENE_VERSION,
 			apiVersion: wasm.apiVersion,
-			selfIntersectionsBackend: 'wasm',
 			createdAt: new Date().toISOString(),
 			runtime: navigator.userAgent,
 			hardwareConcurrency: navigator.hardwareConcurrency,
@@ -202,20 +195,17 @@ async function initialize() {
 		};
 		try {
 			const selected = specs.filter(spec => select.value === 'all' || spec.id === select.value);
-			for (const [index, spec] of selected.entries()) {
+			for (const spec of selected) {
 				const scene = createBenchmarkScene(spec.family, spec.size);
-				// Alternate backend order between scenes to reduce systematic warm-up/order bias.
-				const kernels = index % 2 ? [wasm, referenceKernel] : [referenceKernel, wasm];
-				for (const regions of [false, true])
-					for (const kernel of kernels) {
-						if (cancelled) break;
-						status.textContent = `Running ${spec.id}, ${kernel.backend}, regions ${regions ? 'on' : 'off'}…`;
-						const result = await measure(scene, kernel, regions, samples, warmup);
-						if (result) {
-							report.results.push(result);
-							appendRow(result);
-						}
+				for (const regions of [false, true]) {
+					if (cancelled) break;
+					status.textContent = `Running ${spec.id}, ${wasm.backend}, regions ${regions ? 'on' : 'off'}…`;
+					const result = await measure(scene, wasm, regions, samples, warmup);
+					if (result) {
+						report.results.push(result);
+						appendRow(result);
 					}
+				}
 				if (cancelled) break;
 			}
 			report.completed = !cancelled;
@@ -224,7 +214,6 @@ async function initialize() {
 			report.error = String(error);
 			status.textContent = `Failed: ${error}`;
 		} finally {
-			setGeometryKernel(previous);
 			run.disabled = false;
 			stop.disabled = true;
 			save.disabled = false;

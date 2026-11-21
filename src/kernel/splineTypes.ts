@@ -27,10 +27,10 @@ export interface SplineInterval {
 }
 /** UI-independent operations in the caller's coordinate system; outputs never alias document state. */
 export interface SplineKernel {
-	selfIntersections?(segments: readonly CubicBezier[], closed: boolean): SplineSelfIntersection[];
-	splitSpline?(segments: readonly CubicBezier[], param: number): { left: SplinePiece[]; right: SplinePiece[] };
-	trimBezier?(curve: CubicBezier, start: number, end: number): SplinePiece;
-	extractInterval?(segments: readonly CubicBezier[], start: number, end: number): SplineInterval;
+	selfIntersections(segments: readonly CubicBezier[], closed: boolean): SplineSelfIntersection[];
+	splitSpline(segments: readonly CubicBezier[], param: number): { left: SplinePiece[]; right: SplinePiece[] };
+	trimBezier(curve: CubicBezier, start: number, end: number): SplinePiece;
+	extractInterval(segments: readonly CubicBezier[], start: number, end: number): SplineInterval;
 	naturalHandles(points: readonly Point2[]): SplineHandles[];
 	fitToBezier(points: readonly Point2[], handles?: readonly (SplineHandles | null)[]): CubicBezier[];
 	controlToBezier(points: readonly Point2[], knots?: readonly number[]): CubicBezier[];

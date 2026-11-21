@@ -33,9 +33,9 @@ Build for production:
 npm run build
 ```
 
-The editor loads the Rust/WebAssembly geometry backend by default for intersections, constraint solving, spline calculations, closed-region construction and trim/extend queries, with a TypeScript fallback. See [Rust kernel setup and verification](./docs/rust-kernel.md).
+The editor runs on a Rust/WebAssembly geometry and solver kernel (`npm run build:kernel`). See [Rust kernel setup and verification](./docs/rust-kernel.md).
 
-Reproducible large scenes and TypeScript/WASM measurements are available in the [performance benchmark guide](./benchmarks/README.md).
+Reproducible large scenes and WASM performance measurements are available in the [performance benchmark guide](./benchmarks/README.md).
 
 ## License
 

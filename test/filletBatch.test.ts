@@ -8,7 +8,7 @@ import {
 	getConnectedPrimitivesForPoint,
 	type FilletCandidate,
 } from '../src/math/fillet';
-import { extractSplineInterval } from '../src/math/splineReference';
+import { extractSplineInterval } from '../src/math/spline';
 import { EqualRadiusConstraint, RadiusConstraint, TangentLineCircleConstraint } from '../src/solver/constraints';
 
 const source = JSON.parse(

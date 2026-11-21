@@ -257,7 +257,7 @@ const splineIssue = JSON.parse(
 	)![1]
 );
 const { toggleOrExtendChain } = await import('../src/math/offset');
-const { evaluateBezier } = await import('../src/math/splineReference');
+const { evaluateBezier } = await import('../src/math/spline');
 const { Vec2, projectPointOntoSegment } = await import('../src/math/vector');
 function sampledSpline(sketch: SketchDocument, id: string, steps = 24) {
 	return sketch.splines

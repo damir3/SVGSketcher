@@ -43,28 +43,27 @@ export interface IntersectionPair {
 }
 
 export interface GeometryKernel {
-	inspectConstraints?: InspectionKernel;
-	constraintErrors?: ConstraintErrorKernel;
-	transform?: TransformKernel;
-	copies?: CopyKernel;
-	tracePostprocess?: TracePostprocessKernel;
-	readonly backend: 'typescript' | 'wasm';
-	traceImage?: ImageTraceKernel;
+	readonly backend: 'wasm';
 	readonly apiVersion: typeof GEOMETRY_KERNEL_API_VERSION;
 	/** Candidate points in world coordinates, one result per pair. Filter arc spans before deduplication. */
 	intersectPairs(pairs: readonly IntersectionPair[]): Point2[][];
-	/** Omitted by the TS reference backend, which retains the original NumericalSolver implementation. */
-	solveSystem?: KernelSolve;
-	spline?: SplineKernel;
-	findRegions?: RegionKernel;
-	editing?: EditingKernel;
-	fillet?: FilletKernel;
-	chamfer?: ChamferKernel;
-	offset?: OffsetKernel;
-	queries?: GeometryQueryKernel;
-	curves?: CurveEvaluationKernel;
-	topology?: TopologyKernel;
-	textGeometry?: TextGeometryKernel;
-	construction?: ConstructionKernel;
-	dependency?: DependencyKernel;
+	solveSystem: KernelSolve;
+	spline: SplineKernel;
+	findRegions: RegionKernel;
+	editing: EditingKernel;
+	fillet: FilletKernel;
+	chamfer: ChamferKernel;
+	offset: OffsetKernel;
+	queries: GeometryQueryKernel;
+	curves: CurveEvaluationKernel;
+	topology: TopologyKernel;
+	textGeometry: TextGeometryKernel;
+	construction: ConstructionKernel;
+	dependency: DependencyKernel;
+	inspectConstraints: InspectionKernel;
+	constraintErrors: ConstraintErrorKernel;
+	transform: TransformKernel;
+	copies: CopyKernel;
+	traceImage: ImageTraceKernel;
+	tracePostprocess: TracePostprocessKernel;
 }

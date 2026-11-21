@@ -1,6 +1,5 @@
 import type { CubicBezier, Point2 } from './types';
 import type { SplineKernel, SplinePiece } from './splineTypes';
-import { nativeKnots, typescriptSplineKernel as reference } from './splineReference';
 
 export type SplineGeometryBinding = (
 	points: Float64Array,
@@ -9,6 +8,19 @@ export type SplineGeometryBinding = (
 	settings: Float64Array
 ) => Float64Array;
 const empty = new Float64Array();
+
+function nativeKnots(count: number, knots?: readonly number[]): readonly number[] | null {
+	if (count < 5 || knots?.length !== count + 4) return [];
+	if (
+		!knots.every((v, i) => Number.isFinite(v) && (i === 0 || v >= knots[i - 1])) ||
+		!knots.slice(0, 4).every(v => v === knots[0]) ||
+		!knots.slice(-4).every(v => v === knots[knots.length - 1]) ||
+		!(knots[0] < knots[knots.length - 1]) ||
+		!knots.slice(4, -4).every(v => v > knots[0] && v < knots[knots.length - 1])
+	)
+		return null;
+	return knots;
+}
 function pack(points: readonly Point2[]): Float64Array | null {
 	const data = new Float64Array(points.length * 2);
 	for (let i = 0; i < points.length; i++) {
@@ -128,7 +140,7 @@ export function createWasmSplineKernel(binding: SplineGeometryBinding): SplineKe
 		naturalHandles(pts) {
 			if (pts.length < 2) return [];
 			const packed = pack(pts);
-			if (!packed) return reference.naturalHandles(pts);
+			if (!packed) throw new Error('Non-finite spline input');
 			const data = checked(query(0, packed), pts.length * 4);
 			return Array.from({ length: pts.length }, (_, i) => ({ h1: point(data, i * 4), h2: point(data, i * 4 + 2) }));
 		},
@@ -139,53 +151,54 @@ export function createWasmSplineKernel(binding: SplineGeometryBinding): SplineKe
 			for (let i = 0; handles && i < pts.length; i++) {
 				const h = handles[i];
 				if (!h) continue;
-				if (![h.h1.x, h.h1.y, h.h2.x, h.h2.y].every(Number.isFinite)) return reference.fitToBezier(pts, handles);
+				if (![h.h1.x, h.h1.y, h.h2.x, h.h2.y].every(Number.isFinite)) throw new Error('Non-finite spline input');
 				hs.set([1, h.h1.x, h.h1.y, h.h2.x, h.h2.y], i * 5);
 			}
-			if (!packed) return reference.fitToBezier(pts, handles);
+			if (!packed) throw new Error('Non-finite spline input');
 			return curves(query(1, packed, 0, undefined, hs), pts.length - 1);
 		},
 		controlToBezier(pts, knots) {
 			if (pts.length < 2) return [];
 			const canonical = nativeKnots(pts.length, knots),
 				packed = pack(pts);
-			if (!canonical || !packed) return reference.controlToBezier(pts, knots);
+			if (!packed) throw new Error('Non-finite spline input');
+			if (!canonical) throw new Error('Unsupported non-clamped B-spline knot vector');
 			return curves(query(2, packed, 0, undefined, empty, new Float64Array(canonical)), 1, Math.max(1, pts.length - 3));
 		},
 		pointAt(segments, param) {
 			if (!segments.length) return { x: 0, y: 0 };
 			const packed = packCurves(segments);
-			return packed && Number.isFinite(param)
-				? point(checked(query(4, packed, param), 2))
-				: reference.pointAt(segments, param);
+			if (!packed || !Number.isFinite(param)) throw new Error('Non-finite spline input');
+			return point(checked(query(4, packed, param), 2));
 		},
 		tangentAt(segments, param) {
 			if (!segments.length) return { x: 1, y: 0 };
 			const packed = packCurves(segments);
-			return packed && Number.isFinite(param)
-				? point(checked(query(5, packed, param), 2))
-				: reference.tangentAt(segments, param);
+			if (!packed || !Number.isFinite(param)) throw new Error('Non-finite spline input');
+			return point(checked(query(5, packed, param), 2));
 		},
 		project(segments, target) {
 			if (!segments.length) return { param: 0, distance: Infinity, point: { ...target } };
 			const packed = packCurves(segments);
 			if (!packed || !Number.isFinite(target.x) || !Number.isFinite(target.y))
-				return reference.project(segments, target);
+				throw new Error('Non-finite spline input');
 			const data = checked(query(9, packed, 0, target), 4);
 			if (data[0] < 0 || data[0] > 1 || data[1] < 0) throw new Error('Invalid WASM spline projection');
 			return { param: data[0], distance: data[1], point: point(data, 2) };
 		},
 		evaluateBezier(b, t) {
 			const packed = pack(b);
-			return packed && Number.isFinite(t) ? point(checked(query(6, packed, t), 2)) : reference.evaluateBezier(b, t);
+			if (!packed || !Number.isFinite(t)) throw new Error('Non-finite spline input');
+			return point(checked(query(6, packed, t), 2));
 		},
 		derivativeBezier(b, t) {
 			const packed = pack(b);
-			return packed && Number.isFinite(t) ? point(checked(query(7, packed, t), 2)) : reference.derivativeBezier(b, t);
+			if (!packed || !Number.isFinite(t)) throw new Error('Non-finite spline input');
+			return point(checked(query(7, packed, t), 2));
 		},
 		splitBezier(b, t) {
 			const packed = pack(b);
-			if (!packed || !Number.isFinite(t)) return reference.splitBezier(b, t);
+			if (!packed || !Number.isFinite(t)) throw new Error('Non-finite spline input');
 			const result = curves(query(8, packed, t), 2);
 			return { left: result[0], right: result[1] };
 		},

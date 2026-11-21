@@ -8,7 +8,7 @@ import {
 	getSplineParamAtPoint,
 	getSplineTangentAtParam,
 	type BezierSegment,
-} from '../../math/splineReference';
+} from '../../math/spline';
 
 export interface SplineHandlePointPair {
 	p1Id: string;

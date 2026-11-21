@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:kernel": "node scripts/build-kernel.mjs",
-    "build:wasm": "npm run build:kernel && tsc && vite build --mode wasm",
+    "build:wasm": "npm run build:kernel && tsc && vite build",
     "preview": "vite preview",
     "bench:scenes": "node --import tsx benchmarks/node.mjs --scenes",
     "bench:node": "node --import tsx benchmarks/node.mjs",

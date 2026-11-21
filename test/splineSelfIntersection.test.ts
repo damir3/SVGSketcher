@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getSplineSelfIntersections } from '../src/math/intersection';
-import { evaluateBezier, type BezierSegment } from '../src/math/splineReference';
+import { evaluateBezier, type BezierSegment } from '../src/math/spline';
 import { Vec2 } from '../src/math/vector';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
@@ -22,15 +22,6 @@ function compare(actual: any, expected: any, path = '') {
 	assert.deepEqual(Object.keys(actual).sort(), Object.keys(expected).sort(), path);
 	for (const key of Object.keys(expected)) compare(actual[key], expected[key], `${path}.${key}`);
 }
-test('self-intersections require Rust instead of silently using the removed TS implementation', () => {
-	const previous = getGeometryKernel();
-	try {
-		setGeometryKernel({ ...previous, spline: undefined });
-		assert.throws(() => getSplineSelfIntersections([]), /require the Rust\/WASM kernel/);
-	} finally {
-		setGeometryKernel(previous);
-	}
-});
 for (const c of fixture.cases)
 	test(`spline self-intersections preserve order and parameters: ${c.name}`, { skip: !native }, () => {
 		const segments = hydrate(c.segments),

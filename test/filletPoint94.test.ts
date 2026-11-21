@@ -9,7 +9,7 @@ import {
 	getConnectedPrimitivesForPoint,
 	type FilletCandidate,
 } from '../src/math/fillet';
-import { evaluateBezier, evaluateBezierDerivative } from '../src/math/splineReference';
+import { evaluateBezier, evaluateBezierDerivative } from '../src/math/spline';
 
 const source = JSON.parse(
 	readFileSync(new URL('./fixtures/point94-fillet.json', import.meta.url), 'utf8')

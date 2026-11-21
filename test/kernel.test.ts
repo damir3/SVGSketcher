@@ -9,8 +9,7 @@ import {
 	type KernelCurve,
 	type Point2,
 } from '../src/kernel/types';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
-import { createWasmGeometryKernel } from '../src/kernel/wasm';
+import { createWasmGeometryKernel, type WasmKernelBindings } from '../src/kernel/wasm';
 import { intersectBezierBezier, intersectCurvePairs, intersectCurves, type GeoCurve } from '../src/math/intersection';
 import { Vec2 } from '../src/math/vector';
 
@@ -178,7 +177,11 @@ it('rejects incompatible backend versions without replacing the working kernel',
 		assert.throws(() => setGeometryKernel({ ...previous, apiVersion } as unknown as GeometryKernel), /API version/);
 		assert.equal(getGeometryKernel(), previous);
 		assert.throws(
-			() => createWasmGeometryKernel({ api_version: () => apiVersion, intersect_pairs: () => new Float64Array() }),
+			() =>
+				createWasmGeometryKernel({
+					api_version: () => apiVersion,
+					intersect_pairs: () => new Float64Array(),
+				} as unknown as WasmKernelBindings),
 			/API version/
 		);
 	}
@@ -217,9 +220,38 @@ it('rejects malformed packed results at the WASM boundary', () => {
 	}
 });
 
-it('WASM agrees with TypeScript for 1500 deterministic pairs without mutating inputs', {
-	skip: getGeometryKernel().backend !== 'wasm',
-}, () => {
+function assertPointOnCurve(p: Point2, curve: KernelCurve, tol = 1e-6): void {
+	assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y));
+	if (curve.type === 'segment') {
+		const dx = curve.p2.x - curve.p1.x,
+			dy = curve.p2.y - curve.p1.y;
+		const lenSq = dx * dx + dy * dy;
+		const t = lenSq > 0 ? Math.max(0, Math.min(1, ((p.x - curve.p1.x) * dx + (p.y - curve.p1.y) * dy) / lenSq)) : 0;
+		const dist = Math.hypot(p.x - (curve.p1.x + t * dx), p.y - (curve.p1.y + t * dy));
+		assert.ok(dist < tol, `segment residual ${dist}`);
+	} else if (curve.type === 'circle') {
+		const err = Math.abs(Math.hypot(p.x - curve.center.x, p.y - curve.center.y) - curve.radius);
+		assert.ok(err < tol, `circle residual ${err}`);
+	} else if (curve.type === 'ellipse') {
+		const ux = curve.majorAxisPoint.x - curve.center.x,
+			uy = curve.majorAxisPoint.y - curve.center.y;
+		const vx = curve.minorAxisPoint.x - curve.center.x,
+			vy = curve.minorAxisPoint.y - curve.center.y;
+		const rx = Math.hypot(ux, uy),
+			ry = Math.hypot(vx, vy);
+		if (rx > 1e-6 && ry > 1e-6) {
+			const dx = p.x - curve.center.x,
+				dy = p.y - curve.center.y;
+			const lx = (dx * ux + dy * uy) / (rx * rx);
+			const ly = (dx * vx + dy * vy) / (ry * ry);
+			const err = Math.abs(lx * lx + ly * ly - 1);
+			assert.ok(err < Math.max(tol, 1e-3), `ellipse residual ${err}`);
+		}
+	}
+}
+
+it('WASM intersects 1500 deterministic segment/circle pairs accurately without mutating inputs', () => {
+	assert.equal(getGeometryKernel().backend, 'wasm');
 	let seed = 5489;
 	const random = () => {
 		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -232,17 +264,22 @@ it('WASM agrees with TypeScript for 1500 deterministic pairs without mutating in
 			: { type: 'circle', center: point(), radius: random() * 100 };
 	const pairs = Array.from({ length: 1500 }, () => ({ a: curve(), b: curve() }));
 	const before = structuredClone(pairs);
-	const expected = typescriptGeometryKernel.intersectPairs(pairs);
 	const actual = getGeometryKernel().intersectPairs(pairs);
 	assert.equal(actual.length, pairs.length);
-	actual.forEach((points, i) => assertPoints(points, expected[i]));
+	let total = 0;
+	actual.forEach((points, i) => {
+		total += points.length;
+		for (const p of points) {
+			assertPointOnCurve(p, pairs[i].a);
+			assertPointOnCurve(p, pairs[i].b);
+		}
+	});
+	assert.ok(total > 500);
 	assert.deepEqual(pairs, before);
 	assert.deepEqual(getGeometryKernel().intersectPairs([]), []);
 });
 
-it('WASM agrees with TypeScript for 1200 deterministic ellipse pairs without mutating inputs', {
-	skip: getGeometryKernel().backend !== 'wasm',
-}, () => {
+it('WASM intersects 1200 deterministic ellipse pairs accurately without mutating inputs', () => {
 	let seed = 8187;
 	const random = () => {
 		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -273,15 +310,20 @@ it('WASM agrees with TypeScript for 1200 deterministic ellipse pairs without mut
 	});
 	const before = structuredClone(pairs);
 	const actual = getGeometryKernel().intersectPairs(pairs);
-	const expected = typescriptGeometryKernel.intersectPairs(pairs);
 	assert.equal(actual.length, pairs.length);
-	actual.forEach((points, i) => assertPoints(points, expected[i]));
+	let total = 0;
+	actual.forEach((points, i) => {
+		total += points.length;
+		for (const p of points) {
+			assertPointOnCurve(p, pairs[i].a, 1e-3);
+			assertPointOnCurve(p, pairs[i].b, 1e-3);
+		}
+	});
+	assert.ok(total > 400);
 	assert.deepEqual(pairs, before);
 });
 
-it('WASM agrees with TypeScript for 600 deterministic cubic pairs without mutating inputs', {
-	skip: getGeometryKernel().backend !== 'wasm',
-}, () => {
+it('WASM intersects 600 deterministic cubic pairs accurately without mutating inputs', () => {
 	let seed = 2517;
 	const random = () => {
 		seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -314,9 +356,16 @@ it('WASM agrees with TypeScript for 600 deterministic cubic pairs without mutati
 	});
 	const before = structuredClone(pairs);
 	const actual = getGeometryKernel().intersectPairs(pairs);
-	const expected = typescriptGeometryKernel.intersectPairs(pairs);
 	assert.equal(actual.length, pairs.length);
-	actual.forEach((points, i) => assertPoints(points, expected[i]));
+	let total = 0;
+	actual.forEach((points, i) => {
+		total += points.length;
+		for (const p of points) {
+			assertPointOnCurve(p, pairs[i].a, 1e-3);
+			assertPointOnCurve(p, pairs[i].b, 1e-3);
+		}
+	});
+	assert.ok(total > 100);
 	assert.deepEqual(pairs, before);
 });
 
@@ -385,20 +434,18 @@ it('finds small-feature circle and multiple segment crossings within a single co
 		{ a: tanCubic, b: axisLine },
 		{ a: nearTangentCubicA, b: nearTangentCubicB },
 	];
-	for (const kernel of [typescriptGeometryKernel, getGeometryKernel()]) {
-		const [circleHits, tripleHits, tanHits, nearTangentHits] = kernel.intersectPairs(pairs);
-		assert.equal(circleHits.length, 2);
-		for (const p of circleHits) assert.ok(Math.abs(Math.hypot(p.x - 317.123, p.y) - 0.005) < 1e-10);
-		assert.equal(tripleHits.length, 3);
-		assertPoints(tripleHits, [
-			{ x: 0.01, y: 0 },
-			{ x: 0.03, y: 0 },
-			{ x: 0.05, y: 0 },
-		]);
-		assert.equal(tanHits.length, 1);
-		assert.ok(Math.abs(tanHits[0].x - tsStar) < 1e-6);
-		assert.ok(Math.abs(tanHits[0].y) < 1e-10);
-		assert.equal(nearTangentHits.length, 1);
-		assert.ok(Math.hypot(nearTangentHits[0].x - sharedJoin.x, nearTangentHits[0].y - sharedJoin.y) < 1e-9);
-	}
+	const [circleHits, tripleHits, tanHits, nearTangentHits] = getGeometryKernel().intersectPairs(pairs);
+	assert.equal(circleHits.length, 2);
+	for (const p of circleHits) assert.ok(Math.abs(Math.hypot(p.x - 317.123, p.y) - 0.005) < 1e-10);
+	assert.equal(tripleHits.length, 3);
+	assertPoints(tripleHits, [
+		{ x: 0.01, y: 0 },
+		{ x: 0.03, y: 0 },
+		{ x: 0.05, y: 0 },
+	]);
+	assert.equal(tanHits.length, 1);
+	assert.ok(Math.abs(tanHits[0].x - tsStar) < 1e-6);
+	assert.ok(Math.abs(tanHits[0].y) < 1e-10);
+	assert.equal(nearTangentHits.length, 1);
+	assert.ok(Math.hypot(nearTangentHits[0].x - sharedJoin.x, nearTangentHits[0].y - sharedJoin.y) < 1e-9);
 });

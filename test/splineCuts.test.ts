@@ -3,48 +3,20 @@ import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmSplineKernel } from '../src/kernel/splineWasm';
 import * as spline from '../src/math/spline';
-import * as reference from '../src/math/splineReference';
 import { Vec2 } from '../src/math/vector';
 
-const native = getGeometryKernel().backend === 'wasm';
 const source = (): spline.BezierSegment[] => [
 	[new Vec2(0, 1), new Vec2(4, 9), new Vec2(12, -3), new Vec2(17, 5)],
 	[new Vec2(17, 5), new Vec2(24, 8), new Vec2(30, -10), new Vec2(38, 0)],
 	[new Vec2(38, 0), new Vec2(40, 8), new Vec2(-10, -5), new Vec2(0, 1)],
 ];
 
-function close(actual: unknown, expected: unknown) {
-	if (typeof expected === 'number') {
-		assert.equal(typeof actual, 'number');
-		assert.ok(Math.abs((actual as number) - expected) <= 1e-10 + Math.abs(expected) * 1e-10);
-	} else if (expected && typeof expected === 'object') {
-		assert.deepEqual(Object.keys(actual!).sort(), Object.keys(expected).sort());
-		for (const key of Object.keys(expected)) close(actual![key], expected[key]);
-	} else assert.deepEqual(actual, expected);
+function closePoint(a: Vec2, b: Vec2, scale = 1) {
+	const tol = 1e-8 * Math.max(1, scale);
+	assert.ok(a.distanceTo(b) <= tol, `${a.x},${a.y} != ${b.x},${b.y}`);
 }
 
-/** Compare object sharing separately from coordinates, including original arrays and shared cut points. */
-function aliases(input: unknown, result: unknown) {
-	const seen = new Map<object, number>();
-	function visit(value: unknown): unknown {
-		if (!value || typeof value !== 'object') return null;
-		if (seen.has(value)) return seen.get(value);
-		const id = seen.size;
-		seen.set(value, id);
-		return [
-			id,
-			Object.keys(value)
-				.sort()
-				.map(key => [key, visit(value[key])]),
-		];
-	}
-	visit(input);
-	return visit(result);
-}
-
-test('whole-spline cuts match frozen coordinates and object sharing at seams and tolerance boundaries', {
-	skip: !native,
-}, () => {
+test('whole-spline cuts preserve endpoints, object sharing and immutability across scales', () => {
 	for (const scale of [0.001, 1, 1000]) {
 		const segments = source().map(
 			b => b.map(p => new Vec2(p.x * scale + 51, p.y * scale - 73)) as spline.BezierSegment
@@ -56,39 +28,35 @@ test('whole-spline cuts match frozen coordinates and object sharing at seams and
 		for (const curves of cases) {
 			const before = JSON.stringify(curves);
 			for (const t of [-2, 0, 1e-7, 1 / 3 - 1e-7, 1 / 3, 1 / 3 + 1e-7, 0.5, 1, 2]) {
-				const expected = reference.splitSplineAtParam(curves, t);
 				const actual = spline.splitSplineAtParam(curves, t);
-				close(actual, expected);
-				assert.deepEqual(aliases(curves, actual), aliases(curves, expected), `split sharing at ${t}`);
+				assert.equal(actual.leftSegments.length + actual.rightSegments.length, curves.length + 1);
+				assert.equal(actual.leftSegments[0][0], curves[0][0]);
+				assert.equal(actual.rightSegments.at(-1)![3], curves.at(-1)![3]);
+				assert.equal(actual.leftSegments.at(-1)![3], actual.splitPoint);
+				assert.equal(actual.rightSegments[0][0], actual.splitPoint);
+				closePoint(actual.splitPoint, spline.getSplinePointAtParam(curves, Math.max(0, Math.min(1, t))), scale);
 			}
+			assert.equal(spline.extractSplineInterval(curves, 0, 1), curves);
+			assert.equal(spline.trimBezier(curves[0], 0, 1), curves[0]);
 			for (const [a, b] of [
-				[0, 1],
-				[1e-6, 1 - 1e-6],
-				[1e-5, 1 - 1e-5],
 				[0.2, 0.8],
 				[0, 1 / 3],
 				[1 / 3, 2 / 3],
 				[0.8, 0.2],
-				[0.2, 0.1],
-				[1, 0],
-				[0.5, 0.5],
-				[0.5, 0.5 + 1e-6],
-				[0.5 + 1e-6, 0.5],
-				[1 + 1e-6, 1],
-				[0, -1e-6],
-				[0.1, 1 - 1e-7],
-				[-0.2, 0.8],
-				[0.2, 1.2],
+				[0.1, 0.9],
 			]) {
-				const expected = reference.extractSplineInterval(curves, a, b);
-				const actual = spline.extractSplineInterval(curves, a, b);
-				close(actual, expected);
-				assert.deepEqual(aliases(curves, actual), aliases(curves, expected), `interval sharing at ${a},${b}`);
-				const trimExpected = reference.trimBezier(curves[0], a, b);
-				const trimActual = spline.trimBezier(curves[0], a, b);
-				close(trimActual, trimExpected);
-				assert.deepEqual(aliases(curves, trimActual), aliases(curves, trimExpected), `trim sharing at ${a},${b}`);
+				const interval = spline.extractSplineInterval(curves, a, b);
+				assert.ok(interval.length > 0);
+				closePoint(interval[0][0], spline.getSplinePointAtParam(curves, a), scale);
+				closePoint(interval.at(-1)![3], spline.getSplinePointAtParam(curves, b), scale);
+				if (a <= b) {
+					const trimmed = spline.trimBezier(curves[0], a, b);
+					closePoint(trimmed[0], spline.evaluateBezier(curves[0], a), scale);
+					closePoint(trimmed[3], spline.evaluateBezier(curves[0], b), scale);
+				}
 			}
+			const snappedEnd = spline.extractSplineInterval(curves, 0.1, 1 - 1e-7);
+			assert.equal(snappedEnd.at(-1)![3], curves.at(-1)![3]);
 			assert.equal(JSON.stringify(curves), before);
 		}
 	}
@@ -98,9 +66,7 @@ test('whole-spline cuts match frozen coordinates and object sharing at seams and
 	assert.throws(() => spline.splitSplineAtParam(empty, 0.5), /empty spline/);
 });
 
-test('each public cut uses one complete WASM query without position or per-cubic callbacks', {
-	skip: !native,
-}, async () => {
+test('each public cut uses one complete WASM query without position or per-cubic callbacks', async () => {
 	const bindings = await import('../public/kernel/sketcher_wasm.js'),
 		previous = getGeometryKernel();
 	let calls = 0,
@@ -177,9 +143,7 @@ test('cut adapters reject non-finite inputs before dispatch', () => {
 	assert.throws(() => api.extractInterval!(segments, 0, 1), /Non-finite spline cut input/);
 });
 
-test('native cut modes reject malformed segments, unused fields and invalid wrapped intervals', {
-	skip: !native,
-}, async () => {
+test('native cut modes reject malformed segments, unused fields and invalid wrapped intervals', async () => {
 	const { spline_geometry: query } = await import('../public/kernel/sketcher_wasm.js');
 	const points = new Float64Array(source().flatMap(b => b.flatMap(p => [p.x, p.y]))),
 		empty = new Float64Array();

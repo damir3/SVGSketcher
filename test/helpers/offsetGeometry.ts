@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { Vec2 } from '../../src/math/vector';
-import { evaluateBezier, evaluateBezierDerivative, type BezierSegment } from '../../src/math/splineReference';
+import { evaluateBezier, evaluateBezierDerivative, type BezierSegment } from '../../src/math/spline';
 
 export function closestCubicParameter(curve: BezierSegment, point: Vec2): number {
 	if (curve[0].distanceTo(point) < 1e-9) return 0;

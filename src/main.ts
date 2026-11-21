@@ -723,6 +723,14 @@ function initApp(): void {
 
 // Start application
 window.addEventListener('DOMContentLoaded', async () => {
-	await initializeGeometryKernel();
-	initApp();
+	try {
+		await initializeGeometryKernel();
+		initApp();
+	} catch (error) {
+		console.error('Failed to initialize Rust/WASM geometry kernel.', error);
+		const app = document.getElementById('app');
+		if (app) {
+			app.textContent = `Failed to load Rust/WASM geometry kernel: ${error instanceof Error ? error.message : String(error)}`;
+		}
+	}
 });

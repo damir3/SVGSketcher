@@ -95,7 +95,28 @@ test('fillet query and maximum-radius search each use one native call', () => {
 		return new Float64Array(s[0] === 3 ? [1, 37.4] : packed);
 	});
 	try {
-		setGeometryKernel({ ...previous, fillet: api, spline: undefined });
+		const failSpline = () => {
+			throw new Error('unexpected spline call');
+		};
+		setGeometryKernel({
+			...previous,
+			fillet: api,
+			spline: {
+				selfIntersections: failSpline,
+				splitSpline: failSpline,
+				trimBezier: failSpline,
+				extractInterval: failSpline,
+				naturalHandles: failSpline,
+				fitToBezier: failSpline,
+				controlToBezier: failSpline,
+				pointAt: failSpline,
+				tangentAt: failSpline,
+				project: failSpline,
+				evaluateBezier: failSpline,
+				derivativeBezier: failSpline,
+				splitBezier: failSpline,
+			},
+		});
 		compare(fillet.calculateFilletGeometry(c.c1, c.c2, 15, c.options), result);
 		assert.equal(fillet.findMaxFilletRadius(c.c1, c.c2, c.options), 37.4);
 		assert.deepEqual(modes, [2, 3]);

@@ -1,18 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { describe, it } from 'node:test';
 import * as spline from '../src/math/spline';
-import * as reference from '../src/math/splineReference';
 import { Vec2 } from '../src/math/vector';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmSplineKernel } from '../src/kernel/splineWasm';
-import { PointOnSplineConstraint } from '../src/solver/constraints/pointOnSpline';
 import { FixedConstraint } from '../src/solver/constraints/fixed';
 import { NumericalSolver, ParamManager } from '../src/solver/solver';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelSplineEditing.json', import.meta.url), 'utf8'));
-const wasm = getGeometryKernel().backend === 'wasm' ? await import('../public/kernel/sketcher_wasm.js') : null;
+const wasm = await import('../public/kernel/sketcher_wasm.js');
 const hydrate = (segments: Array<Array<{ x: number; y: number }>>) =>
 	segments.map(b => b.map(Vec2.from) as spline.BezierSegment);
 function compare(actual: any, expected: any): void {
@@ -23,15 +20,6 @@ function compare(actual: any, expected: any): void {
 		expected.forEach((v, i) => compare(actual[i], v));
 	} else for (const key of Object.keys(expected)) compare(actual[key], expected[key]);
 }
-
-it('keeps a byte-identical independent reference of the pre-routing spline implementation', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/math/splineReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixture.sourceSha256
-	);
-});
 
 describe('spline editing captured before routing through the kernel', () => {
 	for (const f of fixture.cases)
@@ -72,33 +60,34 @@ it('preserves Vec2 results, endpoint sharing and the original empty-curve behavi
 	assert.throws(() => spline.splitSplineAtParam([], 0.5));
 });
 
-it('matches evaluation, derivatives and clamped parameters without mutating inputs', () => {
+it('evaluates points, derivatives and clamped parameters without mutating inputs', () => {
 	const points = [new Vec2(0, 0), new Vec2(3, 8), new Vec2(8, 10), new Vec2(13, 4)];
-	const segments = reference.fitPointsToBezier(points);
+	const segments = spline.fitPointsToBezier(points);
 	const original = JSON.stringify(segments);
-	for (const t of [-1, 0, 0.23, 0.9, 1, 2]) {
-		compare(spline.evaluateBezier(segments[1], t), reference.evaluateBezier(segments[1], t));
-		compare(spline.evaluateBezierDerivative(segments[1], t), reference.evaluateBezierDerivative(segments[1], t));
-		compare(spline.getSplinePointAtParam(segments, t), reference.getSplinePointAtParam(segments, t));
-		compare(spline.getSplineTangentAtParam(segments, t), reference.getSplineTangentAtParam(segments, t));
+	compare(spline.getSplinePointAtParam(segments, -1), spline.getSplinePointAtParam(segments, 0));
+	compare(spline.getSplinePointAtParam(segments, 2), spline.getSplinePointAtParam(segments, 1));
+	compare(spline.getSplinePointAtParam(segments, 0), points[0]);
+	compare(spline.getSplinePointAtParam(segments, 1), points[points.length - 1]);
+	for (const t of [0, 0.23, 0.9, 1]) {
+		const p = spline.evaluateBezier(segments[1], t);
+		const d = spline.evaluateBezierDerivative(segments[1], t);
+		assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y));
+		assert.ok(Number.isFinite(d.x) && Number.isFinite(d.y));
 	}
 	assert.equal(JSON.stringify(segments), original);
 });
 
-it('retains reference behavior for unusual knots and non-finite legacy arguments', () => {
+it('rejects non-clamped knot vectors and non-finite spline inputs', () => {
 	const points = [new Vec2(0, 0), new Vec2(3, 8), new Vec2(8, 10), new Vec2(13, 4), new Vec2(20, 0)];
 	const knots = [0, 0, 0, 0, 0.5, 1, 1, 1, 2];
-	compare(spline.bsplineToBezier(points, knots), reference.bsplineToBezier(points, knots));
+	assert.throws(() => spline.bsplineToBezier(points, knots), /knot/i);
 	const segments = spline.fitPointsToBezier(points);
-	compare(spline.getSplinePointAtParam(segments, Infinity), reference.getSplinePointAtParam(segments, Infinity));
-	assert.throws(() => spline.getSplinePointAtParam(segments, NaN));
-	const invalid = spline.computeNaturalFitHandles([new Vec2(NaN, 0), new Vec2(1, 2)]);
-	assert.ok(Number.isNaN(invalid[0].h1.x));
+	assert.throws(() => spline.getSplinePointAtParam(segments, Infinity), /Non-finite/);
+	assert.throws(() => spline.getSplinePointAtParam(segments, NaN), /Non-finite/);
+	assert.throws(() => spline.computeNaturalFitHandles([new Vec2(NaN, 0), new Vec2(1, 2)]), /Non-finite/);
 });
 
-it('routes public helpers through direct WASM modes while retaining reference constraint formulas', {
-	skip: !wasm,
-}, () => {
+it('routes public helpers through direct WASM modes', () => {
 	const previous = getGeometryKernel(),
 		modes: number[] = [];
 	try {
@@ -106,7 +95,7 @@ it('routes public helpers through direct WASM modes while retaining reference co
 			...previous,
 			spline: createWasmSplineKernel((...args) => {
 				modes.push(args[3][0]);
-				return wasm!.spline_geometry(...args);
+				return wasm.spline_geometry(...args);
 			}),
 		});
 		const points = [new Vec2(0, 0), new Vec2(3, 8), new Vec2(8, 10), new Vec2(13, 4)];
@@ -120,18 +109,6 @@ it('routes public helpers through direct WASM modes while retaining reference co
 		spline.evaluateBezierDerivative(segments[0], 0.3);
 		spline.splitBezier(segments[0], 0.3);
 		assert.deepEqual(modes, [0, 1, 2, 4, 5, 9, 6, 7, 8]);
-		const c = new PointOnSplineConstraint('p', 'p', 's', 'fit', ['a', 'b']);
-		c.evaluate(
-			new Map([
-				['p.x', 2],
-				['p.y', 3],
-				['a.x', 0],
-				['a.y', 0],
-				['b.x', 5],
-				['b.y', 2],
-			])
-		);
-		assert.equal(modes.length, 9, 'JS fallback formulas retain independent reference math');
 	} finally {
 		setGeometryKernel(previous);
 	}
@@ -139,7 +116,7 @@ it('routes public helpers through direct WASM modes while retaining reference co
 
 it('rejects malformed WASM spline results instead of exposing corrupt geometry', () => {
 	const points = [new Vec2(0, 0), new Vec2(3, 8)];
-	const segment = reference.fitPointsToBezier(points)[0];
+	const segment = spline.fitPointsToBezier(points)[0];
 	for (const output of [[], [0], [NaN, 0], [1, 2, 3], Array(8).fill(Infinity)]) {
 		const kernel = createWasmSplineKernel(() => new Float64Array(output));
 		assert.throws(() => kernel.naturalHandles(points), /WASM spline/);

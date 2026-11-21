@@ -8,7 +8,7 @@ import { getArcSvgPath } from '../src/canvas/svg';
 import { SketchDocument } from '../src/model/sketch';
 import { calculateFilletGeometry, getConnectedPrimitivesForPoint, type FilletCandidate } from '../src/math/fillet';
 import { filletSplinePreview } from '../src/math/filletPreview';
-import { extractSplineInterval, getSplineSvgPath, type BezierSegment } from '../src/math/splineReference';
+import { extractSplineInterval, getSplineSvgPath, type BezierSegment } from '../src/math/spline';
 import { Vec2 } from '../src/math/vector';
 
 register('./helpers/rawSvgLoader.mjs', import.meta.url);

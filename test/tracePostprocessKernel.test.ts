@@ -47,7 +47,7 @@ const sources = [
 	traceFixture.cases.find((f: any) => f.shape === 'disk'),
 ];
 
-test('an independently loaded Rust postprocessor works when the kernel omits tracePostprocess', {
+test('an explicit Rust postprocessor kernel overrides the active kernel tracePostprocess', {
 	skip: !native,
 }, async () => {
 	const previous = getGeometryKernel();
@@ -66,8 +66,14 @@ test('an independently loaded Rust postprocessor works when the kernel omits tra
 	const result = { ...structuredClone(sources[0].expected), elapsedMs: 0 };
 	const settings = cloneTraceSettings(DEFAULT_TRACE_SETTINGS);
 	try {
-		setGeometryKernel({ ...previous, tracePostprocess: undefined });
-		assert.throws(() => buildTraceGeometry(doc, result, image, settings), /requires the Rust\/WASM kernel/);
+		const fail = () => {
+			throw new Error('unexpected active tracePostprocess');
+		};
+		setGeometryKernel({
+			...previous,
+			tracePostprocess: { place: fail, relations: fail, moved: fail },
+		});
+		assert.throws(() => buildTraceGeometry(doc, result, image, settings), /unexpected active tracePostprocess/);
 		assert.deepEqual(doc.takeSnapshot(), before);
 		assert.equal(doc.canUndo(), false);
 		const kernel = await loadTracePostprocessKernel(new URL('../public/kernel/sketcher_wasm.js', import.meta.url).href);

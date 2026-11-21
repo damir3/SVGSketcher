@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
 import { calculateFilletGeometry, commitFilletToSketch, type FilletCandidate } from '../src/math/fillet';
-import { extractSplineInterval, evaluateBezier, type BezierSegment } from '../src/math/splineReference';
+import { extractSplineInterval, evaluateBezier, type BezierSegment } from '../src/math/spline';
 
 const source = JSON.parse(
 	readFileSync(new URL('./fixtures/fillet-spline-shape.json', import.meta.url), 'utf8')

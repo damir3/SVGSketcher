@@ -12,7 +12,7 @@ import {
 	executeBreak,
 	type GeoSpline,
 } from '../src/math/intersection';
-import { extractSplineInterval } from '../src/math/splineReference';
+import { extractSplineInterval } from '../src/math/spline';
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/splineBreakPrecision.json', import.meta.url), 'utf8'));
 const native = !!getGeometryKernel().editing;
 
