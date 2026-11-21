@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
 import { AngleConstraint, RadiusConstraint, OffsetConstraint } from '../src/solver/constraints';
 import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
 import { compileNativeConstraints } from '../src/solver/nativeConstraints';
 import { applyOffsetConstraintValue } from '../src/model/offsetSync';
+import { DimensionModal } from '../src/ui/modal';
 import { Viewport } from '../src/canvas/viewport';
 import { Vec2 } from '../src/math/vector';
 import type { IConstraint } from '../src/solver/types';
@@ -80,7 +82,7 @@ test('conflicting angle becomes a live reference without moving geometry', () =>
 	assert.equal(sketch.updateDimensionalConstraint(constraint.id, 30), false);
 });
 
-test('a conflicting edit converts an existing angle to reference and supports undo/redo', () => {
+test('a conflicting edit rolls back an existing angle without converting it to reference', () => {
 	const { sketch, a, b, constraint } = angleScene(false);
 	constraint.targetAngle = constraint.value = 60;
 	sketch.addConstraint(constraint);
@@ -89,13 +91,17 @@ test('a conflicting edit converts an existing angle to reference and supports un
 	assert.ok(!constraint.isReference);
 	sketch.clearHistory();
 	const before = sketch.paramManager.getCurrentValues();
-	assert.equal(sketch.updateDimensionalConstraint(constraint.id, 90), true);
-	assert.equal(constraint.isReference, true);
+	let rejected = 0;
+	let references = 0;
+	sketch.solverCoordinator.onConstraintRejected(() => rejected++);
+	sketch.solverCoordinator.onReferenceCreated(() => references++);
+	assert.equal(sketch.updateDimensionalConstraint(constraint.id, 90), false);
+	assert.ok(!constraint.isReference);
+	assert.equal(constraint.targetAngle, 60);
 	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
-	assert.equal(sketch.undo(), true);
-	assert.ok(!sketch.constraints.get(constraint.id)!.isReference);
-	assert.equal(sketch.redo(), true);
-	assert.equal(sketch.constraints.get(constraint.id)!.isReference, true);
+	assert.equal(rejected, 1);
+	assert.equal(references, 0);
+	assert.equal(sketch.canUndo(), false);
 });
 
 for (const clockwise of [false, true]) {
@@ -175,25 +181,86 @@ test('conflicting offset becomes reference and source changes never regenerate i
 	assert.equal(sketch.updateDimensionalConstraint(constraint.id, 99), false);
 });
 
-test('conflicting offset edit restores the scene and retains a measured reference', () => {
+test('conflicting offset edit rolls back the scene and keeps the driving offset', () => {
 	const { sketch, constraint } = offsetScene();
-	// A driving dimension restored from a saved sketch must still handle conflicting edits.
+	// A driving dimension restored from a saved sketch must roll back on conflicting edits.
 	sketch.constraints.set(constraint.id, constraint);
 	sketch.solve();
 	sketch.clearHistory();
 	const before = sketch.takeSnapshot();
 	const values = sketch.paramManager.getCurrentValues();
-	assert.equal(sketch.updateDimensionalConstraint(constraint.id, 20), true);
-	assert.equal(constraint.isReference, true);
+	let rejected = 0;
+	let references = 0;
+	sketch.solverCoordinator.onConstraintRejected(() => rejected++);
+	sketch.solverCoordinator.onReferenceCreated(() => references++);
+	assert.equal(sketch.updateDimensionalConstraint(constraint.id, 20), false);
+	assert.ok(!constraint.isReference);
 	assert.equal(constraint.targetDistance, 10);
 	assert.equal(sketch.constraints.get(constraint.id), constraint);
 	assert.deepEqual(sketch.paramManager.getCurrentValues(), values);
 	assert.deepEqual(sketch.takeSnapshot().lines, before.lines);
 	assert.equal(sketch.isInTransaction(), false);
-	assert.equal(sketch.undo(), true);
-	assert.ok(!sketch.constraints.get(constraint.id)!.isReference);
-	assert.equal(sketch.redo(), true);
-	assert.equal(sketch.constraints.get(constraint.id)!.isReference, true);
+	assert.equal(rejected, 1);
+	assert.equal(references, 0);
+	assert.equal(sketch.canUndo(), false);
+});
+
+test('unsolvable edit on an existing radius constraint rolls back instead of turning it into reference', () => {
+	const sketch = new SketchDocument();
+	sketch.restoreSnapshot(
+		JSON.parse(readFileSync(new URL('./fixtures/pattern-arc-radius-rollback.json', import.meta.url), 'utf8'))
+	);
+	// Fix Point-2 at y=60 so the minimum geometrically feasible radius for Arc-15 is 60*sin(36°)-16 ≈ 19.27.
+	sketch.addFixedConstraint('Point-2');
+	sketch.clearHistory();
+	const before = sketch.paramManager.getCurrentValues();
+	let rejected = 0;
+	let references = 0;
+	sketch.solverCoordinator.onConstraintRejected(() => rejected++);
+	sketch.solverCoordinator.onReferenceCreated(() => references++);
+
+	assert.equal(sketch.updateDimensionalConstraint('c_rad-6', 10), false);
+	const rad = sketch.constraints.get('c_rad-6') as RadiusConstraint;
+	assert.ok(!rad.isReference);
+	assert.equal(rad.targetRadius, 50);
+	assert.equal(rad.value, 50);
+	assert.equal(rad.name, 'Radius (50)');
+	assert.equal(sketch.arcs.get('Arc-15')!.radius, 50);
+	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
+	assert.equal(rejected, 1);
+	assert.equal(references, 0);
+	assert.notEqual(sketch.lastSolverResult?.status, 'OVER_CONSTRAINED');
+	assert.equal(sketch.canUndo(), false);
+
+	const classes = new Set<string>();
+	const classList = {
+		add: (name: string) => classes.add(name),
+		remove: (name: string) => classes.delete(name),
+		contains: (name: string) => classes.has(name),
+	};
+	const input = { value: '10', focus() {}, select() {}, setSelectionRange() {} };
+	const preview = { textContent: '', classList };
+	const modal = Object.assign(Object.create(DimensionModal.prototype), {
+		sketch,
+		currentConstraint: rad,
+		currentMode: 'radius',
+		pendingCreation: false,
+		modalEl: {
+			classList,
+			querySelector: (selector: string) => (selector === '#dim-input-val' ? input : preview),
+		},
+	});
+	modal.apply();
+	assert.equal(classes.has('hidden'), false);
+	assert.equal(preview.textContent, 'Failed to solve');
+	assert.ok(!rad.isReference);
+	assert.equal(rad.targetRadius, 50);
+	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
+
+	assert.equal(sketch.updateDimensionalConstraint('c_rad-6', 45), true);
+	assert.ok(!rad.isReference);
+	assert.equal(rad.targetRadius, 45);
+	assert.equal(sketch.arcs.get('Arc-15')!.radius, 45);
 });
 
 test('reference spline offset measures the live source curve instead of its saved base positions', () => {

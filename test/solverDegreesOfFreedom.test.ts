@@ -42,6 +42,23 @@ describe('degrees of freedom with dependent constraints', () => {
 		assert.equal(result.status, 'CONVERGED');
 		assert.equal(result.degreesOfFreedom, 0);
 	});
+
+	it('keeps DoF and status stable while dragging tangent arc centers', () => {
+		const sketch = new SketchDocument();
+		const fixture = new URL('./fixtures/pattern-arc-radius-rollback.json', import.meta.url);
+		sketch.restoreSnapshot(JSON.parse(readFileSync(fixture, 'utf8')));
+		assert.equal(sketch.lastSolverResult?.status, 'UNDER_CONSTRAINED');
+		assert.equal(sketch.lastSolverResult?.degreesOfFreedom, 1);
+
+		const center = sketch.points.get('Point-23')!;
+		const duringDrag = sketch.dragPoint(center.id, center.x + 2, center.y + 5);
+		assert.equal(duringDrag.status, 'UNDER_CONSTRAINED');
+		assert.equal(duringDrag.degreesOfFreedom, 1);
+
+		const afterRelease = sketch.solve();
+		assert.equal(afterRelease.status, 'UNDER_CONSTRAINED');
+		assert.equal(afterRelease.degreesOfFreedom, 1);
+	});
 });
 
 it('reports fixed parameters in a mixed sketch, excluding temporary drag targets', () => {

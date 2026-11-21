@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
 import { Vec2 } from '../src/math/vector';
+import type { RadiusConstraint } from '../src/solver/constraints';
 
 function arcScene(fixedEnd = false) {
 	const sketch = new SketchDocument();
@@ -123,4 +125,21 @@ test('dragging an arc radius preserves the requested radius and free center', ()
 	assert.ok(Math.abs(start.distanceTo(center) - 20) < 1e-5);
 	assert.ok(Math.abs(end.distanceTo(center) - 20) < 1e-5);
 	assert.equal(sketch.hasRadiusConstraint(arc.id), false);
+});
+
+test('radius edit releases stiff centers when a tangent circular pattern requires center motion', () => {
+	const snapshot = JSON.parse(
+		readFileSync(new URL('./fixtures/pattern-arc-radius-rollback.json', import.meta.url), 'utf8')
+	);
+	for (const target of [49, 45, 30, 10, 60]) {
+		const sketch = new SketchDocument();
+		sketch.restoreSnapshot(structuredClone(snapshot));
+		assert.equal(sketch.updateDimensionalConstraint('c_rad-6', target), true, `R${target} should solve`);
+		const c = sketch.constraints.get('c_rad-6') as RadiusConstraint;
+		assert.ok(!c.isReference);
+		assert.equal(c.targetRadius, target);
+		assert.equal(sketch.arcs.get('Arc-15')!.radius, target);
+		assert.ok(sketch.lastSolverResult!.finalError < 1e-6);
+		assert.notEqual(sketch.lastSolverResult!.status, 'OVER_CONSTRAINED');
+	}
 });

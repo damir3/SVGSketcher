@@ -1,0 +1,197 @@
+{
+	"points": [
+		{ "x": -5.9572906742990456e-12, "y": 60.000000437247905, "type": "point", "id": "Point-2", "fixed": false },
+		{ "x": -14.867159529149815, "y": 65.91333875694248, "type": "point", "id": "Point-21", "fixed": false },
+		{ "x": 14.867013253720021, "y": 65.91370647623431, "type": "point", "id": "Point-22", "fixed": false },
+		{ "x": 61.3226885858371, "y": 84.40343985629261, "type": "point", "id": "Point-23", "fixed": false },
+		{ "x": 14.867013317944611, "y": 65.91370650178719, "type": "point", "id": "Point-24", "fixed": false },
+		{ "x": 58.09310539016326, "y": 34.50785089218439, "type": "point", "id": "Point-25", "fixed": false },
+		{ "x": -61.32268854827503, "y": 84.40343986224592, "type": "point", "id": "Point-26", "fixed": false },
+		{ "x": -58.09350031144287, "y": 34.50782537438606, "type": "point", "id": "Point-27", "fixed": false },
+		{ "x": -14.867159643174583, "y": 65.91333880231396, "type": "point", "id": "Point-28", "fixed": false },
+		{ "x": -57.06339139659096, "y": 18.541019804551855, "type": "point", "id": "Point-29", "fixed": false },
+		{ "x": -67.2815152857507, "y": 6.228832885779779, "type": "point", "id": "Point-30", "fixed": false },
+		{ "x": -58.0935003057568, "y": 34.50782528636113, "type": "point", "id": "Point-31", "fixed": false },
+		{ "x": -99.22219438093322, "y": -32.23924523945001, "type": "point", "id": "Point-32", "fixed": false },
+		{ "x": -50.77077104442339, "y": -44.58669754598992, "type": "point", "id": "Point-33", "fixed": false },
+		{ "x": -67.28151536652123, "y": 6.228832788485839, "type": "point", "id": "Point-34", "fixed": false },
+		{ "x": -35.267115402116005, "y": -48.5410200170122, "type": "point", "id": "Point-35", "fixed": false },
+		{ "x": -26.715103735558593, "y": -62.06370832185137, "type": "point", "id": "Point-36", "fixed": false },
+		{ "x": -50.7707709589204, "y": -44.58669756779081, "type": "point", "id": "Point-37", "fixed": false },
+		{ "x": -1.746642248405204e-8, "y": -104.3283891918957, "type": "point", "id": "Point-38", "fixed": false },
+		{ "x": 26.715438170946147, "y": -62.06391990389806, "type": "point", "id": "Point-39", "fixed": false },
+		{ "x": -26.715103667954683, "y": -62.06370842878375, "type": "point", "id": "Point-40", "fixed": false },
+		{ "x": 35.2671153929652, "y": -48.54102002367867, "type": "point", "id": "Point-41", "fixed": false },
+		{ "x": 50.770673164142224, "y": -44.586314096591195, "type": "point", "id": "Point-42", "fixed": false },
+		{ "x": 26.715438218114585, "y": -62.06391982929667, "type": "point", "id": "Point-43", "fixed": false },
+		{ "x": 99.22219437008862, "y": -32.239245272656945, "type": "point", "id": "Point-44", "fixed": false },
+		{ "x": 67.2818198584355, "y": 6.229085570307667, "type": "point", "id": "Point-45", "fixed": false },
+		{ "x": 50.77067328677691, "y": -44.58631406532847, "type": "point", "id": "Point-46", "fixed": false },
+		{ "x": 57.06339139070302, "y": 18.54101976924664, "type": "point", "id": "Point-47", "fixed": false },
+		{ "x": 58.09310538488033, "y": 34.507850810378635, "type": "point", "id": "Point-48", "fixed": false },
+		{ "x": 67.28181980931524, "y": 6.229085629479343, "type": "point", "id": "Point-49", "fixed": false }
+	],
+	"lines": [],
+	"circles": [],
+	"arcs": [
+		{ "type": "arc", "id": "Arc-14", "centerId": "Point-2", "startPointId": "Point-21", "endPointId": "Point-22", "radius": 16, "clockwise": true, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-15", "centerId": "Point-23", "startPointId": "Point-24", "endPointId": "Point-25", "radius": 50, "clockwise": false, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-16", "centerId": "Point-26", "startPointId": "Point-27", "endPointId": "Point-28", "radius": 49.99999999973161, "clockwise": false, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-17", "centerId": "Point-29", "startPointId": "Point-30", "endPointId": "Point-31", "radius": 16.000000014051768, "clockwise": true, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-18", "centerId": "Point-32", "startPointId": "Point-33", "endPointId": "Point-34", "radius": 49.99999999981536, "clockwise": false, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-19", "centerId": "Point-35", "startPointId": "Point-36", "endPointId": "Point-37", "radius": 16.000000013927593, "clockwise": true, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-20", "centerId": "Point-38", "startPointId": "Point-39", "endPointId": "Point-40", "radius": 49.999999999801574, "clockwise": false, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-21", "centerId": "Point-41", "startPointId": "Point-42", "endPointId": "Point-43", "radius": 16.000000013882744, "clockwise": true, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-22", "centerId": "Point-44", "startPointId": "Point-45", "endPointId": "Point-46", "radius": 49.999999999709296, "clockwise": false, "isConstruction": false },
+		{ "type": "arc", "id": "Arc-23", "centerId": "Point-47", "startPointId": "Point-48", "endPointId": "Point-49", "radius": 16.000000023788612, "clockwise": true, "isConstruction": false }
+	],
+	"ellipses": [],
+	"ellipticalArcs": [],
+	"splines": [],
+	"texts": [],
+	"images": [],
+	"constraints": [
+		{ "id": "c_ptline-1", "type": "point_on_line", "name": "Point on Y-Axis", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Point-2", "origin", "axis_y"], "pointId": "Point-2", "lineP1Id": "origin", "lineP2Id": "axis_y" },
+		{ "id": "c_arcept-14", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-14", "Point-2", "Point-21", "Point-22"], "arcId": "Arc-14", "centerId": "Point-2", "startPointId": "Point-21", "endPointId": "Point-22" },
+		{ "id": "c_rad-5", "type": "radius", "name": "Radius (16)", "weight": 1, "isSoft": false, "isDimensional": true, "value": 16, "entityIds": ["Arc-14"], "circleId": "Arc-14", "targetRadius": 16, "leaderAngle": -1.256230474402871, "leaderOffset": 10.439844720713744, "displayMode": "radius" },
+		{ "id": "c_arcept-15", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-15", "Point-23", "Point-24", "Point-25"], "arcId": "Arc-15", "centerId": "Point-23", "startPointId": "Point-24", "endPointId": "Point-25" },
+		{ "id": "c_rad-6", "type": "radius", "name": "Radius (50)", "weight": 1, "isSoft": false, "isDimensional": true, "value": 50, "entityIds": ["Arc-15"], "circleId": "Arc-15", "targetRadius": 50, "leaderAngle": 2.147208527578578, "leaderOffset": -15.93287769111623, "displayMode": "radius" },
+		{ "id": "c_coinc-2", "type": "coincident", "name": "Coincident", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Point-24", "Point-22"], "p1Id": "Point-24", "p2Id": "Point-22" },
+		{ "id": "c_tang-5", "type": "tangent_circle_circle", "name": "Tangent", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Point-23", "Arc-15", "Point-2", "Arc-14"], "circle1CenterId": "Point-23", "circle1Id": "Arc-15", "circle2CenterId": "Point-2", "circle2Id": "Arc-14", "isInternal": false, "outerCircleId": null, "sharedPointId": null },
+		{ "id": "c_arcept-16", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-16", "Point-26", "Point-27", "Point-28"], "arcId": "Arc-16", "centerId": "Point-26", "startPointId": "Point-27", "endPointId": "Point-28" },
+		{ "id": "c_arcept-17", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-17", "Point-29", "Point-30", "Point-31"], "arcId": "Arc-17", "centerId": "Point-29", "startPointId": "Point-30", "endPointId": "Point-31" },
+		{ "id": "c_arcept-18", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-18", "Point-32", "Point-33", "Point-34"], "arcId": "Arc-18", "centerId": "Point-32", "startPointId": "Point-33", "endPointId": "Point-34" },
+		{ "id": "c_arcept-19", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-19", "Point-35", "Point-36", "Point-37"], "arcId": "Arc-19", "centerId": "Point-35", "startPointId": "Point-36", "endPointId": "Point-37" },
+		{ "id": "c_arcept-20", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-20", "Point-38", "Point-39", "Point-40"], "arcId": "Arc-20", "centerId": "Point-38", "startPointId": "Point-39", "endPointId": "Point-40" },
+		{ "id": "c_arcept-21", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-21", "Point-41", "Point-42", "Point-43"], "arcId": "Arc-21", "centerId": "Point-41", "startPointId": "Point-42", "endPointId": "Point-43" },
+		{ "id": "c_arcept-22", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-22", "Point-44", "Point-45", "Point-46"], "arcId": "Arc-22", "centerId": "Point-44", "startPointId": "Point-45", "endPointId": "Point-46" },
+		{ "id": "c_arcept-23", "type": "arc_endpoints", "name": "Arc Endpoints", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Arc-23", "Point-47", "Point-48", "Point-49"], "arcId": "Arc-23", "centerId": "Point-47", "startPointId": "Point-48", "endPointId": "Point-49" },
+		{
+			"id": "c_cpat-2",
+			"type": "circular_pattern",
+			"name": "Circular Pattern",
+			"weight": 1,
+			"isSoft": false,
+			"isDimensional": false,
+			"entityIds": ["origin", "Point-23", "Point-26", "Point-24", "Point-27", "Point-25", "Point-28", "Point-2", "Point-29", "Point-21", "Point-30", "Point-22", "Point-31", "Arc-15", "Arc-16", "Arc-14", "Arc-17", "Point-32", "Point-33", "Point-34", "Point-35", "Point-36", "Point-37", "Arc-18", "Arc-19", "Circle-5", "Point-38", "Point-39", "Point-40", "Point-41", "Point-42", "Point-43", "Arc-20", "Arc-21", "Circle-6", "Point-44", "Point-45", "Point-46", "Point-47", "Point-48", "Point-49", "Arc-22", "Arc-23"],
+			"centerPtId": "origin",
+			"sourceObjectIds": ["Arc-15", "Arc-14", "Circle-3"],
+			"distribution": "full",
+			"totalAngle": 180,
+			"quantity": 5,
+			"suppression": false,
+			"suppressedIndices": [],
+			"copies": [
+				{
+					"copyIndex": 1,
+					"pointPairs": [
+						{ "sourcePtId": "Point-23", "patternPtId": "Point-26" },
+						{ "sourcePtId": "Point-24", "patternPtId": "Point-27" },
+						{ "sourcePtId": "Point-25", "patternPtId": "Point-28" },
+						{ "sourcePtId": "Point-2", "patternPtId": "Point-29" },
+						{ "sourcePtId": "Point-21", "patternPtId": "Point-30" },
+						{ "sourcePtId": "Point-22", "patternPtId": "Point-31" }
+					],
+					"radiusPairs": [
+						{ "sourceCircleId": "Arc-15", "patternCircleId": "Arc-16" },
+						{ "sourceCircleId": "Arc-14", "patternCircleId": "Arc-17" }
+					],
+					"createdEntityIds": [
+						{ "id": "Point-26", "type": "point" },
+						{ "id": "Point-27", "type": "point" },
+						{ "id": "Point-28", "type": "point" },
+						{ "id": "Arc-16", "type": "arc" },
+						{ "id": "Point-29", "type": "point" },
+						{ "id": "Point-30", "type": "point" },
+						{ "id": "Point-31", "type": "point" },
+						{ "id": "Arc-17", "type": "arc" },
+						{ "id": "Circle-4", "type": "circle" }
+					]
+				},
+				{
+					"copyIndex": 2,
+					"pointPairs": [
+						{ "sourcePtId": "Point-23", "patternPtId": "Point-32" },
+						{ "sourcePtId": "Point-24", "patternPtId": "Point-33" },
+						{ "sourcePtId": "Point-25", "patternPtId": "Point-34" },
+						{ "sourcePtId": "Point-2", "patternPtId": "Point-35" },
+						{ "sourcePtId": "Point-21", "patternPtId": "Point-36" },
+						{ "sourcePtId": "Point-22", "patternPtId": "Point-37" }
+					],
+					"radiusPairs": [
+						{ "sourceCircleId": "Arc-15", "patternCircleId": "Arc-18" },
+						{ "sourceCircleId": "Arc-14", "patternCircleId": "Arc-19" }
+					],
+					"createdEntityIds": [
+						{ "id": "Point-32", "type": "point" },
+						{ "id": "Point-33", "type": "point" },
+						{ "id": "Point-34", "type": "point" },
+						{ "id": "Arc-18", "type": "arc" },
+						{ "id": "Point-35", "type": "point" },
+						{ "id": "Point-36", "type": "point" },
+						{ "id": "Point-37", "type": "point" },
+						{ "id": "Arc-19", "type": "arc" },
+						{ "id": "Circle-5", "type": "circle" }
+					]
+				},
+				{
+					"copyIndex": 3,
+					"pointPairs": [
+						{ "sourcePtId": "Point-23", "patternPtId": "Point-38" },
+						{ "sourcePtId": "Point-24", "patternPtId": "Point-39" },
+						{ "sourcePtId": "Point-25", "patternPtId": "Point-40" },
+						{ "sourcePtId": "Point-2", "patternPtId": "Point-41" },
+						{ "sourcePtId": "Point-21", "patternPtId": "Point-42" },
+						{ "sourcePtId": "Point-22", "patternPtId": "Point-43" }
+					],
+					"radiusPairs": [
+						{ "sourceCircleId": "Arc-15", "patternCircleId": "Arc-20" },
+						{ "sourceCircleId": "Arc-14", "patternCircleId": "Arc-21" }
+					],
+					"createdEntityIds": [
+						{ "id": "Point-38", "type": "point" },
+						{ "id": "Point-39", "type": "point" },
+						{ "id": "Point-40", "type": "point" },
+						{ "id": "Arc-20", "type": "arc" },
+						{ "id": "Point-41", "type": "point" },
+						{ "id": "Point-42", "type": "point" },
+						{ "id": "Point-43", "type": "point" },
+						{ "id": "Arc-21", "type": "arc" },
+						{ "id": "Circle-6", "type": "circle" }
+					]
+				},
+				{
+					"copyIndex": 4,
+					"pointPairs": [
+						{ "sourcePtId": "Point-23", "patternPtId": "Point-44" },
+						{ "sourcePtId": "Point-24", "patternPtId": "Point-45" },
+						{ "sourcePtId": "Point-25", "patternPtId": "Point-46" },
+						{ "sourcePtId": "Point-2", "patternPtId": "Point-47" },
+						{ "sourcePtId": "Point-21", "patternPtId": "Point-48" },
+						{ "sourcePtId": "Point-22", "patternPtId": "Point-49" }
+					],
+					"radiusPairs": [
+						{ "sourceCircleId": "Arc-15", "patternCircleId": "Arc-22" },
+						{ "sourceCircleId": "Arc-14", "patternCircleId": "Arc-23" }
+					],
+					"createdEntityIds": [
+						{ "id": "Point-44", "type": "point" },
+						{ "id": "Point-45", "type": "point" },
+						{ "id": "Point-46", "type": "point" },
+						{ "id": "Arc-22", "type": "arc" },
+						{ "id": "Point-47", "type": "point" },
+						{ "id": "Point-48", "type": "point" },
+						{ "id": "Point-49", "type": "point" },
+						{ "id": "Arc-23", "type": "arc" },
+						{ "id": "Circle-7", "type": "circle" }
+					]
+				}
+			],
+			"isReadOnly": false
+		},
+		{ "id": "c_coinc-3", "type": "coincident", "name": "Coincident", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Point-48", "Point-25"], "p1Id": "Point-48", "p2Id": "Point-25" },
+		{ "id": "c_tang-6", "type": "tangent_circle_circle", "name": "Tangent", "weight": 1, "isSoft": false, "isDimensional": false, "entityIds": ["Point-23", "Arc-15", "Point-47", "Arc-23"], "circle1CenterId": "Point-23", "circle1Id": "Arc-15", "circle2CenterId": "Point-47", "circle2Id": "Arc-23", "isInternal": false, "outerCircleId": null, "sharedPointId": null }
+	],
+	"parameters": [],
+	"idCounter": 128
+}

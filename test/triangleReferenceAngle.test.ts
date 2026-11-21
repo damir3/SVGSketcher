@@ -71,21 +71,25 @@ test('the first side length sets triangle scale and the next side length is refe
 
 for (const scale of [1e-6, 1, 1e6]) {
 	for (const target of [80, 100]) {
-		test(`incompatible triangle angle ${target} becomes reference without collapsing (scale=${scale})`, () => {
+		test(`incompatible edit to existing triangle angle ${target} rolls back without collapsing (scale=${scale})`, () => {
 			const sketch = triangle(scale);
 			const before = sketch.paramManager.getCurrentValues();
 			const visibleStates: Map<string, number>[] = [];
 			sketch.onChange(() => visibleStates.push(sketch.paramManager.getCurrentValues()));
+			let rejected = 0;
 			let references = 0;
+			sketch.solverCoordinator.onConstraintRejected(() => rejected++);
 			sketch.solverCoordinator.onReferenceCreated(() => references++);
-			assert.equal(sketch.updateDimensionalConstraint('c_ang-3', target), true);
+			assert.equal(sketch.updateDimensionalConstraint('c_ang-3', target), false);
 			const c = sketch.constraints.get('c_ang-3') as AngleConstraint;
-			assert.equal(c.isReference, true);
+			assert.ok(!c.isReference);
 			assert.ok(Math.abs(c.targetAngle - 90) < 1e-6);
 			assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
 			assert.ok(visibleStates.length > 0);
 			for (const values of visibleStates) assert.deepEqual(values, before, 'a collapsed trial must never reach the UI');
-			assert.equal(references, 1);
+			assert.equal(rejected, 1);
+			assert.equal(references, 0);
+			assert.equal(sketch.canUndo(), false);
 			assert.notEqual(sketch.lastSolverResult!.status, 'OVER_CONSTRAINED');
 		});
 	}
@@ -117,39 +121,47 @@ test('a compatible triangle angle edit stays driving and preserves a nondegenera
 	}
 });
 
-test('triangle reference conversion can be undone and redone without changing geometry', () => {
-	const sketch = triangle();
+test('adding a reference triangle angle can be undone and redone without changing geometry', () => {
+	const sketch = triangle(1, 'c_ang-3');
 	const before = sketch.paramManager.getCurrentValues();
-	sketch.updateDimensionalConstraint('c_ang-3', 80);
+	const added = sketch.addAngleConstraint('Line-7', 'Line-9', 80)!;
+	assert.equal(added.isReference, true);
 	assert.equal(sketch.undo(), true);
-	const driving = sketch.constraints.get('c_ang-3') as AngleConstraint;
-	assert.ok(!driving.isReference);
-	assert.equal(driving.targetAngle, 90);
+	assert.equal(sketch.constraints.has(added.id), false);
 	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
 	assert.equal(sketch.canUndo(), false);
 	assert.equal(sketch.redo(), true);
-	assert.equal(sketch.constraints.get('c_ang-3')!.isReference, true);
+	assert.equal(sketch.constraints.get(added.id)!.isReference, true);
 	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
 });
 
-test('confirming 80 in the angle popup closes it with a measured reference and an intact triangle', () => {
+test('confirming 80 in the angle popup rejects the edit, keeps the popup open, and leaves the triangle intact', () => {
 	const sketch = triangle();
 	const before = sketch.paramManager.getCurrentValues();
-	const input = { value: '80' };
 	const classes = new Set<string>();
+	const classList = {
+		add: (name: string) => classes.add(name),
+		remove: (name: string) => classes.delete(name),
+		contains: (name: string) => classes.has(name),
+	};
+	const input = { value: '80', focus() {}, select() {}, setSelectionRange() {} };
+	const preview = { textContent: '', classList };
 	const modal = Object.assign(Object.create(DimensionModal.prototype), {
 		sketch,
 		currentConstraint: sketch.constraints.get('c_ang-3'),
 		currentMode: 'radius',
 		pendingCreation: false,
 		modalEl: {
-			querySelector: () => input,
-			classList: { add: (name: string) => classes.add(name) },
+			querySelector: (selector: string) => (selector === '#dim-input-val' ? input : preview),
+			classList,
 		},
 	});
 	modal.apply();
-	assert.equal(classes.has('hidden'), true);
-	assert.equal(sketch.constraints.get('c_ang-3')!.isReference, true);
+	assert.equal(classes.has('hidden'), false);
+	assert.equal(preview.textContent, 'Failed to solve');
+	const c = sketch.constraints.get('c_ang-3') as AngleConstraint;
+	assert.ok(!c.isReference);
+	assert.equal(c.targetAngle, 90);
 	assert.deepEqual(sketch.paramManager.getCurrentValues(), before);
 });
 

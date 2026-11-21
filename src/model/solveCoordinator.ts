@@ -122,7 +122,7 @@ export class SolveCoordinator {
 			return false;
 		}
 		this.solve();
-		return !rejected || !!constraint.isReference;
+		return !rejected;
 	}
 	constructor(sketch: SketchDocument, solver?: NumericalSolver) {
 		this.sketch = sketch;
@@ -239,7 +239,8 @@ export class SolveCoordinator {
 	private buildRadiusStiffness(
 		constraints: IConstraint[],
 		allRadii: Set<string>,
-		drivenRadii: Set<string>
+		drivenRadii: Set<string>,
+		stiffCenters = this.stableCenterEditDepth > 0
 	): Map<string, number> {
 		const linked = new Set<string>(drivenRadii);
 		const edges = new Map<string, string[]>();
@@ -273,7 +274,7 @@ export class SolveCoordinator {
 		for (const id of allRadii) {
 			if (!linked.has(id)) stiffness.set(id, 1000);
 		}
-		if (this.stableCenterEditDepth) {
+		if (stiffCenters) {
 			for (const id of this.circularCenterParams()) stiffness.set(id, 1e6);
 		}
 		return stiffness;
@@ -344,7 +345,7 @@ export class SolveCoordinator {
 			for (const [id, previous] of pending) {
 				const candidate = this.sketch.constraints.get(id);
 				restores.get(id)?.();
-				if (candidate?.isDimensional && candidate.updateReferenceValue && (!previous || previous === candidate)) {
+				if (candidate?.isDimensional && candidate.updateReferenceValue && !previous) {
 					candidate.isReference = true;
 					candidate.expression = undefined;
 					this.sketch.constraints.set(id, candidate);
@@ -359,14 +360,12 @@ export class SolveCoordinator {
 			if (editValues) this.paramManager.restoreValues(editValues);
 			for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
 			res = this.solveConstraints(extraConstraints);
-			if (referenceCreated) {
-				// A measured dimension must preserve the geometry from before the trial.
-				this.paramManager.restoreValues(initialValues!);
-				if (editValues) this.paramManager.restoreValues(editValues);
-				for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
-			}
+			// Rolling back a rejected constraint or creating a measured reference must preserve pre-trial geometry.
+			this.paramManager.restoreValues(initialValues!);
+			if (editValues) this.paramManager.restoreValues(editValues);
+			for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
 		});
-		if (referenceCreated) {
+		if (rejected || referenceCreated) {
 			this.paramManager.restoreValues(initialValues!);
 			if (editValues) this.paramManager.restoreValues(editValues);
 			for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
@@ -500,34 +499,61 @@ export class SolveCoordinator {
 		return this.solver.solve(this.paramManager, constraints, options);
 	}
 
+	private preserveDoFState(result: SolverResult, previous: SolverResult): SolverResult {
+		return {
+			...result,
+			status: previous.status,
+			degreesOfFreedom: previous.degreesOfFreedom,
+			constrainedParams: previous.constrainedParams,
+		};
+	}
+
 	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = prepareSplineConstraints(this.sketch, extraConstraints, drivenRadii, editedHandles);
 		for (const line of editedHandles) line.isAutomaticSplineHandle = false;
-		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii);
-		if (stable) return stable;
+		const isDrag = extraConstraints.length > 0;
+		const preservedDoF = isDrag && editedHandles.length === 0 ? this.lastSolverResult : null;
+		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii, !!preservedDoF);
+		if (stable) return preservedDoF ? this.preserveDoFState(stable, preservedDoF) : stable;
 
 		// Interactive drags keep the regular behaviour (radius may follow the drag)
-		if (extraConstraints.length > 0) {
-			return this.solveWithOffsetSourceRetry(activeConstraints, {
+		// and preserve DoF/status from the last clean solve so soft drag springs
+		// cannot perturb Jacobian rank at tangent singularities.
+		if (isDrag) {
+			const res = this.solveWithOffsetSourceRetry(activeConstraints, {
 				lockedParams: drivenRadii,
+				skipDoF: !!preservedDoF,
 			});
+			return preservedDoF ? this.preserveDoFState(res, preservedDoF) : res;
 		}
 
 		// Radii are changed only as a last resort:
 		// Stage 1: try to satisfy all constraints with every radius locked.
 		const allRadii = this.getAllRadiusParams(drivenRadii);
-		this.tryLockedRadiusSolve(activeConstraints, allRadii, drivenRadii, this.paramManager.getCurrentValues(), 1e-8);
+		const preStageValues = this.paramManager.getCurrentValues();
+		const stage1Ok = this.tryLockedRadiusSolve(activeConstraints, allRadii, drivenRadii, preStageValues, 1e-8);
 
 		// Stage 2: free (non-driven) radii, but make them much stiffer than positions so
 		// that the solver prefers moving geometry over resizing circles. When stage 1
 		// succeeded this is a no-op / polish step that also computes the DoF.
-		const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
-		return this.solveWithOffsetSourceRetry(activeConstraints, {
+		const stiffCenters = this.stableCenterEditDepth > 0;
+		const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, stiffCenters);
+		const result = this.solveWithOffsetSourceRetry(activeConstraints, {
 			lockedParams: drivenRadii,
 			paramStiffness: stiffness,
 		});
+		if (!stage1Ok && stiffCenters && !this.isSolveAccepted(result, 1e-2)) {
+			// High center stiffness can stall Levenberg-Marquardt when centers must move.
+			// Retry from the pre-trial geometry with only non-linked radius stiffness.
+			this.paramManager.restoreValues(preStageValues);
+			return this.solveWithOffsetSourceRetry(activeConstraints, {
+				lockedParams: drivenRadii,
+				paramStiffness: this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, false),
+			});
+		}
+		return result;
 	}
 
 	tryHardSolve(tempHardConstraints: IConstraint[], extraValidator?: () => boolean): boolean {
@@ -555,26 +581,34 @@ export class SolveCoordinator {
 		);
 
 		if (!solvedOk) {
-			const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii);
-			const solveStiff = () =>
-				this.solveWithOffsetSourceRetry(
-					activeConstraints,
-					{
-						lockedParams: drivenRadii,
-						paramStiffness: stiffness,
-						skipDoF: true,
-					},
-					maxError
-				);
-			let stage2 = solveStiff();
-			if (
-				stage2.status !== 'OVER_CONSTRAINED' &&
-				stage2.finalError >= 1e-10 &&
-				stage2.iterations >= this.solver.maxIterations
-			) {
-				stage2 = solveStiff();
+			const runStage2 = (stiffCenters: boolean) => {
+				const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, stiffCenters);
+				const solveStiff = () =>
+					this.solveWithOffsetSourceRetry(
+						activeConstraints,
+						{
+							lockedParams: drivenRadii,
+							paramStiffness: stiffness,
+							skipDoF: true,
+						},
+						maxError
+					);
+				let stage2 = solveStiff();
+				if (
+					stage2.status !== 'OVER_CONSTRAINED' &&
+					stage2.finalError >= 1e-10 &&
+					stage2.iterations >= this.solver.maxIterations
+				) {
+					stage2 = solveStiff();
+				}
+				return this.isSolveAccepted(stage2, maxError, extraValidator);
+			};
+			const stiffCenters = this.stableCenterEditDepth > 0;
+			solvedOk = runStage2(stiffCenters);
+			if (!solvedOk && stiffCenters) {
+				this.paramManager.restoreValues(initialValues);
+				solvedOk = runStage2(false);
 			}
-			solvedOk = this.isSolveAccepted(stage2, maxError, extraValidator);
 			if (!solvedOk) {
 				this.paramManager.restoreValues(initialValues);
 			}

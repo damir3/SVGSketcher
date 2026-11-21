@@ -377,15 +377,12 @@ export class SketchDocument {
 		}
 	}
 
-	/** Discard the initial driving dimension's edits while retaining its measured replacement. */
-	restoreReferenceCreation(reference: IConstraint): void {
-		if (!this.batchSnapshot || !reference.isReference) return;
-		const snapshot = this.batchSnapshot;
-		this.runSilentDerivedUpdate(() => {
-			this.restoreSnapshot(snapshot);
-			this.constraints.set(reference.id, reference);
-		});
-		this.notify();
+	discardTransaction(): void {
+		if (this.batchDepth <= 0) return;
+		this.batchDepth--;
+		if (this.batchDepth === 0) {
+			this.batchSnapshot = null;
+		}
 	}
 
 	pushHistory(coalesce = true): void {

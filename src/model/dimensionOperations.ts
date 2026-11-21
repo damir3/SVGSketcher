@@ -27,11 +27,11 @@ function updateExistingDistanceConstraint<T extends DistanceConstraint | PointTo
 	targetDist?: number,
 	offset?: number
 ): T | null {
-	if (offset !== undefined && existing.offset !== offset) {
-		existing.offset = offset;
-	}
 	if (targetDist !== undefined && existing.targetDistance !== targetDist) {
 		if (!updateDimensionalConstraint(sketch, existing.id, targetDist)) return null;
+	}
+	if (offset !== undefined && existing.offset !== offset) {
+		existing.offset = offset;
 	}
 	return existing;
 }
@@ -69,11 +69,11 @@ function updateExistingAngleConstraint(
 	targetAngleDeg?: number,
 	arcRadius?: number
 ): AngleConstraint | null {
-	if (arcRadius !== undefined && existing.arcRadius !== arcRadius) {
-		existing.arcRadius = arcRadius;
-	}
 	if (targetAngleDeg !== undefined && existing.targetAngle !== targetAngleDeg) {
 		if (!updateDimensionalConstraint(sketch, existing.id, targetAngleDeg)) return null;
+	}
+	if (arcRadius !== undefined && existing.arcRadius !== arcRadius) {
+		existing.arcRadius = arcRadius;
 	}
 	return existing;
 }
@@ -748,16 +748,12 @@ export function addRadiusConstraint(
 	const existing = findConstraint(sketch, RadiusConstraint, c => c.circleId === circleOrArcId);
 
 	if (existing) {
-		if (displayMode !== undefined) {
-			existing.displayMode = displayMode;
-		} else if (!existing.displayMode) {
-			existing.displayMode = defaultMode;
-		}
-
+		const mode = displayMode ?? existing.displayMode ?? defaultMode;
 		if (targetRadius !== undefined) {
-			const mode = existing.displayMode ?? defaultMode;
 			const value = mode === 'diameter' ? targetRadius * 2 : targetRadius;
 			if (!updateDimensionalConstraint(sketch, existing.id, value, mode)) return null;
+		} else if (existing.displayMode !== mode) {
+			existing.displayMode = mode;
 		}
 		return existing;
 	}
@@ -871,9 +867,10 @@ export function updateDimensionalConstraint(
 
 	const offsetTransaction = c instanceof OffsetConstraint;
 	const offsetSnapshot = offsetTransaction ? sketch.takeSnapshot() : null;
+	let updated = false;
 	if (offsetTransaction) sketch.beginTransaction();
 	try {
-		return sketch.solverCoordinator.updateConstraint(
+		updated = sketch.solverCoordinator.updateConstraint(
 			c,
 			() => {
 				let applied = false;
@@ -889,7 +886,11 @@ export function updateDimensionalConstraint(
 			},
 			offsetSnapshot ? () => sketch.runSilentDerivedUpdate(() => sketch.restoreSnapshot(offsetSnapshot)) : undefined
 		);
+		return updated;
 	} finally {
-		if (offsetTransaction) sketch.commitTransaction(false);
+		if (offsetTransaction) {
+			if (updated) sketch.commitTransaction(false);
+			else sketch.discardTransaction();
+		}
 	}
 }

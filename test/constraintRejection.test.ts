@@ -132,6 +132,49 @@ test('confirming a new dimension creates one undo step for creation and its valu
 	assert.equal(sketch.getDistanceConstraint(a.id, b.id)!.targetDistance, 50);
 });
 
+test('entering an unsolvable value for a newly added dimension shows Failed to solve without deleting it', () => {
+	const sketch = new SketchDocument();
+	const a = sketch.addPoint({ x: 0, y: 0 }, true);
+	const b = sketch.addPoint({ x: 10, y: 0 });
+	const c = sketch.addPoint({ x: 0, y: 10 });
+	sketch.addLine(a.id, b.id);
+	sketch.addLine(a.id, c.id);
+	const hyp = sketch.addLine(b.id, c.id);
+	sketch.addDistanceConstraint(a.id, b.id, 10);
+	sketch.addDistanceConstraint(a.id, c.id, 10);
+	sketch.clearHistory();
+	sketch.selectEntity(hyp.id, 'line', false);
+	let popup: ReturnType<typeof dimensionPopup> | undefined;
+	ConstraintTool.applyConstraintToSelection('distance', {
+		sketch,
+		viewport: new Viewport(800, 600),
+		svg: { getBoundingClientRect: () => ({ left: 0, top: 0 }) } as SVGSVGElement,
+		showToast() {},
+		onEditDimension: (constraint, _pos, isNew) => {
+			popup = dimensionPopup(sketch, constraint, '50', isNew);
+			return isNew;
+		},
+	});
+	assert.ok(popup);
+	const created = sketch.getDistanceConstraint(b.id, c.id)!;
+	const initialDist = created.targetDistance;
+	popup.modal.apply();
+	assert.equal(popup.classes.has('hidden'), false);
+	assert.equal(popup.preview.textContent, 'Failed to solve');
+	assert.equal(sketch.getDistanceConstraint(b.id, c.id), created);
+	assert.ok(!created.isReference);
+	assert.equal(created.targetDistance, initialDist);
+	assert.equal(sketch.isInTransaction(), true);
+
+	(popup.modal.modalEl.querySelector('#dim-input-val') as { value: string }).value = '15';
+	popup.modal.apply();
+	assert.equal(popup.classes.has('hidden'), true);
+	assert.equal(sketch.isInTransaction(), false);
+	assert.equal(sketch.getDistanceConstraint(b.id, c.id)!.targetDistance, 15);
+	assert.equal(sketch.undo(), true);
+	assert.equal(sketch.hasDistanceConstraint(b.id, c.id), false);
+});
+
 test('rejects a conflicting constraint without changing geometry, selection, history or visible solver status', () => {
 	const { sketch, a, b, line } = constrainedLine();
 	sketch.selectEntity(line.id, 'line', false);

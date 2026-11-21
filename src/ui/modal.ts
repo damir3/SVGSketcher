@@ -211,17 +211,8 @@ export class DimensionModal {
 		const evalRes = this.sketch.evaluateExpression(text);
 		if (evalRes.isValid && evalRes.value !== undefined && Number.isFinite(evalRes.value) && evalRes.value > 0) {
 			if (this.sketch.updateDimensionalConstraint(this.currentConstraint.id, text, this.currentMode)) {
-				if (this.pendingCreation && this.currentConstraint.isReference) {
-					this.sketch.restoreReferenceCreation(this.currentConstraint);
-				}
 				this.close();
 			} else {
-				if (this.pendingCreation) {
-					this.pendingCreation = false;
-					this.sketch.rollbackTransaction();
-					this.close();
-					return;
-				}
 				const wrapper = this.modalEl.querySelector<HTMLElement>('.dim-input-wrapper');
 				wrapper?.classList.add('error');
 				const previewEl = this.modalEl.querySelector<HTMLElement>('#dim-eval-preview');
