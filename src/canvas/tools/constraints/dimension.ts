@@ -729,20 +729,13 @@ export class DimensionTool extends BaseTool {
 						const sOrigin = this.ctx.viewport.worldToScreen(ORIGIN);
 						const sPt = this.ctx.viewport.worldToScreen(userPt);
 						const { orientation, offsetScreen } = determineDistanceOrientation(sOrigin, sPt, screen);
-						let offsetWorld = offsetScreen / this.ctx.viewport.zoom;
-						if (orientation === 'horizontal') {
-							const sAxisY = this.ctx.viewport.worldToScreen(new Vec2(0, 100));
-							const dy = sAxisY.y - sOrigin.y;
-							const lineLen = Math.hypot(0, dy);
-							const uy = lineLen > 1e-4 ? dy / lineLen : -1;
-							offsetWorld = ((screen.y - sPt.y) * uy) / this.ctx.viewport.zoom;
-						} else if (orientation === 'vertical') {
-							offsetWorld = (screen.x - sPt.x) / this.ctx.viewport.zoom;
-						}
+						const offsetWorld = offsetScreen / this.ctx.viewport.zoom;
 
 						const existed = this.ctx.sketch.hasOriginConstraint(userPtId);
 						const c = this.ctx.sketch.addOriginDistanceConstraint(userPtId, undefined, orientation, offsetWorld);
 						if (c) {
+							const t = computeLabelPosition(sOrigin, sPt, screen, orientation);
+							if (t !== undefined) c.labelPosition = t;
 							this.finishDimensionPlacement(c, this.distanceToast(existed, orientation, 'to (0,0)'), e.client);
 						}
 					}

@@ -531,19 +531,12 @@ describe('Origin & Axis Constraints', () => {
 				zoom: 1,
 				panX: 0,
 				panY: 500, // screen Y = 500 - wy * zoom
-				worldToScreen: (p: { x: number; y: number }) => new Vec2(p.x, 500 - p.y),
+				worldToScreen: (pt: { x: number; y: number }) => new Vec2(pt.x, 500 - pt.y),
 			};
-
-			const sp = viewport.worldToScreen(p); // (50, 450)
-			const sOrigin = viewport.worldToScreen({ x: 0, y: 0 }); // (0, 500)
-			const sAxisY = viewport.worldToScreen({ x: 0, y: 100 }); // (0, 400)
-			const dy = sAxisY.y - sOrigin.y; // -100
-			const uy = dy / Math.hypot(0, dy); // -1
 
 			// Dragging cursor UP by 40px: screen.y = 410 (sp.y = 450)
 			const cursorScreen = new Vec2(50, 410);
-			const screenOffset = (cursorScreen.y - sp.y) * uy; // (410 - 450) * (-1) = 40
-			c.offset = screenOffset / viewport.zoom; // 40
+			c.moveLabelTo(cursorScreen, sketch, viewport);
 
 			let renderedD1: any = null;
 			const mockCtx: any = {

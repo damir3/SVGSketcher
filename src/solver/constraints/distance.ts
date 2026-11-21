@@ -16,7 +16,6 @@ import {
 	renderLinearDimensionVisual,
 } from '../../canvas/dimensionGeometry';
 import { ConstraintPanel } from '../../ui/panels/constraints/constraintPanel';
-import { PointToLineDistanceConstraint } from './pointToLineDistance';
 import { DEFAULT_DISTANCE_OFFSET } from '../../canvas/distances';
 
 export { DEFAULT_DISTANCE_OFFSET };
@@ -232,25 +231,6 @@ export class DistanceConstraint extends BaseConstraint {
 		return (outerRadius + this.leaderOffset - a.radius) / (b.radius - a.radius);
 	}
 
-	private axisDimension(): PointToLineDistanceConstraint | undefined {
-		if (this.p1Id !== 'origin' || this.orientation === 'aligned') return undefined;
-		const axis = this.orientation === 'vertical' ? 'axis_x' : 'axis_y';
-		const dimension = new PointToLineDistanceConstraint(
-			this.id,
-			this.p2Id,
-			axis,
-			'origin',
-			axis,
-			this.targetDistance,
-			this.side,
-			this.weight,
-			this.offset,
-			this.labelPosition
-		);
-		dimension.isReference = this.isReference;
-		return dimension;
-	}
-
 	moveLabelTo(screen: Vec2, sketch: SketchDocument, viewport: Viewport): void {
 		if (this.circleIds) {
 			const center = sketch.points.get(this.p1Id);
@@ -266,13 +246,6 @@ export class DistanceConstraint extends BaseConstraint {
 				this.labelPosition =
 					new Vec2().subVectors(world, p1).dot(new Vec2().subVectors(p2, p1)) / p1.distanceToSquared(p2);
 			}
-			return;
-		}
-		const axis = this.axisDimension();
-		if (axis) {
-			axis.moveLabelTo(screen, sketch, viewport);
-			this.offset = axis.offset;
-			this.labelPosition = axis.labelPosition;
 			return;
 		}
 		const [p1, p2] = this.dimensionPoints(sketch);
@@ -321,12 +294,6 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override render(ctx: ConstraintRenderContext): void {
-		const axis = this.axisDimension();
-		if (axis) {
-			axis.expression = this.expression;
-			axis.render(ctx);
-			return;
-		}
 		this.renderDimension(ctx.sketch, ctx.viewport, ctx.targetGroup, ctx.isSelected, ctx.renderLinearDimensionVisual);
 	}
 
@@ -378,8 +345,6 @@ export class DistanceConstraint extends BaseConstraint {
 	}
 
 	override distanceTo(screen: any, sketch: any, viewport: any, _thresholdPx?: number): number | null {
-		const axis = this.axisDimension();
-		if (axis) return axis.distanceTo(screen, sketch, viewport);
 		const visual = this.resolveDimensionVisual(sketch, viewport);
 		if (!visual) return null;
 

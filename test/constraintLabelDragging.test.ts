@@ -46,8 +46,8 @@ for (const [orientation, offset, position] of [
 }
 
 for (const [orientation, cursor, offset, position] of [
-	['vertical', new Vec2(60, 30), -40, 0.625],
-	['horizontal', new Vec2(60, 30), -50, 0.4],
+	['vertical', new Vec2(60, 30), 10, 0.375],
+	['horizontal', new Vec2(60, 30), 10, 0.6],
 	['aligned', new Vec2(160, 30), 19600 / Math.sqrt(65600), 46 / 41],
 ] as const) {
 	test(`dragging ${orientation} origin distance preserves axis direction and endpoint order`, () => {

@@ -77,7 +77,7 @@ for (const axis of [false, true]) {
 			assert.ok(c instanceof (axis ? DistanceConstraint : PointToLineDistanceConstraint));
 			assert.equal(f.sketch.constraints.size, 1);
 			assert.equal(c.targetDistance, axis ? 40 : 30);
-			assert.ok(Math.abs(c.offset! - 35) < 1e-7);
+			assert.ok(Math.abs(c.offset! - (axis ? 50 : 35)) < 1e-7);
 			assert.ok(c.distanceTo(placement.screen, f.sketch, f.viewport)! < 1e-7);
 			assert.equal(tool.state.step, 0);
 		});
