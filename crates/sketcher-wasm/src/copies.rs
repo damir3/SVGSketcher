@@ -33,3 +33,48 @@ fn query(points: &[f64], data: &[f64]) -> Result<Vec<f64>, &'static str> {
 pub fn copy_geometry(points: &[f64], operations: &[f64]) -> Result<Vec<f64>, JsValue> {
     query(points, operations).map_err(JsValue::from_str)
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn rejects_malformed_packets_tags_and_flags() {
+        for (points, ops) in [
+            (&[0.0][..], &[][..]),
+            (&[], &[0.0, 0.0]),
+            (&[], &[99.0]),
+            (&[], &[-1.0]),
+            (&[], &[1.5]),
+            (&[], &[f64::NAN]),
+            (&[f64::NAN, 0.0], &[4.0, 0.0, 0.0]),
+            (&[], &[1.0, 0.0, 0.0, 4.0, 3.0, 90.0, 1.0]),
+            (
+                &[],
+                &[5.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            ),
+        ] {
+            assert!(query(points, ops).is_err());
+        }
+    }
+    #[test]
+    fn decodes_packed_multi_operation_batches_with_expected_stride() {
+        let points = [10.0, 5.0, 0.0, 0.0];
+        let ops = [
+            0.0, 0.0, 0.0, 10.0, 0.0, // mirror across X axis
+            4.0, 3.0, -2.0, // translate by (3, -2)
+            5.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, // default directions
+        ];
+        let out = query(&points, &ops).unwrap();
+        let stride = 6 + 3 * 2;
+        assert_eq!(out.len(), 3 * stride);
+        // Mirror across X axis: (10, 5) -> (10, -5), near=0; (0, 0) -> (0, 0), near=1
+        assert_eq!(out[0], 1.0);
+        assert_eq!(&out[6..12], &[10.0, -5.0, 0.0, 0.0, 0.0, 1.0]);
+        // Translate by (3, -2)
+        assert_eq!(
+            &out[stride + 6..stride + 12],
+            &[13.0, 3.0, 0.0, 3.0, -2.0, 0.0]
+        );
+        // Default directions: u1=(1,0), u2=(0,1)
+        assert_eq!(&out[2 * stride + 2..2 * stride + 6], &[1.0, 0.0, 0.0, 1.0]);
+    }
+}

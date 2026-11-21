@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
+import { getGeometryKernel } from '../src/kernel';
 import { createWasmChamferKernel } from '../src/kernel/chamferWasm';
 import { SketchDocument } from '../src/model/sketch';
 import {
@@ -12,7 +10,6 @@ import {
 	type ChamferCandidate,
 	type ChamferMode,
 } from '../src/math/chamfer';
-import * as reference from '../src/math/chamferReference';
 import type { ChamferFrame } from '../src/kernel/chamferTypes';
 import { Vec2 } from '../src/math/vector';
 const fixture = JSON.parse(
@@ -64,23 +61,6 @@ function compare(a: unknown, b: unknown, path = '') {
 	assert.deepEqual(keys(a), keys(b), path);
 	for (const key of keys(b)) compare(a[key], b[key], `${path}.${key}`);
 }
-test('chamfer reference matches the pre-routing snapshots', () => {
-	for (const [file, hash] of Object.entries(fixture.sourceHashes))
-		assert.equal(
-			createHash('sha256')
-				.update(readFileSync(new URL(`../${file}`, import.meta.url)))
-				.digest('hex'),
-			hash
-		);
-	for (const c of fixture.corners)
-		compare(reference.calculateChamferCorner(c.vertex, c.other1, c.other2), c.result, c.name);
-	for (const q of fixture.queries)
-		compare(
-			reference.calculateChamferGeometry(candidate(q.corner), q.mode, q.d1, q.d2, q.angle, q.flip),
-			q.result,
-			q.name
-		);
-});
 for (const [index, c] of fixture.corners.entries())
 	test(`native corner preparation: ${c.name}`, () => {
 		const sketch = new SketchDocument();
@@ -112,22 +92,9 @@ for (const q of fixture.queries)
 		assert.ok(r.t1 instanceof Vec2 && r.midPoint instanceof Vec2 && r.bisectorDir instanceof Vec2);
 		assert.equal(JSON.stringify(c), before);
 	});
-test('chamfer reference fallback works without a native feature', () => {
-	const previous = getGeometryKernel();
-	try {
-		setGeometryKernel(typescriptGeometryKernel);
-		const c = candidate(0);
-		compare(
-			calculateChamferGeometry(c, 'distance_angle', 10, 0, 30, true),
-			reference.calculateChamferGeometry(c, 'distance_angle', 10, 0, 30, true)
-		);
-	} finally {
-		setGeometryKernel(previous);
-	}
-});
 test('each chamfer calculation crosses the numeric binding once', () => {
 	const c = candidate(0),
-		r = reference.calculateChamferGeometry(c, 'two_distance', 12, 7, 45, false),
+		r = calculateChamferGeometry(c, 'two_distance', 12, 7, 45, false),
 		calls: number[] = [];
 	const api = createWasmChamferKernel((_data, settings) => {
 		calls.push(settings[0]);
@@ -194,7 +161,7 @@ test('WASM chamfer result validation rejects malformed layouts and error codes',
 			/WASM chamfer result/
 		);
 });
-test('WASM chamfers agree with TypeScript for deterministic rotated and translated corners', {
+test('WASM chamfers satisfy geometric invariants for deterministic rotated and translated corners', {
 	skip: getGeometryKernel().backend !== 'wasm',
 }, () => {
 	const api = getGeometryKernel().chamfer!;
@@ -211,19 +178,29 @@ test('WASM chamfers agree with TypeScript for deterministic rotated and translat
 			l2 = 0.2 + random() * 500;
 		const a = v.clone().add(new Vec2(Math.cos(angle) * l1, Math.sin(angle) * l1)),
 			b = v.clone().add(new Vec2(Math.cos(angle + theta) * l2, Math.sin(angle + theta) * l2));
-		const expected = reference.calculateChamferCorner(v, a, b)!,
-			actual = api.corner(v, a, b)!;
-		compare(actual, expected, `frame ${i}`);
-		const c = { ...candidate(0), vertexPos: v, ...expected };
+		const frame = api.corner(v, a, b)!;
+		assert.ok(frame);
+		assert.ok(Math.abs(Math.hypot(frame.dir1.x, frame.dir1.y) - 1) < 1e-12);
+		assert.ok(Math.abs(Math.hypot(frame.dir2.x, frame.dir2.y) - 1) < 1e-12);
+		assert.ok(Math.abs(frame.len1 - l1) < 1e-9);
+		assert.ok(Math.abs(frame.len2 - l2) < 1e-9);
+		assert.ok(Math.abs(frame.cornerAngleRad - theta) < 1e-9);
 		const mode = (['equal_distance', 'two_distance', 'distance_angle'] as const)[i % 3],
 			d1 = random() * l1 * 1.1,
 			d2 = random() * l2 * 1.1,
 			degrees = random() * 190 - 5,
 			flip = !!(i % 2);
-		compare(
-			api.calculate({ ...actual, vertexPos: v }, mode, d1, d2, degrees, flip),
-			reference.calculateChamferGeometry(c, mode, d1, d2, degrees, flip),
-			`query ${i}`
-		);
+		const r = api.calculate({ ...frame, vertexPos: v }, mode, d1, d2, degrees, flip);
+		if (r.isValid) {
+			const t1 = Vec2.from(r.t1),
+				t2 = Vec2.from(r.t2),
+				mid = Vec2.from(r.midPoint);
+			assert.ok(t1.distanceTo(v.clone().addScaledVector(frame.dir1, r.dist1)) < 1e-8);
+			assert.ok(t2.distanceTo(v.clone().addScaledVector(frame.dir2, r.dist2)) < 1e-8);
+			assert.ok(Math.abs(r.chamferLength - t1.distanceTo(t2)) < 1e-8);
+			assert.ok(mid.distanceTo(t1.clone().lerp(t2, 0.5)) < 1e-8);
+		} else {
+			assert.ok(typeof r.errorMessage === 'string' && r.errorMessage.length > 0);
+		}
 	}
 });

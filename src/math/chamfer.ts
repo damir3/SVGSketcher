@@ -4,7 +4,6 @@ import { remapLineConstraints } from '../model/constraintLinks';
 import { getConnectedPrimitivesForPoint } from './fillet';
 
 import { getGeometryKernel } from '../kernel';
-import * as reference from './chamferReference';
 import type { ChamferMode } from '../kernel/chamferTypes';
 export type { ChamferMode } from '../kernel/chamferTypes';
 
@@ -121,9 +120,8 @@ function buildChamferCandidate(
 	const vertexPos = pCorner1.clone();
 
 	const api = getGeometryKernel().chamfer;
-	const frame = api
-		? api.corner(vertexPos, pOther1, pOther2)
-		: reference.calculateChamferCorner(vertexPos, pOther1, pOther2);
+	if (!api) throw new Error('Chamfer geometry requires the Rust/WASM kernel');
+	const frame = api.corner(vertexPos, pOther1, pOther2);
 	if (!frame) return null;
 	const { len1, len2, cornerAngleRad } = frame;
 	const dir1 = Vec2.from(frame.dir1),
@@ -160,7 +158,7 @@ export function calculateChamferGeometry(
 	flip: boolean
 ): ChamferResult {
 	const api = getGeometryKernel().chamfer;
-	if (!api) return reference.calculateChamferGeometry(candidate, mode, dist1Input, dist2Input, angleDegInput, flip);
+	if (!api) throw new Error('Chamfer geometry requires the Rust/WASM kernel');
 	const r = api.calculate(candidate, mode, dist1Input, dist2Input, angleDegInput, flip);
 	return {
 		...r,

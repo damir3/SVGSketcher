@@ -21,10 +21,9 @@ import {
 	OffsetConstraint,
 } from '../solver/constraints';
 import { Vec2 } from './vector';
-import { intersectCurves, type GeoCurve, type GeoSegment } from './intersection';
-import { computeNaturalFitHandles, getSplineTangentAtParam } from './spline';
+import type { GeoCurve } from './intersection';
+import { computeNaturalFitHandles } from './spline';
 import { getGeometryKernel } from '../kernel';
-import { findExtendCandidate as findExtendCandidateReference } from './extendReference';
 
 export type ExtendPrimitiveType = 'line' | 'arc' | 'elliptical_arc' | 'spline';
 
@@ -87,41 +86,13 @@ export function findExtendTarget(ctx: any, screen: Vec2, thresholdPx = 18): GeoC
  * Calculates the extension candidate for the hovered curve and cursor position.
  */
 export function findExtendCandidate(
-	sketch: SketchDocument,
+	_sketch: SketchDocument,
 	target: GeoCurve,
 	allCurves: GeoCurve[],
 	cursorWorldPos: Vec2
 ): ExtendCandidate | null {
 	const editing = getGeometryKernel().editing;
-	if (!editing) {
-		const ref = findExtendCandidateReference(sketch, target, allCurves, cursorWorldPos);
-		if (!ref || target.type !== 'spline' || (target.isClosed && target.splineType !== 'control')) return ref;
-		const tangent = getSplineTangentAtParam(target.bezierSegments, ref.edge === 'end' ? 1.0 : 0.0);
-		const dir = (ref.edge === 'end' ? tangent.clone() : tangent.clone().multiplyScalar(-1)).normalizeOrUnitX();
-		const raySegment: GeoSegment = {
-			type: 'segment',
-			id: '__extend_ray__',
-			p1: ref.fromPoint,
-			p2: ref.fromPoint.clone().addScaledVector(dir, 50000),
-		};
-		let bestT = ref.intersectedCurveId ? new Vec2().subVectors(ref.toPoint, ref.fromPoint).dot(dir) : Infinity;
-		let bestPt: Vec2 | null = null;
-		for (const pt of intersectCurves(raySegment, target)) {
-			const t = new Vec2().subVectors(pt, ref.fromPoint).dot(dir);
-			if (t > 1e-3 && t < bestT) {
-				bestT = t;
-				bestPt = pt;
-			}
-		}
-		if (!bestPt) return ref;
-		return {
-			...ref,
-			toPoint: bestPt,
-			intersectedCurveId: target.id,
-			intersectedCurveType: 'spline',
-			previewData: { from: ref.fromPoint, to: bestPt },
-		};
-	}
+	if (!editing) throw new Error('Curve editing requires the Rust/WASM kernel');
 	const result = editing.extend(target, allCurves, cursorWorldPos);
 	if (!result) return null;
 	if (target.type === 'circle' || target.type === 'ellipse') throw new Error('Invalid native extend target');

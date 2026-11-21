@@ -1,10 +1,12 @@
 import { getGeometryKernel } from '../kernel';
-import { typescriptConstruction } from './constructionReference';
 import type { ConstructionMode } from '../kernel/constructionTypes';
 import { Vec2, type XY } from './vector';
 const coords = (...points: readonly XY[]) => points.flatMap(p => [p.x, p.y]);
-const query = (mode: ConstructionMode, data: readonly number[]) =>
-	(getGeometryKernel().construction ?? typescriptConstruction)(mode, data);
+const query = (mode: ConstructionMode, data: readonly number[]) => {
+	const api = getGeometryKernel().construction;
+	if (!api) throw new Error('Primitive construction requires the Rust/WASM kernel');
+	return api(mode, data);
+};
 const required = (mode: ConstructionMode, data: readonly number[]) => {
 	const out = query(mode, data);
 	if (!out) throw new Error('Degenerate construction');

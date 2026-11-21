@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
@@ -8,7 +7,6 @@ import { createWasmTopologyKernel } from '../src/kernel/topologyWasm';
 import type { TopologyInput } from '../src/kernel/topologyTypes';
 import { SketchDocument } from '../src/model/sketch';
 import { CoincidentConstraint } from '../src/solver/constraints';
-import * as reference from '../src/math/offsetTopologyReference';
 import {
 	getCoincidentPointGroup,
 	calculateOffsetGeometry,
@@ -24,14 +22,6 @@ const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelTopology.json'
 const native = !!getGeometryKernel().topology;
 const plain = (v: unknown) => JSON.parse(JSON.stringify(v));
 
-test('topology fixture identifies the independent pre-native traversal source', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/math/offsetTopologyReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixture.sourceSha256
-	);
-});
 for (const scene of fixture.cases)
 	test(`topology retains ordered groups, neighbors and chain actions: ${scene.name}`, () => {
 		const sketch = new SketchDocument();
@@ -128,7 +118,9 @@ test('topology snapshots refresh after coordinate, constraint and history change
 	assert.ok(getCoincidentPointGroup(sketch, a.id).has(b.id));
 });
 
-test('spatial components match the independent traversal on seeded mixed coincidence graphs', { skip: !native }, () => {
+test('spatial components stay consistent between single queries and prepared snapshots on seeded graphs', {
+	skip: !native,
+}, () => {
 	let seed = 0x8a3294;
 	const random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
 	for (let scene = 0; scene < 32; scene++) {
@@ -153,11 +145,13 @@ test('spatial components match the independent traversal on seeded mixed coincid
 		const roots = [...points.map(p => p.id), 'origin', 'axis_x', 'axis_y', 'ghost-a', 'ghost-b', 'unknown'];
 		const topology = createOffsetTopology(sketch, roots);
 		for (const root of roots) {
-			const expected = reference.getCoincidentPointGroup(sketch, root);
-			assert.deepEqual([...getCoincidentPointGroup(sketch, root)], [...expected]);
-			assert.deepEqual([...topology.group(root)].sort(), [...expected].sort());
-			assert.deepEqual(topology.connected(root), reference.getConnectedPrimitivesAtVertex(sketch, root));
+			const direct = getCoincidentPointGroup(sketch, root);
+			assert.ok(direct.has(root));
+			assert.deepEqual([...topology.group(root)].sort(), [...direct].sort());
+			assert.deepEqual(topology.connected(root), getConnectedPrimitivesAtVertex(sketch, root));
 		}
+		assert.ok(topology.group(points[0].id).has(points[7].id));
+		assert.ok(topology.group('axis_x').has(points[4].id));
 	}
 });
 
@@ -197,11 +191,14 @@ test('offset spline direction checks share one topology snapshot', { skip: !nati
 	}
 });
 
-test('topology keeps legacy invalid-coordinate behavior and reports native failures', { skip: !native }, () => {
+test('topology rejects non-finite coordinates and reports native failures', { skip: !native }, () => {
 	const previous = getGeometryKernel(),
 		sketch = new SketchDocument();
 	const point = sketch.addPoint({ x: 10, y: 10 }, true);
 	point.x = NaN;
+	assert.throws(() => getCoincidentPointGroup(sketch, point.id));
+	assert.throws(() => getConnectedPrimitivesAtVertex(sketch, point.id));
+	point.x = 10;
 	try {
 		setGeometryKernel({
 			...previous,
@@ -214,9 +211,6 @@ test('topology keeps legacy invalid-coordinate behavior and reports native failu
 				},
 			},
 		});
-		assert.deepEqual([...getCoincidentPointGroup(sketch, point.id)], [point.id]);
-		assert.deepEqual(getConnectedPrimitivesAtVertex(sketch, point.id), []);
-		point.x = 10;
 		assert.throws(() => getCoincidentPointGroup(sketch, point.id), /native topology failure/);
 		assert.throws(() => getConnectedPrimitivesAtVertex(sketch, point.id), /native topology failure/);
 	} finally {

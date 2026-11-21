@@ -1,6 +1,5 @@
-import { withPreciseSplineParameters } from './helpers/preciseEditingOracle';
+import { expectedSplineTrim, refineSplineIntersections } from './helpers/preciseEditingOracle';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
@@ -12,16 +11,11 @@ import {
 	executeTrim,
 	executeBreak,
 	getAllGeoCurves,
+	type CurveIntersection,
 	type GeoCurve,
 } from '../src/math/intersection';
 import { findSketchRegions, pointInRegion } from '../src/math/regions';
 import { findExtendCandidate, executeExtend } from '../src/math/extend';
-import {
-	getTrimCandidate as trimReference,
-	getCurveIntersections as intersectionsReference,
-} from '../src/math/trimReference';
-import { findExtendCandidate as extendReference } from '../src/math/extendReference';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { Vec2 } from '../src/math/vector';
 import { SketchDocument } from '../src/model/sketch';
 
@@ -56,25 +50,17 @@ function compare(a: unknown, b: unknown, path = '') {
 	assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort(), path);
 	for (const key of Object.keys(b)) compare(a[key], b[key], `${path}.${key}`);
 }
-test('editing snapshots identify the frozen pre-routing calculations', () => {
-	for (const [file, hash] of Object.entries(fixtures.sourceHashes))
-		assert.equal(
-			createHash('sha256')
-				.update(readFileSync(new URL(`../${file}`, import.meta.url)))
-				.digest('hex'),
-			hash
-		);
-});
 describe('trim/extend candidates captured before native routing', () => {
 	for (const fixture of fixtures.scenes)
 		test(fixture.name, () => {
 			const target = hydrate(fixture.target) as GeoCurve,
 				others = hydrate(fixture.others) as GeoCurve[];
 			const saved = JSON.stringify([target, others]);
-			const preciseSpline = !!getGeometryKernel().editing && target.type === 'spline';
-			const expectedHits = preciseSpline
-				? withPreciseSplineParameters(() => intersectionsReference(target, others))
-				: fixture.intersections;
+			const refinedSplineHits =
+				target.type === 'spline'
+					? refineSplineIntersections(target, hydrate(fixture.intersections) as CurveIntersection[])
+					: null;
+			const expectedHits = refinedSplineHits ?? fixture.intersections;
 			compare(plain(getCurveIntersections(target, others)), plain(expectedHits), 'intersections');
 			for (const probe of fixture.probes) {
 				const cursor = Vec2.from(probe.cursor),
@@ -83,12 +69,8 @@ describe('trim/extend candidates captured before native routing', () => {
 				assert.ok(t.cutStartWorld instanceof Vec2);
 				assert.ok(t.cutEndWorld instanceof Vec2);
 				const { curve, ...trim } = t;
-				const expectedTrim = preciseSpline
-					? withPreciseSplineParameters(() => {
-							const { curve, ...result } = trimReference(target, others, cursor)!;
-							return plain(result);
-						}, cursor)
-					: probe.trim;
+				const expectedTrim =
+					target.type === 'spline' ? plain(expectedSplineTrim(target, refinedSplineHits!, cursor)) : probe.trim;
 				compare(plain(trim), expectedTrim, 'trim');
 				const e = findExtendCandidate(undefined as unknown as SketchDocument, target, others, cursor);
 				if (e) {
@@ -178,38 +160,29 @@ test('editing result validation rejects corrupt shapes, parameters, flags and so
 		);
 });
 
-test('off-curve cursors match the frozen reference across supported geometry types', {
+test('off-curve cursors return valid trim and extend candidates across supported geometry types', {
 	skip: !getGeometryKernel().editing,
 }, () => {
-	const native = getGeometryKernel();
-	try {
-		for (let i = 0; i < fixtures.scenes.length; i += 7) {
-			const fixture = fixtures.scenes[i],
-				target = hydrate(fixture.target) as GeoCurve,
-				others = hydrate(fixture.others) as GeoCurve[];
-			for (const [dx, dy] of [
-				[1e-5, -1e-5],
-				[3, -4],
-				[1000, -1000],
-			]) {
-				const cursor = Vec2.from(fixture.probes[1].cursor).add(new Vec2(dx, dy));
-				setGeometryKernel(typescriptGeometryKernel);
-				const expectedTrim =
-						target.type === 'spline'
-							? withPreciseSplineParameters(() => trimReference(target, others, cursor), cursor)
-							: trimReference(target, others, cursor),
-					expectedExtend = extendReference(undefined as unknown as SketchDocument, target, others, cursor);
-				setGeometryKernel(native);
-				compare(plain(getTrimCandidate(target, others, cursor)), plain(expectedTrim), fixture.name);
-				compare(
-					plain(findExtendCandidate(undefined as unknown as SketchDocument, target, others, cursor)),
-					plain(expectedExtend),
-					fixture.name
-				);
+	for (let i = 0; i < fixtures.scenes.length; i += 7) {
+		const fixture = fixtures.scenes[i],
+			target = hydrate(fixture.target) as GeoCurve,
+			others = hydrate(fixture.others) as GeoCurve[];
+		for (const [dx, dy] of [
+			[1e-5, -1e-5],
+			[3, -4],
+			[1000, -1000],
+		]) {
+			const cursor = Vec2.from(fixture.probes[1].cursor).add(new Vec2(dx, dy));
+			const trim = getTrimCandidate(target, others, cursor)!;
+			assert.equal(trim.curve, target);
+			assert.ok(Number.isFinite(trim.interval[0]) && Number.isFinite(trim.interval[1]));
+			assert.ok(trim.cutStartWorld instanceof Vec2 && trim.cutEndWorld instanceof Vec2);
+			const extend = findExtendCandidate(undefined as unknown as SketchDocument, target, others, cursor);
+			if (extend) {
+				assert.equal(extend.target, target);
+				assert.ok(extend.fromPoint instanceof Vec2 && extend.toPoint instanceof Vec2);
 			}
 		}
-	} finally {
-		setGeometryKernel(native);
 	}
 });
 
@@ -253,17 +226,9 @@ test('trim/extend preserve document constraints and transaction undo/redo', () =
 	}
 });
 
-test('Rust self-intersections support native and TS editing, break, self-extend and regions', {
+test('Rust self-intersections support native editing, break, self-extend and regions', {
 	skip: !getGeometryKernel().spline?.selfIntersections,
 }, () => {
-	const native = getGeometryKernel();
-	// The TS control-flow reference shares only the mandatory Rust self-intersection query.
-	const reference = {
-		...typescriptGeometryKernel,
-		spline: { ...typescriptGeometryKernel.spline!, selfIntersections: native.spline!.selfIntersections },
-	};
-	const backends = [reference, native];
-
 	const makeAlphaSketch = () => {
 		const sketch = new SketchDocument();
 		const pt = (x: number, y: number) => sketch.addPoint({ x, y });
@@ -289,62 +254,54 @@ test('Rust self-intersections support native and TS editing, break, self-extend 
 		return sketch;
 	};
 
-	try {
-		for (const kernel of backends) {
-			setGeometryKernel(kernel);
+	// 1. Open self-intersecting fit spline: intersections, middle loop trim, and break
+	const alpha = makeAlphaSketch();
+	const alphaCurves = getAllGeoCurves(alpha);
+	const alphaHits = getCurveIntersections(alphaCurves[0], alphaCurves);
+	assert.equal(alphaHits.length, 2);
+	assert.equal(alphaHits[0].cuttingCurveId, alphaCurves[0].id);
+	assert.equal(alphaHits[1].cuttingCurveId, alphaCurves[0].id);
 
-			// 1. Open self-intersecting fit spline: intersections, middle loop trim, and break
-			const alpha = makeAlphaSketch();
-			const alphaCurves = getAllGeoCurves(alpha);
-			const alphaHits = getCurveIntersections(alphaCurves[0], alphaCurves);
-			assert.equal(alphaHits.length, 2);
-			assert.equal(alphaHits[0].cuttingCurveId, alphaCurves[0].id);
-			assert.equal(alphaHits[1].cuttingCurveId, alphaCurves[0].id);
+	const loopCand = getTrimCandidate(alphaCurves[0], alphaCurves, new Vec2(15, 10))!;
+	assert.equal(loopCand.isWholeEntity, false);
+	assert.ok(loopCand.interval[0] > 0.01 && loopCand.interval[1] < 0.99);
+	assert.ok(Math.abs(loopCand.interval[0] - alphaHits[0].param) < 1e-6);
+	assert.ok(Math.abs(loopCand.interval[1] - alphaHits[1].param) < 1e-6);
+	executeTrim(alpha, loopCand);
+	assert.equal(alpha.splines.size, 2);
+	assert.ok([...alpha.constraints.values()].some(c => c.type === 'coincident'));
 
-			const loopCand = getTrimCandidate(alphaCurves[0], alphaCurves, new Vec2(15, 10))!;
-			assert.equal(loopCand.isWholeEntity, false);
-			assert.ok(loopCand.interval[0] > 0.01 && loopCand.interval[1] < 0.99);
-			assert.ok(Math.abs(loopCand.interval[0] - alphaHits[0].param) < 1e-6);
-			assert.ok(Math.abs(loopCand.interval[1] - alphaHits[1].param) < 1e-6);
-			executeTrim(alpha, loopCand);
-			assert.equal(alpha.splines.size, 2);
-			assert.ok([...alpha.constraints.values()].some(c => c.type === 'coincident'));
+	const breakAlpha = makeAlphaSketch();
+	const breakCurves = getAllGeoCurves(breakAlpha);
+	const breakCand = getTrimCandidate(breakCurves[0], breakCurves, new Vec2(15, 10))!;
+	executeBreak(breakAlpha, breakCand);
+	assert.equal(breakAlpha.splines.size, 3);
+	assert.equal(findSketchRegions(breakAlpha).length, 1);
 
-			const breakAlpha = makeAlphaSketch();
-			const breakCurves = getAllGeoCurves(breakAlpha);
-			const breakCand = getTrimCandidate(breakCurves[0], breakCurves, new Vec2(15, 10))!;
-			executeBreak(breakAlpha, breakCand);
-			assert.equal(breakAlpha.splines.size, 3);
-			assert.equal(findSketchRegions(breakAlpha).length, 1);
+	// 2. Closed bow-tie spline: trim one loop instead of deleting the whole curve, or break into two loops
+	const bowTrim = makeBowTieSketch();
+	const bowCurves = getAllGeoCurves(bowTrim);
+	assert.equal(getCurveIntersections(bowCurves[0], bowCurves).length, 2);
+	const bowCand = getTrimCandidate(bowCurves[0], bowCurves, new Vec2(40, 0))!;
+	assert.equal(bowCand.isWholeEntity, false);
+	executeTrim(bowTrim, bowCand);
+	assert.equal(bowTrim.splines.size, 1);
+	assert.equal(findSketchRegions(bowTrim).length, 1);
+	assert.equal(pointInRegion(new Vec2(-25, 0), findSketchRegions(bowTrim)[0]), true);
 
-			// 2. Closed bow-tie spline: trim one loop instead of deleting the whole curve, or break into two loops
-			const bowTrim = makeBowTieSketch();
-			const bowCurves = getAllGeoCurves(bowTrim);
-			assert.equal(getCurveIntersections(bowCurves[0], bowCurves).length, 2);
-			const bowCand = getTrimCandidate(bowCurves[0], bowCurves, new Vec2(40, 0))!;
-			assert.equal(bowCand.isWholeEntity, false);
-			executeTrim(bowTrim, bowCand);
-			assert.equal(bowTrim.splines.size, 1);
-			assert.equal(findSketchRegions(bowTrim).length, 1);
-			assert.equal(pointInRegion(new Vec2(-25, 0), findSketchRegions(bowTrim)[0]), true);
+	const bowBreak = makeBowTieSketch();
+	const bowBreakCurves = getAllGeoCurves(bowBreak);
+	executeBreak(bowBreak, getTrimCandidate(bowBreakCurves[0], bowBreakCurves, new Vec2(40, 0))!);
+	assert.equal(bowBreak.splines.size, 2);
+	assert.equal(findSketchRegions(bowBreak).length, 2);
 
-			const bowBreak = makeBowTieSketch();
-			const bowBreakCurves = getAllGeoCurves(bowBreak);
-			executeBreak(bowBreak, getTrimCandidate(bowBreakCurves[0], bowBreakCurves, new Vec2(40, 0))!);
-			assert.equal(bowBreak.splines.size, 2);
-			assert.equal(findSketchRegions(bowBreak).length, 2);
-
-			// 3. Extend open hook spline until it intersects itself and encloses a region
-			const hook = makeHookSketch();
-			const hookCurves = getAllGeoCurves(hook);
-			const extendCand = findExtendCandidate(hook, hookCurves[0], hookCurves, new Vec2(5, 0))!;
-			assert.equal(extendCand.intersectedCurveId, hookCurves[0].id);
-			assert.equal(extendCand.intersectedCurveType, 'spline');
-			assert.ok(extendCand.toPoint.y > 20);
-			assert.ok(executeExtend(hook, extendCand));
-			assert.equal(findSketchRegions(hook).length, 1);
-		}
-	} finally {
-		setGeometryKernel(native);
-	}
+	// 3. Extend open hook spline until it intersects itself and encloses a region
+	const hook = makeHookSketch();
+	const hookCurves = getAllGeoCurves(hook);
+	const extendCand = findExtendCandidate(hook, hookCurves[0], hookCurves, new Vec2(5, 0))!;
+	assert.equal(extendCand.intersectedCurveId, hookCurves[0].id);
+	assert.equal(extendCand.intersectedCurveType, 'spline');
+	assert.ok(extendCand.toPoint.y > 20);
+	assert.ok(executeExtend(hook, extendCand));
+	assert.equal(findSketchRegions(hook).length, 1);
 });

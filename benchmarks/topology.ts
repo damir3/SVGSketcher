@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { SketchDocument } from '../src/model/sketch';
 import { toggleOrExtendChain } from '../src/math/offset';
-import { toggleOrExtendChain as reference } from '../src/math/offsetTopologyReference';
 import { getGeometryKernel } from '../src/kernel';
 import { summarize } from './stats';
 
@@ -20,20 +19,13 @@ for (const count of [200, 1000]) {
 		}
 	});
 	sketch.commitTransaction();
-	const expected = reference(sketch, null, first, 'line', true);
-	assert.deepEqual(toggleOrExtendChain(sketch, null, first, 'line', true), expected);
-	for (const [name, query] of [
-		['typescript', reference],
-		['rust', toggleOrExtendChain],
-	] as const) {
-		const samples: number[] = [];
-		for (let i = -2; i < 5; i++) {
-			const start = performance.now();
-			const result = query(sketch, null, first, 'line', true);
-			const elapsed = performance.now() - start;
-			assert.equal(result?.items.length, count);
-			if (i >= 0) samples.push(elapsed);
-		}
-		console.log(JSON.stringify({ primitives: count, backend: name, milliseconds: summarize(samples) }));
+	const samples: number[] = [];
+	for (let i = -2; i < 5; i++) {
+		const start = performance.now();
+		const result = toggleOrExtendChain(sketch, null, first, 'line', true);
+		const elapsed = performance.now() - start;
+		assert.equal(result?.items.length, count);
+		if (i >= 0) samples.push(elapsed);
 	}
+	console.log(JSON.stringify({ primitives: count, backend: 'rust', milliseconds: summarize(samples) }));
 }

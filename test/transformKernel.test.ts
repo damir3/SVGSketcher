@@ -6,7 +6,6 @@ import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmTransform } from '../src/kernel/transformWasm';
 import { createWasmConstraintErrors } from '../src/kernel/inspectionWasm';
 import { transformGeometry } from '../src/math/transform';
-import { transformReference } from '../src/math/transformReference';
 import { applyTransform, createTransform, getTransformSelection } from '../src/model/transform';
 import { applyTransform as applyReference, createTransform as createReference } from '../src/model/transformReference';
 import { prepareTransformPreview } from '../src/model/transformPreview';
@@ -54,7 +53,6 @@ for (const f of fixture.cases)
 	test(`batch transform preserves original math: ${f.name}`, () => {
 		const input = plain(f.input),
 			before = plain(input);
-		compare(transformReference(input), f.expected, 'TS');
 		compare(transformGeometry(input), f.expected, 'active');
 		assert.deepEqual(input, before);
 		const transform = createTransform(Vec2.from(input.center), {
@@ -80,7 +78,10 @@ function mixedSketch() {
 		minor = add('minor', 0, 6);
 	doc.lines.set('line', new SketchLine({ id: 'line', p1Id: a, p2Id: b, lineType: 'solid' }));
 	doc.circles.set('circle', new SketchCircle({ id: 'circle', centerId: center, radius: 10 }));
-	doc.arcs.set('arc', new SketchArc({ id: 'arc', centerId: center, startPointId: a, endPointId: c, radius: 10, clockwise: true }));
+	doc.arcs.set(
+		'arc',
+		new SketchArc({ id: 'arc', centerId: center, startPointId: a, endPointId: c, radius: 10, clockwise: true })
+	);
 	doc.ellipses.set('ellipse', new SketchEllipse('ellipse', center, major, minor));
 	doc.ellipticalArcs.set('ellarc', new SketchEllipticalArc('ellarc', center, major, minor, major, minor, true));
 	const fitIds = [add('f1', 20, 0), add('f2', 30, 12), add('f3', 40, 2)];

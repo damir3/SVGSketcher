@@ -64,7 +64,7 @@ function withTypeScriptFallback<T>(actual: T, compute: () => T): T {
 	const previous = getGeometryKernel();
 	if (previous === typescriptGeometryKernel) return actual;
 	try {
-		setGeometryKernel(typescriptGeometryKernel);
+		setGeometryKernel({ ...typescriptGeometryKernel, topology: previous.topology });
 		return compute();
 	} finally {
 		setGeometryKernel(previous);
@@ -80,7 +80,7 @@ test('offset numerical reference matches the pre-routing snapshots', () => {
 		);
 	const previous = getGeometryKernel();
 	try {
-		setGeometryKernel(typescriptGeometryKernel);
+		setGeometryKernel({ ...typescriptGeometryKernel, topology: previous.topology });
 		for (const scene of fixture.scenes) {
 			const sketch = new SketchDocument();
 			sketch.restoreSnapshot(scene.snapshot);

@@ -1,8 +1,4 @@
 import { pointsAtCurveParameters, parametersAtCurvePoints } from './curvePath';
-import {
-	getCurveIntersections as getCurveIntersectionsReference,
-	getTrimCandidate as getTrimCandidateReference,
-} from './trimReference';
 import { ellipseAxes, ellipseParameterAtPoint } from './ellipse';
 import { Vec2 } from './vector';
 import type { SketchDocument } from '../model/sketch';
@@ -335,127 +331,13 @@ export function getSplineSelfIntersections(
 	return query(segments, isClosed).map(hit => ({ ...hit, point: Vec2.from(hit.point) }));
 }
 
-function splineSelfCurveIntersections(target: GeoSpline): CurveIntersection[] {
-	const selfHits: CurveIntersection[] = [];
-	for (const { point, paramA, paramB } of getSplineSelfIntersections(target.bezierSegments, !!target.isClosed)) {
-		for (const param of [paramA, paramB]) {
-			if (!target.isClosed && (param < 1e-4 || param > 1 - 1e-4)) continue;
-			selfHits.push({ point, param, cuttingCurveId: target.id, cuttingCurveType: 'spline' });
-		}
-	}
-	return selfHits;
-}
-
-function mergeCurveIntersections(items: CurveIntersection[], eps: number): CurveIntersection[] {
-	const sorted = [...items].sort((a, b) => a.param - b.param);
-	const unique: CurveIntersection[] = [];
-	for (const item of sorted) {
-		if (!unique.some(u => Math.abs(u.param - item.param) < eps)) unique.push(item);
-	}
-	return unique;
-}
-
-function buildTrimCandidateFromIntersections(
-	target: GeoCurve,
-	intersections: CurveIntersection[],
-	cursorWorldPos: Vec2
-): TrimCandidate {
-	const cursorParam = getParamAtPoint(target, cursorWorldPos);
-	const isClosedCurve =
-		target.type === 'circle' ||
-		target.type === 'ellipse' ||
-		(target.type === 'spline' && target.splineType !== 'control' && !!target.isClosed);
-
-	if (!isClosedCurve) {
-		if (intersections.length === 0) {
-			return {
-				curve: target,
-				interval: [0, 1],
-				cutStartWorld: getPointAtParam(target, 0),
-				cutEndWorld: getPointAtParam(target, 1),
-				isWholeEntity: true,
-			};
-		}
-		const params = [0, ...intersections.map(i => i.param), 1];
-		for (let i = 0; i < params.length - 1; i++) {
-			const pA = params[i];
-			const pB = params[i + 1];
-			if (cursorParam >= pA - 1e-5 && cursorParam <= pB + 1e-5) {
-				const startCut = i > 0 ? intersections[i - 1] : undefined;
-				const endCut = i < intersections.length ? intersections[i] : undefined;
-				return {
-					curve: target,
-					interval: [pA, pB],
-					cutStartWorld: getPointAtParam(target, pA),
-					cutEndWorld: getPointAtParam(target, pB),
-					startCuttingCurveId: startCut?.cuttingCurveId,
-					startCuttingCurveType: startCut?.cuttingCurveType,
-					endCuttingCurveId: endCut?.cuttingCurveId,
-					endCuttingCurveType: endCut?.cuttingCurveType,
-					isWholeEntity: false,
-				};
-			}
-		}
-		const fallbackEnd = intersections[0];
-		return {
-			curve: target,
-			interval: [0, params[1]],
-			cutStartWorld: getPointAtParam(target, 0),
-			cutEndWorld: getPointAtParam(target, params[1]),
-			endCuttingCurveId: fallbackEnd?.cuttingCurveId,
-			endCuttingCurveType: fallbackEnd?.cuttingCurveType,
-			isWholeEntity: false,
-		};
-	}
-
-	const period = target.type === 'circle' || target.type === 'ellipse' ? TWO_PI : 1.0;
-	if (intersections.length < 2) {
-		return {
-			curve: target,
-			interval: [0, period],
-			cutStartWorld: getPointAtParam(target, 0),
-			cutEndWorld: getPointAtParam(target, period),
-			isWholeEntity: true,
-		};
-	}
-	const thetas = intersections.map(i => i.param);
-	const n = thetas.length;
-	let chosenIdxA = n - 1;
-	let chosenIdxB = 0;
-	for (let i = 0; i < n - 1; i++) {
-		if (cursorParam >= thetas[i] - 1e-5 && cursorParam <= thetas[i + 1] + 1e-5) {
-			chosenIdxA = i;
-			chosenIdxB = i + 1;
-			break;
-		}
-	}
-	const cutA = intersections[chosenIdxA];
-	const cutB = intersections[chosenIdxB];
-	return {
-		curve: target,
-		interval: [cutA.param, cutB.param],
-		cutStartWorld: getPointAtParam(target, cutA.param),
-		cutEndWorld: getPointAtParam(target, cutB.param),
-		startCuttingCurveId: cutA.cuttingCurveId,
-		startCuttingCurveType: cutA.cuttingCurveType,
-		endCuttingCurveId: cutB.cuttingCurveId,
-		endCuttingCurveType: cutB.cuttingCurveType,
-		isWholeEntity: false,
-	};
-}
-
 /**
  * Finds all intersection points of `target` with `allCurves` (including spline self-intersections),
  * parameterized along target curve in ascending order.
  */
 export function getCurveIntersections(target: GeoCurve, allCurves: GeoCurve[]): CurveIntersection[] {
 	const editing = getGeometryKernel().editing;
-	if (!editing) {
-		const ref = getCurveIntersectionsReference(target, allCurves);
-		if (target.type !== 'spline') return ref;
-		const selfHits = splineSelfCurveIntersections(target);
-		return selfHits.length === 0 ? ref : mergeCurveIntersections([...ref, ...selfHits], 1e-4);
-	}
+	if (!editing) throw new Error('Curve editing requires the Rust/WASM kernel');
 	return editing.intersections(target, allCurves).map(hit => {
 		const cutter = allCurves[hit.source] ?? target;
 		return {
@@ -469,19 +351,7 @@ export function getCurveIntersections(target: GeoCurve, allCurves: GeoCurve[]): 
 
 export function getTrimCandidate(target: GeoCurve, allCurves: GeoCurve[], cursorWorldPos: Vec2): TrimCandidate | null {
 	const editing = getGeometryKernel().editing;
-	if (!editing) {
-		if (target.type === 'spline') {
-			const selfHits = splineSelfCurveIntersections(target);
-			if (selfHits.length > 0) {
-				const merged = mergeCurveIntersections(
-					[...getCurveIntersectionsReference(target, allCurves), ...selfHits],
-					1e-4
-				);
-				return buildTrimCandidateFromIntersections(target, merged, cursorWorldPos);
-			}
-		}
-		return getTrimCandidateReference(target, allCurves, cursorWorldPos);
-	}
+	if (!editing) throw new Error('Curve editing requires the Rust/WASM kernel');
 	const result = editing.trim(target, allCurves, cursorWorldPos);
 	const start = result.startSource === undefined ? undefined : (allCurves[result.startSource] ?? target);
 	const end = result.endSource === undefined ? undefined : (allCurves[result.endSource] ?? target);

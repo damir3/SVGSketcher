@@ -17,9 +17,14 @@ import {
 } from './intersection';
 import { extractSplineInterval } from './spline';
 import { getGeometryKernel } from '../kernel';
-import * as reference from './filletReference';
 
-type FilletOptions = Parameters<typeof reference.calculateFilletGeometry>[3];
+export interface FilletOptions {
+	cornerVertex?: Vec2;
+	clickPos1?: Vec2;
+	clickPos2?: Vec2;
+	endPointId1?: string;
+	endPointId2?: string;
+}
 
 export interface ConnectedPrimitiveInfo {
 	type: 'line' | 'arc' | 'spline';
@@ -140,22 +145,21 @@ function supported(curve: GeoCurve) {
 	return curve.type === 'segment' || curve.type === 'arc' || curve.type === 'spline';
 }
 export function evaluateCurveExtended(curve: GeoCurve, t: number) {
+	if (!supported(curve)) return { point: new Vec2(0, 0), tangent: new Vec2(1, 0), normal: new Vec2(0, 1) };
 	const api = getGeometryKernel().fillet;
-	if (!api || !supported(curve)) return reference.evaluateCurveExtended(curve, t);
+	if (!api) throw new Error('Fillet geometry requires the Rust/WASM kernel');
 	const r = api.evaluate(curve, t);
 	return { point: Vec2.from(r.point), tangent: Vec2.from(r.tangent), normal: Vec2.from(r.normal) };
 }
 export function projectOntoCurveExtended(curve: GeoCurve, point: Vec2) {
-	const api = getGeometryKernel().fillet;
-	// Preserve the empty-spline sentinel and degenerate-segment point identity.
-	if (
-		!api ||
-		!supported(curve) ||
-		(curve.type === 'spline' && !curve.bezierSegments.length) ||
-		(curve.type === 'segment' && new Vec2().subVectors(curve.p1, curve.p2).lengthSq() < 1e-12)
-	) {
-		return reference.projectOntoCurveExtended(curve, point);
+	if (!supported(curve) || (curve.type === 'spline' && !curve.bezierSegments.length)) {
+		return { t: 0, point, dist: Infinity };
 	}
+	if (curve.type === 'segment' && new Vec2().subVectors(curve.p1, curve.p2).lengthSq() < 1e-12) {
+		return { t: 0, point: curve.p1, dist: point.distanceTo(curve.p1) };
+	}
+	const api = getGeometryKernel().fillet;
+	if (!api) throw new Error('Fillet geometry requires the Rust/WASM kernel');
 	const r = api.project(curve, point);
 	return { ...r, point: Vec2.from(r.point) };
 }
@@ -165,9 +169,9 @@ export function calculateFilletGeometry(
 	radius: number,
 	options: FilletOptions
 ): FilletResult | null {
+	if (!supported(curve1) || !supported(curve2)) return null;
 	const api = getGeometryKernel().fillet;
-	if (!api || !supported(curve1) || !supported(curve2))
-		return reference.calculateFilletGeometry(curve1, curve2, radius, options);
+	if (!api) throw new Error('Fillet geometry requires the Rust/WASM kernel');
 	const r = api.calculate(curve1, curve2, radius, options);
 	if (!r) return null;
 	return {
@@ -628,8 +632,8 @@ export function findMaxFilletRadius(
 	maxR = 100,
 	minR = 0.1
 ): number | null {
+	if (!supported(curve1) || !supported(curve2)) return null;
 	const api = getGeometryKernel().fillet;
-	return api && supported(curve1) && supported(curve2)
-		? api.maxRadius(curve1, curve2, options, maxR, minR)
-		: reference.findMaxFilletRadius(curve1, curve2, options, maxR, minR);
+	if (!api) throw new Error('Fillet geometry requires the Rust/WASM kernel');
+	return api.maxRadius(curve1, curve2, options, maxR, minR);
 }

@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmInspection } from '../src/kernel/inspectionWasm';
-import { measureReference } from '../src/math/measurementReference';
 import { deserializeConstraint } from '../src/solver/constraints/serialization';
 import { AngleConstraint, DistanceConstraint, HorizontalConstraint } from '../src/solver/constraints';
 import { checkConstraints, updateReferenceValues } from '../src/solver/constraintInspection';
@@ -37,8 +36,6 @@ for (const f of fixture.measurements)
 			f.arc === undefined
 				? undefined
 				: ({ arcs: new Map([[(c as AngleConstraint).line1Id, { clockwise: f.arc }]]) } as unknown as SketchDocument);
-		const request = c.getReferenceMeasurement!(values, sketch);
-		near(measureReference(request), f.expected.value, 'independent TS measurement');
 		c.updateReferenceValue!(values, sketch);
 		for (const [key, expected] of Object.entries(f.expected)) {
 			const actual = Reflect.get(c, key);

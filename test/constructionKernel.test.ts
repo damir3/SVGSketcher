@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getGeometryKernel } from '../src/kernel';
 import { CONSTRUCTION_MODES, type ConstructionMode } from '../src/kernel/constructionTypes';
 import { createWasmConstruction } from '../src/kernel/constructionWasm';
-import { typescriptConstruction } from '../src/math/constructionReference';
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelConstruction.json', import.meta.url), 'utf8'));
 const native = getGeometryKernel().construction;
 function compare(actual: number[] | null, expected: number[] | null, name: string) {
@@ -20,9 +18,10 @@ function compare(actual: number[] | null, expected: number[] | null, name: strin
 	);
 }
 for (const f of fixture.cases)
-	test(`construction preserves pre-routing tool results: ${f.name}`, () => {
-		compare(typescriptConstruction(f.mode, f.data), f.expected, f.name + ' TS');
-		if (native) compare(native(f.mode, f.data), f.expected, f.name + ' Rust');
+	test(`construction preserves pre-routing tool results: ${f.name}`, { skip: !native }, () => {
+		const before = structuredClone(f.data);
+		compare(native!(f.mode, f.data), f.expected, f.name + ' Rust');
+		assert.deepEqual(f.data, before);
 	});
 test('construction adapter rejects malformed output and propagates native errors', () => {
 	for (const data of [[1, 1, 2], [1, 1, 2, NaN], [0, 1], [2], [1, 1, 2, 3, 4]])
@@ -98,21 +97,4 @@ test('polygon vertices and tangent construction use one native query each withou
 	} finally {
 		setGeometryKernel(previous);
 	}
-});
-test('the independent construction fallback preserves caller inputs', () => {
-	// The numeric reference is also used when a custom kernel omits construction.
-	for (const f of fixture.cases) {
-		const before = structuredClone(f.data);
-		typescriptConstruction(f.mode, f.data);
-		assert.deepEqual(f.data, before);
-	}
-});
-
-test('construction fixtures identify the independent reference source', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/math/constructionReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixture.referenceHash
-	);
 });

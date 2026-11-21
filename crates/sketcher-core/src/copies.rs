@@ -116,9 +116,45 @@ mod tests {
             Point2::new(0.999e-3, 2.0),
         ];
         let out = query(&points, &[(0, &[0.0, 0.0, 0.0, 10.0])]).unwrap();
+        assert_eq!(out[0], 1.0);
         assert_eq!(&out[6..9], &[-3.0, 4.0, 0.0]);
         assert_eq!(out[11], 0.0);
         assert_eq!(out[14], 1.0);
+    }
+    #[test]
+    fn mirror_rejects_short_axis_as_invalid_without_moving_points() {
+        let points = [Point2::new(3.0, 4.0)];
+        let out = query(&points, &[(0, &[1.0, 2.0, 1.0 + 5e-7, 2.0])]).unwrap();
+        assert_eq!(out[0], 0.0);
+        assert_eq!(&out[6..9], &[3.0, 4.0, 0.0]);
+    }
+    #[test]
+    fn circular_distributions_and_center_proximity() {
+        let points = [
+            Point2::new(10.0, 0.0),
+            Point2::new(1e-3, 0.0),
+            Point2::new(0.999e-3, 0.0),
+        ];
+        // full: quantity 4, copy 1 -> 90 deg
+        let full = query(&points, &[(1, &[0.0, 0.0, 4.0, 0.0, 725.0, 1.0])]).unwrap();
+        assert!((full[1] - 90.0).abs() < 1e-12);
+        assert!(full[6].abs() < 1e-12 && (full[7] - 10.0).abs() < 1e-12);
+        assert_eq!(full[11], 0.0);
+        assert_eq!(full[14], 1.0);
+        // partial: quantity 4, total 180, copy 2 -> 120 deg
+        let partial = query(&points, &[(1, &[0.0, 0.0, 4.0, 1.0, 180.0, 2.0])]).unwrap();
+        assert!((partial[1] - 120.0).abs() < 1e-12);
+        // symmetric: quantity 5, total 270, copy 1 -> +135, copy 2 -> -135
+        let sym = query(
+            &[Point2::new(10.0, 0.0)],
+            &[
+                (1, &[0.0, 0.0, 5.0, 2.0, 270.0, 1.0]),
+                (1, &[0.0, 0.0, 5.0, 2.0, 270.0, 2.0]),
+            ],
+        )
+        .unwrap();
+        assert!((sym[1] - 67.5).abs() < 1e-12);
+        assert!((sym[10] + 67.5).abs() < 1e-12);
     }
     #[test]
     fn rectangular_basis_and_symmetric_offsets_keep_order() {
@@ -129,10 +165,41 @@ mod tests {
         .unwrap();
         assert!((out[6] - 13.6).abs() < 1e-12);
         assert!((out[7] - 6.8).abs() < 1e-12);
+        assert_eq!(out[8], 0.0);
+    }
+    #[test]
+    fn rotation_translation_and_directions_fallbacks() {
+        let rot = query(&[Point2::new(1.0, 0.0)], &[(3, &[0.0, 0.0, 450.0])]).unwrap();
+        assert_eq!(rot[1], 450.0);
+        assert!(rot[6].abs() < 1e-12 && (rot[7] - 1.0).abs() < 1e-12);
+        let tr = query(&[Point2::new(2.0, -3.0)], &[(4, &[5.0, 7.0])]).unwrap();
+        assert_eq!(&tr[6..9], &[7.0, 4.0, 0.0]);
+        // Absent lines fall back to UNIT_X and UNIT_Y; line1 only gives perpendicular u2
+        let dirs = query(
+            &[],
+            &[
+                (5, &[0.0; 10]),
+                (5, &[1.0, 0.0, 0.0, 3.0, 4.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+                (5, &[1.0, 0.0, 0.0, 1e-7, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            ],
+        )
+        .unwrap();
+        assert_eq!(&dirs[2..6], &[1.0, 0.0, 0.0, 1.0]);
+        assert!((dirs[8] - 0.6).abs() < 1e-12 && (dirs[9] - 0.8).abs() < 1e-12);
+        assert!((dirs[10] + 0.8).abs() < 1e-12 && (dirs[11] - 0.6).abs() < 1e-12);
+        assert_eq!(&dirs[14..18], &[1.0, 0.0, 0.0, 1.0]);
     }
     #[test]
     fn invalid_operations_and_extreme_counts_are_rejected() {
         assert!(query(&[], &[(1, &[0.0; 5])]).is_err());
+        assert!(query(&[], &[(1, &[0.0, 0.0, 4.0, 3.0, 90.0, 1.0])]).is_err());
+        assert!(query(
+            &[],
+            &[(2, &[1.0, 0.0, 0.0, 1.0, 5.0, 5.0, 2.0, 0.0, 1.0, 0.0])]
+        )
+        .is_err());
         assert!(query(&[], &[(5, &[2.0; 10])]).is_err());
+        assert!(query(&[Point2::new(f64::NAN, 0.0)], &[(4, &[0.0, 0.0])]).is_err());
+        assert!(query(&[], &[(4, &[f64::INFINITY, 0.0])]).is_err());
     }
 }

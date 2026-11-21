@@ -1,17 +1,10 @@
 import { getGeometryKernel } from '../kernel';
 import type { CopyKernel } from '../kernel/copyTypes';
-import { packCopyOperation } from '../kernel/copyWasm';
-import { copyReference } from './copyReference';
 import { Vec2 } from './vector';
 export const copyGeometry: CopyKernel = (points, operations) => {
 	const kernel = getGeometryKernel().copies;
-	if (
-		kernel &&
-		points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)) &&
-		operations.every(op => packCopyOperation(op).every(Number.isFinite))
-	)
-		return kernel(points, operations);
-	return copyReference(points, operations);
+	if (!kernel) throw new Error('Copy geometry requires the Rust/WASM kernel');
+	return kernel(points, operations);
 };
 /** Editor direction preparation; the solver's independent TS formula helpers remain unchanged. */
 export function patternDirections(

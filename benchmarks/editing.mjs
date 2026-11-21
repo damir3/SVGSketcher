@@ -1,13 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import assert from 'node:assert/strict';
 import { createBenchmarkScene } from './scenes.ts';
 import { summarize } from './stats.ts';
 import { SketchDocument } from '../src/model/sketch.ts';
 import { getAllGeoCurves, getPointAtParam, getCurveIntersections, getTrimCandidate } from '../src/math/intersection.ts';
 import { findExtendCandidate } from '../src/math/extend.ts';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel/index.ts';
-import { typescriptGeometryKernel } from '../src/kernel/typescript.ts';
 import { createWasmGeometryKernel } from '../src/kernel/wasm.ts';
 
 const option = (flag, fallback) => {
@@ -33,10 +31,6 @@ await bindings.default({
 });
 const wasm = createWasmGeometryKernel(bindings),
 	previous = getGeometryKernel();
-const referenceKernel = {
-	...typescriptGeometryKernel,
-	spline: { ...typescriptGeometryKernel.spline, selfIntersections: wasm.spline.selfIntersections },
-};
 const report = {
 	schemaVersion: 1,
 	apiVersion: wasm.apiVersion,
@@ -70,23 +64,10 @@ const compact = (hits, trim, extend) => ({
 			}
 		: null,
 });
-const compare = (a, b) => {
-	if (typeof a === 'number' && typeof b === 'number') {
-		assert.ok(Math.abs(a - b) < 1e-8 + Math.abs(b) * 1e-10);
-		return;
-	}
-	if (!a || !b || typeof a !== 'object' || typeof b !== 'object') {
-		assert.deepEqual(a, b);
-		return;
-	}
-	assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort());
-	for (const key of Object.keys(a)) compare(a[key], b[key]);
-};
 try {
-	let order = 0;
+	setGeometryKernel(wasm);
 	for (const family of ['rectangles', 'splines'])
 		for (const size of ['small', 'medium', 'large']) {
-			setGeometryKernel(typescriptGeometryKernel);
 			const scene = createBenchmarkScene(family, size),
 				sketch = new SketchDocument();
 			sketch.restoreSnapshot(scene.snapshot);
@@ -95,41 +76,34 @@ try {
 			const cursors = Array.from({ length: samples + warmup }, (_, i) =>
 				getPointAtParam(target, (i + 1) / (samples + warmup + 1))
 			);
-			const kernels = order++ % 2 ? [wasm, referenceKernel] : [referenceKernel, wasm];
-			let reference;
-			for (const kernel of kernels) {
-				setGeometryKernel(kernel);
-				const raw = { intersections: [], trim: [], extend: [] },
-					results = [];
-				for (let i = 0; i < cursors.length; i++) {
-					const start = performance.now(),
-						hits = getCurveIntersections(target, curves),
-						cut = performance.now();
-					const trim = getTrimCandidate(target, curves, cursors[i]),
-						trimmed = performance.now();
-					const extend = findExtendCandidate(sketch, target, curves, cursors[i]),
-						extended = performance.now();
-					if (i < warmup) continue;
-					raw.intersections.push(cut - start);
-					raw.trim.push(trimmed - cut);
-					raw.extend.push(extended - trimmed);
-					results.push(JSON.parse(JSON.stringify(compact(hits, trim, extend))));
-				}
-				if (reference) compare(results, reference);
-				else reference = results;
-				const timings = Object.fromEntries(Object.entries(raw).map(([key, values]) => [key, summarize(values)]));
-				report.results.push({
-					scene: scene.id,
-					backend: kernel.backend,
-					curveCount: curves.length,
-					timings,
-					raw,
-					finalCandidate: results.at(-1),
-				});
-				console.log(
-					`${scene.id} ${kernel.backend}: trim p95 ${timings.trim.p95.toFixed(3)} ms, extend p95 ${timings.extend.p95.toFixed(3)} ms`
-				);
+			const raw = { intersections: [], trim: [], extend: [] },
+				results = [];
+			for (let i = 0; i < cursors.length; i++) {
+				const start = performance.now(),
+					hits = getCurveIntersections(target, curves),
+					cut = performance.now();
+				const trim = getTrimCandidate(target, curves, cursors[i]),
+					trimmed = performance.now();
+				const extend = findExtendCandidate(sketch, target, curves, cursors[i]),
+					extended = performance.now();
+				if (i < warmup) continue;
+				raw.intersections.push(cut - start);
+				raw.trim.push(trimmed - cut);
+				raw.extend.push(extended - trimmed);
+				results.push(JSON.parse(JSON.stringify(compact(hits, trim, extend))));
 			}
+			const timings = Object.fromEntries(Object.entries(raw).map(([key, values]) => [key, summarize(values)]));
+			report.results.push({
+				scene: scene.id,
+				backend: wasm.backend,
+				curveCount: curves.length,
+				timings,
+				raw,
+				finalCandidate: results.at(-1),
+			});
+			console.log(
+				`${scene.id} ${wasm.backend}: trim p95 ${timings.trim.p95.toFixed(3)} ms, extend p95 ${timings.extend.p95.toFixed(3)} ms`
+			);
 		}
 	await writeFile(resolve(output, 'editing-report.json'), JSON.stringify(report, null, 2) + '\n');
 } finally {

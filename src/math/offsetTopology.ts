@@ -4,9 +4,13 @@ import { POINT_TOLERANCE } from '../constants';
 import { getGeometryKernel } from '../kernel';
 import type { TopologyInput } from '../kernel/topologyTypes';
 import type { ChainItem, OffsetChain } from './offset';
-import * as reference from './offsetTopologyReference';
 
-type Neighbor = ReturnType<typeof reference.getConnectedPrimitivesAtVertex>[number];
+interface Neighbor {
+	id: string;
+	type: ChainItem['type'];
+	connectedPointId: string;
+	otherPointId: string;
+}
 export interface OffsetTopology {
 	group(pointId: string): ReadonlySet<string>;
 	connected(pointId: string, excludeId?: string): Neighbor[];
@@ -46,8 +50,6 @@ function collect(sketch: SketchDocument, extraIds: readonly (string | undefined)
 		const p = sketch.points.get(id);
 		return { listed: listed.has(id), ...(p ? { position: { x: p.x, y: p.y } } : {}) };
 	});
-	// Preserve legacy non-finite document behavior without sending invalid numeric buffers.
-	if (points.some(p => p.position && (!Number.isFinite(p.position.x) || !Number.isFinite(p.position.y)))) return null;
 	const input: TopologyInput = {
 		points,
 		links,
@@ -59,9 +61,9 @@ function collect(sketch: SketchDocument, extraIds: readonly (string | undefined)
 
 export function orderedCoincidentGroup(sketch: SketchDocument, pointId: string): Set<string> {
 	const kernel = getGeometryKernel().topology;
-	const data = kernel && collect(sketch, [pointId]);
-	if (!data) return reference.getCoincidentPointGroup(sketch, pointId);
-	return new Set(kernel!.group(data.input, data.indices.get(pointId)!, POINT_TOLERANCE).map(i => data.ids[i]));
+	if (!kernel) throw new Error('Offset topology requires the Rust/WASM kernel');
+	const data = collect(sketch, [pointId]);
+	return new Set(kernel.group(data.input, data.indices.get(pointId)!, POINT_TOLERANCE).map(i => data.ids[i]));
 }
 
 /** A call-local snapshot avoids stale coordinates and repeats no document traversal per chain vertex. */
@@ -70,13 +72,9 @@ export function createOffsetTopology(
 	extraIds: readonly (string | undefined)[] = []
 ): OffsetTopology {
 	const kernel = getGeometryKernel().topology;
-	const data = kernel && collect(sketch, extraIds);
-	if (!data)
-		return {
-			group: id => reference.getCoincidentPointGroup(sketch, id),
-			connected: (id, exclude) => reference.getConnectedPrimitivesAtVertex(sketch, id, exclude),
-		};
-	const snapshot = kernel!.prepare(data.input, POINT_TOLERANCE);
+	if (!kernel) throw new Error('Offset topology requires the Rust/WASM kernel');
+	const data = collect(sketch, extraIds);
+	const snapshot = kernel.prepare(data.input, POINT_TOLERANCE);
 	const groups = snapshot.groups.map(g => ({
 		members: new Set(g.members.map(i => data.ids[i])),
 		connections: g.connections.map(c => ({

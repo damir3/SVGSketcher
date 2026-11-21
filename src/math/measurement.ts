@@ -1,8 +1,8 @@
 import { getGeometryKernel } from '../kernel';
 import type { ReferenceMeasurement } from '../kernel/inspectionTypes';
-import { measureReference } from './measurementReference';
 export function measure(request: ReferenceMeasurement): number {
 	const inspect = getGeometryKernel().inspectConstraints;
-	if (!inspect || !request.data.every(Number.isFinite)) return measureReference(request);
+	if (!inspect) throw new Error('Reference measurement requires the Rust/WASM kernel');
+	if (!request.data.every(Number.isFinite)) return NaN;
 	return inspect({ nativeConstraints: new Float64Array(), rowCounts: [], measurements: [request] }).measurements[0];
 }
