@@ -732,8 +732,8 @@ export class RectangularPatternTool extends BaseTool {
 			state.distance2Expression
 		);
 
-		this.ctx.sketch.commitTransaction();
 		this.ctx.sketch.solve();
+		this.ctx.sketch.commitTransaction();
 
 		this.state = null;
 		this.gizmoDragState = null;

@@ -242,8 +242,8 @@ export function commitChamferToSketch(
 		}
 	}
 
-	sketch.commitTransaction();
 	sketch.solve();
+	sketch.commitTransaction();
 
 	return {
 		chamferLineId: chamferLine.id,

@@ -587,8 +587,8 @@ export class CircularPatternTool extends BaseTool {
 			this.state.angleExpression
 		);
 
-		this.ctx.sketch.commitTransaction();
 		this.ctx.sketch.solve();
+		this.ctx.sketch.commitTransaction();
 
 		this.popup.hide();
 		this.state = null;

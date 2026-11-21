@@ -372,8 +372,8 @@ export class MirrorTool extends BaseTool {
 			}
 		}
 
-		this.ctx.sketch.commitTransaction();
 		this.ctx.sketch.solve();
+		this.ctx.sketch.commitTransaction();
 
 		this.state = null;
 		this.onStateChange?.();

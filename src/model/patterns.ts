@@ -672,8 +672,8 @@ export function addPolygon(
 		if (radiusConstraint && options.radiusExpression) radiusConstraint.expression = options.radiusExpression;
 	}
 
-	sketch.commitTransaction();
 	sketch.solve();
+	sketch.commitTransaction();
 
 	if (!constraint) return null;
 

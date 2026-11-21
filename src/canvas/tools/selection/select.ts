@@ -618,6 +618,7 @@ export class SelectTool extends BaseTool {
 			host.dragPointStartWorld = null;
 			host.renderer?.clearPreviews?.();
 			if (host.hasDragged) {
+				let solvedInTransaction = false;
 				if (draggedPtId) {
 					const screen = e ? host.getScreenPos(e) : host.lastMouseScreen;
 					const snap = host.findSnap(screen, draggedPtId);
@@ -636,7 +637,9 @@ export class SelectTool extends BaseTool {
 							host.sketch.beginTransaction();
 						}
 						host.applySnapConstraintIfNeeded(draggedPtId, snap);
+						host.sketch.solve();
 						host.sketch.commitTransaction();
+						solvedInTransaction = true;
 					} else if (snap && snap.type === 'grid') {
 						const pt = host.sketch.getPoint(draggedPtId);
 						if (pt && !host.sketch.isPointFixed(draggedPtId)) {
@@ -644,7 +647,7 @@ export class SelectTool extends BaseTool {
 						}
 					}
 				}
-				host.sketch.solve();
+				if (!solvedInTransaction) host.sketch.solve();
 			} else {
 				host.preDragSnapshot = null;
 			}
