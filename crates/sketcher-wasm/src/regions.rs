@@ -74,7 +74,18 @@ pub(crate) fn decode(data: &[f64]) -> Result<Vec<RegionCurve>, &'static str> {
 }
 fn packed(data: &[f64]) -> Result<Vec<f64>, &'static str> {
     let regions = find_regions(&decode(data)?);
-    let mut out = vec![regions.len() as f64];
+    let total_len: usize = 1 + regions
+        .iter()
+        .map(|region| {
+            2 + region
+                .rings
+                .iter()
+                .map(|ring| 2 + ring.points.len() * 2 + ring.commands.len())
+                .sum::<usize>()
+        })
+        .sum::<usize>();
+    let mut out = Vec::with_capacity(total_len);
+    out.push(regions.len() as f64);
     for region in regions {
         out.extend([region.area, region.rings.len() as f64]);
         for ring in region.rings {

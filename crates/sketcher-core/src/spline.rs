@@ -17,42 +17,49 @@ pub fn split_at(b: &CubicBezier, t: f64) -> [CubicBezier; 2] {
     [[b[0], p01, p012, middle], [middle, p123, p23, b[3]]]
 }
 
+pub(crate) fn is_closed_fit_points(points: &[Point2]) -> bool {
+    let n = points.len().saturating_sub(1);
+    n >= 2 && points[n].scaled_distance(points[0]) < 1e-4
+}
+
+pub(crate) fn natural_handle_at(points: &[Point2], closed: bool, i: usize) -> [Point2; 2] {
+    let n = points.len() - 1;
+    let h = if n == 1 || (!closed && i == 0) {
+        (points[1] - points[0]) * (1.0 / 3.0)
+    } else if !closed && i == n {
+        (points[n] - points[n - 1]) * (1.0 / 3.0)
+    } else {
+        let (prev, next) = if closed && (i == 0 || i == n) {
+            (points[n - 1], points[1])
+        } else {
+            (points[i - 1], points[i + 1])
+        };
+        let dir = next - prev;
+        let dir_length = dir.scaled_length();
+        let (incoming, outgoing) = (points[i] - prev, next - points[i]);
+        let (d1, d2) = (incoming.scaled_length(), outgoing.scaled_length());
+        let mut handle_length = (d1 + d2) / 6.0;
+        if d1 > 1e-6 && d2 > 1e-6 {
+            let cos = (incoming.dot(outgoing) / (d1 * d2)).clamp(-0.999, 1.0);
+            let factor = 1.0 / (3.0 * (1.0 + ((1.0 + cos) * 0.5).max(0.0).sqrt()));
+            handle_length = (d1 + d2) * factor;
+        }
+        if dir_length > 1e-6 {
+            (dir / dir_length) * handle_length
+        } else {
+            dir * (1.0 / 6.0)
+        }
+    };
+    [points[i] - h, points[i] + h]
+}
+
 pub fn natural_handles(points: &[Point2]) -> Vec<[Point2; 2]> {
     if points.len() < 2 {
         return vec![];
     }
-    let n = points.len() - 1;
-    let closed = n >= 2 && points[n].scaled_distance(points[0]) < 1e-4;
-    (0..=n)
-        .map(|i| {
-            let h = if n == 1 || (!closed && i == 0) {
-                (points[1] - points[0]) * (1.0 / 3.0)
-            } else if !closed && i == n {
-                (points[n] - points[n - 1]) * (1.0 / 3.0)
-            } else {
-                let (prev, next) = if closed && (i == 0 || i == n) {
-                    (points[n - 1], points[1])
-                } else {
-                    (points[i - 1], points[i + 1])
-                };
-                let dir = next - prev;
-                let dir_length = dir.scaled_length();
-                let (incoming, outgoing) = (points[i] - prev, next - points[i]);
-                let (d1, d2) = (incoming.scaled_length(), outgoing.scaled_length());
-                let mut handle_length = (d1 + d2) / 6.0;
-                if d1 > 1e-6 && d2 > 1e-6 {
-                    let cos = (incoming.dot(outgoing) / (d1 * d2)).clamp(-0.999, 1.0);
-                    let factor = 1.0 / (3.0 * (1.0 + ((1.0 + cos) * 0.5).max(0.0).sqrt()));
-                    handle_length = (d1 + d2) * factor;
-                }
-                if dir_length > 1e-6 {
-                    (dir / dir_length) * handle_length
-                } else {
-                    dir * (1.0 / 6.0)
-                }
-            };
-            [points[i] - h, points[i] + h]
-        })
+    let closed = is_closed_fit_points(points);
+    (0..points.len())
+        .map(|i| natural_handle_at(points, closed, i))
         .collect()
 }
 

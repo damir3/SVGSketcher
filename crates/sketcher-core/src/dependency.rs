@@ -20,6 +20,14 @@ pub struct Input<'a> {
     pub candidate_has_free_parameters: bool,
     pub has_offsets: bool,
 }
+fn find_root(parent: &mut [usize], mut x: usize) -> usize {
+    while parent[x] != x {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+    }
+    x
+}
+
 fn dependent(mut rows: SparseRows, cols: usize, boundary: usize, relevant: bool) -> bool {
     // Stable sorting preserves duplicate-entry accumulation order from the original Jacobians.
     for row in &mut rows {
@@ -37,7 +45,8 @@ fn dependent(mut rows: SparseRows, cols: usize, boundary: usize, relevant: bool)
         row.truncate(write);
         row.retain(|&(_, v)| v != 0.0);
     }
-    if relevant && rows[boundary..].iter().all(|r| r.is_empty()) {
+    let candidate_empty = rows[boundary..].iter().all(|r| r.is_empty());
+    if relevant && candidate_empty {
         return false;
     }
     for row in &mut rows {
@@ -54,8 +63,82 @@ fn dependent(mut rows: SparseRows, cols: usize, boundary: usize, relevant: bool)
     if rows.len() == boundary {
         return false;
     }
-    let rank = sparse_rank(rows[..boundary].to_vec(), cols, 1e-7);
-    let augmented = sparse_rank(rows, cols, 1e-7);
+    if candidate_empty {
+        return true;
+    }
+    // Restrict rank comparison to the connected component(s) touching the candidate rows.
+    let mut parent: Vec<usize> = (0..cols).collect();
+    for row in &rows {
+        let Some(&(first, _)) = row.first() else {
+            continue;
+        };
+        if first >= cols {
+            continue;
+        }
+        for &(c, _) in &row[1..] {
+            if c < cols {
+                let ra = find_root(&mut parent, first);
+                let rb = find_root(&mut parent, c);
+                if ra != rb {
+                    parent[rb] = ra;
+                }
+            }
+        }
+    }
+    let mut active_root = vec![false; cols];
+    for row in &rows[boundary..] {
+        for &(c, _) in row {
+            if c < cols {
+                let root = find_root(&mut parent, c);
+                active_root[root] = true;
+            }
+        }
+    }
+    let mut col_to_local = vec![usize::MAX; cols];
+    let mut local_cols = 0;
+    for c in 0..cols {
+        if active_root[find_root(&mut parent, c)] {
+            col_to_local[c] = local_cols;
+            local_cols += 1;
+        }
+    }
+    if local_cols == 0 {
+        return true;
+    }
+    if local_cols == cols {
+        let rank = sparse_rank(rows[..boundary].to_vec(), cols, 1e-7);
+        let augmented = sparse_rank(rows, cols, 1e-7);
+        return rank == augmented;
+    }
+    let mut active_rows = Vec::new();
+    for row in rows[..boundary].iter() {
+        let Some(&(first, _)) = row.first() else {
+            continue;
+        };
+        if first < cols && col_to_local[first] != usize::MAX {
+            active_rows.push(
+                row.iter()
+                    .filter_map(|&(c, v)| {
+                        (c < cols && col_to_local[c] != usize::MAX).then_some((col_to_local[c], v))
+                    })
+                    .collect(),
+            );
+        }
+    }
+    let active_boundary = active_rows.len();
+    for row in rows[boundary..].iter() {
+        if !row.is_empty() {
+            active_rows.push(
+                row.iter()
+                    .filter_map(|&(c, v)| {
+                        (c < cols && col_to_local[c] != usize::MAX).then_some((col_to_local[c], v))
+                    })
+                    .collect(),
+            );
+        }
+    }
+    let rank = sparse_rank(active_rows[..active_boundary].to_vec(), local_cols, 1e-7);
+    let augmented = sparse_rank(active_rows, local_cols, 1e-7);
     rank == augmented
 }
 pub fn analyze(input: Input<'_>) -> Result<bool, &'static str> {

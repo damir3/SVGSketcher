@@ -1,8 +1,8 @@
 //! Levenberg–Marquardt loop independent of the browser and constraint implementations.
 use crate::constraints::Program;
 use crate::matrix::{
-    analyze_nullspace, analyze_nullspace_sparse, normal_equations_from_rows,
-    normal_equations_sparse, solve_sparse_linear_system, SparseRows,
+    analyze_nullspace, analyze_nullspace_sparse, normal_equations_upper_from_rows,
+    normal_equations_upper_sparse, NormalEquationsWorkspace, PreparedNormalEquations,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -97,29 +97,6 @@ fn evaluate<E>(
     Ok(data)
 }
 
-fn damp_sparse_rows(
-    base_rows: &[Vec<(usize, f64)>],
-    lambda: f64,
-    stiffness: &[f64],
-) -> Vec<Vec<(usize, f64)>> {
-    let mut rows = base_rows.to_vec();
-    for (i, row) in rows.iter_mut().enumerate() {
-        match row.binary_search_by_key(&i, |&(c, _)| c) {
-            Ok(idx) => {
-                let diagonal = row[idx].1.abs().max(1.0);
-                row[idx].1 += lambda * diagonal * stiffness[i];
-            }
-            Err(idx) => {
-                let val = lambda * stiffness[i];
-                if val != 0.0 {
-                    row.insert(idx, (i, val));
-                }
-            }
-        }
-    }
-    rows
-}
-
 fn constraint_state<E>(
     problem: &Problem<'_>,
     program: Option<&Program>,
@@ -209,7 +186,18 @@ fn solve_inner<E>(
             constrained_indices: Vec::new(),
         });
     }
-    let mut current_error = error(&evaluate(&x, Evaluation::Residuals, m, &mut callback)?);
+    let native_all = program.filter(|p| {
+        !p.needs_callback(Evaluation::Residuals) && !p.needs_callback(Evaluation::Linearization)
+    });
+    let mut initial_residuals = Vec::new();
+    let mut current_error = if let Some(prog) = native_all {
+        initial_residuals.resize(m, 0.0);
+        prog.evaluate_residuals(&x, false, &mut initial_residuals)
+            .map_err(SolveError::InvalidInput)?;
+        error(&initial_residuals)
+    } else {
+        error(&evaluate(&x, Evaluation::Residuals, m, &mut callback)?)
+    };
     let initial_error = current_error;
     if current_error < options.tolerance * options.tolerance {
         let (dof, fixed) = constraint_state(problem, program, &x, &mut callback)?;
@@ -229,86 +217,164 @@ fn solve_inner<E>(
     }
     let mut lambda = options.initial_lambda;
     let mut iteration = 0;
-    let mut cached_linearization: Option<(SparseRows, Vec<f64>, bool)> = None;
-    while iteration < options.max_iterations {
-        if cached_linearization.is_none() {
-            let (h_rows, g) = if let Some(prog) =
-                program.filter(|p| !p.needs_callback(Evaluation::Linearization))
-            {
-                let (residuals, j_rows) = prog
-                    .evaluate_sparse(&x, false)
-                    .map_err(SolveError::InvalidInput)?;
-                normal_equations_from_rows(&j_rows, n, &residuals)
-            } else {
-                let data = evaluate(&x, Evaluation::Linearization, m + m * n, &mut callback)?;
-                let (residuals, j) = data.split_at(m);
-                normal_equations_sparse(j, m, n, residuals)
-            };
-            let mut gradient_norm = 0.0;
-            for &v in &g {
-                gradient_norm += v * v;
-            }
-            let grad_norm = gradient_norm.sqrt();
-            if grad_norm == 0.0
-                || (options.grad_rel_tolerance <= 0.0 && grad_norm < options.tolerance)
-            {
-                break;
-            }
-            let small_grad = grad_norm < options.tolerance;
-            let neg_g: Vec<f64> = g.into_iter().map(|v| -v).collect();
-            cached_linearization = Some((h_rows, neg_g, small_grad));
-        }
-        let (base_h_rows, neg_g, small_grad) = cached_linearization.as_ref().unwrap();
-        let small_grad = *small_grad;
-        let damped_h = damp_sparse_rows(base_h_rows, lambda, problem.stiffness);
-        let Some(delta) = solve_sparse_linear_system(&damped_h, neg_g) else {
-            lambda = (lambda * options.lambda_factor * 2.0).min(options.max_lambda);
-            iteration += 1;
-            continue;
-        };
-        let mut candidate = vec![0.0; n];
-        let mut step_norm = 0.0;
-        for i in 0..n {
-            candidate[i] = problem.lower_bounds[i].max(x[i] + delta[i]);
-            let d = candidate[i] - x[i];
-            step_norm += d * d;
-        }
-        let candidate_error = error(&evaluate(
-            &candidate,
-            Evaluation::Residuals,
-            m,
-            &mut callback,
-        )?);
-        if candidate_error < current_error {
-            let rel_decrease = (current_error - candidate_error) / current_error;
-            let damped_small =
-                small_grad && (lambda < options.initial_lambda || lambda <= options.min_lambda);
-            x = candidate;
-            current_error = candidate_error;
-            cached_linearization = None;
-            evaluate(&x, Evaluation::Commit, 0, &mut callback)?;
-            lambda = (lambda / options.lambda_factor).max(options.min_lambda);
-            if step_norm.sqrt() < options.tolerance
-                || current_error < options.tolerance * options.tolerance
-                || (damped_small && rel_decrease < options.grad_rel_tolerance)
-            {
+    if let Some(prog) = native_all {
+        let error_threshold = (options.tolerance * options.tolerance) * 1e-16;
+        let subset = prog.active_subset(
+            &x,
+            problem.lower_bounds,
+            &initial_residuals,
+            error_threshold,
+        );
+        if !subset.vars.is_empty() {
+            let n_active = subset.vars.len();
+            let active_stiffness: Vec<f64> =
+                subset.vars.iter().map(|&v| problem.stiffness[v]).collect();
+            let mut candidate = x.clone();
+            let mut ws = NormalEquationsWorkspace::new(n_active);
+            let mut cached_linearization: Option<(PreparedNormalEquations, bool)> = None;
+            while iteration < options.max_iterations {
+                if cached_linearization.is_none() {
+                    prog.accumulate_subset_normal_equations(&x, &subset, &mut ws);
+                    let grad_norm = ws.gradient_norm();
+                    if grad_norm == 0.0
+                        || (options.grad_rel_tolerance <= 0.0 && grad_norm < options.tolerance)
+                    {
+                        break;
+                    }
+                    let small_grad = grad_norm < options.tolerance;
+                    let prepared = ws.finish(&active_stiffness);
+                    cached_linearization = Some((prepared, small_grad));
+                }
+                let (prepared, small_grad) = cached_linearization.as_ref().unwrap();
+                let small_grad = *small_grad;
+                let Some(delta) = prepared.solve(lambda, &active_stiffness) else {
+                    lambda = (lambda * options.lambda_factor * 2.0).min(options.max_lambda);
+                    iteration += 1;
+                    continue;
+                };
+                let mut step_norm = 0.0;
+                for (local, &global) in subset.vars.iter().enumerate() {
+                    let next = problem.lower_bounds[global].max(x[global] + delta[local]);
+                    let d = next - x[global];
+                    candidate[global] = next;
+                    step_norm += d * d;
+                }
+                let candidate_error = prog.evaluate_subset_error(&candidate, &subset);
+                if candidate_error < current_error {
+                    let rel_decrease = (current_error - candidate_error) / current_error;
+                    let damped_small = small_grad
+                        && (lambda < options.initial_lambda || lambda <= options.min_lambda);
+                    for &global in &subset.vars {
+                        x[global] = candidate[global];
+                    }
+                    current_error = candidate_error;
+                    cached_linearization = None;
+                    evaluate(&x, Evaluation::Commit, 0, &mut callback)?;
+                    lambda = (lambda / options.lambda_factor).max(options.min_lambda);
+                    if step_norm.sqrt() < options.tolerance
+                        || current_error < options.tolerance * options.tolerance
+                        || (damped_small && rel_decrease < options.grad_rel_tolerance)
+                    {
+                        iteration += 1;
+                        break;
+                    }
+                } else {
+                    if small_grad && (step_norm.sqrt() < options.tolerance || lambda >= 1.0) {
+                        break;
+                    }
+                    lambda = (lambda * options.lambda_factor).min(options.max_lambda);
+                }
                 iteration += 1;
-                break;
             }
-        } else {
-            if small_grad && (step_norm.sqrt() < options.tolerance || lambda >= 1.0) {
-                break;
-            }
-            lambda = (lambda * options.lambda_factor).min(options.max_lambda);
         }
-        iteration += 1;
+    } else {
+        let mut candidate = vec![0.0; n];
+        let mut cached_linearization: Option<(PreparedNormalEquations, bool)> = None;
+        while iteration < options.max_iterations {
+            if cached_linearization.is_none() {
+                let (h_upper, g) = if let Some(prog) =
+                    program.filter(|p| !p.needs_callback(Evaluation::Linearization))
+                {
+                    let (residuals, j_rows) = prog
+                        .evaluate_sparse(&x, false)
+                        .map_err(SolveError::InvalidInput)?;
+                    normal_equations_upper_from_rows(&j_rows, n, &residuals)
+                } else {
+                    let data = evaluate(&x, Evaluation::Linearization, m + m * n, &mut callback)?;
+                    let (residuals, j) = data.split_at(m);
+                    normal_equations_upper_sparse(j, m, n, residuals)
+                };
+                let mut gradient_norm = 0.0;
+                for &v in &g {
+                    gradient_norm += v * v;
+                }
+                let grad_norm = gradient_norm.sqrt();
+                if grad_norm == 0.0
+                    || (options.grad_rel_tolerance <= 0.0 && grad_norm < options.tolerance)
+                {
+                    break;
+                }
+                let small_grad = grad_norm < options.tolerance;
+                let neg_g: Vec<f64> = g.into_iter().map(|v| -v).collect();
+                let prepared = PreparedNormalEquations::new(h_upper, neg_g, problem.stiffness);
+                cached_linearization = Some((prepared, small_grad));
+            }
+            let (prepared, small_grad) = cached_linearization.as_ref().unwrap();
+            let small_grad = *small_grad;
+            let Some(delta) = prepared.solve(lambda, problem.stiffness) else {
+                lambda = (lambda * options.lambda_factor * 2.0).min(options.max_lambda);
+                iteration += 1;
+                continue;
+            };
+            let mut step_norm = 0.0;
+            for i in 0..n {
+                candidate[i] = problem.lower_bounds[i].max(x[i] + delta[i]);
+                let d = candidate[i] - x[i];
+                step_norm += d * d;
+            }
+            let candidate_error = error(&evaluate(
+                &candidate,
+                Evaluation::Residuals,
+                m,
+                &mut callback,
+            )?);
+            if candidate_error < current_error {
+                let rel_decrease = (current_error - candidate_error) / current_error;
+                let damped_small =
+                    small_grad && (lambda < options.initial_lambda || lambda <= options.min_lambda);
+                x.copy_from_slice(&candidate);
+                current_error = candidate_error;
+                cached_linearization = None;
+                evaluate(&x, Evaluation::Commit, 0, &mut callback)?;
+                lambda = (lambda / options.lambda_factor).max(options.min_lambda);
+                if step_norm.sqrt() < options.tolerance
+                    || current_error < options.tolerance * options.tolerance
+                    || (damped_small && rel_decrease < options.grad_rel_tolerance)
+                {
+                    iteration += 1;
+                    break;
+                }
+            } else {
+                if small_grad && (step_norm.sqrt() < options.tolerance || lambda >= 1.0) {
+                    break;
+                }
+                lambda = (lambda * options.lambda_factor).min(options.max_lambda);
+            }
+            iteration += 1;
+        }
     }
-    let hard_error = error(&evaluate(
-        &x,
-        Evaluation::HardResiduals,
-        problem.hard_equations,
-        &mut callback,
-    )?);
+    let hard_error =
+        if let Some(prog) = program.filter(|p| !p.needs_callback(Evaluation::HardResiduals)) {
+            prog.evaluate_hard_error(&x)
+                .map_err(SolveError::InvalidInput)?
+        } else {
+            error(&evaluate(
+                &x,
+                Evaluation::HardResiduals,
+                problem.hard_equations,
+                &mut callback,
+            )?)
+        };
     let (dof, fixed) = constraint_state(problem, program, &x, &mut callback)?;
     let status = if hard_error > 1e-2 {
         Status::OverConstrained

@@ -2,8 +2,53 @@
 //! follow math/regionsReference.ts; hash tables are used only for lookup, never traversal.
 use crate::{angle, bezier, distance, intersect, p, spline, CubicBezier, Curve, Point2};
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::f64::consts::{PI, TAU};
+use std::hash::{BuildHasherDefault, Hasher};
+
+#[derive(Default)]
+struct FxHasher(u64);
+
+impl Hasher for FxHasher {
+    #[inline]
+    fn finish(&self) -> u64 {
+        let mut z = self.0;
+        z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        z ^ (z >> 31)
+    }
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ u64::from(b)).wrapping_mul(0x517c_c1b7_2722_0a95);
+        }
+    }
+    #[inline]
+    fn write_u64(&mut self, i: u64) {
+        self.0 = (self.0 ^ i.rotate_right(32)).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    }
+    #[inline]
+    fn write_i64(&mut self, i: i64) {
+        self.write_u64(i as u64);
+    }
+}
+
+type FxHashMap<K, V> = HashMap<K, V, BuildHasherDefault<FxHasher>>;
+
+enum CurvePrimitives {
+    One([Curve; 1]),
+    Many(Vec<Curve>),
+}
+
+impl CurvePrimitives {
+    fn as_slice(&self) -> &[Curve] {
+        match self {
+            Self::One(one) => one,
+            Self::Many(many) => many,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Geometry {
@@ -150,20 +195,6 @@ impl Geometry {
             Self::Spline(ref segments, _) => spline::point_at(segments, t),
         }
     }
-    fn sampled_point(&self, mut t: f64) -> Point2 {
-        if let Some((a, b)) = self.endpoints() {
-            if t <= 0.0 {
-                return a;
-            }
-            if t >= 1.0 {
-                return b;
-            }
-        }
-        if matches!(self, Self::Spline(_, true)) && !(0.0..=1.0).contains(&t) {
-            t = ((t % 1.0) + 1.0) % 1.0
-        }
-        self.point(t)
-    }
     pub(crate) fn param(&self, point: Point2) -> f64 {
         match *self {
             Self::Segment(a, b) => {
@@ -231,25 +262,30 @@ impl Geometry {
         let d = delta(a, value, cw);
         d <= sweep(a, b, cw) + tol || d >= TAU - tol
     }
-    pub(crate) fn primitives(&self) -> Vec<Curve> {
+    fn curve_primitives(&self) -> CurvePrimitives {
         match *self {
-            Self::Segment(p1, p2) => vec![Curve::Segment { p1, p2 }],
+            Self::Segment(p1, p2) => CurvePrimitives::One([Curve::Segment { p1, p2 }]),
             Self::Circle(center, radius) | Self::Arc(center, radius, ..) => {
-                vec![Curve::Circle { center, radius }]
+                CurvePrimitives::One([Curve::Circle { center, radius }])
             }
             Self::Ellipse(center, major_axis_point, minor_axis_point)
             | Self::EllipticalArc(center, major_axis_point, minor_axis_point, ..) => {
-                vec![Curve::Ellipse {
+                CurvePrimitives::One([Curve::Ellipse {
                     center,
                     major_axis_point,
                     minor_axis_point,
-                }]
+                }])
             }
-            Self::Spline(ref segments, _) => segments
-                .iter()
-                .map(|points| Curve::Bezier { points: *points })
-                .collect(),
+            Self::Spline(ref segments, _) => CurvePrimitives::Many(
+                segments
+                    .iter()
+                    .map(|points| Curve::Bezier { points: *points })
+                    .collect(),
+            ),
         }
+    }
+    pub(crate) fn primitives(&self) -> Vec<Curve> {
+        self.curve_primitives().as_slice().to_vec()
     }
     fn bounds(&self) -> Option<[f64; 4]> {
         let mut b = [
@@ -341,21 +377,27 @@ pub(crate) fn intersections(a: &Geometry, b: &Geometry, pa: &[Curve], pb: &[Curv
     }
     result
 }
-fn key_component(value: f64) -> u64 {
+#[inline]
+fn round_key_f64(value: f64) -> f64 {
     let x = value * 1e5;
     let f = x.floor();
-    let n = if x - f >= 0.5 { f + 1.0 } else { f };
+    if x - f >= 0.5 {
+        f + 1.0
+    } else {
+        f
+    }
+}
+fn key_component(value: f64) -> u64 {
+    let n = round_key_f64(value);
     if n == 0.0 {
         0
     } else {
         n.to_bits()
     }
 }
+#[cfg(test)]
 fn key(q: Point2) -> (u64, u64) {
     (key_component(q.x), key_component(q.y))
-}
-fn edge_key(a: usize, b: usize) -> (usize, usize) {
-    (a.min(b), a.max(b))
 }
 #[derive(Clone, Copy, Debug)]
 struct Edge {
@@ -364,80 +406,273 @@ struct Edge {
     t1: f64,
     from: usize,
 }
-#[derive(Clone, Copy)]
-struct Segment {
-    a: Point2,
-    b: Point2,
-    curve: usize,
-    t0: f64,
-    t1: f64,
+#[derive(Clone)]
+enum AdjList {
+    Inline { len: u8, items: [(usize, usize); 2] },
+    Heap(Vec<(usize, usize)>),
 }
-#[derive(Default)]
+impl AdjList {
+    #[inline]
+    fn empty() -> Self {
+        Self::Inline {
+            len: 0,
+            items: [(0, 0); 2],
+        }
+    }
+    #[inline]
+    fn as_slice(&self) -> &[(usize, usize)] {
+        match self {
+            Self::Inline { len, items } => &items[..*len as usize],
+            Self::Heap(vec) => vec.as_slice(),
+        }
+    }
+    #[inline]
+    fn len(&self) -> usize {
+        match self {
+            Self::Inline { len, .. } => *len as usize,
+            Self::Heap(vec) => vec.len(),
+        }
+    }
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    #[inline]
+    fn push(&mut self, item: (usize, usize)) {
+        match self {
+            Self::Inline { len, items } => {
+                let l = *len as usize;
+                if l < 2 {
+                    items[l] = item;
+                    *len = (l + 1) as u8;
+                } else {
+                    let mut v = Vec::with_capacity(4);
+                    v.push(items[0]);
+                    v.push(items[1]);
+                    v.push(item);
+                    *self = Self::Heap(v);
+                }
+            }
+            Self::Heap(vec) => vec.push(item),
+        }
+    }
+    #[inline]
+    fn retain(&mut self, mut f: impl FnMut((usize, usize)) -> bool) {
+        match self {
+            Self::Inline { len, items } => {
+                let mut write = 0usize;
+                for read in 0..*len as usize {
+                    if f(items[read]) {
+                        items[write] = items[read];
+                        write += 1;
+                    }
+                }
+                *len = write as u8;
+            }
+            Self::Heap(vec) => vec.retain(|&x| f(x)),
+        }
+    }
+}
 struct Graph {
     nodes: Vec<Point2>,
-    keys: HashMap<(u64, u64), usize>,
-    adj: Vec<Vec<usize>>,
+    node_keys: Vec<(i64, i64)>,
+    next_in_cell: Vec<u32>,
+    coarse: FxHashMap<(i64, i64), u32>,
+    fallback_keys: FxHashMap<(u64, u64), usize>,
+    adj: Vec<AdjList>,
     order: Vec<usize>,
-    sources: HashMap<(usize, usize), Edge>,
+    edges: Vec<Edge>,
 }
 impl Graph {
-    fn node(&mut self, q: Point2) -> usize {
-        let k = key(q);
-        if let Some(i) = self.keys.get(&k) {
-            return *i;
+    fn with_capacity(nodes: usize) -> Self {
+        Self {
+            nodes: Vec::with_capacity(nodes),
+            node_keys: Vec::with_capacity(nodes),
+            next_in_cell: Vec::with_capacity(nodes),
+            coarse: FxHashMap::with_capacity_and_hasher(nodes, Default::default()),
+            fallback_keys: FxHashMap::default(),
+            adj: Vec::with_capacity(nodes),
+            order: Vec::with_capacity(nodes),
+            edges: Vec::with_capacity(nodes),
+        }
+    }
+    fn node_fallback(&mut self, q: Point2) -> usize {
+        let k = (key_component(q.x), key_component(q.y));
+        if let Some(&i) = self.fallback_keys.get(&k) {
+            return i;
         }
         let x = f64::from_bits(k.0);
         let y = f64::from_bits(k.1);
         for dx in -1..=1 {
             for dy in -1..=1 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
                 let xx = x + dx as f64;
                 let yy = y + dy as f64;
                 let near = (
                     if xx == 0.0 { 0 } else { xx.to_bits() },
                     if yy == 0.0 { 0 } else { yy.to_bits() },
                 );
-                if let Some(i) = self.keys.get(&near) {
-                    if distance(q, self.nodes[*i]) <= 1e-5 {
-                        return *i;
+                if let Some(&i) = self.fallback_keys.get(&near) {
+                    if distance(q, self.nodes[i]) <= 1e-5 {
+                        return i;
                     }
                 }
             }
         }
         let i = self.nodes.len();
         self.nodes.push(q);
-        self.adj.push(vec![]);
-        self.keys.insert(k, i);
+        self.node_keys.push((i64::MIN, i64::MIN));
+        self.next_in_cell.push(u32::MAX);
+        self.adj.push(AdjList::empty());
+        self.fallback_keys.insert(k, i);
         i
     }
-    fn add(&mut self, s: Segment) {
-        let a = self.node(s.a);
-        let b = self.node(s.b);
+    #[inline]
+    fn node(&mut self, q: Point2) -> usize {
+        // Coordinates within +/-4e10 stay exact in f64 after multiplying by 1e5 (< 2^52)
+        // and fit cleanly in i64 for coarse bit-shifted cell hashing.
+        if q.x.abs() >= 4e10 || q.y.abs() >= 4e10 {
+            return self.node_fallback(q);
+        }
+        let nx = round_key_f64(q.x) as i64;
+        let ny = round_key_f64(q.y) as i64;
+        let cx = nx >> 10;
+        let cy = ny >> 10;
+        let rx = nx & 1023;
+        let ry = ny & 1023;
+        if rx > 0 && rx < 1023 && ry > 0 && ry < 1023 {
+            match self.coarse.entry((cx, cy)) {
+                Entry::Vacant(slot) => {
+                    let i = self.nodes.len();
+                    self.nodes.push(q);
+                    self.node_keys.push((nx, ny));
+                    self.next_in_cell.push(u32::MAX);
+                    self.adj.push(AdjList::empty());
+                    slot.insert(i as u32);
+                    return i;
+                }
+                Entry::Occupied(mut occ) => {
+                    let head = *occ.get();
+                    let mut best_near: Option<(i8, i8, usize)> = None;
+                    let mut cur = head;
+                    while cur != u32::MAX {
+                        let idx = cur as usize;
+                        let (kx, ky) = self.node_keys[idx];
+                        let dx = kx - nx;
+                        let dy = ky - ny;
+                        if dx == 0 && dy == 0 {
+                            return idx;
+                        }
+                        if (-1..=1).contains(&dx)
+                            && (-1..=1).contains(&dy)
+                            && distance(q, self.nodes[idx]) <= 1e-5
+                        {
+                            let rank = (dx as i8, dy as i8);
+                            if best_near.is_none_or(|(bdx, bdy, _)| rank < (bdx, bdy)) {
+                                best_near = Some((dx as i8, dy as i8, idx));
+                            }
+                        }
+                        cur = self.next_in_cell[idx];
+                    }
+                    if let Some((_, _, idx)) = best_near {
+                        return idx;
+                    }
+                    let i = self.nodes.len();
+                    self.nodes.push(q);
+                    self.node_keys.push((nx, ny));
+                    self.next_in_cell.push(head);
+                    self.adj.push(AdjList::empty());
+                    *occ.get_mut() = i as u32;
+                    return i;
+                }
+            }
+        }
+        // Point lies on a coarse-cell boundary; inspect the 2 or 4 overlapping coarse cells.
+        let xs: &[i64] = if rx == 0 {
+            &[cx - 1, cx]
+        } else if rx == 1023 {
+            &[cx, cx + 1]
+        } else {
+            &[cx]
+        };
+        let ys: &[i64] = if ry == 0 {
+            &[cy - 1, cy]
+        } else if ry == 1023 {
+            &[cy, cy + 1]
+        } else {
+            &[cy]
+        };
+        let mut best_near: Option<(i8, i8, usize)> = None;
+        for &ccx in xs {
+            for &ccy in ys {
+                if let Some(&head) = self.coarse.get(&(ccx, ccy)) {
+                    let mut cur = head;
+                    while cur != u32::MAX {
+                        let idx = cur as usize;
+                        let (kx, ky) = self.node_keys[idx];
+                        let dx = kx - nx;
+                        let dy = ky - ny;
+                        if dx == 0 && dy == 0 {
+                            return idx;
+                        }
+                        if (-1..=1).contains(&dx)
+                            && (-1..=1).contains(&dy)
+                            && distance(q, self.nodes[idx]) <= 1e-5
+                        {
+                            let rank = (dx as i8, dy as i8);
+                            if best_near.is_none_or(|(bdx, bdy, _)| rank < (bdx, bdy)) {
+                                best_near = Some((dx as i8, dy as i8, idx));
+                            }
+                        }
+                        cur = self.next_in_cell[idx];
+                    }
+                }
+            }
+        }
+        if let Some((_, _, idx)) = best_near {
+            return idx;
+        }
+        let i = self.nodes.len();
+        self.nodes.push(q);
+        self.node_keys.push((nx, ny));
+        let prev_head = self.coarse.insert((cx, cy), i as u32).unwrap_or(u32::MAX);
+        self.next_in_cell.push(prev_head);
+        self.adj.push(AdjList::empty());
+        i
+    }
+    fn add_nodes(&mut self, a: usize, b: usize, curve: usize, t0: f64, t1: f64) {
         if a == b {
             return;
         }
-        for (x, y) in [(a, b), (b, a)] {
-            if self.adj[x].is_empty() {
-                self.order.push(x)
-            }
-            if !self.adj[x].contains(&y) {
-                self.adj[x].push(y)
-            }
+        let edge = Edge {
+            curve,
+            t0,
+            t1,
+            from: a,
+        };
+        if let Some(&(_, eid)) = self.adj[a].as_slice().iter().find(|&&(n, _)| n == b) {
+            self.edges[eid] = edge;
+            return;
         }
-        self.sources.insert(
-            edge_key(a, b),
-            Edge {
-                curve: s.curve,
-                t0: s.t0,
-                t1: s.t1,
-                from: a,
-            },
-        );
+        let eid = self.edges.len();
+        self.edges.push(edge);
+        if self.adj[a].is_empty() {
+            self.order.push(a);
+        }
+        self.adj[a].push((b, eid));
+        if self.adj[b].is_empty() {
+            self.order.push(b);
+        }
+        self.adj[b].push((a, eid));
     }
     fn remove_bridges(&mut self) {
-        let mut discovery = vec![0; self.nodes.len()];
-        let mut low = discovery.clone();
-        let mut time = 0;
-        let mut bridges = HashSet::new();
+        let mut discovery = vec![0u32; self.nodes.len()];
+        let mut low = vec![0u32; self.nodes.len()];
+        let mut time = 0u32;
+        let mut is_bridge = vec![false; self.edges.len()];
+        let mut stack: Vec<(usize, usize, usize)> = Vec::new();
         for &root in &self.order {
             if discovery[root] != 0 {
                 continue;
@@ -445,23 +680,24 @@ impl Graph {
             time += 1;
             discovery[root] = time;
             low[root] = time;
-            let mut stack = vec![(root, 0)];
-            while let Some(&(node, index)) = stack.last() {
+            stack.push((root, 0, usize::MAX));
+            while let Some(&(node, index, parent_edge)) = stack.last() {
                 let parent = if stack.len() > 1 {
                     Some(stack[stack.len() - 2].0)
                 } else {
                     None
                 };
-                if index == self.adj[node].len() {
+                let neighbors = self.adj[node].as_slice();
+                if index == neighbors.len() {
                     stack.pop();
                     if let Some(parent) = parent {
                         low[parent] = low[parent].min(low[node]);
                         if low[node] > discovery[parent] {
-                            bridges.insert(edge_key(parent, node));
+                            is_bridge[parent_edge] = true;
                         }
                     }
                 } else {
-                    let next = self.adj[node][index];
+                    let (next, eid) = neighbors[index];
                     stack.last_mut().unwrap().1 += 1;
                     if Some(next) == parent {
                         continue;
@@ -470,15 +706,15 @@ impl Graph {
                         time += 1;
                         discovery[next] = time;
                         low[next] = time;
-                        stack.push((next, 0));
+                        stack.push((next, 0, eid));
                     } else {
                         low[node] = low[node].min(discovery[next]);
                     }
                 }
             }
         }
-        for (node, adj) in self.adj.iter_mut().enumerate() {
-            adj.retain(|next| !bridges.contains(&edge_key(node, *next)));
+        for adj in &mut self.adj {
+            adj.retain(|(_, eid)| !is_bridge[eid]);
         }
     }
 }
@@ -699,6 +935,48 @@ fn cubic_self_intersection(segment: &CubicBezier) -> Option<(Point2, f64, f64)> 
     Some((q1.middle(q2), u1, u2))
 }
 
+/// Returns `true` when two cubics that share an exact endpoint `shared` are strictly separated
+/// across a line through `shared`. By the convex-hull property of Bézier curves, the only possible
+/// intersection between them is `shared` itself.
+fn separated_at_shared_endpoint(
+    shared: Point2,
+    a_other: [Point2; 3],
+    b_other: [Point2; 3],
+    a_adj: Point2,
+    b_adj: Point2,
+    a_far: Point2,
+    b_far: Point2,
+) -> bool {
+    let va = a_adj - shared;
+    let vb = b_adj - shared;
+    let la = va.length();
+    let lb = vb.length();
+    let bisector_normal = if la > 1e-12 && lb > 1e-12 {
+        vb * (1.0 / lb) - va * (1.0 / la)
+    } else {
+        Point2::new(0.0, 0.0)
+    };
+    let axes = [bisector_normal, vb, -va, b_far - a_far];
+    for axis in axes {
+        let len_sq = axis.length_squared();
+        if len_sq <= 1e-24 {
+            continue;
+        }
+        let eps = 1e-12 * len_sq.sqrt();
+        if a_other.iter().all(|&q| (q - shared).dot(axis) < -eps)
+            && b_other.iter().all(|&q| (q - shared).dot(axis) > eps)
+        {
+            return true;
+        }
+        if a_other.iter().all(|&q| (q - shared).dot(axis) > eps)
+            && b_other.iter().all(|&q| (q - shared).dot(axis) < -eps)
+        {
+            return true;
+        }
+    }
+    false
+}
+
 /// Ordered crossing points and normalized parameter pairs for an entire cubic spline.
 /// Single-cubic loops precede ascending segment pairs; adjacent endpoints and closed seams are excluded.
 pub fn spline_self_intersections(
@@ -728,6 +1006,35 @@ pub fn spline_self_intersections(
                 || ba[1] > bb[3] + 1e-4
             {
                 continue;
+            }
+            if b == a + 1 && segments[a][3] == segments[b][0] {
+                let sa = segments[a];
+                let sb = segments[b];
+                if separated_at_shared_endpoint(
+                    sa[3],
+                    [sa[0], sa[1], sa[2]],
+                    [sb[1], sb[2], sb[3]],
+                    sa[2],
+                    sb[1],
+                    sa[0],
+                    sb[3],
+                ) {
+                    continue;
+                }
+            } else if closed && a == 0 && b == n - 1 && segments[0][0] == segments[n - 1][3] {
+                let sa = segments[0];
+                let sb = segments[n - 1];
+                if separated_at_shared_endpoint(
+                    sa[0],
+                    [sa[1], sa[2], sa[3]],
+                    [sb[0], sb[1], sb[2]],
+                    sa[1],
+                    sb[2],
+                    sa[3],
+                    sb[0],
+                ) {
+                    continue;
+                }
             }
             for hit in bezier::intersect_beziers(segments[a], segments[b]) {
                 if b == a + 1 && distance(hit, segments[a][3]) < 1e-3 {
@@ -833,39 +1140,245 @@ fn snap_intersection(a: &Geometry, b: &Geometry, q: Point2) -> Point2 {
     best_pt
 }
 
+enum CurveSampler<'a> {
+    Segment(Point2, Point2),
+    Circle(Point2, f64),
+    Ellipse(Ellipse),
+    Arc {
+        center: Point2,
+        radius: f64,
+        a: Point2,
+        b: Point2,
+        start: f64,
+        span: f64,
+        cw: bool,
+    },
+    EllipticalArc {
+        ellipse: Ellipse,
+        a: Point2,
+        b: Point2,
+        start: f64,
+        span: f64,
+        cw: bool,
+    },
+    Spline(&'a [CubicBezier], bool),
+}
+
+impl<'a> CurveSampler<'a> {
+    fn new(geometry: &'a Geometry) -> Self {
+        match *geometry {
+            Geometry::Segment(a, b) => Self::Segment(a, b),
+            Geometry::Circle(c, r) => Self::Circle(c, r),
+            Geometry::Ellipse(c, major, minor) => Self::Ellipse(Ellipse::new(c, major, minor)),
+            Geometry::Arc(center, radius, a, b, cw) => {
+                let start = svg_angle(center, a);
+                let span = sweep(start, svg_angle(center, b), cw);
+                Self::Arc {
+                    center,
+                    radius,
+                    a,
+                    b,
+                    start,
+                    span,
+                    cw,
+                }
+            }
+            Geometry::EllipticalArc(c, major, minor, a, b, cw) => {
+                let ellipse = Ellipse::new(c, major, minor);
+                let start = ellipse.param(a);
+                let span = sweep(start, ellipse.param(b), cw);
+                Self::EllipticalArc {
+                    ellipse,
+                    a,
+                    b,
+                    start,
+                    span,
+                    cw,
+                }
+            }
+            Geometry::Spline(ref segments, closed) => Self::Spline(segments, closed),
+        }
+    }
+
+    fn sampled_point(&self, mut t: f64) -> Point2 {
+        match *self {
+            Self::Segment(a, b) => {
+                if t <= 0.0 {
+                    a
+                } else if t >= 1.0 {
+                    b
+                } else {
+                    a.lerp(b, t)
+                }
+            }
+            Self::Circle(c, r) => p(r * t.cos() + c.x, -(r * t.sin() + (-c.y))),
+            Self::Ellipse(e) => e.point(t),
+            Self::Arc {
+                center,
+                radius,
+                a,
+                b,
+                start,
+                span,
+                cw,
+            } => {
+                if t <= 0.0 {
+                    return a;
+                }
+                if t >= 1.0 {
+                    return b;
+                }
+                let u = t * span;
+                let v = if cw { start + u } else { start - u };
+                p(
+                    radius * v.cos() + center.x,
+                    -(radius * v.sin() + (-center.y)),
+                )
+            }
+            Self::EllipticalArc {
+                ellipse,
+                a,
+                b,
+                start,
+                span,
+                cw,
+            } => {
+                if t <= 0.0 {
+                    return a;
+                }
+                if t >= 1.0 {
+                    return b;
+                }
+                let u = t * span;
+                ellipse.point(if cw { start + u } else { start - u })
+            }
+            Self::Spline(segments, closed) => {
+                if !closed {
+                    if let (Some(first), Some(last)) = (segments.first(), segments.last()) {
+                        if t <= 0.0 {
+                            return first[0];
+                        }
+                        if t >= 1.0 {
+                            return last[3];
+                        }
+                    }
+                } else if !(0.0..=1.0).contains(&t) {
+                    t = ((t % 1.0) + 1.0) % 1.0;
+                }
+                spline::point_at(segments, t)
+            }
+        }
+    }
+}
+
+fn collect_candidate_pairs(
+    curves: &[RegionCurve],
+    bounds: &[Option<[f64; 4]>],
+) -> Vec<(usize, usize)> {
+    let n = curves.len();
+    let mut pairs = Vec::new();
+    if n < 24 {
+        for i in 0..n {
+            for j in i + 1..n {
+                if curves[i].id != curves[j].id
+                    && may_intersect(
+                        &curves[i].geometry,
+                        &curves[j].geometry,
+                        bounds[i],
+                        bounds[j],
+                    )
+                {
+                    pairs.push((i, j));
+                }
+            }
+        }
+        return pairs;
+    }
+    let mut bounded = Vec::with_capacity(n);
+    let mut unbounded = Vec::new();
+    let mut segments = Vec::new();
+    let mut ellipses = Vec::new();
+    for (idx, c) in curves.iter().enumerate() {
+        match bounds[idx] {
+            Some(b) => bounded.push((b[0], b[2], b[1], b[3], idx)),
+            None => unbounded.push(idx),
+        }
+        match c.geometry {
+            Geometry::Segment(..) => segments.push(idx),
+            Geometry::Ellipse(..) | Geometry::EllipticalArc(..) => ellipses.push(idx),
+            _ => {}
+        }
+    }
+    bounded.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
+    for a in 0..bounded.len() {
+        let (_, max_x_a, min_y_a, max_y_a, i) = bounded[a];
+        let id_i = curves[i].id;
+        for &(min_x_b, _, min_y_b, max_y_b, j) in &bounded[a + 1..] {
+            if min_x_b > max_x_a {
+                break;
+            }
+            if max_y_a < min_y_b || max_y_b < min_y_a || id_i == curves[j].id {
+                continue;
+            }
+            pairs.push(if i < j { (i, j) } else { (j, i) });
+        }
+    }
+    for &i in &unbounded {
+        let id_i = curves[i].id;
+        for (j, curve_j) in curves.iter().enumerate() {
+            if i != j && id_i != curve_j.id {
+                pairs.push(if i < j { (i, j) } else { (j, i) });
+            }
+        }
+    }
+    if !segments.is_empty() && !ellipses.is_empty() {
+        for &i in &segments {
+            let id_i = curves[i].id;
+            for &j in &ellipses {
+                if id_i != curves[j].id {
+                    pairs.push(if i < j { (i, j) } else { (j, i) });
+                }
+            }
+        }
+    }
+    pairs.sort_unstable();
+    pairs.dedup();
+    pairs
+}
+
 pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
     let curves_storage = split_self_intersecting_splines(curves);
     let curves: &[RegionCurve] = &curves_storage;
     let bounds: Vec<_> = curves.iter().map(|c| c.geometry.bounds()).collect();
-    let primitives: Vec<_> = curves.iter().map(|c| c.geometry.primitives()).collect();
+    let primitives: Vec<_> = curves
+        .iter()
+        .map(|c| c.geometry.curve_primitives())
+        .collect();
     let mut cuts = vec![vec![]; curves.len()];
-    for i in 0..curves.len() {
-        for j in i + 1..curves.len() {
-            if curves[i].id == curves[j].id
-                || !may_intersect(
-                    &curves[i].geometry,
-                    &curves[j].geometry,
-                    bounds[i],
-                    bounds[j],
-                )
-            {
-                continue;
-            }
-            for q in intersections(
-                &curves[i].geometry,
-                &curves[j].geometry,
-                &primitives[i],
-                &primitives[j],
-            ) {
-                let q = snap_intersection(&curves[i].geometry, &curves[j].geometry, q);
-                cuts[i].push(curves[i].geometry.cut(q));
-                cuts[j].push(curves[j].geometry.cut(q));
-            }
+    for (i, j) in collect_candidate_pairs(curves, &bounds) {
+        for q in intersections(
+            &curves[i].geometry,
+            &curves[j].geometry,
+            primitives[i].as_slice(),
+            primitives[j].as_slice(),
+        ) {
+            let q = snap_intersection(&curves[i].geometry, &curves[j].geometry, q);
+            cuts[i].push(curves[i].geometry.cut(q));
+            cuts[j].push(curves[j].geometry.cut(q));
         }
     }
-    let mut graph = Graph::default();
+    let estimated_nodes: usize = curves
+        .iter()
+        .map(|c| match c.geometry {
+            Geometry::Segment(..) => 2,
+            Geometry::Arc(..) | Geometry::EllipticalArc(..) => 48,
+            Geometry::Circle(..) | Geometry::Ellipse(..) | Geometry::Spline(..) => 96,
+        })
+        .sum();
+    let mut graph = Graph::with_capacity(estimated_nodes);
     for (index, c) in curves.iter().enumerate() {
         let g = &c.geometry;
+        let sampler = CurveSampler::new(g);
         let raw = &mut cuts[index];
         raw.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
         // Compare to the preceding raw cut, not the preceding retained cut.
@@ -878,7 +1391,8 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
         let mut intervals = vec![];
         if g.periodic() {
             if unique.is_empty() {
-                intervals.push((0.0, g.point(0.0), g.period(), g.point(0.0)))
+                let p0 = sampler.sampled_point(0.0);
+                intervals.push((0.0, p0, g.period(), p0))
             } else {
                 for i in 0..unique.len() {
                     let a = unique[i];
@@ -896,9 +1410,10 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
                 }
             }
         } else {
-            let mut all = vec![(0.0, g.sampled_point(0.0))];
+            let mut all = Vec::with_capacity(unique.len() + 2);
+            all.push((0.0, sampler.sampled_point(0.0)));
             all.extend(unique);
-            all.push((1.0, g.sampled_point(1.0)));
+            all.push((1.0, sampler.sampled_point(1.0)));
             for w in all.windows(2) {
                 intervals.push((w[0].0, w[0].1, w[1].0, w[1].1));
             }
@@ -912,73 +1427,97 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
                     .max(1.0)) as usize
             };
             let mut prev = p0;
+            let mut prev_node: Option<usize> = None;
             for k in 1..=count {
                 let next = if k == count {
                     p1
                 } else {
-                    g.sampled_point(t0 + ((t1 - t0) * k as f64) / count as f64)
+                    sampler.sampled_point(t0 + ((t1 - t0) * k as f64) / count as f64)
                 };
                 if distance(prev, next) > 1e-7 {
-                    graph.add(Segment {
-                        a: prev,
-                        b: next,
-                        curve: index,
-                        t0: t0 + ((t1 - t0) * (k - 1) as f64) / count as f64,
-                        t1: t0 + ((t1 - t0) * k as f64) / count as f64,
-                    });
+                    let a = prev_node.unwrap_or_else(|| graph.node(prev));
+                    let b = graph.node(next);
+                    graph.add_nodes(
+                        a,
+                        b,
+                        index,
+                        t0 + ((t1 - t0) * (k - 1) as f64) / count as f64,
+                        t0 + ((t1 - t0) * k as f64) / count as f64,
+                    );
+                    prev_node = Some(b);
+                } else {
+                    prev_node = None;
                 }
                 prev = next;
             }
         }
     }
     graph.remove_bridges();
-    let around: Vec<_> = graph
+    let around: Vec<AdjList> = graph
         .adj
         .iter()
         .enumerate()
         .map(|(i, a)| {
-            let mut sorted = a.clone();
-            sorted.sort_by(|a, b| {
-                angle(graph.nodes[i], graph.nodes[*a])
-                    .partial_cmp(&angle(graph.nodes[i], graph.nodes[*b]))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
-            sorted
+            let slice = a.as_slice();
+            if slice.len() <= 2 {
+                return a.clone();
+            }
+            let origin = graph.nodes[i];
+            let mut keyed: Vec<(usize, usize, f64)> = slice
+                .iter()
+                .map(|&(n, eid)| (n, eid, angle(origin, graph.nodes[n])))
+                .collect();
+            keyed.sort_by(|x, y| x.2.partial_cmp(&y.2).unwrap_or(std::cmp::Ordering::Equal));
+            AdjList::Heap(keyed.into_iter().map(|(n, eid, _)| (n, eid)).collect())
         })
         .collect();
-    let mut visited = HashSet::new();
+    let half_edge_count = graph.edges.len() * 2;
+    let mut visited = vec![false; half_edge_count];
+    let mut local_stamp = vec![0u32; half_edge_count];
+    let mut stamp = 0u32;
+    let mut local_hes = Vec::with_capacity(64);
     let mut loops: Vec<(Ring, f64)> = vec![];
     for &from in &graph.order {
-        for &to in &graph.adj[from] {
-            if visited.contains(&(from, to)) {
+        for &(to, start_eid) in graph.adj[from].as_slice() {
+            let start_he = (start_eid << 1) | usize::from(from != graph.edges[start_eid].from);
+            if visited[start_he] {
                 continue;
             }
-            let (mut a, mut b) = (from, to);
-            let mut local = HashSet::new();
+            stamp = stamp.wrapping_add(1);
+            if stamp == 0 {
+                local_stamp.fill(0);
+                stamp = 1;
+            }
+            local_hes.clear();
+            let (mut a, mut b, mut eid) = (from, to, start_eid);
             let mut points = vec![];
             let mut nodes = vec![];
             let mut edges = vec![];
             for _ in 0..10000 {
-                if !local.insert((a, b)) {
+                let he = (eid << 1) | usize::from(a != graph.edges[eid].from);
+                if local_stamp[he] == stamp {
                     break;
                 }
+                local_stamp[he] = stamp;
+                local_hes.push(he);
                 points.push(graph.nodes[a]);
                 nodes.push(a);
-                if let Some(source) = graph.sources.get(&edge_key(a, b)) {
-                    edges.push(*source)
-                }
-                let nexts = &around[b];
-                let Some(index) = nexts.iter().position(|v| *v == a) else {
+                edges.push(graph.edges[eid]);
+                let nexts = around[b].as_slice();
+                let Some(index) = nexts.iter().position(|&(v, _)| v == a) else {
                     break;
                 };
-                let next = nexts[(index + nexts.len() - 1) % nexts.len()];
+                let (next, next_eid) = nexts[(index + nexts.len() - 1) % nexts.len()];
                 a = b;
                 b = next;
+                eid = next_eid;
                 if a == from && b == to {
                     break;
                 }
             }
-            visited.extend(local);
+            for &he in &local_hes {
+                visited[he] = true;
+            }
             if points.len() < 3 || a != from || b != to {
                 continue;
             }
@@ -990,38 +1529,95 @@ pub fn find_regions(curves: &[RegionCurve]) -> Vec<Region> {
             loops.push((Ring { points, commands }, ar));
         }
     }
-    let parents: Vec<_> = loops
+    let loop_bounds: Vec<[f64; 4]> = loops
         .iter()
-        .map(|(ring, ar)| {
-            let mut parent = None;
-            for (j, (other, other_ar)) in loops.iter().enumerate() {
-                if other_ar <= ar || parent.is_some_and(|i: usize| *other_ar >= loops[i].1) {
-                    continue;
-                }
-                if !inside(ring.points[0], &other.points) {
-                    continue;
-                }
-                let shared = ring
-                    .points
-                    .iter()
-                    .any(|p| other.points.iter().any(|q| p.distance(*q) < 1e-4));
-                if !shared {
-                    parent = Some(j)
-                }
+        .map(|(ring, _)| {
+            let mut b = [
+                f64::INFINITY,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::NEG_INFINITY,
+            ];
+            for q in &ring.points {
+                b[0] = b[0].min(q.x);
+                b[1] = b[1].min(q.y);
+                b[2] = b[2].max(q.x);
+                b[3] = b[3].max(q.y);
             }
-            parent
+            b
         })
         .collect();
+    let mut sorted_x: Vec<Option<Vec<Point2>>> = vec![None; loops.len()];
+    let mut parents = vec![None; loops.len()];
+    const SHARED_BAND: f64 = 1.0001e-4;
+    for i in 0..loops.len() {
+        let (ref ring, ar) = loops[i];
+        let rb = loop_bounds[i];
+        let p0 = ring.points[0];
+        let mut parent: Option<usize> = None;
+        for j in 0..loops.len() {
+            let other_ar = loops[j].1;
+            if other_ar <= ar || parent.is_some_and(|p_idx| other_ar >= loops[p_idx].1) {
+                continue;
+            }
+            let ob = loop_bounds[j];
+            if p0.x < ob[0] - 1e-9
+                || p0.x > ob[2] + 1e-9
+                || p0.y < ob[1] - 1e-9
+                || p0.y > ob[3] + 1e-9
+            {
+                continue;
+            }
+            let other = &loops[j].0;
+            if !inside(p0, &other.points) {
+                continue;
+            }
+            let shared = if rb[2] + SHARED_BAND < ob[0]
+                || rb[0] - SHARED_BAND > ob[2]
+                || rb[3] + SHARED_BAND < ob[1]
+                || rb[1] - SHARED_BAND > ob[3]
+            {
+                false
+            } else if other.points.len() <= 32 {
+                ring.points
+                    .iter()
+                    .any(|p| other.points.iter().any(|q| p.distance(*q) < 1e-4))
+            } else {
+                let sorted = sorted_x[j].get_or_insert_with(|| {
+                    let mut pts = other.points.clone();
+                    pts.sort_unstable_by(|a, b| a.x.total_cmp(&b.x));
+                    pts
+                });
+                ring.points.iter().any(|p| {
+                    let lo = sorted.partition_point(|q| q.x < p.x - SHARED_BAND);
+                    let hi_x = p.x + SHARED_BAND;
+                    let mut k = lo;
+                    while k < sorted.len() && sorted[k].x <= hi_x {
+                        let q = sorted[k];
+                        if (q.y - p.y).abs() < SHARED_BAND && p.distance(q) < 1e-4 {
+                            return true;
+                        }
+                        k += 1;
+                    }
+                    false
+                })
+            };
+            if !shared {
+                parent = Some(j);
+            }
+        }
+        parents[i] = parent;
+    }
     loops
         .iter()
         .enumerate()
         .map(|(i, (ring, ar))| {
             let mut rings = vec![ring.clone()];
             let mut hole_area = 0.0;
-            for (j, (hole, _)) in loops.iter().enumerate() {
+            for (j, (hole, hole_ar)) in loops.iter().enumerate() {
                 if parents[j] == Some(i) {
                     rings.push(hole.clone());
-                    hole_area += area(&hole.points).abs();
+                    hole_area += hole_ar.abs();
                 }
             }
             Region {
@@ -1211,5 +1807,42 @@ mod tests {
         assert!(a > 0.0 && a < b && b < 1.0);
         assert!(point.distance(bezier::evaluate(&curve, a)) < 1e-5);
         assert!(point.distance(bezier::evaluate(&curve, b)) < 1e-5);
+    }
+    #[test]
+    fn adjacent_cubic_fast_rejection_skips_smooth_joins_but_catches_hairpin_crossings() {
+        let smooth = [
+            [p(0.0, 0.0), p(10.0, 5.0), p(20.0, 5.0), p(30.0, 0.0)],
+            [p(30.0, 0.0), p(40.0, -5.0), p(50.0, -5.0), p(60.0, 0.0)],
+        ];
+        assert!(separated_at_shared_endpoint(
+            smooth[0][3],
+            [smooth[0][0], smooth[0][1], smooth[0][2]],
+            [smooth[1][1], smooth[1][2], smooth[1][3]],
+            smooth[0][2],
+            smooth[1][1],
+            smooth[0][0],
+            smooth[1][3],
+        ));
+        assert!(spline_self_intersections(&smooth, false).is_empty());
+
+        // Adjacent cubics sharing (10, 0) that loop back and cross each other near (0, 5).
+        let hairpin = [
+            [p(-10.0, 0.0), p(-10.0, 10.0), p(10.0, 10.0), p(10.0, 0.0)],
+            [p(10.0, 0.0), p(10.0, -10.0), p(-15.0, 20.0), p(5.0, 15.0)],
+        ];
+        assert!(!separated_at_shared_endpoint(
+            hairpin[0][3],
+            [hairpin[0][0], hairpin[0][1], hairpin[0][2]],
+            [hairpin[1][1], hairpin[1][2], hairpin[1][3]],
+            hairpin[0][2],
+            hairpin[1][1],
+            hairpin[0][0],
+            hairpin[1][3],
+        ));
+        let hits = spline_self_intersections(&hairpin, false);
+        assert_eq!(hits.len(), 1);
+        let (pt, a, b) = hits[0];
+        assert!(pt.distance(spline::point_at(&hairpin, a)) < 1e-4);
+        assert!(pt.distance(spline::point_at(&hairpin, b)) < 1e-4);
     }
 }

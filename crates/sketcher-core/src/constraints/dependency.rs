@@ -10,6 +10,10 @@ impl Program {
         geometric: bool,
     ) -> Result<SparseRows, &'static str> {
         let mut rows = vec![Vec::new(); self.covered.len()];
+        let mut p = Vec::with_capacity(16);
+        let mut trial = Vec::with_capacity(16);
+        let mut plus = Vec::with_capacity(4);
+        let mut minus = Vec::with_capacity(4);
         for c in &self.constraints {
             if c.equations() == 0 {
                 continue;
@@ -24,13 +28,15 @@ impl Program {
             {
                 return Err("Dependency policy does not match constraint rows");
             }
-            let p: Vec<f64> = c
-                .refs
-                .iter()
-                .map(|r| r.index.map_or(r.constant, |i| state[i]))
-                .collect();
+            p.clear();
+            p.extend(
+                c.refs
+                    .iter()
+                    .map(|r| r.index.map_or(r.constant, |i| state[i])),
+            );
             if rule.mode == 1 || (rule.mode == 2 && geometric) {
-                let mut trial = p.clone();
+                trial.clear();
+                trial.extend_from_slice(&p);
                 for &column in &rule.columns {
                     if !c.refs.iter().any(|r| r.index == Some(column)) {
                         continue;
@@ -41,13 +47,13 @@ impl Program {
                             trial[i] = p[i] + 1e-5;
                         }
                     }
-                    let plus = c.residuals(&trial);
+                    c.residuals_into(&trial, &mut plus);
                     for (i, r) in c.refs.iter().enumerate() {
                         if r.index == Some(column) {
                             trial[i] = p[i] - 1e-5;
                         }
                     }
-                    let minus = c.residuals(&trial);
+                    c.residuals_into(&trial, &mut minus);
                     for (i, r) in c.refs.iter().enumerate() {
                         if r.index == Some(column) {
                             trial[i] = p[i];
@@ -61,9 +67,9 @@ impl Program {
                     }
                 }
             } else {
-                for (equation, column, value) in c.jacobian(&p) {
+                c.jacobian_into(&p, &mut |equation, column, value| {
                     rows[c.row + equation].push((column, value));
-                }
+                });
             }
         }
         Ok(rows)

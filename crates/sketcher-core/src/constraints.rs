@@ -1,5 +1,5 @@
 //! Native residuals and Jacobians. Tags and reference order match nativeConstraints.ts.
-use crate::matrix::SparseRows;
+use crate::matrix::{NormalEquationsWorkspace, SparseRows};
 use crate::solver::Evaluation;
 mod dependency;
 mod inspection;
@@ -16,6 +16,7 @@ struct Constraint {
     weight: f64,
     a: f64,
     b: f64,
+    sin_cos: Option<(f64, f64)>,
     refs: Vec<Ref>,
 }
 
@@ -43,14 +44,21 @@ impl Constraint {
     }
 
     fn residuals(&self, p: &[f64]) -> Vec<f64> {
+        let mut out = Vec::with_capacity(self.equations());
+        self.residuals_into(p, &mut out);
+        out
+    }
+
+    fn residuals_into(&self, p: &[f64], out: &mut Vec<f64>) {
+        out.clear();
         let w = self.weight;
         match self.kind {
-            0 => vec![(p[0] - self.a) * w, (p[1] - self.b) * w],
-            1 => vec![(p[0] - p[2]) * w, (p[1] - p[3]) * w],
-            2 => vec![(p[3] - p[1]) * w],
-            3 => vec![(p[2] - p[0]) * w],
-            4 => vec![(p[0] - self.a) * w],
-            5 => vec![(p[0] - p[1]) * w],
+            0 => out.extend_from_slice(&[(p[0] - self.a) * w, (p[1] - self.b) * w]),
+            1 => out.extend_from_slice(&[(p[0] - p[2]) * w, (p[1] - p[3]) * w]),
+            2 => out.push((p[3] - p[1]) * w),
+            3 => out.push((p[2] - p[0]) * w),
+            4 => out.push((p[0] - self.a) * w),
+            5 => out.push((p[0] - p[1]) * w),
             6 => {
                 let (dx, dy) = (p[2] - p[0], p[3] - p[1]);
                 let distance = if self.b == 1.0 {
@@ -60,17 +68,19 @@ impl Constraint {
                 } else {
                     dx.hypot(dy)
                 };
-                vec![(distance - self.a) * w]
+                out.push((distance - self.a) * w);
             }
-            7 => vec![((p[0] - p[2]).hypot(p[1] - p[3]) - (p[4] - p[6]).hypot(p[5] - p[7])) * w],
-            8 => vec![
+            7 => {
+                out.push(((p[0] - p[2]).hypot(p[1] - p[3]) - (p[4] - p[6]).hypot(p[5] - p[7])) * w)
+            }
+            8 => out.extend_from_slice(&[
                 (p[0] - ((1.0 - self.a) * p[2] + self.a * p[4])) * w,
                 (p[1] - ((1.0 - self.a) * p[3] + self.a * p[5])) * w,
-            ],
-            9 => vec![((p[0] - p[2]).hypot(p[1] - p[3]) - p[4]) * w],
+            ]),
+            9 => out.push(((p[0] - p[2]).hypot(p[1] - p[3]) - p[4]) * w),
             10 => {
                 let (dx, dy) = (p[4] - p[2], p[5] - p[3]);
-                vec![(((p[0] - p[2]) * dy - (p[1] - p[3]) * dx) / dx.hypot(dy).max(1e-7)) * w]
+                out.push((((p[0] - p[2]) * dy - (p[1] - p[3]) * dx) / dx.hypot(dy).max(1e-7)) * w);
             }
             11..=13 => {
                 let (dx1, dy1, dx2, dy2) = (p[2] - p[0], p[3] - p[1], p[6] - p[4], p[7] - p[5]);
@@ -82,11 +92,11 @@ impl Constraint {
                 };
                 let equation = (product / (l1 * l2)) * ((l1 + l2) * 0.5) * w;
                 if self.kind != 13 || self.a == 1.0 {
-                    vec![equation]
+                    out.push(equation);
                 } else {
                     let cross =
                         ((p[4] + p[6]) * 0.5 - p[0]) * dy1 - ((p[5] + p[7]) * 0.5 - p[1]) * dx1;
-                    vec![equation, (cross / l1) * w]
+                    out.extend_from_slice(&[equation, (cross / l1) * w]);
                 }
             }
             14 => {
@@ -106,7 +116,7 @@ impl Constraint {
                 let angle = p[10] * ((self.a * std::f64::consts::PI) / 180.0);
                 let (sin, cos) = (angle.sin(), angle.cos());
                 let (rx, ry) = (x1 * cos - y1 * sin, y1 * cos + x1 * sin);
-                vec![(rx * y2 - ry * x2) * average * w]
+                out.push((rx * y2 - ry * x2) * average * w);
             }
             15 | 20 => {
                 let (dx, dy) = (p[4] - p[2], p[5] - p[3]);
@@ -116,7 +126,7 @@ impl Constraint {
                 } else {
                     self.b * self.a
                 };
-                vec![(distance - target) * w]
+                out.push((distance - target) * w);
             }
             16 => {
                 let distance = (p[2] - p[0]).hypot(p[3] - p[1]).max(1e-7);
@@ -127,33 +137,35 @@ impl Constraint {
                 } else {
                     p[5] - p[4]
                 };
-                vec![(distance - target) * w]
+                out.push((distance - target) * w);
             }
-            17 => vec![ellipse_residual(p, 6, w)],
-            18 => vec![ellipse_residual(p, 6, w), ellipse_residual(p, 8, w)],
-            19 => vec![
+            17 => out.push(ellipse_residual(p, 6, w)),
+            18 => out.extend_from_slice(&[ellipse_residual(p, 6, w), ellipse_residual(p, 8, w)]),
+            19 => out.extend_from_slice(&[
                 ((p[2] - p[0]).hypot(p[3] - p[1]) - p[6]) * w,
                 ((p[4] - p[0]).hypot(p[5] - p[1]) - p[6]) * w,
-            ],
+            ]),
             21 => {
                 if self.a == 1.0 {
-                    vec![(p[0] + p[2]) * 0.5 * w, (p[1] + p[3]) * 0.5 * w]
+                    out.extend_from_slice(&[(p[0] + p[2]) * 0.5 * w, (p[1] + p[3]) * 0.5 * w]);
                 } else {
                     let (dx, dy) = (p[6] - p[4], p[7] - p[5]);
                     let length = dx.hypot(dy).max(1e-7);
                     let (mx, my) = ((p[0] + p[2]) * 0.5, (p[1] + p[3]) * 0.5);
-                    vec![
+                    out.extend_from_slice(&[
                         (((mx - p[4]) * dy - (my - p[5]) * dx) / length) * w,
                         (((p[2] - p[0]) * dx + (p[3] - p[1]) * dy) / length) * w,
-                    ]
+                    ]);
                 }
             }
             22 => {
-                let angle = pattern_angle(p[6], p[7], self.b, self.a);
-                let (sin, cos) = (angle.sin(), angle.cos());
+                let (sin, cos) = self.sin_cos.unwrap_or_else(|| {
+                    let angle = pattern_angle(p[6], p[7], self.b, self.a);
+                    (angle.sin(), angle.cos())
+                });
                 let (x, y) = (p[2] - p[0], p[3] - p[1]);
                 let (tx, ty) = (p[0] + x * cos - y * sin, p[1] + y * cos + x * sin);
-                vec![(p[4] - tx) * w, (p[5] - ty) * w]
+                out.extend_from_slice(&[(p[4] - tx) * w, (p[5] - ty) * w]);
             }
             23 => {
                 let directions = rectangular_directions(p);
@@ -161,59 +173,68 @@ impl Constraint {
                 let o2 = axis_offset(p[13], self.b, p[15]);
                 let x = directions.u1[0] * o1 + directions.u2[0] * o2;
                 let y = directions.u1[1] * o1 + directions.u2[1] * o2;
-                vec![(p[2] - (p[0] + x)) * w, (p[3] - (p[1] + y)) * w]
+                out.extend_from_slice(&[(p[2] - (p[0] + x)) * w, (p[3] - (p[1] + y)) * w]);
             }
             24 => {
                 let (dx, dy) = (p[4] - p[2], p[5] - p[3]);
                 let left = (dx * (p[1] - p[3]) - dy * (p[0] - p[2])) / dx.hypot(dy).max(1e-9);
-                vec![(left - self.b * self.a) * w]
+                out.push((left - self.b * self.a) * w);
             }
-            25 => vec![
+            25 => out.extend_from_slice(&[
                 (p[0] - p[2]) * w,
                 (p[1] - p[3]) * w,
                 (p[4] - p[5] - self.b * self.a) * w,
-            ],
+            ]),
             26 => {
                 let distance = p[6] * self.a;
-                vec![
+                out.extend_from_slice(&[
                     (p[0] - (p[2] + p[4] * distance)) * w,
                     (p[1] - (p[3] + p[5] * distance)) * w,
-                ]
+                ]);
             }
             27 => {
                 if self.b == 3.0 {
-                    vec![p[0] * w, p[1] * w]
+                    out.extend_from_slice(&[p[0] * w, p[1] * w]);
                 } else if self.b == 0.0 {
-                    vec![(p[0].hypot(p[1]) - self.a) * w]
+                    out.push((p[0].hypot(p[1]) - self.a) * w);
                 } else {
                     let coordinate = p[if self.b == 1.0 { 0 } else { 1 }];
-                    vec![if self.a == 0.0 {
+                    out.push(if self.a == 0.0 {
                         coordinate * w
                     } else {
                         (coordinate - p[2] * self.a) * w
-                    }]
+                    });
                 }
             }
             28 => {
                 if self.b == 1.0 {
-                    vec![p[0] * w, p[1] * w]
+                    out.extend_from_slice(&[p[0] * w, p[1] * w]);
                 } else {
-                    vec![(p[0] - p[2] * self.a) * w, (p[1] - p[2] * self.a) * w]
+                    out.extend_from_slice(&[
+                        (p[0] - p[2] * self.a) * w,
+                        (p[1] - p[2] * self.a) * w,
+                    ]);
                 }
             }
-            29 | 30 => self.spline_residuals(p),
+            29 | 30 => out.extend(self.spline_residuals(p)),
             _ => unreachable!(),
         }
     }
 
+    #[cfg(test)]
     fn jacobian(&self, p: &[f64]) -> Vec<(usize, usize, f64)> {
-        let w = self.weight;
         let mut entries = Vec::new();
+        self.jacobian_into(p, &mut |row, col, val| entries.push((row, col, val)));
+        entries
+    }
+
+    fn jacobian_into(&self, p: &[f64], emit: &mut impl FnMut(usize, usize, f64)) {
+        let w = self.weight;
         let mut add = |row: usize, slot: usize, value: f64| {
             if let Some(col) = self.refs[slot].index {
                 // Pattern point entries bypass addJacobianEntry in the TS reference.
                 if self.kind == 22 || (self.kind == 23 && slot < 4) || value.abs() > 1e-12 {
-                    entries.push((row, col, value));
+                    emit(row, col, value);
                 }
             }
         };
@@ -353,8 +374,10 @@ impl Constraint {
                 }
             }
             22 => {
-                let angle = pattern_angle(p[6], p[7], self.b, self.a);
-                let (sin, cos) = (angle.sin(), angle.cos());
+                let (sin, cos) = self.sin_cos.unwrap_or_else(|| {
+                    let angle = pattern_angle(p[6], p[7], self.b, self.a);
+                    (angle.sin(), angle.cos())
+                });
                 add(0, 4, w);
                 add(0, 2, -cos * w);
                 add(0, 3, sin * w);
@@ -391,7 +414,11 @@ impl Constraint {
                     add_axis_derivatives(&mut add, 8, [o2 * a, o2 * b], [o2 * c, o2 * e], w);
                 }
             }
-            24 => return self.offset_line_jacobian(p),
+            24 => {
+                for (row, col, val) in self.offset_line_jacobian(p) {
+                    emit(row, col, val);
+                }
+            }
             25 => {
                 // Offsets drive children only; parent references remain active in residuals.
                 add(0, 0, w);
@@ -420,56 +447,73 @@ impl Constraint {
                 add(0, 0, w);
                 add(1, 1, w);
             }
-            30 => return self.automatic_jacobian(p),
-            10..=13 | 15..=18 | 20..=21 | 29 => return self.numeric_jacobian(p),
+            30 => {
+                for (row, col, val) in self.automatic_jacobian(p) {
+                    emit(row, col, val);
+                }
+            }
+            10..=13 | 15..=18 | 20..=21 | 29 => self.numeric_jacobian_into(p, emit),
             _ => unreachable!(),
         }
-        entries
     }
 
-    fn numeric_jacobian(&self, p: &[f64]) -> Vec<(usize, usize, f64)> {
+    fn numeric_jacobian_into(&self, p: &[f64], emit: &mut impl FnMut(usize, usize, f64)) {
         let mut columns: Vec<usize> = self.refs.iter().filter_map(|r| r.index).collect();
         columns.sort_unstable();
         columns.dedup();
         let mut trial = p.to_vec();
         let central = self.kind == 11;
-        let mut entries = Vec::new();
-        for equation in 0..self.equations() {
-            let f0 = if central {
-                0.0
-            } else {
-                self.residuals(p)[equation]
-            };
-            for &column in &columns {
-                // All aliases of a shared parameter must be perturbed together.
+        let eq_count = self.equations();
+        let mut base = Vec::with_capacity(eq_count);
+        if !central {
+            self.residuals_into(p, &mut base);
+        }
+        let mut plus = Vec::with_capacity(eq_count);
+        let mut minus = Vec::with_capacity(eq_count);
+        let mut deferred = Vec::new();
+        let step = if central { 2.0 * 1e-5 } else { 1e-5 };
+        for &column in &columns {
+            // All aliases of a shared parameter must be perturbed together.
+            for (slot, r) in self.refs.iter().enumerate() {
+                if r.index == Some(column) {
+                    trial[slot] = p[slot] + 1e-5;
+                }
+            }
+            self.residuals_into(&trial, &mut plus);
+            if central {
                 for (slot, r) in self.refs.iter().enumerate() {
                     if r.index == Some(column) {
-                        trial[slot] = p[slot] + 1e-5;
+                        trial[slot] = p[slot] - 1e-5;
                     }
                 }
-                let plus = self.residuals(&trial)[equation];
-                let minus = if central {
-                    for (slot, r) in self.refs.iter().enumerate() {
-                        if r.index == Some(column) {
-                            trial[slot] = p[slot] - 1e-5;
-                        }
-                    }
-                    self.residuals(&trial)[equation]
-                } else {
-                    f0
-                };
-                for (slot, r) in self.refs.iter().enumerate() {
-                    if r.index == Some(column) {
-                        trial[slot] = p[slot];
-                    }
+                self.residuals_into(&trial, &mut minus);
+            }
+            for (slot, r) in self.refs.iter().enumerate() {
+                if r.index == Some(column) {
+                    trial[slot] = p[slot];
                 }
-                let derivative = (plus - minus) / if central { 2.0 * 1e-5 } else { 1e-5 };
+            }
+            let minus_slice = if central { &minus } else { &base };
+            let d0 = (plus[0] - minus_slice[0]) / step;
+            if d0.abs() > 1e-11 {
+                emit(0, column, d0);
+            }
+            for equation in 1..eq_count {
+                let derivative = (plus[equation] - minus_slice[equation]) / step;
                 if derivative.abs() > 1e-11 {
-                    entries.push((equation, column, derivative));
+                    deferred.push((equation, column, derivative));
                 }
             }
         }
-        entries
+        if !deferred.is_empty() {
+            for equation in 1..eq_count {
+                for &(eq, col, val) in &deferred {
+                    if eq == equation {
+                        emit(eq, col, val);
+                    }
+                }
+            }
+        }
     }
 
     fn offset_line_jacobian(&self, p: &[f64]) -> Vec<(usize, usize, f64)> {
@@ -698,6 +742,12 @@ impl Program {
             {
                 return Err("Invalid native constraint configuration reference");
             }
+            let sin_cos = if kind == 22 {
+                let angle = pattern_angle(refs[6].constant, refs[7].constant, header[5], header[4]);
+                Some((angle.sin(), angle.cos()))
+            } else {
+                None
+            };
             let constraint = Constraint {
                 kind,
                 row,
@@ -705,6 +755,7 @@ impl Program {
                 weight: header[3],
                 a: header[4],
                 b: header[5],
+                sin_cos,
                 refs,
             };
             let equations = constraint.equations();
@@ -782,6 +833,7 @@ impl Program {
             0
         };
         let mut p = Vec::with_capacity(16);
+        let mut res_buf = Vec::with_capacity(4);
         for constraint in &self.constraints {
             let row = if hard_only {
                 let Some(row) = constraint.hard_row else {
@@ -799,19 +851,265 @@ impl Program {
                     .map(|r| r.index.map_or(r.constant, |i| state[i])),
             );
             if residuals {
-                let values = constraint.residuals(&p);
-                output[row..row + values.len()].copy_from_slice(&values);
+                constraint.residuals_into(&p, &mut res_buf);
+                output[row..row + res_buf.len()].copy_from_slice(&res_buf);
             }
             if jacobian {
                 // Native rows are authoritative; ignore callback values in those rows.
                 output[offset + row * self.n..offset + (row + constraint.equations()) * self.n]
                     .fill(0.0);
-                for (equation, column, value) in constraint.jacobian(&p) {
+                constraint.jacobian_into(&p, &mut |equation, column, value| {
                     output[offset + (row + equation) * self.n + column] += value;
-                }
+                });
             }
         }
         Ok(())
+    }
+}
+
+pub(crate) struct ActiveSubset {
+    pub(crate) vars: Vec<usize>,
+    pub(crate) var_to_local: Vec<usize>,
+    pub(crate) constraints: Vec<usize>,
+    pub(crate) idle_sum_sq: f64,
+}
+
+fn find_root(parent: &mut [usize], mut x: usize) -> usize {
+    while parent[x] != x {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+    }
+    x
+}
+
+fn merge_sparse_row(row_vec: &mut Vec<(usize, f64)>) {
+    if row_vec.len() > 1 {
+        row_vec.sort_by_key(|&(c, _)| c);
+        let mut write = 0;
+        for read in 0..row_vec.len() {
+            let (col, val) = row_vec[read];
+            if write > 0 && row_vec[write - 1].0 == col {
+                row_vec[write - 1].1 += val;
+            } else {
+                row_vec[write] = (col, val);
+                write += 1;
+            }
+        }
+        row_vec.truncate(write);
+        row_vec.retain(|&(_, v)| v != 0.0);
+    } else if row_vec.first().is_some_and(|&(_, v)| v == 0.0) {
+        row_vec.clear();
+    }
+}
+
+impl Program {
+    pub(crate) fn evaluate_residuals(
+        &self,
+        state: &[f64],
+        hard_only: bool,
+        output: &mut [f64],
+    ) -> Result<(), &'static str> {
+        let expected = if hard_only {
+            self.hard_covered.len()
+        } else {
+            self.covered.len()
+        };
+        if state.len() != self.n || output.len() != expected {
+            return Err("Invalid native constraint evaluation dimensions");
+        }
+        output.fill(0.0);
+        let mut p = Vec::with_capacity(16);
+        let mut res_buf = Vec::with_capacity(4);
+        for constraint in &self.constraints {
+            let row = if hard_only {
+                let Some(row) = constraint.hard_row else {
+                    continue;
+                };
+                row
+            } else {
+                constraint.row
+            };
+            p.clear();
+            p.extend(
+                constraint
+                    .refs
+                    .iter()
+                    .map(|r| r.index.map_or(r.constant, |i| state[i])),
+            );
+            constraint.residuals_into(&p, &mut res_buf);
+            output[row..row + res_buf.len()].copy_from_slice(&res_buf);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn evaluate_hard_error(&self, state: &[f64]) -> Result<f64, &'static str> {
+        if state.len() != self.n {
+            return Err("Invalid native constraint evaluation dimensions");
+        }
+        let mut sum = 0.0;
+        let mut p = Vec::with_capacity(16);
+        let mut res_buf = Vec::with_capacity(4);
+        for constraint in &self.constraints {
+            if constraint.hard_row.is_none() {
+                continue;
+            }
+            p.clear();
+            p.extend(
+                constraint
+                    .refs
+                    .iter()
+                    .map(|r| r.index.map_or(r.constant, |i| state[i])),
+            );
+            constraint.residuals_into(&p, &mut res_buf);
+            for &r in &res_buf {
+                sum += r * r;
+            }
+        }
+        Ok(sum * 0.5)
+    }
+
+    /// Partitions free variables and constraints into connected components, retaining only
+    /// components that currently have non-negligible residual error or a lower-bound violation.
+    pub(crate) fn active_subset(
+        &self,
+        state: &[f64],
+        lower_bounds: &[f64],
+        residuals: &[f64],
+        error_threshold: f64,
+    ) -> ActiveSubset {
+        let mut parent: Vec<usize> = (0..self.n).collect();
+        let mut constraint_var = Vec::with_capacity(self.constraints.len());
+        for constraint in &self.constraints {
+            let mut first = usize::MAX;
+            for r in &constraint.refs {
+                if let Some(i) = r.index {
+                    if first == usize::MAX {
+                        first = i;
+                    } else {
+                        let ra = find_root(&mut parent, first);
+                        let rb = find_root(&mut parent, i);
+                        if ra != rb {
+                            parent[rb] = ra;
+                        }
+                    }
+                }
+            }
+            constraint_var.push(first);
+        }
+        let mut comp_sum_sq = vec![0.0; self.n];
+        let mut const_sum_sq = 0.0;
+        for (idx, constraint) in self.constraints.iter().enumerate() {
+            let count = constraint.equations();
+            let mut sum_sq = 0.0;
+            for &r in &residuals[constraint.row..constraint.row + count] {
+                sum_sq += r * r;
+            }
+            let v = constraint_var[idx];
+            if v == usize::MAX {
+                const_sum_sq += sum_sq;
+            } else {
+                let root = find_root(&mut parent, v);
+                comp_sum_sq[root] += sum_sq;
+            }
+        }
+        let sum_sq_threshold = error_threshold * 2.0;
+        let mut active_root = vec![false; self.n];
+        for i in 0..self.n {
+            let root = find_root(&mut parent, i);
+            if comp_sum_sq[root] > sum_sq_threshold || state[i] < lower_bounds[i] {
+                active_root[root] = true;
+            }
+        }
+        let mut var_to_local = vec![usize::MAX; self.n];
+        let mut vars = Vec::new();
+        for (i, slot) in var_to_local.iter_mut().enumerate() {
+            let root = find_root(&mut parent, i);
+            if active_root[root] {
+                *slot = vars.len();
+                vars.push(i);
+            }
+        }
+        let mut constraints = Vec::new();
+        let mut idle_sum_sq = const_sum_sq;
+        for (idx, constraint) in self.constraints.iter().enumerate() {
+            let v = constraint_var[idx];
+            if v != usize::MAX && active_root[find_root(&mut parent, v)] {
+                constraints.push(idx);
+            } else if v != usize::MAX {
+                let count = constraint.equations();
+                for &r in &residuals[constraint.row..constraint.row + count] {
+                    idle_sum_sq += r * r;
+                }
+            }
+        }
+        ActiveSubset {
+            vars,
+            var_to_local,
+            constraints,
+            idle_sum_sq,
+        }
+    }
+
+    pub(crate) fn evaluate_subset_error(&self, state: &[f64], subset: &ActiveSubset) -> f64 {
+        let mut sum_sq = subset.idle_sum_sq;
+        let mut p = Vec::with_capacity(16);
+        let mut res_buf = Vec::with_capacity(4);
+        for &idx in &subset.constraints {
+            let constraint = &self.constraints[idx];
+            p.clear();
+            p.extend(
+                constraint
+                    .refs
+                    .iter()
+                    .map(|r| r.index.map_or(r.constant, |i| state[i])),
+            );
+            constraint.residuals_into(&p, &mut res_buf);
+            for &r in &res_buf {
+                sum_sq += r * r;
+            }
+        }
+        sum_sq * 0.5
+    }
+
+    /// Evaluates active constraints directly into `ws`, accumulating `H = J^T * J` and `g = J^T * f`
+    /// without allocating a full `Vec<Vec<_>>` Jacobian matrix.
+    pub(crate) fn accumulate_subset_normal_equations(
+        &self,
+        state: &[f64],
+        subset: &ActiveSubset,
+        ws: &mut NormalEquationsWorkspace,
+    ) {
+        ws.reset();
+        let mut p = Vec::with_capacity(16);
+        let mut res_buf = Vec::with_capacity(4);
+        let mut row_bufs: Vec<Vec<(usize, f64)>> = (0..4).map(|_| Vec::with_capacity(12)).collect();
+        for &idx in &subset.constraints {
+            let constraint = &self.constraints[idx];
+            let count = constraint.equations();
+            if row_bufs.len() < count {
+                row_bufs.resize_with(count, || Vec::with_capacity(12));
+            }
+            for row in &mut row_bufs[..count] {
+                row.clear();
+            }
+            p.clear();
+            p.extend(
+                constraint
+                    .refs
+                    .iter()
+                    .map(|r| r.index.map_or(r.constant, |i| state[i])),
+            );
+            constraint.residuals_into(&p, &mut res_buf);
+            constraint.jacobian_into(&p, &mut |equation, column, value| {
+                let local = subset.var_to_local[column];
+                debug_assert!(local < subset.vars.len());
+                row_bufs[equation].push((local, value));
+            });
+            for eq in 0..count {
+                merge_sparse_row(&mut row_bufs[eq]);
+                ws.add_row(&row_bufs[eq], res_buf[eq]);
+            }
+        }
     }
 
     pub fn evaluate_sparse(
@@ -827,9 +1125,10 @@ impl Program {
         } else {
             self.covered.len()
         };
-        let mut residuals = vec![0.0; m];
+        let mut residuals = if hard_only { Vec::new() } else { vec![0.0; m] };
         let mut rows: Vec<Vec<(usize, f64)>> = vec![Vec::new(); m];
         let mut p = Vec::with_capacity(16);
+        let mut res_buf = Vec::with_capacity(4);
         for constraint in &self.constraints {
             let row = if hard_only {
                 let Some(row) = constraint.hard_row else {
@@ -847,31 +1146,15 @@ impl Program {
                     .map(|r| r.index.map_or(r.constant, |i| state[i])),
             );
             if !hard_only {
-                let values = constraint.residuals(&p);
-                residuals[row..row + values.len()].copy_from_slice(&values);
+                constraint.residuals_into(&p, &mut res_buf);
+                residuals[row..row + res_buf.len()].copy_from_slice(&res_buf);
             }
-            for (equation, column, value) in constraint.jacobian(&p) {
+            constraint.jacobian_into(&p, &mut |equation, column, value| {
                 rows[row + equation].push((column, value));
-            }
+            });
         }
         for row_vec in &mut rows {
-            if row_vec.len() > 1 {
-                row_vec.sort_by_key(|&(c, _)| c);
-                let mut write = 0;
-                for read in 0..row_vec.len() {
-                    let (col, val) = row_vec[read];
-                    if write > 0 && row_vec[write - 1].0 == col {
-                        row_vec[write - 1].1 += val;
-                    } else {
-                        row_vec[write] = (col, val);
-                        write += 1;
-                    }
-                }
-                row_vec.truncate(write);
-                row_vec.retain(|&(_, v)| v != 0.0);
-            } else if row_vec.first().is_some_and(|&(_, v)| v == 0.0) {
-                row_vec.clear();
-            }
+            merge_sparse_row(row_vec);
         }
         Ok((residuals, rows))
     }
@@ -889,6 +1172,7 @@ mod tests {
             weight: 1.0,
             a,
             b,
+            sin_cos: None,
             refs: indices
                 .iter()
                 .map(|&index| Ref {
