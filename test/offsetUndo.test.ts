@@ -64,10 +64,10 @@ test('SelectTool.handleMouseUp keeps offset topology changes inside the undo tra
 	const l3 = sketch.addLine(p3.id, p4.id);
 	const l4 = sketch.addLine(p4.id, p1.id);
 	sketch.addFixedConstraint(p1.id);
-	sketch.addHorizontalConstraint(l1.id);
-	sketch.addVerticalConstraint(l2.id);
-	sketch.addHorizontalConstraint(l3.id);
-	sketch.addVerticalConstraint(l4.id);
+	sketch.addHorizontalConstraint(p1.id, p2.id);
+	sketch.addVerticalConstraint(p2.id, p3.id);
+	sketch.addHorizontalConstraint(p3.id, p4.id);
+	sketch.addVerticalConstraint(p4.id, p1.id);
 	// Keeps p3 at y = 50 (so snapping p3 onto axis_x at y = 0 is rejected), while p3.x stays free to drag.
 	sketch.addDistanceConstraint(p2.id, p3.id, 40);
 
@@ -117,4 +117,70 @@ test('SelectTool.handleMouseUp keeps offset topology changes inside the undo tra
 	assert.notEqual(sketch.lastSolverResult?.status, 'OVER_CONSTRAINED');
 	assert.ok(Math.abs(sketch.points.get(p3.id)!.x - 60) < 1e-4);
 	assert.ok(Math.abs(sketch.points.get(p3.id)!.y - 50) < 1e-4);
+});
+
+test('rejected constraint does not reconcile offset topology or corrupt subsequent undo', () => {
+	const sketch = new SketchDocument();
+	sketch.onChange(() => {
+		sketch.canUndo();
+	});
+
+	const p1 = sketch.addPoint(new Vec2(0, 10));
+	const p2 = sketch.addPoint(new Vec2(60, 10));
+	const p3 = sketch.addPoint(new Vec2(60, 50));
+	const p4 = sketch.addPoint(new Vec2(0, 50));
+	const l1 = sketch.addLine(p1.id, p2.id);
+	const l2 = sketch.addLine(p2.id, p3.id);
+	const l3 = sketch.addLine(p3.id, p4.id);
+	const l4 = sketch.addLine(p4.id, p1.id);
+	sketch.addFixedConstraint(p1.id);
+	sketch.addHorizontalConstraint(p1.id, p2.id);
+	sketch.addVerticalConstraint(p2.id, p3.id);
+	sketch.addHorizontalConstraint(p3.id, p4.id);
+	sketch.addVerticalConstraint(p4.id, p1.id);
+	sketch.addDistanceConstraint(p2.id, p3.id, 40);
+
+	const chain: OffsetChain = {
+		items: [
+			{ id: l1.id, type: 'line', startPointId: p1.id, endPointId: p2.id },
+			{ id: l2.id, type: 'line', startPointId: p2.id, endPointId: p3.id },
+			{ id: l3.id, type: 'line', startPointId: p3.id, endPointId: p4.id },
+			{ id: l4.id, type: 'line', startPointId: p4.id, endPointId: p1.id },
+		],
+		isClosed: true,
+		firstSelectedId: l1.id,
+	};
+	const geom = calculateOffsetGeometry(sketch, chain, 'one_side', 10, 10, true);
+	assert.equal(geom.isValid, true);
+	commitOffsetToSketch(sketch, chain, geom, 'one_side', 10, 10, true);
+	sketch.clearHistory();
+
+	const beforeDrag = sketch.takeSnapshot();
+	sketch.dragPoint(p3.id, 50, 50);
+	sketch.solve();
+	sketch.pushSnapshot(beforeDrag);
+	const lineIdsBeforeReject = [...sketch.lines.keys()];
+
+	// Move p3 to an invalid position where inward offset would collapse, then add a conflicting snap constraint.
+	p3.set(50, 0);
+	let rejected = false;
+	sketch.solverCoordinator.onConstraintRejected(() => {
+		rejected = true;
+	});
+	applySnapConstraint(sketch, p3.id, {
+		type: 'line',
+		id: 'axis_x',
+		worldPos: new Vec2(50, 0),
+		screenPos: new Vec2(0, 0),
+	});
+	assert.equal(rejected, true);
+	// Offset topology must not have been torn down or recreated during the rejected trial.
+	assert.deepEqual([...sketch.lines.keys()], lineIdsBeforeReject);
+
+	assert.equal(sketch.undo(), true);
+	const afterUndo = sketch.takeSnapshot();
+	assert.equal(afterUndo.points.length, beforeDrag.points.length);
+	assert.equal(afterUndo.lines.length, beforeDrag.lines.length);
+	assert.equal(afterUndo.constraints.length, beforeDrag.constraints.length);
+	assert.notEqual(sketch.lastSolverResult?.status, 'OVER_CONSTRAINED');
 });

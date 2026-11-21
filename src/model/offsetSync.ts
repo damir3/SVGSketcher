@@ -22,12 +22,16 @@ function moveUnfixedPoint(sketch: SketchDocument, id: string, pos: { x: number; 
 
 const offsetSourceStates = new WeakMap<OffsetConstraint, Array<string | number | boolean | undefined>>();
 
-export function syncOffsetSources(sketch: SketchDocument, offsets: OffsetConstraint[], onRecompute: () => void): void {
+export function syncOffsetSources(
+	sketch: SketchDocument,
+	offsets: OffsetConstraint[],
+	onRecompute: () => boolean | void
+): void {
 	// New/restored constraints already describe their snapshot's source geometry.
 	for (const c of offsets) {
 		if (!offsetSourceStates.has(c)) offsetSourceStates.set(c, offsetSourceState(sketch, c));
 	}
-	onRecompute();
+	if (onRecompute() === false) return;
 	// Each pass also propagates offsets of offsets, regardless of constraint order.
 	for (let pass = 0; pass < offsets.length && refreshOffsetSources(sketch, offsets); pass++) {
 		onRecompute();

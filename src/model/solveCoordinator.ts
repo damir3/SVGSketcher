@@ -387,6 +387,7 @@ export class SolveCoordinator {
 			this.paramManager.restoreValues(initialValues!);
 			if (editValues) this.paramManager.restoreValues(editValues);
 			for (const [line, automatic] of automaticHandles!) line.isAutomaticSplineHandle = automatic;
+			return false;
 		});
 		if (rejected || referenceCreated) {
 			this.paramManager.restoreValues(initialValues!);
