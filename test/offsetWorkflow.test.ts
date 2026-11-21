@@ -8,7 +8,8 @@ import {
 	roundedOffsetScene,
 } from './helpers/mixedOffsetScene';
 import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
-import { fitPointsToBezier } from '../src/math/splineReference';
+import { fitPointsToBezier } from '../src/math/spline';
+import { resizeOffsetSpline } from '../src/math/offsetSpline';
 import { Vec2 } from '../src/math/vector';
 import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
@@ -424,13 +425,14 @@ for (const flip of [false, true])
 		assert.ok(before.points.length > splineIssue.snapshot.points.length);
 	});
 
-test('spline offsets saved with 17 points keep their IDs when the distance changes', async () => {
-	const reference = await import('../src/math/offsetReference');
+test('spline offsets saved with 17 points keep their IDs when the distance changes', () => {
 	const sketch = new SketchDocument();
 	sketch.restoreSnapshot(splineIssue.snapshot);
 	const chain = toggleOrExtendChain(sketch, null, 'Spline-2', 'spline', true)!;
-	const legacy = reference.calculateOffsetGeometry(sketch, chain, 'one_side', 3, 0, true);
-	const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, legacy, 'one_side', 3, 0, true))!;
+	const initial = calculateOffsetGeometry(sketch, chain, 'one_side', 3, 0, true);
+	const splinePrim = initial.sides[0].primitives.find(p => p.type === 'spline')!;
+	resizeOffsetSpline(splinePrim, 17, initial.sides[0].side * initial.sides[0].distance);
+	const created = sketch.withDeferredSolve(() => commitOffsetToSketch(sketch, chain, initial, 'one_side', 3, 0, true))!;
 	const splineId = created.createdIds.find(id => sketch.splines.has(id))!;
 	const ids = [...sketch.splines.get(splineId)!.pointIds];
 	assert.equal(ids.length, 17);

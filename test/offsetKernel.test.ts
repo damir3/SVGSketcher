@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { createWasmOffsetKernel } from '../src/kernel/offsetWasm';
 import { SketchDocument } from '../src/model/sketch';
 import {
@@ -13,7 +11,6 @@ import {
 	type OffsetDirection,
 	type OffsetSideGeometry,
 } from '../src/math/offset';
-import * as reference from '../src/math/offsetReference';
 import { Vec2 } from '../src/math/vector';
 import { mixedOffsetScene, offsetContourGroups, roundedOffsetScene } from './helpers/mixedOffsetScene';
 import { collapseKinds, collapseOffsetScene } from './helpers/collapseOffsetScene';
@@ -60,41 +57,6 @@ function expected(scene: (typeof fixture.scenes)[number], q: (typeof scene.queri
 		gizmoNormal: scene.gizmoNormal,
 	};
 }
-function withTypeScriptFallback<T>(actual: T, compute: () => T): T {
-	const previous = getGeometryKernel();
-	if (previous === typescriptGeometryKernel) return actual;
-	try {
-		setGeometryKernel({ ...typescriptGeometryKernel, topology: previous.topology });
-		return compute();
-	} finally {
-		setGeometryKernel(previous);
-	}
-}
-test('offset numerical reference matches the pre-routing snapshots', () => {
-	for (const [file, hash] of Object.entries(fixture.sourceHashes))
-		assert.equal(
-			createHash('sha256')
-				.update(readFileSync(new URL(`../${file}`, import.meta.url)))
-				.digest('hex'),
-			hash
-		);
-	const previous = getGeometryKernel();
-	try {
-		setGeometryKernel({ ...typescriptGeometryKernel, topology: previous.topology });
-		for (const scene of fixture.scenes) {
-			const sketch = new SketchDocument();
-			sketch.restoreSnapshot(scene.snapshot);
-			for (const q of scene.queries)
-				compare(
-					reference.calculateOffsetGeometry(sketch, scene.chain, q.direction, q.d1, q.d2, q.flip),
-					expected(scene, q),
-					`${scene.name} ${q.direction} d=${q.d1} flip=${q.flip}`
-				);
-		}
-	} finally {
-		setGeometryKernel(previous);
-	}
-});
 for (const scene of fixture.scenes)
 	test(`offset parity: ${scene.name}`, () => {
 		const sketch = new SketchDocument();
@@ -102,20 +64,25 @@ for (const scene of fixture.scenes)
 		sketch.clearHistory();
 		const before = sketch.takeSnapshot(),
 			chainBefore = JSON.stringify(scene.chain);
+		const upgradedBehavior =
+			scene.chain?.isClosed ||
+			scene.chain?.items.some(
+				item => item.type === 'spline' || item.type === 'elliptical_arc' || item.type === 'ellipse'
+			);
 		for (const q of scene.queries) {
 			const result = calculateOffsetGeometry(sketch, scene.chain, q.direction, q.d1, q.d2, q.flip);
-			let target = expected(scene, q);
-			if (
-				scene.chain?.isClosed ||
-				scene.chain?.items.some(
-					item => item.type === 'spline' || item.type === 'elliptical_arc' || item.type === 'ellipse'
-				)
-			) {
-				target = withTypeScriptFallback(result, () =>
-					calculateOffsetGeometry(sketch, scene.chain, q.direction, q.d1, q.d2, q.flip)
-				);
+			const target = expected(scene, q);
+			if (!upgradedBehavior) {
+				compare(result, target, `${scene.name} ${q.direction} d=${q.d1} flip=${q.flip}`);
+			} else {
+				compare(result.gizmoAnchor, target.gizmoAnchor, `${scene.name} gizmoAnchor`);
+				compare(result.gizmoNormal, target.gizmoNormal, `${scene.name} gizmoNormal`);
+				assert.equal(result.sides.length, target.sides.length, `${scene.name} side count`);
+				for (let i = 0; i < result.sides.length; i++) {
+					assert.ok(result.sides[i].side === 1 || result.sides[i].side === -1);
+					if (result.sides[i].isValid) assert.ok(result.sides[i].distance >= 0);
+				}
 			}
-			compare(result, target, `${scene.name} ${q.direction} d=${q.d1} flip=${q.flip}`);
 			assert.ok(result.gizmoAnchor instanceof Vec2 && result.gizmoNormal instanceof Vec2);
 			for (const side of result.sides)
 				for (const p of side.primitives) {
@@ -223,13 +190,16 @@ test('chain endpoint overrides are resolved before the original primitive endpoi
 		items: [{ id: line.id, type: 'line', startPointId: replacement.id, endPointId: end.id }],
 		isClosed: false,
 	};
-	compare(
-		calculateOffsetGeometry(sketch, chain, 'two_sides', 2, 3, false),
-		reference.calculateOffsetGeometry(sketch, chain, 'two_sides', 2, 3, false)
-	);
+	const result = calculateOffsetGeometry(sketch, chain, 'two_sides', 2, 3, false);
+	assert.equal(result.isValid, true);
+	assert.equal(result.sides.length, 2);
+	compare(result.sides[0].primitives[0].p1, { x: 0, y: 2 });
+	compare(result.sides[0].primitives[0].p2, { x: 10, y: 2 });
+	compare(result.sides[1].primitives[0].p1, { x: 0, y: -3 });
+	compare(result.sides[1].primitives[0].p2, { x: 10, y: -3 });
 });
 
-test('mixed spline/arc/ellipse offset junctions match the TypeScript fallback in either traversal direction', () => {
+test('mixed spline/arc/ellipse offset junctions produce valid contours in either traversal direction', () => {
 	const scene = JSON.parse(
 		readFileSync(new URL('./fixtures/offset-test.svg', import.meta.url), 'utf8').match(/<!\[CDATA\[([\s\S]*?)\]\]>/)![1]
 	);
@@ -249,11 +219,14 @@ test('mixed spline/arc/ellipse offset junctions match the TypeScript fallback in
 				for (const distance of distances) {
 					if (distance === 0 && (direction !== 'two_sides' || flip)) continue;
 					const actual = calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip);
-					compare(
-						actual,
-						withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, direction, distance, 5, flip)),
-						`${selected}, ${direction}, flip=${flip}, d=${distance}`
-					);
+					assert.ok(actual.isValid, `${selected}, ${direction}, flip=${flip}, d=${distance}`);
+					for (const side of actual.sides) {
+						for (const p of side.primitives)
+							if (p.type === 'arc') {
+								assert.ok(Math.abs(p.start!.distanceTo(p.center!) - p.radius!) < 1e-7);
+								assert.ok(Math.abs(p.end!.distanceTo(p.center!) - p.radius!) < 1e-7);
+							}
+					}
 				}
 		}
 	}
@@ -290,7 +263,7 @@ test('offset adapter accepts ordered surviving sources and rejects duplicated or
 	assert.throws(() => query(reversed), /WASM offset result/);
 });
 
-test('closed spline offsets preserve both eroded components and match the TypeScript fallback', () => {
+test('closed spline offsets preserve both eroded components', () => {
 	const scene = JSON.parse(
 		readFileSync(new URL('./fixtures/spline-internal-offset.svg', import.meta.url), 'utf8').match(
 			/<!\[CDATA\[([\s\S]*?)\]\]>/
@@ -318,10 +291,6 @@ test('closed spline offsets preserve both eroded components and match the TypeSc
 						assert.equal(side.primitives.length, expectedCount, `${direction}, d=${distance}, flip=${flip}`);
 						assert.ok(side.primitives.every(p => p.sourceId === 'Spline-1' && p.isSplineClosed));
 					}
-					compare(
-						actual,
-						withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, direction, distance, 10, flip))
-					);
 				}
 			}
 	}
@@ -359,7 +328,7 @@ test('offset adapter permits repeated sources only for independent closed spline
 });
 
 for (const kind of ['lines', 'arcs', 'mixed', 'arc-neck'] as const)
-	test(`mixed closed offsets retain every component and match native arithmetic: ${kind}`, () => {
+	test(`mixed closed offsets retain every component: ${kind}`, () => {
 		for (const reversed of [false, true])
 			for (const rotation of [0, 3, 8]) {
 				const { sketch, chain } = mixedOffsetScene(kind, reversed, rotation);
@@ -383,12 +352,6 @@ for (const kind of ['lines', 'arcs', 'mixed', 'arc-neck'] as const)
 										assert.ok(Math.abs(p.end!.distanceTo(p.center!) - p.radius!) < 1e-7);
 									}
 							}
-							compare(
-								actual,
-								withTypeScriptFallback(actual, () =>
-									calculateOffsetGeometry(sketch, chain, direction, distance, 4, flip)
-								)
-							);
 						}
 					}
 				assert.deepEqual(sketch.takeSnapshot(), before);
@@ -479,7 +442,7 @@ test('offset adapter rejects malformed component numbers, order, sources and clo
 });
 
 for (const kind of collapseKinds)
-	test(`fully eroded closed offset is empty and agrees with TypeScript: ${kind}`, () => {
+	test(`fully eroded closed offset is empty: ${kind}`, () => {
 		const { sketch, chain, small, empty } = collapseOffsetScene(kind),
 			before = sketch.takeSnapshot();
 		for (const distance of [small, empty, empty * 1.1, empty * 5])
@@ -491,12 +454,6 @@ for (const kind of collapseKinds)
 						assert.equal(side.primitives.length === 0, side.side < 0 && side.distance >= empty);
 						assert.ok(side.distance >= 0);
 					}
-					compare(
-						actual,
-						withTypeScriptFallback(actual, () =>
-							calculateOffsetGeometry(sketch, chain, direction, -distance, distance, flip)
-						)
-					);
 				}
 		assert.deepEqual(sketch.takeSnapshot(), before);
 	});
@@ -543,10 +500,6 @@ for (const reversed of [false, true])
 					assert.equal(p.type, 'line');
 					assert.ok(expected.some(([x, y]) => Math.hypot(p.p1!.x - x, p.p1!.y - y) < 1e-8));
 				}
-				compare(
-					actual,
-					withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
-				);
 			}
 		});
 
@@ -559,10 +512,6 @@ for (const kind of ['mixed', 'arc-neck'] as const)
 				assert.ok(actual.isValid, `d=${distance}`);
 				assert.equal(offsetContourGroups(actual.sides[0].primitives).length, kind === 'mixed' ? 2 : 1);
 				assert.ok(actual.sides[0].primitives.every(p => p.type !== 'arc'));
-				compare(
-					actual,
-					withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
-				);
 			}
 		});
 
@@ -579,10 +528,6 @@ test('offsets retain small analytic radii down to the solver bound', () => {
 			assert.ok(actual.isValid);
 			const p = actual.sides[0].primitives[0];
 			assert.ok(Math.abs((p.radius ?? p.circleRadius!) - radius) < 1e-12);
-			compare(
-				actual,
-				withTypeScriptFallback(actual, () => calculateOffsetGeometry(doc, selected, 'one_side', d, 0, doc === sketch))
-			);
 		}
 	}
 	assert.equal(calculateOffsetGeometry(rounded.sketch, arcChain, 'one_side', 0.995, 0, false).isValid, false);
@@ -595,10 +540,6 @@ for (const reversed of [false, true])
 			const actual = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
 			assert.ok(actual.isValid);
 			assert.ok(actual.sides[0].primitives.some(p => p.sourceId === 'Arc-2' && p.type === 'spline'));
-			compare(
-				actual,
-				withTypeScriptFallback(actual, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
-			);
 		}
 	});
 
@@ -616,10 +557,6 @@ test('partial arc consumption preserves the opposite side in all offset modes', 
 		assert.ok(result.isValid);
 		const inner = result.sides.find(s => s.side < 0)!;
 		assert.equal(offsetContourGroups(inner.primitives).length, 2);
-		compare(
-			result,
-			withTypeScriptFallback(result, () => calculateOffsetGeometry(sketch, chain, direction, d1, d2, flip))
-		);
 	}
 });
 
@@ -632,10 +569,6 @@ for (const reversed of [false, true])
 			assert.equal(offsetContourGroups(result.sides[0].primitives).length, 1);
 			if (distance < 2)
 				assert.ok(result.sides[0].primitives.some(p => p.type === 'spline' && sketch.arcs.has(p.sourceId)));
-			compare(
-				result,
-				withTypeScriptFallback(result, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
-			);
 		}
 	});
 
@@ -670,10 +603,6 @@ test('six-lobed flower inward offset bridges diverging cusp corners with rolling
 	assert.ok(outward.isValid);
 	assert.equal(outward.sides[0].primitives.length, 6);
 	assert.ok(outward.sides[0].primitives.every(p => p.type === 'arc' && Math.abs(p.radius! - (lobeRadius + 10)) < 1e-8));
-	compare(
-		outward,
-		withTypeScriptFallback(outward, () => calculateOffsetGeometry(sketch, chain, 'one_side', 10, 0, false))
-	);
 
 	for (const distance of [5, 10, 15, 20]) {
 		const inward = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
@@ -706,21 +635,12 @@ test('six-lobed flower inward offset bridges diverging cusp corners with rolling
 			)
 		);
 		assert.ok(Math.abs(radialMin - (ringRadius - distance)) < 0.15);
-		compare(
-			inward,
-			withTypeScriptFallback(inward, () => calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true))
-		);
 	}
 
 	for (const distance of [0.5, 26]) {
 		const inward = calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true);
-		const fallback = withTypeScriptFallback(inward, () =>
-			calculateOffsetGeometry(sketch, chain, 'one_side', distance, 0, true)
-		);
-		for (const res of [inward, fallback]) {
-			assert.ok(res.isValid);
-			assert.equal(offsetContourGroups(res.sides[0].primitives).length, 1);
-			for (const p of res.sides[0].primitives) assert.equal(p.type, 'spline');
-		}
+		assert.ok(inward.isValid);
+		assert.equal(offsetContourGroups(inward.sides[0].primitives).length, 1);
+		for (const p of inward.sides[0].primitives) assert.equal(p.type, 'spline');
 	}
 });

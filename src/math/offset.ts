@@ -3,9 +3,6 @@ import type { SketchPoint } from '../model/types';
 import { createOffsetTopology, orderedCoincidentGroup, chainPointIds, type OffsetTopology } from './offsetTopology';
 import { Vec2 } from './vector';
 import { getGeometryKernel } from '../kernel';
-import * as reference from './offsetReference';
-import { refineSplineOffsets } from './offsetSpline';
-import { recoverOffsetRadii } from './offsetRadius';
 import type { OffsetKernelItem, KernelOffsetPrimitive, OffsetDirection } from '../kernel/offsetTypes';
 import { OffsetConstraint, type OffsetPair, type OffsetSplinePoint } from '../solver/constraints/offset';
 
@@ -399,8 +396,6 @@ export function toggleOrExtendChain(
 	};
 }
 
-export { intersectLines2D } from './offsetReference';
-
 export function calculateOffsetGeometry(
 	sketch: SketchDocument,
 	chain: OffsetChain,
@@ -410,6 +405,7 @@ export function calculateOffsetGeometry(
 	flip: boolean
 ): OffsetGeometryResult {
 	const api = getGeometryKernel().offset;
+	if (!api) throw new Error('Offset geometry requires the Rust/WASM kernel');
 	let topology: OffsetTopology | undefined;
 	const graph = () => (topology ??= createOffsetTopology(sketch, chainPointIds(chain)));
 	const items = (chain?.items ?? []).map(item => collectOffsetItem(sketch, item, graph));
@@ -418,18 +414,7 @@ export function calculateOffsetGeometry(
 		0,
 		items.findIndex(item => item.sourceId === selected)
 	);
-	const result = api
-		? api.calculate(items, !!chain?.isClosed, items.length ? ref : -1, direction, dist1, dist2, flip)
-		: refineSplineOffsets(
-				items,
-				recoverOffsetRadii(
-					items,
-					!!chain?.isClosed,
-					reference.calculateOffsetGeometry(sketch, chain, direction, dist1, dist2, flip),
-					() => reference.calculateOffsetGeometry(sketch, chain, 'one_side', 0, 0, false).sides[0]
-				),
-				!!chain?.isClosed
-			);
+	const result = api.calculate(items, !!chain?.isClosed, items.length ? ref : -1, direction, dist1, dist2, flip);
 	return {
 		...result,
 		gizmoAnchor: Vec2.from(result.gizmoAnchor),

@@ -1,11 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { resizeOffsetSpline } from '../src/math/offsetSpline';
-import { resizeOffsetSpline as reference } from '../src/math/offsetSplineResizeReference';
 import { Vec2 } from '../src/math/vector';
-import { evaluateBezier, type BezierSegment } from '../src/math/splineReference';
+import { evaluateBezier, type BezierSegment } from '../src/math/spline';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
 import { createWasmOffsetSplineResize } from '../src/kernel/offsetSplineWasm';
@@ -26,14 +24,6 @@ function compare(actual: any, expected: any, path = '') {
 	for (const key of Object.keys(expected)) compare(actual[key], expected[key], `${path}.${key}`);
 }
 
-test('resize fixtures identify the untouched pre-native arithmetic', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/math/offsetSplineResizeReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixture.sourceSha256
-	);
-});
 for (const f of fixture.cases)
 	test(`offset resize matches frozen subdivision and normal metadata: ${f.name}`, () => {
 		const primitive = structuredClone(f.primitive);
@@ -89,18 +79,26 @@ test('resizing preserves no-op array identities and ignores absent metadata', ()
 	}
 });
 
-test('resizer remains equivalent during repeated growth and signed basis changes', () => {
+test('resizer preserves counts, normals, bases and closed seams during repeated growth', () => {
 	for (const f of fixture.cases) {
-		const expected = structuredClone(f.primitive),
-			actual = structuredClone(f.primitive);
+		const actual = structuredClone(f.primitive);
 		for (const [count, distance] of [
 			[4, -2],
 			[12, 0],
 			[24, 5],
 		]) {
-			reference(expected, count, distance);
 			resizeOffsetSpline(actual, count, distance);
-			compare(plain(actual), plain(expected));
+			assert.equal(actual.fitPoints.length, count);
+			assert.equal(actual.fitNormals.length, count);
+			assert.equal(actual.fitBases.length, count);
+			assert.equal(actual.handles.length, count);
+			for (let i = 0; i < count; i++) {
+				const expectedBase = Vec2.from(actual.fitPoints[i]).addScaledVector(actual.fitNormals[i], -distance);
+				compare(plain(actual.fitBases[i]), plain(expectedBase), `${f.name}/${count}/${i}`);
+			}
+			if (actual.isSplineClosed) {
+				compare(plain(actual.handles[0]), plain(actual.handles[count - 1]), `${f.name}/${count}/seam`);
+			}
 		}
 	}
 });

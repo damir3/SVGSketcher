@@ -403,7 +403,64 @@ mod closed_tests {
                     }
                 })
                 .collect();
-            assert!(fit(&nodes, true).len() >= 4);
+            let pieces = fit(&nodes, true);
+            assert!((4..=8).contains(&pieces.len()));
+            let samples: Vec<_> = pieces
+                .iter()
+                .flat_map(|piece| {
+                    (0..32).map(move |i| spline::evaluate_bezier(&piece.curve, i as f64 / 32.0))
+                })
+                .collect();
+            let area: f64 = samples
+                .iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let b = samples[(i + 1) % samples.len()];
+                    a.x * b.y - a.y * b.x
+                })
+                .sum::<f64>()
+                / 2.0;
+            assert!(area > std::f64::consts::PI * radius * radius * 0.8);
         }
+    }
+    #[test]
+    fn duplicate_samples_collapse_to_one_finite_segment() {
+        let nodes = vec![
+            Node {
+                p: p(5.0, 7.0),
+                t: p(1.0, 0.0),
+                n: p(0.0, 1.0),
+                corner: false,
+            };
+            128
+        ];
+        let pieces = fit(&nodes, false);
+        assert_eq!(pieces.len(), 1);
+        for pt in pieces[0].curve {
+            assert_eq!(pt, p(5.0, 7.0));
+        }
+    }
+    #[test]
+    fn tiny_open_interval_remains_one_finite_cubic() {
+        let nodes = [
+            Node {
+                p: p(0.0, 0.0),
+                t: p(1.0, 0.0),
+                n: p(0.0, 1.0),
+                corner: false,
+            },
+            Node {
+                p: p(1e-9, 0.0),
+                t: p(1.0, 0.0),
+                n: p(0.0, 1.0),
+                corner: false,
+            },
+        ];
+        let pieces = fit(&nodes, false);
+        assert_eq!(pieces.len(), 1);
+        assert!(pieces[0]
+            .curve
+            .iter()
+            .all(|pt| pt.x.is_finite() && pt.y.is_finite()));
     }
 }
