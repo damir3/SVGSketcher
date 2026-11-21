@@ -205,11 +205,10 @@ export class OffsetTool extends BaseTool {
 	}
 
 	override deactivate(): void {
-		this.cancel();
-		super.deactivate();
+		this.resetState(false);
 	}
 
-	private resetState(): void {
+	private resetState(render = true): void {
 		this.ctx?.highlightManager?.clear();
 		this.chain = null;
 		this.geomResult = null;
@@ -217,7 +216,7 @@ export class OffsetTool extends BaseTool {
 		this.popup.hide();
 		this.ctx?.setCursor(this.defaultCursor);
 		this.onStateChange?.();
-		this.ctx?.requestRender();
+		if (render) this.ctx?.requestRender();
 	}
 
 	override cancel(): void {
@@ -365,8 +364,12 @@ export class OffsetTool extends BaseTool {
 			this.ctx.showToast(res.createdIds.length ? 'Offset created' : 'Offset contour is empty. Distance saved.');
 		}
 
-		this.resetState();
-		this.ctx?.setTool?.('select');
+		if (this.ctx?.setTool) {
+			this.resetState(false);
+			this.ctx.setTool('select');
+		} else {
+			this.resetState(true);
+		}
 	}
 
 	override getRenderOptions(): Record<string, unknown> {

@@ -28,13 +28,23 @@ import { MIN_OFFSET_RADIUS as MIN_SOLVER_RADIUS } from '../kernel/offsetTypes';
 
 export class SolveCoordinator {
 	private readonly sketch: SketchDocument;
-	readonly paramManager = new ParamManager();
+	private readonly _paramManager = new ParamManager();
+	private paramManagerDirty = false;
 	private readonly solver: NumericalSolver;
 	lastSolverResult: SolverResult | null = null;
 	lastSolveTimeMs = 0;
 
 	private solveDeferred = 0;
 	private solveSuppressed = 0;
+
+	get paramManager(): ParamManager {
+		if (this.paramManagerDirty) this.flushParamManagerRebuild();
+		return this._paramManager;
+	}
+
+	get isSolveDeferred(): boolean {
+		return this.solveDeferred > 0;
+	}
 	private pendingConstraints = new Map<string, IConstraint | undefined>();
 	private pendingConstraintSnapshot: SketchSnapshot | null = null;
 	private pendingConstraintRestores = new Map<string, () => void>();
@@ -145,10 +155,20 @@ export class SolveCoordinator {
 	}
 
 	rebuildParamManager(): void {
-		this.paramManager.clear();
+		if (this.solveDeferred > 0 || this.solveSuppressed > 0) {
+			this.paramManagerDirty = true;
+			return;
+		}
+		this.flushParamManagerRebuild();
+	}
+
+	private flushParamManagerRebuild(): void {
+		this.paramManagerDirty = false;
+		const pm = this._paramManager;
+		pm.clear();
 
 		for (const pt of this.sketch.points.values()) {
-			this.paramManager.register({
+			pm.register({
 				id: `${pt.id}.x`,
 				get: () => pt.x,
 				set: val => {
@@ -156,7 +176,7 @@ export class SolveCoordinator {
 				},
 				isFixed: pt.fixed,
 			});
-			this.paramManager.register({
+			pm.register({
 				id: `${pt.id}.y`,
 				get: () => pt.y,
 				set: val => {
@@ -167,7 +187,7 @@ export class SolveCoordinator {
 		}
 
 		for (const entity of [...this.sketch.circles.values(), ...this.sketch.arcs.values()]) {
-			this.paramManager.register({
+			pm.register({
 				id: `${entity.id}.r`,
 				get: () => entity.radius,
 				set: val => {
@@ -290,7 +310,10 @@ export class SolveCoordinator {
 			return fn();
 		} finally {
 			this.solveDeferred--;
-			if (this.solveDeferred === 0) this.solve();
+			if (this.solveDeferred === 0) {
+				if (this.paramManagerDirty) this.flushParamManagerRebuild();
+				this.solve();
+			}
 		}
 	}
 

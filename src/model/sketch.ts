@@ -315,7 +315,7 @@ export class SketchDocument {
 	}
 
 	notify(): void {
-		if (this.updatingOffsets) return;
+		if (this.updatingOffsets || this.solverCoordinator.isSolveDeferred) return;
 		this.solverCoordinator.refreshReferenceDimensions();
 		for (const listener of this.changeListeners) {
 			listener();

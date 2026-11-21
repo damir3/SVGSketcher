@@ -673,46 +673,52 @@ export function commitOffsetToSketch(
 ): { createdIds: string[]; constraintIds: string[] } | null {
 	if (!geomResult.isValid || geomResult.sides.length === 0) return null;
 
-	sketch.beginTransaction();
-
 	const createdIds: string[] = [];
 	const constraintIds: string[] = [];
 
-	for (let sideIdx = 0; sideIdx < geomResult.sides.length; sideIdx++) {
-		const side = geomResult.sides[sideIdx];
-		const { createdIds: sideIds, offsetPairs, cornerPointIds } = createOffsetSideGeometry(sketch, chain, side);
-		createdIds.push(...sideIds);
-		// Create OffsetConstraint for this side if offset pairs exist
-		if (offsetPairs.length > 0 || (chain.isClosed && side.primitives.length === 0)) {
-			const offC = new OffsetConstraint(
-				sketch.nextId('c_offset'),
-				offsetPairs,
-				Math.abs(side.distance),
-				0,
-				1.0,
-				chain,
-				// Each constraint controls one side, including when the tool creates two.
-				'one_side',
-				side.side < 0,
-				cornerPointIds
-			);
-			if (side.primitives.length === 0)
-				offC.emptyDimension = {
-					anchor: Vec2.from(geomResult.gizmoAnchor),
-					normal: Vec2.from(geomResult.gizmoNormal).multiplyScalar(side.side),
-				};
-			if (expressions) {
-				const expr =
-					sideIdx === 0 || _direction === 'symmetric' ? expressions.dist1 : (expressions.dist2 ?? expressions.dist1);
-				if (expr) offC.expression = expr;
+	sketch.withDeferredSolve(() => {
+		sketch.beginTransaction();
+		try {
+			for (let sideIdx = 0; sideIdx < geomResult.sides.length; sideIdx++) {
+				const side = geomResult.sides[sideIdx];
+				const { createdIds: sideIds, offsetPairs, cornerPointIds } = createOffsetSideGeometry(sketch, chain, side);
+				createdIds.push(...sideIds);
+				// Create OffsetConstraint for this side if offset pairs exist
+				if (offsetPairs.length > 0 || (chain.isClosed && side.primitives.length === 0)) {
+					const offC = new OffsetConstraint(
+						sketch.nextId('c_offset'),
+						offsetPairs,
+						Math.abs(side.distance),
+						0,
+						1.0,
+						chain,
+						// Each constraint controls one side, including when the tool creates two.
+						'one_side',
+						side.side < 0,
+						cornerPointIds
+					);
+					if (side.primitives.length === 0)
+						offC.emptyDimension = {
+							anchor: Vec2.from(geomResult.gizmoAnchor),
+							normal: Vec2.from(geomResult.gizmoNormal).multiplyScalar(side.side),
+						};
+					if (expressions) {
+						const expr =
+							sideIdx === 0 || _direction === 'symmetric'
+								? expressions.dist1
+								: (expressions.dist2 ?? expressions.dist1);
+						if (expr) offC.expression = expr;
+					}
+					sketch.addConstraint(offC);
+					constraintIds.push(offC.id);
+				}
 			}
-			sketch.addConstraint(offC);
-			constraintIds.push(offC.id);
+			sketch.commitTransaction();
+		} catch (err) {
+			sketch.rollbackTransaction();
+			throw err;
 		}
-	}
-
-	sketch.commitTransaction();
-	sketch.solve();
+	});
 
 	return { createdIds, constraintIds };
 }

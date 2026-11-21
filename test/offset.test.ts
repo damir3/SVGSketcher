@@ -381,4 +381,44 @@ describe('Offset Geometry Calculation', () => {
 		assert.equal(chain.items[0].endPointId, p2.id);
 		assert.equal(chain.items[0].reversed, false);
 	});
+
+	it('batches solve and change notifications when committing a multi-segment offset', () => {
+		const sketch = new SketchDocument();
+		let firstLineId = '';
+		sketch.withDeferredSolve(() => {
+			const n = 12;
+			const pts = Array.from({ length: n }, (_, i) => {
+				const a = (i / n) * Math.PI * 2;
+				return sketch.addPoint({ x: Math.cos(a) * 50, y: Math.sin(a) * 50 });
+			});
+			for (let i = 0; i < n; i++) {
+				const line = sketch.addLine(pts[i].id, pts[(i + 1) % n].id);
+				if (i === 0) firstLineId = line.id;
+			}
+		});
+
+		const chain = toggleOrExtendChain(sketch, null, firstLineId, 'line', true)!;
+		const geom = calculateOffsetGeometry(sketch, chain, 'two_sides', 5, 5, false);
+		assert.equal(geom.isValid, true);
+
+		let actualSolves = 0;
+		let notifications = 0;
+		const origSolve = sketch.solverCoordinator.solve.bind(sketch.solverCoordinator);
+		sketch.solverCoordinator.solve = (...args) => {
+			if (!sketch.solverCoordinator.isSolveDeferred) actualSolves++;
+			return origSolve(...args);
+		};
+		sketch.onChange(() => {
+			notifications++;
+		});
+
+		const res = commitOffsetToSketch(sketch, chain, geom, 'two_sides', 5, 5, false);
+		assert.ok(res && res.createdIds.length === 24 && res.constraintIds.length === 2);
+		assert.equal(actualSolves, 1);
+		assert.equal(notifications, 1);
+
+		assert.equal(sketch.undo(), true);
+		assert.equal(sketch.lines.size, 12);
+		assert.equal(sketch.constraints.size, 0);
+	});
 });
