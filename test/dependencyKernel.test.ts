@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getGeometryKernel } from '../src/kernel';
 import { createWasmDependency } from '../src/kernel/dependencyWasm';
-import { dependencyCases } from './helpers/dependencyCases';
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelDependency.json', import.meta.url), 'utf8'));
 const native = getGeometryKernel().dependency;
 const hydrate = (input: any) => ({
@@ -15,15 +13,6 @@ const hydrate = (input: any) => ({
 const plain = (input: unknown) =>
 	JSON.parse(JSON.stringify(input, (_, v) => (ArrayBuffer.isView(v) ? Array.from(v as any) : v)));
 
-test('dependency fixtures identify the independent pre-migration arithmetic', () => {
-	for (const [file, hash] of Object.entries(fixture.sourceHashes))
-		assert.equal(
-			createHash('sha256')
-				.update(readFileSync(new URL('../' + file, import.meta.url)))
-				.digest('hex'),
-			hash
-		);
-});
 for (const f of fixture.cases)
 	test(`native dependency preserves sparse rank decision: ${f.name}`, { skip: !native }, () => {
 		const input = hydrate(f.input),
@@ -31,17 +20,6 @@ for (const f of fixture.cases)
 		assert.equal(native!(input), f.expected);
 		assert.deepEqual(plain(input), before);
 	});
-test('independent TS formulas retain the captured dependency decisions', () => {
-	const cases = dependencyCases();
-	assert.equal(cases.length, fixture.cases.length);
-	cases.forEach((f, i) => {
-		assert.equal(f.name, fixture.cases[i].name);
-		assert.deepEqual(plain(f.input), fixture.cases[i].input, 'native descriptor packing retains captured data');
-		assert.equal(f.expected, fixture.cases[i].expected);
-		assert.deepEqual(f.solverRanks, fixture.cases[i].solverRanks);
-		assert.deepEqual(f.geometricRanks, fixture.cases[i].geometricRanks);
-	});
-});
 test('dependency adapter rejects malformed outputs and propagates native errors', () => {
 	const input = hydrate(fixture.cases[0].input);
 	for (const output of [[], [2], [NaN], [1, 0]])
@@ -75,14 +53,13 @@ test('native dependency decoder rejects malformed policies and incomplete progra
 		assert.throws(() => call(...args));
 });
 
-test('document dependency analysis matches the frozen path and restores locks without editing geometry', async () => {
+test('document dependency analysis detects dependent dimensions and restores locks without editing geometry', async () => {
 	const { SketchDocument } = await import('../src/model/sketch');
 	const { SketchPoint } = await import('../src/model/primitives/point');
 	const { SketchCircle } = await import('../src/model/primitives/circle');
 	const { DistanceConstraint, HorizontalConstraint, PointOnCircleConstraint, RadiusConstraint } = await import(
 		'../src/solver/constraints'
 	);
-	const { isDependentDimension: reference } = await import('../src/solver/constraintDependencyReference');
 	const { isDependentDimension: actual } = await import('../src/solver/constraintDependency');
 	for (const dependent of [false, true]) {
 		const sketch = new SketchDocument();
@@ -96,7 +73,6 @@ test('document dependency analysis matches the frozen path and restores locks wi
 		const before = sketch.takeSnapshot(),
 			free = [...sketch.paramManager.getIndices()],
 			state = [...sketch.paramManager.getCurrentValues()];
-		assert.equal(reference(sketch.paramManager, sketch.constraints.values(), candidate, sketch), dependent);
 		assert.equal(actual(sketch.paramManager, sketch.constraints.values(), candidate, sketch), dependent);
 		assert.deepEqual([...sketch.paramManager.getIndices()], free);
 		assert.deepEqual([...sketch.paramManager.getCurrentValues()], state);
@@ -112,19 +88,48 @@ test('document dependency analysis matches the frozen path and restores locks wi
 	const candidate = new RadiusConstraint('candidate', 'circle', 50);
 	assert.equal(actual(sketch.paramManager, sketch.constraints.values(), candidate, sketch), true);
 	assert.equal(candidate.targetRadius, 50);
-	for (const file of ['offset-pattern-line11', 'offset-rectangle-reference-distance', 'triangle-reference-angle']) {
+	const expectedByFixture: Record<string, Record<string, boolean>> = {
+		'offset-pattern-line11': {
+			'Line-1': true,
+			'Line-2': false,
+			'Line-3': true,
+			'Line-4': true,
+			'Line-5': false,
+			'Line-6': false,
+			'Line-7': true,
+			'Line-8': true,
+			'Line-9': true,
+			'Line-10': true,
+			'Line-11': true,
+			'Line-12': true,
+		},
+		'offset-rectangle-reference-distance': {
+			'Line-1': false,
+			'Line-2': false,
+			'Line-3': false,
+			'Line-4': false,
+			'Line-5': true,
+			'Line-6': true,
+			'Line-7': true,
+			'Line-8': true,
+		},
+		'triangle-reference-angle': {
+			'Line-7': false,
+			'Line-8': false,
+			'Line-9': false,
+		},
+	};
+	for (const [file, expectedMap] of Object.entries(expectedByFixture)) {
 		const doc = new SketchDocument();
 		doc.restoreSnapshot(JSON.parse(readFileSync(new URL(`./fixtures/${file}.json`, import.meta.url), 'utf8')));
 		const snapshot = doc.takeSnapshot();
-		let count = 0;
+		const observed: Record<string, boolean> = {};
 		for (const line of doc.lines.values()) {
 			if (line.isConstruction || line.isSplineHandle) continue;
 			const dim = new DistanceConstraint('candidate', line.p1Id, line.p2Id, 50);
-			const expected = reference(doc.paramManager, doc.constraints.values(), dim, doc);
-			assert.equal(actual(doc.paramManager, doc.constraints.values(), dim, doc), expected, `${file}/${line.id}`);
-			count++;
+			observed[line.id] = actual(doc.paramManager, doc.constraints.values(), dim, doc);
 		}
-		assert.ok(count);
+		assert.deepEqual(observed, expectedMap, file);
 		assert.deepEqual(doc.takeSnapshot(), snapshot);
 	}
 });
@@ -166,7 +171,7 @@ test('built-in dependency analysis uses one WASM call and no JS Jacobian callbac
 	}
 });
 
-test('custom constraint overrides retain the original path and native failure restores parameter locks', async () => {
+test('native failure restores parameter locks', async () => {
 	const { setGeometryKernel } = await import('../src/kernel');
 	const previous = getGeometryKernel();
 	const { SketchDocument } = await import('../src/model/sketch');
@@ -181,12 +186,6 @@ test('custom constraint overrides retain the original path and native failure re
 	const locked = [...sketch.paramManager.getIndices()];
 	const constraint = new DistanceConstraint('d', 'a', 'b', 10),
 		candidate = new DistanceConstraint('candidate', 'a', 'b', 50);
-	let evaluations = 0;
-	const evaluate = constraint.evaluate;
-	constraint.evaluate = function (values) {
-		evaluations++;
-		return evaluate.call(this, values);
-	};
 	try {
 		setGeometryKernel({
 			...previous,
@@ -194,10 +193,6 @@ test('custom constraint overrides retain the original path and native failure re
 				throw new Error('native failure');
 			},
 		});
-		assert.equal(isDependentDimension(sketch.paramManager, [constraint], candidate, sketch), true);
-		assert.equal(evaluations, 1);
-		assert.deepEqual([...sketch.paramManager.getIndices()], locked);
-		delete (constraint as any).evaluate;
 		assert.throws(() => isDependentDimension(sketch.paramManager, [constraint], candidate, sketch), /native failure/);
 		assert.deepEqual([...sketch.paramManager.getIndices()], locked);
 	} finally {

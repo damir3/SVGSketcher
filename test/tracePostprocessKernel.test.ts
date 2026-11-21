@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { createWasmTracePostprocess } from '../src/kernel/tracePostprocessWasm';
 import { loadTracePostprocessKernel } from '../src/kernel/imageTraceLoader';
 import { buildTraceGeometry } from '../src/model/imageTrace/build';
@@ -48,7 +47,7 @@ const sources = [
 	traceFixture.cases.find((f: any) => f.shape === 'disk'),
 ];
 
-test('an independently loaded Rust postprocessor works with the TypeScript geometry backend', {
+test('an independently loaded Rust postprocessor works when the kernel omits tracePostprocess', {
 	skip: !native,
 }, async () => {
 	const previous = getGeometryKernel();
@@ -67,14 +66,13 @@ test('an independently loaded Rust postprocessor works with the TypeScript geome
 	const result = { ...structuredClone(sources[0].expected), elapsedMs: 0 };
 	const settings = cloneTraceSettings(DEFAULT_TRACE_SETTINGS);
 	try {
-		setGeometryKernel(typescriptGeometryKernel);
+		setGeometryKernel({ ...previous, tracePostprocess: undefined });
 		assert.throws(() => buildTraceGeometry(doc, result, image, settings), /requires the Rust\/WASM kernel/);
 		assert.deepEqual(doc.takeSnapshot(), before);
 		assert.equal(doc.canUndo(), false);
 		const kernel = await loadTracePostprocessKernel(new URL('../public/kernel/sketcher_wasm.js', import.meta.url).href);
 		compare(plain(kernel.place(fixture.placements[0].input)), fixture.placements[0].expected);
 		assert.equal(buildTraceGeometry(doc, result, image, settings, kernel).entities.length, result.stats.lines);
-		assert.equal(getGeometryKernel().backend, 'typescript');
 	} finally {
 		setGeometryKernel(previous);
 	}

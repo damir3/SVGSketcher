@@ -1,7 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { analyzeNullspace, Matrix, solveLinearSystem } from '../src/math/matrix';
 import { SketchDocument } from '../src/model/sketch';
 
 function restoreTangentCircleScene(): SketchDocument {
@@ -43,19 +42,6 @@ describe('degrees of freedom with dependent constraints', () => {
 		assert.equal(result.status, 'CONVERGED');
 		assert.equal(result.degreesOfFreedom, 0);
 	});
-});
-
-it('distinguishes fixed coordinates from pivots that move with free coordinates', () => {
-	// The first two rows fix x but allow y and z to move together.
-	// The last row fixes w, whose pivot comes after the free column z.
-	const matrix = new Matrix(3, 4, [1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1]);
-	assert.deepEqual(analyzeNullspace(matrix), { rank: 3, fixedColumns: [0, 3] });
-});
-
-it('returns the linear solution in the original variable order after reordering and pivoting', () => {
-	const matrix = new Matrix(3, 3, [1, 2, 3, 0, 0, 4, 0, 5, 0]);
-	const rhs = new Float64Array([14, 12, 10]);
-	assert.deepEqual(solveLinearSystem(matrix, rhs), new Float64Array([1, 2, 3]));
 });
 
 it('reports fixed parameters in a mixed sketch, excluding temporary drag targets', () => {

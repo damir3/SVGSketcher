@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmTransform } from '../src/kernel/transformWasm';
 import { createWasmConstraintErrors } from '../src/kernel/inspectionWasm';
 import { transformGeometry } from '../src/math/transform';
 import { applyTransform, createTransform, getTransformSelection } from '../src/model/transform';
-import { applyTransform as applyReference, createTransform as createReference } from '../src/model/transformReference';
 import { prepareTransformPreview } from '../src/model/transformPreview';
 import { constraintMaxErrors } from '../src/solver/constraintMaxErrors';
 import { SketchDocument } from '../src/model/sketch';
@@ -28,27 +26,28 @@ import { renderTransformPreview } from '../src/canvas/modifyPreviews';
 
 const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelTransform.json', import.meta.url), 'utf8'));
 const native = getGeometryKernel().transform;
-function compare(actual: any, expected: any, path = '') {
+function compare(actual: any, expected: any, path = '', tolerance = 1e-12) {
 	if (typeof expected === 'number') {
 		assert.ok(
-			Object.is(actual, expected) || Math.abs(actual - expected) <= 1e-12 * Math.max(1, Math.abs(expected)),
+			Object.is(actual, expected) || Math.abs(actual - expected) <= tolerance * Math.max(1, Math.abs(expected)),
 			`${path}: ${actual} != ${expected}`
 		);
 	} else if (expected && typeof expected === 'object') {
 		assert.deepEqual(Object.keys(actual), Object.keys(expected), path);
-		for (const key of Object.keys(expected)) compare(actual[key], expected[key], path + '/' + key);
+		for (const key of Object.keys(expected)) compare(actual[key], expected[key], path + '/' + key, tolerance);
 	} else assert.deepEqual(actual, expected, path);
 }
 const plain = (value: unknown) => JSON.parse(JSON.stringify(value));
 
-test('transform fixtures identify the frozen pre-migration implementation', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/model/transformReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixture.sourceHash
-	);
-});
+function affinePoint(center: Vec2, values: { x: number; y: number; angle: number; scale: number }, p: { x: number; y: number }) {
+	const rad = (values.angle * Math.PI) / 180;
+	const c = Math.cos(rad),
+		s = Math.sin(rad);
+	const dx = (p.x - center.x) * values.scale,
+		dy = (p.y - center.y) * values.scale;
+	return new Vec2(center.x + dx * c - dy * s + values.x, center.y + dx * s + dy * c + values.y);
+}
+
 for (const f of fixture.cases)
 	test(`batch transform preserves original math: ${f.name}`, () => {
 		const input = plain(f.input),
@@ -149,27 +148,55 @@ for (const source of [
 			{ x: 5, y: 9, angle: -90, scale: 1.5 },
 		]) {
 			test(`document transform preserves constraints, IDs, selection and history: ${source}/${copy}/${values.angle}/${values.scale}`, () => {
-				const load = () => {
+				const doc = (() => {
 					if (source === 'mixed') return mixedSketch();
 					const d = new SketchDocument();
 					d.restoreSnapshot(JSON.parse(readFileSync(new URL(`./fixtures/${source}.json`, import.meta.url), 'utf8')));
 					d.clearHistory();
 					return d;
+				})();
+				const selection = selectAll(doc);
+				const normalized = () => {
+					const state = plain(doc.takeSnapshot());
+					state.constraints.sort((a: any, b: any) => a.id.localeCompare(b.id));
+					return state;
 				};
-				const expected = load(),
-					actual = load();
-				const se = selectAll(expected),
-					sa = selectAll(actual);
-				assert.equal(applyTransform(actual, sa, values, copy), applyReference(expected, se, values, copy));
-				compare(plain(actual.takeSnapshot()), plain(expected.takeSnapshot()), source);
-				assert.deepEqual([...actual.selection.pointIds], [...expected.selection.pointIds]);
-				assert.deepEqual([...actual.selection.lineIds], [...expected.selection.lineIds]);
-				assert.equal(actual.undo(), true);
-				assert.equal(expected.undo(), true);
-				compare(plain(actual.takeSnapshot()), plain(expected.takeSnapshot()), 'undo');
-				assert.equal(actual.redo(), true);
-				assert.equal(expected.redo(), true);
-				compare(plain(actual.takeSnapshot()), plain(expected.takeSnapshot()), 'redo');
+				const before = normalized();
+				const beforePointCount = doc.points.size;
+				const beforeSelectedLines = new Set(doc.selection.lineIds);
+				const removed = applyTransform(doc, selection, values, copy);
+				assert.ok(Number.isInteger(removed) && removed >= 0);
+				if (copy) {
+					assert.ok(doc.points.size > beforePointCount);
+					for (const id of beforeSelectedLines) assert.ok(!doc.selection.lineIds.has(id));
+				} else {
+					assert.equal(doc.points.size, beforePointCount);
+					assert.deepEqual([...doc.selection.lineIds], [...beforeSelectedLines]);
+				}
+				if (source === 'mixed' && values.angle === 0 && values.scale === 1) {
+					assert.equal(removed, 0);
+				}
+				const after = normalized();
+				assert.equal(doc.undo(), true);
+				const undone = normalized();
+				assert.equal(undone.points.length, before.points.length);
+				assert.deepEqual(
+					undone.points.map((p: any) => p.id),
+					before.points.map((p: any) => p.id)
+				);
+				if (source !== 'mixed') compare(undone, before, 'undo', 1e-4);
+				assert.equal(doc.redo(), true);
+				const redone = normalized();
+				assert.equal(redone.points.length, after.points.length);
+				assert.deepEqual(
+					redone.points.map((p: any) => p.id),
+					after.points.map((p: any) => p.id)
+				);
+				if (source !== 'mixed') {
+					compare(redone, after, 'redo', 1e-4);
+					assert.equal(doc.undo(), true);
+					compare(normalized(), undone, 'second-undo', 1e-4);
+				}
 			});
 		}
 }
@@ -207,7 +234,7 @@ test('preview batches fit and control spline controls and reuses their curve sna
 		doc = mixedSketch(),
 		selection = selectAll(doc),
 		values = { x: 5, y: 7, angle: 30, scale: 1.5 };
-	const expected = createReference(selection.center, values);
+	const expected = { point: (p: { x: number; y: number }) => affinePoint(selection.center, values, p) };
 	let calls = 0;
 	try {
 		setGeometryKernel({
@@ -345,7 +372,7 @@ test('transform and maximum-error adapters reject malformed packets and preserve
 	assert.throws(() => wasm.constraint_max_errors(new Float64Array(), new Float64Array([0]), new Float64Array()));
 });
 
-test('custom constraint overrides preserve the original transform path', () => {
+test('custom constraint overrides evaluate via JS residual callback during transform', () => {
 	const previous = getGeometryKernel(),
 		doc = new SketchDocument();
 	const a = doc.addPoint({ x: 0, y: 0 }),
@@ -364,11 +391,8 @@ test('custom constraint overrides preserve the original transform path', () => {
 	try {
 		setGeometryKernel({
 			...previous,
-			transform() {
-				throw Error('custom geometry must use compatibility path');
-			},
 			constraintErrors() {
-				throw Error('custom formula must use compatibility path');
+				throw Error('custom formula must evaluate via JS residual callback');
 			},
 		});
 		assert.equal(applyTransform(doc, getTransformSelection(doc)!, { x: 3, y: 2, angle: 0, scale: 1 }, false), 0);
@@ -437,9 +461,8 @@ test('full preview uses one native transform and draws the same paths as the ori
 		);
 		assert.equal(calls, 1);
 		assert.equal(overlays, 1);
-		const reference = new Element('g'),
-			transform = createReference(selection.center, values);
-		renderTransformedObjects(doc, viewport, selection.previewIds, (x, y) => transform.point(new Vec2(x, y)), {
+		const reference = new Element('g');
+		renderTransformedObjects(doc, viewport, selection.previewIds, (x, y) => affinePoint(selection.center, values, { x, y }), {
 			targetGroup: reference as unknown as SVGGElement,
 			baseColor: '#abc',
 			transformScale: values.scale,

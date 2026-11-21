@@ -1,7 +1,4 @@
-import { getGeometryKernel } from '../kernel';
 import { transformGeometry } from '../math/transform';
-import { applyTransform as applyReference } from './transformReference';
-import { describeNativeConstraint } from '../solver/nativeConstraints';
 import { constraintMaxErrors } from '../solver/constraintMaxErrors';
 import { AABB, getCurveBoundingBox } from '../math/aabb';
 import { Vec2, type XY } from '../math/vector';
@@ -129,12 +126,6 @@ export function applyTransform(
 		throw new Error('Invalid transform parameters.');
 	}
 	const constraints = [...sketch.constraints.values()];
-	if (
-		!getGeometryKernel().transform ||
-		!getGeometryKernel().constraintErrors ||
-		constraints.some(c => c.type !== 'drag_point' && !describeNativeConstraint(c))
-	)
-		return applyReference(sketch, selection, values, copy);
 	const { entities } = selection;
 	const before = sketch.paramManager.getCurrentValues();
 	const after = new Map(before);

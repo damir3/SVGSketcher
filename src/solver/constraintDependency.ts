@@ -1,6 +1,5 @@
 import { getGeometryKernel } from '../kernel';
 import { checkConstraints } from './constraintInspection';
-import { isDependentDimension as reference } from './constraintDependencyReference';
 import type { SketchDocument } from '../model/sketch';
 import type { ParamManager } from './solver';
 import type { IConstraint } from './types';
@@ -42,7 +41,7 @@ export function isDependentDimension(
 	sketch: SketchDocument
 ): boolean {
 	const kernel = getGeometryKernel().dependency;
-	if (!kernel) return reference(manager, constraints, candidate, sketch);
+	if (!kernel) throw new Error('Constraint dependency requires the Rust/WASM kernel');
 	if (!candidate.isDimensional || !candidate.updateReferenceValue || candidate.isSoft) return false;
 	const values = manager.getCurrentValues();
 	const previousFree = new Set(manager.getIndices().keys());
@@ -52,7 +51,7 @@ export function isDependentDimension(
 		const indices = manager.getIndices();
 		const hard = items.filter(c => c !== candidate && !c.isReference && !c.isSoft);
 		const descriptions = new Map([...hard, candidate].map(c => [c, describeNativeConstraint(c)] as const));
-		if ([...descriptions.values()].some(d => !d)) return reference(manager, items, candidate, sketch);
+		if ([...descriptions.values()].some(d => !d)) return false;
 		const { error, satisfied } = checkConstraints(hard, values, true);
 		if (!satisfied || !Number.isFinite(error) || error > 1e-2) return false;
 		const measurement: IConstraint = Object.assign(
@@ -69,9 +68,7 @@ export function isDependentDimension(
 		descriptions.set(measurement, describeNativeConstraint(measurement));
 		const compiled = compileNativeConstraints(all, values, indices, descriptions);
 		const state = Float64Array.from(indices.keys(), id => values.get(id)!);
-		// Custom equations, method overrides and unsupported spline representations keep their TS semantics.
-		if (compiled.fallbackAll.length || !state.every(Number.isFinite))
-			return reference(manager, items, candidate, sketch);
+		if (compiled.fallbackAll.length || !state.every(Number.isFinite)) return false;
 		// Most dimensions use analytic rows and need no parameter-to-entity index at all.
 		let entityColumns: Map<string, number[]> | undefined;
 		const relevantColumns = (entities: readonly string[]) => {

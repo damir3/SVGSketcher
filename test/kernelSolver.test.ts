@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel/index';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { GEOMETRY_KERNEL_API_VERSION } from '../src/kernel/types';
 import { SolverEvaluation, type KernelSolveProblem, type KernelSolverEvaluator } from '../src/kernel/solverTypes';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
@@ -211,8 +210,4 @@ it('dispatches NumericalSolver through Rust and supports geometry calls inside b
 	} finally {
 		setGeometryKernel(previous);
 	}
-});
-
-it('keeps the TypeScript backend as the independent reference numerical implementation', () => {
-	assert.equal(typescriptGeometryKernel.solveSystem, undefined);
 });

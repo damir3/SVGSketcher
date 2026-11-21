@@ -5,7 +5,6 @@ import { SketchDocument } from '../src/model/sketch';
 import { SketchPoint } from '../src/model/primitives/point';
 import { DistanceConstraint, HorizontalConstraint } from '../src/solver/constraints';
 import { isDependentDimension } from '../src/solver/constraintDependency';
-import { isDependentDimension as reference } from '../src/solver/constraintDependencyReference';
 if (!getGeometryKernel().dependency) throw new Error('Run with --import ./test/helpers/wasmKernel.ts');
 for (const shape of ['full', 'partial'])
 	for (const n of [20, 100, 300, 1000]) {
@@ -27,25 +26,15 @@ for (const shape of ['full', 'partial'])
 			undefined,
 			shape === 'full' ? 'aligned' : 'vertical'
 		);
-		const check = (fn: typeof reference) => fn(sketch.paramManager, sketch.constraints.values(), candidate, sketch);
-		assert.equal(check(reference), true);
-		assert.equal(check(isDependentDimension), true);
-		for (let i = 0; i < 15; i++) {
-			check(reference);
-			check(isDependentDimension);
+		const run = () => isDependentDimension(sketch.paramManager, sketch.constraints.values(), candidate, sketch);
+		assert.equal(run(), true);
+		for (let i = 0; i < 15; i++) run();
+		const samples: number[] = [];
+		for (let i = 0; i < 11; i++) {
+			const start = performance.now();
+			assert.equal(run(), true);
+			samples.push(performance.now() - start);
 		}
-		const measure = (fn: typeof reference) => {
-			const samples: number[] = [];
-			for (let i = 0; i < 11; i++) {
-				const start = performance.now();
-				assert.equal(check(fn), true);
-				samples.push(performance.now() - start);
-			}
-			return samples.sort((a, b) => a - b)[5];
-		};
-		const ts = measure(reference),
-			rust = measure(isDependentDimension);
-		console.log(
-			`${shape}, ${n} segments: TS ${ts.toFixed(2)} ms, Rust ${rust.toFixed(2)} ms, ${(ts / rust).toFixed(2)}x`
-		);
+		const rust = samples.sort((a, b) => a - b)[5];
+		console.log(`${shape}, ${n} segments: Rust ${rust.toFixed(2)} ms`);
 	}

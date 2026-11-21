@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel/index';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { SolverEvaluation } from '../src/kernel/solverTypes';
 import { compileNativeConstraints } from '../src/solver/nativeConstraints';
 import { FixedConstraint, DragPointConstraint, ParallelConstraint } from '../src/solver/constraints';
@@ -242,41 +241,31 @@ it('keeps offset parents and suppressed pattern copies exactly unchanged', () =>
 });
 
 it('preserves hard rows across soft composite records and JS fallback rows', { skip: !native }, () => {
-	const previous = getGeometryKernel();
 	const fixture = fixtures.find(f => f.name === 'circular_pattern weighted')!;
-	try {
-		for (const reverse of [false, true]) {
-			let fallbackCalls = 0;
-			const run = () => {
-				const values = new Map(Object.entries({ ...fixture.params, 'z.x': 1, 'z.y': 2 }));
-				const pattern = deserializeConstraint(structuredClone(fixture.constraint))!;
-				pattern.isSoft = true;
-				pattern.weight = 0.1;
-				const custom = new FixedConstraint('custom', 'z', 11, 12);
-				const evaluate = custom.evaluate.bind(custom);
-				custom.evaluate = state => {
-					fallbackCalls++;
-					return evaluate(state);
-				};
-				const fixed = new FixedConstraint('fixed', 'a', 3, 7);
-				const constraints = reverse ? [fixed, pattern, custom] : [custom, pattern, fixed];
-				return { result: new NumericalSolver().solve(managerFor(values), constraints), values };
-			};
-			setGeometryKernel(typescriptGeometryKernel);
-			const expected = run();
-			setGeometryKernel(previous);
-			fallbackCalls = 0;
-			const actual = run();
-			assert.ok(fallbackCalls > 0);
-			assert.equal(actual.result.status, expected.result.status);
-			assert.equal(actual.result.degreesOfFreedom, expected.result.degreesOfFreedom);
-			assert.deepEqual(actual.result.constrainedParams, expected.result.constrainedParams);
-			assert.ok(actual.result.finalError < 1e-12);
-			close([...actual.values.values()], [...expected.values.values()], true);
-		}
-	} finally {
-		setGeometryKernel(previous);
-	}
+	const results = [false, true].map(reverse => {
+		let fallbackCalls = 0;
+		const values = new Map(Object.entries({ ...fixture.params, 'z.x': 1, 'z.y': 2 }));
+		const pattern = deserializeConstraint(structuredClone(fixture.constraint))!;
+		pattern.isSoft = true;
+		pattern.weight = 0.1;
+		const custom = new FixedConstraint('custom', 'z', 11, 12);
+		const evaluate = custom.evaluate.bind(custom);
+		custom.evaluate = state => {
+			fallbackCalls++;
+			return evaluate(state);
+		};
+		const fixed = new FixedConstraint('fixed', 'a', 3, 7);
+		const constraints = reverse ? [fixed, pattern, custom] : [custom, pattern, fixed];
+		const result = new NumericalSolver().solve(managerFor(values), constraints);
+		assert.ok(fallbackCalls > 0);
+		assert.ok(result.finalError < 1e-12);
+		close([values.get('a.x')!, values.get('a.y')!, values.get('z.x')!, values.get('z.y')!], [3, 7, 11, 12], true);
+		return { result, values };
+	});
+	assert.equal(results[0].result.status, results[1].result.status);
+	assert.equal(results[0].result.degreesOfFreedom, results[1].result.degreesOfFreedom);
+	assert.deepEqual(results[0].result.constrainedParams, results[1].result.constrainedParams);
+	close([...results[0].values.values()], [...results[1].values.values()], true);
 });
 
 it('falls back atomically when a composite record is invalid or its offset helper is customized', () => {
