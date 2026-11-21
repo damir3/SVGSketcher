@@ -295,7 +295,7 @@
       "id": "Circle-1",
       "centerId": "Point-8",
       "radius": 60,
-      "isConstruction": true
+      "lineType": "construction"
     }
   ],
   "arcs": [
@@ -307,7 +307,7 @@
       "endPointId": "Point-27",
       "radius": 16,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -317,7 +317,7 @@
       "endPointId": "Point-32",
       "radius": 16.00000000000447,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -327,7 +327,7 @@
       "endPointId": "Point-43",
       "radius": 15.999999999781194,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -337,7 +337,7 @@
       "endPointId": "Point-42",
       "radius": 50.00000000000167,
       "clockwise": false,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -347,7 +347,7 @@
       "endPointId": "Point-48",
       "radius": 16.000000009543445,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -357,7 +357,7 @@
       "endPointId": "Point-51",
       "radius": 15.999999999781192,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -367,7 +367,7 @@
       "endPointId": "Point-50",
       "radius": 50.00000000000168,
       "clockwise": false,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -377,7 +377,7 @@
       "endPointId": "Point-56",
       "radius": 16.00000000954344,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -387,7 +387,7 @@
       "endPointId": "Point-59",
       "radius": 15.99999999978129,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -397,7 +397,7 @@
       "endPointId": "Point-58",
       "radius": 50,
       "clockwise": false,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -407,7 +407,7 @@
       "endPointId": "Point-64",
       "radius": 16.000000009543374,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -417,7 +417,7 @@
       "endPointId": "Point-30",
       "radius": 49.99999999054616,
       "clockwise": false,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -427,7 +427,7 @@
       "endPointId": "Point-40",
       "radius": 16.000000009543395,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -437,7 +437,7 @@
       "endPointId": "Point-35",
       "radius": 15.999999999781187,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -447,7 +447,7 @@
       "endPointId": "Point-34",
       "radius": 50.00000000000171,
       "clockwise": false,
-      "isConstruction": false
+      "lineType": "solid"
     }
   ],
   "ellipses": [],

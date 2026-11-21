@@ -541,6 +541,7 @@ export class SVGRenderer {
 			return {
 				svg: `${this.defsEl.outerHTML}<g transform="${transform}">${group.innerHTML}</g>`,
 				bounds,
+				viewportZoom: viewport.zoom,
 			};
 		} finally {
 			group.remove();

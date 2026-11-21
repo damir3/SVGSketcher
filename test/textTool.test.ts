@@ -171,10 +171,10 @@ describe('Text Model & Entity Lifecycle', () => {
 		const p2 = sketch.addPoint({ x: 50, y: -20 });
 		const p3 = sketch.addPoint({ x: -50, y: -20 });
 
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		const text = sketch.addText({
 			mode: 'text',
@@ -213,10 +213,10 @@ describe('Text Model & Entity Lifecycle', () => {
 		const p1 = sketch.addPoint({ x: 20, y: 10 });
 		const p2 = sketch.addPoint({ x: 20, y: 0 });
 		const p3 = sketch.addPoint({ x: 0, y: 0 });
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		const text = sketch.addText({
 			mode: 'text',
@@ -237,10 +237,10 @@ describe('Text Model & Entity Lifecycle', () => {
 		const p1 = sketch.addPoint({ x: 20, y: 10 });
 		const p2 = sketch.addPoint({ x: 20, y: 0 });
 		const p3 = sketch.addPoint({ x: 0, y: 0 });
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		const text = sketch.addText({
 			mode: 'text',
@@ -281,10 +281,10 @@ describe('Text Model & Entity Lifecycle', () => {
 		const p1 = sketch.addPoint({ x: 40, y: 20 });
 		const p2 = sketch.addPoint({ x: 40, y: 0 });
 		const p3 = sketch.addPoint({ x: 0, y: 0 });
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		sketch.pushHistory();
 
@@ -521,10 +521,10 @@ describe('SVG Export with Text Elements', () => {
 		const p1 = sketch.addPoint({ x: 30, y: 10 });
 		const p2 = sketch.addPoint({ x: 30, y: -10 });
 		const p3 = sketch.addPoint({ x: -30, y: -10 });
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		sketch.addText({
 			mode: 'text',
@@ -556,10 +556,10 @@ describe('SVG Export with Text Elements', () => {
 			'Text rectangle corner points should not be exported as isolated circles'
 		);
 
-		// Verify other geometry (non-text construction lines and normal lines) are still exported
+		// Verify that ordinary geometry is still exported.
 		const otherP1 = sketch.addPoint({ x: 50, y: 50 });
 		const otherP2 = sketch.addPoint({ x: 100, y: 50 });
-		sketch.addLine(otherP1.id, otherP2.id, false);
+		sketch.addLine(otherP1.id, otherP2.id, 'solid');
 		const svgWithOther = exportSketchToSVG(sketch);
 		assert.ok(svgWithOther.includes('<line'), 'Regular lines should still be exported');
 	});
@@ -603,6 +603,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 		};
@@ -662,6 +663,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 		};
@@ -734,11 +736,11 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 
 		const pA = sketch.addPoint({ x: 0, y: 0 });
 		const pB = sketch.addPoint({ x: 50, y: 0 });
-		const line1 = sketch.addLine(pA.id, pB.id, false);
+		const line1 = sketch.addLine(pA.id, pB.id, 'solid');
 
 		const pC = sketch.addPoint({ x: 0, y: 50 });
 		const pD = sketch.addPoint({ x: 50, y: 50 });
-		const line2 = sketch.addLine(pC.id, pD.id, false);
+		const line2 = sketch.addLine(pC.id, pD.id, 'solid');
 
 		let hoverItem: any = { id: line1.id, type: 'line' };
 		const mockCtx: any = {
@@ -747,6 +749,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 			findLineNear: () => (hoverItem?.type === 'line' ? sketch.lines.get(hoverItem.id) : null),
@@ -980,6 +983,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 		};
@@ -1134,6 +1138,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 		};
@@ -1182,6 +1187,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 		};
@@ -1277,6 +1283,7 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 			renderer: { textRotationGizmo: null, textDragGizmo: null },
 			svg: makeEl(),
 			isConstructionMode: false,
+			lineType: 'solid',
 			setCursor: () => {},
 			requestRender: () => {},
 		};
@@ -1537,10 +1544,10 @@ describe('TextTool Interactive Operations & Sidebar Panel', () => {
 		const p2 = sketch.addPoint({ x: 20, y: -10 });
 		const p3 = sketch.addPoint({ x: -20, y: -10 });
 
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		const text = sketch.addText({
 			mode: 'text',

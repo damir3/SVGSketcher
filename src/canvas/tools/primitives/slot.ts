@@ -1230,12 +1230,12 @@ export class SlotTool extends BaseTool {
 		const pt4 = sketch.addPoint(outline.pt4);
 
 		// Centerline construction line and side lines
-		const axisLine = sketch.addLine(c1Id, c2Id, true);
-		const topLine = sketch.addLine(pt1.id, pt2.id, isConst);
-		const bottomLine = sketch.addLine(pt3.id, pt4.id, isConst);
+		const axisLine = sketch.addLine(c1Id, c2Id, 'construction');
+		const topLine = sketch.addLine(pt1.id, pt2.id, isConst ? 'construction' : 'solid');
+		const bottomLine = sketch.addLine(pt3.id, pt4.id, isConst ? 'construction' : 'solid');
 
-		const arc1 = sketch.addArc(c1Id, pt4.id, pt1.id, effectiveR, outline.cw1, isConst);
-		const arc2 = sketch.addArc(c2Id, pt2.id, pt3.id, effectiveR, outline.cw2, isConst);
+		const arc1 = sketch.addArc(c1Id, pt4.id, pt1.id, effectiveR, outline.cw1, isConst ? 'construction' : 'solid');
+		const arc2 = sketch.addArc(c2Id, pt2.id, pt3.id, effectiveR, outline.cw2, isConst ? 'construction' : 'solid');
 
 		// Geometric constraints
 		sketch.addTangentConstraint(topLine.id, arc1.id);
@@ -1324,11 +1324,25 @@ export class SlotTool extends BaseTool {
 		const cwCap2 = isArcClockwiseThroughPoint(this.ctx.viewport, c2, geom.p2Outer, geom.p2Inner, geom.midCap2);
 
 		// Centerline construction arc + 4 boundary arcs (no radial construction lines)
-		const centerArc = sketch.addArc(centerId, c1Id, c2Id, rArc, cwCenter, true);
-		const outerArc = sketch.addArc(centerId, p1Out.id, p2Out.id, rArc + geom.effectiveR, cwOuter, isConst);
-		const innerArc = sketch.addArc(centerId, p1In.id, p2In.id, rArc - geom.effectiveR, cwInner, isConst);
-		const cap1 = sketch.addArc(c1Id, p1In.id, p1Out.id, geom.effectiveR, cwCap1, isConst);
-		const cap2 = sketch.addArc(c2Id, p2Out.id, p2In.id, geom.effectiveR, cwCap2, isConst);
+		const centerArc = sketch.addArc(centerId, c1Id, c2Id, rArc, cwCenter, 'construction');
+		const outerArc = sketch.addArc(
+			centerId,
+			p1Out.id,
+			p2Out.id,
+			rArc + geom.effectiveR,
+			cwOuter,
+			isConst ? 'construction' : 'solid'
+		);
+		const innerArc = sketch.addArc(
+			centerId,
+			p1In.id,
+			p2In.id,
+			rArc - geom.effectiveR,
+			cwInner,
+			isConst ? 'construction' : 'solid'
+		);
+		const cap1 = sketch.addArc(c1Id, p1In.id, p1Out.id, geom.effectiveR, cwCap1, isConst ? 'construction' : 'solid');
+		const cap2 = sketch.addArc(c2Id, p2Out.id, p2In.id, geom.effectiveR, cwCap2, isConst ? 'construction' : 'solid');
 
 		// Geometric constraints
 		sketch.addTangentConstraint(outerArc.id, cap1.id);

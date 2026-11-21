@@ -94,6 +94,7 @@ function createMockDeleteContext(sketch: SketchDocument): { ctx: ToolContext; to
 		svg: svgObj as any,
 		highlightManager,
 		isConstructionMode: false,
+		lineType: 'solid',
 		requestRender: () => {},
 		setTool: () => {},
 		setCursor: () => {},

@@ -106,7 +106,7 @@ test('document dependency analysis matches the frozen path and restores locks wi
 	const sketch = new SketchDocument();
 	sketch.points.set('center', new SketchPoint('center', 0, 0, true));
 	sketch.points.set('edge', new SketchPoint('edge', 10, 0, true));
-	sketch.circles.set('circle', new SketchCircle('circle', 'center', 10));
+	sketch.circles.set('circle', new SketchCircle({ id: 'circle', centerId: 'center', radius: 10 }));
 	sketch.constraints.set('on', new PointOnCircleConstraint('on', 'edge', 'center', 'circle'));
 	sketch.rebuildParamManager();
 	const candidate = new RadiusConstraint('candidate', 'circle', 50);

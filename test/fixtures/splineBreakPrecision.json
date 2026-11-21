@@ -317,8 +317,7 @@
         "id": "Line-14",
         "p1Id": "Point-42",
         "p2Id": "Point-43",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-2",
         "isAutomaticSplineHandle": false
       },
@@ -327,8 +326,7 @@
         "id": "Line-15",
         "p1Id": "Point-44",
         "p2Id": "Point-45",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-2",
         "isAutomaticSplineHandle": false
       },
@@ -337,8 +335,7 @@
         "id": "Line-16",
         "p1Id": "Point-46",
         "p2Id": "Point-47",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-2",
         "isAutomaticSplineHandle": false
       },
@@ -347,8 +344,7 @@
         "id": "Line-17",
         "p1Id": "Point-48",
         "p2Id": "Point-49",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-2",
         "isAutomaticSplineHandle": false
       },
@@ -357,8 +353,7 @@
         "id": "Line-51",
         "p1Id": "Point-119",
         "p2Id": "Point-120",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-4",
         "isAutomaticSplineHandle": false
       },
@@ -367,8 +362,7 @@
         "id": "Line-52",
         "p1Id": "Point-121",
         "p2Id": "Point-122",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-4",
         "isAutomaticSplineHandle": false
       },
@@ -377,8 +371,7 @@
         "id": "Line-53",
         "p1Id": "Point-123",
         "p2Id": "Point-124",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-4",
         "isAutomaticSplineHandle": false
       },
@@ -387,8 +380,7 @@
         "id": "Line-43",
         "p1Id": "Point-103",
         "p2Id": "Point-104",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -397,8 +389,7 @@
         "id": "Line-44",
         "p1Id": "Point-105",
         "p2Id": "Point-106",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -407,8 +398,7 @@
         "id": "Line-45",
         "p1Id": "Point-107",
         "p2Id": "Point-108",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -417,8 +407,7 @@
         "id": "Line-46",
         "p1Id": "Point-109",
         "p2Id": "Point-110",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -427,8 +416,7 @@
         "id": "Line-47",
         "p1Id": "Point-111",
         "p2Id": "Point-112",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -437,8 +425,7 @@
         "id": "Line-48",
         "p1Id": "Point-113",
         "p2Id": "Point-114",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -447,8 +434,7 @@
         "id": "Line-49",
         "p1Id": "Point-115",
         "p2Id": "Point-116",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       },
@@ -457,8 +443,7 @@
         "id": "Line-50",
         "p1Id": "Point-117",
         "p2Id": "Point-118",
-        "isConstruction": true,
-        "isSplineHandle": true,
+        "lineType": "spline_handle",
         "parentSplineId": "Spline-3",
         "isAutomaticSplineHandle": false
       }

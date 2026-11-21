@@ -843,7 +843,7 @@ function executeSplitOperation(sketch: SketchDocument, candidate: TrimCandidate,
 			return;
 		}
 
-		const newLines = split.spans.map(([, , p1, p2]) => sketch.addLine(p1, p2, line.isConstruction));
+		const newLines = split.spans.map(([, , p1, p2]) => sketch.addLine(p1, p2, line.lineType));
 		if (mode === 'trim' && !split.isStart && !split.isEnd && split.pA && split.pB && newLines.length === 2) {
 			sketch.addPointOnLineConstraint(split.pA.id, newLines[1].id);
 			sketch.addPointOnLineConstraint(split.pB.id, newLines[0].id);
@@ -865,9 +865,9 @@ function executeSplitOperation(sketch: SketchDocument, candidate: TrimCandidate,
 			'circle',
 			circle.id,
 			[
-				sketch.addArc(circle.centerId, pB.id, pA.id, circle.radius, true, circle.isConstruction),
+				sketch.addArc(circle.centerId, pB.id, pA.id, circle.radius, true, circle.lineType),
 				...(mode === 'break'
-					? [sketch.addArc(circle.centerId, pA.id, pB.id, circle.radius, true, circle.isConstruction)]
+					? [sketch.addArc(circle.centerId, pA.id, pB.id, circle.radius, true, circle.lineType)]
 					: []),
 			],
 			() => sketch.removeEntity(circle.id)
@@ -884,7 +884,7 @@ function executeSplitOperation(sketch: SketchDocument, candidate: TrimCandidate,
 		copyRadiusConstraints(
 			'arc',
 			arc.id,
-			split.spans.map(([, , s, e]) => sketch.addArc(arc.centerId, s, e, arc.radius, arc.clockwise, arc.isConstruction)),
+			split.spans.map(([, , s, e]) => sketch.addArc(arc.centerId, s, e, arc.radius, arc.clockwise, arc.lineType)),
 			() => sketch.removeEntity(arc.id)
 		);
 	} else if (curve.type === 'ellipse') {

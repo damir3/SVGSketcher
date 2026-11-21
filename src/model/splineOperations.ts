@@ -33,8 +33,7 @@ export function createFitSplineHandle(
 			id: lineId,
 			p1Id,
 			p2Id,
-			isConstruction: true,
-			isSplineHandle: true,
+			lineType: 'spline_handle',
 			parentSplineId: splineId,
 			isAutomaticSplineHandle,
 		})
@@ -61,8 +60,7 @@ export function createControlSplineHandleLines(
 				id: lineId,
 				p1Id: pointIds[i],
 				p2Id: pointIds[i + 1],
-				isConstruction: true,
-				isSplineHandle: true,
+				lineType: 'spline_handle',
 				parentSplineId: splineId,
 			})
 		);
@@ -132,7 +130,7 @@ export function addFitSpline(
 			if (line) {
 				line.parentSplineId = sid;
 				line.isAutomaticSplineHandle ??= false;
-				line.isSplineHandle = true;
+				line.lineType = 'spline_handle';
 			}
 		}
 	}
@@ -163,7 +161,7 @@ export function addControlSpline(
 			const line = sketch.lines.get(lid);
 			if (line) {
 				line.parentSplineId = sid;
-				line.isSplineHandle = true;
+				line.lineType = 'spline_handle';
 			}
 		}
 	}
@@ -202,7 +200,7 @@ export function copySpline(
 
 		const p1Id = mapPoint(line.p1Id);
 		const p2Id = mapPoint(line.p2Id);
-		const copy = sketch.addLine(p1Id, p2Id, line.isConstruction);
+		const copy = sketch.addLine(p1Id, p2Id, line.lineType);
 		copy.isAutomaticSplineHandle = line.isAutomaticSplineHandle;
 		lines.set(line.id, copy.id);
 		const midpoint = constraints.find(
@@ -304,24 +302,6 @@ export function isSplineInternalConstraint(sketch: SketchDocument, c: IConstrain
 		}
 	}
 	return false;
-}
-
-export function restoreAutomaticSplineHandles(sketch: SketchDocument): void {
-	for (const spline of sketch.splines.values()) {
-		if (spline.splineType !== 'fit' || !spline.tangentLineIds) continue;
-		const points = spline.pointIds.map(id => sketch.points.get(id));
-		if (points.some(point => !point)) continue;
-		const natural = computeNaturalFitHandles(points as SketchPoint[]);
-		for (const [index, lineId] of spline.tangentLineIds.entries()) {
-			const line = sketch.lines.get(lineId);
-			const handle = natural[index];
-			if (!line || line.isAutomaticSplineHandle !== undefined || !handle) continue;
-			const p1 = sketch.points.get(line.p1Id);
-			const p2 = sketch.points.get(line.p2Id);
-			// Older snapshots only stored the handle geometry.
-			line.isAutomaticSplineHandle = !!p1 && !!p2 && p1.distanceTo(handle.h1) < 1e-5 && p2.distanceTo(handle.h2) < 1e-5;
-		}
-	}
 }
 
 export function prepareSplineConstraints(

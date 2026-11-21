@@ -3,7 +3,8 @@ import type { SnapResult, ToolContext, ToolMouseEvent, ToolRenderContext } from 
 import { Vec2 } from '../../../math/vector';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { createSvgLine } from '../../svg';
-import { getPreviewStrokeAttrs } from '../../styles';
+import { applyDrawingLineStyle, getPreviewStrokeAttrs } from '../../styles';
+import { renderCuttingPlaneMarks } from '../../cuttingPlane';
 
 type LineField = 'length' | 'angle';
 type LinePointer = Pick<ToolMouseEvent, 'world' | 'snap' | 'client'>;
@@ -72,12 +73,11 @@ export class LineTool extends BaseTool {
 		const start = this.getStartPoint();
 		if (!start) return;
 		const { end } = this.getSegmentGeometry(start, ctx.cursorWorld, ctx.snap);
-		createSvgLine(
-			ctx.viewport.worldToScreen(start),
-			ctx.viewport.worldToScreen(end),
-			getPreviewStrokeAttrs(ctx.isConstruction, false, true),
-			ctx.targetGroup
-		);
+		const attrs = getPreviewStrokeAttrs(ctx.isConstruction, false, true);
+		const s1 = ctx.viewport.worldToScreen(start);
+		const s2 = ctx.viewport.worldToScreen(end);
+		createSvgLine(s1, s2, applyDrawingLineStyle(attrs, this.ctx.lineType), ctx.targetGroup);
+		if (this.ctx.lineType === 'cutting_plane') renderCuttingPlaneMarks(s1, s2, String(attrs.stroke), ctx.targetGroup);
 	}
 
 	override cancel(): void {
@@ -154,7 +154,7 @@ export class LineTool extends BaseTool {
 			this.ctx.applySnapConstraintIfNeeded?.(endId, snap);
 		}
 
-		const line = sketch.addLine(startId, endId, this.ctx.isConstructionMode);
+		const line = sketch.addLine(startId, endId, this.ctx.lineType);
 		if (angle === undefined) {
 			this.ctx.applyAutoOrientationConstraint?.(startId, endId);
 		} else {

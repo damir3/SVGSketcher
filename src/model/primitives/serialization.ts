@@ -1,6 +1,7 @@
 import type { ISketchPrimitive } from './base';
 import { SketchPoint } from './point';
 import { SketchLine } from './line';
+import type { LineType, RoundCurveLineType } from '../lineTypes';
 import { SketchCircle } from './circle';
 import { SketchArc } from './arc';
 import { SketchEllipse } from './ellipse';
@@ -19,8 +20,7 @@ export interface LineSnapshot {
 	id: string;
 	p1Id: string;
 	p2Id: string;
-	isConstruction?: boolean;
-	isSplineHandle?: boolean;
+	lineType: LineType;
 	parentSplineId?: string;
 	isAutomaticSplineHandle?: boolean;
 }
@@ -29,7 +29,7 @@ export interface CircleSnapshot {
 	id: string;
 	centerId: string;
 	radius: number;
-	isConstruction?: boolean;
+	lineType: RoundCurveLineType;
 }
 export interface ArcSnapshot {
 	type: 'arc';
@@ -39,7 +39,7 @@ export interface ArcSnapshot {
 	endPointId: string;
 	radius: number;
 	clockwise?: boolean;
-	isConstruction?: boolean;
+	lineType: RoundCurveLineType;
 }
 export interface EllipseSnapshot {
 	type: 'ellipse';

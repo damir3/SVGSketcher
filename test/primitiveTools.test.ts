@@ -55,6 +55,9 @@ function createMockContext(sketch: SketchDocument): { ctx: ToolContext; isConstr
 		get isConstructionMode() {
 			return isConstruction.value;
 		},
+		get lineType() {
+			return isConstruction.value ? 'construction' : 'solid';
+		},
 		requestRender: () => {},
 		setTool: () => {},
 		setCursor: () => {},
@@ -285,6 +288,105 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(sketch.lines.size, 1);
 		assert.equal(sketch.points.size, 2);
 		assert.equal(lineTool.popup.getNumericValue('length'), 0);
+	});
+
+	it('LineTool creates a centerline with the selected auxiliary line type', () => {
+		const sketch = new SketchDocument();
+		const { ctx } = createMockContext(sketch);
+		const tool = new LineTool();
+		tool.activate({ ...ctx, isConstructionMode: true, lineType: 'centerline' });
+		tool.onMouseDown(makeMouseEvent(10, 20));
+		tool.onMouseDown(makeMouseEvent(100, 20));
+
+		const [line] = sketch.lines.values();
+		assert.equal(line?.lineType, 'centerline');
+		assert.equal(line?.isSplineHandle, false);
+	});
+
+	it('line type follows matching selections and falls back to the drawing mode', () => {
+		const sketch = new SketchDocument();
+		const a = sketch.addPoint(new Vec2(0, 0));
+		const b = sketch.addPoint(new Vec2(40, 0));
+		const c = sketch.addPoint(new Vec2(40, 40));
+		const hidden = sketch.addLine(a.id, b.id, 'hidden');
+		const circle = sketch.addCircle(c.id, 15, 'hidden');
+		const solid = sketch.addLine(b.id, c.id);
+		const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+			sketch,
+			render() {},
+		});
+		let shown: { type: string; active: boolean } | undefined;
+		interaction.onConstructionChange = (active, type) => {
+			shown = { type, active };
+		};
+		sketch.onChange(() => interaction.updateConstructionState());
+		interaction.setConstructionLineType('centerline');
+		assert.deepEqual(shown, { type: 'centerline', active: true });
+
+		sketch.selectEntity(hidden.id, 'line');
+		assert.deepEqual(shown, { type: 'hidden', active: true });
+		interaction.toggleConstructionMode();
+		assert.deepEqual(shown, { type: 'hidden', active: false });
+		assert.equal(sketch.lines.get(hidden.id)?.lineType, 'solid');
+		interaction.toggleConstructionMode();
+		assert.deepEqual(shown, { type: 'hidden', active: true });
+		assert.equal(sketch.lines.get(hidden.id)?.lineType, 'hidden');
+		sketch.selectEntity(circle.id, 'circle', true);
+		assert.deepEqual(shown, { type: 'hidden', active: true });
+		sketch.selectEntity(solid.id, 'line', true);
+		assert.deepEqual(shown, { type: 'centerline', active: true });
+
+		interaction.setConstructionLineType('phantom');
+		assert.deepEqual(shown, { type: 'phantom', active: true });
+		sketch.clearSelection();
+		assert.deepEqual(shown, { type: 'centerline', active: true });
+
+		sketch.selectEntity(hidden.id, 'line');
+		interaction.toggleConstructionMode();
+		assert.deepEqual(shown, { type: 'phantom', active: false });
+		sketch.clearSelection();
+		sketch.selectEntity(hidden.id, 'line');
+		assert.deepEqual(shown, { type: 'centerline', active: false });
+		sketch.clearSelection();
+		assert.deepEqual(shown, { type: 'centerline', active: true });
+		interaction.toggleConstructionMode();
+		assert.deepEqual(shown, { type: 'centerline', active: false });
+		interaction.toggleConstructionMode();
+		assert.deepEqual(shown, { type: 'centerline', active: true });
+	});
+
+	it('enables Centerline for drawing when other geometry stays selected', () => {
+		const sketch = new SketchDocument();
+		const a = sketch.addPoint(new Vec2(0, 0));
+		const b = sketch.addPoint(new Vec2(40, 0));
+		const line = sketch.addLine(a.id, b.id);
+		const circle = sketch.addCircle(a.id, 5);
+		const interaction: CanvasInteraction = Object.assign(Object.create(CanvasInteraction.prototype), {
+			activeTool: 'line',
+			sketch,
+			render() {},
+		});
+		const ctx = interaction.createToolContext();
+
+		sketch.selectEntity(line.id, 'line');
+		interaction.setConstructionLineType('centerline');
+		assert.equal(ctx.lineType, 'centerline');
+		assert.equal(interaction.getEffectiveConstructionState(), true);
+		assert.equal(line.lineType, 'solid');
+		assert.equal(sketch.isEntitySelected(line.id, 'line'), true);
+		interaction.toggleConstructionMode();
+		assert.equal(ctx.lineType, 'solid');
+
+		interaction.activeTool = 'select';
+		sketch.selectEntity(circle.id, 'circle');
+		interaction.setConstructionLineType('cutting_plane');
+		assert.equal(ctx.lineType, 'cutting_plane');
+		assert.equal(interaction.getEffectiveConstructionState(), true);
+		assert.equal(circle.lineType, 'solid');
+		interaction.setConstructionLineType('centerline');
+		assert.equal(interaction.getEffectiveConstructionState(), true);
+		assert.equal(circle.lineType, 'centerline');
+		assert.equal(sketch.isEntitySelected(circle.id, 'circle'), true);
 	});
 
 	it('LineTool confirms typed length and angle from the popup and resets the next segment', () => {
@@ -2381,7 +2483,7 @@ describe('Polygon tool modes', () => {
 			tool.activate(ctx);
 			const a = sketch.addPoint(new Vec2(3, 2), true);
 			const b = sketch.addPoint(new Vec2(13, 2), true);
-			const base = sketch.addLine(a.id, b.id, true);
+			const base = sketch.addLine(a.id, b.id, 'construction');
 			for (const point of [a, b]) {
 				tool.onMouseDown(
 					makeMouseEvent(point.x, point.y, {

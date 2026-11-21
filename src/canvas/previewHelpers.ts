@@ -4,6 +4,7 @@ import { Vec2 } from '../math/vector';
 import type { Viewport } from './viewport';
 import type { TrimCandidate } from '../math/intersection';
 import type { ExtendCandidate } from '../math/extend';
+import type { RoundCurveLineType } from '../model/lineTypes';
 import { POINT_TOLERANCE } from '../constants';
 import {
 	createSvgElement,
@@ -15,6 +16,7 @@ import {
 } from './svg';
 import {
 	COLORS,
+	applyDrawingLineStyle,
 	STROKE_WIDTH,
 	DASH_ARRAY,
 	getPreviewStrokeAttrs,
@@ -55,10 +57,17 @@ export function renderArcPreviewVisual(
 	se: Vec2,
 	sr: number,
 	clockwise: boolean,
-	isConstruction = false
+	lineType: RoundCurveLineType = 'solid'
 ): void {
 	createSvgCircle(sc, sr, GUIDE_OUTLINE_ATTRS, parent);
-	createSvgPath(getArcSvgPath(sc, ss, se, sr, clockwise), getPreviewStrokeAttrs(isConstruction, false, true), parent);
+	createSvgPath(
+		getArcSvgPath(sc, ss, se, sr, clockwise),
+		applyDrawingLineStyle(
+			getPreviewStrokeAttrs(lineType === 'construction' || lineType === 'centerline', false, true),
+			lineType
+		),
+		parent
+	);
 	createSvgLine(sc, ss, AUX_RAY_ATTRS, parent);
 	createSvgLine(sc, se, AUX_RAY_ATTRS, parent);
 }

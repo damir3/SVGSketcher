@@ -126,7 +126,6 @@ import {
 	clearSelection,
 	clearSelectionSets,
 	getSelectedPrimitives,
-	getSelectedConstructionState,
 	deleteSelected,
 	getBoundingBox,
 	getSelectionBoundingBox,
@@ -154,6 +153,10 @@ import {
 	SketchSpline,
 	SketchText,
 	type TextSnapshot,
+	type EditableLineType,
+	type RoundCurveLineType,
+	isRoundCurveLineType,
+	type LineType,
 	type ISketchPrimitive,
 	type PrimitiveType,
 	type SelectionState,
@@ -181,7 +184,6 @@ import {
 	isSplineHandlePoint,
 	resetFitSplineTangents,
 	isSplineInternalConstraint,
-	restoreAutomaticSplineHandles,
 	deleteSplineWithHandles,
 	removePointFromSplines,
 } from './splineOperations';
@@ -203,8 +205,8 @@ const BUILT_IN_POINTS = new Map<string, SketchPoint>([
 ]);
 
 const BUILT_IN_LINES = new Map<string, SketchLine>([
-	['axis_x', Object.freeze(new SketchLine({ id: 'axis_x', p1Id: 'origin', p2Id: 'axis_x', isConstruction: true }))],
-	['axis_y', Object.freeze(new SketchLine({ id: 'axis_y', p1Id: 'origin', p2Id: 'axis_y', isConstruction: true }))],
+	['axis_x', Object.freeze(new SketchLine({ id: 'axis_x', p1Id: 'origin', p2Id: 'axis_x', lineType: 'construction' }))],
+	['axis_y', Object.freeze(new SketchLine({ id: 'axis_y', p1Id: 'origin', p2Id: 'axis_y', lineType: 'construction' }))],
 ]);
 
 export class PointMap extends Map<string, SketchPoint> {
@@ -491,8 +493,6 @@ export class SketchDocument {
 			}
 		}
 
-		restoreAutomaticSplineHandles(this);
-
 		this.counters.clear();
 		const idMaps: Array<Map<string, unknown>> = [
 			...this.primitiveCollections.map(col => col.map),
@@ -608,15 +608,20 @@ export class SketchDocument {
 	}
 
 	// --- Line methods ---
-	addLine(p1Id: string, p2Id: string, isConstruction = false): SketchLine {
-		return this.registerPrimitive(this.lines, new SketchLine({ id: this.nextId('Line'), p1Id, p2Id, isConstruction }));
+	addLine(p1Id: string, p2Id: string, lineType: LineType = 'solid'): SketchLine {
+		return this.registerPrimitive(this.lines, new SketchLine({ id: this.nextId('Line'), p1Id, p2Id, lineType }));
 	}
 
 	// --- Circle methods ---
-	addCircle(centerId: string, radius: number, isConstruction = false): SketchCircle {
+	addCircle(centerId: string, radius: number, lineType: RoundCurveLineType = 'solid'): SketchCircle {
 		return this.registerPrimitive(
 			this.circles,
-			new SketchCircle({ id: this.nextId('Circle'), centerId, radius, isConstruction })
+			new SketchCircle({
+				id: this.nextId('Circle'),
+				centerId,
+				radius,
+				lineType,
+			})
 		);
 	}
 
@@ -627,7 +632,7 @@ export class SketchDocument {
 		endPointId: string,
 		radius: number,
 		clockwise = false,
-		isConstruction = false
+		lineType: RoundCurveLineType = 'solid'
 	): SketchArc {
 		const arc = new SketchArc({
 			id: this.nextId('Arc'),
@@ -636,7 +641,7 @@ export class SketchDocument {
 			endPointId,
 			radius,
 			clockwise,
-			isConstruction,
+			lineType,
 		});
 		return this.registerPrimitive(this.arcs, arc, () => this.syncArcEndpoints(arc));
 	}
@@ -1371,13 +1376,29 @@ export class SketchDocument {
 		this.commitTransaction();
 	}
 
-	toggleConstruction(id: string): void {
+	setLineType(id: string, type: EditableLineType): void {
 		const prim = this.getPrimitive(id);
 		if (!prim || prim.type === 'point' || !this.primitiveCollectionMap.get(prim.type)?.map.has(id)) {
 			return;
 		}
+		if (prim instanceof SketchLine) {
+			if (prim.isSplineHandle || prim.lineType === type) return;
+			this.pushHistory();
+			prim.lineType = type;
+			this.notify();
+			return;
+		}
+		if (prim instanceof SketchArc || prim instanceof SketchCircle) {
+			if (!isRoundCurveLineType(type) || prim.lineType === type) return;
+			this.pushHistory();
+			prim.lineType = type;
+			this.notify();
+			return;
+		}
+		const isConstruction = type === 'construction';
+		if ((type !== 'solid' && type !== 'construction') || !!prim.isConstruction === isConstruction) return;
 		this.pushHistory();
-		prim.isConstruction = !prim.isConstruction;
+		prim.isConstruction = isConstruction;
 		this.notify();
 	}
 
@@ -1643,12 +1664,8 @@ export class SketchDocument {
 		clearSelection(this);
 	}
 
-	getSelectedPrimitives(): Array<{ id: string; isConstruction?: boolean }> {
+	getSelectedPrimitives(): ISketchPrimitive[] {
 		return getSelectedPrimitives(this);
-	}
-
-	getSelectedConstructionState(): boolean | null {
-		return getSelectedConstructionState(this);
 	}
 
 	deleteSelected(): void {

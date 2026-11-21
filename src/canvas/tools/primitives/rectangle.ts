@@ -609,10 +609,10 @@ export class RectangleTool extends BaseTool {
 		const p3 = sketch.addPoint(new Vec2(min.x, max.y));
 
 		const isConst = this.ctx.isConstructionMode;
-		sketch.addLine(p0.id, p1.id, isConst);
-		sketch.addLine(p1.id, p2.id, isConst);
-		sketch.addLine(p2.id, p3.id, isConst);
-		sketch.addLine(p3.id, p0.id, isConst);
+		sketch.addLine(p0.id, p1.id, isConst ? 'construction' : 'solid');
+		sketch.addLine(p1.id, p2.id, isConst ? 'construction' : 'solid');
+		sketch.addLine(p2.id, p3.id, isConst ? 'construction' : 'solid');
+		sketch.addLine(p3.id, p0.id, isConst ? 'construction' : 'solid');
 
 		sketch.addHorizontalConstraint(p0.id, p1.id);
 		sketch.addVerticalConstraint(p1.id, p2.id);
@@ -672,8 +672,8 @@ export class RectangleTool extends BaseTool {
 			this.ctx.applySnapConstraintIfNeeded?.(this.findClosestPoint([p0, p1, p2, p3], effectiveWorld).id, snap);
 		}
 
-		const d1 = sketch.addLine(p0.id, p2.id, true);
-		sketch.addLine(p1.id, p3.id, true);
+		const d1 = sketch.addLine(p0.id, p2.id, 'construction');
+		sketch.addLine(p1.id, p3.id, 'construction');
 		sketch.addMidpointConstraint(centerPtId, d1.id);
 
 		this.finalizeCommit('Center rectangle created');
@@ -701,10 +701,10 @@ export class RectangleTool extends BaseTool {
 		}
 
 		const isConst = this.ctx.isConstructionMode;
-		const l0 = sketch.addLine(pCorner0.id, pCorner1.id, isConst);
-		const l1 = sketch.addLine(pCorner1.id, pCorner2.id, isConst);
-		const l2 = sketch.addLine(pCorner2.id, pCorner3.id, isConst);
-		const l3 = sketch.addLine(pCorner3.id, pCorner0.id, isConst);
+		const l0 = sketch.addLine(pCorner0.id, pCorner1.id, isConst ? 'construction' : 'solid');
+		const l1 = sketch.addLine(pCorner1.id, pCorner2.id, isConst ? 'construction' : 'solid');
+		const l2 = sketch.addLine(pCorner2.id, pCorner3.id, isConst ? 'construction' : 'solid');
+		const l3 = sketch.addLine(pCorner3.id, pCorner0.id, isConst ? 'construction' : 'solid');
 
 		sketch.addParallelConstraint(l0.id, l2.id);
 		sketch.addParallelConstraint(l1.id, l3.id);
@@ -752,16 +752,30 @@ export class RectangleTool extends BaseTool {
 		const centerTL = sketch.addPoint(new Vec2(min.x + r, max.y - r));
 
 		// 2. Lines
-		const topLine = sketch.addLine(ptTopStart.id, ptTopEnd.id, isConst);
-		const rightLine = sketch.addLine(ptRightStart.id, ptRightEnd.id, isConst);
-		const bottomLine = sketch.addLine(ptBottomStart.id, ptBottomEnd.id, isConst);
-		const leftLine = sketch.addLine(ptLeftStart.id, ptLeftEnd.id, isConst);
+		const topLine = sketch.addLine(ptTopStart.id, ptTopEnd.id, isConst ? 'construction' : 'solid');
+		const rightLine = sketch.addLine(ptRightStart.id, ptRightEnd.id, isConst ? 'construction' : 'solid');
+		const bottomLine = sketch.addLine(ptBottomStart.id, ptBottomEnd.id, isConst ? 'construction' : 'solid');
+		const leftLine = sketch.addLine(ptLeftStart.id, ptLeftEnd.id, isConst ? 'construction' : 'solid');
 
 		// 3. Corner Arcs (clockwise = true in screen space)
-		const trArc = sketch.addArc(centerTR.id, ptTopEnd.id, ptRightStart.id, r, true, isConst);
-		const brArc = sketch.addArc(centerBR.id, ptRightEnd.id, ptBottomStart.id, r, true, isConst);
-		const blArc = sketch.addArc(centerBL.id, ptBottomEnd.id, ptLeftStart.id, r, true, isConst);
-		const tlArc = sketch.addArc(centerTL.id, ptLeftEnd.id, ptTopStart.id, r, true, isConst);
+		const trArc = sketch.addArc(centerTR.id, ptTopEnd.id, ptRightStart.id, r, true, isConst ? 'construction' : 'solid');
+		const brArc = sketch.addArc(
+			centerBR.id,
+			ptRightEnd.id,
+			ptBottomStart.id,
+			r,
+			true,
+			isConst ? 'construction' : 'solid'
+		);
+		const blArc = sketch.addArc(
+			centerBL.id,
+			ptBottomEnd.id,
+			ptLeftStart.id,
+			r,
+			true,
+			isConst ? 'construction' : 'solid'
+		);
+		const tlArc = sketch.addArc(centerTL.id, ptLeftEnd.id, ptTopStart.id, r, true, isConst ? 'construction' : 'solid');
 
 		// 4. Constraints
 		sketch.addHorizontalConstraint(ptTopStart.id, ptTopEnd.id);

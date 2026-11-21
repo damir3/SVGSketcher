@@ -1,16 +1,25 @@
-import { AABB } from '../../math/aabb';
-import { isValidImage } from '../image';
+import { AABB, getCurveBoundingBox } from '../../math/aabb';
+import { DEFAULT_ZOOM } from '../../constants';
+import { getImageBounds, isValidImage } from '../image';
 import { ellipseAxes, ellipseParameterAtPoint } from '../../math/ellipse';
 import type { SketchDocument } from '../sketch';
 import type { SketchSnapshot } from '../history';
-import type { SketchPoint } from '../types';
+import type { ArcSnapshot, CircleSnapshot, LineSnapshot, SketchPoint } from '../types';
 import { bsplineToBezier, fitPointsToBezier, getSplineSvgPath, type BezierSegment } from '../../math/spline';
 import { findSketchRegions } from '../../math/regions';
-import { SVG_EXPORT_STYLE } from '../../canvas/styles';
+import { DIMENSION_FONT_SIZE, DIMENSION_TEXT_ATTRS, DRAWING_LINE_STYLES, SVG_EXPORT_STYLE } from '../../canvas/styles';
+import { getCuttingPlaneMarks } from '../../canvas/cuttingPlane';
+import {
+	DRAWING_LINE_TYPES,
+	isDrawingLineType,
+	isRoundCurveLineType,
+	type LineType,
+	type RoundCurveLineType,
+} from '../lineTypes';
 import { getFontSync } from '../../canvas/fonts';
 import { generateTextSvgPathData } from '../../math/textPath';
 import type { GeoCurve } from '../../math/intersection';
-import { Vec2 } from '../../math/vector';
+import { Vec2, type XY } from '../../math/vector';
 
 export interface SketchFileMetadata {
 	format: 'svg-sketcher';
@@ -24,6 +33,38 @@ export interface SketchFileMetadata {
 		zoom: number;
 	};
 	snapshot: SketchSnapshot;
+}
+
+type ImportedLineType = { lineType?: LineType; isConstruction?: boolean };
+type ImportedSketchSnapshot = Omit<SketchSnapshot, 'lines' | 'circles' | 'arcs'> & {
+	lines?: Array<Omit<LineSnapshot, 'lineType'> & ImportedLineType & { isSplineHandle?: boolean }>;
+	circles?: Array<Omit<CircleSnapshot, 'lineType'> & ImportedLineType>;
+	arcs?: Array<Omit<ArcSnapshot, 'lineType'> & ImportedLineType>;
+};
+
+function normalizeImportedLineTypes(snapshot: ImportedSketchSnapshot): SketchSnapshot {
+	const getRoundLineType = (lineType?: LineType, isConstruction?: boolean): RoundCurveLineType =>
+		isRoundCurveLineType(lineType) ? lineType : isConstruction === true ? 'construction' : 'solid';
+	return {
+		...snapshot,
+		lines: (snapshot.lines ?? []).map(({ lineType, isConstruction, isSplineHandle, ...line }) => ({
+			...line,
+			lineType:
+				isRoundCurveLineType(lineType) || isDrawingLineType(lineType) || lineType === 'spline_handle'
+					? lineType
+					: isSplineHandle === true
+						? 'spline_handle'
+						: getRoundLineType(undefined, isConstruction),
+		})),
+		circles: (snapshot.circles ?? []).map(({ lineType, isConstruction, ...circle }) => ({
+			...circle,
+			lineType: getRoundLineType(lineType, isConstruction),
+		})),
+		arcs: (snapshot.arcs ?? []).map(({ lineType, isConstruction, ...arc }) => ({
+			...arc,
+			lineType: getRoundLineType(lineType, isConstruction),
+		})),
+	};
 }
 
 type SvgMatrix = [number, number, number, number, number, number];
@@ -680,7 +721,10 @@ function withoutImageObjectUrls(snapshot: SketchSnapshot): SketchSnapshot {
 	};
 }
 
-export type SvgExportLayers = Partial<Record<'regions' | 'solid' | 'construction' | 'images' | 'dimensions', boolean>>;
+const SKETCH_FILE_VERSION = 1;
+export type SvgExportLayers = Partial<
+	Record<'regions' | 'solid' | 'engineeringLines' | 'images' | 'dimensions', boolean>
+>;
 
 export interface SvgExportSettings {
 	/** Primitive line width in sketch millimeters, before export scaling. */
@@ -699,6 +743,8 @@ export interface SvgExportDimensions {
 	svg: string;
 	/** Annotation bounds in sketch coordinates (Y-up), before export scaling. */
 	bounds: AABB;
+	/** Screen pixels per sketch unit in the viewport used to render the dimensions. */
+	viewportZoom?: number;
 }
 
 export function exportSketchToSVG(
@@ -715,13 +761,18 @@ export function exportSketchToSVG(
 	if (!Number.isFinite(strokeWidth) || strokeWidth <= 0) {
 		throw new RangeError('SVG export line width must be finite and positive');
 	}
-	const constructionDashArray = `${strokeWidth * 5},${strokeWidth * 5}`;
 	const solidStroke = ` stroke="${SVG_EXPORT_STYLE.geometryStroke}"`;
-	const constructionStroke = ` stroke-dasharray="${constructionDashArray}" stroke="${SVG_EXPORT_STYLE.constructionStroke}"`;
+	const includeSolid = layers.solid !== false;
+	const includeEngineeringLines = layers.engineeringLines !== false;
+	const annotationZoom =
+		(layers.dimensions ? dimensions?.viewportZoom : undefined) ?? viewportState?.zoom ?? DEFAULT_ZOOM;
+	const labelFontSize =
+		DIMENSION_FONT_SIZE / (Number.isFinite(annotationZoom) && annotationZoom > 0 ? annotationZoom : DEFAULT_ZOOM);
+	const labelFontFamily = DIMENSION_TEXT_ATTRS['font-family'].replaceAll('"', '&quot;');
 
 	const metadataPayload: SketchFileMetadata = {
 		format: 'svg-sketcher',
-		version: 1,
+		version: SKETCH_FILE_VERSION,
 		generator: 'SVG Sketcher',
 		createdAt: new Date().toISOString(),
 		viewport: viewportState,
@@ -735,9 +786,18 @@ export function exportSketchToSVG(
 	const images: string[] = [];
 	const regions: string[] = [];
 	const solid: string[] = [];
-	const construction: string[] = [];
-	const pushShape = (isConstruction: boolean | undefined, render: (stroke: string) => string): void => {
-		(isConstruction ? construction : solid).push(render(isConstruction ? constructionStroke : solidStroke));
+	const drawingLines = new Map(DRAWING_LINE_TYPES.map(type => [type, [] as string[]]));
+	const bbox = new AABB();
+	const addSvgBounds = (point: XY, radius = 0): void => {
+		bbox.addPoint({ x: point.x - radius, y: -point.y - radius });
+		bbox.addPoint({ x: point.x + radius, y: -point.y + radius });
+	};
+	const pushLineShape = (type: LineType, render: (width: number) => string): void => {
+		if (isDrawingLineType(type)) {
+			drawingLines.get(type)!.push(render(strokeWidth * DRAWING_LINE_STYLES[type].exportWidthFactor));
+		} else {
+			solid.push(render(strokeWidth));
+		}
 	};
 	const svgArcFlags = (startAngle: number, endAngle: number, clockwise?: boolean): [number, number] => {
 		const twoPi = 2 * Math.PI;
@@ -745,19 +805,24 @@ export function exportSketchToSVG(
 		return [sweepAngle > Math.PI ? 1 : 0, clockwise ? 1 : 0];
 	};
 	const usedPoints = new Set<string>();
-	const useSvgPoints = (...ids: string[]): Vec2[] | null => {
+	const useSvgPoints = (visible: boolean, ...ids: string[]): Vec2[] | null => {
+		// Keep points referenced by hidden curves out of the isolated points layer.
 		for (const id of ids) usedPoints.add(id);
+		if (!visible) return null;
 		const pts: Vec2[] = [];
 		for (const id of ids) {
 			const pt = sketch.points.get(id);
 			if (!pt) return null;
 			pts.push(new Vec2(pt.x, -pt.y));
 		}
+		for (const pt of pts) addSvgBounds(pt);
 		return pts;
 	};
 	const scaleTransform = `scale(${scale})`;
 
 	for (const image of layers.images === false ? [] : (metadataPayload.snapshot.images ?? [])) {
+		const imageBounds = getImageBounds(image);
+		bbox.addPoint(imageBounds.min).addPoint(imageBounds.max);
 		const { x, y, width, height, angle, opacity } = image;
 		const href = `./${encodeURIComponent(image.fileName)}`;
 		const rotation = `rotate(${-angle % 360} ${x} ${-y})`;
@@ -784,65 +849,82 @@ export function exportSketchToSVG(
 	}
 
 	for (const region of layers.regions === false ? [] : findSketchRegions(sketch)) {
+		for (const point of region.points) bbox.addPoint(point);
 		regions.push(
 			`<path d="${region.path}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" fill-rule="evenodd" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`
 		);
 	}
+	const includeLineBounds = (type: LineType) =>
+		type === 'solid' ? includeSolid : includeEngineeringLines && isDrawingLineType(type);
 
 	for (const line of sketch.lines.values()) {
-		if (line.isSplineHandle || textRectLineIds.has(line.id)) continue;
-		const pts = useSvgPoints(line.p1Id, line.p2Id);
+		const pts = useSvgPoints(!textRectLineIds.has(line.id) && includeLineBounds(line.lineType), line.p1Id, line.p2Id);
 		if (pts) {
 			const [p1, p2] = pts;
-			pushShape(
-				line.isConstruction,
-				stroke =>
-					`<line x1="${p1.x.toFixed(2)}" y1="${p1.y.toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${p2.y.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" />`
+			pushLineShape(
+				line.lineType,
+				width =>
+					`<line x1="${p1.x.toFixed(2)}" y1="${p1.y.toFixed(2)}" x2="${p2.x.toFixed(2)}" y2="${p2.y.toFixed(2)}"${solidStroke} stroke-width="${width}" stroke-linecap="round" />`
 			);
+			if (line.lineType === 'cutting_plane') {
+				const marks = getCuttingPlaneMarks(p1, p2, strokeWidth, labelFontSize);
+				if (!marks) continue;
+				const shapes = drawingLines.get('cutting_plane')!;
+				for (const { path, tip, label } of marks.ends) {
+					shapes.push(
+						`<path d="${path}"${solidStroke} stroke-width="${strokeWidth}" stroke-dasharray="none" fill="none" />`,
+						`<text x="${label.x}" y="${label.y}" fill="${SVG_EXPORT_STYLE.geometryStroke}" font-size="${marks.fontSize}" font-family="${labelFontFamily}" font-weight="${DIMENSION_TEXT_ATTRS['font-weight']}" text-anchor="middle" dominant-baseline="central">A</text>`
+					);
+					addSvgBounds(tip, 4 * strokeWidth);
+					addSvgBounds(label, marks.fontSize / 2);
+				}
+			}
 		}
 	}
 
 	for (const circ of sketch.circles.values()) {
-		const pts = useSvgPoints(circ.centerId);
+		const pts = useSvgPoints(includeLineBounds(circ.lineType), circ.centerId);
 		if (pts) {
 			const [center] = pts;
-			pushShape(
-				circ.isConstruction,
-				stroke =>
-					`<circle cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="${circ.radius.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+			addSvgBounds(center, circ.radius);
+			pushLineShape(
+				circ.lineType,
+				width =>
+					`<circle cx="${center.x.toFixed(2)}" cy="${center.y.toFixed(2)}" r="${circ.radius.toFixed(2)}"${solidStroke} stroke-width="${width}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
 
 	for (const arc of sketch.arcs.values()) {
-		const pts = useSvgPoints(arc.centerId, arc.startPointId, arc.endPointId);
+		const pts = useSvgPoints(includeLineBounds(arc.lineType), arc.centerId, arc.startPointId, arc.endPointId);
 		if (pts) {
 			const [sc, ss, se] = pts;
+			addSvgBounds(sc, arc.radius);
 			const [largeArcFlag, sweepFlag] = svgArcFlags(sc.angleToPoint(ss), sc.angleToPoint(se), arc.clockwise);
-			pushShape(
-				arc.isConstruction,
-				stroke =>
-					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+			pushLineShape(
+				arc.lineType,
+				width =>
+					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${arc.radius.toFixed(2)} ${arc.radius.toFixed(2)} 0 ${largeArcFlag} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${solidStroke} stroke-width="${width}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
 
 	for (const el of sketch.ellipses.values()) {
-		const pts = useSvgPoints(el.centerId, el.majorAxisPointId, el.minorAxisPointId);
+		const pts = useSvgPoints(includeSolid && !el.isConstruction, el.centerId, el.majorAxisPointId, el.minorAxisPointId);
 		if (pts) {
 			const [sc, smaj, smin] = pts;
 			const r = sc.distancesTo(smaj, smin);
+			addSvgBounds(sc, Math.max(r.x, r.y));
 			const deg = sc.angleToPointDeg(smaj);
-			pushShape(
-				el.isConstruction,
-				stroke =>
-					`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${stroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
+			solid.push(
+				`<ellipse cx="${sc.x.toFixed(2)}" cy="${sc.y.toFixed(2)}" rx="${r.x.toFixed(2)}" ry="${r.y.toFixed(2)}" transform="rotate(${deg.toFixed(2)} ${sc.x.toFixed(2)} ${sc.y.toFixed(2)})"${solidStroke} stroke-width="${strokeWidth}" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
 
 	for (const elarc of sketch.ellipticalArcs.values()) {
 		const pts = useSvgPoints(
+			includeSolid && !elarc.isConstruction,
 			elarc.centerId,
 			elarc.majorAxisPointId,
 			elarc.minorAxisPointId,
@@ -852,6 +934,7 @@ export function exportSketchToSVG(
 		if (pts) {
 			const [sc, smaj, smin, ss, se] = pts;
 			const r = sc.distancesTo(smaj, smin);
+			addSvgBounds(sc, Math.max(r.x, r.y));
 			const theta = sc.angleToPoint(smaj);
 			const thetaDeg = (theta * 180) / Math.PI;
 			const { axisU: u, axisV: v } = ellipseAxes(theta);
@@ -860,26 +943,24 @@ export function exportSketchToSVG(
 				ellipseParameterAtPoint(se, sc, r, u, v),
 				elarc.clockwise
 			);
-			pushShape(
-				elarc.isConstruction,
-				stroke =>
-					`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+			solid.push(
+				`<path d="M ${ss.x.toFixed(2)} ${ss.y.toFixed(2)} A ${r.x.toFixed(2)} ${r.y.toFixed(2)} ${thetaDeg.toFixed(2)} ${largeArc} ${sweepFlag} ${se.x.toFixed(2)} ${se.y.toFixed(2)}"${solidStroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
 
 	for (const spline of sketch.splines.values()) {
+		const visible = includeSolid && !spline.isConstruction;
 		for (const pid of spline.pointIds) usedPoints.add(pid);
 		if (spline.tangentLineIds) {
 			for (const lid of spline.tangentLineIds) {
 				const l = sketch.lines.get(lid);
-				if (l) {
-					usedPoints.add(l.p1Id);
-					usedPoints.add(l.p2Id);
-				}
+				if (l) useSvgPoints(visible, l.p1Id, l.p2Id);
 			}
 		}
+		if (!visible) continue;
 		const pts = spline.pointIds.map(id => sketch.points.get(id)).filter(Boolean) as SketchPoint[];
+		for (const pt of pts) bbox.addPoint(pt);
 		if (pts.length >= 2) {
 			let segments: BezierSegment[] = [];
 			if (spline.splineType === 'control') {
@@ -905,16 +986,14 @@ export function exportSketchToSVG(
 				);
 			}
 			const d = getSplineSvgPath(segments, p => p, !!spline.isClosed);
-			pushShape(
-				spline.isConstruction,
-				stroke =>
-					`<path d="${d}"${stroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
+			solid.push(
+				`<path d="${d}"${solidStroke} stroke-width="${strokeWidth}" stroke-linecap="round" fill="${SVG_EXPORT_STYLE.fill}" />`
 			);
 		}
 	}
 
 	// Export text objects as vector paths
-	for (const text of sketch.texts.values()) {
+	for (const text of includeSolid ? sketch.texts.values() : []) {
 		const font = getFontSync(text.fontFamily, text.bold, text.italic);
 		if (!font) continue;
 
@@ -950,6 +1029,12 @@ export function exportSketchToSVG(
 		);
 
 		if (d) {
+			if (rectangleCorners) {
+				for (const corner of rectangleCorners) bbox.addPoint(corner);
+			} else if (targetCurve) {
+				const pathBounds = getCurveBoundingBox(targetCurve);
+				if (pathBounds) bbox.addPoint(pathBounds.min).addPoint(pathBounds.max);
+			}
 			solid.push(
 				`<path d="${d}" fill="${SVG_EXPORT_STYLE.regionFill}" fill-opacity="${SVG_EXPORT_STYLE.regionFillOpacity}" stroke="${SVG_EXPORT_STYLE.regionStroke}" />`
 			);
@@ -957,21 +1042,20 @@ export function exportSketchToSVG(
 	}
 
 	// Export isolated points
-	for (const pt of sketch.points.values()) {
+	for (const pt of includeSolid ? sketch.points.values() : []) {
 		if (!usedPoints.has(pt.id) && !textRectPointIds.has(pt.id)) {
+			bbox.addPoint(pt);
 			const fill = SVG_EXPORT_STYLE.isolatedPointFill;
 			solid.push(`<circle cx="${pt.x.toFixed(2)}" cy="${(-pt.y).toFixed(2)}" r="${strokeWidth}" fill="${fill}" />`);
 		}
 	}
 
-	let bbox = sketch.getBoundingBox();
 	if (layers.dimensions && dimensions) {
-		bbox ??= new AABB();
 		bbox.addPoint(dimensions.bounds.min).addPoint(dimensions.bounds.max);
 	}
 	let bounds = [-100, -100, 200, 200];
 
-	if (bbox) {
+	if ([bbox.min.x, bbox.min.y, bbox.max.x, bbox.max.y].every(Number.isFinite)) {
 		const w = bbox.max.x - bbox.min.x;
 		const h = bbox.max.y - bbox.min.y;
 		const padding = Math.max(10, Math.max(w, h) * 0.05);
@@ -984,13 +1068,21 @@ export function exportSketchToSVG(
 	}
 
 	const viewBox = bounds.map(value => (value * scale).toFixed(2)).join(' ');
-	const geometry = { regions, solid, construction };
-	const groups = (['regions', 'solid', 'construction'] as const)
+	const geometry = { regions, solid };
+	const groups = (['regions', 'solid'] as const)
 		.filter(id => layers[id] !== false)
 		.map(id => {
 			const content = geometry[id].map(element => `    ${element}\n`).join('');
 			return `<g id="${id}" transform="${scaleTransform}">\n${content}  </g>`;
 		});
+
+	for (const [type, shapes] of drawingLines) {
+		const { layer, dash } = DRAWING_LINE_STYLES[type];
+		if (shapes.length === 0) continue;
+		const pattern = dash.map(length => Number((length * strokeWidth).toPrecision(8))).join(' ');
+		const content = shapes.map(element => `    ${element}\n`).join('');
+		groups.push(`<g id="${layer}" transform="${scaleTransform}" stroke-dasharray="${pattern}">\n${content}  </g>`);
+	}
 
 	if (layers.dimensions && dimensions) {
 		groups.push(`<g id="dimensions" transform="${scaleTransform}">${dimensions.svg}</g>`);
@@ -1009,9 +1101,13 @@ export function importSketchFromSVG(
 	error?: string;
 } {
 	const restoreMetadata = (rawJson: string) => {
-		const data = JSON.parse(rawJson) as SketchFileMetadata;
+		const data = JSON.parse(rawJson) as Omit<SketchFileMetadata, 'snapshot'> & { snapshot?: ImportedSketchSnapshot };
 		if (data.format !== 'svg-sketcher' || !data.snapshot) return null;
-		sketch.restoreSnapshot(withoutImageObjectUrls(data.snapshot));
+		// Both version numbers were used for snapshots with explicit line types.
+		if (data.version !== SKETCH_FILE_VERSION && data.version !== 2) {
+			return { success: false, error: `Unsupported Sketcher SVG version ${data.version}` };
+		}
+		sketch.restoreSnapshot(withoutImageObjectUrls(normalizeImportedLineTypes(data.snapshot)));
 		sketch.clearHistory();
 		return {
 			success: true,

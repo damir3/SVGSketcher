@@ -1,5 +1,6 @@
 import type { IConstraint } from '../solver/types';
 export * from './primitives';
+export * from './lineTypes';
 import type {
 	SketchPoint,
 	SketchLine,

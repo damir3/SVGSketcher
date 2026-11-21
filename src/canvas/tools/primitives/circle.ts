@@ -9,7 +9,8 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { getCircumcircle, Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine } from '../../svg';
-import { AUX_RAY_ATTRS, getPreviewStrokeAttrs } from '../../styles';
+import { applyDrawingLineStyle, AUX_RAY_ATTRS, getPreviewStrokeAttrs } from '../../styles';
+import { getRoundCurveLineType } from '../../../model/lineTypes';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { VariationToolPanel } from '../../../ui/panels/tools';
 import { findHoverTarget } from '../hoverTarget';
@@ -170,7 +171,7 @@ export class CircleTool extends BaseTool {
 	private finish(center: Vec2, radius: number, existingCenterId?: string, dimensionMode?: 'radius' | 'diameter'): void {
 		const sketch = this.ctx.sketch;
 		const point = existingCenterId ? sketch.points.get(existingCenterId)! : sketch.addPoint(center);
-		const circle = sketch.addCircle(point.id, Math.max(radius, 0.1), this.ctx.isConstructionMode);
+		const circle = sketch.addCircle(point.id, Math.max(radius, 0.1), getRoundCurveLineType(this.ctx.lineType));
 
 		if (this._mode === 'three_tangent' || this._mode === 'two_tangent') {
 			for (const lineId of this.lineIds) {
@@ -500,7 +501,12 @@ export class CircleTool extends BaseTool {
 		const centerScreen = ctx.viewport.worldToScreen(this.center!);
 		const radiusPixels = radius * ctx.viewport.zoom;
 
-		createSvgCircle(centerScreen, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
+		createSvgCircle(
+			centerScreen,
+			radiusPixels,
+			applyDrawingLineStyle(getPreviewStrokeAttrs(ctx.isConstruction), getRoundCurveLineType(this.ctx.lineType)),
+			ctx.targetGroup
+		);
 		createSvgLine(centerScreen.clone().multiplyScalar(2).sub(edge), edge, AUX_RAY_ATTRS, ctx.targetGroup);
 	}
 
@@ -598,7 +604,12 @@ export class CircleTool extends BaseTool {
 		const screenCenter = ctx.viewport.worldToScreen(center);
 		const screenEdge = ctx.viewport.worldToScreen(new Vec2(center.x + radius, center.y));
 		const radiusPixels = screenCenter.distanceTo(screenEdge);
-		createSvgCircle(screenCenter, radiusPixels, getPreviewStrokeAttrs(ctx.isConstruction, false), ctx.targetGroup);
+		createSvgCircle(
+			screenCenter,
+			radiusPixels,
+			applyDrawingLineStyle(getPreviewStrokeAttrs(ctx.isConstruction), getRoundCurveLineType(this.ctx.lineType)),
+			ctx.targetGroup
+		);
 	}
 
 	private openRadiusPopup(screen: Vec2, label = 'Diameter', defaultValue = 20): void {

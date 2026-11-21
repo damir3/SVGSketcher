@@ -99,6 +99,7 @@ function createMockContext(sketch: SketchDocument, svgRoot: any): ToolContext {
 		svg: svgRoot as any,
 		highlightManager,
 		isConstructionMode: false,
+		lineType: 'solid',
 		requestRender: () => {},
 		setCursor: () => {},
 		findPointNear: (screen: Vec2, radius = 10) => {

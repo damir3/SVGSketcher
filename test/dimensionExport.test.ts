@@ -94,24 +94,37 @@ test('exported point diameter is twice the primitive stroke width in every unit 
 	}
 });
 
-test('custom line width controls geometry, construction dashes and points and survives SVG reopening', () => {
+test('custom line width controls geometry, engineering dashes and points and survives SVG reopening', () => {
 	const sketch = scene();
 	const a = sketch.addPoint(new Vec2(0, 50));
 	const b = sketch.addPoint(new Vec2(70, 50));
-	sketch.addLine(a.id, b.id, true);
-	sketch.addCircle(a.id, 10, true);
+	const c = sketch.addPoint(new Vec2(0, 120));
+	sketch.addLine(a.id, b.id, 'hidden');
+	sketch.addCircle(a.id, 10, 'hidden');
+	sketch.addArc(a.id, b.id, c.id, 70, false, 'centerline');
+	sketch.addCircle(b.id, 15, 'phantom');
+	sketch.addLine(a.id, c.id, 'cutting_plane');
 	sketch.addPoint(new Vec2(100, 50));
+	const widthFactors = {
+		solid: [1],
+		centerlines: [0.5],
+		'hidden-lines': [0.5, 0.5],
+		'phantom-lines': [0.5],
+		'cutting-planes': [1, 1, 1],
+	};
 	for (const strokeWidth of [0.1, 0.35, 0.8]) {
 		for (const scale of [1, 96 / 25.4]) {
 			const svg = sketch.exportSVG(undefined, scale, { strokeWidth });
-			for (const match of svg.matchAll(/stroke-width="([^"]+)"/g)) {
-				assert.equal(Number(match[1]), strokeWidth);
+			for (const [layer, factors] of Object.entries(widthFactors)) {
+				const group = svg.match(new RegExp(`<g id="${layer}"[^>]*>([\\s\\S]*?)</g>`))?.[1] ?? '';
+				const widths = Array.from(group.matchAll(/stroke-width="([^"]+)"/g), match => Number(match[1]));
+				assert.deepEqual(widths, factors.map(factor => strokeWidth * factor), layer);
 			}
-			const dashes = [...svg.matchAll(/stroke-dasharray="([^"]+)"/g)];
-			assert.equal(dashes.length, 2);
-			for (const match of dashes) {
-				assert.deepEqual(match[1].split(',').map(Number), [strokeWidth * 5, strokeWidth * 5]);
-			}
+			const hiddenDashes = svg.match(/<g id="hidden-lines"[^>]*stroke-dasharray="([^"]+)"/)![1];
+			assert.deepEqual(
+				hiddenDashes.split(' ').map(Number),
+				[5, 3].map(length => Number((strokeWidth * length).toPrecision(8)))
+			);
 			assert.equal(Number(svg.match(/<circle cx="100.00" cy="-50.00" r="([^"]+)"/)![1]), strokeWidth);
 			const reopened = new SketchDocument();
 			const result = reopened.importSVG(svg);
@@ -196,7 +209,7 @@ test('an empty sketch can export dimensions alone without geometry or invalid bo
 	const svg = new SketchDocument().exportSVG(
 		undefined,
 		1,
-		{ solid: false, construction: false, regions: false, images: false, dimensions: true },
+		{ solid: false, engineeringLines: false, regions: false, images: false, dimensions: true },
 		dimensions
 	);
 	assert.match(svg, /id="dimensions"/);
@@ -244,6 +257,41 @@ test('renderer exports only dimensions without selection styling or changing can
 		}
 		assert.equal(renderer.exportDimensions(new SketchDocument(), viewport), undefined);
 		assert.equal(svg.innerHTML, before);
+	} finally {
+		globalThis.document = previous;
+	}
+});
+
+test('cutting-plane letters export at the same effective size as dimension labels', () => {
+	const previous = globalThis.document;
+	try {
+		globalThis.document = { createElementNS: (_ns: string, tag: string) => new SvgElement(tag) } as unknown as Document;
+		const sketch = scene();
+		const a = sketch.addPoint(new Vec2(0, 35));
+		const b = sketch.addPoint(new Vec2(70, 35));
+		sketch.addLine(a.id, b.id, 'cutting_plane');
+		const renderer = new SVGRenderer(new SvgElement('svg') as unknown as SVGSVGElement);
+		const viewport = new Viewport(800, 600);
+		for (const zoom of [1, 2.5, 8]) {
+			viewport.zoom = zoom;
+			for (const [scale, strokeWidth] of [[1, 0.2], [96 / 25.4, 0.8]]) {
+				const dimensions = renderer.exportDimensions(sketch, viewport, strokeWidth)!;
+				const svg = sketch.exportSVG(undefined, scale, { dimensions: true, strokeWidth }, dimensions);
+				const dimensionFont = Number(dimensions.svg.match(/font-size="([^"]+)"/)![1]);
+				const dimensionScale = Number(dimensions.svg.match(/translate\([^)]+\) scale\(([^)]+)\)/)![1]);
+				const letters = [...svg.matchAll(/<text [^>]*font-size="([^"]+)"[^>]*>A<\/text>/g)];
+				assert.equal(letters.length, 2);
+				for (const letter of letters) {
+					assert.ok(Math.abs(Number(letter[1]) - dimensionFont * dimensionScale) < 1e-10);
+				}
+
+				const withoutDimensions = sketch.exportSVG(viewport, scale, { strokeWidth });
+				assert.equal(
+					withoutDimensions.match(/<text [^>]*font-size="([^"]+)"[^>]*>A<\/text>/)?.[1],
+					letters[0][1]
+				);
+			}
+		}
 	} finally {
 		globalThis.document = previous;
 	}

@@ -28,21 +28,21 @@
       "id": "Line-7",
       "p1Id": "Point-8",
       "p2Id": "Point-9",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-8",
       "p1Id": "Point-9",
       "p2Id": "Point-10",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-9",
       "p1Id": "Point-10",
       "p2Id": "Point-8",
-      "isConstruction": false
+      "lineType": "solid"
     }
   ],
   "circles": [],

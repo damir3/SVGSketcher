@@ -78,9 +78,9 @@ function mixedSketch() {
 		center = add('center', 0, 0);
 	const major = add('major', 16, 0),
 		minor = add('minor', 0, 6);
-	doc.lines.set('line', new SketchLine('line', a, b));
-	doc.circles.set('circle', new SketchCircle('circle', center, 10));
-	doc.arcs.set('arc', new SketchArc('arc', center, a, c, 10, true));
+	doc.lines.set('line', new SketchLine({ id: 'line', p1Id: a, p2Id: b, lineType: 'solid' }));
+	doc.circles.set('circle', new SketchCircle({ id: 'circle', centerId: center, radius: 10 }));
+	doc.arcs.set('arc', new SketchArc({ id: 'arc', centerId: center, startPointId: a, endPointId: c, radius: 10, clockwise: true }));
 	doc.ellipses.set('ellipse', new SketchEllipse('ellipse', center, major, minor));
 	doc.ellipticalArcs.set('ellarc', new SketchEllipticalArc('ellarc', center, major, minor, major, minor, true));
 	const fitIds = [add('f1', 20, 0), add('f2', 30, 12), add('f3', 40, 2)];

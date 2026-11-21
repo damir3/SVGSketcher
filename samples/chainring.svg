@@ -4462,812 +4462,812 @@
         "id": "Line-1",
         "p1Id": "Point-13",
         "p2Id": "Point-19",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-2",
         "p1Id": "Point-20",
         "p2Id": "Point-16",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-3",
         "p1Id": "Point-24",
         "p2Id": "Point-26",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-4",
         "p1Id": "Point-25",
         "p2Id": "Point-27",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-5",
         "p1Id": "Point-290",
         "p2Id": "Point-291",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-6",
         "p1Id": "Point-293",
         "p2Id": "Point-294",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-7",
         "p1Id": "Point-298",
         "p2Id": "Point-299",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-8",
         "p1Id": "Point-301",
         "p2Id": "Point-302",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-9",
         "p1Id": "Point-306",
         "p2Id": "Point-307",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-10",
         "p1Id": "Point-309",
         "p2Id": "Point-310",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-11",
         "p1Id": "Point-314",
         "p2Id": "Point-315",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-12",
         "p1Id": "Point-317",
         "p2Id": "Point-318",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-13",
         "p1Id": "Point-322",
         "p2Id": "Point-323",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-14",
         "p1Id": "Point-325",
         "p2Id": "Point-326",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-15",
         "p1Id": "Point-330",
         "p2Id": "Point-331",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-16",
         "p1Id": "Point-333",
         "p2Id": "Point-334",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-17",
         "p1Id": "Point-338",
         "p2Id": "Point-339",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-18",
         "p1Id": "Point-341",
         "p2Id": "Point-342",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-19",
         "p1Id": "Point-346",
         "p2Id": "Point-347",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-20",
         "p1Id": "Point-349",
         "p2Id": "Point-350",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-21",
         "p1Id": "Point-354",
         "p2Id": "Point-355",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-22",
         "p1Id": "Point-357",
         "p2Id": "Point-358",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-23",
         "p1Id": "Point-362",
         "p2Id": "Point-363",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-24",
         "p1Id": "Point-365",
         "p2Id": "Point-366",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-25",
         "p1Id": "Point-370",
         "p2Id": "Point-371",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-26",
         "p1Id": "Point-373",
         "p2Id": "Point-374",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-27",
         "p1Id": "Point-378",
         "p2Id": "Point-379",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-28",
         "p1Id": "Point-381",
         "p2Id": "Point-382",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-29",
         "p1Id": "Point-386",
         "p2Id": "Point-387",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-30",
         "p1Id": "Point-389",
         "p2Id": "Point-390",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-31",
         "p1Id": "Point-394",
         "p2Id": "Point-395",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-32",
         "p1Id": "Point-397",
         "p2Id": "Point-398",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-33",
         "p1Id": "Point-402",
         "p2Id": "Point-403",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-34",
         "p1Id": "Point-405",
         "p2Id": "Point-406",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-35",
         "p1Id": "Point-410",
         "p2Id": "Point-411",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-36",
         "p1Id": "Point-413",
         "p2Id": "Point-414",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-37",
         "p1Id": "Point-418",
         "p2Id": "Point-419",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-38",
         "p1Id": "Point-421",
         "p2Id": "Point-422",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-39",
         "p1Id": "Point-426",
         "p2Id": "Point-427",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-40",
         "p1Id": "Point-429",
         "p2Id": "Point-430",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-41",
         "p1Id": "Point-434",
         "p2Id": "Point-435",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-42",
         "p1Id": "Point-437",
         "p2Id": "Point-438",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-43",
         "p1Id": "Point-442",
         "p2Id": "Point-443",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-44",
         "p1Id": "Point-445",
         "p2Id": "Point-446",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-45",
         "p1Id": "Point-450",
         "p2Id": "Point-451",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-46",
         "p1Id": "Point-453",
         "p2Id": "Point-454",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-47",
         "p1Id": "Point-458",
         "p2Id": "Point-459",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-48",
         "p1Id": "Point-461",
         "p2Id": "Point-462",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-49",
         "p1Id": "Point-466",
         "p2Id": "Point-467",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-50",
         "p1Id": "Point-469",
         "p2Id": "Point-470",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-51",
         "p1Id": "Point-474",
         "p2Id": "Point-475",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-52",
         "p1Id": "Point-477",
         "p2Id": "Point-478",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-53",
         "p1Id": "Point-482",
         "p2Id": "Point-483",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-54",
         "p1Id": "Point-485",
         "p2Id": "Point-486",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-55",
         "p1Id": "Point-490",
         "p2Id": "Point-491",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-56",
         "p1Id": "Point-493",
         "p2Id": "Point-494",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-57",
         "p1Id": "Point-498",
         "p2Id": "Point-499",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-58",
         "p1Id": "Point-501",
         "p2Id": "Point-502",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-59",
         "p1Id": "Point-506",
         "p2Id": "Point-507",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-60",
         "p1Id": "Point-509",
         "p2Id": "Point-510",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-61",
         "p1Id": "Point-514",
         "p2Id": "Point-515",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-62",
         "p1Id": "Point-517",
         "p2Id": "Point-518",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-63",
         "p1Id": "Point-522",
         "p2Id": "Point-523",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-64",
         "p1Id": "Point-525",
         "p2Id": "Point-526",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-65",
         "p1Id": "Point-530",
         "p2Id": "Point-531",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-66",
         "p1Id": "Point-533",
         "p2Id": "Point-534",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-67",
         "p1Id": "Point-538",
         "p2Id": "Point-539",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-68",
         "p1Id": "Point-541",
         "p2Id": "Point-542",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-69",
         "p1Id": "Point-546",
         "p2Id": "Point-547",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-70",
         "p1Id": "Point-549",
         "p2Id": "Point-550",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-71",
         "p1Id": "Point-554",
         "p2Id": "Point-555",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-72",
         "p1Id": "Point-557",
         "p2Id": "Point-558",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-73",
         "p1Id": "Point-562",
         "p2Id": "Point-563",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-74",
         "p1Id": "Point-565",
         "p2Id": "Point-566",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-75",
         "p1Id": "Point-570",
         "p2Id": "Point-571",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-76",
         "p1Id": "Point-573",
         "p2Id": "Point-574",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-77",
         "p1Id": "Point-578",
         "p2Id": "Point-579",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-78",
         "p1Id": "Point-581",
         "p2Id": "Point-582",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-79",
         "p1Id": "Point-586",
         "p2Id": "Point-587",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-80",
         "p1Id": "Point-589",
         "p2Id": "Point-590",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-81",
         "p1Id": "Point-594",
         "p2Id": "Point-595",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-82",
         "p1Id": "Point-597",
         "p2Id": "Point-598",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-83",
         "p1Id": "Point-602",
         "p2Id": "Point-603",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-84",
         "p1Id": "Point-605",
         "p2Id": "Point-606",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-85",
         "p1Id": "Point-610",
         "p2Id": "Point-611",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-86",
         "p1Id": "Point-613",
         "p2Id": "Point-614",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-87",
         "p1Id": "Point-618",
         "p2Id": "Point-619",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-88",
         "p1Id": "Point-621",
         "p2Id": "Point-622",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-89",
         "p1Id": "Point-626",
         "p2Id": "Point-627",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-90",
         "p1Id": "Point-629",
         "p2Id": "Point-630",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-91",
         "p1Id": "Point-634",
         "p2Id": "Point-635",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-92",
         "p1Id": "Point-637",
         "p2Id": "Point-638",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-93",
         "p1Id": "Point-642",
         "p2Id": "Point-643",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-94",
         "p1Id": "Point-645",
         "p2Id": "Point-646",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-95",
         "p1Id": "Point-650",
         "p2Id": "Point-651",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-96",
         "p1Id": "Point-653",
         "p2Id": "Point-654",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-97",
         "p1Id": "Point-658",
         "p2Id": "Point-659",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-98",
         "p1Id": "Point-661",
         "p2Id": "Point-662",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-99",
         "p1Id": "Point-666",
         "p2Id": "Point-667",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-100",
         "p1Id": "Point-669",
         "p2Id": "Point-670",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-101",
         "p1Id": "Point-674",
         "p2Id": "Point-675",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-102",
         "p1Id": "Point-677",
         "p2Id": "Point-678",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-103",
         "p1Id": "Point-682",
         "p2Id": "Point-683",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-104",
         "p1Id": "Point-685",
         "p2Id": "Point-686",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-105",
         "p1Id": "Point-690",
         "p2Id": "Point-691",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-106",
         "p1Id": "Point-693",
         "p2Id": "Point-694",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-107",
         "p1Id": "Point-698",
         "p2Id": "Point-699",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-108",
         "p1Id": "Point-702",
         "p2Id": "Point-703",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-109",
         "p1Id": "Point-707",
         "p2Id": "Point-708",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-110",
         "p1Id": "Point-711",
         "p2Id": "Point-712",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-111",
         "p1Id": "Point-716",
         "p2Id": "Point-717",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-112",
         "p1Id": "Point-720",
         "p2Id": "Point-721",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-113",
         "p1Id": "Point-725",
         "p2Id": "Point-726",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-114",
         "p1Id": "Point-729",
         "p2Id": "Point-730",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-115",
         "p1Id": "Point-734",
         "p2Id": "Point-735",
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "line",
         "id": "Line-116",
         "p1Id": "Point-738",
         "p2Id": "Point-739",
-        "isConstruction": false
+        "lineType": "solid"
       }
     ],
     "circles": [
@@ -5276,70 +5276,70 @@
         "id": "Circle-2",
         "centerId": "Point-1",
         "radius": 40,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-3",
         "centerId": "Point-1",
         "radius": 52,
-        "isConstruction": true
+        "lineType": "construction"
       },
       {
         "type": "circle",
         "id": "Circle-4",
         "centerId": "Point-2",
         "radius": 5,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-5",
         "centerId": "Point-3",
         "radius": 5,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-6",
         "centerId": "Point-4",
         "radius": 5,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-7",
         "centerId": "Point-5",
         "radius": 5,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-8",
         "centerId": "Point-6",
         "radius": 5,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-9",
         "centerId": "Point-7",
         "radius": 5,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "circle",
         "id": "Circle-10",
         "centerId": "Point-286",
         "radius": 136,
-        "isConstruction": true
+        "lineType": "construction"
       },
       {
         "type": "circle",
         "id": "Circle-11",
         "centerId": "Point-286",
         "radius": 131.5,
-        "isConstruction": true
+        "lineType": "construction"
       }
     ],
     "arcs": [
@@ -5351,7 +5351,7 @@
         "endPointId": "Point-17",
         "radius": 113,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5361,7 +5361,7 @@
         "endPointId": "Point-14",
         "radius": 9.5,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5371,7 +5371,7 @@
         "endPointId": "Point-17",
         "radius": 9.500000000003018,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5381,7 +5381,7 @@
         "endPointId": "Point-20",
         "radius": 9.49999999999742,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5391,7 +5391,7 @@
         "endPointId": "Point-25",
         "radius": 5,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5401,7 +5401,7 @@
         "endPointId": "Point-293",
         "radius": 5.000000000407794,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5411,7 +5411,7 @@
         "endPointId": "Point-297",
         "radius": 0.5000000004321218,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5421,7 +5421,7 @@
         "endPointId": "Point-301",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5431,7 +5431,7 @@
         "endPointId": "Point-305",
         "radius": 0.5000000004321256,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5441,7 +5441,7 @@
         "endPointId": "Point-309",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5451,7 +5451,7 @@
         "endPointId": "Point-313",
         "radius": 0.5000000004321238,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5461,7 +5461,7 @@
         "endPointId": "Point-317",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5471,7 +5471,7 @@
         "endPointId": "Point-321",
         "radius": 0.5000000004321246,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5481,7 +5481,7 @@
         "endPointId": "Point-325",
         "radius": 5.000000000407846,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5491,7 +5491,7 @@
         "endPointId": "Point-329",
         "radius": 0.5000000004321266,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5501,7 +5501,7 @@
         "endPointId": "Point-333",
         "radius": 5.000000000407848,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5511,7 +5511,7 @@
         "endPointId": "Point-337",
         "radius": 0.5000000004321247,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5521,7 +5521,7 @@
         "endPointId": "Point-341",
         "radius": 5.000000000407849,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5531,7 +5531,7 @@
         "endPointId": "Point-345",
         "radius": 0.5000000004321244,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5541,7 +5541,7 @@
         "endPointId": "Point-349",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5551,7 +5551,7 @@
         "endPointId": "Point-353",
         "radius": 0.5000000004321232,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5561,7 +5561,7 @@
         "endPointId": "Point-357",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5571,7 +5571,7 @@
         "endPointId": "Point-361",
         "radius": 0.5000000004321232,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5581,7 +5581,7 @@
         "endPointId": "Point-365",
         "radius": 5.0000000004078435,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5591,7 +5591,7 @@
         "endPointId": "Point-369",
         "radius": 0.5000000004321224,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5601,7 +5601,7 @@
         "endPointId": "Point-373",
         "radius": 5.000000000407844,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5611,7 +5611,7 @@
         "endPointId": "Point-377",
         "radius": 0.5000000004321231,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5621,7 +5621,7 @@
         "endPointId": "Point-381",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5631,7 +5631,7 @@
         "endPointId": "Point-385",
         "radius": 0.5000000004321219,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5641,7 +5641,7 @@
         "endPointId": "Point-389",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5651,7 +5651,7 @@
         "endPointId": "Point-393",
         "radius": 0.5000000004321221,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5661,7 +5661,7 @@
         "endPointId": "Point-397",
         "radius": 5.000000000407843,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5671,7 +5671,7 @@
         "endPointId": "Point-401",
         "radius": 0.5000000004321214,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5681,7 +5681,7 @@
         "endPointId": "Point-405",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5691,7 +5691,7 @@
         "endPointId": "Point-409",
         "radius": 0.5000000004321256,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5701,7 +5701,7 @@
         "endPointId": "Point-413",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5711,7 +5711,7 @@
         "endPointId": "Point-417",
         "radius": 0.5000000004321221,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5721,7 +5721,7 @@
         "endPointId": "Point-421",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5731,7 +5731,7 @@
         "endPointId": "Point-425",
         "radius": 0.5000000004321246,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5741,7 +5741,7 @@
         "endPointId": "Point-429",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5751,7 +5751,7 @@
         "endPointId": "Point-433",
         "radius": 0.5000000004321247,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5761,7 +5761,7 @@
         "endPointId": "Point-437",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5771,7 +5771,7 @@
         "endPointId": "Point-441",
         "radius": 0.5000000004321263,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5781,7 +5781,7 @@
         "endPointId": "Point-445",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5791,7 +5791,7 @@
         "endPointId": "Point-449",
         "radius": 0.5000000004321262,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5801,7 +5801,7 @@
         "endPointId": "Point-453",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5811,7 +5811,7 @@
         "endPointId": "Point-457",
         "radius": 0.5000000004321272,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5821,7 +5821,7 @@
         "endPointId": "Point-461",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5831,7 +5831,7 @@
         "endPointId": "Point-465",
         "radius": 0.5000000004321247,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5841,7 +5841,7 @@
         "endPointId": "Point-469",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5851,7 +5851,7 @@
         "endPointId": "Point-473",
         "radius": 0.5000000004321221,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5861,7 +5861,7 @@
         "endPointId": "Point-477",
         "radius": 5.000000000407843,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5871,7 +5871,7 @@
         "endPointId": "Point-481",
         "radius": 0.5000000004321217,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5881,7 +5881,7 @@
         "endPointId": "Point-485",
         "radius": 5.000000000407842,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5891,7 +5891,7 @@
         "endPointId": "Point-489",
         "radius": 0.5000000004321196,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5901,7 +5901,7 @@
         "endPointId": "Point-493",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5911,7 +5911,7 @@
         "endPointId": "Point-497",
         "radius": 0.5000000004321219,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5921,7 +5921,7 @@
         "endPointId": "Point-501",
         "radius": 5.000000000407848,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5931,7 +5931,7 @@
         "endPointId": "Point-505",
         "radius": 0.5000000004321218,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5941,7 +5941,7 @@
         "endPointId": "Point-509",
         "radius": 5.000000000407846,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5951,7 +5951,7 @@
         "endPointId": "Point-513",
         "radius": 0.5000000004321211,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5961,7 +5961,7 @@
         "endPointId": "Point-517",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5971,7 +5971,7 @@
         "endPointId": "Point-521",
         "radius": 0.5000000004321231,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5981,7 +5981,7 @@
         "endPointId": "Point-525",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -5991,7 +5991,7 @@
         "endPointId": "Point-529",
         "radius": 0.5000000004321267,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6001,7 +6001,7 @@
         "endPointId": "Point-533",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6011,7 +6011,7 @@
         "endPointId": "Point-537",
         "radius": 0.5000000004321247,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6021,7 +6021,7 @@
         "endPointId": "Point-541",
         "radius": 5.00000000040785,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6031,7 +6031,7 @@
         "endPointId": "Point-545",
         "radius": 0.5000000004321263,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6041,7 +6041,7 @@
         "endPointId": "Point-549",
         "radius": 5.000000000407849,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6051,7 +6051,7 @@
         "endPointId": "Point-553",
         "radius": 0.5000000004321228,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6061,7 +6061,7 @@
         "endPointId": "Point-557",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6071,7 +6071,7 @@
         "endPointId": "Point-561",
         "radius": 0.5000000004321284,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6081,7 +6081,7 @@
         "endPointId": "Point-565",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6091,7 +6091,7 @@
         "endPointId": "Point-569",
         "radius": 0.5000000004321213,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6101,7 +6101,7 @@
         "endPointId": "Point-573",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6111,7 +6111,7 @@
         "endPointId": "Point-577",
         "radius": 0.5000000004321266,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6121,7 +6121,7 @@
         "endPointId": "Point-581",
         "radius": 5.0000000004078435,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6131,7 +6131,7 @@
         "endPointId": "Point-585",
         "radius": 0.500000000432123,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6141,7 +6141,7 @@
         "endPointId": "Point-589",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6151,7 +6151,7 @@
         "endPointId": "Point-593",
         "radius": 0.5000000004321227,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6161,7 +6161,7 @@
         "endPointId": "Point-597",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6171,7 +6171,7 @@
         "endPointId": "Point-601",
         "radius": 0.5000000004321218,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6181,7 +6181,7 @@
         "endPointId": "Point-605",
         "radius": 5.000000000407844,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6191,7 +6191,7 @@
         "endPointId": "Point-609",
         "radius": 0.5000000004321214,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6201,7 +6201,7 @@
         "endPointId": "Point-613",
         "radius": 5.000000000407843,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6211,7 +6211,7 @@
         "endPointId": "Point-617",
         "radius": 0.5000000004321214,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6221,7 +6221,7 @@
         "endPointId": "Point-621",
         "radius": 5.000000000407845,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6231,7 +6231,7 @@
         "endPointId": "Point-625",
         "radius": 0.5000000004321221,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6241,7 +6241,7 @@
         "endPointId": "Point-629",
         "radius": 5.000000000407844,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6251,7 +6251,7 @@
         "endPointId": "Point-633",
         "radius": 0.500000000432126,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6261,7 +6261,7 @@
         "endPointId": "Point-637",
         "radius": 5.00000000040785,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6271,7 +6271,7 @@
         "endPointId": "Point-641",
         "radius": 0.5000000004321266,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6281,7 +6281,7 @@
         "endPointId": "Point-645",
         "radius": 5.000000000407849,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6291,7 +6291,7 @@
         "endPointId": "Point-649",
         "radius": 0.5000000004321263,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6301,7 +6301,7 @@
         "endPointId": "Point-653",
         "radius": 5.000000000407849,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6311,7 +6311,7 @@
         "endPointId": "Point-657",
         "radius": 0.5000000004321228,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6321,7 +6321,7 @@
         "endPointId": "Point-661",
         "radius": 5.000000000407846,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6331,7 +6331,7 @@
         "endPointId": "Point-665",
         "radius": 0.5000000004321258,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6341,7 +6341,7 @@
         "endPointId": "Point-669",
         "radius": 5.000000000407847,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6351,7 +6351,7 @@
         "endPointId": "Point-673",
         "radius": 0.5000000004321201,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6361,7 +6361,7 @@
         "endPointId": "Point-677",
         "radius": 5.0000000004078435,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6371,7 +6371,7 @@
         "endPointId": "Point-681",
         "radius": 0.5000000004321218,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6381,7 +6381,7 @@
         "endPointId": "Point-685",
         "radius": 5.000000000407842,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6391,7 +6391,7 @@
         "endPointId": "Point-689",
         "radius": 0.5000000004321222,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6401,7 +6401,7 @@
         "endPointId": "Point-693",
         "radius": 5.0000000004078435,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6411,7 +6411,7 @@
         "endPointId": "Point-697",
         "radius": 0.5000000004321192,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6421,7 +6421,7 @@
         "endPointId": "Point-289",
         "radius": 0.5,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6431,7 +6431,7 @@
         "endPointId": "Point-701",
         "radius": 113.00000000003851,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6441,7 +6441,7 @@
         "endPointId": "Point-701",
         "radius": 9.50000000181962,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6451,7 +6451,7 @@
         "endPointId": "Point-702",
         "radius": 9.500000002086338,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6461,7 +6461,7 @@
         "endPointId": "Point-700",
         "radius": 9.500000001633593,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6471,7 +6471,7 @@
         "endPointId": "Point-710",
         "radius": 113.00000000003851,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6481,7 +6481,7 @@
         "endPointId": "Point-710",
         "radius": 9.500000001819613,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6491,7 +6491,7 @@
         "endPointId": "Point-711",
         "radius": 9.50000000208633,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6501,7 +6501,7 @@
         "endPointId": "Point-709",
         "radius": 9.50000000163358,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6511,7 +6511,7 @@
         "endPointId": "Point-719",
         "radius": 113.00000000003851,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6521,7 +6521,7 @@
         "endPointId": "Point-719",
         "radius": 9.500000001819624,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6531,7 +6531,7 @@
         "endPointId": "Point-720",
         "radius": 9.50000000208634,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6541,7 +6541,7 @@
         "endPointId": "Point-718",
         "radius": 9.500000001633587,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6551,7 +6551,7 @@
         "endPointId": "Point-728",
         "radius": 113.00000000003851,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6561,7 +6561,7 @@
         "endPointId": "Point-728",
         "radius": 9.50000000181962,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6571,7 +6571,7 @@
         "endPointId": "Point-729",
         "radius": 9.500000002086336,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6581,7 +6581,7 @@
         "endPointId": "Point-727",
         "radius": 9.500000001633591,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6591,7 +6591,7 @@
         "endPointId": "Point-737",
         "radius": 113.0000000000385,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6601,7 +6601,7 @@
         "endPointId": "Point-737",
         "radius": 9.500000001819615,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6611,7 +6611,7 @@
         "endPointId": "Point-738",
         "radius": 9.500000002086333,
         "clockwise": false,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6621,7 +6621,7 @@
         "endPointId": "Point-736",
         "radius": 9.500000001633584,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6631,7 +6631,7 @@
         "endPointId": "Point-744",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6641,7 +6641,7 @@
         "endPointId": "Point-747",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6651,7 +6651,7 @@
         "endPointId": "Point-750",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6661,7 +6661,7 @@
         "endPointId": "Point-753",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6671,7 +6671,7 @@
         "endPointId": "Point-756",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6681,7 +6681,7 @@
         "endPointId": "Point-759",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6691,7 +6691,7 @@
         "endPointId": "Point-762",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6701,7 +6701,7 @@
         "endPointId": "Point-765",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6711,7 +6711,7 @@
         "endPointId": "Point-768",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6721,7 +6721,7 @@
         "endPointId": "Point-771",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6731,7 +6731,7 @@
         "endPointId": "Point-774",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6741,7 +6741,7 @@
         "endPointId": "Point-777",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6751,7 +6751,7 @@
         "endPointId": "Point-780",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6761,7 +6761,7 @@
         "endPointId": "Point-783",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6771,7 +6771,7 @@
         "endPointId": "Point-786",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6781,7 +6781,7 @@
         "endPointId": "Point-789",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6791,7 +6791,7 @@
         "endPointId": "Point-792",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6801,7 +6801,7 @@
         "endPointId": "Point-795",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6811,7 +6811,7 @@
         "endPointId": "Point-798",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6821,7 +6821,7 @@
         "endPointId": "Point-801",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6831,7 +6831,7 @@
         "endPointId": "Point-804",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6841,7 +6841,7 @@
         "endPointId": "Point-807",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6851,7 +6851,7 @@
         "endPointId": "Point-810",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6861,7 +6861,7 @@
         "endPointId": "Point-813",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6871,7 +6871,7 @@
         "endPointId": "Point-816",
         "radius": 127.99999999999999,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6881,7 +6881,7 @@
         "endPointId": "Point-819",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6891,7 +6891,7 @@
         "endPointId": "Point-822",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6901,7 +6901,7 @@
         "endPointId": "Point-825",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6911,7 +6911,7 @@
         "endPointId": "Point-828",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6921,7 +6921,7 @@
         "endPointId": "Point-831",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6931,7 +6931,7 @@
         "endPointId": "Point-834",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6941,7 +6941,7 @@
         "endPointId": "Point-837",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6951,7 +6951,7 @@
         "endPointId": "Point-840",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6961,7 +6961,7 @@
         "endPointId": "Point-843",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6971,7 +6971,7 @@
         "endPointId": "Point-846",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6981,7 +6981,7 @@
         "endPointId": "Point-849",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -6991,7 +6991,7 @@
         "endPointId": "Point-852",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7001,7 +7001,7 @@
         "endPointId": "Point-855",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7011,7 +7011,7 @@
         "endPointId": "Point-858",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7021,7 +7021,7 @@
         "endPointId": "Point-861",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7031,7 +7031,7 @@
         "endPointId": "Point-864",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7041,7 +7041,7 @@
         "endPointId": "Point-867",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7051,7 +7051,7 @@
         "endPointId": "Point-870",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7061,7 +7061,7 @@
         "endPointId": "Point-873",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7071,7 +7071,7 @@
         "endPointId": "Point-876",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7081,7 +7081,7 @@
         "endPointId": "Point-879",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7091,7 +7091,7 @@
         "endPointId": "Point-882",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7101,7 +7101,7 @@
         "endPointId": "Point-885",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7111,7 +7111,7 @@
         "endPointId": "Point-888",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7121,7 +7121,7 @@
         "endPointId": "Point-891",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7131,7 +7131,7 @@
         "endPointId": "Point-894",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       },
       {
         "type": "arc",
@@ -7141,7 +7141,7 @@
         "endPointId": "Point-897",
         "radius": 128,
         "clockwise": true,
-        "isConstruction": false
+        "lineType": "solid"
       }
     ],
     "ellipses": [],

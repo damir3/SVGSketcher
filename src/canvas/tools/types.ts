@@ -8,6 +8,7 @@ import type { HoverTarget, FindHoverTargetOptions } from './hoverTarget';
 import type { IHighlightManager } from '../highlightManager';
 import type { IToolPanel } from '../../ui/panels/tools/types';
 import type {
+	EditableLineType,
 	SketchPoint,
 	SketchLine,
 	SketchCircle,
@@ -119,6 +120,7 @@ export interface ToolContext {
 
 	/** Whether construction geometry mode is currently enabled */
 	readonly isConstructionMode: boolean;
+	readonly lineType: EditableLineType;
 
 	/** Trigger full redraw of canvas */
 	requestRender(): void;

@@ -477,6 +477,7 @@ describe('Origin & Axis Constraints', () => {
 				},
 				renderer: { clearPreviews: () => {} },
 				isConstructionMode: false,
+				lineType: 'solid',
 				setCursor: () => {},
 				applySnapConstraintIfNeeded: (pointId: string, snap: any) => {
 					if (snap?.id === 'origin') {

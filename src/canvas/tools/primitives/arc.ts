@@ -3,6 +3,7 @@ import { BaseTool } from '../base';
 import type { ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import { Vec2 } from '../../../math/vector';
 import { renderArcPreviewVisual } from '../../previewHelpers';
+import { getRoundCurveLineType } from '../../../model/lineTypes';
 import { createSvgCircle, createSvgLine } from '../../svg';
 import { AUX_RAY_ATTRS, GUIDE_OUTLINE_ATTRS, getPreviewStrokeAttrs } from '../../styles';
 import { ToolPopup } from '../../../ui/tool-popup';
@@ -366,7 +367,7 @@ export class ArcTool extends BaseTool {
 				this.arcPoint2Id!,
 				geometry.radius,
 				geometry.clockwise,
-				this.ctx.isConstructionMode
+				getRoundCurveLineType(this.ctx.lineType)
 			);
 			this.finalizeArcCommit(arc, '3-point arc created');
 		}
@@ -410,7 +411,7 @@ export class ArcTool extends BaseTool {
 			s2,
 			geometry.radius * viewport.zoom,
 			geometry.clockwise,
-			isConstruction
+			getRoundCurveLineType(this.ctx.lineType)
 		);
 	}
 
@@ -469,7 +470,7 @@ export class ArcTool extends BaseTool {
 				endId,
 				radius,
 				clockwise,
-				this.ctx.isConstructionMode
+				getRoundCurveLineType(this.ctx.lineType)
 			);
 			this.finalizeArcCommit(arc, 'Centerpoint arc created');
 		}
@@ -536,7 +537,7 @@ export class ArcTool extends BaseTool {
 				viewport.worldToScreen(end),
 				radius * viewport.zoom,
 				clockwise,
-				ctx.isConstruction
+				getRoundCurveLineType(this.ctx.lineType)
 			);
 		}
 	}
@@ -603,7 +604,7 @@ export class ArcTool extends BaseTool {
 				endPointId,
 				geom.radius,
 				geom.clockwise,
-				this.ctx.isConstructionMode
+				getRoundCurveLineType(this.ctx.lineType)
 			);
 
 			// Automatically add tangent constraint between the connected curve and the new arc
@@ -652,7 +653,7 @@ export class ArcTool extends BaseTool {
 				geometry.s2,
 				geometry.radius * ctx.viewport.zoom,
 				geometry.clockwise,
-				ctx.isConstruction
+				getRoundCurveLineType(this.ctx.lineType)
 			);
 		} else {
 			createSvgLine(

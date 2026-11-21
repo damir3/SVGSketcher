@@ -13,7 +13,7 @@ describe('solver status without constraints', () => {
 				{ type: 'point', id: 'Point-4', x: -50, y: 0, fixed: false },
 				{ type: 'point', id: 'Point-5', x: 0, y: 25, fixed: false },
 			],
-			lines: [{ type: 'line', id: 'Line-4', p1Id: 'Point-4', p2Id: 'Point-5', isConstruction: false }],
+			lines: [{ type: 'line', id: 'Line-4', p1Id: 'Point-4', p2Id: 'Point-5', lineType: 'solid' }],
 			circles: [],
 			arcs: [],
 			constraints: [],

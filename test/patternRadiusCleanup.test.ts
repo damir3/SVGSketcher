@@ -96,7 +96,7 @@ for (const kind of ['circular', 'rectangular'] as const)
 				b = sketch.addPoint(new Vec2(kind === 'circular' ? -10 : 30, 0), true);
 			const source = sketch.addCircle(a.id, 5),
 				copy = sketch.addCircle(b.id, 5);
-			sketch.addLine(a.id, b.id, true); // retain both centers when either circle is deleted
+			sketch.addLine(a.id, b.id, 'construction'); // retain both centers when either circle is deleted
 			const data = {
 				copyIndex: 1,
 				i: 1,

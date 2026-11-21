@@ -2,7 +2,7 @@ import { getImageBounds } from './image';
 import type { SketchDocument } from './sketch';
 import { Vec2 } from '../math/vector';
 import { AABB } from '../math/aabb';
-import type { SelectionState, SketchPoint } from './types';
+import type { ISketchPrimitive, SelectionState, SketchPoint } from './types';
 
 export type SelectableEntityType =
 	| 'point'
@@ -100,8 +100,8 @@ export function clearSelection(sketch: SketchDocument): void {
 	sketch.notify();
 }
 
-export function getSelectedPrimitives(sketch: SketchDocument): Array<{ id: string; isConstruction?: boolean }> {
-	const list: Array<{ id: string; isConstruction?: boolean }> = [];
+export function getSelectedPrimitives(sketch: SketchDocument): ISketchPrimitive[] {
+	const list: ISketchPrimitive[] = [];
 	for (const col of sketch.getPrimitiveCollections()) {
 		for (const id of sketch.selection[col.selectionKey]) {
 			if (!col.map.has(id)) continue;
@@ -110,12 +110,6 @@ export function getSelectedPrimitives(sketch: SketchDocument): Array<{ id: strin
 		}
 	}
 	return list;
-}
-
-export function getSelectedConstructionState(sketch: SketchDocument): boolean | null {
-	const primitives = sketch.getSelectedPrimitives();
-	if (primitives.length === 0) return null;
-	return primitives.every(p => !!p.isConstruction);
 }
 
 export function deleteSelected(sketch: SketchDocument): void {

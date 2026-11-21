@@ -336,7 +336,7 @@ export function executeExtend(
 
 		if (becomesFullLoop) {
 			// Extend arc into full Circle
-			const circle = sketch.addCircle(arc.centerId, arc.radius, arc.isConstruction);
+			const circle = sketch.addCircle(arc.centerId, arc.radius, arc.lineType);
 			const radC = sketch.getConstraintsForEntity('arc', arc.id).find(c => c.type === 'radius');
 			sketch.removeEntity(arc.id);
 			if (radC && (radC as any).targetRadius) {
@@ -411,9 +411,7 @@ export function executeExtend(
 }
 
 function addHandlePolygonLine(sketch: SketchDocument, splineId: string, p1Id: string, p2Id: string): string {
-	const polyLine = sketch.addLine(p1Id, p2Id);
-	polyLine.isConstruction = true;
-	polyLine.isSplineHandle = true;
+	const polyLine = sketch.addLine(p1Id, p2Id, 'spline_handle');
 	polyLine.parentSplineId = splineId;
 	return polyLine.id;
 }
@@ -428,9 +426,7 @@ function addFitHandle(
 ): string {
 	const h1 = sketch.addPoint(h1Pos);
 	const h2 = sketch.addPoint(h2Pos);
-	const hLine = sketch.addLine(h1.id, h2.id);
-	hLine.isConstruction = true;
-	hLine.isSplineHandle = true;
+	const hLine = sketch.addLine(h1.id, h2.id, 'spline_handle');
 	hLine.parentSplineId = splineId;
 	hLine.isAutomaticSplineHandle = isAutomaticSplineHandle;
 	const d1 = fitPt.distanceTo(h1Pos);

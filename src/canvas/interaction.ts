@@ -11,7 +11,8 @@ import type {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 } from '../solver/constraints';
-import type { ISketchPrimitive } from '../model/types';
+import { SketchArc, SketchCircle, SketchLine, type ISketchPrimitive } from '../model/types';
+import { isRoundCurveLineType, type AuxiliaryLineType, type EditableLineType } from '../model/lineTypes';
 import { showToast } from '../ui/toast';
 import { HighlightManager } from './highlightManager';
 import { applyAutoOrientation, applySnapConstraint, computeAxisSnappedWorldPos, findSnapTarget } from './snapping';
@@ -76,6 +77,14 @@ function isEditableElement(el: HTMLElement | null | undefined): boolean {
 	);
 }
 
+function supportsAuxiliaryLineType(primitive: ISketchPrimitive, type: AuxiliaryLineType): boolean {
+	return (
+		primitive instanceof SketchLine ||
+		type === 'construction' ||
+		(isRoundCurveLineType(type) && (primitive instanceof SketchArc || primitive instanceof SketchCircle))
+	);
+}
+
 export class CanvasInteraction implements SelectInteractionHost {
 	svg: SVGSVGElement;
 	sketch: SketchDocument;
@@ -84,7 +93,18 @@ export class CanvasInteraction implements SelectInteractionHost {
 	readonly highlightManager: HighlightManager;
 
 	activeTool: ToolType = 'select';
-	isConstructionMode = false;
+	private lineModeEnabled = false;
+	private constructionLineType: AuxiliaryLineType = 'construction';
+	private inactiveSelectionMode?: { type: AuxiliaryLineType; ids: Set<string> };
+
+	private get drawingLineType(): EditableLineType {
+		return this.lineModeEnabled ? this.constructionLineType : 'solid';
+	}
+
+	get isConstructionMode(): boolean {
+		const type = this.drawingLineType;
+		return type === 'construction' || type === 'centerline';
+	}
 
 	// Dragging point state
 	isDraggingPoint = false;
@@ -152,7 +172,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 	) => boolean | void;
 	onToolChange?: (tool: ToolType) => void;
 	onReplaceImage?: (id: string) => void;
-	onConstructionChange?: (isConstruction: boolean) => void;
+	onConstructionChange?: (isActive: boolean, type: AuxiliaryLineType) => void;
 	isSnappingEnabled = true;
 	onSnappingChange?: (active: boolean) => void;
 	onViewportChange?: () => void;
@@ -222,6 +242,9 @@ export class CanvasInteraction implements SelectInteractionHost {
 			},
 			get isConstructionMode() {
 				return self.isConstructionMode;
+			},
+			get lineType() {
+				return self.drawingLineType;
 			},
 			requestRender: () => this.render(),
 			setTool: (tool: ToolType) => this.setTool(tool),
@@ -382,6 +405,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 			this.svg.classList.toggle('tool-select', tool === 'select');
 			this.updateCursor();
 			this.onToolChange?.(tool);
+			this.updateConstructionState();
 			this.render();
 		} finally {
 			this.isSettingTool = false;
@@ -389,31 +413,85 @@ export class CanvasInteraction implements SelectInteractionHost {
 	}
 
 	toggleConstructionMode(): void {
-		const selected = this.sketch.getSelectedPrimitives();
-		if (selected.length > 0) {
-			this.sketch.beginTransaction();
-			for (const p of selected) {
-				this.sketch.toggleConstruction(p.id);
+		const selected = this.getLineSelection();
+		const { type } = this.getConstructionControlState(selected);
+		this.inactiveSelectionMode =
+			selected.length > 0 && selected.every(item => item.type === type)
+				? { type, ids: new Set(selected.map(item => item.primitive.id)) }
+				: undefined;
+		this.applyConstructionMode(type, true);
+	}
+
+	setConstructionLineType(type: AuxiliaryLineType): void {
+		this.inactiveSelectionMode = undefined;
+		this.applyConstructionMode(type, false);
+	}
+
+	private getLineSelection() {
+		if (isDrawingPrimitiveTool(this.activeTool)) return [];
+		return this.sketch.getSelectedPrimitives().flatMap(primitive => {
+			if (primitive.type === 'point') return [];
+			const type =
+				primitive instanceof SketchLine || primitive instanceof SketchArc || primitive instanceof SketchCircle
+					? primitive.lineType
+					: primitive.isConstruction
+						? 'construction'
+						: 'solid';
+			if (type === 'spline_handle') return [];
+			return [{ primitive, type }];
+		});
+	}
+
+	private getConstructionControlState(selected = this.getLineSelection()): {
+		type: AuxiliaryLineType;
+		active: boolean;
+	} {
+		const type = selected[0]?.type;
+		if (type && selected.every(item => item.type === type)) {
+			if (type !== 'solid') return { type, active: true };
+			const auxiliaryType = this.inactiveSelectionMode?.type ?? this.constructionLineType;
+			if (selected.some(item => supportsAuxiliaryLineType(item.primitive, auxiliaryType))) {
+				return { type: auxiliaryType, active: false };
 			}
-			this.sketch.commitTransaction();
-			this.updateConstructionState();
-		} else {
-			this.isConstructionMode = !this.isConstructionMode;
-			this.updateConstructionState();
 		}
+		return { type: this.constructionLineType, active: this.lineModeEnabled };
+	}
+
+	private applyConstructionMode(type: AuxiliaryLineType, toggle: boolean): void {
+		const selected = this.getLineSelection().filter(({ primitive }) => supportsAuxiliaryLineType(primitive, type));
+		if (selected.length > 0) {
+			const changed = toggle ? selected : selected.filter(item => item.type !== type);
+			if (changed.length > 0) {
+				this.sketch.beginTransaction();
+				for (const item of changed) {
+					const nextType = toggle && item.type === type ? 'solid' : type;
+					this.sketch.setLineType(item.primitive.id, nextType);
+				}
+				this.sketch.commitTransaction();
+			}
+		} else {
+			this.constructionLineType = type;
+			this.lineModeEnabled = !toggle || !this.lineModeEnabled;
+		}
+		this.updateConstructionState();
 		this.render();
 	}
 
 	getEffectiveConstructionState(): boolean {
-		const selectedState = this.sketch.getSelectedConstructionState();
-		if (selectedState !== null) {
-			return selectedState;
-		}
-		return this.isConstructionMode;
+		return this.getConstructionControlState().active;
 	}
 
 	updateConstructionState(): void {
-		this.onConstructionChange?.(this.getEffectiveConstructionState());
+		const selected = this.getLineSelection();
+		const inactiveMode = this.inactiveSelectionMode;
+		if (
+			inactiveMode &&
+			(inactiveMode.ids.size !== selected.length || selected.some(item => !inactiveMode.ids.has(item.primitive.id)))
+		) {
+			this.inactiveSelectionMode = undefined;
+		}
+		const { type, active } = this.getConstructionControlState(selected);
+		this.onConstructionChange?.(active, type);
 	}
 
 	toggleSnapping(): void {

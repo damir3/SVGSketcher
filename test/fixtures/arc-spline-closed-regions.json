@@ -126,8 +126,7 @@
       "id": "Line-1",
       "p1Id": "Point-10",
       "p2Id": "Point-11",
-      "isConstruction": true,
-      "isSplineHandle": true,
+      "lineType": "spline_handle",
       "parentSplineId": "Spline-1",
       "isAutomaticSplineHandle": false
     },
@@ -136,8 +135,7 @@
       "id": "Line-2",
       "p1Id": "Point-12",
       "p2Id": "Point-13",
-      "isConstruction": true,
-      "isSplineHandle": true,
+      "lineType": "spline_handle",
       "parentSplineId": "Spline-1",
       "isAutomaticSplineHandle": true
     },
@@ -146,8 +144,7 @@
       "id": "Line-3",
       "p1Id": "Point-14",
       "p2Id": "Point-15",
-      "isConstruction": true,
-      "isSplineHandle": true,
+      "lineType": "spline_handle",
       "parentSplineId": "Spline-1",
       "isAutomaticSplineHandle": true
     },
@@ -156,8 +153,7 @@
       "id": "Line-4",
       "p1Id": "Point-16",
       "p2Id": "Point-17",
-      "isConstruction": true,
-      "isSplineHandle": true,
+      "lineType": "spline_handle",
       "parentSplineId": "Spline-1",
       "isAutomaticSplineHandle": false
     }
@@ -172,7 +168,7 @@
       "endPointId": "Point-3",
       "radius": 44.70834779049353,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "arc",
@@ -182,7 +178,7 @@
       "endPointId": "Point-5",
       "radius": 47.05916631855693,
       "clockwise": true,
-      "isConstruction": false
+      "lineType": "solid"
     }
   ],
   "ellipses": [],

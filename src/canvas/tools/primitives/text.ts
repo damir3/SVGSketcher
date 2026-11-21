@@ -316,10 +316,10 @@ export class TextTool extends BaseTool {
 		const p2 = sketch.addPoint(new Vec2(max.x, min.y), false);
 		const p3 = sketch.addPoint(min, false);
 
-		const l0 = sketch.addLine(p0.id, p1.id, true);
-		const l1 = sketch.addLine(p1.id, p2.id, true);
-		const l2 = sketch.addLine(p2.id, p3.id, true);
-		const l3 = sketch.addLine(p3.id, p0.id, true);
+		const l0 = sketch.addLine(p0.id, p1.id, 'construction');
+		const l1 = sketch.addLine(p1.id, p2.id, 'construction');
+		const l2 = sketch.addLine(p2.id, p3.id, 'construction');
+		const l3 = sketch.addLine(p3.id, p0.id, 'construction');
 
 		sketch.addParallelConstraint(l0.id, l2.id);
 		sketch.addParallelConstraint(l1.id, l3.id);

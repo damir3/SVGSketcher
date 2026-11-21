@@ -2,6 +2,7 @@ import { projectPointOntoSegment, Vec2 } from '../../math/vector';
 import { distanceToSegment } from '../../math/hitTest';
 import { segmentIntersectsAABB } from '../../math/aabb';
 import type { GeoSegment } from '../../math/intersection';
+import type { LineType } from '../lineTypes';
 import {
 	createPrimitiveSvgGroup,
 	isPointIdConstrained,
@@ -12,7 +13,9 @@ import {
 } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 import { createSvgLine } from '../../canvas/svg';
+import { renderCuttingPlaneMarks } from '../../canvas/cuttingPlane';
 import {
+	applyDrawingLineStyle,
 	CHAMFER_HIGHLIGHT_ATTRS,
 	DIR1_LINE_ATTRS,
 	DIR2_LINE_ATTRS,
@@ -24,46 +27,39 @@ import {
 	SPLINE_HANDLE_SELECTED_ATTRS,
 } from '../../canvas/styles';
 
+interface LineData {
+	id: string;
+	p1Id: string;
+	p2Id: string;
+	lineType: LineType;
+	parentSplineId?: string;
+	isAutomaticSplineHandle?: boolean;
+}
+
 export class SketchLine implements ISketchPrimitive {
 	readonly type = 'line' as const;
 	id: string;
 	p1Id: string;
 	p2Id: string;
-	isConstruction?: boolean;
-	isSplineHandle?: boolean;
+	lineType: LineType;
 	parentSplineId?: string;
 	isAutomaticSplineHandle?: boolean;
 
-	constructor(
-		dataOrId:
-			| string
-			| {
-					id: string;
-					p1Id: string;
-					p2Id: string;
-					isConstruction?: boolean;
-					isSplineHandle?: boolean;
-					parentSplineId?: string;
-					isAutomaticSplineHandle?: boolean;
-			  },
-		p1Id = '',
-		p2Id = '',
-		isConstruction = false
-	) {
-		if (typeof dataOrId === 'object') {
-			this.id = dataOrId.id;
-			this.p1Id = dataOrId.p1Id;
-			this.p2Id = dataOrId.p2Id;
-			this.isConstruction = dataOrId.isConstruction;
-			this.isSplineHandle = dataOrId.isSplineHandle;
-			this.parentSplineId = dataOrId.parentSplineId;
-			this.isAutomaticSplineHandle = dataOrId.isAutomaticSplineHandle;
-		} else {
-			this.id = dataOrId;
-			this.p1Id = p1Id;
-			this.p2Id = p2Id;
-			this.isConstruction = isConstruction;
-		}
+	constructor(data: LineData) {
+		this.id = data.id;
+		this.p1Id = data.p1Id;
+		this.p2Id = data.p2Id;
+		this.lineType = data.lineType;
+		this.parentSplineId = data.parentSplineId;
+		this.isAutomaticSplineHandle = data.isAutomaticSplineHandle;
+	}
+
+	get isConstruction(): boolean {
+		return this.lineType !== 'solid';
+	}
+
+	get isSplineHandle(): boolean {
+		return this.lineType === 'spline_handle';
 	}
 
 	distanceTo(screen: Vec2, sketch: any, viewport: any, _thresholdPx?: number): number | null {
@@ -146,14 +142,21 @@ export class SketchLine implements ISketchPrimitive {
 			const chamfer = ctx.options.chamferState?.candidate;
 			const isChamferPreview =
 				chamfer?.result?.isValid && (chamfer.line1.id === this.id || chamfer.line2.id === this.id);
+			const attrs = isChamferPreview
+				? CHAMFER_HIGHLIGHT_ATTRS
+				: getPrimitiveStrokeAttrs(
+						ctx.isSelected,
+						this.lineType === 'construction' || this.lineType === 'centerline',
+						ctx.baseColor,
+						true
+					);
 			createSvgLine(
 				start ? ctx.viewport.worldToScreen(start) : s1,
 				end ? ctx.viewport.worldToScreen(end) : s2,
-				isChamferPreview
-					? CHAMFER_HIGHLIGHT_ATTRS
-					: getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor, true),
+				applyDrawingLineStyle(attrs, this.lineType),
 				lineG
 			);
+			if (this.lineType === 'cutting_plane') renderCuttingPlaneMarks(s1, s2, String(attrs.stroke), lineG);
 		}
 	}
 
@@ -167,7 +170,9 @@ export class SketchLine implements ISketchPrimitive {
 		if (opts.targetGroup && opts.strokeAttrs) {
 			const sp1 = opts.viewport.worldToScreen(rp1);
 			const sp2 = opts.viewport.worldToScreen(rp2);
-			createSvgLine(sp1, sp2, opts.strokeAttrs, opts.targetGroup);
+			const attrs = opts.strokeAttrs;
+			createSvgLine(sp1, sp2, applyDrawingLineStyle(attrs, this.lineType), opts.targetGroup);
+			if (this.lineType === 'cutting_plane') renderCuttingPlaneMarks(sp1, sp2, String(attrs.stroke), opts.targetGroup);
 			opts.drawVertex?.(sp1, rp1);
 			opts.drawVertex?.(sp2, rp2);
 		}

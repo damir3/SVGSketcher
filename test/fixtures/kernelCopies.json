@@ -1,9 +1,9 @@
 {
   "capturedFrom": "4c3d58c before routing",
   "sourceHashes": {
-    "src/model/patternsReference.ts": "e4f45be3db7fb1fc2edf4f42e239aa3a2771fa3032a7066c5e3d25cc819905ae",
+    "src/model/patternsReference.ts": "9a5411ed81149129c42a7ef887872a09a795397e32d0220db916e563006ec634",
     "src/canvas/modifyPreviewsReference.ts": "5177442a6321808962a290dc7d9921e4495f49e0c9a35060ee885b0a178bc37f",
-    "src/canvas/tools/modify/mirrorReference.ts": "894ceba0d1ddf85519288fe6c9eff5375bbd11ea3374015d02f6b081ac595265"
+    "src/canvas/tools/modify/mirrorReference.ts": "222d45f995b2102a4f2cf720cc186773e026e70cbb3eb33156997df0d47d736c"
   },
   "points": [
     {

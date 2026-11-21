@@ -72,7 +72,7 @@ export function buildTraceGeometry(
 							ids.push(null);
 							continue;
 						}
-						const line = sketch.addLine(a, b, construction);
+						const line = sketch.addLine(a, b, construction ? 'construction' : 'solid');
 						lineIds.push(line.id);
 						entities.push({ id: line.id, type: 'line' });
 						ids.push({ id: line.id, kind: 'line' });
@@ -80,7 +80,7 @@ export function buildTraceGeometry(
 						const centerId = addPoint(segment.center);
 						const radius = placement.radius(segment),
 							clockwise = placement.clockwise(segment);
-						const arc = sketch.addArc(centerId, a, b, radius, clockwise, construction);
+						const arc = sketch.addArc(centerId, a, b, radius, clockwise, construction ? 'construction' : 'solid');
 						radial.push({ id: arc.id, centerId, radius });
 						entities.push({ id: arc.id, type: 'arc' });
 						ids.push({ id: arc.id, kind: 'arc' });
@@ -115,7 +115,7 @@ export function buildTraceGeometry(
 
 			for (const circle of result.circles) {
 				const centerId = addPoint(circle.center);
-				const created = sketch.addCircle(centerId, placement.radius(circle), construction);
+				const created = sketch.addCircle(centerId, placement.radius(circle), construction ? 'construction' : 'solid');
 				radial.push({ id: created.id, centerId, radius: created.radius });
 				entities.push({ id: created.id, type: 'circle' });
 			}

@@ -794,7 +794,7 @@ describe('OffsetTool UI and Workflow', () => {
 			// Add a construction line right through Arc-14 midpoint to verify construction lines do not shadow arcs
 			const cP1 = sketch.addPoint({ x: -10, y: 74 });
 			const cP2 = sketch.addPoint({ x: 20, y: 74 });
-			sketch.addLine(cP1.id, cP2.id, true);
+			sketch.addLine(cP1.id, cP2.id, 'construction');
 
 			const viewport = new Viewport(800, 600);
 			const tool = new OffsetTool();

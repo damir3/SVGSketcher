@@ -98,84 +98,84 @@
       "id": "Line-1",
       "p1Id": "Point-2",
       "p2Id": "Point-3",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-2",
       "p1Id": "Point-3",
       "p2Id": "Point-4",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-3",
       "p1Id": "Point-4",
       "p2Id": "Point-5",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-4",
       "p1Id": "Point-5",
       "p2Id": "Point-6",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-5",
       "p1Id": "Point-6",
       "p2Id": "Point-7",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-6",
       "p1Id": "Point-7",
       "p2Id": "Point-2",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-7",
       "p1Id": "Point-8",
       "p2Id": "Point-9",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-8",
       "p1Id": "Point-9",
       "p2Id": "Point-10",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-9",
       "p1Id": "Point-10",
       "p2Id": "Point-11",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-10",
       "p1Id": "Point-11",
       "p2Id": "Point-12",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-11",
       "p1Id": "Point-12",
       "p2Id": "Point-13",
-      "isConstruction": false
+      "lineType": "solid"
     },
     {
       "type": "line",
       "id": "Line-12",
       "p1Id": "Point-13",
       "p2Id": "Point-8",
-      "isConstruction": false
+      "lineType": "solid"
     }
   ],
   "circles": [],

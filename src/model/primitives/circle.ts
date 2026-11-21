@@ -2,6 +2,7 @@ import { Vec2 } from '../../math/vector';
 import { distanceToCircle } from '../../math/hitTest';
 import { circleIntersectsAABB } from '../../math/aabb';
 import type { GeoCircle } from '../../math/intersection';
+import type { RoundCurveLineType } from '../lineTypes';
 import {
 	createPrimitiveSvgGroup,
 	isPointIdConstrained,
@@ -12,32 +13,24 @@ import {
 } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 import { createSvgCircle } from '../../canvas/svg';
-import { getPrimitiveStrokeAttrs, HIT_AREA_RING_ATTRS } from '../../canvas/styles';
+import { applyDrawingLineStyle, getPrimitiveStrokeAttrs, HIT_AREA_RING_ATTRS } from '../../canvas/styles';
 
 export class SketchCircle implements ISketchPrimitive {
 	readonly type = 'circle' as const;
 	id: string;
 	centerId: string;
 	radius: number;
-	isConstruction?: boolean;
+	lineType: RoundCurveLineType;
 
-	constructor(
-		dataOrId: string | { id: string; centerId: string; radius: number; isConstruction?: boolean },
-		centerId = '',
-		radius = 0,
-		isConstruction = false
-	) {
-		if (typeof dataOrId === 'object') {
-			this.id = dataOrId.id;
-			this.centerId = dataOrId.centerId;
-			this.radius = dataOrId.radius;
-			this.isConstruction = dataOrId.isConstruction;
-		} else {
-			this.id = dataOrId;
-			this.centerId = centerId;
-			this.radius = radius;
-			this.isConstruction = isConstruction;
-		}
+	constructor(data: { id: string; centerId: string; radius: number; lineType?: RoundCurveLineType }) {
+		this.id = data.id;
+		this.centerId = data.centerId;
+		this.radius = data.radius;
+		this.lineType = data.lineType ?? 'solid';
+	}
+
+	get isConstruction(): boolean {
+		return this.lineType !== 'solid';
 	}
 
 	distanceTo(screen: Vec2, sketch: any, viewport: any, _thresholdPx?: number): number | null {
@@ -87,10 +80,14 @@ export class SketchCircle implements ISketchPrimitive {
 		createSvgCircle(
 			sc,
 			sr,
-			{
-				fill: 'none',
-				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor),
-			},
+			applyDrawingLineStyle(
+				getPrimitiveStrokeAttrs(
+					ctx.isSelected,
+					this.lineType === 'construction' || this.lineType === 'centerline',
+					ctx.baseColor
+				),
+				this.lineType
+			),
 			circleG
 		);
 	}
@@ -103,7 +100,7 @@ export class SketchCircle implements ISketchPrimitive {
 		if (opts.targetGroup && opts.strokeAttrs) {
 			const sc = opts.viewport.worldToScreen(rc);
 			const sr = this.radius * opts.viewport.zoom * (opts.transformScale ?? 1);
-			createSvgCircle(sc, sr, opts.strokeAttrs, opts.targetGroup);
+			createSvgCircle(sc, sr, applyDrawingLineStyle(opts.strokeAttrs, this.lineType), opts.targetGroup);
 			opts.drawVertex?.(sc, rc);
 		}
 		return [rc];

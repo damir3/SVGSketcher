@@ -708,7 +708,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const spline = sketch.addFitSpline([p1.id, p2.id, p3.id, p4.id, p1.id]);
 		const l1 = sketch.addPoint({ x: -20, y: 40 });
 		const l2 = sketch.addPoint({ x: 120, y: 60 });
-		sketch.addLine(l1.id, l2.id, true);
+		sketch.addLine(l1.id, l2.id, 'construction');
 
 		const curves = getAllGeoCurves(sketch);
 		const sCurve = curves.find(c => c.id === spline.id) as GeoSpline;
@@ -758,7 +758,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		// Add a cutting line cutting across the spline
 		const l1 = sketch.addPoint({ x: -20, y: 50 });
 		const l2 = sketch.addPoint({ x: 120, y: 50 });
-		sketch.addLine(l1.id, l2.id, true);
+		sketch.addLine(l1.id, l2.id, 'construction');
 
 		const curves = getAllGeoCurves(sketch);
 		const sCurve = curves.find(c => c.id === spline.id) as GeoSpline;
@@ -800,7 +800,7 @@ describe('Spline Intersections, Trim, and Break', () => {
 		const spline = sketch.addControlSpline([p0.id, p1.id, p2.id, p3.id, p4.id]);
 		const l1 = sketch.addPoint({ x: -20, y: 50 });
 		const l2 = sketch.addPoint({ x: 120, y: 50 });
-		sketch.addLine(l1.id, l2.id, true);
+		sketch.addLine(l1.id, l2.id, 'construction');
 
 		const curves = getAllGeoCurves(sketch);
 		const sCurve = curves.find(c => c.id === spline.id) as GeoSpline;

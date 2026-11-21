@@ -89,6 +89,7 @@ function createMockContext(
 		},
 		svg: svgRoot as any,
 		isConstructionMode: false,
+		lineType: 'solid',
 		requestRender: () => {},
 		setCursor: () => {},
 		showToast: () => {},

@@ -294,7 +294,7 @@ export class MirrorTool extends BaseTool {
 				const np1Id = getOrReflectPoint(line.p1Id);
 				const np2Id = getOrReflectPoint(line.p2Id);
 				if (np1Id !== np2Id) {
-					const newLine = this.ctx.sketch.addLine(np1Id, np2Id, line.isConstruction);
+					const newLine = this.ctx.sketch.addLine(np1Id, np2Id, line.isSplineHandle ? 'construction' : line.lineType);
 					newCreatedItems.push({ id: newLine.id, type: 'line' });
 				}
 				continue;
@@ -304,7 +304,7 @@ export class MirrorTool extends BaseTool {
 			const circle = this.ctx.sketch.circles.get(objId);
 			if (circle) {
 				const nCenterId = getOrReflectPoint(circle.centerId);
-				const newCircle = this.ctx.sketch.addCircle(nCenterId, circle.radius, circle.isConstruction);
+				const newCircle = this.ctx.sketch.addCircle(nCenterId, circle.radius, circle.lineType);
 				this.ctx.sketch.addEqualRadiusConstraint(circle.id, newCircle.id);
 				newCreatedItems.push({ id: newCircle.id, type: 'circle' });
 				continue;
@@ -316,14 +316,7 @@ export class MirrorTool extends BaseTool {
 				const nCenterId = getOrReflectPoint(arc.centerId);
 				const nStartId = getOrReflectPoint(arc.startPointId);
 				const nEndId = getOrReflectPoint(arc.endPointId);
-				const newArc = this.ctx.sketch.addArc(
-					nCenterId,
-					nStartId,
-					nEndId,
-					arc.radius,
-					!arc.clockwise,
-					arc.isConstruction
-				);
+				const newArc = this.ctx.sketch.addArc(nCenterId, nStartId, nEndId, arc.radius, !arc.clockwise, arc.lineType);
 				this.ctx.sketch.addEqualRadiusConstraint(arc.id, newArc.id);
 				newCreatedItems.push({ id: newArc.id, type: 'arc' });
 				continue;

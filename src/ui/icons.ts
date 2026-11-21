@@ -31,6 +31,10 @@ import ellipticalArc from '../assets/icons/elliptical-arc.svg?raw';
 import splineFit from '../assets/icons/spline-fit.svg?raw';
 import splineControl from '../assets/icons/spline-control.svg?raw';
 import construction from '../assets/icons/construction.svg?raw';
+import centerline from '../assets/icons/centerline.svg?raw';
+import hiddenLine from '../assets/icons/hidden-line.svg?raw';
+import phantomLine from '../assets/icons/phantom-line.svg?raw';
+import cuttingPlane from '../assets/icons/cutting-plane.svg?raw';
 import snap from '../assets/icons/snap.svg?raw';
 import trim from '../assets/icons/trim.svg?raw';
 import fillet from '../assets/icons/fillet.svg?raw';
@@ -86,7 +90,6 @@ import symmetry from '../assets/icons/symmetry.svg?raw';
 import undo from '../assets/icons/undo.svg?raw';
 import redo from '../assets/icons/redo.svg?raw';
 import deleteIcon from '../assets/icons/delete.svg?raw';
-import clear from '../assets/icons/clear.svg?raw';
 import fitView from '../assets/icons/fit-view.svg?raw';
 import exportIcon from '../assets/icons/export.svg?raw';
 import openIcon from '../assets/icons/open.svg?raw';
@@ -156,6 +159,10 @@ export const ICONS = {
 	flip_horizontal: flipHorizontal,
 	flip_vertical: flipVertical,
 	construction,
+	centerline,
+	hidden: hiddenLine,
+	phantom: phantomLine,
+	cutting_plane: cuttingPlane,
 	snap,
 	trim,
 	extend,
@@ -196,7 +203,6 @@ export const ICONS = {
 	undo,
 	redo,
 	delete: deleteIcon,
-	clear,
 	fitView,
 	export: exportIcon,
 	open: openIcon,

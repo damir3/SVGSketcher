@@ -2,6 +2,7 @@ import { Vec2 } from '../../math/vector';
 import { distanceToArc } from '../../math/hitTest';
 import { arcIntersectsAABB } from '../../math/aabb';
 import type { GeoArc } from '../../math/intersection';
+import type { RoundCurveLineType } from '../lineTypes';
 import {
 	createPrimitiveSvgGroup,
 	isPointIdConstrained,
@@ -13,7 +14,12 @@ import {
 } from './base';
 import { PrimitivePanel, type IPrimitivePanel } from '../../ui/panels/primitives';
 import { createSvgLine, createSvgPath, getArcSvgPath, getArcSweep } from '../../canvas/svg';
-import { AUX_AXIS_ATTRS, getPrimitiveStrokeAttrs, HIT_AREA_STROKE_ATTRS } from '../../canvas/styles';
+import {
+	applyDrawingLineStyle,
+	AUX_AXIS_ATTRS,
+	getPrimitiveStrokeAttrs,
+	HIT_AREA_STROKE_ATTRS,
+} from '../../canvas/styles';
 
 export class SketchArc implements ISketchPrimitive {
 	readonly type = 'arc' as const;
@@ -23,44 +29,28 @@ export class SketchArc implements ISketchPrimitive {
 	endPointId: string;
 	radius: number;
 	clockwise?: boolean;
-	isConstruction?: boolean;
+	lineType: RoundCurveLineType;
 
-	constructor(
-		dataOrId:
-			| string
-			| {
-					id: string;
-					centerId: string;
-					startPointId: string;
-					endPointId: string;
-					radius: number;
-					clockwise?: boolean;
-					isConstruction?: boolean;
-			  },
-		centerId = '',
-		startPointId = '',
-		endPointId = '',
-		radius = 0,
-		clockwise = false,
-		isConstruction = false
-	) {
-		if (typeof dataOrId === 'object') {
-			this.id = dataOrId.id;
-			this.centerId = dataOrId.centerId;
-			this.startPointId = dataOrId.startPointId;
-			this.endPointId = dataOrId.endPointId;
-			this.radius = dataOrId.radius;
-			this.clockwise = dataOrId.clockwise;
-			this.isConstruction = dataOrId.isConstruction;
-		} else {
-			this.id = dataOrId;
-			this.centerId = centerId;
-			this.startPointId = startPointId;
-			this.endPointId = endPointId;
-			this.radius = radius;
-			this.clockwise = clockwise;
-			this.isConstruction = isConstruction;
-		}
+	constructor(data: {
+		id: string;
+		centerId: string;
+		startPointId: string;
+		endPointId: string;
+		radius: number;
+		clockwise?: boolean;
+		lineType?: RoundCurveLineType;
+	}) {
+		this.id = data.id;
+		this.centerId = data.centerId;
+		this.startPointId = data.startPointId;
+		this.endPointId = data.endPointId;
+		this.radius = data.radius;
+		this.clockwise = data.clockwise;
+		this.lineType = data.lineType ?? 'solid';
+	}
+
+	get isConstruction(): boolean {
+		return this.lineType !== 'solid';
 	}
 
 	distanceTo(screen: Vec2, sketch: any, viewport: any, thresholdPx = 18): number | null {
@@ -145,10 +135,15 @@ export class SketchArc implements ISketchPrimitive {
 		createSvgPath(d, HIT_AREA_STROKE_ATTRS, arcG);
 		createSvgPath(
 			previewD,
-			{
-				fill: 'none',
-				...getPrimitiveStrokeAttrs(ctx.isSelected, !!this.isConstruction, ctx.baseColor, true),
-			},
+			applyDrawingLineStyle(
+				getPrimitiveStrokeAttrs(
+					ctx.isSelected,
+					this.lineType === 'construction' || this.lineType === 'centerline',
+					ctx.baseColor,
+					true
+				),
+				this.lineType
+			),
 			arcG
 		);
 
@@ -175,7 +170,7 @@ export class SketchArc implements ISketchPrimitive {
 			const sr = this.radius * opts.viewport.zoom * (opts.transformScale ?? 1);
 			const clockwise = opts.invertWinding ? !this.clockwise : !!this.clockwise;
 			const d = getArcSvgPath(sc, ss, se, sr, clockwise);
-			createSvgPath(d, opts.strokeAttrs, opts.targetGroup);
+			createSvgPath(d, applyDrawingLineStyle(opts.strokeAttrs, this.lineType), opts.targetGroup);
 			opts.drawVertex?.(sc, rc);
 			opts.drawVertex?.(ss, rs);
 			opts.drawVertex?.(se, re);

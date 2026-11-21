@@ -23,8 +23,8 @@ export function createTopologyScenes() {
 					const duplicate = p(20.0005, 10);
 					sketch.lines.values().next().value!.p2Id = duplicate.id;
 					const handle = sketch.addLine(points[1].id, points[4].id);
-					handle.isSplineHandle = true;
-					sketch.addLine(points[1].id, points[4].id, true);
+					handle.lineType = 'spline_handle';
+					sketch.addLine(points[1].id, points[4].id, 'construction');
 				}
 				if (kind === 'constraints') {
 					link(points[0].id, 'missing-a');

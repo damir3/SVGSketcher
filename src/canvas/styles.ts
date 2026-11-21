@@ -1,4 +1,5 @@
 import { LINE_DISTANCE_PX } from './distances';
+import { isDrawingLineType, type DrawingLineType, type LineType } from '../model/lineTypes';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -71,7 +72,6 @@ export const REGION_STYLE = {
 
 export const SVG_EXPORT_STYLE = {
 	geometryStroke: '#0f172a',
-	constructionStroke: '#64748b',
 	strokeWidth: 0.2,
 	fill: 'none',
 	isolatedPointFill: '#0f172a',
@@ -79,6 +79,16 @@ export const SVG_EXPORT_STYLE = {
 	regionFillOpacity: 0.5,
 	regionStroke: 'none',
 } as const;
+
+export const DRAWING_LINE_STYLES = {
+	centerline: { layer: 'centerlines', dash: [12, 4, 2, 4], canvasWidthFactor: 1, exportWidthFactor: 0.5 },
+	hidden: { layer: 'hidden-lines', dash: [5, 3], canvasWidthFactor: 1, exportWidthFactor: 0.5 },
+	phantom: { layer: 'phantom-lines', dash: [12, 4, 2, 4, 2, 4], canvasWidthFactor: 1, exportWidthFactor: 0.5 },
+	cutting_plane: { layer: 'cutting-planes', dash: [9, 5, 1, 5], canvasWidthFactor: 2, exportWidthFactor: 1 },
+} as const satisfies Record<
+	DrawingLineType,
+	{ layer: string; dash: readonly number[]; canvasWidthFactor: number; exportWidthFactor: number }
+>;
 
 export const DASH_ARRAY = {
 	construction: '6,6',
@@ -131,13 +141,13 @@ export const DIM_ARROWS = {
 
 export const DIMENSION_FONT_SIZE = 12;
 
-export const DIMENSION_TEXT_ATTRS: SvgAttrs = {
+export const DIMENSION_TEXT_ATTRS = {
 	'text-anchor': 'middle',
 	'dominant-baseline': 'central',
 	'font-size': DIMENSION_FONT_SIZE,
 	'font-weight': 600,
 	'font-family': 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-};
+} as const satisfies SvgAttrs;
 
 export type SvgAttrs = Record<string, string | number | boolean | undefined | null>;
 
@@ -647,5 +657,15 @@ export function getPreviewStrokeAttrs(isConstruction = false, isGuide = false, r
 		'stroke-linecap': roundCap ? 'round' : undefined,
 		'stroke-dasharray': isGuide ? DASH_ARRAY.guideCircle : isConstruction ? DASH_ARRAY.construction : undefined,
 		fill: 'none',
+	};
+}
+
+export function applyDrawingLineStyle(attrs: SvgAttrs, type: LineType): SvgAttrs {
+	if (!isDrawingLineType(type)) return attrs;
+	const { dash, canvasWidthFactor } = DRAWING_LINE_STYLES[type];
+	return {
+		...attrs,
+		'stroke-dasharray': dash.join(' '),
+		'stroke-width': Number(attrs['stroke-width'] ?? STROKE_WIDTH.normal) * canvasWidthFactor,
 	};
 }

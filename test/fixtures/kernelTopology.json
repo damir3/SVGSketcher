@@ -54,36 +54,35 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-6",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-2",
             "p2Id": "Point-5",
-            "isConstruction": false,
-            "isSplineHandle": true
+            "lineType": "spline_handle"
           },
           {
             "type": "line",
             "id": "Line-5",
             "p1Id": "Point-2",
             "p2Id": "Point-5",
-            "isConstruction": true
+            "lineType": "construction"
           }
         ],
         "circles": [],
@@ -818,36 +817,35 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-6",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-2",
             "p2Id": "Point-5",
-            "isConstruction": false,
-            "isSplineHandle": true
+            "lineType": "spline_handle"
           },
           {
             "type": "line",
             "id": "Line-5",
             "p1Id": "Point-2",
             "p2Id": "Point-5",
-            "isConstruction": true
+            "lineType": "construction"
           }
         ],
         "circles": [],
@@ -1635,28 +1633,28 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-4",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -2399,28 +2397,28 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-1",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -3165,28 +3163,28 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-2",
             "p2Id": "Point-5",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -3869,28 +3867,28 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-5",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -4573,21 +4571,21 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -5317,21 +5315,21 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -6091,42 +6089,42 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "origin",
             "p2Id": "Point-6",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-5",
             "p1Id": "Point-7",
             "p2Id": "Point-8",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-6",
             "p1Id": "axis_x",
             "p2Id": "Point-9",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -7258,42 +7256,42 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "origin",
             "p2Id": "Point-6",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-5",
             "p1Id": "Point-7",
             "p2Id": "Point-8",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-6",
             "p1Id": "axis_x",
             "p2Id": "Point-9",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -8446,21 +8444,21 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -9172,21 +9170,21 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -9863,29 +9861,28 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-7",
             "p2Id": "Point-5",
-            "isConstruction": true,
-            "isSplineHandle": true,
+            "lineType": "spline_handle",
             "parentSplineId": "Spline-1"
           },
           {
@@ -9893,8 +9890,7 @@
             "id": "Line-5",
             "p1Id": "Point-5",
             "p2Id": "Point-1",
-            "isConstruction": true,
-            "isSplineHandle": true,
+            "lineType": "spline_handle",
             "parentSplineId": "Spline-1"
           }
         ],
@@ -9904,7 +9900,7 @@
             "id": "Circle-1",
             "centerId": "Point-6",
             "radius": 3,
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "arcs": [
@@ -9916,7 +9912,7 @@
             "endPointId": "Point-7",
             "radius": 10,
             "clockwise": false,
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "ellipses": [],
@@ -11072,29 +11068,28 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-7",
             "p2Id": "Point-5",
-            "isConstruction": true,
-            "isSplineHandle": true,
+            "lineType": "spline_handle",
             "parentSplineId": "Spline-1"
           },
           {
@@ -11102,8 +11097,7 @@
             "id": "Line-5",
             "p1Id": "Point-5",
             "p2Id": "Point-1",
-            "isConstruction": true,
-            "isSplineHandle": true,
+            "lineType": "spline_handle",
             "parentSplineId": "Spline-1"
           }
         ],
@@ -11113,7 +11107,7 @@
             "id": "Circle-1",
             "centerId": "Point-6",
             "radius": 3,
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "arcs": [
@@ -11125,7 +11119,7 @@
             "endPointId": "Point-7",
             "radius": 10,
             "clockwise": false,
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "ellipses": [],
@@ -12290,35 +12284,35 @@
             "id": "Line-1",
             "p1Id": "Point-1",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-2",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-3",
             "p2Id": "Point-4",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-6",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-5",
             "p1Id": "Point-7",
             "p2Id": "Point-8",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],
@@ -13342,35 +13336,35 @@
             "id": "Line-1",
             "p1Id": "Point-2",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-2",
             "p1Id": "Point-3",
             "p2Id": "Point-2",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-3",
             "p1Id": "Point-4",
             "p2Id": "Point-3",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-4",
             "p1Id": "Point-6",
             "p2Id": "Point-1",
-            "isConstruction": false
+            "lineType": "solid"
           },
           {
             "type": "line",
             "id": "Line-5",
             "p1Id": "Point-7",
             "p2Id": "Point-8",
-            "isConstruction": false
+            "lineType": "solid"
           }
         ],
         "circles": [],

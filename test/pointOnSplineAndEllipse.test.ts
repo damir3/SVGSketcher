@@ -83,6 +83,7 @@ function createMockCtx(sketch: SketchDocument, vp: Viewport, interaction?: Canva
 		},
 		svg: {} as any,
 		isConstructionMode: false,
+		lineType: 'solid',
 		requestRender: () => {},
 		setTool: () => {},
 		setCursor: () => {},

@@ -29,6 +29,13 @@ const SVG_EXPORT_UNITS = [
 	{ id: 'in', label: 'Inches (in)', scale: PIXELS_PER_INCH },
 	{ id: 'ft', label: 'Feet (ft)', scale: 12 * PIXELS_PER_INCH },
 ];
+const LINE_TYPE_OPTIONS = [
+	{ type: 'construction', label: 'Construction Line' },
+	{ type: 'centerline', label: 'Centerline' },
+	{ type: 'hidden', label: 'Hidden Line' },
+	{ type: 'phantom', label: 'Phantom Line' },
+	{ type: 'cutting_plane', label: 'Cutting Plane' },
+] as const;
 
 function initApp(): void {
 	const app = document.getElementById('app');
@@ -70,9 +77,20 @@ function initApp(): void {
 				<button class="btn-header btn-icon active" id="btn-dimensions-header" title="Toggle Dimensions" aria-label="Toggle Dimensions" aria-pressed="true">
 					${ICONS.dimensionsToggle}
 				</button>
-				<button class="btn-header btn-icon" id="btn-construction-header" title="Toggle Construction Mode (X)" aria-label="Toggle Construction Mode">
-					${ICONS.construction}
-				</button>
+				<div class="construction-control">
+					<button class="btn-header btn-icon" id="btn-construction-header" title="Toggle Construction Line (X)" aria-label="Toggle Construction Line" aria-pressed="false">
+						${ICONS.construction}
+					</button>
+					<button class="btn-header btn-icon construction-menu-toggle" id="btn-construction-menu" title="Choose line type" aria-label="Choose line type" aria-controls="construction-menu" aria-expanded="false">
+						<svg viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="m3 5 3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+					</button>
+					<div class="construction-menu" id="construction-menu" role="group" aria-label="Line type" hidden>
+						${LINE_TYPE_OPTIONS.map(
+							({ type, label }) =>
+								`<button type="button" id="construction-mode-${type}" aria-pressed="false">${ICONS[type]}${label}</button>`
+						).join('')}
+					</div>
+				</div>
 				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-fit-view" title="Fit to View (Z)" aria-label="Fit to View">
 					${ICONS.fitView}
@@ -80,10 +98,6 @@ function initApp(): void {
 				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-parameters" title="Parameters (${isMac ? 'Cmd+P' : 'Ctrl+P'})" aria-label="Parameters">
 					${ICONS.parameters}
-				</button>
-				<div class="header-divider"></div>
-				<button class="btn-header btn-icon" id="btn-clear" title="Clear Sketch" aria-label="Clear Sketch">
-					${ICONS.clear}
 				</button>
 				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-add-image" title="Add Image" aria-label="Add Image">
@@ -152,7 +166,7 @@ function initApp(): void {
 				<fieldset>
 					<legend>Include in SVG</legend>
 					<label><input type="checkbox" name="layers" value="solid" checked /> Solid geometry</label>
-					<label><input type="checkbox" name="layers" value="construction" checked /> Construction geometry</label>
+					<label><input type="checkbox" name="layers" value="engineeringLines" checked /> Engineering lines</label>
 					<label><input type="checkbox" name="layers" value="regions" checked /> Region fills</label>
 					<label><input type="checkbox" name="layers" value="images" checked /> Reference images</label>
 					<label><input type="checkbox" name="layers" value="dimensions" /> Dimensions and angles</label>
@@ -177,8 +191,14 @@ function initApp(): void {
 	const btnConstraintBadgesHeader = document.getElementById('btn-constraint-badges-header') as HTMLButtonElement;
 	const btnDimensionsHeader = document.getElementById('btn-dimensions-header') as HTMLButtonElement;
 	const btnConstructionHeader = document.getElementById('btn-construction-header') as HTMLButtonElement;
+	const btnConstructionMenu = document.querySelector<HTMLButtonElement>('#btn-construction-menu')!;
+	const constructionMenu = document.querySelector<HTMLElement>('#construction-menu')!;
+	const constructionControl = constructionMenu.parentElement!;
+	const constructionOptions = LINE_TYPE_OPTIONS.map(mode => ({
+		...mode,
+		button: constructionMenu.querySelector<HTMLButtonElement>(`#construction-mode-${mode.type}`)!,
+	}));
 	const btnFitView = document.getElementById('btn-fit-view') as HTMLButtonElement;
-	const btnClear = document.getElementById('btn-clear') as HTMLButtonElement;
 	const btnImport = document.getElementById('btn-import') as HTMLButtonElement;
 	const fileInputSvg = document.getElementById('file-input-svg') as HTMLInputElement;
 	const fileInputImage = document.getElementById('file-input-image') as HTMLInputElement;
@@ -237,9 +257,19 @@ function initApp(): void {
 		zoomLevel.textContent = `${Math.round(viewport.zoom * 100)}%`;
 	};
 
-	interaction.onConstructionChange = active => {
+	interaction.onConstructionChange = (active, lineType) => {
 		toolbar.setConstructionActive(active);
-		btnConstructionHeader?.classList.toggle('active', active);
+		btnConstructionHeader.classList.toggle('active', active);
+		btnConstructionHeader.setAttribute('aria-pressed', String(active));
+		for (const { type, button } of constructionOptions) {
+			button.setAttribute('aria-pressed', String(type === lineType));
+		}
+		if (btnConstructionHeader.dataset.lineType === lineType) return;
+		const { label } = constructionOptions.find(option => option.type === lineType)!;
+		btnConstructionHeader.dataset.lineType = lineType;
+		btnConstructionHeader.innerHTML = ICONS[lineType];
+		btnConstructionHeader.title = `Toggle ${label} (X)`;
+		btnConstructionHeader.setAttribute('aria-label', `Toggle ${label}`);
 	};
 	interaction.updateConstructionState();
 
@@ -248,7 +278,6 @@ function initApp(): void {
 		btnSnapHeader?.classList.toggle('active', active);
 	};
 	btnSnapHeader?.classList.toggle('active', interaction.isSnappingEnabled);
-	btnConstructionHeader?.classList.toggle('active', interaction.getEffectiveConstructionState());
 
 	// Resize handling
 	function handleResize(): void {
@@ -371,21 +400,46 @@ function initApp(): void {
 		});
 	}
 
-	btnConstructionHeader?.addEventListener('click', () => {
+	btnConstructionHeader.addEventListener('click', () => {
+		setConstructionMenuOpen(false);
 		interaction.toggleConstructionMode();
+	});
+	function setConstructionMenuOpen(open: boolean): void {
+		constructionMenu.hidden = !open;
+		btnConstructionMenu.setAttribute('aria-expanded', String(open));
+	}
+	btnConstructionMenu.addEventListener('click', () => {
+		const open = constructionMenu.hidden;
+		setConstructionMenuOpen(open);
+		if (open) {
+			const lineType = btnConstructionHeader.dataset.lineType;
+			const option = constructionOptions.find(option => option.type === lineType) ?? constructionOptions[0];
+			option.button.focus();
+		}
+	});
+	for (const { type, button } of constructionOptions) {
+		button.addEventListener('click', () => {
+			interaction.setConstructionLineType(type);
+			setConstructionMenuOpen(false);
+			btnConstructionMenu.focus();
+		});
+	}
+	constructionControl.addEventListener('keydown', e => {
+		if (constructionMenu.hidden) return;
+		e.stopPropagation();
+		if (e.key === 'Escape') {
+			setConstructionMenuOpen(false);
+			btnConstructionMenu.focus();
+		}
+	});
+	constructionControl.addEventListener('focusout', e => {
+		if (!constructionControl.contains(e.relatedTarget as Node | null)) setConstructionMenuOpen(false);
+	});
+	document.addEventListener('pointerdown', e => {
+		if (!constructionControl.contains(e.target as Node)) setConstructionMenuOpen(false);
 	});
 
 	let imageRequest = 0;
-	btnClear.addEventListener('click', () => {
-		if (confirm('Clear sketch canvas?')) {
-			imageRequest++;
-			if (interaction.activeTool === 'image') interaction.setTool('select');
-			sketch.clear();
-			renderer.render(sketch, viewport);
-			showToast('Sketch cleared');
-		}
-	});
-
 	let replaceImageId: string | null = null;
 	function pickImage(id: string | null): void {
 		imageRequest++;
@@ -506,7 +560,7 @@ function initApp(): void {
 				strokeWidth,
 				regions: layers.includes('regions'),
 				solid: layers.includes('solid'),
-				construction: layers.includes('construction'),
+				engineeringLines: layers.includes('engineeringLines'),
 				images: layers.includes('images'),
 				dimensions: layers.includes('dimensions'),
 			},

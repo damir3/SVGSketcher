@@ -232,7 +232,7 @@ export function applyTransform(
 								p1Id: mapId(entity.p1Id),
 								p2Id: mapId(entity.p2Id),
 								parentSplineId,
-								isSplineHandle: !!parentSplineId,
+								lineType: entity.isSplineHandle && !parentSplineId ? 'construction' : entity.lineType,
 							})
 						);
 						break;

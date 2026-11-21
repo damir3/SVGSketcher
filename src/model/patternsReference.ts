@@ -55,7 +55,7 @@ function buildPatternCopyEntities(
 			const np1Id = mapPoint(line.p1Id);
 			const np2Id = mapPoint(line.p2Id);
 			if (np1Id !== np2Id) {
-				const newLine = sketch.addLine(np1Id, np2Id, line.isConstruction);
+				const newLine = sketch.addLine(np1Id, np2Id, line.isSplineHandle ? 'construction' : line.lineType);
 				createdEntityIds.push({ id: newLine.id, type: 'line' });
 			}
 			continue;
@@ -63,7 +63,7 @@ function buildPatternCopyEntities(
 
 		const circle = sketch.circles.get(objId);
 		if (circle) {
-			const newCircle = sketch.addCircle(mapPoint(circle.centerId), circle.radius, circle.isConstruction);
+			const newCircle = sketch.addCircle(mapPoint(circle.centerId), circle.radius, circle.lineType);
 			radiusPairs.push({ sourceCircleId: circle.id, patternCircleId: newCircle.id });
 			createdEntityIds.push({ id: newCircle.id, type: 'circle' });
 			continue;
@@ -77,7 +77,7 @@ function buildPatternCopyEntities(
 				mapPoint(arc.endPointId),
 				arc.radius,
 				arc.clockwise,
-				arc.isConstruction
+				arc.lineType
 			);
 			radiusPairs.push({ sourceCircleId: arc.id, patternCircleId: newArc.id });
 			createdEntityIds.push({ id: newArc.id, type: 'arc' });
@@ -569,11 +569,11 @@ export function addPolygon(
 			k === 0 && existingVertices.length === 2
 				? [...sketch.lines.values()].find(
 						line =>
-							line.isConstruction === isConstruction &&
+							line.lineType === (isConstruction ? 'construction' : 'solid') &&
 							((line.p1Id === p1Id && line.p2Id === p2Id) || (line.p1Id === p2Id && line.p2Id === p1Id))
 					)
 				: undefined;
-		lines.push(existingEdge ?? sketch.addLine(p1Id, p2Id, isConstruction));
+		lines.push(existingEdge ?? sketch.addLine(p1Id, p2Id, isConstruction ? 'construction' : 'solid'));
 	}
 
 	const copies: PatternCopyData[] = [];
