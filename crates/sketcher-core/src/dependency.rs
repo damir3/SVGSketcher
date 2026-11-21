@@ -175,6 +175,14 @@ pub fn analyze(input: Input<'_>) -> Result<bool, &'static str> {
     if program.needs_callback(Evaluation::Linearization) {
         return Err("Dependency program has unsupported rows");
     }
+    if input.has_offsets && !program.candidate_touches_offset_child(input.hard_rows) {
+        return Ok(dependent(
+            program.dependency_rows(input.values, input.rules, true)?,
+            n,
+            input.hard_rows,
+            input.candidate_has_free_parameters,
+        ));
+    }
     let first = program.dependency_rows(input.values, input.rules, false)?;
     if dependent(
         first,
@@ -440,5 +448,84 @@ mod tests {
             1,
             true
         ));
+    }
+    #[test]
+    fn redundant_coincident_with_offset_child_does_not_pin_parent_dimension() {
+        // Params: 0:off.x, 1:off.y, 2:orig.x, 3:orig.y, 4:off.r, 5:orig.r
+        let values = [10.0, 20.0, 10.0, 20.0, 25.0, 15.0];
+        let mut base = record(
+            25,
+            0,
+            10.0,
+            1.0,
+            &[
+                (0.0, 0.0),
+                (1.0, 0.0),
+                (2.0, 0.0),
+                (3.0, 0.0),
+                (4.0, 0.0),
+                (5.0, 0.0),
+            ],
+        );
+        // Redundant coincident between orig center (2,3) and off center (0,1).
+        base.extend(record(
+            1,
+            3,
+            0.0,
+            0.0,
+            &[(2.0, 0.0), (3.0, 0.0), (0.0, 0.0), (1.0, 0.0)],
+        ));
+        // Candidate on parent center distance to origin: should be independent (false).
+        let mut parent_data = base.clone();
+        parent_data.extend(record(
+            6,
+            5,
+            10.0_f64.hypot(20.0),
+            0.0,
+            &[(-1.0, 0.0), (-1.0, 0.0), (2.0, 0.0), (3.0, 0.0)],
+        ));
+        let rules = [
+            Rule {
+                row: 0,
+                count: 3,
+                mode: 2,
+                columns: vec![0, 1, 2, 3, 4, 5],
+            },
+            Rule {
+                row: 3,
+                count: 2,
+                mode: 0,
+                columns: vec![],
+            },
+            Rule {
+                row: 5,
+                count: 1,
+                mode: 0,
+                columns: vec![],
+            },
+        ];
+        assert!(!analyze(Input {
+            values: &values,
+            constraints: &parent_data,
+            rules: &rules,
+            rows: 6,
+            hard_rows: 5,
+            candidate_has_free_parameters: true,
+            has_offsets: true
+        })
+        .unwrap());
+        // Candidate on offset child radius: must still be dependent (true).
+        let mut child_data = base;
+        child_data.extend(record(4, 5, 25.0, 0.0, &[(4.0, 0.0)]));
+        assert!(analyze(Input {
+            values: &values,
+            constraints: &child_data,
+            rules: &rules,
+            rows: 6,
+            hard_rows: 5,
+            candidate_has_free_parameters: true,
+            has_offsets: true
+        })
+        .unwrap());
     }
 }

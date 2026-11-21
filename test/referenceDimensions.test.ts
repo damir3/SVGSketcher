@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
-import { AngleConstraint, RadiusConstraint, OffsetConstraint } from '../src/solver/constraints';
+import { AngleConstraint, CoincidentConstraint, RadiusConstraint, OffsetConstraint } from '../src/solver/constraints';
 import { serializeConstraint, deserializeConstraint } from '../src/solver/constraints/serialization';
 import { compileNativeConstraints } from '../src/solver/nativeConstraints';
 import { applyOffsetConstraintValue } from '../src/model/offsetSync';
@@ -379,4 +379,56 @@ test('reference angle, diameter and offset labels show measured values in parent
 	assert.ok(texts.includes('(60°)'));
 	assert.ok(texts.includes('(Ø20)'));
 	assert.ok(texts.includes('(10)'));
+});
+
+test('redundant coincident on offset circle centers neither pins the parent nor turns parent radius into reference', () => {
+	const sketch = new SketchDocument();
+	const origCenter = sketch.addPoint({ x: 50, y: 0 });
+	const offCenter = sketch.addPoint({ x: 50, y: 0 });
+	const origCircle = sketch.addCircle(origCenter.id, 15);
+	const offCircle = sketch.addCircle(offCenter.id, 25);
+	sketch.addHorizontalConstraint('origin', origCenter.id);
+	// Distance from origin to origCenter = 35 + origCircle.r (like tangency to a fixed circle at origin)
+	const fixedCenter = sketch.addPoint({ x: 0, y: 0 }, true);
+	const fixedCircle = sketch.addCircle(fixedCenter.id, 35);
+	sketch.addRadiusConstraint(fixedCircle.id, 35);
+	sketch.addCircleTangentConstraint(fixedCircle.id, origCircle.id);
+	const offset = new OffsetConstraint(
+		'off',
+		[
+			{
+				kind: 'circle',
+				origId: origCircle.id,
+				origCenterId: origCenter.id,
+				offId: offCircle.id,
+				offCenterId: offCenter.id,
+				side: 1,
+			},
+		],
+		10
+	);
+	sketch.addConstraint(offset);
+
+	// Guard: adding a redundant coincident/concentric between offset parent and child centers is rejected.
+	assert.equal(sketch.addCoincidentConstraint(origCenter.id, offCenter.id), null);
+	assert.equal(sketch.addConcentricConstraint(origCircle.id, offCircle.id), null);
+
+	// Simulate an existing saved sketch that already contains such a redundant coincident.
+	sketch.constraints.set('c_coinc_legacy', new CoincidentConstraint('c_coinc_legacy', origCenter.id, offCenter.id));
+	sketch.rebuildParamManager();
+	const res = sketch.solve();
+	assert.equal(res.constrainedParams.has(`${origCircle.id}.r`), false);
+	assert.equal(res.constrainedParams.has(`${origCenter.id}.x`), false);
+
+	// Dimensioning the offset child radius must still produce a reference dimension.
+	const childRad = sketch.addRadiusConstraint(offCircle.id, 30)!;
+	assert.equal(childRad.isReference, true);
+	assert.ok(Math.abs(childRad.targetRadius - 25) < 1e-6);
+
+	// Dimensioning the parent radius must create a driving constraint and update the offset child.
+	const parentRad = sketch.addRadiusConstraint(origCircle.id, 20)!;
+	assert.ok(!parentRad.isReference);
+	assert.ok(Math.abs(origCircle.radius - 20) < 1e-5);
+	assert.ok(Math.abs(offCircle.radius - 30) < 1e-5);
+	assert.ok(Math.abs(childRad.targetRadius - 30) < 1e-5);
 });

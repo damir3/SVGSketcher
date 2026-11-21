@@ -2635,11 +2635,8 @@
           "axis_x.y",
           "axis_y.x",
           "axis_y.y",
-          "c.x",
-          "c.y",
           "origin.x",
-          "origin.y",
-          "r1.r"
+          "origin.y"
         ],
         "freeParametersCount": 17,
         "equationsCount": 3,
@@ -3004,15 +3001,12 @@
           "axis_x.y",
           "axis_y.x",
           "axis_y.y",
-          "c.x",
-          "c.y",
           "f.x",
           "f.y",
           "g.x",
           "g.y",
           "origin.x",
-          "origin.y",
-          "r1.r"
+          "origin.y"
         ],
         "freeParametersCount": 17,
         "equationsCount": 9,
@@ -3166,9 +3160,7 @@
           "axis_y.x",
           "axis_y.y",
           "d.x",
-          "d.y",
           "e.x",
-          "e.y",
           "origin.x",
           "origin.y"
         ],

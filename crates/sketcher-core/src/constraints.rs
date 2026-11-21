@@ -516,6 +516,29 @@ impl Constraint {
         }
     }
 
+    fn geometric_jacobian_into(&self, p: &[f64], emit: &mut impl FnMut(usize, usize, f64)) {
+        match self.kind {
+            24 => self.numeric_jacobian_into(p, emit),
+            25 => {
+                let w = self.weight;
+                let mut add = |row: usize, slot: usize, value: f64| {
+                    if let Some(col) = self.refs[slot].index {
+                        if value.abs() > 1e-12 {
+                            emit(row, col, value);
+                        }
+                    }
+                };
+                add(0, 0, w);
+                add(0, 2, -w);
+                add(1, 1, w);
+                add(1, 3, -w);
+                add(2, 4, w);
+                add(2, 5, -w);
+            }
+            _ => self.jacobian_into(p, emit),
+        }
+    }
+
     fn offset_line_jacobian(&self, p: &[f64]) -> Vec<(usize, usize, f64)> {
         let initial = self.residuals(p)[0];
         let mut trial = p.to_vec();
@@ -1149,9 +1172,17 @@ impl Program {
                 constraint.residuals_into(&p, &mut res_buf);
                 residuals[row..row + res_buf.len()].copy_from_slice(&res_buf);
             }
-            constraint.jacobian_into(&p, &mut |equation, column, value| {
-                rows[row + equation].push((column, value));
-            });
+            if hard_only {
+                // DoF / nullspace analysis uses two-way offset derivatives so redundant constraints
+                // between parent and offset child do not artificially pin the parent.
+                constraint.geometric_jacobian_into(&p, &mut |equation, column, value| {
+                    rows[row + equation].push((column, value));
+                });
+            } else {
+                constraint.jacobian_into(&p, &mut |equation, column, value| {
+                    rows[row + equation].push((column, value));
+                });
+            }
         }
         for row_vec in &mut rows {
             merge_sparse_row(row_vec);

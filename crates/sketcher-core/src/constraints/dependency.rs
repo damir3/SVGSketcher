@@ -2,6 +2,39 @@ use super::Program;
 use crate::{dependency::Rule, matrix::SparseRows};
 
 impl Program {
+    /// Whether any candidate constraint (`row >= hard_rows`) references an offset child parameter.
+    pub(crate) fn candidate_touches_offset_child(&self, hard_rows: usize) -> bool {
+        let mut child_cols = vec![false; self.n];
+        let mut has_child = false;
+        for c in &self.constraints {
+            if c.row >= hard_rows {
+                continue;
+            }
+            let slots: &[usize] = match c.kind {
+                24 | 26 => &[0, 1],
+                25 => &[0, 1, 4],
+                _ => continue,
+            };
+            for &slot in slots {
+                if let Some(col) = c.refs[slot].index {
+                    child_cols[col] = true;
+                    has_child = true;
+                }
+            }
+        }
+        if !has_child {
+            return false;
+        }
+        self.constraints
+            .iter()
+            .filter(|c| c.row >= hard_rows && c.equations() > 0)
+            .any(|c| {
+                c.refs
+                    .iter()
+                    .any(|r| r.index.is_some_and(|col| child_cols[col]))
+            })
+    }
+
     /// Preserve the solver Jacobian unless the dependency test requests central differences.
     pub(crate) fn dependency_rows(
         &self,

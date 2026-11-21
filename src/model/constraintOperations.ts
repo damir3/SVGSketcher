@@ -22,6 +22,7 @@ import {
 	SymmetryConstraint,
 	CircularPatternConstraint,
 	RectangularPatternConstraint,
+	OffsetConstraint,
 } from '../solver/constraints';
 import { SketchEllipticalArc, type SketchArc, type SketchCircle, type SketchLine } from './types';
 import { Vec2 } from '../math/vector';
@@ -238,6 +239,18 @@ export function toggleFixedConstraints(sketch: SketchDocument, pointIds: string[
 	return !allFixed;
 }
 
+function areOffsetCircleCenters(sketch: SketchDocument, p1Id: string, p2Id: string): boolean {
+	for (const constraint of sketch.constraints.values()) {
+		if (!(constraint instanceof OffsetConstraint) || constraint.isReference) continue;
+		for (const pair of constraint.pairs) {
+			if (pair.kind === 'circle' && matchesEndpoints(pair.origCenterId, pair.offCenterId, p1Id, p2Id)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 export function addCoincidentConstraint(
 	sketch: SketchDocument,
 	p1Id: string,
@@ -246,6 +259,8 @@ export function addCoincidentConstraint(
 	if (p1Id === p2Id || !sketch.points.has(p1Id) || !sketch.points.has(p2Id)) return null;
 	// Do not constrain endpoints of the same line segment (would collapse length to 0)
 	if (sketch.getLineBetween(p1Id, p2Id)) return null;
+	// Offset circle/arc pairs already share a center via OffsetConstraint.
+	if (areOffsetCircleCenters(sketch, p1Id, p2Id)) return null;
 	return addUniqueConstraint(
 		sketch,
 		CoincidentConstraint,
@@ -742,6 +757,7 @@ export function addConcentricConstraint(
 	const circ1 = getRadial(sketch, c1Id);
 	const circ2 = getRadial(sketch, c2Id);
 	if (!circ1 || !circ2) return null;
+	if (areOffsetCircleCenters(sketch, circ1.centerId, circ2.centerId)) return null;
 
 	const c = new ConcentricConstraint(sketch.nextId('c_concen'), circ1.centerId, circ2.centerId);
 	return addConstraint(sketch, c) ? c : null;
