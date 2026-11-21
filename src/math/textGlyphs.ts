@@ -1,6 +1,6 @@
 import type * as opentype from 'opentype.js';
 import type { GeoCurve } from './intersection';
-import type { TextLayoutOptions } from './textPathReference';
+import type { TextLayoutOptions } from './textPath';
 import type { TextGeometryInput, TextGlyph } from '../kernel/textTypes';
 
 /** Extract font-owned data only; all placement, spacing and geometric transforms belong to the kernel. */

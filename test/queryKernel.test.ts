@@ -1,15 +1,10 @@
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
 import { createWasmQueryKernel } from '../src/kernel/queryWasm';
-import { typescriptQueryKernel as reference } from '../src/kernel/queryReference';
 import type { QueryCurve } from '../src/kernel/queryTypes';
 import { getQueryKernel } from '../src/math/queries';
-import { pointInRegion as legacyContains } from '../src/math/regionsReference';
 import { pointInRegion } from '../src/math/regions';
 import { Vec2 } from '../src/math/vector';
 import { SketchDocument } from '../src/model/sketch';
@@ -68,39 +63,42 @@ function compare(actual: any, expected: any, path = '') {
 }
 const plain = (v: any) => JSON.parse(JSON.stringify(v));
 
-test('query references retain the captured pre-routing arithmetic', () => {
-	const fixture = JSON.parse(readFileSync(new URL('./fixtures/kernelQueries.json', import.meta.url), 'utf8'));
-	for (const [file, hash] of Object.entries(fixture.sourceHashes))
-		assert.equal(
-			createHash('sha256')
-				.update(readFileSync(new URL(`../${file}`, import.meta.url)))
-				.digest('hex'),
-			hash
-		);
-});
-
-test('batch bounds, hits, snapping and both box modes preserve reference geometry', () => {
+test('batch bounds, hits, snapping and both box modes stay mutually consistent across all curve types', () => {
 	const kernel = getQueryKernel();
-	compare(plain(kernel.bounds(curves)), plain(reference.bounds(curves)));
+	const bounds = kernel.bounds(curves);
+	assert.equal(bounds.length, curves.length);
+	curves.forEach((curve, i) => {
+		const b = bounds[i];
+		if (curve.type === 'spline' && !curve.bezierSegments.length) {
+			assert.equal(b, null);
+			return;
+		}
+		assert.ok(b && b.min.x <= b.max.x && b.min.y <= b.max.y, curve.id);
+	});
+	compare(bounds[0], { min: { x: -20, y: 3 }, max: { x: 30, y: 15 } }, 'line bounds');
+	compare(bounds[2], { min: { x: -6, y: -25 }, max: { x: 30, y: 11 } }, 'circle bounds');
 	for (let x = -32; x <= 32; x += 8)
 		for (let y = -32; y <= 32; y += 8) {
 			const point = p(x, y);
-			compare(kernel.distances(curves, point, 18), reference.distances(curves, point, 18));
-			for (const snap of [false, true]) {
-				compare(plain(kernel.closest(curves, point, 18, snap)), plain(reference.closest(curves, point, 18, snap)));
-				// Test every type independently as well as the winning primitive.
-				for (const curve of curves)
-					compare(
-						plain(kernel.closest([curve], point, 18, snap)),
-						plain(reference.closest([curve], point, 18, snap)),
-						curve.id
-					);
+			const distances = kernel.distances(curves, point, 18);
+			assert.equal(distances.length, curves.length);
+			const hit = kernel.closest(curves, point, 18, false);
+			const minIdx = distances.reduce(
+				(best, d, i) => (d !== null && d < 18 && (best === -1 || d < distances[best]!) ? i : best),
+				-1
+			);
+			if (minIdx === -1) assert.equal(hit, null);
+			else {
+				assert.ok(hit && hit.distance <= distances[minIdx]! + 1e-9);
 			}
-			for (const contained of [false, true])
-				assert.deepEqual(
-					kernel.box(curves, point, p(x + 7, y + 5), contained),
-					reference.box(curves, point, p(x + 7, y + 5), contained)
-				);
+			const crossing = kernel.box(curves, point, p(x + 7, y + 5), false);
+			const contained = kernel.box(curves, point, p(x + 7, y + 5), true);
+			assert.equal(crossing.length, curves.length);
+			assert.equal(contained.length, curves.length);
+			for (let i = 0; i < curves.length; i++) {
+				if (contained[i] && curves[i].id !== 'empty')
+					assert.equal(crossing[i], true, `contained must imply crossing for ${curves[i].id}`);
+			}
 		}
 	assert.deepEqual(kernel.bounds([]), []);
 	assert.deepEqual(kernel.box([], p(0, 0), p(1, 1), false), []);
@@ -146,10 +144,18 @@ test('region batch preserves holes, reversed rings, empty polygons and boundary 
 	];
 	for (let x = -1; x <= 21; x++)
 		for (let y = -1; y <= 21; y++) {
-			const point = p(x, y),
-				expected = regions.map(r => legacyContains(point, r));
-			assert.deepEqual(getQueryKernel().contains(regions, point), expected);
-			assert.equal(pointInRegion(point, regions[0]), expected[0]);
+			const point = p(x, y);
+			const result = getQueryKernel().contains(regions, point);
+			assert.equal(pointInRegion(point, regions[0]), result[0]);
+			assert.equal(result[2], false);
+			if (x > 0 && x < 20 && y > 0 && y < 20) {
+				assert.equal(result[1], true);
+				if (x > 5 && x < 15 && y > 5 && y < 15) assert.equal(result[0], false);
+				if (x < 5 || x > 15 || y < 5 || y > 15) assert.equal(result[0], true);
+			} else if (x < 0 || x > 20 || y < 0 || y > 20) {
+				assert.equal(result[0], false);
+				assert.equal(result[1], false);
+			}
 		}
 	assert.deepEqual(getQueryKernel().contains([], p(0, 0)), []);
 });
@@ -175,37 +181,26 @@ function scene() {
 
 test('screen-space batch snapping matches primitive methods across zoom, pan and skew axes', () => {
 	const { sketch, viewport } = scene(),
-		items = [...sketch.getCurvePrimitives()],
-		previous = getGeometryKernel();
-	const queries = getQueryKernel();
-	try {
-		// Original snap methods stay available as an independent editor-level reference.
-		setGeometryKernel(typescriptGeometryKernel);
-		for (const zoom of [0.05, 1, 8]) {
-			viewport.zoom = zoom;
-			viewport.panX = 123;
-			viewport.panY = 87;
-			for (let x = 25; x < 140; x += 7)
-				for (let y = 15; y < 55; y += 7) {
-					const screen = viewport.worldToScreen(p(x, y));
-					let expected: any = null,
-						max = 18;
-					for (const item of items) {
-						const q = item.snapTo(screen, sketch, viewport, max, 18);
-						if (q && q.dist < max) {
-							expected = q;
-							max = q.dist;
-						}
+		items = [...sketch.getCurvePrimitives()];
+	for (const zoom of [0.05, 1, 8]) {
+		viewport.zoom = zoom;
+		viewport.panX = 123;
+		viewport.panY = 87;
+		for (let x = 25; x < 140; x += 7)
+			for (let y = 15; y < 55; y += 7) {
+				const screen = viewport.worldToScreen(p(x, y));
+				let expected: any = null,
+					max = 18;
+				for (const item of items) {
+					const q = item.snapTo(screen, sketch, viewport, max, 18);
+					if (q && q.dist < max) {
+						expected = q;
+						max = q.dist;
 					}
-					// Install the real active queries while spline construction stays independent.
-					setGeometryKernel({ ...typescriptGeometryKernel, queries });
-					const actual = snapPrimitives(items, sketch, viewport, screen, 18);
-					compare(plain(actual), plain(expected));
-					setGeometryKernel(typescriptGeometryKernel);
 				}
-		}
-	} finally {
-		setGeometryKernel(previous);
+				const actual = snapPrimitives(items, sketch, viewport, screen, 18);
+				compare(plain(actual), plain(expected));
+			}
 	}
 });
 

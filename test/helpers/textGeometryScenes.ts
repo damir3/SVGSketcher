@@ -3,7 +3,7 @@ import * as opentype from 'opentype.js';
 import { Vec2 } from '../../src/math/vector';
 import type { TextLayoutOptions } from '../../src/math/textPath';
 import type { GeoCurve } from '../../src/math/intersection';
-import { hydrateQueryCurve } from '../../src/kernel/queryReference';
+import { hydrateQueryCurve } from './hydrateQueryCurve';
 
 const ot = (opentype as any).default ?? opentype;
 export function textFonts(): Record<string, opentype.Font> {

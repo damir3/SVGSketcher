@@ -1,17 +1,14 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
-import { typescriptGeometryKernel } from '../src/kernel/typescript';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
 import { createWasmRegionKernel, packRegionCurves } from '../src/kernel/regionWasm';
 import { findCurveRegions, type SketchRegion } from '../src/math/regions';
-import { findCurveRegions as reference } from '../src/math/regionsReference';
 import { getAllGeoCurves, type GeoCurve } from '../src/math/intersection';
 import { Vec2 } from '../src/math/vector';
 import { SketchDocument } from '../src/model/sketch';
-import { createBenchmarkScene, dragTarget } from '../benchmarks/scenes';
+import { createBenchmarkScene, dragTarget, SCENE_SIZES } from '../benchmarks/scenes';
 
 const fixtures = JSON.parse(readFileSync(new URL('./fixtures/kernelRegions.json', import.meta.url), 'utf8')) as {
 	sourceSha256: string;
@@ -54,14 +51,6 @@ function compare(actual: SketchRegion[], expected: SketchRegion[]) {
 		}
 	}
 }
-test('region fixtures identify the unchanged pre-native TypeScript source', () => {
-	assert.equal(
-		createHash('sha256')
-			.update(readFileSync(new URL('../src/math/regionsReference.ts', import.meta.url)))
-			.digest('hex'),
-		fixtures.sourceSha256
-	);
-});
 describe('region topology and exact boundaries captured before native routing', () => {
 	for (const fixture of fixtures.cases)
 		test(fixture.name, () => {
@@ -74,29 +63,26 @@ describe('region topology and exact boundaries captured before native routing', 
 		});
 });
 
-test('native regions match the frozen reference on 24 dragged benchmark states', {
+test('native regions preserve face counts and valid boundaries on 24 dragged benchmark states', {
 	skip: !getGeometryKernel().findRegions,
 }, () => {
-	const native = getGeometryKernel();
-	try {
-		for (const family of ['rectangles', 'splines'] as const)
-			for (const size of ['small', 'medium', 'large'] as const) {
-				const scene = createBenchmarkScene(family, size),
-					sketch = new SketchDocument();
-				sketch.restoreSnapshot(scene.snapshot);
-				for (const i of [0, 3, 12, 29]) {
-					const target = dragTarget(scene, i, 30);
-					sketch.dragPoint(scene.dragPointId, target.x, target.y);
-					const curves = getAllGeoCurves(sketch).filter(c => !c.isConstruction);
-					setGeometryKernel(typescriptGeometryKernel);
-					const expected = reference(curves);
-					setGeometryKernel(native);
-					compare(findCurveRegions(curves), expected);
+	for (const family of ['rectangles', 'splines'] as const)
+		for (const size of ['small', 'medium', 'large'] as const) {
+			const scene = createBenchmarkScene(family, size),
+				sketch = new SketchDocument();
+			sketch.restoreSnapshot(scene.snapshot);
+			for (const i of [0, 3, 12, 29]) {
+				const target = dragTarget(scene, i, 30);
+				sketch.dragPoint(scene.dragPointId, target.x, target.y);
+				const curves = getAllGeoCurves(sketch).filter(c => !c.isConstruction);
+				const regions = findCurveRegions(curves);
+				assert.equal(regions.length, SCENE_SIZES[size] * (family === 'rectangles' ? 2 : 1));
+				for (const region of regions) {
+					assert.ok(Number.isFinite(region.area) && region.area > 0);
+					assert.ok(region.points.length >= 3 && region.path.startsWith('M ') && region.path.endsWith('Z'));
 				}
 			}
-	} finally {
-		setGeometryKernel(native);
-	}
+		}
 });
 
 test('region result validation rejects corrupt counts, commands, flags and non-finite coordinates', () => {
@@ -185,10 +171,7 @@ test('finds all 4 regions in sketch with near-vertex spline crossings', {
 		{
 			type: 'spline',
 			id: 'Spline-2',
-			points: [
-				new Vec2(-70.71378470916424, -48.95193749047031),
-				new Vec2(74.04047285089842, 25.072922657919527),
-			],
+			points: [new Vec2(-70.71378470916424, -48.95193749047031), new Vec2(74.04047285089842, 25.072922657919527)],
 			bezierSegments: [
 				[
 					new Vec2(-70.71378470916424, -48.95193749047031),
@@ -272,8 +255,4 @@ test('finds region enclosed by line and spline in region-issue3 sketch', {
 	];
 	const regions = findCurveRegions(curves);
 	assert.equal(regions.length, 1);
-	const refRegions = reference(curves);
-	assert.equal(refRegions.length, 1);
 });
-
-

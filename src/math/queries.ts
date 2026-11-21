@@ -1,10 +1,11 @@
 import { getGeometryKernel } from '../kernel';
-import { typescriptQueryKernel } from '../kernel/queryReference';
 import type { GeometryQueryKernel, QueryCurve } from '../kernel/queryTypes';
 
 /** Batch callers retain document filtering and priority rules in the editor. */
 export function getQueryKernel(): GeometryQueryKernel {
-	return getGeometryKernel().queries ?? typescriptQueryKernel;
+	const queries = getGeometryKernel().queries;
+	if (!queries) throw new Error('Geometry queries require the Rust/WASM kernel');
+	return queries;
 }
 
 /** Invalid/unbounded geometry must not reject otherwise valid queries in the same batch. */

@@ -1,5 +1,4 @@
 import { getGeometryKernel } from '../kernel';
-import { typescriptCurveKernel } from '../kernel/curveReference';
 import type { RegionKernelCurve } from '../kernel/regionTypes';
 import type { Point2 } from '../kernel/types';
 import { Vec2 } from './vector';
@@ -14,7 +13,11 @@ export interface PathEvaluator {
 	getSampleAtDistance(distance: number): CurveSample;
 	getSamplesAtDistances(distances: readonly number[]): CurveSample[];
 }
-export const getCurveEvaluationKernel = () => getGeometryKernel().curves ?? typescriptCurveKernel;
+export const getCurveEvaluationKernel = () => {
+	const curves = getGeometryKernel().curves;
+	if (!curves) throw new Error('Curve evaluation requires the Rust/WASM kernel');
+	return curves;
+};
 
 /** Prepared paths capture a geometry snapshot and reuse one distance table for every batch. */
 export function createCurvePath(curve: RegionKernelCurve): PathEvaluator {

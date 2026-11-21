@@ -1,6 +1,5 @@
 import type { CurveEvaluationKernel, CurveFrame } from './curveTypes';
 import { packRegionCurves } from './regionWasm';
-import { typescriptCurveKernel as reference } from './curveReference';
 import { isQueryableCurve } from '../math/queries';
 
 export type CurvePathBinding = (
@@ -17,7 +16,7 @@ function checked(data: Float64Array, size: number): Float64Array {
 export function createWasmCurveKernel(binding: CurvePathBinding): CurveEvaluationKernel {
 	return {
 		preparePath(curve) {
-			if (!isQueryableCurve(curve)) return reference.preparePath(curve);
+			if (!isQueryableCurve(curve)) throw new Error('Non-finite curve path input');
 			const data = packRegionCurves([curve]),
 				table = binding(data, empty, empty, 0),
 				n = (table.length - 4) / 3;
@@ -34,7 +33,7 @@ export function createWasmCurveKernel(binding: CurvePathBinding): CurveEvaluatio
 			return {
 				length: table[0],
 				samples(distances) {
-					if (!distances.every(Number.isFinite)) return reference.preparePath(curve).samples(distances);
+					if (!distances.every(Number.isFinite)) throw new Error('Non-finite curve path distance');
 					if (!distances.length) return [];
 					const out = checked(binding(data, table, new Float64Array(distances), 1), distances.length * 6);
 					return distances.map(
@@ -48,12 +47,8 @@ export function createWasmCurveKernel(binding: CurvePathBinding): CurveEvaluatio
 			};
 		},
 		pointsAtParameters(curve, parameters) {
-			const degenerateArc =
-				curve.type === 'elliptical_arc' &&
-				((curve.center.x === curve.majorAxisPoint.x && curve.center.y === curve.majorAxisPoint.y) ||
-					(curve.center.x === curve.minorAxisPoint.x && curve.center.y === curve.minorAxisPoint.y));
-			if (!isQueryableCurve(curve) || !parameters.every(Number.isFinite) || degenerateArc)
-				return reference.pointsAtParameters(curve, parameters);
+			if (!isQueryableCurve(curve) || !parameters.every(Number.isFinite))
+				throw new Error('Non-finite curve parameter input');
 			if (!parameters.length) return [];
 			const out = checked(
 				binding(packRegionCurves([curve]), empty, new Float64Array(parameters), 2),
@@ -63,7 +58,7 @@ export function createWasmCurveKernel(binding: CurvePathBinding): CurveEvaluatio
 		},
 		parametersAtPoints(curve, points) {
 			if (!isQueryableCurve(curve) || !points.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)))
-				return reference.parametersAtPoints(curve, points);
+				throw new Error('Non-finite curve point input');
 			if (!points.length) return [];
 			const data = new Float64Array(points.length * 2);
 			points.forEach((p, i) => {

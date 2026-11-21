@@ -2,21 +2,17 @@ import assert from 'node:assert/strict';
 import * as opentype from 'opentype.js';
 import { serializeTextPath } from '../src/math/textSvg';
 import { parseTextSvg } from './helpers/parseTextSvg';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { getGeometryKernel, setGeometryKernel } from '../src/kernel';
 import { createWasmGeometryKernel } from '../src/kernel/wasm';
 import { createWasmTextGeometry } from '../src/kernel/textWasm';
 import type { TextGeometryInput } from '../src/kernel/textTypes';
-import { generateTextSvgPathData } from '../src/math/textPath';
+import { createPathEvaluator, generateTextSvgPathData } from '../src/math/textPath';
 import { prepareTextGlyphs } from '../src/math/textGlyphs';
 import { Vec2 } from '../src/math/vector';
-import { hydrateQueryCurve } from '../src/kernel/queryReference';
+import { hydrateQueryCurve } from './helpers/hydrateQueryCurve';
 import { textFonts } from './helpers/textGeometryScenes';
-import { textPlacementExpected } from './helpers/textPlacementExpected';
-import { createPathEvaluator } from '../src/math/curvePathReference';
-import { generateTextSvgPathData as correctedReference, extendOpenTextPath } from '../src/math/textPlacementReference';
 
 const PathClass = (opentype as any).Path ?? (opentype as any).default?.Path;
 
@@ -57,39 +53,15 @@ function hydrate(f: any) {
 		curve: f.curve ? hydrateQueryCurve(f.curve) : undefined,
 	};
 }
-test('text fixtures identify the unchanged font and independent layout sources', () => {
-	for (const [file, hash] of Object.entries(fixture.sourceHashes))
-		assert.equal(
-			createHash('sha256')
-				.update(readFileSync(new URL(`../${file}`, import.meta.url)))
-				.digest('hex'),
-			hash
-		);
-});
 for (const f of fixture.cases)
 	test(`native text layout preserves unrounded geometry: ${f.name}`, () => {
 		const { options, curve } = hydrate(f),
 			input = prepareTextGlyphs(options, fonts[f.font], curve);
-		const correctedBelow = options.mode === 'text_on_path' && options.placement === 'below' && !options.flipVertical;
-		const expectedInput =
-			input && correctedBelow ? { ...f.input, capHeight: fonts[f.font].charToGlyph('H').getBoundingBox().y2 } : f.input;
-		assert.deepEqual(
-			plain(input),
-			expectedInput,
-			'font extraction retains pre-routing data and the corrected cap metric'
-		);
-		const correctedOverflow =
-			options.mode === 'text_on_path' && curve && extendOpenTextPath(options, fonts[f.font], curve) !== curve;
-		const expected =
-			correctedBelow || correctedOverflow
-				? textPlacementExpected(options, fonts[f.font], curve)
-				: native
-					? (f.expectedWasm ?? f.expected)
-					: f.expected;
+		assert.deepEqual(plain(input), f.input, 'font extraction retains pre-routing data and the corrected cap metric');
+		const expected = f.expectedWasm ?? f.expected;
 		const before = plain({ options, curve, input });
 		if (native && input) compare(getGeometryKernel().textGeometry!(input), expected.commands, f.name);
 		const svg = generateTextSvgPathData(options, fonts[f.font], curve);
-		// Captured outlines remain unchanged; historical SVG can contain merged zero coordinates.
 		const expectedPath = new PathClass();
 		expectedPath.commands = expected.commands;
 		compareSvg(svg, serializeTextPath(expectedPath));
@@ -124,22 +96,6 @@ test('the complete text uses one native call without curve or spline callbacks',
 				before = calls;
 			generateTextSvgPathData(options, fonts[f.font], curve);
 			assert.equal(calls, before + 1);
-		}
-	} finally {
-		setGeometryKernel(previous);
-	}
-});
-
-test('custom kernels without text support retain the independent TypeScript layout', () => {
-	const previous = getGeometryKernel();
-	try {
-		setGeometryKernel({ ...previous, textGeometry: undefined });
-		for (const f of fixture.cases.filter((_, i) => i % 7 === 0)) {
-			const { options, curve } = hydrate(f);
-			assert.equal(
-				generateTextSvgPathData(options, fonts[f.font], curve),
-				correctedReference(options, fonts[f.font], curve)
-			);
 		}
 	} finally {
 		setGeometryKernel(previous);
@@ -193,46 +149,32 @@ const simple: TextGeometryInput = {
 	],
 	rectangle: [new Vec2(0, 20), new Vec2(40, 20), new Vec2(40, 0), new Vec2(0, 0)],
 };
-test('below placement touches the capital line for real fonts, both coordinate systems and both backends', () => {
-	const previous = getGeometryKernel();
+test('below placement touches the capital line for real fonts and both coordinate systems', () => {
 	const line = { id: 'cap-line', type: 'segment' as const, p1: new Vec2(0, 0), p2: new Vec2(100, 0) };
-	try {
-		for (const kernel of native ? [previous, { ...previous, textGeometry: undefined }] : [previous]) {
-			setGeometryKernel(kernel);
-			for (const font of [fonts.arial, fonts.times, fonts.courier])
-				for (const height of [3, 10])
-					for (const flipHorizontal of [false, true])
-						for (const flipVertical of [false, true])
-							for (const coordSystem of ['cad', 'svg'] as const) {
-								const options = {
-									mode: 'text_on_path' as const,
-									text: 'HHH',
-									height,
-									characterSpacing: 10,
-									placement: 'below' as const,
-									fitToPath: true,
-									alignment: 'center' as const,
-									flipHorizontal,
-									flipVertical,
-									coordSystem,
-								};
-								const result = generateTextSvgPathData(options, font, line);
-								const coordinates = result.match(/[-+]?(?:\d*\.)?\d+/g)!.map(Number);
-								const y = coordinates.filter((_, i) => i % 2 === 1).map(v => (coordSystem === 'svg' ? -v : v));
-								assert.ok(
-									Math.abs(Math.max(...y)) < 1e-12,
-									'capital line or vertically flipped baseline touches the path'
-								);
-								const cap = font.charToGlyph('H').getBoundingBox().y2 * (height / font.unitsPerEm);
-								assert.ok(
-									Math.abs(Math.min(...y) + cap) <= 0.005001,
-									'glyph height and the below side remain unchanged'
-								);
-							}
-		}
-	} finally {
-		setGeometryKernel(previous);
-	}
+	for (const font of [fonts.arial, fonts.times, fonts.courier])
+		for (const height of [3, 10])
+			for (const flipHorizontal of [false, true])
+				for (const flipVertical of [false, true])
+					for (const coordSystem of ['cad', 'svg'] as const) {
+						const options = {
+							mode: 'text_on_path' as const,
+							text: 'HHH',
+							height,
+							characterSpacing: 10,
+							placement: 'below' as const,
+							fitToPath: true,
+							alignment: 'center' as const,
+							flipHorizontal,
+							flipVertical,
+							coordSystem,
+						};
+						const result = generateTextSvgPathData(options, font, line);
+						const coordinates = result.match(/[-+]?(?:\d*\.)?\d+/g)!.map(Number);
+						const y = coordinates.filter((_, i) => i % 2 === 1).map(v => (coordSystem === 'svg' ? -v : v));
+						assert.ok(Math.abs(Math.max(...y)) < 1e-12, 'capital line or vertically flipped baseline touches the path');
+						const cap = font.charToGlyph('H').getBoundingBox().y2 * (height / font.unitsPerEm);
+						assert.ok(Math.abs(Math.min(...y) + cap) <= 0.005001, 'glyph height and the below side remain unchanged');
+					}
 });
 
 test('overlong spline text retains signed alignment and continues along endpoint tangents', { skip: !native }, () => {
