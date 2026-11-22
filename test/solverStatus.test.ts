@@ -89,6 +89,49 @@ it('goes directly to the free-radius pass when a pattern copy must change radius
 	assert.ok(sketch.lastSolverResult!.finalError < 1e-10);
 });
 
+it('edits the distance to the center of a tangent arc in a circular pattern', () => {
+	const sketch = new SketchDocument();
+	const largeRadius = 40;
+	const center = sketch.addPoint({ x: 0, y: 100 }, true);
+	const tangentCenter = sketch.addPoint({ x: 50, y: 50 * Math.sqrt(3) });
+	const centerDistance = center.distanceTo(tangentCenter);
+	const shared = sketch.addPoint(center.clone().lerp(tangentCenter, largeRadius / centerDistance));
+	const start = sketch.addPoint({ x: -shared.x, y: shared.y });
+	const end = sketch.addPoint({
+		x: shared.x / 2 + (shared.y * Math.sqrt(3)) / 2,
+		y: shared.y / 2 - (shared.x * Math.sqrt(3)) / 2,
+	});
+	const large = sketch.addArc(center.id, start.id, shared.id, largeRadius);
+	const tangent = sketch.addArc(tangentCenter.id, shared.id, end.id, centerDistance - largeRadius, true);
+	assert.ok(sketch.addRadiusConstraint(large.id, largeRadius));
+
+	const sources = [large.id, tangent.id];
+	const copies = Array.from({ length: 5 }, (_, i) => {
+		const copy = sketch.generatePatternCopy('origin', sources, i + 1, 6, 'full', 360);
+		assert.ok(copy);
+		return copy;
+	});
+	assert.ok(sketch.addCircularPatternConstraint('origin', sources, 'full', 360, 6, false, [], copies));
+	const neighborId = copies[4].radiusPairs?.find(pair => pair.sourceCircleId === large.id)?.patternCircleId;
+	const neighbor = neighborId && sketch.arcs.get(neighborId);
+	assert.ok(neighbor);
+	assert.ok(sketch.addCoincidentConstraint(end.id, neighbor.startPointId));
+	assert.ok(sketch.addCircleTangentConstraint(large.id, tangent.id));
+	assert.ok(sketch.addCircleTangentConstraint(neighbor.id, tangent.id));
+	const distance = sketch.addOriginDistanceConstraint(tangentCenter.id, 100, 'aligned');
+	assert.ok(distance);
+	assert.equal(sketch.lastSolverResult?.degreesOfFreedom, 0);
+
+	assert.ok(sketch.updateDimensionalConstraint(distance.id, '120'));
+
+	assert.equal(distance.value, 120);
+	assert.equal(large.radius, largeRadius);
+	assert.ok(Math.abs(tangentCenter.length() - 120) < 1e-6);
+	assert.ok(Math.abs(tangent.radius - 20.1281158) < 1e-6);
+	assert.equal(sketch.lastSolverResult?.degreesOfFreedom, 0);
+	assert.ok(sketch.lastSolverResult!.finalError < 1e-10);
+});
+
 it('keeps iterating past small ill-conditioned gradients to close a shallow loop', () => {
 	const createShallowLoop = (gradRelTolerance?: number) => {
 		const sketch = new SketchDocument(

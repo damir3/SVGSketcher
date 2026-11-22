@@ -356,7 +356,7 @@ export class SolveCoordinator {
 		let rejected = false;
 		let referenceCreated = false;
 		syncOffsetSources(this.sketch, offsets, () => {
-			res = this.solveConstraints(extraConstraints);
+			res = this.solveConstraints(extraConstraints, editValues !== null);
 			if (!pending.size) return;
 			// Solvers can skip residual evaluation when every parameter is fixed.
 			const values = this.paramManager.getCurrentValues();
@@ -561,7 +561,7 @@ export class SolveCoordinator {
 		};
 	}
 
-	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
+	private solveConstraints(extraConstraints: IConstraint[], retryWithoutRadiusStiffness = false): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = prepareSplineConstraints(this.sketch, extraConstraints, drivenRadii, editedHandles);
@@ -592,8 +592,8 @@ export class SolveCoordinator {
 		// that the solver prefers moving geometry over resizing circles. When stage 1
 		// succeeded this is a no-op / polish step that also computes the DoF.
 		const stiffCenters = this.stableCenterEditDepth > 0;
-		const stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, stiffCenters);
-		const result = this.solveWithOffsetSourceRetry(activeConstraints, {
+		let stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, stiffCenters);
+		let result = this.solveWithOffsetSourceRetry(activeConstraints, {
 			lockedParams: drivenRadii,
 			paramStiffness: stiffness,
 		});
@@ -601,10 +601,16 @@ export class SolveCoordinator {
 			// High center stiffness can stall Levenberg-Marquardt when centers must move.
 			// Retry from the pre-trial geometry with only non-linked radius stiffness.
 			this.paramManager.restoreValues(preStageValues);
-			return this.solveWithOffsetSourceRetry(activeConstraints, {
+			stiffness = this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, false);
+			result = this.solveWithOffsetSourceRetry(activeConstraints, {
 				lockedParams: drivenRadii,
-				paramStiffness: this.buildRadiusStiffness(activeConstraints, allRadii, drivenRadii, false),
+				paramStiffness: stiffness,
 			});
+		}
+		if (!stage1Ok && retryWithoutRadiusStiffness && stiffness.size > 0 && result.status === 'OVER_CONSTRAINED') {
+			// Radius stiffness can stall a feasible dimension edit when tangency requires a radius change.
+			this.paramManager.restoreValues(preStageValues);
+			return this.solveWithOffsetSourceRetry(activeConstraints, { lockedParams: drivenRadii });
 		}
 		return result;
 	}
