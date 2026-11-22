@@ -25,70 +25,22 @@ export function determineDistanceOrientation(
 	orientation: 'aligned' | 'horizontal' | 'vertical';
 	offsetScreen: number;
 } {
-	const len = s1.distanceTo(s2);
-
+	const minX = Math.min(s1.x, s2.x);
+	const maxX = Math.max(s1.x, s2.x);
+	const minY = Math.min(s1.y, s2.y);
+	const maxY = Math.max(s1.y, s2.y);
 	const midPoint = new Vec2().midpoint(s1, s2);
-	const v = new Vec2().subVectors(cursor, midPoint);
+	const offset = new Vec2().subVectors(cursor, midPoint);
 
-	if (len < 1e-4) {
-		return { orientation: 'aligned', offsetScreen: 0 };
+	if (cursor.x > minX && cursor.x < maxX && (cursor.y < minY || cursor.y > maxY)) {
+		return { orientation: 'horizontal', offsetScreen: offset.y };
+	}
+	if (cursor.y > minY && cursor.y < maxY && (cursor.x < minX || cursor.x > maxX)) {
+		return { orientation: 'vertical', offsetScreen: offset.x };
 	}
 
-	const dir = new Vec2().subVectors(s2, s1).normalizeOrUnitX();
-	const normal = dir.clone().perpendicular();
-	const normalOffset = v.dot(normal);
-
-	// Angle of cursor from midpoint in degrees (-180 to 180)
-	// -90° is UP, +90° is DOWN, 0° is RIGHT, ±180° is LEFT
-	const theta = v.signedAngleDeg();
-
-	// Angle of line and line normal in degrees
-	const lineAngle = dir.signedAngleDeg();
-	const norm1 = lineAngle + 90;
-	const norm2 = lineAngle - 90;
-
-	const angleDiff = (a: number, b: number): number => {
-		const d = Math.abs(a - b) % 360;
-		return d > 180 ? 360 - d : d;
-	};
-
-	const diffNormal = Math.min(angleDiff(theta, norm1), angleDiff(theta, norm2));
-	const diffVertical = Math.min(angleDiff(theta, 90), angleDiff(theta, -90));
-	const diffHorizontal = Math.min(angleDiff(theta, 0), angleDiff(theta, 180));
-
-	// If points are nearly horizontal (|dy| < 5px), vertical dimension makes no sense
-	if (Math.abs(dir.y * len) < 5) {
-		return {
-			orientation: diffNormal <= 45 ? 'aligned' : 'horizontal',
-			offsetScreen: diffNormal <= 45 ? normalOffset : v.y,
-		};
-	}
-
-	// If points are nearly vertical (|dx| < 5px), horizontal dimension makes no sense
-	if (Math.abs(dir.x * len) < 5) {
-		return {
-			orientation: diffNormal <= 45 ? 'aligned' : 'vertical',
-			offsetScreen: diffNormal <= 45 ? normalOffset : v.x,
-		};
-	}
-
-	// Choose between aligned, horizontal, and vertical based on which direction cursor is pulled towards
-	if (diffNormal <= diffVertical + 15 && diffNormal <= diffHorizontal + 15) {
-		return {
-			orientation: 'aligned',
-			offsetScreen: normalOffset,
-		};
-	} else if (diffVertical < diffHorizontal) {
-		return {
-			orientation: 'horizontal',
-			offsetScreen: v.y,
-		};
-	} else {
-		return {
-			orientation: 'vertical',
-			offsetScreen: v.x,
-		};
-	}
+	const normal = new Vec2().subVectors(s2, s1).normalizeOrNull(1e-4)?.perpendicular();
+	return { orientation: 'aligned', offsetScreen: normal ? offset.dot(normal) : 0 };
 }
 
 const EMPTY_STATE: DimensionState = {

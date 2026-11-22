@@ -445,24 +445,53 @@ describe('Origin & Axis Constraints', () => {
 			assert.ok(dist !== null && dist < 1e-3);
 		});
 
-		it('determineDistanceOrientation supports aligned distance to (0,0) and axes', () => {
-			const sOrigin = new Vec2(0, 0);
-			const sPt = new Vec2(100, 100); // 45 deg line
+		it('chooses distance orientation from the strict bounds of the endpoints', () => {
+			const a = new Vec2(100, 0);
+			const b = new Vec2(0, 100);
+			const placements = [
+				[99, -1, 'horizontal'],
+				[1, 101, 'horizontal'],
+				[-1, 99, 'vertical'],
+				[101, 1, 'vertical'],
+				[50, 25, 'aligned'],
+				[-10, -50, 'aligned'],
+				[50, 0, 'aligned'],
+				[0, 50, 'aligned'],
+				[100, -1, 'aligned'],
+				[-1, 100, 'aligned'],
+			] as const;
 
-			// Normal is at 135 deg (-45 deg). Cursor pulled perpendicular:
-			const cursorNormal = new Vec2(20, 80);
-			const resAligned = determineDistanceOrientation(sOrigin, sPt, cursorNormal);
-			assert.equal(resAligned.orientation, 'aligned');
+			for (const [x, y, orientation] of placements) {
+				const cursor = new Vec2(x, y);
+				assert.equal(
+					determineDistanceOrientation(a, b, cursor).orientation,
+					orientation,
+					`Cursor at (${x}, ${y})`
+				);
+				assert.equal(
+					determineDistanceOrientation(b, a, cursor).orientation,
+					orientation,
+					`Cursor at (${x}, ${y}), reversed endpoints`
+				);
+			}
 
-			// Cursor pulled up/down (vertical direction) => horizontal dimension:
-			const cursorVertical = new Vec2(50, 200);
-			const resHoriz = determineDistanceOrientation(sOrigin, sPt, cursorVertical);
-			assert.equal(resHoriz.orientation, 'horizontal');
-
-			// Cursor pulled left/right (horizontal direction) => vertical dimension:
-			const cursorHorizontal = new Vec2(200, 50);
-			const resVert = determineDistanceOrientation(sOrigin, sPt, cursorHorizontal);
-			assert.equal(resVert.orientation, 'vertical');
+			const origin = new Vec2(0, 0);
+			assert.deepEqual(determineDistanceOrientation(origin, new Vec2(100, 0), new Vec2(50, -10)), {
+				orientation: 'horizontal',
+				offsetScreen: -10,
+			});
+			assert.deepEqual(determineDistanceOrientation(origin, new Vec2(0, 100), new Vec2(10, 50)), {
+				orientation: 'vertical',
+				offsetScreen: 10,
+			});
+			assert.equal(
+				determineDistanceOrientation(origin, new Vec2(100, 1), new Vec2(-1, 0.5)).orientation,
+				'vertical'
+			);
+			assert.deepEqual(determineDistanceOrientation(origin, origin, new Vec2(50, 50)), {
+				orientation: 'aligned',
+				offsetScreen: 0,
+			});
 		});
 
 		it('LineTool creates a line starting from (0,0) and applies origin coincident constraint', () => {
