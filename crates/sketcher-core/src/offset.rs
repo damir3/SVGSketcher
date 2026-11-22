@@ -247,11 +247,14 @@ pub fn intersect_lines(a: Point2, d1: Point2, b: Point2, d2: Point2) -> Option<P
 fn line_circle(origin: Point2, dir: Point2, c: Point2, r: f64, near: Point2) -> Option<Point2> {
     let t = (c - origin).dot(dir);
     let p = origin + dir * t;
-    let d = p.distance_squared(c);
-    if d > r * r {
+    let d_sq = p.distance_squared(c);
+    if d_sq > r * r {
+        if d_sq.sqrt() <= r + 1e-4 && p.distance(near) <= 1e-3 {
+            return Some(p);
+        }
         return None;
     }
-    let dt = (r * r - d).max(0.0).sqrt();
+    let dt = (r * r - d_sq).max(0.0).sqrt();
     let a = origin + dir * (t - dt);
     let b = origin + dir * (t + dt);
     Some(if a.distance(near) < b.distance(near) {
@@ -317,12 +320,21 @@ fn join_arcs(a: &Shape, b: &Shape, d: f64, vertex: Option<Point2>) -> Option<Poi
     let (Shape::Arc(c, r, aa, cw1), Shape::Arc(q, s, bb, cw2)) = (a, b) else {
         return None;
     };
-    if dist(aa[1], bb[0]) < 1e-8 {
+    let end_gap = dist(aa[1], bb[0]);
+    if end_gap < 1e-8 {
         return Some(middle(aa[1], bb[0]));
     }
     let delta = *q - *c;
     let distance = delta.length();
-    if distance < 1e-12 || distance > r + s + 1e-8 || distance < (r - s).abs() - 1e-8 {
+    // Tangent source arcs often carry ~1e-6..1e-5 solver residuals; snap their
+    // nearly-touching offset endpoints directly instead of falling through to
+    // connect_corner_gaps (which converts an exact arc into a fitted spline).
+    let tang_tol = if end_gap <= 1e-3 {
+        1e-4_f64.min(0.01 * d.abs().max(1e-6))
+    } else {
+        1e-8
+    };
+    if distance < 1e-12 || distance > r + s + tang_tol || distance < (r - s).abs() - tang_tol {
         return None;
     }
     let x = (r * r - s * s + distance * distance) / (2.0 * distance);
@@ -921,5 +933,25 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn near_tangent_arcs_with_solver_residual_remain_arcs_without_gaps() {
+        // Two externally tangent circles (R=40 and R=13.6248) with a ~1e-5 solver residual
+        // separating their centers must still join as exact arcs, not fall through to spline fitting.
+        let r1 = 30.0;
+        let r2 = 23.6247776;
+        let c1 = p(0.0, 100.0);
+        let dir = unit(p(52.99168776, -8.21570461));
+        let c2 = step(c1, dir, r1 + r2 + 1e-5);
+        let a_end = step(c1, dir, r1);
+        let b_start = step(c2, scale(dir, -1.0), r2);
+        let a = Shape::Arc(c1, r1, [p(-29.645, 95.402), a_end], false);
+        let b = Shape::Arc(c2, r2, [b_start, p(67.794, 73.372)], true);
+        let joined = join_arcs(&a, &b, 10.0, Some(step(c1, dir, 40.0)));
+        assert!(joined.is_some());
+        let pt = joined.unwrap();
+        assert!(dist(pt, a_end) < 1e-4);
+        assert!(dist(pt, b_start) < 1e-4);
     }
 }

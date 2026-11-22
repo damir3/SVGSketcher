@@ -448,10 +448,14 @@ export class SolveCoordinator {
 		const centers = this.circularCenterParams();
 		if (!centers.size) return null;
 		const initial = this.paramManager.getCurrentValues();
-		const trial = this.solver.solve(this.paramManager, constraints, {
-			lockedParams: new Set([...drivenRadii, ...centers]),
-			skipDoF: true,
-		});
+		const trial = this.solveWithOffsetSourceRetry(
+			constraints,
+			{
+				lockedParams: new Set([...drivenRadii, ...centers]),
+				skipDoF: true,
+			},
+			1e-8
+		);
 		// A solve with no free parameters can return without evaluating constant residuals.
 		const error =
 			this.paramManager.getFreeCount() > 0
@@ -489,10 +493,14 @@ export class SolveCoordinator {
 		if (allRadii.size <= drivenRadii.size || this.lockedRadiusError(constraints, initialValues, maxError) >= maxError) {
 			return false;
 		}
-		const stage1 = this.solver.solve(this.paramManager, constraints, {
-			lockedParams: allRadii,
-			skipDoF: true,
-		});
+		const stage1 = this.solveWithOffsetSourceRetry(
+			constraints,
+			{
+				lockedParams: allRadii,
+				skipDoF: true,
+			},
+			maxError
+		);
 		const ok = this.isSolveAccepted(stage1, maxError, validator);
 		if (!ok) {
 			// Discard the least-squares compromise and start over from the original state.
@@ -501,26 +509,47 @@ export class SolveCoordinator {
 		return ok;
 	}
 
+	private hardConstraintError(constraints: IConstraint[], values: Map<string, number>): number {
+		let sumSq = 0;
+		for (const c of constraints) {
+			if (c.isSoft || c.isReference) continue;
+			for (const v of c.evaluate(values)) sumSq += v * v;
+		}
+		return sumSq * 0.5;
+	}
+
 	private solveWithOffsetSourceRetry(
 		constraints: IConstraint[],
 		options: SolveCallOptions,
 		maxError = 1e-2
 	): SolverResult {
-		const offsets = new Set(constraints.filter(c => c instanceof OffsetConstraint && !c.isReference && c.sourceChain));
+		const offsets = new Set(constraints.filter(c => c instanceof OffsetConstraint && !c.isReference));
 		const initial = offsets.size ? this.paramManager.getCurrentValues() : null;
 		const result = this.solver.solve(this.paramManager, constraints, options);
-		if (!offsets.size || this.isSolveAccepted(result, maxError)) return result;
+		if (!offsets.size) return result;
 
-		// Child-only offset Jacobians cannot guide a large source edit while
-		// their residuals still describe the old source. Solve the driving
-		// geometry first, then let the offsets follow that solved geometry.
+		const nonOffsets = constraints.filter(c => !offsets.has(c));
+		const firstDrivingError = this.hardConstraintError(nonOffsets, this.paramManager.getCurrentValues());
+		if (this.isSolveAccepted(result, maxError) && firstDrivingError < 1e-12) return result;
+
+		// Child-only offset Jacobians cannot guide source edits while their
+		// residuals still describe the old source, causing LM to reject parent
+		// steps even for small residuals. Solve the driving geometry first,
+		// then let the offsets follow that solved geometry.
+		const firstValues = this.paramManager.getCurrentValues();
 		this.paramManager.restoreValues(initial!);
-		this.solver.solve(
-			this.paramManager,
-			constraints.filter(c => !offsets.has(c)),
-			options
-		);
-		return this.solver.solve(this.paramManager, constraints, options);
+		this.solver.solve(this.paramManager, nonOffsets, { ...options, skipDoF: true });
+		const retry = this.solver.solve(this.paramManager, constraints, options);
+		const retryDrivingError = this.hardConstraintError(nonOffsets, this.paramManager.getCurrentValues());
+		if (
+			result.status !== 'OVER_CONSTRAINED' &&
+			(retry.status === 'OVER_CONSTRAINED' ||
+				(retryDrivingError >= firstDrivingError && retry.finalError >= result.finalError))
+		) {
+			this.paramManager.restoreValues(firstValues);
+			return result;
+		}
+		return retry;
 	}
 
 	private preserveDoFState(result: SolverResult, previous: SolverResult): SolverResult {

@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { SketchDocument } from '../src/model/sketch';
+import { findSketchRegions } from '../src/math/regions';
 import { OffsetConstraint } from '../src/solver/constraints';
 import type { DistanceConstraint } from '../src/solver/constraints';
+import { toggleOrExtendChain, calculateOffsetGeometry, commitOffsetToSketch } from '../src/math/offset';
+import { generateCircularPatternCopy } from '../src/model/patterns';
 
 const snapshot = JSON.parse(
 	readFileSync(new URL('./fixtures/offset-polygon-source-dimension.json', import.meta.url), 'utf8')
@@ -78,4 +81,87 @@ test('editing the default source length keeps it driving and supports undo/redo'
 		assertSolvedPolygon(sketch, target);
 	}
 	assert.equal(references, 0);
+});
+
+test('small residual on tangent circular-pattern seam closes cleanly when an offset is present', () => {
+	const sketch = new SketchDocument();
+	const count = 12;
+	const pitchR = 40;
+	const arcR = 5;
+	const filletR = 6;
+	const step = (2 * Math.PI) / count;
+	const halfChord = pitchR * Math.sin(step / 2);
+	const c1 = sketch.addPoint({ x: 0, y: pitchR });
+	// Externally-tangent fillet center on the +x side (angle = pi/2 - step/2)
+	const dFillet =
+		pitchR * Math.cos(step / 2) + Math.sqrt((arcR + filletR) ** 2 - halfChord * halfChord);
+	const c2x = dFillet * Math.sin(step / 2);
+	const c2y = dFillet * Math.cos(step / 2);
+	const dx = c2x - c1.x;
+	const dy = c2y - c1.y;
+	const dist = Math.hypot(dx, dy);
+	const t1 = sketch.addPoint({ x: c1.x + (dx * arcR) / dist, y: c1.y + (dy * arcR) / dist });
+	// Mirror t1 across Y-axis for start of arc1 (on the -x side)
+	const t0 = sketch.addPoint({ x: -t1.x, y: t1.y });
+	// Rotate t0 CW by step (-step) to land on the start of the adjacent copy's arc1
+	const cosS = Math.cos(-step);
+	const sinS = Math.sin(-step);
+	const t2 = sketch.addPoint({ x: t0.x * cosS - t0.y * sinS, y: t0.x * sinS + t0.y * cosS });
+	const c2 = sketch.addPoint({ x: c2x, y: c2y });
+
+	let arc1!: ReturnType<SketchDocument['addArc']>;
+	let arc2!: ReturnType<SketchDocument['addArc']>;
+	let adjArc1!: ReturnType<SketchDocument['addArc']>;
+	sketch.withDeferredSolve(() => {
+		arc1 = sketch.addArc(c1.id, t0.id, t1.id, arcR, false);
+		arc2 = sketch.addArc(c2.id, t1.id, t2.id, filletR, true);
+		const pitchCircle = sketch.addCircle('origin', pitchR);
+		pitchCircle.lineType = 'construction';
+		sketch.addRadiusConstraint(arc1.id, arcR);
+		sketch.addTangentConstraint(arc1.id, arc2.id);
+		sketch.addPointOnAxisConstraint(c1.id, 'y');
+		sketch.addRadiusConstraint(pitchCircle.id, pitchR);
+		sketch.addPointOnCircleConstraint(c1.id, pitchCircle.id);
+
+		const sourceIds = [arc1.id, arc2.id];
+		const copies = [];
+		for (let i = 1; i < count; i++) {
+			const copy = generateCircularPatternCopy(sketch, 'origin', sourceIds, i, count, 'full', 360);
+			assert.ok(copy);
+			copies.push(copy);
+		}
+		const pat = sketch.addCircularPatternConstraint('origin', sourceIds, 'full', 360, count, false, [], copies);
+		assert.ok(pat);
+		const adjArc1Id = copies
+			.map(c => c.radiusPairs!.find(p => p.sourceCircleId === arc1.id)!.patternCircleId)
+			.find(id => sketch.points.get(sketch.arcs.get(id)!.startPointId)!.distanceTo(t2) < 1e-3)!;
+		assert.ok(adjArc1Id);
+		adjArc1 = sketch.arcs.get(adjArc1Id)!;
+		sketch.addCoincidentConstraint(arc2.endPointId, adjArc1.startPointId);
+		sketch.addTangentConstraint(adjArc1Id, arc2.id);
+	});
+
+	// Add an outward offset of the closed scalloped chain
+	const chain = toggleOrExtendChain(sketch, null, arc1.id, 'arc', true);
+	assert.ok(chain && chain.isClosed);
+	const geom = calculateOffsetGeometry(sketch, chain, 'one_side', 2, 2, true);
+	assert.ok(geom.isValid);
+	commitOffsetToSketch(sketch, chain, geom, 'one_side', 2, 2, true);
+
+	// Perturb the seam slightly (~5e-5, so initial error is ~1e-9 << 1e-2)
+	const pABefore = sketch.points.get(arc2.endPointId)!;
+	const pBBefore = sketch.points.get(adjArc1.startPointId)!;
+	assert.ok(pABefore.distanceTo(pBBefore) < 1e-5, `before perturb: ${pABefore.distanceTo(pBBefore)}`);
+	pABefore.x += 4e-5;
+	pABefore.y -= 3e-5;
+	sketch.solve();
+
+	// Seam must close tightly (< 1e-6), allowing both inner and outer regions to be detected
+	const pA = sketch.points.get(arc2.endPointId)!;
+	const pB = sketch.points.get(adjArc1.startPointId)!;
+	const seamGap = pA.distanceTo(pB);
+	assert.ok(seamGap < 1e-6, `expected seam gap < 1e-6, got ${seamGap}`);
+
+	const regions = findSketchRegions(sketch);
+	assert.equal(regions.length, 2, `expected 2 regions (inner + ring), got ${regions.length}`);
 });

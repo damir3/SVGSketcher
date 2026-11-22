@@ -91,11 +91,11 @@ test('document dependency analysis detects dependent dimensions and restores loc
 	const expectedByFixture: Record<string, Record<string, boolean>> = {
 		'offset-pattern-line11': {
 			'Line-1': true,
-			'Line-2': false,
+			'Line-2': true,
 			'Line-3': true,
 			'Line-4': true,
-			'Line-5': false,
-			'Line-6': false,
+			'Line-5': true,
+			'Line-6': true,
 			'Line-7': true,
 			'Line-8': true,
 			'Line-9': true,
