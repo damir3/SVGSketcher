@@ -1,4 +1,7 @@
-use super::Program;
+use super::{
+    ConstraintKind::{OffsetCircle, OffsetLineEndpoint, OffsetSplinePoint},
+    Program,
+};
 use crate::{dependency::Rule, matrix::SparseRows};
 
 impl Program {
@@ -11,9 +14,9 @@ impl Program {
                 continue;
             }
             let slots: &[usize] = match c.kind {
-                24 | 26 => &[0, 1],
-                25 if c.refs.len() == 2 => &[0],
-                25 => &[0, 1, 4],
+                OffsetLineEndpoint | OffsetSplinePoint => &[0, 1],
+                OffsetCircle if c.refs.len() == 2 => &[0],
+                OffsetCircle => &[0, 1, 4],
                 _ => continue,
             };
             for &slot in slots {
@@ -58,7 +61,10 @@ impl Program {
                 .ok_or("Missing dependency policy")?;
             let rule = &rules[rule_index];
             if c.row + c.equations() > rule.row + rule.count
-                || ((24..=26).contains(&c.kind) != (rule.mode == 2))
+                || (matches!(
+                    c.kind,
+                    OffsetLineEndpoint | OffsetCircle | OffsetSplinePoint
+                ) != (rule.mode == 2))
             {
                 return Err("Dependency policy does not match constraint rows");
             }

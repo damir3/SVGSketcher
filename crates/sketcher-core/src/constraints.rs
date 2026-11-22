@@ -1,16 +1,94 @@
 //! Native residuals and Jacobians. Tags and reference order match nativeConstraints.ts.
 use crate::matrix::{NormalEquationsWorkspace, SparseRows};
 use crate::solver::Evaluation;
+use ConstraintKind::*;
 mod dependency;
 mod inspection;
 mod splines;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ConstraintKind {
+    FixedPoint,
+    Coincident,
+    Horizontal,
+    Vertical,
+    Radius,
+    EqualRadius,
+    Distance,
+    EqualLength,
+    Midpoint,
+    PointOnCircle,
+    PointOnLine,
+    Parallel,
+    Perpendicular,
+    Collinear,
+    Angle,
+    TangentLineCircle,
+    TangentCircleCircle,
+    PointOnEllipse,
+    EllipticalArcEndpoints,
+    CircularArcEndpoints,
+    PointToLineDistance,
+    Symmetry,
+    CircularPatternPoint,
+    RectangularPatternPoint,
+    OffsetLineEndpoint,
+    OffsetCircle,
+    OffsetSplinePoint,
+    OriginDistance,
+    LineToAxisDistance,
+    PointOnSpline,
+    AutomaticSplineHandles,
+}
+
+impl TryFrom<usize> for ConstraintKind {
+    type Error = &'static str;
+
+    // These tags are part of the packed constraint format shared with TypeScript.
+    fn try_from(tag: usize) -> Result<Self, Self::Error> {
+        Ok(match tag {
+            0 => FixedPoint,
+            1 => Coincident,
+            2 => Horizontal,
+            3 => Vertical,
+            4 => Radius,
+            5 => EqualRadius,
+            6 => Distance,
+            7 => EqualLength,
+            8 => Midpoint,
+            9 => PointOnCircle,
+            10 => PointOnLine,
+            11 => Parallel,
+            12 => Perpendicular,
+            13 => Collinear,
+            14 => Angle,
+            15 => TangentLineCircle,
+            16 => TangentCircleCircle,
+            17 => PointOnEllipse,
+            18 => EllipticalArcEndpoints,
+            19 => CircularArcEndpoints,
+            20 => PointToLineDistance,
+            21 => Symmetry,
+            22 => CircularPatternPoint,
+            23 => RectangularPatternPoint,
+            24 => OffsetLineEndpoint,
+            25 => OffsetCircle,
+            26 => OffsetSplinePoint,
+            27 => OriginDistance,
+            28 => LineToAxisDistance,
+            29 => PointOnSpline,
+            30 => AutomaticSplineHandles,
+            _ => return Err("Unknown native constraint kind"),
+        })
+    }
+}
 
 struct Ref {
     index: Option<usize>,
     constant: f64,
 }
 struct Constraint {
-    kind: usize,
+    kind: ConstraintKind,
     row: usize,
     hard_row: Option<usize>,
     weight: f64,
@@ -29,17 +107,22 @@ fn integer(value: f64) -> Result<usize, &'static str> {
 
 impl Constraint {
     fn equations(&self) -> usize {
-        if self.kind == 30 {
-            self.b as usize * 4
-        } else if self.kind == 25 {
-            if self.refs.len() == 2 { 1 } else { 3 }
-        } else if matches!(self.kind, 0 | 1 | 8 | 18 | 19 | 21..=23 | 26 | 28)
-            || (self.kind == 13 && self.a == 0.0)
-            || (self.kind == 27 && self.b == 3.0)
-        {
-            2
-        } else {
-            1
+        match self.kind {
+            AutomaticSplineHandles => self.b as usize * 4,
+            OffsetCircle if self.refs.len() != 2 => 3,
+            Collinear if self.a == 0.0 => 2,
+            OriginDistance if self.b == 3.0 => 2,
+            FixedPoint
+            | Coincident
+            | Midpoint
+            | EllipticalArcEndpoints
+            | CircularArcEndpoints
+            | Symmetry
+            | CircularPatternPoint
+            | RectangularPatternPoint
+            | OffsetSplinePoint
+            | LineToAxisDistance => 2,
+            _ => 1,
         }
     }
 
@@ -53,13 +136,13 @@ impl Constraint {
         out.clear();
         let w = self.weight;
         match self.kind {
-            0 => out.extend_from_slice(&[(p[0] - self.a) * w, (p[1] - self.b) * w]),
-            1 => out.extend_from_slice(&[(p[0] - p[2]) * w, (p[1] - p[3]) * w]),
-            2 => out.push((p[3] - p[1]) * w),
-            3 => out.push((p[2] - p[0]) * w),
-            4 => out.push((p[0] - self.a) * w),
-            5 => out.push((p[0] - p[1]) * w),
-            6 => {
+            FixedPoint => out.extend_from_slice(&[(p[0] - self.a) * w, (p[1] - self.b) * w]),
+            Coincident => out.extend_from_slice(&[(p[0] - p[2]) * w, (p[1] - p[3]) * w]),
+            Horizontal => out.push((p[3] - p[1]) * w),
+            Vertical => out.push((p[2] - p[0]) * w),
+            Radius => out.push((p[0] - self.a) * w),
+            EqualRadius => out.push((p[0] - p[1]) * w),
+            Distance => {
                 let (dx, dy) = (p[2] - p[0], p[3] - p[1]);
                 let distance = if self.b == 1.0 {
                     dx * if dx >= 0.0 { 1.0 } else { -1.0 }
@@ -70,28 +153,28 @@ impl Constraint {
                 };
                 out.push((distance - self.a) * w);
             }
-            7 => {
+            EqualLength => {
                 out.push(((p[0] - p[2]).hypot(p[1] - p[3]) - (p[4] - p[6]).hypot(p[5] - p[7])) * w)
             }
-            8 => out.extend_from_slice(&[
+            Midpoint => out.extend_from_slice(&[
                 (p[0] - ((1.0 - self.a) * p[2] + self.a * p[4])) * w,
                 (p[1] - ((1.0 - self.a) * p[3] + self.a * p[5])) * w,
             ]),
-            9 => out.push(((p[0] - p[2]).hypot(p[1] - p[3]) - p[4]) * w),
-            10 => {
+            PointOnCircle => out.push(((p[0] - p[2]).hypot(p[1] - p[3]) - p[4]) * w),
+            PointOnLine => {
                 let (dx, dy) = (p[4] - p[2], p[5] - p[3]);
                 out.push((((p[0] - p[2]) * dy - (p[1] - p[3]) * dx) / dx.hypot(dy).max(1e-7)) * w);
             }
-            11..=13 => {
+            Parallel | Perpendicular | Collinear => {
                 let (dx1, dy1, dx2, dy2) = (p[2] - p[0], p[3] - p[1], p[6] - p[4], p[7] - p[5]);
                 let (l1, l2) = (dx1.hypot(dy1).max(1e-7), dx2.hypot(dy2).max(1e-7));
-                let product = if self.kind == 12 {
+                let product = if self.kind == Perpendicular {
                     dx1 * dx2 + dy1 * dy2
                 } else {
                     dx1 * dy2 - dy1 * dx2
                 };
                 let equation = (product / (l1 * l2)) * ((l1 + l2) * 0.5) * w;
-                if self.kind != 13 || self.a == 1.0 {
+                if self.kind != Collinear || self.a == 1.0 {
                     out.push(equation);
                 } else {
                     let cross =
@@ -99,7 +182,7 @@ impl Constraint {
                     out.extend_from_slice(&[equation, (cross / l1) * w]);
                 }
             }
-            14 => {
+            Angle => {
                 let (dx1, dy1) = ((p[2] - p[0]) * p[8], (p[3] - p[1]) * p[8]);
                 let (dx2, dy2) = ((p[6] - p[4]) * p[9], (p[7] - p[5]) * p[9]);
                 let (l1, l2) = (dx1.hypot(dy1).max(1e-7), dx2.hypot(dy2).max(1e-7));
@@ -118,17 +201,17 @@ impl Constraint {
                 let (rx, ry) = (x1 * cos - y1 * sin, y1 * cos + x1 * sin);
                 out.push((rx * y2 - ry * x2) * average * w);
             }
-            15 | 20 => {
+            TangentLineCircle | PointToLineDistance => {
                 let (dx, dy) = (p[4] - p[2], p[5] - p[3]);
                 let distance = ((p[0] - p[2]) * dy - (p[1] - p[3]) * dx) / dx.hypot(dy).max(1e-7);
-                let target = if self.kind == 15 {
+                let target = if self.kind == TangentLineCircle {
                     self.a * p[6]
                 } else {
                     self.b * self.a
                 };
                 out.push((distance - target) * w);
             }
-            16 => {
+            TangentCircleCircle => {
                 let distance = (p[2] - p[0]).hypot(p[3] - p[1]).max(1e-7);
                 let target = if self.a == 0.0 {
                     p[4] + p[5]
@@ -139,13 +222,15 @@ impl Constraint {
                 };
                 out.push((distance - target) * w);
             }
-            17 => out.push(ellipse_residual(p, 6, w)),
-            18 => out.extend_from_slice(&[ellipse_residual(p, 6, w), ellipse_residual(p, 8, w)]),
-            19 => out.extend_from_slice(&[
+            PointOnEllipse => out.push(ellipse_residual(p, 6, w)),
+            EllipticalArcEndpoints => {
+                out.extend_from_slice(&[ellipse_residual(p, 6, w), ellipse_residual(p, 8, w)])
+            }
+            CircularArcEndpoints => out.extend_from_slice(&[
                 ((p[2] - p[0]).hypot(p[3] - p[1]) - p[6]) * w,
                 ((p[4] - p[0]).hypot(p[5] - p[1]) - p[6]) * w,
             ]),
-            21 => {
+            Symmetry => {
                 if self.a == 1.0 {
                     out.extend_from_slice(&[(p[0] + p[2]) * 0.5 * w, (p[1] + p[3]) * 0.5 * w]);
                 } else {
@@ -158,7 +243,7 @@ impl Constraint {
                     ]);
                 }
             }
-            22 => {
+            CircularPatternPoint => {
                 let (sin, cos) = self.sin_cos.unwrap_or_else(|| {
                     let angle = pattern_angle(p[6], p[7], self.b, self.a);
                     (angle.sin(), angle.cos())
@@ -167,7 +252,7 @@ impl Constraint {
                 let (tx, ty) = (p[0] + x * cos - y * sin, p[1] + y * cos + x * sin);
                 out.extend_from_slice(&[(p[4] - tx) * w, (p[5] - ty) * w]);
             }
-            23 => {
+            RectangularPatternPoint => {
                 let directions = rectangular_directions(p);
                 let o1 = axis_offset(p[12], self.a, p[14]);
                 let o2 = axis_offset(p[13], self.b, p[15]);
@@ -175,25 +260,25 @@ impl Constraint {
                 let y = directions.u1[1] * o1 + directions.u2[1] * o2;
                 out.extend_from_slice(&[(p[2] - (p[0] + x)) * w, (p[3] - (p[1] + y)) * w]);
             }
-            24 => {
+            OffsetLineEndpoint => {
                 let (dx, dy) = (p[4] - p[2], p[5] - p[3]);
                 let left = (dx * (p[1] - p[3]) - dy * (p[0] - p[2])) / dx.hypot(dy).max(1e-9);
                 out.push((left - self.b * self.a) * w);
             }
-            25 if self.refs.len() == 2 => out.push((p[0] - p[1] - self.b * self.a) * w),
-            25 => out.extend_from_slice(&[
+            OffsetCircle if self.refs.len() == 2 => out.push((p[0] - p[1] - self.b * self.a) * w),
+            OffsetCircle => out.extend_from_slice(&[
                 (p[0] - p[2]) * w,
                 (p[1] - p[3]) * w,
                 (p[4] - p[5] - self.b * self.a) * w,
             ]),
-            26 => {
+            OffsetSplinePoint => {
                 let distance = p[6] * self.a;
                 out.extend_from_slice(&[
                     (p[0] - (p[2] + p[4] * distance)) * w,
                     (p[1] - (p[3] + p[5] * distance)) * w,
                 ]);
             }
-            27 => {
+            OriginDistance => {
                 if self.b == 3.0 {
                     out.extend_from_slice(&[p[0] * w, p[1] * w]);
                 } else if self.b == 0.0 {
@@ -207,7 +292,7 @@ impl Constraint {
                     });
                 }
             }
-            28 => {
+            LineToAxisDistance => {
                 if self.b == 1.0 {
                     out.extend_from_slice(&[p[0] * w, p[1] * w]);
                 } else {
@@ -217,8 +302,7 @@ impl Constraint {
                     ]);
                 }
             }
-            29 | 30 => out.extend(self.spline_residuals(p)),
-            _ => unreachable!(),
+            PointOnSpline | AutomaticSplineHandles => out.extend(self.spline_residuals(p)),
         }
     }
 
@@ -234,36 +318,39 @@ impl Constraint {
         let mut add = |row: usize, slot: usize, value: f64| {
             if let Some(col) = self.refs[slot].index {
                 // Pattern point entries bypass addJacobianEntry in the TS reference.
-                if self.kind == 22 || (self.kind == 23 && slot < 4) || value.abs() > 1e-12 {
+                if self.kind == CircularPatternPoint
+                    || (self.kind == RectangularPatternPoint && slot < 4)
+                    || value.abs() > 1e-12
+                {
                     emit(row, col, value);
                 }
             }
         };
         match self.kind {
-            0 => {
+            FixedPoint => {
                 add(0, 0, w);
                 add(1, 1, w);
             }
-            1 => {
+            Coincident => {
                 add(0, 0, w);
                 add(0, 2, -w);
                 add(1, 1, w);
                 add(1, 3, -w);
             }
-            2 => {
+            Horizontal => {
                 add(0, 1, -w);
                 add(0, 3, w);
             }
-            3 => {
+            Vertical => {
                 add(0, 0, -w);
                 add(0, 2, w);
             }
-            4 => add(0, 0, w),
-            5 => {
+            Radius => add(0, 0, w),
+            EqualRadius => {
                 add(0, 0, w);
                 add(0, 1, -w);
             }
-            6 => {
+            Distance => {
                 let (dx, dy) = (p[2] - p[0], p[3] - p[1]);
                 if self.b == 1.0 {
                     let sign = if dx >= 0.0 { 1.0 } else { -1.0 };
@@ -282,7 +369,7 @@ impl Constraint {
                     add(0, 3, y);
                 }
             }
-            7 => {
+            EqualLength => {
                 let (dx1, dy1, dx2, dy2) = (p[2] - p[0], p[3] - p[1], p[6] - p[4], p[7] - p[5]);
                 let (l1, l2) = (dx1.hypot(dy1).max(1e-7), dx2.hypot(dy2).max(1e-7));
                 add(0, 0, (-dx1 / l1) * w);
@@ -294,7 +381,7 @@ impl Constraint {
                 add(0, 6, (-dx2 / l2) * w);
                 add(0, 7, (-dy2 / l2) * w);
             }
-            8 => {
+            Midpoint => {
                 add(0, 0, w);
                 add(0, 2, -(1.0 - self.a) * w);
                 add(0, 4, -self.a * w);
@@ -302,7 +389,7 @@ impl Constraint {
                 add(1, 3, -(1.0 - self.a) * w);
                 add(1, 5, -self.a * w);
             }
-            9 => {
+            PointOnCircle => {
                 let (dx, dy) = (p[0] - p[2], p[1] - p[3]);
                 let scale = (w * 1.0) / dx.hypot(dy).max(1e-7);
                 let (x, y) = (dx * scale, dy * scale);
@@ -312,7 +399,7 @@ impl Constraint {
                 add(0, 3, -y);
                 add(0, 4, -w);
             }
-            14 => {
+            Angle => {
                 let d1 = [(p[2] - p[0]) * p[8], (p[3] - p[1]) * p[8]];
                 let d2 = [(p[6] - p[4]) * p[9], (p[7] - p[5]) * p[9]];
                 let lengths = [d1[0].hypot(d1[1]), d2[0].hypot(d2[1])];
@@ -362,7 +449,7 @@ impl Constraint {
                     add(0, slot + 1, gradient[1] * sign);
                 }
             }
-            19 => {
+            CircularArcEndpoints => {
                 for (row, slot) in [(0, 2), (1, 4)] {
                     let (dx, dy) = (p[slot] - p[0], p[slot + 1] - p[1]);
                     let inverse = 1.0 / dx.hypot(dy).max(1e-7);
@@ -374,7 +461,7 @@ impl Constraint {
                     add(row, 6, -w);
                 }
             }
-            22 => {
+            CircularPatternPoint => {
                 let (sin, cos) = self.sin_cos.unwrap_or_else(|| {
                     let angle = pattern_angle(p[6], p[7], self.b, self.a);
                     (angle.sin(), angle.cos())
@@ -390,7 +477,7 @@ impl Constraint {
                 add(1, 0, sin * w);
                 add(1, 1, -(1.0 - cos) * w);
             }
-            23 => {
+            RectangularPatternPoint => {
                 let d = rectangular_directions(p);
                 let o1 = axis_offset(p[12], self.a, p[14]);
                 let o2 = axis_offset(p[13], self.b, p[15]);
@@ -415,26 +502,26 @@ impl Constraint {
                     add_axis_derivatives(&mut add, 8, [o2 * a, o2 * b], [o2 * c, o2 * e], w);
                 }
             }
-            24 => {
+            OffsetLineEndpoint => {
                 for (row, col, val) in self.offset_line_jacobian(p) {
                     emit(row, col, val);
                 }
             }
-            25 if self.refs.len() == 2 => {
+            OffsetCircle if self.refs.len() == 2 => {
                 // Shared-center offset circle/arc: drive only the child radius.
                 add(0, 0, w);
             }
-            25 => {
+            OffsetCircle => {
                 // Offsets drive children only; parent references remain active in residuals.
                 add(0, 0, w);
                 add(1, 1, w);
                 add(2, 4, w);
             }
-            26 => {
+            OffsetSplinePoint => {
                 add(0, 0, w);
                 add(1, 1, w);
             }
-            27 => {
+            OriginDistance => {
                 if self.b == 3.0 {
                     add(0, 0, w);
                     add(1, 1, w);
@@ -448,17 +535,26 @@ impl Constraint {
                     add(0, 1, (p[1] / length) * w);
                 }
             }
-            28 => {
+            LineToAxisDistance => {
                 add(0, 0, w);
                 add(1, 1, w);
             }
-            30 => {
+            AutomaticSplineHandles => {
                 for (row, col, val) in self.automatic_jacobian(p) {
                     emit(row, col, val);
                 }
             }
-            10..=13 | 15..=18 | 20..=21 | 29 => self.numeric_jacobian_into(p, emit),
-            _ => unreachable!(),
+            PointOnLine
+            | Parallel
+            | Perpendicular
+            | Collinear
+            | TangentLineCircle
+            | TangentCircleCircle
+            | PointOnEllipse
+            | EllipticalArcEndpoints
+            | PointToLineDistance
+            | Symmetry
+            | PointOnSpline => self.numeric_jacobian_into(p, emit),
         }
     }
 
@@ -467,7 +563,7 @@ impl Constraint {
         columns.sort_unstable();
         columns.dedup();
         let mut trial = p.to_vec();
-        let central = self.kind == 11;
+        let central = self.kind == Parallel;
         let eq_count = self.equations();
         let mut base = Vec::with_capacity(eq_count);
         if !central {
@@ -523,8 +619,8 @@ impl Constraint {
 
     fn geometric_jacobian_into(&self, p: &[f64], emit: &mut impl FnMut(usize, usize, f64)) {
         match self.kind {
-            24 => self.numeric_jacobian_into(p, emit),
-            25 if self.refs.len() == 2 => {
+            OffsetLineEndpoint => self.numeric_jacobian_into(p, emit),
+            OffsetCircle if self.refs.len() == 2 => {
                 let w = self.weight;
                 if w.abs() > 1e-12 {
                     if let Some(col) = self.refs[0].index {
@@ -535,7 +631,7 @@ impl Constraint {
                     }
                 }
             }
-            25 => {
+            OffsetCircle => {
                 let w = self.weight;
                 let mut add = |row: usize, slot: usize, value: f64| {
                     if let Some(col) = self.refs[slot].index {
@@ -709,23 +805,25 @@ impl Program {
             if header.iter().any(|v| !v.is_finite()) {
                 return Err("Non-finite native constraint data");
             }
-            let kind = integer(header[0])?;
+            let tag = integer(header[0])?;
             let count = integer(header[6])?;
+            let kind = ConstraintKind::try_from(tag)?;
             let expected_refs = match kind {
-                0 | 5 => 2,
-                1 | 2 | 3 | 6 => 4,
-                4 => 1,
-                7 | 11..=13 | 17 | 21 | 22 => 8,
-                25 if count == 2 => 2,
-                8 | 10 | 16 | 20 | 24 | 25 => 6,
-                9 => 5,
-                14 => 11,
-                15 | 19 | 26 => 7,
-                18 => 10,
-                23 => 18,
-                27 | 28 => 3,
-                29 | 30 => count,
-                _ => return Err("Unknown native constraint kind"),
+                FixedPoint | EqualRadius => 2,
+                Coincident | Horizontal | Vertical | Distance => 4,
+                Radius => 1,
+                EqualLength | Parallel | Perpendicular | Collinear | PointOnEllipse | Symmetry
+                | CircularPatternPoint => 8,
+                OffsetCircle if count == 2 => 2,
+                Midpoint | PointOnLine | TangentCircleCircle | PointToLineDistance
+                | OffsetLineEndpoint | OffsetCircle => 6,
+                PointOnCircle => 5,
+                Angle => 11,
+                TangentLineCircle | CircularArcEndpoints | OffsetSplinePoint => 7,
+                EllipticalArcEndpoints => 10,
+                RectangularPatternPoint => 18,
+                OriginDistance | LineToAxisDistance => 3,
+                PointOnSpline | AutomaticSplineHandles => count,
             };
             if count != expected_refs {
                 return Err("Invalid native constraint reference count");
@@ -733,14 +831,14 @@ impl Program {
             if count > (data.len() - offset - 7) / 2 {
                 return Err("Truncated native constraint references");
             }
-            if (kind == 6 && ![0.0, 1.0, 2.0].contains(&header[5]))
-                || (kind == 13 && header[4] != 0.0 && header[4] != 1.0)
-                || (kind == 14 && ![0.0, 1.0, 2.0].contains(&header[5]))
-                || (kind == 16 && ![0.0, 1.0, 2.0].contains(&header[4]))
-                || (kind == 21 && ![0.0, 1.0].contains(&header[4]))
-                || (kind == 22 && ![0.0, 1.0, 2.0].contains(&header[5]))
-                || (kind == 27 && ![0.0, 1.0, 2.0, 3.0].contains(&header[5]))
-                || (kind == 28 && ![0.0, 1.0].contains(&header[5]))
+            if (kind == Distance && ![0.0, 1.0, 2.0].contains(&header[5]))
+                || (kind == Collinear && header[4] != 0.0 && header[4] != 1.0)
+                || (kind == Angle && ![0.0, 1.0, 2.0].contains(&header[5]))
+                || (kind == TangentCircleCircle && ![0.0, 1.0, 2.0].contains(&header[4]))
+                || (kind == Symmetry && ![0.0, 1.0].contains(&header[4]))
+                || (kind == CircularPatternPoint && ![0.0, 1.0, 2.0].contains(&header[5]))
+                || (kind == OriginDistance && ![0.0, 1.0, 2.0, 3.0].contains(&header[5]))
+                || (kind == LineToAxisDistance && ![0.0, 1.0].contains(&header[5]))
             {
                 return Err("Invalid native constraint variant");
             }
@@ -768,21 +866,22 @@ impl Program {
                     constant: pair[1],
                 });
             }
-            if matches!(kind, 29 | 30) {
+            if matches!(kind, PointOnSpline | AutomaticSplineHandles) {
                 splines::validate(kind, header[4], header[5], &refs)?;
             }
             let constants = match kind {
-                22 => &refs[6..],
-                23 => &refs[12..],
-                26..=28 => &refs[2..],
+                CircularPatternPoint => &refs[6..],
+                RectangularPatternPoint => &refs[12..],
+                OffsetSplinePoint | OriginDistance | LineToAxisDistance => &refs[2..],
                 _ => &[],
             };
             if constants.iter().any(|r| r.index.is_some())
-                || (kind == 23 && refs[14..].iter().any(|r| ![0.0, 1.0].contains(&r.constant)))
+                || (kind == RectangularPatternPoint
+                    && refs[14..].iter().any(|r| ![0.0, 1.0].contains(&r.constant)))
             {
                 return Err("Invalid native constraint configuration reference");
             }
-            let sin_cos = if kind == 22 {
+            let sin_cos = if kind == CircularPatternPoint {
                 let angle = pattern_angle(refs[6].constant, refs[7].constant, header[5], header[4]);
                 Some((angle.sin(), angle.cos()))
             } else {
@@ -1212,7 +1311,7 @@ impl Program {
 mod tests {
     use super::*;
 
-    fn constraint(kind: usize, a: f64, b: f64, indices: &[Option<usize>]) -> Constraint {
+    fn constraint(kind: ConstraintKind, a: f64, b: f64, indices: &[Option<usize>]) -> Constraint {
         Constraint {
             kind,
             row: 0,
@@ -1233,7 +1332,7 @@ mod tests {
 
     #[test]
     fn angle_rotation_and_axis_scaling_preserve_orientation() {
-        let mut c = constraint(14, 90.0, 1.0, &[None; 11]);
+        let mut c = constraint(Angle, 90.0, 1.0, &[None; 11]);
         let mut p = [0.0, 0.0, 1.0, 0.0, 2.0, 3.0, 2.0, 8.0, 1.0, 1.0, 1.0];
         assert!(c.residuals(&p)[0].abs() < 1e-14);
         p[6] = 7.0;
@@ -1258,7 +1357,7 @@ mod tests {
             None,
             None,
         ];
-        let mut c = constraint(14, 67.0, 0.0, &refs);
+        let mut c = constraint(Angle, 67.0, 0.0, &refs);
         let mut p = [2.0, 3.0, 12.0, -1.0, 2.0, 3.0, -4.0, 15.0, -1.0, 1.0, -1.0];
         for axis in [0.0, 1.0, 2.0] {
             c.b = axis;
@@ -1293,7 +1392,7 @@ mod tests {
 
     #[test]
     fn origin_modes_preserve_signed_distances_and_equation_counts() {
-        let mut c = constraint(27, 5.0, 1.0, &[Some(0), Some(1), None]);
+        let mut c = constraint(OriginDistance, 5.0, 1.0, &[Some(0), Some(1), None]);
         let p = [-3.0, 4.0, -1.0];
         assert_eq!(c.residuals(&p), vec![2.0]);
         assert_eq!(c.jacobian(&p), vec![(0, 0, 1.0)]);
@@ -1311,7 +1410,7 @@ mod tests {
 
     #[test]
     fn origin_radial_jacobian_keeps_length_floor_and_small_derivative_cutoff() {
-        let mut c = constraint(27, 5.0, 0.0, &[Some(0), Some(1), None]);
+        let mut c = constraint(OriginDistance, 5.0, 0.0, &[Some(0), Some(1), None]);
         assert!(c.jacobian(&[0.0, 0.0, 1.0]).is_empty());
         let entries = c.jacobian(&[1e-9, -2e-9, 1.0]);
         assert!((entries[0].2 - 0.01).abs() < 1e-15);
@@ -1323,7 +1422,7 @@ mod tests {
 
     #[test]
     fn line_axis_retains_two_rows_for_a_shared_endpoint() {
-        let mut c = constraint(28, 4.0, 0.0, &[Some(0), Some(0), None]);
+        let mut c = constraint(LineToAxisDistance, 4.0, 0.0, &[Some(0), Some(0), None]);
         assert_eq!(c.equations(), 2);
         assert_eq!(c.residuals(&[1.0, 1.0, -1.0]), vec![5.0, 5.0]);
         assert_eq!(
@@ -1337,7 +1436,7 @@ mod tests {
     #[test]
     fn offset_line_moves_only_children_and_perturbs_parent_aliases_together() {
         let mut c = constraint(
-            24,
+            OffsetLineEndpoint,
             2.0,
             1.0,
             &[Some(0), Some(1), Some(2), Some(3), Some(4), Some(5)],
@@ -1355,7 +1454,7 @@ mod tests {
 
     #[test]
     fn rectangular_pattern_uses_perpendicular_second_direction_when_absent() {
-        let c = constraint(23, 5.0, 10.0, &[None; 18]);
+        let c = constraint(RectangularPatternPoint, 5.0, 10.0, &[None; 18]);
         let p = [
             2.0, 3.0, -3.0, 13.0, 0.0, 0.0, 3.0, 4.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
             0.0,
@@ -1368,7 +1467,7 @@ mod tests {
     #[test]
     fn circular_point_derivatives_bypass_the_small_coefficient_cutoff() {
         let mut c = constraint(
-            22,
+            CircularPatternPoint,
             360.0,
             0.0,
             &[None, None, None, None, Some(0), Some(1), None, None],
@@ -1381,7 +1480,7 @@ mod tests {
     #[test]
     fn elliptical_endpoints_use_both_rows_and_perturb_shared_parameters_together() {
         let c = constraint(
-            18,
+            EllipticalArcEndpoints,
             0.0,
             0.0,
             &[
@@ -1410,7 +1509,7 @@ mod tests {
     #[test]
     fn circular_endpoints_accumulate_radius_aliases_in_both_equations() {
         let c = constraint(
-            19,
+            CircularArcEndpoints,
             0.0,
             0.0,
             &[None, None, Some(0), None, Some(0), None, Some(0)],

@@ -1,9 +1,14 @@
-use super::{integer, Constraint, Ref};
+use super::{integer, Constraint, ConstraintKind, Ref};
 use crate::{spline, Point2};
 
-pub(super) fn validate(kind: usize, a: f64, b: f64, refs: &[Ref]) -> Result<(), &'static str> {
+pub(super) fn validate(
+    kind: ConstraintKind,
+    a: f64,
+    b: f64,
+    refs: &[Ref],
+) -> Result<(), &'static str> {
     let invalid = "Invalid spline constraint representation";
-    if kind == 29 {
+    if kind == ConstraintKind::PointOnSpline {
         let count = integer(b)?;
         let base = count
             .checked_mul(2)
@@ -66,7 +71,7 @@ fn points(p: &[f64]) -> Vec<Point2> {
 
 impl Constraint {
     pub(super) fn spline_residuals(&self, p: &[f64]) -> Vec<f64> {
-        if self.kind == 29 {
+        if self.kind == ConstraintKind::PointOnSpline {
             let n = self.b as usize;
             if n < 2 {
                 return vec![0.0];
@@ -239,9 +244,9 @@ mod tests {
             constant: 0.0,
         })
         .collect::<Vec<_>>();
-        assert!(validate(30, 2.0, 1.0, &refs).is_ok());
+        assert!(validate(ConstraintKind::AutomaticSplineHandles, 2.0, 1.0, &refs).is_ok());
         let c = Constraint {
-            kind: 30,
+            kind: ConstraintKind::AutomaticSplineHandles,
             row: 0,
             hard_row: Some(0),
             weight: 9.0,

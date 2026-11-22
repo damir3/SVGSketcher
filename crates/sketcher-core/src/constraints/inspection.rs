@@ -1,4 +1,4 @@
-use super::Program;
+use super::{ConstraintKind::Angle, Program};
 use crate::inspection::angle_valid;
 
 impl Program {
@@ -28,7 +28,7 @@ impl Program {
             p.clear();
             p.extend(c.refs.iter().map(|r| r.constant));
             residuals[c.row..c.row + count].copy_from_slice(&c.residuals(&p));
-            if c.kind == 14 {
+            if c.kind == Angle {
                 satisfied &= angle_valid(&p, p[8], p[9], p[10], c.a);
             }
         }
