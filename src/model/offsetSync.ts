@@ -1,5 +1,12 @@
 import type { SketchDocument } from './sketch';
-import { CoincidentConstraint, MidpointConstraint, OffsetConstraint, type OffsetPair } from '../solver/constraints';
+import type { IConstraint } from '../solver/types';
+import {
+	CoincidentConstraint,
+	MidpointConstraint,
+	OffsetConstraint,
+	TangentCircleCircleConstraint,
+	type OffsetPair,
+} from '../solver/constraints';
 import { SketchPoint, SketchCircle, SketchArc, SketchEllipticalArc, SketchSpline } from './types';
 import { createFitSplineHandle } from './splineOperations';
 import { Vec2 } from '../math/vector';
@@ -20,6 +27,70 @@ function moveUnfixedPoint(sketch: SketchDocument, id: string, pos: { x: number; 
 	}
 }
 
+export function addOffsetArcTangencyAlignment(sketch: SketchDocument, constraints: IConstraint[]): void {
+	const sourceArcs = new Set<string>();
+	for (const c of constraints) {
+		if (!(c instanceof OffsetConstraint)) continue;
+		for (const item of c.sourceChain?.items ?? []) {
+			if (item.type === 'arc') sourceArcs.add(item.id);
+		}
+	}
+	if (sourceArcs.size < 2) return;
+
+	const tangencies = constraints.filter(
+		(c): c is TangentCircleCircleConstraint =>
+			c instanceof TangentCircleCircleConstraint &&
+			!c.isSoft &&
+			!c.sharedPointId &&
+			sourceArcs.has(c.circle1Id) &&
+			sourceArcs.has(c.circle2Id)
+	);
+	if (!tangencies.length) return;
+
+	const parents = new Map<string, string>();
+	const root = (id: string): string => {
+		let parent = parents.get(id);
+		while (parent !== undefined) {
+			const ancestor = parents.get(parent);
+			if (ancestor !== undefined) parents.set(id, ancestor);
+			id = parent;
+			parent = ancestor;
+		}
+		return id;
+	};
+	for (const c of constraints) {
+		if (!(c instanceof CoincidentConstraint) || c.isSoft) continue;
+		const a = root(c.p1Id);
+		const b = root(c.p2Id);
+		if (a !== b) parents.set(a, b);
+	}
+
+	for (const c of tangencies) {
+		const a = sketch.arcs.get(c.circle1Id);
+		const b = sketch.arcs.get(c.circle2Id);
+		if (!a || !b) continue;
+		const aRoots = [root(a.startPointId), root(a.endPointId)];
+		const shared = [b.startPointId, b.endPointId].filter(id => aRoots.includes(root(id)));
+		if (shared.length !== 1 || aRoots[0] === aRoots[1]) continue;
+
+		// Center distance has little sensitivity to sideways motion near tangency.
+		// Guide the solve with collinearity while keeping the original tangency branch.
+		const alignment = new TangentCircleCircleConstraint(
+			`${c.id}:alignment`,
+			c.circle1CenterId,
+			c.circle1Id,
+			c.circle2CenterId,
+			c.circle2Id,
+			c.isInternal,
+			c.outerCircleId,
+			c.weight,
+			shared[0]
+		);
+		alignment.isSoft = true;
+		constraints.push(alignment);
+	}
+}
+
 const offsetSourceStates = new WeakMap<OffsetConstraint, Array<string | number | boolean | undefined>>();
 
 export function syncOffsetSources(
@@ -31,10 +102,10 @@ export function syncOffsetSources(
 	for (const c of offsets) {
 		if (!offsetSourceStates.has(c)) offsetSourceStates.set(c, offsetSourceState(sketch, c));
 	}
-	if (onRecompute() === false) return;
-	// Each pass also propagates offsets of offsets, regardless of constraint order.
-	for (let pass = 0; pass < offsets.length && refreshOffsetSources(sketch, offsets); pass++) {
-		onRecompute();
+	if (onRecompute() === false || !offsets.length) return;
+	// Propagate offsets of offsets, then account for source motion from solving the rebuilt geometry.
+	for (let pass = 0; pass <= offsets.length && refreshOffsetSources(sketch, offsets); pass++) {
+		if (onRecompute() === false) return;
 	}
 }
 

@@ -5,8 +5,9 @@ import { SketchDocument } from '../src/model/sketch';
 import { findSketchRegions } from '../src/math/regions';
 import { OffsetConstraint } from '../src/solver/constraints';
 import type { DistanceConstraint } from '../src/solver/constraints';
-import { toggleOrExtendChain, calculateOffsetGeometry, commitOffsetToSketch } from '../src/math/offset';
+import { toggleOrExtendChain, calculateOffsetGeometry, commitOffsetToSketch, type OffsetChain } from '../src/math/offset';
 import { generateCircularPatternCopy } from '../src/model/patterns';
+import { syncOffsetSources } from '../src/model/offsetSync';
 
 const snapshot = JSON.parse(
 	readFileSync(new URL('./fixtures/offset-polygon-source-dimension.json', import.meta.url), 'utf8')
@@ -164,4 +165,67 @@ test('small residual on tangent circular-pattern seam closes cleanly when an off
 
 	const regions = findSketchRegions(sketch);
 	assert.equal(regions.length, 2, `expected 2 regions (inner + ring), got ${regions.length}`);
+});
+
+test('offset source arc tangency straightens a seam linked by coincidence constraints', () => {
+	const sketch = new SketchDocument();
+	const addPoint = (x: number, y: number, fixed = false) => sketch.addPoint({ x, y }, fixed);
+	const end = addPoint(0, 0);
+	const link = addPoint(0, 0);
+	const start = addPoint(0, 0);
+	const chain = sketch.withDeferredSolve((): OffsetChain => {
+		const first = sketch.addArc(addPoint(-50, 0, true).id, addPoint(-10, 30, true).id, end.id, 50);
+		const second = sketch.addArc(addPoint(30, 0, true).id, start.id, addPoint(12, 24, true).id, 30, true);
+		sketch.addRadiusConstraint(first.id, 50);
+		sketch.addRadiusConstraint(second.id, 30);
+		assert.ok(sketch.addCoincidentConstraint(end.id, link.id));
+		assert.ok(sketch.addCoincidentConstraint(link.id, start.id));
+		const tangent = sketch.addCircleTangentConstraint(first.id, second.id);
+		assert.ok(tangent);
+		assert.equal(tangent.sharedPointId, null);
+		return {
+			items: [first, second].map(arc => ({
+				id: arc.id,
+				type: 'arc',
+				startPointId: arc.startPointId,
+				endPointId: arc.endPointId,
+			})),
+			isClosed: false,
+		};
+	});
+	const geom = calculateOffsetGeometry(sketch, chain, 'one_side', 10, 10, false);
+	assert.ok(commitOffsetToSketch(sketch, chain, geom, 'one_side', 10, 10, false));
+	const constraintCount = sketch.constraints.size;
+
+	end.y = link.y = start.y = 0.002;
+	sketch.solve();
+
+	for (const point of [end, link, start]) assert.ok(Math.abs(point.y) < 1e-6);
+	assert.equal(sketch.constraints.size, constraintCount);
+});
+
+test('offset topology is refreshed after settling the first source update', () => {
+	const sketch = new SketchDocument();
+	const center = sketch.addPoint({ x: 2, y: 3 });
+	const source = sketch.addCircle(center.id, 10);
+	const chain: OffsetChain = { items: [{ id: source.id, type: 'circle' }], isClosed: true };
+	const geom = calculateOffsetGeometry(sketch, chain, 'one_side', 5, 5, true);
+	const created = commitOffsetToSketch(sketch, chain, geom, 'one_side', 5, 5, true);
+	assert.ok(created);
+	const offset = sketch.constraints.get(created.constraintIds[0]);
+	assert.ok(offset instanceof OffsetConstraint);
+
+	syncOffsetSources(sketch, [offset], () => {
+		if (source.radius === 10) {
+			source.radius = 4;
+		} else if (source.radius === 4) {
+			assert.equal(offset.pairs.length, 0);
+			source.radius = 8;
+		}
+	});
+
+	assert.equal(offset.pairs.length, 1);
+	const [pair] = offset.pairs;
+	assert.equal(pair.kind, 'circle');
+	assert.equal(sketch.circles.get(pair.offId)?.radius, 3);
 });

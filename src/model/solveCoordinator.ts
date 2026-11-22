@@ -4,7 +4,7 @@ import { serializeConstraint } from '../solver/constraints/serialization';
 import { isDependentDimension } from '../solver/constraintDependency';
 import { checkConstraints, updateReferenceValues } from '../solver/constraintInspection';
 import { getRadial } from './constraintOperations';
-import { syncOffsetSources } from './offsetSync';
+import { addOffsetArcTangencyAlignment, syncOffsetSources } from './offsetSync';
 import { prepareSplineConstraints } from './splineOperations';
 import { ParamManager, NumericalSolver } from '../solver/solver';
 import type { IConstraint, SolveCallOptions, SolverResult } from '../solver/types';
@@ -561,10 +561,20 @@ export class SolveCoordinator {
 		};
 	}
 
+	private prepareConstraints(
+		extraConstraints: IConstraint[],
+		drivenRadii: Set<string>,
+		editedHandles: SketchLine[]
+	): IConstraint[] {
+		const constraints = prepareSplineConstraints(this.sketch, extraConstraints, drivenRadii, editedHandles);
+		addOffsetArcTangencyAlignment(this.sketch, constraints);
+		return constraints;
+	}
+
 	private solveConstraints(extraConstraints: IConstraint[], retryWithoutRadiusStiffness = false): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
-		const activeConstraints = prepareSplineConstraints(this.sketch, extraConstraints, drivenRadii, editedHandles);
+		const activeConstraints = this.prepareConstraints(extraConstraints, drivenRadii, editedHandles);
 		for (const line of editedHandles) line.isAutomaticSplineHandle = false;
 		const isDrag = extraConstraints.length > 0;
 		const preservedDoF = isDrag && editedHandles.length === 0 ? this.lastSolverResult : null;
@@ -619,7 +629,7 @@ export class SolveCoordinator {
 		const initialValues = this.paramManager.getCurrentValues();
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
-		const activeConstraints = prepareSplineConstraints(this.sketch, tempHardConstraints, drivenRadii, editedHandles);
+		const activeConstraints = this.prepareConstraints(tempHardConstraints, drivenRadii, editedHandles);
 		this.collectDrivenRadii(tempHardConstraints, drivenRadii);
 
 		const stable = this.tryStableCenterSolve(activeConstraints, drivenRadii, true, extraValidator);
