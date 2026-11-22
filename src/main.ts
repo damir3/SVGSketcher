@@ -152,7 +152,11 @@ function initApp(): void {
 		<dialog class="svg-export-dialog" id="svg-export-dialog" aria-labelledby="svg-export-title">
 			<form method="dialog">
 				<h2 id="svg-export-title">Export SVG</h2>
-				<label class="svg-export-units">
+				<label class="svg-export-row">
+					File name
+					<input type="text" name="fileName" autocomplete="off" spellcheck="false" pattern=".*\\S.*" required />
+				</label>
+				<label class="svg-export-row">
 					Units
 					<select name="units" autofocus>
 						${SVG_EXPORT_UNITS.map(
@@ -160,7 +164,7 @@ function initApp(): void {
 						).join('')}
 					</select>
 				</label>
-				<label class="svg-export-units">
+				<label class="svg-export-row">
 					Line width (mm)
 					<input type="number" name="strokeWidth" min="0.001" step="any" value="${SVG_EXPORT_STYLE.strokeWidth}" required />
 				</label>
@@ -515,9 +519,11 @@ function initApp(): void {
 	const exportDialog = document.getElementById('svg-export-dialog') as HTMLDialogElement;
 	const exportForm = exportDialog.querySelector('form')!;
 	const exportSettingsKey = 'sketcher.svgExportSettings';
+	const exportFileName = exportForm.querySelector<HTMLInputElement>('[name="fileName"]')!;
 	const exportUnits = exportForm.querySelector<HTMLSelectElement>('[name="units"]')!;
 	const exportStrokeWidth = exportForm.querySelector<HTMLInputElement>('[name="strokeWidth"]')!;
 	const exportLayers = exportForm.querySelectorAll<HTMLInputElement>('[name="layers"]');
+	let sceneFileName: string | undefined;
 	try {
 		const saved = JSON.parse(localStorage.getItem(exportSettingsKey) ?? 'null');
 		if (saved && typeof saved === 'object') {
@@ -548,12 +554,17 @@ function initApp(): void {
 		}
 	}
 	exportForm.addEventListener('change', saveExportSettings);
-	btnExport.addEventListener('click', () => exportDialog.showModal());
+	btnExport.addEventListener('click', () => {
+		exportFileName.value = sceneFileName ?? `sketch_${Date.now()}.svg`;
+		exportDialog.showModal();
+	});
 	exportDialog.querySelector('#btn-cancel-svg-export')?.addEventListener('click', () => exportDialog.close());
 	exportDialog.addEventListener('keydown', e => e.stopPropagation());
 
 	exportForm.addEventListener('submit', e => {
 		e.preventDefault();
+		const fileName = exportFileName.value.trim();
+		const downloadName = /\.svg$/i.test(fileName) ? fileName : `${fileName}.svg`;
 		const settings = new FormData(exportForm);
 		const unit = settings.get('units');
 		const scale = SVG_EXPORT_UNITS.find(({ id }) => id === unit)?.scale ?? PIXELS_PER_MILLIMETER;
@@ -576,11 +587,12 @@ function initApp(): void {
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = `sketch_${Date.now()}.svg`;
+		link.download = downloadName;
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
 		URL.revokeObjectURL(url);
+		sceneFileName = downloadName;
 		exportDialog.close();
 		showToast('SVG exported successfully');
 	});
@@ -598,6 +610,7 @@ function initApp(): void {
 
 			const result = sketch.importSVG(content);
 			if (result.success) {
+				sceneFileName = file.name;
 				if (result.exportSettings) {
 					exportStrokeWidth.value = String(result.exportSettings.strokeWidth);
 					saveExportSettings();

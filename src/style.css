@@ -2006,15 +2006,15 @@ body {
 	font-size: 16px;
 }
 
-.svg-export-units {
+.svg-export-row {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
 }
 
-.svg-export-units select,
-.svg-export-units input {
+.svg-export-row select,
+.svg-export-row input {
 	padding: 6px 8px;
 	border: 1px solid var(--border-color);
 	border-radius: 6px;
@@ -2023,7 +2023,12 @@ body {
 	font: inherit;
 }
 
-.svg-export-units input {
+.svg-export-row input[type="text"] {
+	flex: 1;
+	min-width: 0;
+}
+
+.svg-export-row input[type="number"] {
 	width: 100px;
 }
 
