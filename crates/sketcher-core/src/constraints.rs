@@ -32,7 +32,7 @@ impl Constraint {
         if self.kind == 30 {
             self.b as usize * 4
         } else if self.kind == 25 {
-            3
+            if self.refs.len() == 2 { 1 } else { 3 }
         } else if matches!(self.kind, 0 | 1 | 8 | 18 | 19 | 21..=23 | 26 | 28)
             || (self.kind == 13 && self.a == 0.0)
             || (self.kind == 27 && self.b == 3.0)
@@ -180,6 +180,7 @@ impl Constraint {
                 let left = (dx * (p[1] - p[3]) - dy * (p[0] - p[2])) / dx.hypot(dy).max(1e-9);
                 out.push((left - self.b * self.a) * w);
             }
+            25 if self.refs.len() == 2 => out.push((p[0] - p[1] - self.b * self.a) * w),
             25 => out.extend_from_slice(&[
                 (p[0] - p[2]) * w,
                 (p[1] - p[3]) * w,
@@ -419,6 +420,10 @@ impl Constraint {
                     emit(row, col, val);
                 }
             }
+            25 if self.refs.len() == 2 => {
+                // Shared-center offset circle/arc: drive only the child radius.
+                add(0, 0, w);
+            }
             25 => {
                 // Offsets drive children only; parent references remain active in residuals.
                 add(0, 0, w);
@@ -519,6 +524,17 @@ impl Constraint {
     fn geometric_jacobian_into(&self, p: &[f64], emit: &mut impl FnMut(usize, usize, f64)) {
         match self.kind {
             24 => self.numeric_jacobian_into(p, emit),
+            25 if self.refs.len() == 2 => {
+                let w = self.weight;
+                if w.abs() > 1e-12 {
+                    if let Some(col) = self.refs[0].index {
+                        emit(0, col, w);
+                    }
+                    if let Some(col) = self.refs[1].index {
+                        emit(0, col, -w);
+                    }
+                }
+            }
             25 => {
                 let w = self.weight;
                 let mut add = |row: usize, slot: usize, value: f64| {
@@ -694,11 +710,13 @@ impl Program {
                 return Err("Non-finite native constraint data");
             }
             let kind = integer(header[0])?;
+            let count = integer(header[6])?;
             let expected_refs = match kind {
                 0 | 5 => 2,
                 1 | 2 | 3 | 6 => 4,
                 4 => 1,
                 7 | 11..=13 | 17 | 21 | 22 => 8,
+                25 if count == 2 => 2,
                 8 | 10 | 16 | 20 | 24 | 25 => 6,
                 9 => 5,
                 14 => 11,
@@ -706,10 +724,9 @@ impl Program {
                 18 => 10,
                 23 => 18,
                 27 | 28 => 3,
-                29 | 30 => integer(header[6])?,
+                29 | 30 => count,
                 _ => return Err("Unknown native constraint kind"),
             };
-            let count = integer(header[6])?;
             if count != expected_refs {
                 return Err("Invalid native constraint reference count");
             }

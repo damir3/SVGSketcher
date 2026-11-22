@@ -120,7 +120,7 @@ export class OffsetConstraint extends BaseConstraint {
 		let n = 0;
 		for (const p of this.pairs) {
 			if (p.kind === 'line') n += 2;
-			else if (p.kind === 'circle') n += 3;
+			else if (p.kind === 'circle') n += p.offCenterId === p.origCenterId ? 1 : 3;
 			else if (p.kind === 'spline') n += 2 * p.points.length;
 		}
 		return n;
@@ -144,12 +144,14 @@ export class OffsetConstraint extends BaseConstraint {
 				res.push(this.lineResidual(pm, p, p.offP1Id));
 				res.push(this.lineResidual(pm, p, p.offP2Id));
 			} else if (p.kind === 'circle') {
-				const o = readParamPoint(pm, p.origCenterId);
-				const f = readParamPoint(pm, p.offCenterId);
 				const ro = pm.get(`${p.origId}.r`) ?? 0;
 				const rf = pm.get(`${p.offId}.r`) ?? 0;
-				res.push((f.x - o.x) * this.weight);
-				res.push((f.y - o.y) * this.weight);
+				if (p.offCenterId !== p.origCenterId) {
+					const o = readParamPoint(pm, p.origCenterId);
+					const f = readParamPoint(pm, p.offCenterId);
+					res.push((f.x - o.x) * this.weight);
+					res.push((f.y - o.y) * this.weight);
+				}
 				res.push((rf - ro - p.side * this.targetDistance) * this.weight);
 			} else if (p.kind === 'spline') {
 				for (const sp of p.points) {
@@ -188,10 +190,12 @@ export class OffsetConstraint extends BaseConstraint {
 				}
 			} else if (p.kind === 'circle') {
 				const w = this.weight;
-				this.addJacobianEntry(res, paramIndices, `${p.offCenterId}.x`, row, w);
-				row++;
-				this.addJacobianEntry(res, paramIndices, `${p.offCenterId}.y`, row, w);
-				row++;
+				if (p.offCenterId !== p.origCenterId) {
+					this.addJacobianEntry(res, paramIndices, `${p.offCenterId}.x`, row, w);
+					row++;
+					this.addJacobianEntry(res, paramIndices, `${p.offCenterId}.y`, row, w);
+					row++;
+				}
 				this.addJacobianEntry(res, paramIndices, `${p.offId}.r`, row, w);
 				row++;
 			} else if (p.kind === 'spline') {

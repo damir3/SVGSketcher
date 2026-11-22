@@ -99,18 +99,28 @@ export function describePatternConstraint(c: IConstraint): Description[] | null 
 						equations: 1,
 					});
 			} else if (pair.kind === 'circle') {
-				records.push({
-					kind: 25,
-					refs: [
-						...point(pair.offCenterId),
-						...point(pair.origCenterId),
-						scalar(`${pair.offId}.r`),
-						scalar(`${pair.origId}.r`),
-					],
-					a: c.targetDistance,
-					b: pair.side,
-					equations: 3,
-				});
+				if (pair.offCenterId === pair.origCenterId) {
+					records.push({
+						kind: 25,
+						refs: [scalar(`${pair.offId}.r`), scalar(`${pair.origId}.r`)],
+						a: c.targetDistance,
+						b: pair.side,
+						equations: 1,
+					});
+				} else {
+					records.push({
+						kind: 25,
+						refs: [
+							...point(pair.offCenterId),
+							...point(pair.origCenterId),
+							scalar(`${pair.offId}.r`),
+							scalar(`${pair.origId}.r`),
+						],
+						a: c.targetDistance,
+						b: pair.side,
+						equations: 3,
+					});
+				}
 			} else if (pair.kind === 'spline') {
 				for (const p of pair.points)
 					records.push({

@@ -12,6 +12,7 @@ impl Program {
             }
             let slots: &[usize] = match c.kind {
                 24 | 26 => &[0, 1],
+                25 if c.refs.len() == 2 => &[0],
                 25 => &[0, 1, 4],
                 _ => continue,
             };

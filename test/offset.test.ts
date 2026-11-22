@@ -421,4 +421,47 @@ describe('Offset Geometry Calculation', () => {
 		assert.equal(sketch.lines.size, 12);
 		assert.equal(sketch.constraints.size, 0);
 	});
+
+	it('reuses existing circle and arc centers when committing offset and keeps the center movable', () => {
+		const sketch = new SketchDocument();
+		const cCenter = sketch.addPoint({ x: 10, y: 20 });
+		const circle = sketch.addCircle(cCenter.id, 30);
+
+		const cChain = toggleOrExtendChain(sketch, null, circle.id, 'circle', false)!;
+		const cGeom = calculateOffsetGeometry(sketch, cChain, 'one_side', 8, 8, false);
+		assert.equal(cGeom.isValid, true);
+		const cRes = commitOffsetToSketch(sketch, cChain, cGeom, 'one_side', 8, 8, false)!;
+		const offCircle = sketch.circles.get(cRes.createdIds[0])!;
+		assert.equal(offCircle.centerId, cCenter.id);
+		assert.equal(sketch.points.size, 1);
+
+		// Dragging the shared center moves both circles and preserves the offset radius.
+		sketch.dragPoint(cCenter.id, 25, 35);
+		assert.ok(Math.abs(cCenter.x - 25) < 1e-4);
+		assert.ok(Math.abs(cCenter.y - 35) < 1e-4);
+		assert.ok(Math.abs(offCircle.radius - (circle.radius + 8)) < 1e-4);
+
+		// Arc offset also reuses the original arc's center and survives deleting the offset arc.
+		const aCenter = sketch.addPoint({ x: 100, y: 0 });
+		const aStart = sketch.addPoint({ x: 120, y: 0 });
+		const aEnd = sketch.addPoint({ x: 100, y: 20 });
+		const arc = sketch.addArc(aCenter.id, aStart.id, aEnd.id, 20, false);
+		const pointsBeforeArcOffset = sketch.points.size;
+
+		const aChain = toggleOrExtendChain(sketch, null, arc.id, 'arc', false)!;
+		const aGeom = calculateOffsetGeometry(sketch, aChain, 'one_side', 5, 5, false);
+		assert.equal(aGeom.isValid, true);
+		const aRes = commitOffsetToSketch(sketch, aChain, aGeom, 'one_side', 5, 5, false)!;
+		const offArc = sketch.arcs.get(aRes.createdIds[0])!;
+		assert.equal(offArc.centerId, aCenter.id);
+		// Only the 2 offset arc endpoints are added, not a duplicate center point.
+		assert.equal(sketch.points.size, pointsBeforeArcOffset + 2);
+
+		sketch.dragPoint(aCenter.id, 115, 10);
+		assert.ok(Math.abs(aCenter.x - 115) < 1e-4);
+		assert.ok(Math.abs(aCenter.y - 10) < 1e-4);
+
+		sketch.removeEntity(offArc.id);
+		assert.ok(sketch.points.has(aCenter.id));
+	});
 });

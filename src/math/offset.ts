@@ -574,10 +574,15 @@ export function createOffsetSideGeometry(
 		const pairCount = offsetPairs.length;
 
 		if (prim.type === 'circle') {
-			const centerPt = sketch.addPoint(prim.circleCenter!);
+			const origCircle = sketch.circles.get(prim.sourceId);
+			const origCenter = origCircle ? sketch.points.get(origCircle.centerId) : undefined;
+			const centerPt =
+				origCenter && prim.circleCenter && origCenter.distanceTo(prim.circleCenter) < 1e-6
+					? origCenter
+					: sketch.addPoint(prim.circleCenter!);
 			const circle = sketch.addCircle(centerPt.id, prim.circleRadius!);
 			createdIds.push(circle.id);
-			pushCircleOffsetPair(sketch.circles.get(prim.sourceId), circle, prim.circleRadius ?? circle.radius);
+			pushCircleOffsetPair(origCircle, circle, prim.circleRadius ?? circle.radius);
 		} else if (prim.type === 'line') {
 			const [p1, p2] = getSpanEndpoints(i, prim.p1!, prim.p2!);
 			const line = sketch.addLine(p1.id, p2.id);
@@ -605,11 +610,16 @@ export function createOffsetSideGeometry(
 				});
 			}
 		} else if (prim.type === 'arc') {
-			const centerPt = sketch.addPoint(prim.center!);
+			const origArc = sketch.arcs.get(prim.sourceId);
+			const origCenter = origArc ? sketch.points.get(origArc.centerId) : undefined;
+			const centerPt =
+				origCenter && prim.center && origCenter.distanceTo(prim.center) < 1e-6
+					? origCenter
+					: sketch.addPoint(prim.center!);
 			const [pStart, pEnd] = getSpanEndpoints(i, prim.start!, prim.end!);
 			const arc = sketch.addArc(centerPt.id, pStart.id, pEnd.id, prim.radius!, !!prim.clockwise);
 			createdIds.push(arc.id);
-			pushCircleOffsetPair(sketch.arcs.get(prim.sourceId), arc, prim.radius ?? arc.radius);
+			pushCircleOffsetPair(origArc, arc, prim.radius ?? arc.radius);
 		} else if (prim.type === 'spline') {
 			const ptIds: string[] = [];
 			const splinePoints: OffsetSplinePoint[] = [];
