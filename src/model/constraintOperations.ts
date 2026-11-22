@@ -148,7 +148,125 @@ export function addConstraint(sketch: SketchDocument, constraint: IConstraint): 
 	return sketch.solverCoordinator.addConstraint(constraint);
 }
 
-export function removeConstraint(sketch: SketchDocument, id: string): void {
+export function getConstraintCreatedGeometryIds(sketch: SketchDocument, constraintId: string): string[] {
+	const c = sketch.constraints.get(constraintId);
+	if (!c) return [];
+
+	if (c instanceof OffsetConstraint) {
+		const ids: string[] = [];
+		const seen = new Set<string>();
+		for (const pair of c.pairs) {
+			const offId = pair.kind === 'line' ? pair.offLineId : pair.kind === 'circle' ? pair.offId : pair.offSplineId;
+			if (!seen.has(offId) && sketch.hasOwnPrimitive(offId)) {
+				seen.add(offId);
+				ids.push(offId);
+			}
+		}
+		return ids;
+	}
+
+	if ((c instanceof CircularPatternConstraint && !c.isReadOnly) || c instanceof RectangularPatternConstraint) {
+		const curveIds: string[] = [];
+		const seenCurves = new Set<string>();
+		const createdPointIds: string[] = [];
+		const seenPoints = new Set<string>();
+
+		for (const copy of c.copies) {
+			for (const item of copy.createdEntityIds) {
+				if (item.type === 'point') {
+					if (!seenPoints.has(item.id) && sketch.points.has(item.id) && !sketch.isSplineHandlePoint(item.id)) {
+						seenPoints.add(item.id);
+						createdPointIds.push(item.id);
+					}
+					continue;
+				}
+				if (item.type === 'line' && sketch.isSplineHandleLine(item.id)) continue;
+				if (!seenCurves.has(item.id) && sketch.hasOwnPrimitive(item.id, item.type)) {
+					seenCurves.add(item.id);
+					curveIds.push(item.id);
+				}
+			}
+		}
+
+		// Points that belong to created curves will be cleaned up when those curves are deleted;
+		// only include standalone created points directly so user-drawn curves attached to a vertex aren't unexpectedly removed.
+		const curvePointIds = new Set<string>();
+		for (const curveId of curveIds) {
+			for (const ptId of sketch.getPrimitivePointIds(curveId)) curvePointIds.add(ptId);
+		}
+		const standalonePointIds = createdPointIds.filter(ptId => !curvePointIds.has(ptId));
+		return [...curveIds, ...standalonePointIds];
+	}
+
+	if (c instanceof SymmetryConstraint && c.isMirrorCopy) {
+		if (sketch.points.has(c.p2Id) && !sketch.isSplineHandlePoint(c.p2Id)) {
+			return [c.p2Id];
+		}
+		return [];
+	}
+
+	return [];
+}
+
+function isPointCoveredByExcludedCurves(
+	sketch: SketchDocument,
+	pointId: string,
+	excludedEntityIds: ReadonlySet<string>
+): boolean {
+	if (excludedEntityIds.has(pointId)) return true;
+	let referencingCurveCount = 0;
+	for (const col of sketch.getPrimitiveCollections()) {
+		if (!col.isCurve) continue;
+		for (const [primId, prim] of col.map.entries()) {
+			if (prim.getPointIds(sketch).includes(pointId)) {
+				referencingCurveCount++;
+				if (!excludedEntityIds.has(primId)) return false;
+			}
+		}
+	}
+	return referencingCurveCount > 0;
+}
+
+export function getCreatedGeometryConstraintsForIds(
+	sketch: SketchDocument,
+	constraintIds: Iterable<string>,
+	excludedEntityIds?: ReadonlySet<string>
+): IConstraint[] {
+	const result: IConstraint[] = [];
+	const seen = new Set<string>();
+	for (const id of constraintIds) {
+		if (seen.has(id)) continue;
+		seen.add(id);
+		const c = sketch.constraints.get(id);
+		if (!c) continue;
+		if (
+			c.isInternalConstraint?.(sketch) ||
+			sketch.isSplineInternalConstraint(c) ||
+			c.type === 'arc_endpoints' ||
+			c.type === 'elliptical_arc_endpoints'
+		) {
+			continue;
+		}
+		const createdIds = getConstraintCreatedGeometryIds(sketch, id);
+		if (createdIds.length === 0) continue;
+		if (excludedEntityIds && excludedEntityIds.size > 0) {
+			const hasUncovered = createdIds.some(entityId =>
+				c instanceof SymmetryConstraint && c.isMirrorCopy
+					? !isPointCoveredByExcludedCurves(sketch, entityId, excludedEntityIds)
+					: !excludedEntityIds.has(entityId)
+			);
+			if (!hasUncovered) continue;
+		}
+		result.push(c);
+	}
+	return result;
+}
+
+export function removeConstraint(
+	sketch: SketchDocument,
+	id: string,
+	options?: { deleteCreatedGeometry?: boolean }
+): void {
 	const c = sketch.constraints.get(id);
 	if (!c) return;
 	if (
@@ -158,6 +276,31 @@ export function removeConstraint(sketch: SketchDocument, id: string): void {
 		c.type === 'elliptical_arc_endpoints'
 	) {
 		return;
+	}
+	if (options?.deleteCreatedGeometry) {
+		const createdIds = getConstraintCreatedGeometryIds(sketch, id);
+		if (createdIds.length > 0) {
+			sketch.beginTransaction();
+			if (c instanceof OffsetConstraint) {
+				for (const jId of c.junctionConstraintIds ?? []) {
+					sketch.constraints.delete(jId);
+					sketch.selection.constraintIds.delete(jId);
+				}
+			}
+			sketch.constraints.delete(id);
+			sketch.selection.constraintIds.delete(id);
+			for (const entityId of createdIds) {
+				if (sketch.hasOwnPrimitive(entityId)) {
+					sketch.removeEntity(entityId);
+				}
+			}
+			sketch.cleanOrphanConstraints();
+			sketch.cleanOrphanTexts();
+			sketch.rebuildParamManager();
+			sketch.solve();
+			sketch.commitTransaction();
+			return;
+		}
 	}
 	sketch.pushHistory();
 	if (c instanceof FixedConstraint) {

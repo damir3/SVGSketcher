@@ -2061,6 +2061,60 @@ body {
 	gap: 8px;
 }
 
+/* --- CONFIRM DELETE CONSTRAINT DIALOG --- */
+.confirm-delete-dialog {
+	width: 400px;
+	max-width: calc(100vw - 32px);
+	max-height: calc(100dvh - 32px);
+	margin: auto;
+	padding: 0;
+	border: 1px solid var(--border-color);
+	border-radius: 12px;
+	background: var(--bg-surface);
+	color: var(--text-primary);
+	box-shadow: 0 12px 28px -6px rgba(15, 23, 42, 0.22);
+}
+
+.confirm-delete-dialog::backdrop {
+	background: rgba(15, 23, 42, 0.45);
+}
+
+.confirm-delete-content {
+	display: grid;
+	gap: 14px;
+	padding: 18px;
+	font-size: 13px;
+}
+
+.confirm-delete-dialog h2 {
+	margin: 0;
+	font-size: 16px;
+}
+
+.confirm-delete-dialog p {
+	margin: 0;
+	color: var(--text-secondary);
+	line-height: 1.45;
+}
+
+.confirm-delete-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 4px;
+}
+
+.btn-header.danger {
+	background-color: #dc2626;
+	border-color: #dc2626;
+	color: #ffffff;
+}
+
+.btn-header.danger:hover {
+	background-color: #b91c1c;
+	border-color: #b91c1c;
+}
+
 /* --- PARAMETERS MODAL POPUP --- */
 .param-modal-backdrop {
 	position: fixed;

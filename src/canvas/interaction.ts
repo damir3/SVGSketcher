@@ -11,6 +11,7 @@ import type {
 	PointToLineDistanceConstraint,
 	OffsetConstraint,
 } from '../solver/constraints';
+import type { IConstraint } from '../solver/types';
 import { SketchArc, SketchCircle, SketchLine, type ISketchPrimitive } from '../model/types';
 import { isRoundCurveLineType, type AuxiliaryLineType, type EditableLineType } from '../model/lineTypes';
 import { showToast } from '../ui/toast';
@@ -172,6 +173,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 	) => boolean | void;
 	onToolChange?: (tool: ToolType) => void;
 	onReplaceImage?: (id: string) => void;
+	onConfirmConstraintDelete?: (constraints: IConstraint[]) => Promise<'delete-geometry' | 'keep-geometry' | 'cancel'>;
 	onConstructionChange?: (isActive: boolean, type: AuxiliaryLineType) => void;
 	isSnappingEnabled = true;
 	onSnappingChange?: (active: boolean) => void;
@@ -253,6 +255,9 @@ export class CanvasInteraction implements SelectInteractionHost {
 			},
 			showToast: (msg: string) => showToast(msg),
 			onEditDimension: (c, screenPos, isNew) => this.onEditDimension?.(c, screenPos, isNew),
+			get onConfirmConstraintDelete() {
+				return self.onConfirmConstraintDelete;
+			},
 			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
 				this.findSnap(screen, excludePointId, allowGrid),
 			findPointNear: (screen, thresholdPx) => findPointNear(this.sketch, this.viewport, screen, thresholdPx),
@@ -652,15 +657,25 @@ export class CanvasInteraction implements SelectInteractionHost {
 				}
 				return;
 			case 'Delete':
-			case 'Backspace':
+			case 'Backspace': {
 				if (this.selectedImageId) {
 					this.sketch.removeImage(this.selectedImageId);
 					this.setTool('select');
 					return;
 				}
+				const affected = this.sketch.getCreatedGeometryConstraintsForSelection();
+				if (affected.length > 0 && this.onConfirmConstraintDelete) {
+					void this.onConfirmConstraintDelete(affected).then(choice => {
+						if (choice === 'cancel') return;
+						this.sketch.deleteSelected({ deleteConstraintGeometry: choice === 'delete-geometry' });
+						this.render();
+					});
+					return;
+				}
 				this.sketch.deleteSelected();
 				this.render();
 				return;
+			}
 			case 'KeyX':
 				this.toggleConstructionMode();
 				return;

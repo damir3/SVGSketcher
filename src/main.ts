@@ -10,6 +10,7 @@ import { CanvasInteraction } from './canvas/interaction';
 import { Toolbar, showToast } from './ui/toolbar';
 import { Sidebar } from './ui/sidebar';
 import { DimensionModal } from './ui/modal';
+import { DeleteConstraintDialog, type ConfirmConstraintDelete } from './ui/delete-constraint-dialog';
 import { ParametersPopup } from './ui/parameters-popup';
 import { ICONS } from './ui/icons';
 import { setToolIconProvider } from './ui/panels/tools/iconProvider';
@@ -231,7 +232,12 @@ function initApp(): void {
 	const toolbar = new Toolbar(toolbarContainer, sketch, interaction);
 	const sidebar = new Sidebar(sidebarContainer, sketch, interaction);
 	const dimModal = new DimensionModal(sketch);
+	const deleteConstraintDialog = new DeleteConstraintDialog();
 	const paramModal = new ParametersPopup(sketch);
+
+	const confirmConstraintDelete: ConfirmConstraintDelete = constraints => deleteConstraintDialog.open(constraints);
+	interaction.onConfirmConstraintDelete = confirmConstraintDelete;
+	sidebar.onConfirmConstraintDelete = confirmConstraintDelete;
 
 	const btnParameters = document.getElementById('btn-parameters') as HTMLButtonElement;
 	btnParameters?.addEventListener('click', () => {

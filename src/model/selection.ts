@@ -1,5 +1,6 @@
 import { getImageBounds } from './image';
 import type { SketchDocument } from './sketch';
+import type { IConstraint } from '../solver/types';
 import { Vec2 } from '../math/vector';
 import { AABB } from '../math/aabb';
 import type { ISketchPrimitive, SelectionState, SketchPoint } from './types';
@@ -112,7 +113,21 @@ export function getSelectedPrimitives(sketch: SketchDocument): ISketchPrimitive[
 	return list;
 }
 
-export function deleteSelected(sketch: SketchDocument): void {
+export function getCreatedGeometryConstraintsForSelection(sketch: SketchDocument): IConstraint[] {
+	if (sketch.selection.constraintIds.size === 0) return [];
+	const excludedEntityIds = new Set<string>([
+		...sketch.selection.pointIds,
+		...sketch.selection.lineIds,
+		...sketch.selection.circleIds,
+		...sketch.selection.arcIds,
+		...sketch.selection.ellipseIds,
+		...sketch.selection.ellipticalArcIds,
+		...sketch.selection.splineIds,
+	]);
+	return sketch.getCreatedGeometryConstraintsForIds(sketch.selection.constraintIds, excludedEntityIds);
+}
+
+export function deleteSelected(sketch: SketchDocument, options?: { deleteConstraintGeometry?: boolean }): void {
 	if (getSelectionCount(sketch) === 0) return;
 
 	sketch.beginTransaction();
@@ -128,6 +143,24 @@ export function deleteSelected(sketch: SketchDocument): void {
 		const c = sketch.constraints.get(cid);
 		return c ? !sketch.isSplineInternalConstraint(c) : true;
 	});
+
+	const extraCreatedEntityIds: string[] = [];
+	const extraJunctionConstraintIds: string[] = [];
+	if (options?.deleteConstraintGeometry) {
+		const seenExtra = new Set<string>();
+		for (const cid of selectedConstraints) {
+			const c = sketch.constraints.get(cid);
+			if (c && c.type === 'offset' && 'junctionConstraintIds' in c && Array.isArray(c.junctionConstraintIds)) {
+				extraJunctionConstraintIds.push(...(c.junctionConstraintIds as string[]));
+			}
+			for (const entityId of sketch.getConstraintCreatedGeometryIds(cid)) {
+				if (!seenExtra.has(entityId)) {
+					seenExtra.add(entityId);
+					extraCreatedEntityIds.push(entityId);
+				}
+			}
+		}
+	}
 
 	const selectedSplinesSet = new Set(selectedSplines);
 
@@ -179,9 +212,16 @@ export function deleteSelected(sketch: SketchDocument): void {
 		}
 	}
 
+	for (const jId of extraJunctionConstraintIds) {
+		sketch.constraints.delete(jId);
+		sketch.selection.constraintIds.delete(jId);
+	}
 	for (const id of selectedConstraints) sketch.removeConstraint(id);
 	for (const group of [...curveSelectionGroups, selectedTexts, filteredPoints]) {
 		for (const id of group) sketch.removeEntity(id);
+	}
+	for (const id of extraCreatedEntityIds) {
+		if (sketch.hasOwnPrimitive(id)) sketch.removeEntity(id);
 	}
 
 	sketch.resetFitSplineTangents(selectedLines, selectedPoints);

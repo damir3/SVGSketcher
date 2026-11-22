@@ -138,6 +138,9 @@ export interface ToolContext {
 	/** Return true to own confirmation of a newly created dimension's transaction. */
 	onEditDimension?(constraint: any, screenPos: Vec2, isNew?: boolean): boolean | void;
 
+	/** Confirmation callback when deleting a constraint that created/cloned geometry */
+	onConfirmConstraintDelete?(constraints: IConstraint[]): Promise<'delete-geometry' | 'keep-geometry' | 'cancel'>;
+
 	/** Snapping helper */
 	findSnap(screen: Vec2, excludePointId?: string, allowGrid?: boolean): SnapResult | null;
 

@@ -113,6 +113,7 @@ type ConstraintSnapshotData =
 			lineP1Id: string;
 			lineP2Id: string;
 			lineId?: string;
+			isMirrorCopy?: boolean;
 	  }
 	| {
 			type: 'circular_pattern';

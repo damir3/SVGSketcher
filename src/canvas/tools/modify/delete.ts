@@ -35,6 +35,18 @@ export class DeleteTool extends BaseTool {
 		if (target.id === 'origin' || target.id === 'axis_x' || target.id === 'axis_y') return;
 
 		this.ctx?.highlightManager?.clear();
+		if (target.type === 'constraint') {
+			const affected = this.ctx.sketch.getCreatedGeometryConstraintsForIds([target.id]);
+			if (affected.length > 0 && this.ctx.onConfirmConstraintDelete) {
+				void this.ctx.onConfirmConstraintDelete(affected).then(choice => {
+					if (choice === 'cancel') return;
+					this.ctx.sketch.removeConstraint(target.id, { deleteCreatedGeometry: choice === 'delete-geometry' });
+					this.ctx.showToast('Deleted');
+					this.ctx.requestRender();
+				});
+				return;
+			}
+		}
 		this.ctx.sketch.beginTransaction();
 		this.ctx.sketch.removeEntity(target.id);
 		this.ctx.sketch.commitTransaction();

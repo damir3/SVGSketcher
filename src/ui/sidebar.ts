@@ -17,6 +17,8 @@ import {
 import { ICONS } from './icons';
 import { type Vec2 } from '../math/vector';
 import type { IInspectable, InspectorContext } from './panels/inspector/types';
+import type { IConstraint } from '../solver/types';
+import type { ConfirmConstraintDelete } from './delete-constraint-dialog';
 
 const CHEVRON_DOWN_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
 const MAX_SELECTED_INSPECTOR_ITEMS = 200;
@@ -64,6 +66,7 @@ export class Sidebar {
 			| OffsetConstraint,
 		screenPos?: Vec2
 	) => void;
+	onConfirmConstraintDelete?: ConfirmConstraintDelete;
 
 	constructor(container: HTMLElement, sketch: SketchDocument, interaction?: CanvasInteraction) {
 		this.container = container;
@@ -748,6 +751,16 @@ export class Sidebar {
 			btn.addEventListener('click', e => {
 				e.stopPropagation();
 				const id = btn.getAttribute('data-delete-id')!;
+				if (this.sketch.constraints.has(id)) {
+					const affected: IConstraint[] = this.sketch.getCreatedGeometryConstraintsForIds([id]);
+					if (affected.length > 0 && this.onConfirmConstraintDelete) {
+						void this.onConfirmConstraintDelete(affected).then(choice => {
+							if (choice === 'cancel') return;
+							this.sketch.removeConstraint(id, { deleteCreatedGeometry: choice === 'delete-geometry' });
+						});
+						return;
+					}
+				}
 				this.sketch.removeEntity(id);
 			});
 		});

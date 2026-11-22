@@ -45,6 +45,8 @@ import {
 } from './patterns';
 import {
 	addConstraint,
+	getConstraintCreatedGeometryIds,
+	getCreatedGeometryConstraintsForIds,
 	removeConstraint,
 	addFixedConstraint,
 	removeFixedConstraint,
@@ -126,6 +128,7 @@ import {
 	clearSelection,
 	clearSelectionSets,
 	getSelectedPrimitives,
+	getCreatedGeometryConstraintsForSelection,
 	deleteSelected,
 	getBoundingBox,
 	getSelectionBoundingBox,
@@ -766,8 +769,16 @@ export class SketchDocument {
 		return addConstraint(this, constraint);
 	}
 
-	removeConstraint(id: string): void {
-		removeConstraint(this, id);
+	removeConstraint(id: string, options?: { deleteCreatedGeometry?: boolean }): void {
+		removeConstraint(this, id, options);
+	}
+
+	getConstraintCreatedGeometryIds(id: string): string[] {
+		return getConstraintCreatedGeometryIds(this, id);
+	}
+
+	getCreatedGeometryConstraintsForIds(ids: Iterable<string>, excludedEntityIds?: ReadonlySet<string>): IConstraint[] {
+		return getCreatedGeometryConstraintsForIds(this, ids, excludedEntityIds);
 	}
 
 	addFixedConstraint(pointId: string): FixedConstraint | null {
@@ -1665,8 +1676,12 @@ export class SketchDocument {
 		return getSelectedPrimitives(this);
 	}
 
-	deleteSelected(): void {
-		deleteSelected(this);
+	getCreatedGeometryConstraintsForSelection(): IConstraint[] {
+		return getCreatedGeometryConstraintsForSelection(this);
+	}
+
+	deleteSelected(options?: { deleteConstraintGeometry?: boolean }): void {
+		deleteSelected(this, options);
 	}
 
 	addText(options: Omit<TextSnapshot, 'type' | 'id'>): SketchText {
