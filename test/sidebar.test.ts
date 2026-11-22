@@ -2,6 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { SketchDocument } from '../src/model/sketch';
+import { OffsetConstraint } from '../src/solver/constraints';
 
 register('./helpers/rawSvgLoader.mjs', import.meta.url);
 const { Sidebar } = await import('../src/ui/sidebar');
@@ -327,5 +328,42 @@ describe('Sidebar', () => {
 		assert.deepEqual(externalTargets.at(-1), { id: line.id, type: 'line' });
 		sketch.clearSelection();
 		assert.equal(externalTargets.at(-1), null);
+	});
+
+	it('hides linked primitive chips for offset constraints in primitive constraints list', () => {
+		const sketch = new SketchDocument();
+		const p1 = sketch.addPoint({ x: 0, y: 0 });
+		const p2 = sketch.addPoint({ x: 50, y: 0 });
+		const origLine = sketch.addLine(p1.id, p2.id);
+		const op1 = sketch.addPoint({ x: 0, y: 10 });
+		const op2 = sketch.addPoint({ x: 50, y: 10 });
+		const offLine = sketch.addLine(op1.id, op2.id);
+
+		const offset = new OffsetConstraint(
+			'c_offset_1',
+			[
+				{
+					kind: 'line',
+					origLineId: origLine.id,
+					origP1Id: p1.id,
+					origP2Id: p2.id,
+					offLineId: offLine.id,
+					offP1Id: op1.id,
+					offP2Id: op2.id,
+					side: 1,
+				},
+			],
+			10
+		);
+		sketch.addConstraint(offset);
+
+		const container = createSidebarContainer();
+		new Sidebar(container, sketch);
+
+		sketch.selectEntity(origLine.id, 'line', false);
+		assert.ok(container.innerHTML.includes('Offset'));
+		assert.ok(container.innerHTML.includes('10.0 mm'));
+		assert.equal(container.querySelectorAll('.constraint-entity-chip').length, 0);
+		assert.ok(!container.innerHTML.includes('constraint-linked-entities'));
 	});
 });

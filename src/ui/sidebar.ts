@@ -578,7 +578,8 @@ export class Sidebar {
 			valBadge = `<span class="val-badge">${columns}x${rows}</span>`;
 		}
 
-		const hideLinkedEntities = (c.type === 'circular_pattern' && !c.isReadOnly) || c.type === 'rectangular_pattern';
+		const hideLinkedEntities =
+			(c.type === 'circular_pattern' && !c.isReadOnly) || c.type === 'rectangular_pattern' || c.type === 'offset';
 		const allEntities = hideLinkedEntities ? [] : this.sketch.getEntitiesForConstraint(c);
 		const targetEntities = (
 			currentEntityIds.length === 1 ? allEntities.filter(e => e.id !== currentEntityIds[0]) : allEntities
