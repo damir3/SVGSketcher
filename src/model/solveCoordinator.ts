@@ -356,7 +356,7 @@ export class SolveCoordinator {
 		let rejected = false;
 		let referenceCreated = false;
 		syncOffsetSources(this.sketch, offsets, () => {
-			res = this.solveConstraints(extraConstraints, editValues !== null);
+			res = this.solveConstraints(extraConstraints);
 			if (!pending.size) return;
 			// Solvers can skip residual evaluation when every parameter is fixed.
 			const values = this.paramManager.getCurrentValues();
@@ -571,7 +571,7 @@ export class SolveCoordinator {
 		return constraints;
 	}
 
-	private solveConstraints(extraConstraints: IConstraint[], retryWithoutRadiusStiffness = false): SolverResult {
+	private solveConstraints(extraConstraints: IConstraint[]): SolverResult {
 		const drivenRadii = this.collectDrivenRadii();
 		const editedHandles: SketchLine[] = [];
 		const activeConstraints = this.prepareConstraints(extraConstraints, drivenRadii, editedHandles);
@@ -617,10 +617,13 @@ export class SolveCoordinator {
 				paramStiffness: stiffness,
 			});
 		}
-		if (!stage1Ok && retryWithoutRadiusStiffness && stiffness.size > 0 && result.status === 'OVER_CONSTRAINED') {
-			// Radius stiffness can stall a feasible dimension edit when tangency requires a radius change.
+		if (!stage1Ok && stiffness.size > 0 && result.status === 'OVER_CONSTRAINED') {
+			// Radius stiffness can stall a feasible constraint when geometry requires a radius change.
+			const stiffValues = this.paramManager.getCurrentValues();
 			this.paramManager.restoreValues(preStageValues);
-			return this.solveWithOffsetSourceRetry(activeConstraints, { lockedParams: drivenRadii });
+			const retry = this.solveWithOffsetSourceRetry(activeConstraints, { lockedParams: drivenRadii });
+			if (retry.status !== 'OVER_CONSTRAINED' && Number.isFinite(retry.finalError)) return retry;
+			this.paramManager.restoreValues(stiffValues);
 		}
 		return result;
 	}

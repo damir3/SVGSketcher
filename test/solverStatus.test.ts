@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { ConstraintTool } from '../src/canvas/tools/constraints/constraint';
 import { findSketchRegions } from '../src/math/regions';
 import { setCircleOrArcRadius } from '../src/model/inspectorOperations';
 import { SketchDocument, type PatternCopyData } from '../src/model/sketch';
@@ -129,6 +130,82 @@ it('edits the distance to the center of a tangent arc in a circular pattern', ()
 	assert.ok(Math.abs(tangentCenter.length() - 120) < 1e-6);
 	assert.ok(Math.abs(tangent.radius - 20.1281158) < 1e-6);
 	assert.equal(sketch.lastSolverResult?.degreesOfFreedom, 0);
+	assert.ok(sketch.lastSolverResult!.finalError < 1e-10);
+});
+
+function tangentArcPattern() {
+	const sketch = new SketchDocument();
+	const pointAt = (center: { x: number; y: number }, radius: number, degrees: number) => {
+		const angle = (degrees * Math.PI) / 180;
+		return sketch.addPoint({ x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) });
+	};
+	const radius = 20;
+	const tangentRadius = 4.5;
+	const center = sketch.addPoint({ x: 0, y: 100 });
+	const start = pointAt(center, radius, 195);
+	const shared = pointAt(center, radius, -16);
+	const tangentCenter = pointAt(center, radius + tangentRadius, -16);
+	const end = pointAt(tangentCenter, tangentRadius, 1);
+	const arc = sketch.addArc(center.id, start.id, shared.id, radius);
+	const tangent = sketch.addArc(tangentCenter.id, shared.id, end.id, tangentRadius, true);
+	assert.ok(sketch.addPointOnAxisConstraint(center.id, 'y'));
+	const height = sketch.addPointToAxisDistanceConstraint(center.id, 'x', 100);
+	assert.ok(height);
+	assert.ok(sketch.addRadiusConstraint(arc.id, radius));
+	assert.ok(sketch.addTangentConstraint(arc.id, tangent.id));
+
+	const sources = [arc.id, tangent.id];
+	const copy = sketch.generatePatternCopy('origin', sources, 1, 2, 'partial', 330);
+	assert.ok(copy);
+	const pattern = sketch.addCircularPatternConstraint('origin', sources, 'partial', 330, 2, false, [], [copy]);
+	assert.ok(pattern);
+	const startPair = copy.pointPairs.find(pair => pair.sourcePtId === start.id);
+	assert.ok(startPair);
+	const copyStart = sketch.points.get(startPair.patternPtId)!;
+	return { sketch, arc, tangent, tangentRadius, center, end, copyStart, height, pattern };
+}
+
+it('joins arc endpoints in a circular pattern when coincidence requires a radius change', () => {
+	const { sketch, arc, tangent, tangentRadius, end, copyStart } = tangentArcPattern();
+	assert.ok(end.distanceTo(copyStart) > 1);
+	sketch.selectEntity(end.id, 'point');
+	sketch.selectEntity(copyStart.id, 'point', true);
+
+	const messages: string[] = [];
+	const applied = ConstraintTool.applyConstraintToSelection('coincident', {
+		sketch,
+		showToast: message => messages.push(message),
+	});
+	assert.ok(applied, messages.join(', '));
+	assert.ok(end.distanceTo(copyStart) < 1e-6);
+	assert.equal(arc.radius, 20);
+	assert.ok(Math.abs(tangent.radius - tangentRadius) > 1);
+	assert.ok(sketch.lastSolverResult!.finalError < 1e-10);
+});
+
+it('preserves coincident arc endpoints when the circular pattern angle changes', () => {
+	const { sketch, arc, end, copyStart, pattern } = tangentArcPattern();
+	assert.ok(sketch.addCoincidentConstraint(end.id, copyStart.id));
+
+	assert.ok(sketch.updateCircularPattern(pattern.id, { totalAngle: 325 }));
+
+	assert.equal(pattern.totalAngle, 325);
+	assert.ok(end.distanceTo(copyStart) < 1e-6);
+	assert.equal(arc.radius, 20);
+	assert.ok(sketch.lastSolverResult!.finalError < 1e-10);
+});
+
+it('preserves coincident arc endpoints when a parameter changes their driving dimension', () => {
+	const { sketch, arc, center, end, copyStart, height } = tangentArcPattern();
+	assert.ok(sketch.addCoincidentConstraint(end.id, copyStart.id));
+	assert.ok(sketch.addParameter('height', '100').success);
+	assert.ok(sketch.updateDimensionalConstraint(height.id, 'height'));
+
+	assert.ok(sketch.updateParameter('height', 'height', '110').success);
+
+	assert.ok(Math.abs(center.y - 110) < 1e-6);
+	assert.ok(end.distanceTo(copyStart) < 1e-6);
+	assert.equal(arc.radius, 20);
 	assert.ok(sketch.lastSolverResult!.finalError < 1e-10);
 });
 
