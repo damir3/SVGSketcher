@@ -290,6 +290,64 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(lineTool.popup.getNumericValue('length'), 0);
 	});
 
+	it('LineTool continues through axes and standalone points and stops at attached geometry', () => {
+		const sketch = new SketchDocument();
+		const first = sketch.addPoint(new Vec2(-30, -30));
+		const second = sketch.addPoint(new Vec2(-30, 30));
+		const existingLine = sketch.addLine(first.id, second.id);
+		const standalone = sketch.addPoint(new Vec2(-10, 25));
+		const attached = sketch.addPoint(new Vec2(-30, -10));
+		sketch.addPointOnLineConstraint(attached.id, existingLine.id);
+		const { ctx } = createMockContext(sketch);
+		const tool = new LineTool();
+		tool.activate(ctx);
+
+		tool.onMouseDown(makeMouseEvent(10, 15));
+		for (const [id, x, y] of [
+			['axis_x', 20, 0],
+			['axis_y', 0, 20],
+		] as const) {
+			const pos = new Vec2(x, y);
+			tool.onMouseDown(makeMouseEvent(x, y, { type: 'line', id, worldPos: pos, screenPos: pos }));
+			assert.equal(tool.popup.isOpen(), true);
+			assert.ok([...sketch.constraints.values()].some(c => c instanceof PointOnLineConstraint && c.lineP2Id === id));
+		}
+
+		const clickPoint = (point: typeof first) => {
+			tool.onMouseDown(
+				makeMouseEvent(point.x, point.y, {
+					type: 'point',
+					id: point.id,
+					worldPos: point,
+					screenPos: point,
+				})
+			);
+		};
+		clickPoint(standalone);
+		assert.equal([...sketch.lines.values()].at(-1)?.p2Id, standalone.id);
+		assert.equal(tool.popup.isOpen(), true);
+
+		const lineHit = new Vec2(-30, 10);
+		tool.onMouseDown(
+			makeMouseEvent(lineHit.x, lineHit.y, {
+				type: 'line',
+				id: existingLine.id,
+				worldPos: lineHit,
+				screenPos: lineHit,
+			})
+		);
+		assert.equal(sketch.lines.size, 5);
+		assert.equal([...sketch.lines.values()].at(-1)?.p1Id, standalone.id);
+		assert.equal(tool.popup.isOpen(), false);
+
+		for (const point of [first, attached]) {
+			tool.onMouseDown(makeMouseEvent(-50, -20));
+			clickPoint(point);
+			assert.equal([...sketch.lines.values()].at(-1)?.p2Id, point.id);
+			assert.equal(tool.popup.isOpen(), false);
+		}
+	});
+
 	it('LineTool creates a centerline with the selected auxiliary line type', () => {
 		const sketch = new SketchDocument();
 		const { ctx } = createMockContext(sketch);

@@ -896,7 +896,7 @@ describe('Snapping with Ellipse and Spline', () => {
 		}
 	});
 
-	it('LineTool terminates chaining when ending on coordinate origin or axis snap', () => {
+	it('LineTool continues on reference snaps and stops on an existing endpoint at the origin', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
@@ -907,68 +907,42 @@ describe('Snapping with Ellipse and Spline', () => {
 			const mockCtx = createMockCtx(sketch, vp, interaction);
 			tool.activate(mockCtx);
 
-			// Line ending on origin
-			const sStart = vp.worldToScreen({ x: 50, y: 50 });
-			tool.onMouseDown({
-				screen: sStart,
-				world: new Vec2(50, 50),
-				client: sStart,
-				raw: {} as any,
-				snap: null,
-				effectiveWorld: new Vec2(50, 50),
-				effectiveScreen: sStart,
-			});
+			const click = (world: Vec2, snap = interaction.findSnap(vp.worldToScreen(world))) => {
+				const screen = vp.worldToScreen(world);
+				tool.onMouseDown({
+					screen,
+					world,
+					client: screen,
+					raw: { preventDefault() {} } as MouseEvent,
+					snap,
+					effectiveWorld: snap?.worldPos ?? world,
+					effectiveScreen: snap?.screenPos ?? screen,
+				});
+				return snap;
+			};
+			const origin = new Vec2(0, 0);
+			click(new Vec2(50, 50), null);
+			assert.equal(click(origin)?.id, 'origin');
 
-			const sOrigin = vp.worldToScreen({ x: 0, y: 0 });
-			const snapOrigin = interaction.findSnap(sOrigin);
-			assert.ok(snapOrigin && snapOrigin.id === 'origin');
-
-			tool.onMouseDown({
-				screen: sOrigin,
-				world: snapOrigin.worldPos,
-				client: sOrigin,
-				raw: {} as any,
-				snap: snapOrigin,
-				effectiveWorld: snapOrigin.worldPos,
-				effectiveScreen: sOrigin,
-			});
-
-			assert.equal(tool.isBusy(), false, 'LineTool terminates on origin snap');
+			assert.equal(tool.popup.isOpen(), true, 'LineTool continues after an origin snap');
 			const cOrigin = [...sketch.constraints.values()].find(
 				c => c instanceof CoincidentConstraint && c.p1Id === 'origin'
 			);
 			assert.ok(cOrigin, 'Endpoint constrained to origin');
 
-			// Line ending on X-axis
-			tool.onMouseDown({
-				screen: sStart,
-				world: new Vec2(50, 50),
-				client: sStart,
-				raw: {} as any,
-				snap: null,
-				effectiveWorld: new Vec2(50, 50),
-				effectiveScreen: sStart,
-			});
-
-			const sAxis = vp.worldToScreen({ x: 100, y: 0 });
-			const snapAxis = interaction.findSnap(sAxis);
-			assert.ok(snapAxis && snapAxis.id === 'axis_x');
-
-			tool.onMouseDown({
-				screen: sAxis,
-				world: snapAxis.worldPos,
-				client: sAxis,
-				raw: {} as any,
-				snap: snapAxis,
-				effectiveWorld: snapAxis.worldPos,
-				effectiveScreen: sAxis,
-			});
-
-			assert.equal(tool.isBusy(), false, 'LineTool terminates on axis snap');
+			assert.equal(click(new Vec2(100, 0))?.id, 'axis_x');
+			assert.equal(tool.popup.isOpen(), true, 'LineTool continues after an axis snap');
+			const [first, second] = sketch.lines.values();
+			assert.equal(second.p1Id, first.p2Id);
 			const cAxis = [...sketch.constraints.values()].find(
 				c => c instanceof PointOnLineConstraint && c.lineP2Id === 'axis_x'
 			);
 			assert.ok(cAxis, 'Endpoint constrained to X-axis');
+
+			click(new Vec2(80, -30), null);
+			assert.equal(click(origin)?.id, first.p2Id);
+			assert.equal([...sketch.lines.values()].at(-1)?.p2Id, first.p2Id);
+			assert.equal(tool.popup.isOpen(), false);
 		} finally {
 			cleanupDoc();
 		}

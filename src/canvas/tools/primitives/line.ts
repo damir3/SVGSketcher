@@ -1,6 +1,7 @@
 import { BaseTool } from '../base';
 import type { SnapResult, ToolContext, ToolMouseEvent, ToolRenderContext } from '../types';
 import { Vec2 } from '../../../math/vector';
+import { isPointAttachedToCurve } from '../../../model/constraintLinks';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { createSvgLine } from '../../svg';
 import { applyDrawingLineStyle, getPreviewStrokeAttrs } from '../../styles';
@@ -146,6 +147,11 @@ export class LineTool extends BaseTool {
 				: null;
 
 		const { sketch } = this.ctx;
+		const hitAxis = snap?.type === 'line' && (snap.id === 'axis_x' || snap.id === 'axis_y');
+		const hitPrimitive =
+			snap?.type === 'point'
+				? !!snap.id && snap.id !== 'origin' && snap.id !== startId && isPointAttachedToCurve(sketch, snap.id)
+				: !!snap && !hitAxis && snap.type !== 'grid';
 		let endId: string;
 		if (snap?.type === 'point' && snap.id && snap.id !== startId && sketch.points.has(snap.id)) {
 			endId = snap.id;
@@ -167,8 +173,6 @@ export class LineTool extends BaseTool {
 		}
 		sketch.commitTransaction();
 
-		const hitPrimitive =
-			snap && snap.type !== 'grid' && (snap.type !== 'point' || (snap.id !== undefined && snap.id !== startId));
 		if (hitPrimitive) {
 			this.resetDrawing();
 		} else {

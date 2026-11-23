@@ -207,6 +207,17 @@ function isPointOnCurveConstraint(
 	);
 }
 
+export function isPointAttachedToCurve(sketch: SketchDocument, pointId: string): boolean {
+	if (sketch.isPointUsed(pointId)) return true;
+	return sketch.getConstraintsForEntity('point', pointId).some(c => {
+		if (c instanceof PointOnLineConstraint) return !!sketch.getLineBetween(c.lineP1Id, c.lineP2Id);
+		if (isPointOnCurveConstraint(c)) return true;
+		if (c instanceof MidpointConstraint) return c.midId === pointId && !!sketch.getLineBetween(c.p1Id, c.p2Id);
+		if (c instanceof CoincidentConstraint) return sketch.isPointUsed(c.p1Id === pointId ? c.p2Id : c.p1Id);
+		return false;
+	});
+}
+
 function usesLineEndpoint(c: CollinearConstraint | AngleConstraint, targetId: string): boolean {
 	return c.l1P1 === targetId || c.l1P2 === targetId || c.l2P1 === targetId || c.l2P2 === targetId;
 }
