@@ -9,7 +9,7 @@ import { BaseTool } from '../base';
 import type { ToolMouseEvent, ToolRenderContext } from '../types';
 import { getCircumcircle, Vec2 } from '../../../math/vector';
 import { createSvgCircle, createSvgLine } from '../../svg';
-import { applyDrawingLineStyle, AUX_RAY_ATTRS, getPreviewStrokeAttrs } from '../../styles';
+import { applyDrawingLineStyle, AUX_RAY_ATTRS, COLORS, getPreviewStrokeAttrs } from '../../styles';
 import { getRoundCurveLineType } from '../../../model/lineTypes';
 import { ToolPopup } from '../../../ui/tool-popup';
 import { VariationToolPanel } from '../../../ui/panels/tools';
@@ -449,7 +449,7 @@ export class CircleTool extends BaseTool {
 				screenA,
 				screenB,
 				{
-					stroke: '#38bdf8',
+					stroke: COLORS.selectedHover,
 					'stroke-width': 3,
 					'stroke-dasharray': '6 4',
 					opacity: 0.95,
@@ -589,8 +589,8 @@ export class CircleTool extends BaseTool {
 			screen,
 			4,
 			{
-				fill: '#38bdf8',
-				stroke: '#fff',
+				fill: COLORS.selectedHover,
+				stroke: COLORS.background,
 				'stroke-width': 1.5,
 				'pointer-events': 'none',
 			},

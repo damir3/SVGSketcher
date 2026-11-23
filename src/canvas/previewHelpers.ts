@@ -356,7 +356,7 @@ export function renderBreakPreviewVisual(parent: SVGElement, candidate: TrimCand
 
 export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendCandidate, viewport: Viewport): void {
 	const EXTEND_PREVIEW_ATTRS = {
-		stroke: '#0284c7',
+		stroke: COLORS.primary,
 		'stroke-width': 2,
 		'stroke-dasharray': '5 3',
 		fill: 'none',
@@ -410,8 +410,8 @@ export function renderExtendPreviewVisual(parent: SVGElement, candidate: ExtendC
 			sTo,
 			4,
 			{
-				fill: '#0284c7',
-				stroke: '#ffffff',
+				fill: COLORS.primary,
+				stroke: COLORS.background,
 				'stroke-width': 1.5,
 				'pointer-events': 'none',
 			},

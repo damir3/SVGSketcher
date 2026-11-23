@@ -9,6 +9,7 @@ import { Viewport } from '../src/canvas/viewport';
 
 register('./helpers/rawSvgLoader.mjs', import.meta.url);
 const { SVGRenderer, COLORS, renderAngleExtensionLines } = await import('../src/canvas/renderer');
+const { LIGHT_THEME } = await import('../src/theme/themes');
 
 class SvgElement {
 	attributes: Record<string, string> = {};
@@ -238,7 +239,9 @@ test('renderer exports only dimensions without selection styling or changing can
 		assert.ok(!exported.svg.includes('fx:'));
 		assert.equal(dimension.expression, '35 * 2');
 		assert.ok(exported.svg.includes('translate(-25 -50) scale(0.5)'));
-		assert.ok(!exported.svg.split('</defs>')[1].includes(COLORS.selected));
+		assert.ok(!exported.svg.includes('var(--'), 'theme variables are resolved to concrete colors');
+		assert.ok(exported.svg.includes(LIGHT_THEME.canvas.primary), 'export uses the default theme palette');
+		assert.ok(!exported.svg.split('</defs>')[1].includes(LIGHT_THEME.canvas.selected));
 		assert.ok(!exported.svg.includes('constraint-badge'));
 		assert.deepEqual(exported.bounds.min, new Vec2(17, -208));
 		assert.deepEqual(exported.bounds.max, new Vec2(283, -42));

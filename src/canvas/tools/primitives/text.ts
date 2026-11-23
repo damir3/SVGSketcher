@@ -476,7 +476,8 @@ export class TextTool extends BaseTool {
 					stroke: COLORS.primary,
 					'stroke-width': 1.5,
 					'stroke-dasharray': '4,4',
-					fill: 'rgba(2, 132, 199, 0.05)',
+					fill: COLORS.primary,
+					'fill-opacity': 0.05,
 				},
 				ctx.targetGroup
 			);

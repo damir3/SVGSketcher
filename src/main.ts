@@ -16,9 +16,12 @@ import { ICONS } from './ui/icons';
 import { setToolIconProvider } from './ui/panels/tools/iconProvider';
 import { preloadFonts, setOnFontLoaded } from './canvas/fonts';
 import { initializeGeometryKernel } from './kernel/browser';
+import { cycleTheme, getNextTheme, initTheme, onThemeChange } from './theme/themeController';
 
 setToolIconProvider(name => ICONS[name] ?? '');
 preloadFonts();
+// Apply the color theme before anything is rendered to avoid a flash of the default palette.
+initTheme();
 
 const PIXELS_PER_INCH = 96;
 const PIXELS_PER_MILLIMETER = PIXELS_PER_INCH / 25.4;
@@ -112,6 +115,7 @@ function initApp(): void {
 				<button class="btn-header primary" id="btn-export" title="Export as SVG" aria-haspopup="dialog">
 					${ICONS.export} Export SVG
 				</button>
+				<button class="btn-header btn-icon" id="btn-theme" type="button"></button>
 				<a class="btn-header btn-icon" href="https://github.com/damir3/SVGSketcher" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
 					${ICONS.github}
 				</a>
@@ -208,6 +212,7 @@ function initApp(): void {
 	const fileInputSvg = document.getElementById('file-input-svg') as HTMLInputElement;
 	const fileInputImage = document.getElementById('file-input-image') as HTMLInputElement;
 	const btnExport = document.getElementById('btn-export') as HTMLButtonElement;
+	const btnTheme = document.getElementById('btn-theme') as HTMLButtonElement;
 	const canvasContainer = document.querySelector('.cad-canvas-container') as HTMLElement;
 
 	const coordX = document.getElementById('coord-x') as HTMLElement;
@@ -395,6 +400,20 @@ function initApp(): void {
 
 	btnSnapHeader?.addEventListener('click', () => {
 		interaction.toggleSnapping();
+	});
+
+	// The button shows the theme it switches to.
+	function updateThemeButton(): void {
+		const next = getNextTheme();
+		const label = `Switch to ${next.label} Theme`;
+		btnTheme.innerHTML = ICONS[`theme_${next.id}` as keyof typeof ICONS] ?? ICONS.theme_light;
+		btnTheme.title = label;
+		btnTheme.setAttribute('aria-label', label);
+	}
+	onThemeChange(updateThemeButton);
+	updateThemeButton();
+	btnTheme.addEventListener('click', () => {
+		cycleTheme();
 	});
 
 	for (const [btn, setVisible] of [

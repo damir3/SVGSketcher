@@ -1,28 +1,11 @@
 :root {
-	--bg-app: #ffffff;
-	--bg-surface: #ffffff;
-	--bg-surface-elevated: #f8fafc;
-	--bg-surface-hover: #f1f5f9;
-	--border-color: #e2e8f0;
-	--border-active: #0284c7;
-
-	--text-primary: #0f172a;
-	--text-secondary: #475569;
-	--text-muted: #94a3b8;
-
-	--cad-cyan: #0284c7;
-	--cad-blue: #0284c7;
-	--cad-green: #16a34a;
-	--cad-amber: #d97706;
-	--cad-red: #dc2626;
-
+	/* Color tokens are defined per theme in src/theme/themes.ts and applied at runtime. */
 	--toolbar-width: 96px;
 	--sidebar-width: 320px;
 	--header-height: 48px;
 	--footer-height: 28px;
 
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-	color-scheme: light;
 }
 
 * {
@@ -69,12 +52,12 @@ body {
 .brand-icon {
 	width: 28px;
 	height: 28px;
-	background: linear-gradient(135deg, #0284c7, #38bdf8);
+	background: linear-gradient(135deg, var(--cad-blue), var(--cad-blue-light));
 	border-radius: 6px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+	box-shadow: 0 2px 6px color-mix(in srgb, var(--cad-blue) 25%, transparent);
 }
 
 .brand-title {
@@ -121,31 +104,31 @@ body {
 
 .btn-header:hover {
 	background-color: var(--bg-surface-hover);
-	border-color: #cbd5e1;
-	color: #0f172a;
+	border-color: var(--border-strong);
+	color: var(--text-primary);
 }
 
 .btn-header.primary {
-	background: linear-gradient(135deg, #0284c7, #0ea5e9);
-	border-color: #0284c7;
-	color: #fff;
+	background: linear-gradient(135deg, var(--cad-blue), var(--cad-blue-bright));
+	border-color: var(--cad-blue);
+	color: var(--text-on-accent);
 }
 
 .btn-header.active {
-	background-color: #e0f2fe;
-	border-color: #0284c7;
-	color: #0284c7;
-	box-shadow: 0 0 0 1px #0284c7;
+	background-color: var(--cad-blue-soft);
+	border-color: var(--cad-blue);
+	color: var(--cad-blue);
+	box-shadow: 0 0 0 1px var(--cad-blue);
 }
 
 .btn-header.active:hover {
-	background-color: #bae6fd;
-	border-color: #0284c7;
-	color: #0284c7;
+	background-color: var(--cad-blue-soft-hover);
+	border-color: var(--cad-blue);
+	color: var(--cad-blue);
 }
 
 .btn-header.primary:hover {
-	box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--cad-blue) 35%, transparent);
 }
 
 .btn-header:disabled {
@@ -318,10 +301,10 @@ body {
 }
 
 .tool-btn.active {
-	background-color: #e0f2fe;
-	color: var(--cad-cyan);
-	border-color: #7dd3fc;
-	box-shadow: 0 1px 4px rgba(2, 132, 199, 0.15);
+	background-color: var(--cad-blue-soft);
+	color: var(--cad-blue);
+	border-color: var(--cad-blue-border);
+	box-shadow: 0 1px 4px color-mix(in srgb, var(--cad-blue) 15%, transparent);
 }
 
 .tool-btn .btn-tooltip {
@@ -332,13 +315,13 @@ body {
 	position: fixed;
 	top: 0;
 	left: 0;
-	background-color: #0f172a;
-	color: #fff;
+	background-color: var(--tooltip-bg);
+	color: var(--tooltip-text);
 	font-size: 11px;
 	font-weight: 600;
 	padding: 5px 10px;
 	border-radius: 5px;
-	border: 1px solid #1e293b;
+	border: 1px solid var(--tooltip-border);
 	white-space: nowrap;
 	pointer-events: none;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
@@ -358,15 +341,15 @@ body {
 .cad-canvas-container {
 	flex: 1;
 	position: relative;
-	background-color: #ffffff;
+	background-color: var(--canvas-background);
 	overflow: hidden;
 	transition: background-color 0.15s ease;
 }
 
 .cad-canvas-container.drag-over {
-	outline: 3px dashed #0284c7;
+	outline: 3px dashed var(--cad-blue);
 	outline-offset: -6px;
-	background-color: #f0f9ff;
+	background-color: var(--cad-blue-subtle);
 }
 
 .cad-canvas-container.drag-over #cad-svg {
@@ -378,7 +361,7 @@ body {
 	width: 100%;
 	height: 100%;
 	display: block;
-	background-color: #ffffff;
+	background-color: var(--canvas-background);
 	cursor: default;
 }
 
@@ -427,30 +410,30 @@ body {
 /* --- Select Tool Hover Highlighting (Sky Blue) --- */
 #cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected).select-hover .visible-primitive,
 #cad-svg:not(.is-dragging) .sketch-entity:not(.is-selected).select-hover .visible-spline-handle {
-	stroke: #0ea5e9 !important;
+	stroke: var(--canvas-selected) !important;
 	stroke-width: 2px !important;
-	filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45)) !important;
+	filter: drop-shadow(0 0 3px color-mix(in srgb, var(--canvas-selected) 45%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-point:not(.is-selected).select-hover .visible-point {
-	stroke: #0ea5e9 !important;
+	stroke: var(--canvas-selected) !important;
 	stroke-width: 2px !important;
 	r: 5px !important;
-	filter: drop-shadow(0 0 5px rgba(14, 165, 233, 0.85)) !important;
+	filter: drop-shadow(0 0 5px color-mix(in srgb, var(--canvas-selected) 85%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-entity.is-selected.select-hover .visible-primitive,
 #cad-svg:not(.is-dragging) .sketch-entity.is-selected.select-hover .visible-spline-handle {
-	stroke: #38bdf8 !important;
+	stroke: var(--canvas-selected-hover) !important;
 	stroke-width: 3px !important;
-	filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.85)) !important;
+	filter: drop-shadow(0 0 5px color-mix(in srgb, var(--canvas-selected-hover) 85%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-point.is-selected.select-hover .visible-point {
-	stroke: #38bdf8 !important;
+	stroke: var(--canvas-selected-hover) !important;
 	stroke-width: 2px !important;
 	r: 5.5px !important;
-	filter: drop-shadow(0 0 5px rgba(56, 189, 248, 0.9)) !important;
+	filter: drop-shadow(0 0 5px color-mix(in srgb, var(--canvas-selected-hover) 90%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-line.is-selected.select-hover .visible-primitive {
@@ -467,8 +450,8 @@ body {
 
 #cad-svg:not(.is-dragging) .sketch-text-entity.select-hover text,
 #cad-svg:not(.is-dragging) .sketch-text-entity.select-hover path {
-	fill: #38bdf8 !important;
-	filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.7)) !important;
+	fill: var(--canvas-selected-hover) !important;
+	filter: drop-shadow(0 0 4px color-mix(in srgb, var(--canvas-selected-hover) 70%, transparent)) !important;
 }
 
 /* Axis & Origin Hover & Selection Highlighting */
@@ -478,37 +461,37 @@ body {
 }
 
 #cad-svg:not(.is-dragging) .sketch-axis-line.select-hover line:not(.hit-area) {
-	stroke: #0ea5e9 !important;
+	stroke: var(--canvas-selected) !important;
 	stroke-width: 2.5px !important;
-	filter: drop-shadow(0 0 3px rgba(14, 165, 233, 0.45)) !important;
+	filter: drop-shadow(0 0 3px color-mix(in srgb, var(--canvas-selected) 45%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-axis-line.selected line:not(.hit-area),
 #cad-svg:not(.is-dragging) .sketch-axis-line.is-selected line:not(.hit-area) {
-	stroke: #0284c7 !important;
+	stroke: var(--canvas-primary) !important;
 	stroke-width: 2.5px !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-origin-marker.select-hover path,
 #cad-svg:not(.is-dragging) .sketch-origin-marker.select-hover circle {
-	stroke: #0ea5e9 !important;
-	filter: drop-shadow(0 0 5px rgba(14, 165, 233, 0.85)) !important;
+	stroke: var(--canvas-selected) !important;
+	filter: drop-shadow(0 0 5px color-mix(in srgb, var(--canvas-selected) 85%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-origin-marker.select-hover path {
-	fill: #0ea5e9 !important;
+	fill: var(--canvas-selected) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-origin-marker.selected path,
 #cad-svg:not(.is-dragging) .sketch-origin-marker.is-selected path,
 #cad-svg:not(.is-dragging) .sketch-origin-marker.selected circle,
 #cad-svg:not(.is-dragging) .sketch-origin-marker.is-selected circle {
-	stroke: #0284c7 !important;
+	stroke: var(--canvas-primary) !important;
 }
 
 #cad-svg:not(.is-dragging) .sketch-origin-marker.selected path,
 #cad-svg:not(.is-dragging) .sketch-origin-marker.is-selected path {
-	fill: #0284c7 !important;
+	fill: var(--canvas-primary) !important;
 }
 
 #cad-svg.tool-delete .sketch-axis-line,
@@ -536,7 +519,7 @@ body {
 /* Hover highlighting on dimension annotations (Select mode) */
 #cad-svg:not(.is-dragging) .dimension-item.select-hover line,
 #cad-svg:not(.is-dragging) .dimension-item.select-hover path {
-	stroke: #0284c7 !important;
+	stroke: var(--canvas-primary) !important;
 	stroke-width: 2px !important;
 }
 
@@ -549,59 +532,59 @@ body {
 }
 
 #cad-svg:not(.is-dragging) .dimension-item.select-hover rect {
-	stroke: #0284c7 !important;
-	fill: #e0f2fe !important;
+	stroke: var(--canvas-primary) !important;
+	fill: var(--canvas-selected-bg) !important;
 	stroke-width: 1px !important;
-	filter: drop-shadow(0 0 2px rgba(2, 132, 199, 0.35)) !important;
+	filter: drop-shadow(0 0 2px color-mix(in srgb, var(--canvas-primary) 35%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .dimension-item.select-hover text {
-	fill: #0284c7 !important;
+	fill: var(--canvas-primary) !important;
 }
 
 #cad-svg:not(.is-dragging) .constraint-badge.select-hover rect {
-	stroke: #0284c7 !important;
-	fill: #e0f2fe !important;
+	stroke: var(--canvas-primary) !important;
+	fill: var(--canvas-selected-bg) !important;
 	stroke-width: 1px !important;
-	filter: drop-shadow(0 0 2px rgba(2, 132, 199, 0.35)) !important;
+	filter: drop-shadow(0 0 2px color-mix(in srgb, var(--canvas-primary) 35%, transparent)) !important;
 }
 
 #cad-svg:not(.is-dragging) .constraint-badge.select-hover text,
 #cad-svg:not(.is-dragging) .constraint-badge.select-hover path {
-	fill: #0284c7 !important;
-	stroke: #0284c7 !important;
+	fill: var(--canvas-primary) !important;
+	stroke: var(--canvas-primary) !important;
 }
 
 /* --- Delete Tool Hover Highlighting (Red) --- */
 #cad-svg.tool-delete .sketch-entity.delete-hover .visible-primitive {
-	stroke: rgba(255, 0, 0, 0.85) !important;
+	stroke: var(--canvas-delete) !important;
 	stroke-width: 2px !important;
-	filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.4)) !important;
+	filter: drop-shadow(0 0 3px color-mix(in srgb, var(--canvas-delete) 45%, transparent)) !important;
 }
 
 #cad-svg.tool-delete .sketch-point.delete-hover .visible-point {
-	stroke: rgba(255, 0, 0, 0.95) !important;
+	stroke: var(--canvas-delete) !important;
 	stroke-width: 2px !important;
 	r: 5px !important;
-	filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.85)) !important;
+	filter: drop-shadow(0 0 5px var(--canvas-delete)) !important;
 }
 
 #cad-svg.tool-delete .constraint-badge.delete-hover rect {
-	stroke: rgba(255, 0, 0, 0.85) !important;
-	fill: rgba(255, 220, 220, 0.95) !important;
+	stroke: var(--canvas-delete) !important;
+	fill: var(--canvas-delete-bg) !important;
 	stroke-width: 1px !important;
-	filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.4)) !important;
+	filter: drop-shadow(0 0 2px color-mix(in srgb, var(--canvas-delete) 45%, transparent)) !important;
 }
 
 #cad-svg.tool-delete .constraint-badge.delete-hover text,
 #cad-svg.tool-delete .constraint-badge.delete-hover path {
-	fill: rgba(255, 0, 0, 0.85) !important;
-	stroke: rgba(255, 0, 0, 0.85) !important;
+	fill: var(--canvas-delete) !important;
+	stroke: var(--canvas-delete) !important;
 }
 
 #cad-svg.tool-delete .dimension-item.delete-hover line,
 #cad-svg.tool-delete .dimension-item.delete-hover path {
-	stroke: rgba(255, 0, 0, 0.85) !important;
+	stroke: var(--canvas-delete) !important;
 	stroke-width: 2px !important;
 }
 
@@ -614,14 +597,14 @@ body {
 }
 
 #cad-svg.tool-delete .dimension-item.delete-hover rect {
-	stroke: rgba(255, 0, 0, 0.85) !important;
-	fill: rgba(255, 220, 220, 0.95) !important;
+	stroke: var(--canvas-delete) !important;
+	fill: var(--canvas-delete-bg) !important;
 	stroke-width: 1px !important;
-	filter: drop-shadow(0 0 2px rgba(255, 0, 0, 0.4)) !important;
+	filter: drop-shadow(0 0 2px color-mix(in srgb, var(--canvas-delete) 45%, transparent)) !important;
 }
 
 #cad-svg.tool-delete .dimension-item.delete-hover text {
-	fill: rgba(255, 0, 0, 0.85) !important;
+	fill: var(--canvas-delete) !important;
 }
 
 /* --- RIGHT SIDEBAR --- */
@@ -666,27 +649,27 @@ body {
 }
 
 .status-under {
-	background-color: #e0f2fe;
+	background-color: var(--cad-blue-soft);
 	color: var(--cad-blue);
-	border: 1px solid #bae6fd;
+	border: 1px solid var(--cad-blue-soft-hover);
 }
 .status-under .dof-indicator {
 	background-color: var(--cad-blue);
 }
 
 .status-fully {
-	background-color: #dcfce7;
+	background-color: var(--cad-green-soft);
 	color: var(--cad-green);
-	border: 1px solid #86efac;
+	border: 1px solid var(--cad-green-border);
 }
 .status-fully .dof-indicator {
 	background-color: var(--cad-green);
 }
 
 .status-conflict {
-	background-color: #fee2e2;
+	background-color: var(--cad-red-soft);
 	color: var(--cad-red);
-	border: 1px solid #fca5a5;
+	border: 1px solid var(--cad-red-border);
 }
 .status-conflict .dof-indicator {
 	background-color: var(--cad-red);
@@ -791,9 +774,9 @@ body {
 .inspector-expr-badge {
 	display: inline-flex;
 	align-items: center;
-	background-color: rgba(59, 130, 246, 0.1);
-	color: #2563eb;
-	border: 1px solid rgba(59, 130, 246, 0.25);
+	background-color: color-mix(in srgb, var(--cad-info) 10%, transparent);
+	color: var(--cad-info);
+	border: 1px solid color-mix(in srgb, var(--cad-info) 25%, transparent);
 	border-radius: 4px;
 	padding: 1px 5px;
 	font-size: 10.5px;
@@ -907,8 +890,8 @@ body {
 
 .btn-insp-clear-selection:hover {
 	color: var(--cad-red);
-	border-color: #fca5a5;
-	background-color: #fef2f2;
+	border-color: var(--cad-red-border);
+	background-color: var(--cad-red-subtle);
 }
 
 /* Tree groups */
@@ -990,8 +973,8 @@ body {
 }
 
 .tree-item.selected {
-	background-color: #e0f2fe;
-	border-color: #7dd3fc;
+	background-color: var(--cad-blue-soft);
+	border-color: var(--cad-blue-border);
 }
 
 .tree-item-info {
@@ -1023,7 +1006,7 @@ body {
 	font-size: 10px;
 	font-weight: 600;
 	font-family: monospace;
-	background-color: #e0f2fe;
+	background-color: var(--cad-blue-soft);
 	color: var(--cad-blue);
 	padding: 1px 5px;
 	border-radius: 3px;
@@ -1053,8 +1036,8 @@ body {
 	font-weight: 600;
 	font-family: monospace;
 	color: var(--text-primary);
-	background-color: #ffffff;
-	border: 1px solid #cbd5e1;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border-strong);
 	cursor: pointer;
 	transition: all 0.12s ease;
 	line-height: 1.3;
@@ -1063,7 +1046,7 @@ body {
 .constraint-entity-chip:hover {
 	background-color: var(--cad-blue);
 	border-color: var(--cad-blue);
-	color: #ffffff;
+	color: var(--text-on-accent);
 }
 
 .constraint-entity-chip .chip-icon {
@@ -1073,7 +1056,7 @@ body {
 }
 
 .constraint-entity-chip:hover .chip-icon {
-	color: #ffffff;
+	color: var(--text-on-accent);
 }
 
 .constraint-entity-chip .chip-icon svg {
@@ -1099,7 +1082,7 @@ body {
 }
 
 .tree-delete-btn:hover {
-	background-color: #fee2e2;
+	background-color: var(--cad-red-soft);
 	color: var(--cad-red);
 }
 
@@ -1136,8 +1119,8 @@ body {
 /* --- DIMENSION POPUP --- */
 .dimension-popup {
 	position: fixed;
-	background-color: #ffffff;
-	border: 1px solid #cbd5e1;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border-strong);
 	box-shadow:
 		0 4px 16px rgba(0, 0, 0, 0.12),
 		0 2px 4px rgba(0, 0, 0, 0.06);
@@ -1156,17 +1139,17 @@ body {
 
 .dim-mode-switch-compact {
 	display: flex;
-	background-color: var(--bg-surface-elevated, #f1f5f9);
+	background-color: var(--bg-surface-elevated);
 	padding: 2px;
 	border-radius: 6px;
-	border: 1px solid #e2e8f0;
+	border: 1px solid var(--border-color);
 	gap: 2px;
 }
 
 .btn-dim-mode-compact {
 	border: none;
 	background: transparent;
-	color: var(--text-secondary, #64748b);
+	color: var(--text-secondary);
 	font-size: 12px;
 	font-weight: 700;
 	font-family: monospace;
@@ -1183,21 +1166,21 @@ body {
 }
 
 .btn-dim-mode-compact:hover {
-	color: var(--text-primary, #0f172a);
-	background-color: rgba(0, 0, 0, 0.04);
+	color: var(--text-primary);
+	background-color: var(--hover-overlay);
 }
 
 .btn-dim-mode-compact.active {
-	background-color: #ffffff;
-	color: var(--cad-blue, #0284c7);
+	background-color: var(--bg-surface);
+	color: var(--cad-blue);
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .dim-input-wrapper {
 	display: flex;
 	align-items: center;
-	background-color: var(--bg-surface-elevated, #f8fafc);
-	border: 1px solid #cbd5e1;
+	background-color: var(--bg-surface-elevated);
+	border: 1px solid var(--border-strong);
 	border-radius: 6px;
 	padding: 2px 8px;
 	height: 28px;
@@ -1240,8 +1223,8 @@ body {
 /* --- UNIFIED TOOL POPUP --- */
 .tool-popup {
 	position: fixed;
-	background-color: #ffffff;
-	border: 1px solid #cbd5e1;
+	background-color: var(--bg-surface);
+	border: 1px solid var(--border-strong);
 	box-shadow:
 		0 4px 16px rgba(0, 0, 0, 0.12),
 		0 2px 4px rgba(0, 0, 0, 0.06);
@@ -1275,15 +1258,15 @@ body {
 .tool-popup-label {
 	font-size: 11px;
 	font-weight: 600;
-	color: var(--text-secondary, #64748b);
+	color: var(--text-secondary);
 	letter-spacing: 0.3px;
 }
 
 .tool-popup-input-wrapper {
 	display: flex;
 	align-items: center;
-	background-color: var(--bg-surface-elevated, #f8fafc);
-	border: 1px solid #cbd5e1;
+	background-color: var(--bg-surface-elevated);
+	border: 1px solid var(--border-strong);
 	border-radius: 6px;
 	padding: 2px 6px;
 	height: 26px;
@@ -1292,17 +1275,17 @@ body {
 }
 
 .tool-popup-input-wrapper:focus-within {
-	border-color: var(--cad-blue, #0284c7);
-	box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+	border-color: var(--cad-blue);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--cad-blue) 20%, transparent);
 }
 
 .tool-popup-input-wrapper.error {
-	border-color: #ef4444 !important;
-	box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+	border-color: var(--cad-red-bright) !important;
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--cad-red-bright) 20%, transparent) !important;
 }
 
 .tool-popup-input-wrapper.error input {
-	color: #ef4444;
+	color: var(--cad-red-bright);
 }
 
 .tool-popup-input-wrapper input {
@@ -1310,7 +1293,7 @@ body {
 	background: transparent;
 	border: none;
 	outline: none;
-	color: var(--text-primary, #0f172a);
+	color: var(--text-primary);
 	font-size: 13px;
 	font-weight: 600;
 	font-family: monospace;
@@ -1341,21 +1324,21 @@ body {
 	padding: 0 2px;
 	border: 0;
 	background: transparent;
-	color: var(--text-secondary, #64748b);
+	color: var(--text-secondary);
 	font-size: 7px;
 	line-height: 1;
 	cursor: pointer;
 }
 
 .tool-popup-stepper button:hover {
-	color: var(--cad-blue, #0284c7);
-	background: rgba(2, 132, 199, 0.12);
+	color: var(--cad-blue);
+	background: color-mix(in srgb, var(--cad-blue) 12%, transparent);
 }
 
 .tool-popup-unit {
 	font-size: 11px;
 	font-weight: 600;
-	color: var(--text-muted, #64748b);
+	color: var(--text-muted);
 	margin-left: 2px;
 	user-select: none;
 	flex-shrink: 0;
@@ -1367,7 +1350,7 @@ body {
 	gap: 6px;
 	font-size: 11px;
 	font-weight: 500;
-	color: var(--text-secondary, #475569);
+	color: var(--text-secondary);
 	cursor: pointer;
 	user-select: none;
 }
@@ -1383,7 +1366,7 @@ body {
 	background: transparent;
 	border-radius: 4px;
 	cursor: pointer;
-	color: #94a3b8;
+	color: var(--text-muted);
 	transition:
 		color 0.15s,
 		background-color 0.15s;
@@ -1391,13 +1374,13 @@ body {
 }
 
 .tool-popup-lock-btn:hover {
-	background-color: rgba(0, 0, 0, 0.05);
-	color: var(--text-primary, #0f172a);
+	background-color: var(--hover-overlay);
+	color: var(--text-primary);
 }
 
 .tool-popup-lock-btn.locked {
-	color: #0284c7;
-	background-color: rgba(2, 132, 199, 0.12);
+	color: var(--cad-blue);
+	background-color: color-mix(in srgb, var(--cad-blue) 12%, transparent);
 }
 
 .tool-popup-lock-btn svg {
@@ -1409,7 +1392,7 @@ body {
 .tool-popup-error {
 	font-size: 10px;
 	font-weight: 600;
-	color: #ef4444;
+	color: var(--cad-red-bright);
 	text-align: right;
 	margin-top: -1px;
 }
@@ -1428,7 +1411,7 @@ body {
 
 .gizmo-arrow:hover,
 .gizmo-circle:hover {
-	filter: drop-shadow(0 2px 8px rgba(2, 132, 199, 0.6)) brightness(1.15) !important;
+	filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--canvas-primary) 60%, transparent)) brightness(1.15) !important;
 	cursor: grab;
 }
 
@@ -1443,9 +1426,9 @@ body {
 	bottom: 40px;
 	left: 50%;
 	transform: translateX(-50%);
-	background-color: #0f172a;
-	color: #f8fafc;
-	border: 1px solid #334155;
+	background-color: var(--tooltip-bg);
+	color: var(--tooltip-text);
+	border: 1px solid var(--tooltip-border);
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 	font-size: 13px;
 	font-weight: 600;
@@ -1482,7 +1465,7 @@ body {
 }
 
 .circle-tangent-selected {
-	stroke: var(--cad-blue, #38bdf8) !important;
+	stroke: var(--canvas-selected-hover) !important;
 	stroke-width: 3px !important;
 }
 
@@ -1537,9 +1520,9 @@ body {
 }
 .tool-mode-button.active {
 	background: var(--cad-blue);
-	color: #fff;
+	color: var(--text-on-accent);
 	font-weight: 600;
-	box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
+	box-shadow: 0 1px 4px color-mix(in srgb, var(--cad-blue) 30%, transparent);
 }
 
 .tool-mode-icon {
@@ -1573,7 +1556,7 @@ body {
 	padding: 6px 8px;
 	border-left: 2px solid var(--cad-blue);
 	border-radius: 0 4px 4px 0;
-	background: rgba(56, 189, 248, 0.08);
+	background: color-mix(in srgb, var(--cad-blue-light) 8%, transparent);
 	color: var(--cad-blue);
 	font-size: 11px;
 	line-height: 1.4;
@@ -1647,7 +1630,7 @@ body {
 .mirror-step-item.active {
 	border-color: var(--cad-blue);
 	box-shadow: 0 0 0 1px var(--cad-blue);
-	background-color: #f0f9ff;
+	background-color: var(--cad-blue-subtle);
 }
 
 .mirror-step-btn {
@@ -1679,7 +1662,7 @@ body {
 
 .mirror-step-item.active .mirror-step-num {
 	background-color: var(--cad-blue);
-	color: #ffffff;
+	color: var(--text-on-accent);
 }
 
 .mirror-step-info {
@@ -1709,7 +1692,7 @@ body {
 }
 
 .mirror-step-value.selected-line {
-	color: #d97706;
+	color: var(--cad-amber);
 	font-weight: 600;
 }
 
@@ -1736,7 +1719,7 @@ body {
 .btn-mirror-ok {
 	flex: 1;
 	background-color: var(--cad-blue);
-	color: #ffffff;
+	color: var(--text-on-accent);
 	border: none;
 	border-radius: 6px;
 	padding: 7px 12px;
@@ -1747,7 +1730,7 @@ body {
 }
 
 .btn-mirror-ok:hover:not(:disabled) {
-	background-color: #0369a1;
+	background-color: var(--cad-blue-hover);
 }
 
 .btn-mirror-ok:disabled {
@@ -1835,7 +1818,7 @@ body {
 
 .seg-btn.active {
 	background-color: var(--cad-blue);
-	color: #ffffff;
+	color: var(--text-on-accent);
 	font-weight: 600;
 }
 
@@ -1945,21 +1928,21 @@ body {
 }
 
 .dim-input-wrapper.error {
-	border-color: #ef4444;
-	background-color: #fef2f2;
+	border-color: var(--cad-red-bright);
+	background-color: var(--cad-red-subtle);
 }
 
 .dim-eval-preview {
 	font-size: 11px;
 	font-family: monospace;
 	font-weight: 600;
-	color: #0284c7;
+	color: var(--cad-blue);
 	padding: 0 6px;
 	height: 26px;
 	display: inline-flex;
 	align-items: center;
-	background: #f0f9ff;
-	border: 1px solid #bae6fd;
+	background: var(--cad-blue-subtle);
+	border: 1px solid var(--cad-blue-soft-hover);
 	border-radius: 4px;
 	max-width: 220px;
 	white-space: nowrap;
@@ -1973,9 +1956,9 @@ body {
 }
 
 .dim-eval-preview.error {
-	color: #dc2626;
-	background: #fef2f2;
-	border-color: #fecaca;
+	color: var(--cad-red);
+	background: var(--cad-red-subtle);
+	border-color: var(--cad-red-border-soft);
 }
 
 /* --- SVG EXPORT DIALOG --- */
@@ -2110,14 +2093,14 @@ body {
 }
 
 .btn-header.danger {
-	background-color: #dc2626;
-	border-color: #dc2626;
+	background-color: var(--cad-red-solid);
+	border-color: var(--cad-red-solid);
 	color: #ffffff;
 }
 
 .btn-header.danger:hover {
-	background-color: #b91c1c;
-	border-color: #b91c1c;
+	background-color: var(--cad-red-solid-hover);
+	border-color: var(--cad-red-solid-hover);
 }
 
 /* --- PARAMETERS MODAL POPUP --- */
@@ -2136,7 +2119,7 @@ body {
 }
 
 .param-modal-dialog {
-	background-color: #ffffff;
+	background-color: var(--bg-surface);
 	border: 1px solid var(--border-color);
 	box-shadow:
 		0 10px 25px -5px rgba(0, 0, 0, 0.2),
@@ -2168,7 +2151,7 @@ body {
 	align-items: center;
 	justify-content: space-between;
 	border-bottom: 1px solid var(--border-color);
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	cursor: grab;
 	touch-action: none;
 	user-select: none;
@@ -2188,8 +2171,8 @@ body {
 	width: 32px;
 	height: 32px;
 	border-radius: 8px;
-	background: linear-gradient(135deg, #0284c7, #0ea5e9);
-	color: #ffffff;
+	background: linear-gradient(135deg, var(--cad-blue), var(--cad-blue-bright));
+	color: var(--text-on-accent);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -2223,7 +2206,7 @@ body {
 }
 
 .btn-modal-close:hover {
-	background-color: #e2e8f0;
+	background-color: var(--border-color);
 	color: var(--text-primary);
 }
 
@@ -2240,7 +2223,7 @@ body {
 	border: 1px solid var(--border-color);
 	border-radius: 8px;
 	overflow: hidden;
-	background: #ffffff;
+	background: var(--bg-surface);
 }
 
 .param-table {
@@ -2250,7 +2233,7 @@ body {
 }
 
 .param-table th {
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	padding: 8px 10px;
 	font-weight: 600;
 	font-size: 11px;
@@ -2263,7 +2246,7 @@ body {
 
 .param-table td {
 	padding: 6px 10px;
-	border-bottom: 1px solid #f1f5f9;
+	border-bottom: 1px solid var(--bg-surface-hover);
 	vertical-align: middle;
 }
 
@@ -2275,25 +2258,25 @@ body {
 	width: 100%;
 	box-sizing: border-box;
 	padding: 5px 8px;
-	border: 1px solid #cbd5e1;
+	border: 1px solid var(--border-strong);
 	border-radius: 5px;
 	font-size: 13px;
 	font-family: monospace;
-	background-color: #ffffff;
+	background-color: var(--bg-surface);
 	color: var(--text-primary);
 	outline: none;
 	transition: border-color 0.15s ease;
 }
 
 .param-cell-input:focus {
-	border-color: #0284c7;
-	box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
+	border-color: var(--cad-blue);
+	box-shadow: 0 0 0 2px color-mix(in srgb, var(--cad-blue) 15%, transparent);
 }
 
 .param-cell-input.error {
-	border-color: #ef4444 !important;
-	background-color: #fef2f2 !important;
-	color: #dc2626 !important;
+	border-color: var(--cad-red-bright) !important;
+	background-color: var(--cad-red-subtle) !important;
+	color: var(--cad-red) !important;
 }
 
 .param-cell-value {
@@ -2304,7 +2287,7 @@ body {
 }
 
 .param-val-error {
-	color: #dc2626;
+	color: var(--cad-red);
 	font-weight: 600;
 	font-size: 11px;
 }
@@ -2324,22 +2307,22 @@ body {
 }
 
 .btn-param-row-delete:hover {
-	background-color: #fee2e2;
-	color: #dc2626;
+	background-color: var(--cad-red-soft);
+	color: var(--cad-red);
 }
 
 .param-syntax-hint {
 	font-size: 11.5px;
 	color: var(--text-secondary);
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	padding: 8px 12px;
 	border-radius: 6px;
-	border: 1px solid #e2e8f0;
+	border: 1px solid var(--border-color);
 	line-height: 1.4;
 }
 
 .param-syntax-hint code {
-	background-color: #e2e8f0;
+	background-color: var(--border-color);
 	padding: 1px 4px;
 	border-radius: 3px;
 	font-family: monospace;
@@ -2349,7 +2332,7 @@ body {
 .param-modal-footer {
 	padding: 12px 18px;
 	border-top: 1px solid var(--border-color);
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -2361,7 +2344,7 @@ body {
 	font-weight: 500;
 	border-radius: 6px;
 	border: 1px solid var(--border-color);
-	background-color: #ffffff;
+	background-color: var(--bg-surface);
 	color: var(--text-primary);
 	cursor: pointer;
 	display: inline-flex;
@@ -2371,19 +2354,19 @@ body {
 }
 
 .btn-param-action:hover {
-	background-color: #f1f5f9;
-	border-color: #cbd5e1;
+	background-color: var(--bg-surface-hover);
+	border-color: var(--border-strong);
 }
 
 .btn-param-action.primary {
-	background: linear-gradient(135deg, #0284c7, #0ea5e9);
-	border-color: #0284c7;
-	color: #ffffff;
+	background: linear-gradient(135deg, var(--cad-blue), var(--cad-blue-bright));
+	border-color: var(--cad-blue);
+	color: var(--text-on-accent);
 }
 
 .btn-param-action.primary:hover {
-	box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
-	background: linear-gradient(135deg, #0369a1, #0284c7);
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--cad-blue) 35%, transparent);
+	background: linear-gradient(135deg, var(--cad-blue-hover), var(--cad-blue));
 }
 
 /* --- IMAGE TRACE MODAL --- */
@@ -2405,7 +2388,7 @@ body {
 	width: 390px;
 	max-width: calc(100vw - 24px);
 	max-height: calc(100vh - var(--header-height) - var(--footer-height) - 28px);
-	background-color: #ffffff;
+	background-color: var(--bg-surface);
 	border: 1px solid var(--border-color);
 	border-radius: 12px;
 	box-shadow:
@@ -2424,7 +2407,7 @@ body {
 	align-items: center;
 	justify-content: space-between;
 	border-bottom: 1px solid var(--border-color);
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	cursor: move;
 }
 
@@ -2447,7 +2430,7 @@ body {
 }
 
 .trace-section {
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	border: 1px solid var(--border-color);
 	border-radius: 8px;
 	padding: 9px 11px;
@@ -2538,9 +2521,9 @@ body {
 
 .trace-select {
 	padding: 4px 8px;
-	border: 1px solid #cbd5e1;
+	border: 1px solid var(--border-strong);
 	border-radius: 5px;
-	background-color: #ffffff;
+	background-color: var(--bg-surface);
 	color: var(--text-primary);
 	font-size: 11.5px;
 	max-width: 210px;
@@ -2561,12 +2544,12 @@ body {
 .trace-num-input {
 	width: 54px;
 	padding: 3px 6px;
-	border: 1px solid #cbd5e1;
+	border: 1px solid var(--border-strong);
 	border-radius: 5px;
 	font-size: 11.5px;
 	font-family: monospace;
 	text-align: right;
-	background-color: #ffffff;
+	background-color: var(--bg-surface);
 	color: var(--text-primary);
 }
 
@@ -2580,9 +2563,9 @@ body {
 	margin: 0 14px 8px;
 	padding: 7px 10px;
 	border-radius: 6px;
-	background-color: #fffbeb;
-	border: 1px solid #fde68a;
-	color: #92400e;
+	background-color: var(--cad-amber-soft);
+	border: 1px solid var(--cad-amber-border);
+	color: var(--cad-amber-text);
 	font-size: 11px;
 	line-height: 1.35;
 }
@@ -2594,7 +2577,7 @@ body {
 .trace-modal-footer {
 	padding: 10px 14px;
 	border-top: 1px solid var(--border-color);
-	background-color: var(--bg-surface-elevated, #f8fafc);
+	background-color: var(--bg-surface-elevated);
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
@@ -2623,9 +2606,9 @@ body {
 	dominant-baseline: central;
 	font-size: 11px;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-	fill: rgba(0, 0, 0, 0.6);
+	fill: var(--canvas-grid-label);
 	paint-order: stroke fill;
-	stroke: #ffffff;
+	stroke: var(--canvas-background);
 	stroke-width: 3px;
 	stroke-linejoin: round;
 }

@@ -289,7 +289,7 @@ export function renderTransformedObjects(
 			options.vertexRadius ?? 3,
 			options.vertexAttrs ?? {
 				fill: options.transformScale !== undefined || baseColor === COLORS.constrained ? baseColor : COLORS.primary,
-				stroke: COLORS.white,
+				stroke: COLORS.background,
 				'stroke-width': STROKE_WIDTH.normal,
 				opacity,
 				'pointer-events': 'none',

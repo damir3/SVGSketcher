@@ -100,7 +100,7 @@ export class ConstraintPanel implements ISidebarPanel {
 				const label = this.options.deleteButton.label ?? 'Delete Constraint';
 				deleteButtonHtml = `
 					<div style="margin-top: 10px;">
-						<button type="button" class="btn-sidebar-delete-constraint" data-delete-id="${c.id}" style="width: 100%; padding: 6px 10px; font-size: 12px; font-weight: 600; color: #dc2626; background: rgba(220, 38, 38, 0.08); border: 1px solid rgba(220, 38, 38, 0.2); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
+						<button type="button" class="btn-sidebar-delete-constraint" data-delete-id="${c.id}" style="width: 100%; padding: 6px 10px; font-size: 12px; font-weight: 600; color: var(--cad-red); background: var(--cad-red-subtle); border: 1px solid var(--cad-red-border-soft); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
 							${deleteIcon} ${label}
 						</button>
 					</div>

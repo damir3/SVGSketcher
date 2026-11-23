@@ -87,7 +87,7 @@ export function renderConstraintBadge(
 		new Vec2(width, 18),
 		{
 			rx: 3,
-			fill: isSelected ? COLORS.selectedBg : COLORS.white,
+			fill: isSelected ? COLORS.selectedBg : COLORS.background,
 			stroke: isSelected ? COLORS.primary : COLORS.badgeBorder,
 			'stroke-width': STROKE_WIDTH.thin,
 		},

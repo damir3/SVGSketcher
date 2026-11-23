@@ -3,6 +3,6 @@
   xmlns="http://www.w3.org/2000/svg"
   xmlns:svg="http://www.w3.org/2000/svg">
   <polygon points="12.04,2.12 2.61,8.91 6.16,19.97 17.78,20.02 21.41,8.98 " stroke="currentColor" stroke-width="2" stroke-linejoin="round" id="polygon1" transform="translate(0,0.92998837)" />
-  <circle cx="12" cy="12.929988" r="2" fill="#0284c7" stroke="#0f172a" stroke-width="0.5" id="circle1" />
-  <circle cx="19.59" cy="15.429988" r="2" fill="#0284c7" stroke="#0f172a" stroke-width="0.5" id="circle2" />
+  <circle cx="12" cy="12.929988" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5" id="circle1" />
+  <circle cx="19.59" cy="15.429988" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5" id="circle2" />
 </svg>

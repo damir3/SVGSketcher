@@ -51,6 +51,7 @@ import {
 	renderTransformPreview as renderTransformPreviewElements,
 } from './modifyPreviews';
 import { COLORS, DASH_ARRAY, REGION_STYLE, STROKE_WIDTH, SVG_EXPORT_STYLE } from './styles';
+import { resolveCanvasColorVariables } from '../theme/themes';
 
 export interface RenderOptions {
 	activeTextId?: string | null;
@@ -172,7 +173,7 @@ export class SVGRenderer {
 
 		createArrowMarker('dim-arrow', COLORS.primary);
 		createArrowMarker('dim-arrow-selected', COLORS.selected);
-		createArrowMarker('dim-arrow-delete', 'rgba(255, 0, 0, 0.9)');
+		createArrowMarker('dim-arrow-delete', COLORS.delete);
 	}
 
 	render(sketch: SketchDocument, viewport: Viewport, options: RenderOptions = {}): void {
@@ -539,7 +540,8 @@ export class SVGRenderer {
 			);
 			const transform = `translate(${-viewport.panX / viewport.zoom} ${-viewport.panY / viewport.zoom}) scale(${1 / viewport.zoom})`;
 			return {
-				svg: `${this.defsEl.outerHTML}<g transform="${transform}">${group.innerHTML}</g>`,
+				// Exported files must not depend on the UI theme: inline the default palette.
+				svg: resolveCanvasColorVariables(`${this.defsEl.outerHTML}<g transform="${transform}">${group.innerHTML}</g>`),
 				bounds,
 				viewportZoom: viewport.zoom,
 			};

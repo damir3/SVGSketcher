@@ -1,5 +1,6 @@
 import { LINE_DISTANCE_PX } from './distances';
 import { isDrawingLineType, type DrawingLineType, type LineType } from '../model/lineTypes';
+import { CANVAS_COLOR_TOKENS, canvasColorVariable, type CanvasColorToken } from '../theme/themes';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -7,64 +8,22 @@ export const SVG_NS = 'http://www.w3.org/2000/svg';
 // Styling Constants & Design Tokens
 // ==========================================
 
-export const COLORS = {
-	primary: '#0284c7', // Sky-600: main active CAD color (selection, dimensions, rays)
-	selected: '#0ea5e9', // Sky-500: selected constraint/dimension/accent
-	selectedBg: '#e0f2fe', // Sky-100: selected badge fill
-	unconstrained: '#1e293b', // Slate-800: normal unconstrained geometry
-	constrained: '#16a34a', // Green-600: fully constrained geometry & vertices
-	conflict: '#dc2626', // Red-600: overconstrained error
-	construction: '#64748b', // Slate-500: construction geometry & auxiliary rings
-	fixed: '#d97706', // Amber-600: fixed points / badges
-	badgeBorder: '#cbd5e1', // Slate-300: default badge border
-	badgeText: '#475569', // Slate-600: default badge text
-	tooltipBg: '#0f172a', // Slate-900: tooltip background
-	white: '#ffffff',
-	hitTransparent: 'rgba(0, 0, 0, 0.001)',
-	guideFaint: 'rgba(2, 132, 199, 0.25)',
-	guideStartEllipse: 'rgba(2, 132, 199, 0.3)',
-	extLineDim: 'rgba(2, 132, 199, 1)',
-	selectionBoxFill: 'rgba(14, 165, 233, 0.12)',
-	crossingSelectionBoxFill: 'rgba(22, 163, 74, 0.12)',
-	pointSnapFill: 'rgba(2, 132, 199, 0.2)',
-	objectSnapFill: 'rgba(16, 185, 129, 0.25)',
-	objectSnapStroke: '#0e9c6d',
-	gridSnapFill: 'rgba(99, 102, 241, 0.15)',
-	gridSnapStroke: '#7cbdfa',
-	xAxis: 'rgba(220, 38, 38, 0.65)',
-	yAxis: 'rgba(22, 163, 74, 0.65)',
-	originQuarter: 'rgba(100, 116, 139, 0.45)',
-	gridMinor: 'rgba(0, 0, 0, 0.08)',
-	gridMajor: 'rgba(0, 0, 0, 0.20)',
-	trim: 'rgba(255, 0, 0, 0.75)',
-
-	// Spline styles and colors
-	splineHandle: '#84cc16', // Amber-700: tangent handle & control polygon idle stroke
-	splineHandleDotStroke: '#22c55e', // Green-500: tangent handle endpoint outline
-	splineClosedFill: 'rgba(56, 189, 248, 0.12)', // Sky-400 12%: closed spline fill
-	splinePreview: '#84cc16', // Lime-500: spline drawing preview stroke
-	splineCheckmarkFill: '#22c55e', // Green-500: spline completion checkmark fill
-	splineCheckmarkStroke: '#16a34a', // Green-600: spline completion checkmark border
-
-	// Mirror & Patterns
-	mirrorLine: '#f59e0b', // Amber-500: mirror axis line
-	patternCenter: '#f59e0b', // Amber-500: circular pattern center marker
-	patternAxis1: '#2563eb', // Blue-600: rectangular pattern direction 1 axis
-	patternAxis2: '#059669', // Emerald-600: rectangular pattern direction 2 axis
-	checkboxActiveFill: '#2563eb', // Blue-600: active suppression checkbox fill
-	checkboxActiveStroke: '#1d4ed8', // Blue-700: active suppression checkbox stroke
-	checkboxSuppressedFill: '#f8fafc', // Slate-50: suppressed checkbox fill
-	checkboxSuppressedStroke: '#94a3b8', // Slate-400: suppressed checkbox border
-	checkboxSuppressedDash: '#ef4444', // Red-500: suppressed checkbox minus dash
-	labelSlate: '#f8fafc', // Slate-50: label text on dark pills
-
-	// Fillet
-	filletWedgeFill: 'rgba(2, 132, 199, 0.16)', // Sky-600 16%: corner wedge fill
-} as const;
+/**
+ * Theme-aware canvas colors. Each value is a `var(--canvas-…)` reference that
+ * resolves against the active theme (see `src/theme/themes.ts`), so switching
+ * themes recolors the canvas without re-rendering it.
+ */
+export const COLORS: Readonly<Record<CanvasColorToken, string>> & { readonly hitTransparent: string } = {
+	...(Object.fromEntries(CANVAS_COLOR_TOKENS.map(token => [token, `var(${canvasColorVariable(token)})`])) as Record<
+		CanvasColorToken,
+		string
+	>),
+	hitTransparent: 'rgba(0, 0, 0, 0.001)', // invisible but hit-testable fill/stroke
+};
 
 export const REGION_STYLE = {
-	fill: '#888',
-	hoverFill: '#bae6fd',
+	fill: COLORS.regionFill,
+	hoverFill: COLORS.regionHoverFill,
 	fillOpacity: 0.1,
 	hoverFillOpacity: 0.5,
 	stroke: COLORS.primary,
@@ -293,7 +252,7 @@ export const MIRROR_PREVIEW_LINE_ATTRS: SvgAttrs = {
 
 export const MIRROR_PREVIEW_VERTEX_ATTRS: SvgAttrs = {
 	fill: COLORS.primary,
-	stroke: COLORS.white,
+	stroke: COLORS.background,
 	'stroke-width': STROKE_WIDTH.dimension,
 	opacity: 0.85,
 	'pointer-events': 'none',
@@ -318,14 +277,14 @@ export const PATTERN_CENTER_CROSSHAIR_ATTRS: SvgAttrs = {
 
 export const PATTERN_CENTER_DOT_ATTRS: SvgAttrs = {
 	fill: COLORS.patternCenter,
-	stroke: COLORS.white,
+	stroke: COLORS.background,
 	'stroke-width': STROKE_WIDTH.dimension,
 	'pointer-events': 'none',
 };
 
 export const CHECKBOX_HALO_ATTRS: SvgAttrs = {
 	rx: 5,
-	fill: COLORS.white,
+	fill: COLORS.background,
 	stroke: COLORS.badgeBorder,
 	'stroke-width': STROKE_WIDTH.thin,
 	filter: FILTERS.checkboxHalo,
@@ -339,7 +298,7 @@ export const CHECKBOX_ACTIVE_ATTRS: SvgAttrs = {
 };
 
 export const CHECKBOX_CHECKMARK_ATTRS: SvgAttrs = {
-	stroke: COLORS.white,
+	stroke: COLORS.onAccent,
 	'stroke-width': STROKE_WIDTH.normal,
 	'stroke-linecap': 'round',
 	'stroke-linejoin': 'round',
@@ -378,7 +337,7 @@ export const RECT_PATTERN_PILL_TEXT_ATTRS: SvgAttrs = {
 
 // Shared Gizmo Styles
 export const GIZMO_POINT_ATTRS: SvgAttrs = {
-	fill: COLORS.white,
+	fill: COLORS.background,
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.normal,
 	'pointer-events': 'none',
@@ -394,7 +353,7 @@ export const GIZMO_GUIDE_ATTRS: SvgAttrs = {
 
 export const GIZMO_ARROW_ATTRS: SvgAttrs = {
 	fill: COLORS.primary,
-	stroke: COLORS.white,
+	stroke: COLORS.background,
 	'stroke-width': STROKE_WIDTH.dimension,
 	'stroke-linejoin': 'round',
 	class: 'gizmo-arrow',
@@ -404,7 +363,7 @@ export const GIZMO_ARROW_ATTRS: SvgAttrs = {
 export const GIZMO_CIRCLE_RADIUS = 5.5;
 
 export const GIZMO_CIRCLE_ATTRS: SvgAttrs = {
-	fill: COLORS.white,
+	fill: COLORS.background,
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.thick,
 	'pointer-events': 'all',
@@ -444,7 +403,7 @@ export const FILLET_ARC_ATTRS: SvgAttrs = {
 };
 
 export const FILLET_GIZMO_SQUARE_ATTRS: SvgAttrs = {
-	fill: COLORS.white,
+	fill: COLORS.background,
 	stroke: COLORS.primary,
 	'stroke-width': STROKE_WIDTH.dimension,
 	'pointer-events': 'none',
@@ -570,7 +529,7 @@ export const SPLINE_CHECKMARK_CIRCLE_ATTRS: SvgAttrs = {
 };
 
 export const SPLINE_CHECKMARK_PATH_ATTRS: SvgAttrs = {
-	stroke: COLORS.white,
+	stroke: COLORS.onAccent,
 	'stroke-width': 2,
 	'stroke-linecap': 'round',
 	'stroke-linejoin': 'round',
@@ -580,13 +539,13 @@ export const SPLINE_CHECKMARK_PATH_ATTRS: SvgAttrs = {
 // Preview Points
 export const PREVIEW_POINT_ATTRS: SvgAttrs = {
 	fill: COLORS.primary,
-	stroke: COLORS.white,
+	stroke: COLORS.background,
 	'stroke-width': STROKE_WIDTH.thin,
 };
 
 export const POLYGON_RADIUS_HANDLE_ATTRS: SvgAttrs = {
 	fill: COLORS.constrained,
-	stroke: COLORS.white,
+	stroke: COLORS.background,
 	'stroke-width': STROKE_WIDTH.thin,
 };
 

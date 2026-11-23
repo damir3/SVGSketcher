@@ -288,7 +288,7 @@ export function renderLinearDimensionVisual(opts: LinearDimensionVisualOptions):
 			4,
 			{
 				fill: COLORS.primary,
-				stroke: COLORS.white,
+				stroke: COLORS.background,
 				'stroke-width': 1.5,
 			},
 			g

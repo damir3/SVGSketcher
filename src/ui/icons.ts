@@ -95,9 +95,13 @@ import exportIcon from '../assets/icons/export.svg?raw';
 import openIcon from '../assets/icons/open.svg?raw';
 import parameters from '../assets/icons/parameters.svg?raw';
 import github from '../assets/icons/github.svg?raw';
+import themeLight from '../assets/icons/theme-light.svg?raw';
+import themeDark from '../assets/icons/theme-dark.svg?raw';
 
 export const ICONS = {
 	github,
+	theme_light: themeLight,
+	theme_dark: themeDark,
 	select,
 	pan,
 	point,

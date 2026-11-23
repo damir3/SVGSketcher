@@ -88,7 +88,7 @@ export class SketchPoint extends Vec2 implements ISketchPrimitive {
 			ctx.isSelected ? 4 : splineInfo?.isHandleDot ? SPLINE_STYLES.handleDot.r : 3,
 			{
 				class: 'entity-visible visible-point',
-				fill: COLORS.white,
+				fill: COLORS.background,
 				stroke: strokeColor,
 				'stroke-width': STROKE_WIDTH.thin,
 				'pointer-events': 'all',
