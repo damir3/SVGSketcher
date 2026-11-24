@@ -22,6 +22,7 @@ export class LineTool extends BaseTool {
 	});
 
 	private startPointId: string | null = null;
+	private startOnReference = false;
 	private lastPointer: LinePointer | null = null;
 
 	override activate(ctx: ToolContext): void {
@@ -52,7 +53,7 @@ export class LineTool extends BaseTool {
 			startId = sketch.addPoint(snap?.worldPos ?? world).id;
 			this.ctx.applySnapConstraintIfNeeded?.(startId, snap);
 		}
-		this.startSegment(startId, e.client);
+		this.startSegment(startId, e.client, snap?.reference);
 	}
 
 	override onMouseMove(e: ToolMouseEvent): void {
@@ -120,8 +121,9 @@ export class LineTool extends BaseTool {
 		return { end: start.clone().addScaledVector(direction, length), length, angle };
 	}
 
-	private startSegment(pointId: string, client: Vec2): void {
+	private startSegment(pointId: string, client: Vec2, onReference = false): void {
 		this.startPointId = pointId;
+		this.startOnReference = onReference;
 		this.lastPointer = { world: this.getStartPoint()!, snap: null, client };
 		this.popup.resetField('length', 0);
 		this.popup.resetField('angle', 0);
@@ -150,7 +152,8 @@ export class LineTool extends BaseTool {
 		const hitAxis = snap?.type === 'line' && (snap.id === 'axis_x' || snap.id === 'axis_y');
 		const hitPrimitive =
 			snap?.type === 'point'
-				? !!snap.id && snap.id !== 'origin' && snap.id !== startId && isPointAttachedToCurve(sketch, snap.id)
+				? !!snap.reference ||
+					(!!snap.id && snap.id !== 'origin' && snap.id !== startId && isPointAttachedToCurve(sketch, snap.id))
 				: !!snap && !hitAxis && snap.type !== 'grid';
 		let endId: string;
 		if (snap?.type === 'point' && snap.id && snap.id !== startId && sketch.points.has(snap.id)) {
@@ -162,7 +165,11 @@ export class LineTool extends BaseTool {
 
 		const line = sketch.addLine(startId, endId, this.ctx.lineType);
 		if (angle === undefined) {
-			this.ctx.applyAutoOrientationConstraint?.(startId, endId);
+			// A near-horizontal or near-vertical constraint would move a point off its reference.
+			const alreadyAligned = Math.abs(end.x - start.x) < 1e-9 || Math.abs(end.y - start.y) < 1e-9;
+			if (alreadyAligned || (!this.startOnReference && !snap?.reference)) {
+				this.ctx.applyAutoOrientationConstraint?.(startId, endId);
+			}
 		} else {
 			this.constrainAngle(line.id, angle);
 		}

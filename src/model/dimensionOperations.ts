@@ -738,7 +738,7 @@ export function addRadiusConstraint(
 	displayMode?: 'radius' | 'diameter',
 	placement?: Pick<RadiusConstraint, 'leaderAngle' | 'leaderOffset'>
 ): RadiusConstraint | null {
-	const isCircle = sketch.circles.has(circleOrArcId);
+	const isCircle = !!sketch.circles.get(circleOrArcId);
 	const entity = getRadial(sketch, circleOrArcId);
 	if (!entity) return null;
 
@@ -761,6 +761,7 @@ export function addRadiusConstraint(
 	const r = targetRadius ?? roundDimensionDefault(entity.radius, MIN_SOLVER_RADIUS);
 	const c = new RadiusConstraint(sketch.nextId('c_rad'), circleOrArcId, r, 1.0, placement?.leaderAngle, defaultMode);
 	c.leaderOffset = placement?.leaderOffset;
+	if (sketch.isFixedReference(circleOrArcId)) c.isReference = true;
 	return sketch.withStableCircleCenters(() => addConstraint(sketch, c)) ? c : null;
 }
 

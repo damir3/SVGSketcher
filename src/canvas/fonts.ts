@@ -102,7 +102,7 @@ export async function loadFontAsync(family = 'Arial', bold = false, italic = fal
 
 	if (!isNode && typeof window !== 'undefined' && typeof fetch === 'function') {
 		try {
-			const res = await fetch(`/fonts/${filename}`);
+			const res = await fetch(new URL(`${import.meta.env.BASE_URL}fonts/${filename}`, document.baseURI));
 			if (res.ok) {
 				const buffer = await res.arrayBuffer();
 				const font = parseFontBuffer(buffer);

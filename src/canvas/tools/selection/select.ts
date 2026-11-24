@@ -406,7 +406,7 @@ export class SelectTool extends BaseTool {
 				id = nearPoint.id;
 				type = 'point';
 			} else if (!type) {
-				if (snap && snap.type === 'point' && snap.id) {
+				if (snap && !snap.reference && snap.type === 'point' && snap.id) {
 					id = snap.id;
 					type = 'point';
 				} else {
@@ -640,7 +640,7 @@ export class SelectTool extends BaseTool {
 						host.sketch.solve();
 						host.sketch.commitTransaction();
 						solvedInTransaction = true;
-					} else if (snap && snap.type === 'grid') {
+					} else if (snap?.type === 'grid') {
 						const pt = host.sketch.getPoint(draggedPtId);
 						if (pt && !host.sketch.isPointFixed(draggedPtId)) {
 							pt.copy(snap.worldPos);

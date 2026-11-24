@@ -93,7 +93,7 @@ export class ConstraintTool extends BaseTool {
 			| 'spline'
 			| undefined;
 
-		if (type && !this.isEntityCompatibleWithConstraint(type)) {
+		if (type && (this.ctx.sketch.isFixedReference(id ?? '') || !this.isEntityCompatibleWithConstraint(type))) {
 			id = undefined;
 			type = undefined;
 		}
@@ -116,6 +116,7 @@ export class ConstraintTool extends BaseTool {
 				['spline', () => this.ctx.findSplineNear?.(screen)],
 			];
 			for (const [candidateType, find] of hitFinders) {
+				if (!this.isEntityCompatibleWithConstraint(candidateType)) continue;
 				const hit = find();
 				if (hit) {
 					id = hit.id;
@@ -441,6 +442,18 @@ export class ConstraintTool extends BaseTool {
 		const cCount = sel.circleIds.size + sel.arcIds.size;
 		const eCount = sel.ellipseIds.size + sel.ellipticalArcIds.size;
 		const sCount = sel.splineIds.size;
+		if (type !== 'dimension' && type !== 'distance') {
+			const ids = [
+				...sel.pointIds,
+				...sel.lineIds,
+				...sel.circleIds,
+				...sel.arcIds,
+				...sel.ellipseIds,
+				...sel.ellipticalArcIds,
+				...sel.splineIds,
+			];
+			if (ids.some(id => sketch.isFixedReference(id)) && ids.every(id => !sketch.hasOwnPrimitive(id))) return false;
+		}
 
 		switch (type) {
 			case 'fixed':

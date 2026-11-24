@@ -557,7 +557,7 @@ export class ArcTool extends BaseTool {
 			let ptId: string | null = null;
 			let ptPos: Vec2 | null = null;
 
-			if (snap && snap.type === 'point' && snap.id) {
+			if (snap && !snap.reference && snap.type === 'point' && snap.id) {
 				ptId = snap.id;
 				ptPos = snap.worldPos;
 			} else {

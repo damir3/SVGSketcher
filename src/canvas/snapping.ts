@@ -1,6 +1,8 @@
-import { snapPrimitives } from './geometryQueries';
+import { screenQueryCurve, snapPrimitives } from './geometryQueries';
+import type { GeoCurve } from '../math/intersection';
+import { getQueryKernel } from '../math/queries';
 import type { SketchDocument } from '../model/sketch';
-import type { SketchLine } from '../model/types';
+import type { SketchLine, SketchPoint } from '../model/types';
 import type { Viewport } from './viewport';
 import { ORIGIN, Vec2 } from '../math/vector';
 import { SNAP_GEOMETRY_DISTANCE_PX, SNAP_GRID_DISTANCE_PX, SNAP_POINT_DISTANCE_PX } from './distances';
@@ -64,6 +66,76 @@ function cleanGridCoordinate(val: number, step: number): number {
 	return parseFloat(val.toFixed(decimals));
 }
 
+function snapLineToCoordinate(
+	line: SketchLine,
+	sketch: SketchDocument,
+	viewport: Viewport,
+	world: Vec2,
+	nearestGrid: Vec2
+): Pick<SnapResult, 'worldPos' | 'screenPos'> | null {
+	const segment = line.toGeoCurve(sketch);
+	if (!segment) return null;
+	const { p1, p2 } = segment;
+	const coordinates = [
+		['x', nearestGrid.x],
+		['y', nearestGrid.y],
+		['x', 0],
+		['y', 0],
+	] as const;
+	let best: Pick<SnapResult, 'worldPos' | 'screenPos'> | null = null;
+	let bestDistance = SNAP_GEOMETRY_DISTANCE_PX;
+	for (const [axis, coordinate] of coordinates) {
+		const delta = p2[axis] - p1[axis];
+		const tolerance = coordinate === 0 ? SNAP_GEOMETRY_DISTANCE_PX : SNAP_GRID_DISTANCE_PX;
+		if (delta === 0 || Math.abs(world[axis] - coordinate) * viewport.zoom > tolerance) continue;
+		const t = (coordinate - p1[axis]) / delta;
+		if (t < 0 || t > 1) continue;
+		const worldPos = p1.clone().lerp(p2, t);
+		worldPos[axis] = coordinate;
+		const distance = world.distanceTo(worldPos) * viewport.zoom;
+		if (distance < bestDistance) {
+			bestDistance = distance;
+			best = { worldPos, screenPos: viewport.worldToScreen(worldPos) };
+		}
+	}
+	return best;
+}
+
+export interface SnapReferences {
+	readonly vertices: readonly SketchPoint[];
+	readonly curves: readonly GeoCurve[];
+}
+
+function snapReferenceCurves(
+	curves: readonly GeoCurve[],
+	viewport: Viewport,
+	screenPos: Vec2,
+	threshold: number
+): SnapResult | null {
+	if (!curves.length) return null;
+	const hit = getQueryKernel().closest(
+		curves.map(curve => screenQueryCurve(curve, viewport)),
+		screenPos,
+		threshold,
+		true,
+		SNAP_GEOMETRY_DISTANCE_PX
+	);
+	if (!hit?.point) return null;
+
+	const curve = curves[hit.index];
+	const screen = Vec2.from(hit.point);
+	const world = curve.type === 'segment' ? curve.p1.clone().lerp(curve.p2, hit.param!) : viewport.screenToWorld(screen);
+	const type =
+		curve.type === 'segment'
+			? 'line'
+			: curve.type === 'arc'
+				? 'circle'
+				: curve.type === 'elliptical_arc'
+					? 'ellipse'
+					: curve.type;
+	return { type, id: curve.id, reference: true, worldPos: world, screenPos: screen };
+}
+
 export function findSnapTarget(
 	sketch: SketchDocument,
 	viewport: Viewport,
@@ -74,9 +146,17 @@ export function findSnapTarget(
 		isSnappingEnabled: boolean;
 		excludePointId?: string;
 		allowGrid?: boolean;
+		references?: SnapReferences;
 	}
 ): SnapResult | null {
-	const { activeTool, isSnapModifierPressed, isSnappingEnabled, excludePointId, allowGrid = true } = options;
+	const {
+		activeTool,
+		isSnapModifierPressed,
+		isSnappingEnabled,
+		excludePointId,
+		allowGrid = true,
+		references,
+	} = options;
 	// Suppress all snapping if snap modifier is held (metaKey on Mac, ctrlKey on Windows)
 	if (isSnapModifierPressed) {
 		return null;
@@ -85,7 +165,7 @@ export function findSnapTarget(
 	// Priority 1: Point snapping (Always active, highest priority)
 	const pointSnapDistPx = SNAP_POINT_DISTANCE_PX;
 	let closestPointDist = pointSnapDistPx;
-	let foundPoint: { id: string; worldPos: Vec2; screenPos: Vec2 } | null = null;
+	let foundPoint: SnapResult | null = null;
 
 	// A dragged spline point can move its own handles, so they cannot be snap targets.
 	const excludedSplineIds = new Set<string>();
@@ -145,7 +225,16 @@ export function findSnapTarget(
 		const d = screenPos.distanceTo(s);
 		if (d < closestPointDist) {
 			closestPointDist = d;
-			foundPoint = { id: pt.id, worldPos: pt.clone(), screenPos: s };
+			foundPoint = { type: 'point', id: pt.id, worldPos: pt.clone(), screenPos: s };
+		}
+	}
+
+	for (const vertex of references?.vertices ?? []) {
+		const screen = viewport.worldToScreen(vertex);
+		const distance = screenPos.distanceTo(screen);
+		if (distance < closestPointDist) {
+			closestPointDist = distance;
+			foundPoint = { type: 'point', id: vertex.id, reference: true, worldPos: vertex.clone(), screenPos: screen };
 		}
 	}
 
@@ -154,18 +243,11 @@ export function findSnapTarget(
 		const dOrigin = screenPos.distanceTo(sOrigin);
 		if (dOrigin < closestPointDist) {
 			closestPointDist = dOrigin;
-			foundPoint = { id: 'origin', worldPos: new Vec2(0, 0), screenPos: sOrigin };
+			foundPoint = { type: 'point', id: 'origin', worldPos: new Vec2(0, 0), screenPos: sOrigin };
 		}
 	}
 
-	if (foundPoint) {
-		return {
-			type: 'point',
-			id: foundPoint.id,
-			worldPos: foundPoint.worldPos,
-			screenPos: foundPoint.screenPos,
-		};
-	}
+	if (foundPoint) return foundPoint;
 
 	// Priority 2: Line, Circle/Arc, Ellipse & Spline snapping
 	const geomSnapDistPx = SNAP_GEOMETRY_DISTANCE_PX;
@@ -186,24 +268,20 @@ export function findSnapTarget(
 		candidates.push(prim);
 	}
 	const foundGeom = snapPrimitives(candidates, sketch, viewport, screenPos, geomSnapDistPx);
-
-	if (foundGeom) {
-		return {
+	const referenceSnap =
+		references && snapReferenceCurves(references.curves, viewport, screenPos, foundGeom?.dist ?? geomSnapDistPx);
+	const geometrySnap: SnapResult | null =
+		referenceSnap ||
+		(foundGeom && {
 			type: foundGeom.type,
 			id: foundGeom.id,
 			worldPos: foundGeom.worldPos,
 			screenPos: foundGeom.screenPos,
-		};
-	}
+		});
 
-	// Priority 3: Coordinate axes & grid snapping
-	if (!isSnappingEnabled || !allowGrid) {
-		return null;
+	if (!isSnappingEnabled || !allowGrid || (geometrySnap && geometrySnap.type !== 'line')) {
+		return geometrySnap;
 	}
-
-	const sOrigin = viewport.worldToScreen(ORIGIN);
-	const dAxisX = Math.abs(screenPos.y - sOrigin.y);
-	const dAxisY = Math.abs(screenPos.x - sOrigin.x);
 
 	const world = viewport.screenToWorld(screenPos);
 	const { step, subStep } = viewport.getGridStep();
@@ -213,6 +291,16 @@ export function findSnapTarget(
 		cleanGridCoordinate(Math.round(world.x / gridStep) * gridStep, gridStep),
 		cleanGridCoordinate(Math.round(world.y / gridStep) * gridStep, gridStep)
 	);
+	if (geometrySnap) {
+		const line = geometrySnap.id ? sketch.lines.get(geometrySnap.id) : undefined;
+		const coordinateSnap = line && snapLineToCoordinate(line, sketch, viewport, world, nearestWorld);
+		return coordinateSnap ? { ...geometrySnap, ...coordinateSnap } : geometrySnap;
+	}
+
+	// Priority 3: Coordinate axes & grid snapping without nearby geometry
+	const sOrigin = viewport.worldToScreen(ORIGIN);
+	const dAxisX = Math.abs(screenPos.y - sOrigin.y);
+	const dAxisY = Math.abs(screenPos.x - sOrigin.x);
 	const nearestScreen = viewport.worldToScreen(nearestWorld);
 
 	const axis = dAxisX < geomSnapDistPx && dAxisX <= dAxisY ? 'x' : dAxisY < geomSnapDistPx ? 'y' : null;

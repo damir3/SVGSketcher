@@ -212,7 +212,21 @@ const BUILT_IN_LINES = new Map<string, SketchLine>([
 	['axis_y', Object.freeze(new SketchLine({ id: 'axis_y', p1Id: 'origin', p2Id: 'axis_y', lineType: 'construction' }))],
 ]);
 
-export class PointMap extends Map<string, SketchPoint> {
+export const FIXED_REFERENCE_PREFIX = 'projection:';
+
+export function isFixedReferenceId(id: unknown): id is string {
+	return typeof id === 'string' && id.startsWith(FIXED_REFERENCE_PREFIX);
+}
+
+class ReferenceMap<T extends ISketchPrimitive> extends Map<string, T> {
+	readonly references = new Map<string, T>();
+
+	override get(id: string): T | undefined {
+		return super.get(id) ?? this.references.get(id);
+	}
+}
+
+export class PointMap extends ReferenceMap<SketchPoint> {
 	override get(key: string): SketchPoint | undefined {
 		return super.get(key) ?? BUILT_IN_POINTS.get(key);
 	}
@@ -223,13 +237,13 @@ export interface SketchDocumentOptions {
 }
 
 export class SketchDocument {
-	points: Map<string, SketchPoint> = new PointMap();
-	lines = new Map<string, SketchLine>();
-	circles = new Map<string, SketchCircle>();
-	arcs = new Map<string, SketchArc>();
+	points = new PointMap();
+	lines = new ReferenceMap<SketchLine>();
+	circles = new ReferenceMap<SketchCircle>();
+	arcs = new ReferenceMap<SketchArc>();
 	ellipses = new Map<string, SketchEllipse>();
 	ellipticalArcs = new Map<string, SketchEllipticalArc>();
-	splines = new Map<string, SketchSpline>();
+	splines = new ReferenceMap<SketchSpline>();
 	texts = new Map<string, SketchText>();
 	images = new Map<string, SketchImage>();
 	constraints = new Map<string, IConstraint>();
@@ -548,6 +562,26 @@ export class SketchDocument {
 		afterRegister?.();
 		this.solve();
 		return primitive;
+	}
+
+	/** Fixed references resolve by ID, but are excluded from edits, snapshots and geometry iteration. */
+	setFixedReferences(references: readonly ISketchPrimitive[]): void {
+		for (const { map } of this.primitiveCollections) {
+			if (map instanceof ReferenceMap) map.references.clear();
+		}
+		for (const primitive of references) {
+			const map = this.primitiveCollectionMap.get(primitive.type)?.map;
+			if (map instanceof ReferenceMap) map.references.set(primitive.id, primitive);
+		}
+		this.rebuildParamManager();
+	}
+
+	isFixedReference(id: string): boolean {
+		return isFixedReferenceId(id) && !!this.getPrimitive(id) && !this.hasOwnPrimitive(id);
+	}
+
+	hasMissingFixedReference(constraint: IConstraint): boolean {
+		return constraint.entityIds.some(id => isFixedReferenceId(id) && !this.getPrimitive(id));
 	}
 
 	// --- Point methods ---

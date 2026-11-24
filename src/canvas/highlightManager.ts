@@ -127,6 +127,7 @@ export class HighlightManager implements IHighlightManager {
 			this.currentTarget.id === 'origin' ||
 			this.currentTarget.id === 'axis_x' ||
 			this.currentTarget.id === 'axis_y' ||
+			ctx.sketch.isFixedReference(this.currentTarget.id) ||
 			ctx.sketch.points.has(this.currentTarget.id) ||
 			ctx.sketch.lines.has(this.currentTarget.id) ||
 			ctx.sketch.circles.has(this.currentTarget.id) ||

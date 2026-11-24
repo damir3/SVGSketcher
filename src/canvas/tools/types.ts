@@ -85,6 +85,8 @@ export type ToolType =
 export interface SnapResult {
 	type: 'point' | 'line' | 'circle' | 'spline' | 'ellipse' | 'grid';
 	id?: string;
+	/** Coordinate from fixed geometry outside the editable document. */
+	reference?: true;
 	worldPos: Vec2;
 	screenPos: Vec2;
 }

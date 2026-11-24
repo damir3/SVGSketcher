@@ -16,7 +16,13 @@ import { SketchArc, SketchCircle, SketchLine, type ISketchPrimitive } from '../m
 import { isRoundCurveLineType, type AuxiliaryLineType, type EditableLineType } from '../model/lineTypes';
 import { showToast } from '../ui/toast';
 import { HighlightManager } from './highlightManager';
-import { applyAutoOrientation, applySnapConstraint, computeAxisSnappedWorldPos, findSnapTarget } from './snapping';
+import {
+	applyAutoOrientation,
+	applySnapConstraint,
+	computeAxisSnappedWorldPos,
+	findSnapTarget,
+	type SnapReferences,
+} from './snapping';
 import {
 	findArcNear,
 	findCircleNear,
@@ -150,6 +156,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 	private isSnapModifierPressed = false;
 	lastMouseScreen: Vec2 = ORIGIN;
 	private regionHoverPoint: Vec2 | null = null;
+	snapReferences?: SnapReferences;
 
 	private isSnapModifier(e: MouseEvent | KeyboardEvent): boolean {
 		return this.isMac ? e.metaKey : e.ctrlKey;
@@ -229,6 +236,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 	createToolContext(): ToolContext {
 		if (this.toolContext) return this.toolContext;
 		const self = this;
+		const useReferences = () => isConstraintTool(this.activeTool) && this.activeTool !== 'fixed';
 		this.toolContext = {
 			get sketch() {
 				return self.sketch;
@@ -260,15 +268,26 @@ export class CanvasInteraction implements SelectInteractionHost {
 			},
 			findSnap: (screen: Vec2, excludePointId?: string, allowGrid = true) =>
 				this.findSnap(screen, excludePointId, allowGrid),
-			findPointNear: (screen, thresholdPx) => findPointNear(this.sketch, this.viewport, screen, thresholdPx),
+			findPointNear: (screen, thresholdPx) =>
+				findPointNear(
+					this.sketch,
+					this.viewport,
+					screen,
+					thresholdPx,
+					undefined,
+					useReferences() ? this.snapReferences?.vertices : undefined
+				),
 			findLineNear: (screen, thresholdPx, includeAxes) =>
-				findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx, includeAxes),
-			findCircleNear: (screen, thresholdPx) => findCircleNear(this.sketch, this.viewport, screen, thresholdPx),
-			findArcNear: (screen, thresholdPx) => findArcNear(this.sketch, this.viewport, screen, thresholdPx),
+				findLineNear(this.sketch, this.viewport, screen, this.activeTool, thresholdPx, includeAxes, useReferences()),
+			findCircleNear: (screen, thresholdPx) =>
+				findCircleNear(this.sketch, this.viewport, screen, thresholdPx, useReferences()),
+			findArcNear: (screen, thresholdPx) =>
+				findArcNear(this.sketch, this.viewport, screen, thresholdPx, useReferences()),
 			findEllipseNear: (screen, thresholdPx) => findEllipseNear(this.sketch, this.viewport, screen, thresholdPx),
 			findEllipticalArcNear: (screen, thresholdPx) =>
 				findEllipticalArcNear(this.sketch, this.viewport, screen, thresholdPx),
-			findSplineNear: (screen, thresholdPx) => findSplineNear(this.sketch, this.viewport, screen, thresholdPx),
+			findSplineNear: (screen, thresholdPx) =>
+				findSplineNear(this.sketch, this.viewport, screen, thresholdPx, useReferences()),
 			findConstraintNear: (screen, thresholdPx) => findConstraintNear(this.sketch, this.viewport, screen, thresholdPx),
 			toGeoCurve: (type, id) => this.sketch.toGeoCurve(id, type),
 			findTrimTarget: (screen, thresholdPx) => findTrimTargetNear(this.sketch, this.viewport, screen, thresholdPx),
@@ -394,6 +413,11 @@ export class CanvasInteraction implements SelectInteractionHost {
 			}
 			this.cancelDrawing();
 			if (dimensionSelection) Object.assign(this.sketch.selection, dimensionSelection);
+			if (!isConstraintTool(tool) || tool === 'fixed') {
+				for (const set of Object.values(this.sketch.selection)) {
+					for (const id of set) if (this.sketch.isFixedReference(id)) set.delete(id);
+				}
+			}
 
 			const nextTool = this.tools.get(tool) ?? null;
 			this.activeToolInstance = nextTool;
@@ -701,6 +725,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 			isSnappingEnabled: this.isSnappingEnabled,
 			excludePointId,
 			allowGrid,
+			references: this.snapReferences,
 		});
 	}
 

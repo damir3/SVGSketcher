@@ -43,7 +43,7 @@ export function setPointCoords(sketch: SketchDocument, pointId: string, targetX:
 
 function setPointCoordsImpl(sketch: SketchDocument, pointId: string, targetX: number, targetY: number): boolean {
 	const pt = sketch.points.get(pointId);
-	if (!pt || !isFinite(targetX) || !isFinite(targetY)) return false;
+	if (!pt || sketch.isFixedReference(pointId) || !isFinite(targetX) || !isFinite(targetY)) return false;
 
 	const target = new Vec2(targetX, targetY);
 	const delta = new Vec2().subVectors(target, pt);

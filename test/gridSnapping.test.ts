@@ -1,7 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { SketchDocument } from '../src/model/sketch';
+import { FIXED_REFERENCE_PREFIX, SketchDocument } from '../src/model/sketch';
+import { SketchLine, SketchPoint } from '../src/model/types';
 import { CanvasInteraction } from '../src/canvas/interaction';
+import { applySnapConstraint, findSnapTarget } from '../src/canvas/snapping';
 import { Viewport } from '../src/canvas/viewport';
 import { Vec2 } from '../src/math/vector';
 import { computeNaturalFitHandles } from '../src/math/spline';
@@ -355,7 +357,7 @@ describe('Grid Snapping & Drag Precision', () => {
 		}
 	});
 
-	it('geometry has strictly higher priority than coordinate axes and grid', () => {
+	it('keeps the sketch line as the snap target while snapping a coordinate to the grid', () => {
 		const cleanupDoc = setupMockDocument();
 		try {
 			const sketch = new SketchDocument();
@@ -382,14 +384,94 @@ describe('Grid Snapping & Drag Precision', () => {
 			const p2 = sketch.addPoint({ x: 50, y: 1 });
 			const line = sketch.addLine(p1.id, p2.id);
 
-			// Screen position of world (20, 1)
-			const sLine = viewport.worldToScreen({ x: 20, y: 1 });
+			const sLine = viewport.worldToScreen({ x: 20.5, y: 1 });
 			const snap = interaction.findSnap(sLine);
 			assert.ok(snap, 'Snap should be found');
 			assert.equal(snap.type, 'line');
 			assert.equal(snap.id, line.id, 'Should snap to sketch line, not to axis_x or grid');
+			assert.deepEqual(snap.worldPos, new Vec2(20, 1));
 		} finally {
 			cleanupDoc();
 		}
+	});
+
+	it('snaps X and Y independently along a diagonal line', () => {
+		const sketch = new SketchDocument();
+		const viewport = new Viewport(800, 600);
+		viewport.zoom = 4;
+		const start = sketch.addPoint(new Vec2(-10, 2));
+		const end = sketch.addPoint(new Vec2(50, 32));
+		const line = sketch.addLine(start.id, end.id);
+		const options = { activeTool: 'line', isSnappingEnabled: true, isSnapModifierPressed: false } as const;
+
+		for (const [cursor, expected] of [
+			[new Vec2(20.5, 17.5), new Vec2(20, 17)], // X only
+			[new Vec2(26.5, 20.5), new Vec2(26, 20)], // Y only
+			[new Vec2(25.25, 20.5), new Vec2(26, 20)], // Both eligible, Y is closer along the line
+			[new Vec2(1.5, 8), new Vec2(0, 7)], // Y-axis crossing beyond grid tolerance
+		]) {
+			const screen = viewport.worldToScreen(cursor);
+			const snap = findSnapTarget(sketch, viewport, screen, options);
+			assert.deepEqual(snap, {
+				type: 'line',
+				id: line.id,
+				worldPos: expected,
+				screenPos: viewport.worldToScreen(expected),
+			});
+			const lineOnly = findSnapTarget(sketch, viewport, screen, { ...options, allowGrid: false });
+			assert.equal(lineOnly?.id, line.id);
+			assert.notDeepEqual(lineOnly?.worldPos, expected);
+		}
+
+		const screen = viewport.worldToScreen(new Vec2(20.5, 19.5));
+		const lineOnly = findSnapTarget(sketch, viewport, screen, { ...options, allowGrid: false });
+		assert.equal(lineOnly?.id, line.id);
+		assert.deepEqual(findSnapTarget(sketch, viewport, screen, options), lineOnly);
+	});
+
+	it('combines fixed reference lines with grid snapping and restores their constraints', () => {
+		const sketch = new SketchDocument();
+		const viewport = new Viewport(800, 600);
+		viewport.zoom = 4;
+		const startId = `${FIXED_REFERENCE_PREFIX}start`;
+		const endId = `${FIXED_REFERENCE_PREFIX}end`;
+		const line = new SketchLine({
+			id: `${FIXED_REFERENCE_PREFIX}line`,
+			p1Id: startId,
+			p2Id: endId,
+			lineType: 'construction',
+		});
+		const referencesAt = (y: number) => [
+			new SketchPoint({ id: startId, x: 10, y, fixed: true }),
+			new SketchPoint({ id: endId, x: 50, y, fixed: true }),
+			line,
+		];
+		sketch.setFixedReferences(referencesAt(1));
+
+		const snap = findSnapTarget(sketch, viewport, viewport.worldToScreen(new Vec2(20.5, 1)), {
+			activeTool: 'point',
+			isSnappingEnabled: true,
+			isSnapModifierPressed: false,
+			references: { vertices: [], curves: [line.toGeoCurve(sketch)!] },
+		});
+		assert.equal(snap?.id, line.id);
+		assert.equal(snap.reference, true);
+		assert.deepEqual(snap.worldPos, new Vec2(20, 1));
+		const point = sketch.addPoint(snap.worldPos);
+		applySnapConstraint(sketch, point.id, snap);
+		const snapshot = sketch.takeSnapshot();
+		assert.equal(snapshot.points.length, 1);
+		assert.equal(snapshot.lines.length, 0);
+		assert.equal(snapshot.constraints[0]?.type, 'point_on_line');
+
+		const restored = new SketchDocument();
+		restored.restoreSnapshot(snapshot);
+		const constraint = [...restored.constraints.values()][0];
+		assert.ok(restored.hasMissingFixedReference(constraint));
+		restored.setFixedReferences(referencesAt(8));
+		restored.solve();
+		assert.ok(!restored.hasMissingFixedReference(constraint));
+		assert.equal(restored.points.get(startId)?.y, 8);
+		assert.ok(Math.abs(restored.points.get(point.id)!.y - 8) < 1e-6);
 	});
 });

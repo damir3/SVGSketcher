@@ -65,7 +65,9 @@ export class SolveCoordinator {
 	}
 
 	refreshReferenceDimensions(): void {
-		const references = [...this.sketch.constraints.values()].filter(c => c.isReference);
+		const references = [...this.sketch.constraints.values()].filter(
+			c => c.isReference && !this.sketch.hasMissingFixedReference(c)
+		);
 		if (!references.length) return;
 		const values = this.paramManager.getCurrentValues();
 		updateReferenceValues(references, values, this.sketch);
@@ -80,7 +82,12 @@ export class SolveCoordinator {
 			!constraint.isReference &&
 			!this.sketch.constraints.has(constraint.id) &&
 			this.solveDeferred === 0 &&
-			isDependentDimension(this.paramManager, this.sketch.constraints.values(), constraint, this.sketch);
+			isDependentDimension(
+				this.paramManager,
+				[...this.sketch.constraints.values()].filter(c => !this.sketch.hasMissingFixedReference(c)),
+				constraint,
+				this.sketch
+			);
 		if (referenceDetected) constraint.isReference = true;
 		if (constraint.isReference) {
 			this.sketch.pushHistory();
@@ -167,6 +174,17 @@ export class SolveCoordinator {
 		const pm = this._paramManager;
 		pm.clear();
 
+		const registerConstant = (id: string, value: number) =>
+			pm.register({ id, get: () => value, set: () => {}, isFixed: true });
+
+		for (const pt of this.sketch.points.references.values()) {
+			registerConstant(`${pt.id}.x`, pt.x);
+			registerConstant(`${pt.id}.y`, pt.y);
+		}
+		for (const entity of [...this.sketch.circles.references.values(), ...this.sketch.arcs.references.values()]) {
+			registerConstant(`${entity.id}.r`, entity.radius);
+		}
+
 		for (const pt of this.sketch.points.values()) {
 			pm.register({
 				id: `${pt.id}.x`,
@@ -208,7 +226,7 @@ export class SolveCoordinator {
 		locked = new Set<string>()
 	): Set<string> {
 		for (const c of constraints) {
-			if (!(c instanceof RadiusConstraint) || c.isReference) continue;
+			if (!(c instanceof RadiusConstraint) || c.isReference || this.sketch.isFixedReference(c.circleId)) continue;
 			const entity = getRadial(this.sketch, c.circleId);
 			if (!entity) continue;
 			entity.radius = Math.max(MIN_SOLVER_RADIUS, c.targetRadius);
@@ -360,7 +378,9 @@ export class SolveCoordinator {
 			if (!pending.size) return;
 			// Solvers can skip residual evaluation when every parameter is fixed.
 			const values = this.paramManager.getCurrentValues();
-			const hardConstraints = [...this.sketch.constraints.values()].filter(c => !c.isSoft && !c.isReference);
+			const hardConstraints = [...this.sketch.constraints.values()].filter(
+				c => !c.isSoft && !c.isReference && !this.sketch.hasMissingFixedReference(c)
+			);
 			const { error: hardError, satisfied: geometryValid } = checkConstraints(hardConstraints, values);
 			if (res.status !== 'OVER_CONSTRAINED' && Number.isFinite(res.finalError) && hardError <= 1e-2 && geometryValid)
 				return;

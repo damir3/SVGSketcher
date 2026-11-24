@@ -1,4 +1,4 @@
-import type { SketchDocument } from './sketch';
+import { isFixedReferenceId, type SketchDocument } from './sketch';
 import { matchesEndpoints } from './constraintLinks';
 import type { IConstraint } from '../solver/types';
 import {
@@ -32,7 +32,7 @@ export function getRadial(sketch: SketchDocument, id: string): SketchCircle | Sk
 }
 
 export function isBuiltInLineId(sketch: SketchDocument, id?: string): boolean {
-	return Boolean(id && !sketch.lines.has(id) && sketch.getLine(id));
+	return Boolean(id && !sketch.lines.get(id) && sketch.getLine(id));
 }
 
 export function findConstraint<T extends IConstraint>(
@@ -141,7 +141,7 @@ function getTangentSide(sketch: SketchDocument, line: SketchLine, centerId: stri
 }
 
 function hasConstraintEntity(sketch: SketchDocument, id: string): boolean {
-	return !!sketch.points.get(id) || !!sketch.getLine(id) || sketch.hasOwnPrimitive(id);
+	return !!sketch.points.get(id) || !!sketch.getLine(id) || !!sketch.getPrimitive(id);
 }
 
 export function addConstraint(sketch: SketchDocument, constraint: IConstraint): boolean {
@@ -305,7 +305,7 @@ export function removeConstraint(
 	sketch.pushHistory();
 	if (c instanceof FixedConstraint) {
 		const pt = sketch.points.get(c.pointId);
-		if (pt) pt.fixed = false;
+		if (pt && !sketch.isFixedReference(c.pointId)) pt.fixed = false;
 		sketch.rebuildParamManager();
 	}
 	sketch.constraints.delete(id);
@@ -314,7 +314,7 @@ export function removeConstraint(
 }
 
 export function addFixedConstraint(sketch: SketchDocument, pointId: string): FixedConstraint | null {
-	const pt = sketch.points.get(pointId);
+	const pt = sketch.points.has(pointId) ? sketch.points.get(pointId) : undefined;
 	if (!pt) return null;
 	const existing = findConstraint(sketch, FixedConstraint, c => c.pointId === pointId);
 	if (existing) {
@@ -331,6 +331,7 @@ export function addFixedConstraint(sketch: SketchDocument, pointId: string): Fix
 }
 
 export function removeFixedConstraint(sketch: SketchDocument, pointId: string): boolean {
+	if (sketch.isFixedReference(pointId)) return false;
 	const pt = sketch.points.get(pointId);
 	const hasFix = !!findConstraint(sketch, FixedConstraint, c => c.pointId === pointId);
 	if (!hasFix && (!pt || !pt.fixed)) {
@@ -399,7 +400,8 @@ export function addCoincidentConstraint(
 	p1Id: string,
 	p2Id: string
 ): CoincidentConstraint | null {
-	if (p1Id === p2Id || !sketch.points.has(p1Id) || !sketch.points.has(p2Id)) return null;
+	if (p1Id === p2Id || [p1Id, p2Id].some(id => !sketch.points.has(id) && !sketch.isFixedReference(id))) return null;
+	if (sketch.isFixedReference(p1Id) && sketch.isFixedReference(p2Id)) return null;
 	// Do not constrain endpoints of the same line segment (would collapse length to 0)
 	if (sketch.getLineBetween(p1Id, p2Id)) return null;
 	// Offset circle/arc pairs already share a center via OffsetConstraint.
@@ -418,7 +420,8 @@ export function addCoincidentConstraints(sketch: SketchDocument, pointIds: Itera
 	const hasOrigin = ids.delete('origin');
 	const [anchor, ...others] = ids;
 	if (!anchor || (!hasOrigin && others.length === 0)) return false;
-	if ([...ids].some(id => !sketch.points.has(id))) return false;
+	if ([...ids].some(id => !sketch.points.has(id) && !sketch.isFixedReference(id))) return false;
+	if (![...ids].some(id => sketch.points.has(id))) return false;
 
 	// Coincidence is transitive, so any selected segment endpoints would collapse the segment.
 	if ([...sketch.lines.values()].some(line => ids.has(line.p1Id) && ids.has(line.p2Id))) return false;
@@ -434,7 +437,7 @@ export function addCoincidentConstraints(sketch: SketchDocument, pointIds: Itera
 }
 
 export function addOriginCoincidentConstraint(sketch: SketchDocument, pointId: string): CoincidentConstraint | null {
-	if (!sketch.points.get(pointId) || pointId === 'origin') return null;
+	if (!sketch.points.get(pointId) || sketch.isFixedReference(pointId) || pointId === 'origin') return null;
 	return addUniqueConstraint(
 		sketch,
 		CoincidentConstraint,
@@ -1013,7 +1016,7 @@ export function cleanOrphanConstraints(sketch: SketchDocument): void {
 			}
 			continue;
 		}
-		if (constraint.entityIds.some(entId => !hasConstraintEntity(sketch, entId))) {
+		if (constraint.entityIds.some(entId => !hasConstraintEntity(sketch, entId) && !isFixedReferenceId(entId))) {
 			dropConstraint(cid);
 			continue;
 		}

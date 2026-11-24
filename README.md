@@ -37,6 +37,13 @@ The editor runs on a Rust/WebAssembly geometry and solver kernel (`npm run build
 
 Reproducible large scenes and WASM performance measurements are available in the [performance benchmark guide](./benchmarks/README.md).
 
+## Embedding
+
+A custom browser entry point can call `startSketcher` from `src/app.ts` once
+the page has mounted its `#app` element. The optional `onReady` callback
+receives the sketch, canvas and viewport, along with methods to set the sketch
+name and supply fixed reference geometry for snapping and region display.
+
 ## License
 
 This project is licensed under the [Apache License 2.0](./LICENSE).

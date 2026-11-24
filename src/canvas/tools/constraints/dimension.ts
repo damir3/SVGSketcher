@@ -430,11 +430,10 @@ export class DimensionTool extends BaseTool {
 				const line = this.ctx.findLineNear?.(screen, undefined, true);
 				if (line && this.beginCenterLinePlacement(draft.circleId, line.id, e)) return true;
 			}
-			if (draft instanceof RadiusConstraint && !returnToSelect && sketch.circles.size + sketch.arcs.size > 1) {
-				const hit = [
-					sketch.circles.size ? this.ctx.findCircleNear(screen) : null,
-					sketch.arcs.size ? this.ctx.findArcNear(screen) : null,
-				].find(entity => entity && sketch.canAddCircleDistanceConstraint(draft.circleId, entity.id));
+			if (draft instanceof RadiusConstraint && !returnToSelect) {
+				const hit = [this.ctx.findCircleNear?.(screen), this.ctx.findArcNear?.(screen)].find(
+					entity => entity && sketch.canAddCircleDistanceConstraint(draft.circleId, entity.id)
+				);
 				if (hit) {
 					this.beginCircleDistancePlacement(draft.circleId, hit.id);
 					return true;
@@ -474,6 +473,11 @@ export class DimensionTool extends BaseTool {
 		const targetG = target.closest('[data-id]') as SVGElement | null;
 		let id = targetG?.getAttribute('data-id');
 		let type = targetG?.getAttribute('data-type') as 'point' | 'line' | 'circle' | 'arc' | 'constraint' | undefined;
+
+		if (id && this.ctx.sketch.isFixedReference(id)) {
+			id = undefined;
+			type = undefined;
+		}
 
 		// Priority 1: When selecting points in step 0, step 1, or step 2 (2 points selected), points ALWAYS have top priority!
 		const excludeIds = new Set<string>();
@@ -767,9 +771,7 @@ export class DimensionTool extends BaseTool {
 				const hitPt = this.ctx.findPointNear(screen);
 				if (hitPt && this.renderPointToLinePreview(hitPt.id, l1.id, screen)) return;
 
-				const radial =
-					(ctx.sketch.circles.size ? this.ctx.findCircleNear(screen) : null) ??
-					(ctx.sketch.arcs.size ? this.ctx.findArcNear(screen) : null);
+				const radial = this.ctx.findCircleNear?.(screen) ?? this.ctx.findArcNear?.(screen);
 				if (radial && this.renderCenterLinePreview(radial.id, l1.id, screen)) return;
 				const hitLine = this.ctx.findLineNear(screen, undefined, true);
 				if (hitLine && this.renderLineToLinePreview(l1.id, hitLine.id, screen)) return;

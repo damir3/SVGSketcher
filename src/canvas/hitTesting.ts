@@ -44,12 +44,13 @@ export function findPointNear(
 	viewport: Viewport,
 	screen: Vec2,
 	thresholdPx = POINT_DISTANCE_PX,
-	excludePointId?: string
+	excludePointId?: string,
+	referenceVertices: readonly SketchPoint[] = []
 ): SketchPoint | null {
 	let closestDist = thresholdPx;
 	let foundPoint: SketchPoint | null = null;
 
-	for (const pt of sketch.points.values()) {
+	for (const pt of [...sketch.points.values(), ...referenceVertices]) {
 		if (excludePointId && pt.id === excludePointId) continue;
 		const d = pt.distanceTo(screen, sketch, viewport, closestDist);
 		if (d !== null && d < closestDist) {
@@ -94,12 +95,16 @@ export function findLineNear(
 	screen: Vec2,
 	activeTool: ToolType,
 	thresholdPx = LINE_DISTANCE_PX,
-	includeAxes = false
+	includeAxes = false,
+	includeReferences = false
 ): SketchLine | null {
 	const foundLine = findClosest(
 		sketch,
 		viewport,
-		[...sketch.lines.values()].filter(line => isSplineHandleLineVisible(sketch, line, activeTool)),
+		[
+			...[...sketch.lines.values()].filter(line => isSplineHandleLineVisible(sketch, line, activeTool)),
+			...(includeReferences ? sketch.lines.references.values() : []),
+		],
 		screen,
 		thresholdPx
 	);
@@ -115,18 +120,26 @@ export function findCircleNear(
 	sketch: SketchDocument,
 	viewport: Viewport,
 	screen: Vec2,
-	thresholdPx = LINE_DISTANCE_PX
+	thresholdPx = LINE_DISTANCE_PX,
+	includeReferences = false
 ): SketchCircle | null {
-	return findClosest(sketch, viewport, sketch.circles.values(), screen, thresholdPx);
+	const primitives = includeReferences
+		? [...sketch.circles.values(), ...sketch.circles.references.values()]
+		: sketch.circles.values();
+	return findClosest(sketch, viewport, primitives, screen, thresholdPx);
 }
 
 export function findArcNear(
 	sketch: SketchDocument,
 	viewport: Viewport,
 	screen: Vec2,
-	thresholdPx = LINE_DISTANCE_PX
+	thresholdPx = LINE_DISTANCE_PX,
+	includeReferences = false
 ): SketchArc | null {
-	return findClosest(sketch, viewport, sketch.arcs.values(), screen, thresholdPx);
+	const primitives = includeReferences
+		? [...sketch.arcs.values(), ...sketch.arcs.references.values()]
+		: sketch.arcs.values();
+	return findClosest(sketch, viewport, primitives, screen, thresholdPx);
 }
 
 export function findConstraintNear(
@@ -160,9 +173,13 @@ export function findSplineNear(
 	sketch: SketchDocument,
 	viewport: Viewport,
 	screen: Vec2,
-	thresholdPx = LINE_DISTANCE_PX
+	thresholdPx = LINE_DISTANCE_PX,
+	includeReferences = false
 ): SketchSpline | null {
-	return findClosest(sketch, viewport, sketch.splines.values(), screen, thresholdPx);
+	const primitives = includeReferences
+		? [...sketch.splines.values(), ...sketch.splines.references.values()]
+		: sketch.splines.values();
+	return findClosest(sketch, viewport, primitives, screen, thresholdPx);
 }
 
 export function findTextNear(

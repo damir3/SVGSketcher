@@ -5,7 +5,7 @@ import type { TransformValues } from '../model/transform';
 import type { SketchDocument } from '../model/sketch';
 import { isPointIdConstrained, type ISketchPrimitive } from '../model/primitives';
 import type { Viewport } from './viewport';
-import { getAllGeoCurves } from '../math/intersection';
+import { getAllGeoCurves, type GeoCurve } from '../math/intersection';
 import { findCurveRegions, regionsContainingPoint, type SketchRegion } from '../math/regions';
 import { collectFilletPreviewTrims } from '../math/filletPreview';
 import type { ConstraintRenderContext } from '../solver/constraints';
@@ -82,6 +82,7 @@ export class SVGRenderer {
 	private regionHoverGroup: SVGGElement;
 	private constraintBadgesVisible = true;
 	private dimensionsVisible = true;
+	externalRegionCurves: readonly GeoCurve[] = [];
 	private cachedRegions: SketchRegion[] = [];
 	private regionGeometryKey: string | null = null;
 	private gridRenderKey: string | null = null;
@@ -239,7 +240,9 @@ export class SVGRenderer {
 	private renderRegions(sketch: SketchDocument, viewport: Viewport, hoverPoint: Vec2 | null): void {
 		if (!this.deferRegionSolve) {
 			const start = performance.now();
-			const curves = getAllGeoCurves(sketch).filter(curve => !curve.isConstruction);
+			const curves = getAllGeoCurves(sketch)
+				.concat(this.externalRegionCurves)
+				.filter(curve => !curve.isConstruction);
 			const geometryKey = JSON.stringify(curves);
 			if (geometryKey !== this.regionGeometryKey) {
 				this.cachedRegions = findCurveRegions(curves);
