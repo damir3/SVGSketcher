@@ -65,25 +65,34 @@ function initApp(options: SketcherOptions): void {
 	app.innerHTML = `
 		<!-- TOP HEADER -->
 		<header class="cad-header">
-			<div class="brand">
-				<div class="brand-icon">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
-						<polygon points="12 2 2 22 22 22"/>
-					</svg>
+			<div class="header-start">
+				<div class="brand">
+					<div class="brand-icon">
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5">
+							<polygon points="12 2 2 22 22 22"/>
+						</svg>
+					</div>
+					<div class="brand-title">SVG Sketcher</div>
 				</div>
-				<div class="brand-title">SVG Sketcher</div>
+				<button class="btn-header btn-icon" id="btn-import" type="button" title="Open SVG (with CAD metadata)" aria-label="Open SVG">
+					${ICONS.open}
+				</button>
+				<input type="file" id="file-input-svg" accept=".svg,image/svg+xml" hidden />
+				<button class="btn-header btn-icon" id="btn-export" type="button" title="Export as SVG" aria-label="Export SVG" aria-haspopup="dialog">
+					${ICONS.export}
+				</button>
+				<div class="header-divider"></div>
+				<button class="btn-header btn-icon" id="btn-undo" type="button" title="Undo (Ctrl+Z / Cmd+Z)" aria-label="Undo" disabled>
+					${ICONS.undo}
+				</button>
+				<button class="btn-header btn-icon" id="btn-redo" type="button" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" aria-label="Redo" disabled>
+					${ICONS.redo}
+				</button>
 			</div>
 
 			<div class="sketch-name" id="sketch-name">Untitled Sketch</div>
 
 			<div class="header-actions">
-				<button class="btn-header btn-icon" id="btn-undo" title="Undo (Ctrl+Z / Cmd+Z)" aria-label="Undo" disabled>
-					${ICONS.undo}
-				</button>
-				<button class="btn-header btn-icon" id="btn-redo" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" aria-label="Redo" disabled>
-					${ICONS.redo}
-				</button>
-				<div class="header-divider"></div>
 				<button class="btn-header btn-icon active" id="btn-snap-header" title="Toggle Snapping" aria-label="Toggle Snapping">
 					${ICONS.snap}
 				</button>
@@ -123,13 +132,7 @@ function initApp(options: SketcherOptions): void {
 					${ICONS.image}
 				</button>
 				<input type="file" id="file-input-image" accept="image/*" hidden />
-				<button class="btn-header" id="btn-import" title="Open SVG (with CAD metadata)">
-					${ICONS.open} Open SVG
-				</button>
-				<input type="file" id="file-input-svg" accept=".svg,image/svg+xml" style="display: none;" />
-				<button class="btn-header primary" id="btn-export" title="Export as SVG" aria-haspopup="dialog">
-					${ICONS.export} Export SVG
-				</button>
+				<div class="header-divider"></div>
 				<button class="btn-header btn-icon" id="btn-theme" type="button"></button>
 				<a class="btn-header btn-icon" href="https://github.com/damir3/SVGSketcher" target="_blank" rel="noopener" title="GitHub" aria-label="GitHub">
 					${ICONS.github}
@@ -148,7 +151,7 @@ function initApp(options: SketcherOptions): void {
 			</main>
 
 			<!-- RIGHT SIDEBAR -->
-			<aside class="cad-sidebar" id="sidebar"></aside>
+			<aside class="cad-sidebar" id="sidebar" aria-label="Inspector"></aside>
 		</div>
 
 		<!-- BOTTOM STATUS BAR -->

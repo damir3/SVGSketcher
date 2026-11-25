@@ -102,10 +102,6 @@ export class Sidebar {
 		const totalPrimitives = this.getPrimitivesCount(handlePointIds);
 
 		this.container.innerHTML = `
-			<div class="sidebar-header">
-				<div class="sidebar-title">Inspector & Tree</div>
-			</div>
-
 			<div class="sidebar-content">
 				<!-- Active Tool Panel (delegated to active tool) -->
 				${this.renderActiveToolCard()}
