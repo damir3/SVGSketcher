@@ -96,10 +96,7 @@ function matchesSelector(el: MockElement, selector: string): boolean {
 	}
 	const attrValueMatch = selector.match(/^(\.[a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)="([^"]*)"\]$/);
 	if (attrValueMatch) {
-		return (
-			el.classes.has(attrValueMatch[1].slice(1)) &&
-			el.attrs.get(attrValueMatch[2]) === attrValueMatch[3]
-		);
+		return el.classes.has(attrValueMatch[1].slice(1)) && el.attrs.get(attrValueMatch[2]) === attrValueMatch[3];
 	}
 	// Support patterns like ".tree-item[data-type]" or ".tree-delete-btn[data-delete-id]" or ".constraint-entity-chip"
 	const attrMatch = selector.match(/^(\.[a-zA-Z0-9_-]+)\[([a-zA-Z0-9_-]+)\]$/);
@@ -215,7 +212,9 @@ describe('Sidebar', () => {
 		assert.equal(sketch.selection.pointIds.has(p2.id), false);
 
 		// Normal click focuses single primitive inspector
-		const lineRow = container.querySelectorAll('.tree-item[data-type]').find(r => r.getAttribute('data-id') === line.id)!;
+		const lineRow = container
+			.querySelectorAll('.tree-item[data-type]')
+			.find(r => r.getAttribute('data-id') === line.id)!;
 		lineRow.click();
 		assert.ok(!container.innerHTML.includes('Selected Primitives'));
 		assert.ok(container.innerHTML.includes('insp-line-length'));

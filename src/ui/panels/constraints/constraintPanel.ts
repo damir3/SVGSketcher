@@ -1,4 +1,8 @@
-import { Vec2 } from '../../../math/vector';
+import {
+	bindInlineValueControl,
+	renderInlineValueControl,
+	type InlineValueControlOptions,
+} from '../inspector/inlineValueControl';
 import type { InspectorContext, ISidebarPanel } from '../inspector/types';
 import type { BaseConstraint } from '../../../solver/constraints/base';
 import type {
@@ -132,25 +136,7 @@ export class ConstraintPanel implements ISidebarPanel {
 						paramsInnerHtml += dim.disabledContent(context);
 					}
 				} else {
-					const label = typeof dim.label === 'function' ? dim.label(context) : (dim.label ?? 'Distance');
-					const valueStr = dim.getValue(context);
-					paramsInnerHtml += `
-						<div class="inspector-param-row">
-							<span class="inspector-param-label">${label}:</span>
-							<div class="inspector-value-group">
-								<span class="inspector-value-display" data-constraint-id="${c.id}" title="Double-click to edit">
-									<strong>${valueStr}</strong>
-									${c.expression ? `<span class="inspector-expr-badge" title="fx: ${c.expression}">fx: ${c.expression}</span>` : ''}
-								</span>
-								<button type="button" class="btn-insp-edit-dim" data-constraint-id="${c.id}" title="Edit dimension">
-									<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-										<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-										<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-									</svg>
-								</button>
-							</div>
-						</div>
-					`;
+					paramsInnerHtml += renderInlineValueControl(this.createDimensionControlOptions(context, dim));
 				}
 			}
 		}
@@ -241,23 +227,13 @@ export class ConstraintPanel implements ISidebarPanel {
 			});
 		}
 
-		// Dimension edit events
+		// Dimension inline edit events
 		if (this.options.dimension) {
 			const dim = this.options.dimension;
 			const isVisible = dim.isVisible ? dim.isVisible(context) : true;
 			const isDisabled = dim.isDisabled ? dim.isDisabled(context) : false;
 			if (isVisible && !isDisabled) {
-				const bindEditTrigger = (selector: string, eventName: 'click' | 'dblclick') => {
-					container.querySelectorAll<HTMLElement>(selector).forEach(el => {
-						el.addEventListener(eventName, e => {
-							e.stopPropagation();
-							const rect = el.getBoundingClientRect();
-							context.onEditDimension?.(c, new Vec2(rect.left - 240, rect.top - 10));
-						});
-					});
-				};
-				bindEditTrigger(`.btn-insp-edit-dim[data-constraint-id="${c.id}"]`, 'click');
-				bindEditTrigger(`.inspector-value-display[data-constraint-id="${c.id}"]`, 'dblclick');
+				bindInlineValueControl(container, context, this.createDimensionControlOptions(context, dim));
 			}
 		}
 
@@ -292,5 +268,60 @@ export class ConstraintPanel implements ISidebarPanel {
 		if (this.options.extraContent?.bindEvents) {
 			this.options.extraContent.bindEvents(container, context);
 		}
+	}
+
+	private getDimensionEditInfo(context: InspectorContext): {
+		unit: string;
+		displayMode?: 'radius' | 'diameter';
+		isAngle: boolean;
+		initialValue: string;
+	} {
+		const c = this.options.constraint as any;
+		const isDistance = 'targetDistance' in c;
+		const isAngle = 'targetAngle' in c;
+		let displayMode: 'radius' | 'diameter' | undefined;
+		if (!isDistance && !isAngle) {
+			const isCircle = context.sketch.circles.has(c.circleId);
+			displayMode = c.displayMode ?? (isCircle ? 'diameter' : 'radius');
+		}
+		const curVal = isDistance
+			? c.targetDistance
+			: isAngle
+				? c.targetAngle
+				: displayMode === 'diameter'
+					? c.targetRadius * 2
+					: c.targetRadius;
+		const unit = isAngle ? '°' : 'mm';
+		const displayVal = Number(curVal.toFixed(2)).toString();
+		return {
+			unit,
+			displayMode,
+			isAngle,
+			initialValue: c.expression ?? displayVal,
+		};
+	}
+
+	private createDimensionControlOptions(
+		context: InspectorContext,
+		dim: NonNullable<ConstraintPanelOptions['dimension']>
+	): InlineValueControlOptions {
+		const c = this.options.constraint;
+		const label = typeof dim.label === 'function' ? dim.label(context) : (dim.label ?? 'Distance');
+		const info = this.getDimensionEditInfo(context);
+		return {
+			key: c.id,
+			inputId: `insp-dim-input-${c.id}`,
+			label,
+			unit: info.unit,
+			displayAttr: { name: 'data-constraint-id', value: c.id },
+			getDisplayValue: () => dim.getValue(context),
+			getInitialInputValue: () => this.getDimensionEditInfo(context).initialValue,
+			getExpression: () => c.expression,
+			validate: val => Number.isFinite(val) && val > 0,
+			step: info.isAngle ? 0.5 : 0.1,
+			max: info.isAngle ? (c.name.includes('Arc') ? 359.9 : 179.9) : Infinity,
+			commit: text =>
+				context.sketch.updateDimensionalConstraint(c.id, text, this.getDimensionEditInfo(context).displayMode),
+		};
 	}
 }

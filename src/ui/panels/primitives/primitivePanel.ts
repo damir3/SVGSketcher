@@ -1,11 +1,38 @@
+import {
+	bindInlineValueControl,
+	formatInlineUnitValue,
+	renderInlineValueControl,
+	type InlineValueControlOptions,
+} from '../inspector/inlineValueControl';
 import type { InspectorContext } from '../inspector/types';
-import type { IPrimitivePanel, PrimitivePanelOptions } from './types';
+import type { IPrimitivePanel, PrimitiveFieldConfig, PrimitivePanelOptions } from './types';
 
 export class PrimitivePanel implements IPrimitivePanel {
 	private options: PrimitivePanelOptions;
 
 	constructor(options: PrimitivePanelOptions) {
 		this.options = options;
+	}
+
+	private createFieldControlOptions(f: PrimitiveFieldConfig, context: InspectorContext): InlineValueControlOptions {
+		return {
+			key: f.id,
+			inputId: f.id,
+			label: f.label,
+			unit: f.unit,
+			displayAttr: { name: 'data-field-id', value: f.id },
+			getDisplayValue: () => formatInlineUnitValue(f.getValue(context), f.unit),
+			getInitialInputValue: () => String(f.getValue(context)),
+			validate: f.validate,
+			step: f.unit === '°' ? 0.5 : 0.1,
+			commit: (_text, val) => {
+				const snapshot = context.sketch.takeSnapshot();
+				const result = f.onCommit?.(val, context);
+				if (result === false) return false;
+				context.sketch.pushSnapshot(snapshot);
+				return true;
+			},
+		};
 	}
 
 	render(context: InspectorContext): string {
@@ -25,16 +52,10 @@ export class PrimitivePanel implements IPrimitivePanel {
 				? `
 			<div class="pattern-params-card in-inspector">
 				${fields
-					.map(
-						f => `
-					<div class="pattern-param-row">
-						<label class="pattern-param-label" for="${f.id}">${f.label}</label>
-						<div class="pattern-input-suffix-wrapper">
-							<input type="text" id="${f.id}" value="${f.getValue(context)}" autocomplete="off" spellcheck="false" class="pattern-num-input" />
-							${f.unit ? `<span class="pattern-input-suffix">${f.unit}</span>` : ''}
-						</div>
-					</div>
-				`
+					.map(f =>
+						f.onCommit
+							? renderInlineValueControl(this.createFieldControlOptions(f, context))
+							: `<div class="inspector-row"><span>${f.label}:</span> <strong>${formatInlineUnitValue(f.getValue(context), f.unit)}</strong></div>`
 					)
 					.join('')}
 			</div>
@@ -61,11 +82,11 @@ export class PrimitivePanel implements IPrimitivePanel {
 		`;
 	}
 
-	bindEvents(_container: HTMLElement, context: InspectorContext): void {
+	bindEvents(container: HTMLElement, context: InspectorContext): void {
 		const fields = this.options.fields ?? [];
 		for (const f of fields) {
 			if (f.onCommit) {
-				context.bindInspectorNumberInput(`#${f.id}`, val => f.onCommit!(val, context), f.validate);
+				bindInlineValueControl(container, context, this.createFieldControlOptions(f, context));
 			}
 		}
 	}

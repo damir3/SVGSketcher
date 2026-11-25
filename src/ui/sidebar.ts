@@ -15,7 +15,6 @@ import {
 	RectangularPatternConstraint,
 } from '../solver/constraints';
 import { ICONS } from './icons';
-import { type Vec2 } from '../math/vector';
 import type { IInspectable, InspectorContext } from './panels/inspector/types';
 import type { IConstraint } from '../solver/types';
 import type { ConfirmConstraintDelete } from './delete-constraint-dialog';
@@ -56,16 +55,8 @@ export class Sidebar {
 	private interaction?: CanvasInteraction;
 	private isPrimitivesExpanded = false;
 	private hoveredSelectedTargetId: string | null = null;
+	private suppressRender = false;
 
-	onEditDimension?: (
-		constraint:
-			| DistanceConstraint
-			| RadiusConstraint
-			| AngleConstraint
-			| PointToLineDistanceConstraint
-			| OffsetConstraint,
-		screenPos?: Vec2
-	) => void;
 	onConfirmConstraintDelete?: ConfirmConstraintDelete;
 
 	constructor(container: HTMLElement, sketch: SketchDocument, interaction?: CanvasInteraction) {
@@ -88,6 +79,7 @@ export class Sidebar {
 	}
 
 	render(): void {
+		if (this.suppressRender) return;
 		const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
 		if (
 			activeEl &&
@@ -301,7 +293,6 @@ export class Sidebar {
 	private createInspectorContext(): InspectorContext {
 		return {
 			sketch: this.sketch,
-			onEditDimension: (c, screenPos) => this.onEditDimension?.(c, screenPos),
 			renderConstraintsSublist: (constraints, label, entityIds) =>
 				this.renderConstraintsSublist(constraints, label, entityIds),
 			renderPrimitivesSublist: primitives => this.renderPrimitivesSublist(primitives),
@@ -310,6 +301,23 @@ export class Sidebar {
 			requestRender: () => {
 				this.render();
 				this.interaction?.render();
+			},
+			withoutSidebarRender: fn => {
+				this.suppressRender = true;
+				try {
+					fn();
+				} finally {
+					this.suppressRender = false;
+				}
+				if (typeof window !== 'undefined') {
+					window.addEventListener(
+						'mouseup',
+						() => {
+							setTimeout(() => this.render(), 0);
+						},
+						{ once: true }
+					);
+				}
 			},
 			getIcon: (name: string) => ICONS[name] ?? '',
 		};

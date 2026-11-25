@@ -277,10 +277,6 @@ function initApp(options: SketcherOptions): void {
 		return isNew && !constraint.isReference;
 	};
 
-	sidebar.onEditDimension = (constraint, screenPos) => {
-		dimModal.open(constraint, screenPos);
-	};
-
 	interaction.onToolChange = tool => {
 		toolbar.setActiveButton(tool);
 		sidebar.render();

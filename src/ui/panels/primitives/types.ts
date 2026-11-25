@@ -5,7 +5,7 @@ export interface PrimitiveFieldConfig {
 	label: string;
 	unit?: string;
 	getValue: (context: InspectorContext) => number | string;
-	onCommit?: (val: number, context: InspectorContext) => void;
+	onCommit?: (val: number, context: InspectorContext) => boolean | void;
 	validate?: (val: number) => boolean;
 }
 

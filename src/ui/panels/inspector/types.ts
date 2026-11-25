@@ -1,10 +1,8 @@
 import type { SketchDocument } from '../../../model/sketch';
-import type { Vec2 } from '../../../math/vector';
 import type { PrimitiveType } from '../../../model/primitives/base';
 
 export interface InspectorContext {
 	sketch: SketchDocument;
-	onEditDimension?: (constraint: any, screenPos: Vec2) => void;
 	renderConstraintsSublist(constraints: any[], label: string, entityIds: string[]): string;
 	renderPrimitivesSublist(primitives: Array<{ id: string; type: PrimitiveType }>): string;
 	bindInspectorNumberInput(
@@ -13,6 +11,7 @@ export interface InspectorContext {
 		validator?: (val: number) => boolean
 	): void;
 	requestRender?: () => void;
+	withoutSidebarRender?: (fn: () => void) => void;
 	getIcon?: (name: string) => string;
 }
 

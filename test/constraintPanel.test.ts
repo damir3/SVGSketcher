@@ -33,7 +33,7 @@ describe('ConstraintPanel Integration', () => {
 		assert.ok(html.includes('prims'), 'Should render primitives sublist');
 	});
 
-	it('DistanceConstraint renders dimension value and fx expression', () => {
+	it('DistanceConstraint renders dimension value and fx expression without edit button', () => {
 		const doc = new SketchDocument();
 		const p1 = doc.addPoint({ x: 0, y: 0 });
 		const p2 = doc.addPoint({ x: 50, y: 0 });
@@ -48,12 +48,126 @@ describe('ConstraintPanel Integration', () => {
 		const html = c.sidebarPanel.render(mockCtx);
 		assert.ok(html.includes('Distance'), 'Should render title');
 		assert.ok(html.includes('50 mm'), 'Should render formatted distance');
-		assert.ok(html.includes('fx: len / 2'), 'Should render expression badge');
-		assert.ok(html.includes('btn-insp-edit-dim'), 'Should render edit dimension button');
+		const badgeIndex = html.indexOf('<span class="inspector-expr-badge">fx</span>');
+		const valueIndex = html.indexOf('<strong>50 mm</strong>');
+		assert.ok(badgeIndex >= 0 && badgeIndex < valueIndex, 'Should render compact fx badge before value');
+		assert.ok(!html.includes('>fx: len / 2<'), 'Should not render full formula text next to value');
+		assert.ok(!html.includes('btn-insp-edit-dim'), 'Should not render edit dimension button');
+		assert.ok(html.includes('inspector-inline-editor'), 'Should render inline dimension editor');
 
 		const restored = deserializeConstraint(serializeConstraint(c));
 		assert.ok(restored instanceof DistanceConstraint);
 		assert.equal(restored.sidebarPanel.render(mockCtx), html);
+	});
+
+	it('DistanceConstraint supports inline editing on click, Enter, Escape, and blur', () => {
+		const doc = new SketchDocument();
+		doc.addParameter('len', '80');
+		const p1 = doc.addPoint({ x: 0, y: 0 }, true);
+		const p2 = doc.addPoint({ x: 50, y: 0 });
+		doc.addLine(p1.id, p2.id);
+		const c = doc.addDistanceConstraint(p1.id, p2.id, 50)!;
+
+		const makeClassList = (initial: string[]) => {
+			const set = new Set(initial);
+			return {
+				add: (...names: string[]) => names.forEach(n => set.add(n)),
+				remove: (...names: string[]) => names.forEach(n => set.delete(n)),
+				contains: (name: string) => set.has(name),
+			};
+		};
+		const makeEl = (classes: string[], value = '') => {
+			const listeners = new Map<string, Array<(e: any) => void>>();
+			return {
+				value,
+				textContent: '',
+				innerHTML: '',
+				classList: makeClassList(classes),
+				addEventListener(type: string, fn: (e: any) => void) {
+					const list = listeners.get(type) ?? [];
+					list.push(fn);
+					listeners.set(type, list);
+				},
+				dispatch(type: string, extra: Record<string, any> = {}) {
+					const evt = { stopPropagation() {}, preventDefault() {}, ...extra };
+					for (const fn of listeners.get(type) ?? []) fn(evt);
+				},
+				focus() {},
+				blur() {},
+				select() {},
+			};
+		};
+
+		const displayBtn = makeEl(['inspector-value-display']);
+		const editorEl = makeEl(['inspector-inline-editor', 'hidden']);
+		const wrapEl = makeEl(['pattern-input-suffix-wrapper', 'inspector-dim-input-wrap']);
+		const input = makeEl(['pattern-num-input', 'inspector-dim-input'], '50');
+		const previewEl = makeEl(['dim-eval-preview', 'inspector-dim-preview', 'hidden']);
+
+		const selectorMap = new Map<string, any>([
+			[`.inspector-value-display[data-constraint-id="${c.id}"]`, displayBtn],
+			[`[data-dim-editor="${c.id}"]`, editorEl],
+			[`[data-dim-wrap="${c.id}"]`, wrapEl],
+			[`#insp-dim-input-${c.id}`, input],
+			[`#insp-dim-preview-${c.id}`, previewEl],
+		]);
+		const mockContainer: any = {
+			contains: () => false,
+			querySelector: (sel: string) => selectorMap.get(sel) ?? null,
+			querySelectorAll: () => [],
+		};
+		let renderCalls = 0;
+		const mockCtx: any = {
+			sketch: doc,
+			renderPrimitivesSublist: () => '',
+			requestRender: () => {
+				renderCalls++;
+			},
+		};
+
+		c.sidebarPanel.bindEvents(mockContainer, mockCtx);
+
+		// Click opens inline editor
+		displayBtn.dispatch('click');
+		assert.equal(displayBtn.classList.contains('hidden'), true);
+		assert.equal(editorEl.classList.contains('hidden'), false);
+		assert.equal(input.value, '50');
+
+		// Escape cancels without changing constraint
+		input.value = '99';
+		input.dispatch('keydown', { key: 'Escape' });
+		assert.equal(c.targetDistance, 50);
+		assert.equal(displayBtn.classList.contains('hidden'), false);
+		assert.equal(editorEl.classList.contains('hidden'), true);
+
+		// Re-open, type expression, verify live preview and commit via Enter
+		displayBtn.dispatch('click');
+		input.value = 'len / 2';
+		input.dispatch('input');
+		assert.equal(previewEl.classList.contains('hidden'), false);
+		assert.equal(previewEl.textContent, '= 40.0 mm');
+
+		input.dispatch('keydown', { key: 'Enter' });
+		assert.equal(c.targetDistance, 40);
+		assert.equal(c.expression, 'len / 2');
+		assert.equal(editorEl.classList.contains('hidden'), true);
+		assert.equal(renderCalls, 1);
+
+		// Invalid expression keeps editor open with error on Enter
+		displayBtn.dispatch('click');
+		assert.equal(input.value, 'len / 2');
+		input.value = 'unknown_var + 1';
+		input.dispatch('keydown', { key: 'Enter' });
+		assert.equal(editorEl.classList.contains('hidden'), false);
+		assert.equal(wrapEl.classList.contains('error'), true);
+		assert.equal(c.targetDistance, 40);
+
+		// Blur on valid numeric value commits it
+		input.value = '65';
+		input.dispatch('blur', {});
+		assert.equal(c.targetDistance, 65);
+		assert.equal(c.expression, undefined);
+		assert.equal(editorEl.classList.contains('hidden'), true);
 	});
 
 	it('RadiusConstraint renders segmented control for mode and dimension', () => {

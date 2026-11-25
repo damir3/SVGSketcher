@@ -740,6 +740,7 @@ body {
 	align-items: center;
 	justify-content: space-between;
 	gap: 8px;
+	min-height: 28px;
 	font-size: 12px;
 	padding: 2px 0;
 }
@@ -748,28 +749,49 @@ body {
 	font-size: 11.5px;
 	font-weight: 600;
 	color: var(--text-secondary);
+	flex-shrink: 0;
 }
 
 .inspector-value-group {
 	display: flex;
+	flex: 1;
+	min-width: 0;
 	align-items: center;
+	justify-content: flex-end;
 	gap: 6px;
 }
 
 .inspector-value-display {
 	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 5px;
+	height: 24px;
+	box-sizing: border-box;
+	font-family: inherit;
 	font-size: 12px;
 	color: var(--text-primary);
+	background: transparent;
+	border: 1px solid transparent;
 	cursor: pointer;
-	padding: 2px 4px;
+	padding: 2px 5px;
 	border-radius: 4px;
-	transition: background-color 0.15s ease;
+	transition:
+		background-color 0.15s ease,
+		border-color 0.15s ease;
 }
 
 .inspector-value-display:hover {
 	background-color: var(--bg-surface-hover);
+	border-color: var(--border-color);
+}
+
+.inspector-value-display:focus-visible {
+	outline: 2px solid var(--cad-blue);
+	outline-offset: -1px;
+}
+
+.inspector-value-display.hidden {
+	display: none;
 }
 
 .inspector-value-display strong {
@@ -784,35 +806,66 @@ body {
 	color: var(--cad-info);
 	border: 1px solid color-mix(in srgb, var(--cad-info) 25%, transparent);
 	border-radius: 4px;
-	padding: 1px 5px;
-	font-size: 10.5px;
+	padding: 0 4px;
+	font-size: 10px;
+	line-height: 1.4;
 	font-family: monospace;
-	font-weight: 500;
-	max-width: 100px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	font-weight: 700;
+	flex-shrink: 0;
 }
 
-.btn-insp-edit-dim {
+.inspector-inline-editor {
+	position: relative;
 	display: inline-flex;
+	min-width: 0;
+	max-width: 100%;
 	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: 1px solid var(--border-color);
-	border-radius: 4px;
-	background-color: var(--bg-surface-elevated);
-	color: var(--text-secondary);
-	cursor: pointer;
-	transition: all 0.15s ease;
+	justify-content: flex-end;
 }
 
-.btn-insp-edit-dim:hover {
-	background-color: var(--bg-surface-hover);
-	border-color: var(--cad-blue);
-	color: var(--cad-blue);
+.inspector-inline-editor.hidden {
+	display: none;
+}
+
+.inspector-dim-input-wrap {
+	min-width: 0;
+	max-width: 100%;
+}
+
+.inspector-dim-input {
+	height: 24px;
+	box-sizing: border-box;
+	padding: 2px 6px;
+	user-select: text;
+}
+
+.inspector-dim-input-wrap.error .inspector-dim-input {
+	border-color: var(--cad-red-bright);
+	background-color: var(--cad-red-subtle);
+	box-shadow: 0 0 0 1px var(--cad-red-bright);
+}
+
+.inspector-dim-preview {
+	position: absolute;
+	top: calc(100% + 4px);
+	right: 0;
+	z-index: 30;
+	height: 24px;
+	max-width: 240px;
+	padding: 0 8px;
+	font-size: 11px;
+	background: var(--bg-surface);
+	border: 1px solid var(--cad-blue-border);
+	border-radius: 6px;
+	box-shadow:
+		0 4px 12px rgba(0, 0, 0, 0.14),
+		0 1px 3px rgba(0, 0, 0, 0.08);
+	pointer-events: none;
+}
+
+.inspector-dim-preview.error {
+	background: var(--bg-surface);
+	border-color: var(--cad-red-border);
 }
 
 /* Inspector Constraints Section */
@@ -1937,6 +1990,13 @@ body {
 .pattern-params-card.in-inspector .pattern-num-input {
 	width: 78px;
 	font-family: monospace;
+}
+
+.pattern-params-card.in-inspector .pattern-num-input.inspector-dim-input {
+	width: 152px;
+	max-width: 100%;
+	min-width: 64px;
+	flex: 0 1 152px;
 }
 
 /* --- DIMENSION POPUP CALCULATOR PREVIEW --- */
