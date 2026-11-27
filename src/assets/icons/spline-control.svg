@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
   <!-- Dashed control polygon -->
   <polyline points="4,19 4,6 20,6 20,19" stroke="var(--icon-secondary, #b45309)" stroke-width="1" stroke-dasharray="2 1.5"/>
-  
+
   <!-- Control Point Spline curve -->
-  <path d="M 4 19 C 4 6 20 6 20 19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-  
+  <path d="M 4 19 C 4 6 20 6 20 19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+
   <!-- Control points -->
   <circle cx="4" cy="19" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5"/>
   <circle cx="4" cy="6" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5"/>

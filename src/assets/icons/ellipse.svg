@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" viewBox="0 0 24 24" fill="none">
-  <ellipse cx="12" cy="12" rx="9.5" ry="4.8" transform="rotate(-25 12 12)" stroke="currentColor" stroke-width="2"/>
+  <ellipse cx="12" cy="12" rx="9.5" ry="4.8" transform="rotate(-25 12 12)" stroke="currentColor" stroke-width="1.5"/>
   <circle cx="12" cy="12" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5"/>
   <circle cx="20.6" cy="8.0" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5"/>
   <circle cx="10.0" cy="7.7" r="2" fill="var(--icon-accent, #0284c7)" stroke="var(--icon-outline, #0f172a)" stroke-width="0.5"/>
