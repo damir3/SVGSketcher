@@ -262,8 +262,29 @@ describe('Fit to View & Selection Bounding Box', () => {
 			assert.equal(vp.panY, targetAll.panY);
 			assert.equal(vp.zoom, targetAll.zoom);
 
-			// 3. An empty sketch restores the default view.
+			interaction.snapReferences = {
+				vertices: [],
+				curves: [{ type: 'circle', id: 'fixed-circle', center: new Vec2(500, 100), radius: 100 }],
+			};
+			const targetWithReferences = vp.getTargetFit(new AABB(new Vec2(0, 0)).addPoint(new Vec2(600, 300)));
+			interaction.fitToView(false);
+			assert.deepEqual([vp.panX, vp.panY, vp.zoom], [
+				targetWithReferences.panX, targetWithReferences.panY, targetWithReferences.zoom,
+			]);
+
+			sketch.selectEntity(l1.id, 'line');
+			interaction.fitToView(false);
+			assert.deepEqual([vp.panX, vp.panY, vp.zoom], [targetSelected.panX, targetSelected.panY, targetSelected.zoom]);
+
 			sketch.clear();
+			const targetReferencesOnly = vp.getTargetFit(new AABB(new Vec2(400, 0)).addPoint(new Vec2(600, 200)));
+			interaction.fitToView(false);
+			assert.deepEqual([vp.panX, vp.panY, vp.zoom], [
+				targetReferencesOnly.panX, targetReferencesOnly.panY, targetReferencesOnly.zoom,
+			]);
+
+			// An empty sketch without references restores the default view.
+			interaction.snapReferences = undefined;
 			interaction.fitToView(false);
 			assert.equal(vp.zoom, 4);
 			assert.equal(vp.panX, 400);

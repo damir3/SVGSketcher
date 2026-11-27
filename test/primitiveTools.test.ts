@@ -505,6 +505,25 @@ describe('Primitive Tools Creation', () => {
 		assert.equal(c.radius, 30);
 	});
 
+	it('preserves small circle diameters and clamps the center and two-point modes to 1 mm', () => {
+		for (const [mode, scale] of [['center_diameter', 2], ['two_point', 1]] as const) {
+			for (const diameter of [4, 0.25]) {
+				const sketch = new SketchDocument();
+				const { ctx } = createMockContext(sketch);
+				const tool = new CircleTool();
+				tool.activate(ctx);
+				tool.setMode(mode);
+				tool.onMouseDown(makeMouseEvent(0, 0));
+				const cursor = makeMouseEvent(diameter / scale, 0);
+				tool.onMouseMove(cursor);
+				const expected = Math.max(1, diameter);
+				assert.equal(tool.popup.getNumericValue('radius'), expected);
+				tool.onMouseDown(cursor);
+				assert.equal([...sketch.circles.values()][0]?.radius, expected / 2);
+			}
+		}
+	});
+
 	for (const kind of ['circle', 'arc'] as const) {
 		it(`places a new ${kind} dimension inside toward the final cursor position`, () => {
 			const sketch = new SketchDocument();

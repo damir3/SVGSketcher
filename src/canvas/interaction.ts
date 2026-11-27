@@ -3,6 +3,7 @@ import type { SketchSnapshot } from '../model/history';
 import { DEFAULT_ZOOM } from '../constants';
 import type { Viewport } from './viewport';
 import type { SVGRenderer } from './renderer';
+import { AABB, getCurveBoundingBoxes } from '../math/aabb';
 import { ORIGIN, Vec2 } from '../math/vector';
 import type {
 	DistanceConstraint,
@@ -569,7 +570,7 @@ export class CanvasInteraction implements SelectInteractionHost {
 	}
 
 	fitToView(smooth = true): void {
-		const bbox = this.sketch.getSelectionBoundingBox() ?? this.sketch.getBoundingBox();
+		const bbox = this.sketch.getSelectionBoundingBox() ?? this.getFitBounds();
 		const target = bbox
 			? this.viewport.getTargetFit(bbox)
 			: {
@@ -589,6 +590,22 @@ export class CanvasInteraction implements SelectInteractionHost {
 		}
 
 		this.animateViewportTo(target.panX, target.panY, target.zoom);
+	}
+
+	private getFitBounds(): AABB | null {
+		let bounds = this.sketch.getBoundingBox();
+		const references = this.snapReferences;
+		if (!references) return bounds;
+
+		for (const vertex of references.vertices) {
+			(bounds ??= new AABB()).addPoint(vertex);
+		}
+		if (references.curves.length) {
+			for (const curveBounds of getCurveBoundingBoxes(references.curves)) {
+				if (curveBounds) (bounds ??= new AABB()).addPoint(curveBounds.min).addPoint(curveBounds.max);
+			}
+		}
+		return bounds;
 	}
 
 	private bindEvents(): void {

@@ -20,6 +20,7 @@ export type CircleMode = 'center_diameter' | 'two_point' | 'three_point' | 'two_
 
 type TangentLine = { p: Vec2; n: Vec2 };
 type CircleGeometry = { center: Vec2; radius: number };
+const MIN_DIAMETER = 1;
 
 export class CircleTool extends BaseTool {
 	readonly id = 'circle' as const;
@@ -183,7 +184,9 @@ export class CircleTool extends BaseTool {
 			const constraint = sketch.addRadiusConstraint(circle.id, radius, dimensionMode);
 			const expression = this.popup.getExpression('radius');
 			if (constraint) {
-				if (expression) constraint.expression = expression;
+				if (expression && (dimensionMode === 'radius' || this.popup.getNumericValue('radius', 20) >= MIN_DIAMETER)) {
+					constraint.expression = expression;
+				}
 				constraint.placeLabelInsideNear(
 					this.ctx.viewport.worldToScreen(this.lastCursorWorld),
 					sketch,
@@ -202,24 +205,37 @@ export class CircleTool extends BaseTool {
 		if (this.drawingStep === 0) this.ctx.sketch.beginTransaction();
 	}
 
+	private getDiameter(distance: number): number {
+		const diameter = this.popup.isLocked('radius') ? this.popup.getNumericValue('radius', 20) : distance;
+		return Math.max(MIN_DIAMETER, diameter);
+	}
+
+	private getDiameterEnd(start: Vec2, cursor: Vec2, diameter: number): Vec2 {
+		const direction = new Vec2().subVectors(cursor, start);
+		const distance = direction.length();
+		if (distance === diameter) return cursor;
+		if (distance === 0) return start.clone().add(new Vec2(diameter, 0));
+		return start.clone().addScaledVector(direction, diameter / distance);
+	}
+
 	private commitPopupValue(): void {
 		if (!this.popup.isLocked('radius')) return;
 
 		const value = this.popup.getNumericValue('radius', 10);
 
 		if (this._mode === 'center_diameter' && this.center) {
-			this.finish(this.center, value / 2, this.centerId!, 'diameter');
+			this.finish(this.center, this.getDiameter(value) / 2, this.centerId!, 'diameter');
 			return;
 		}
 
 		if (this._mode === 'three_point' && this.points.length === 2) {
-			const circle = this.getThreePointCircleForDiameter(value, this.lastCursorWorld);
+			const circle = this.getThreePointCircleForDiameter(this.getDiameter(value), this.lastCursorWorld);
 			if (!circle) {
 				this.ctx.showToast('Diameter must be at least the distance between the first two points');
 				return;
 			}
 
-			this.finish(circle.center, value / 2, undefined, 'diameter');
+			this.finish(circle.center, circle.radius, undefined, 'diameter');
 			return;
 		}
 
@@ -261,9 +277,7 @@ export class CircleTool extends BaseTool {
 				this.notify();
 			} else {
 				const locked = this.popup.isLocked('radius');
-				const radius = locked
-					? this.popup.getNumericValue('radius', 20) / 2
-					: Math.max(5, this.center!.distanceTo(e.world));
+				const radius = this.getDiameter(2 * this.center!.distanceTo(e.world)) / 2;
 				this.finish(this.center!, radius, this.centerId!, locked ? 'diameter' : undefined);
 			}
 
@@ -285,9 +299,8 @@ export class CircleTool extends BaseTool {
 			if (this._mode === 'two_point' && this.points.length === 2) {
 				const [a, cursor] = this.points;
 				const locked = this.popup.isLocked('radius');
-				const diameter = locked ? this.popup.getNumericValue('radius', 20) : a.distanceTo(cursor);
-				const directionLength = a.distanceTo(cursor);
-				const b = locked && directionLength > 1e-9 ? a.clone().lerp(cursor, diameter / directionLength) : cursor;
+				const diameter = this.getDiameter(a.distanceTo(cursor));
+				const b = this.getDiameterEnd(a, cursor, diameter);
 
 				this.finish(new Vec2().midpoint(a, b), diameter / 2, undefined, locked ? 'diameter' : undefined);
 				return;
@@ -303,7 +316,7 @@ export class CircleTool extends BaseTool {
 
 				const locked = this.popup.isLocked('radius');
 				const finalCircle = locked
-					? this.getThreePointCircleForDiameter(this.popup.getNumericValue('radius', 20), this.points[2])
+					? this.getThreePointCircleForDiameter(this.getDiameter(2 * circle.radius), this.points[2])
 					: circle;
 				if (!finalCircle) {
 					this.ctx.showToast('Diameter must be at least the distance between the first two points');
@@ -360,13 +373,13 @@ export class CircleTool extends BaseTool {
 
 		if (this._mode === 'center_diameter' && this.drawingStep === 1 && !this.popup.isLocked('radius')) {
 			this.popup.updateValues({
-				radius: 2 * Math.max(5, this.center!.distanceTo(e.effectiveWorld)),
+				radius: this.getDiameter(2 * this.center!.distanceTo(e.effectiveWorld)),
 			});
 		}
 
 		if (this._mode === 'two_point' && this.drawingStep > 0 && !this.popup.isLocked('radius')) {
 			this.popup.updateValues({
-				radius: Math.max(5, this.points[0].distanceTo(e.effectiveWorld)),
+				radius: this.getDiameter(this.points[0].distanceTo(e.effectiveWorld)),
 			});
 		}
 
@@ -492,9 +505,7 @@ export class CircleTool extends BaseTool {
 
 	private renderCenterDiameterPreview(ctx: ToolRenderContext): void {
 		const cursor = this.shouldSnap() && ctx.snap ? ctx.snap.worldPos : ctx.cursorWorld;
-		const radius = this.popup.isLocked('radius')
-			? this.popup.getNumericValue('radius', 20) / 2
-			: this.center!.distanceTo(cursor);
+		const radius = this.getDiameter(2 * this.center!.distanceTo(cursor)) / 2;
 		const dir = new Vec2().subVectors(cursor, this.center!);
 		const length = dir.length() || 1;
 		const edge = ctx.viewport.worldToScreen(this.center!.clone().addScaledVector(dir, radius / length));
@@ -531,12 +542,8 @@ export class CircleTool extends BaseTool {
 
 	private renderTwoPointPreview(ctx: ToolRenderContext, cursor: Vec2): void {
 		const firstPoint = this.points[0];
-		const dir = new Vec2().subVectors(cursor, firstPoint);
-		const length = dir.length() || 1;
-		const diameter = this.popup.isLocked('radius') ? this.popup.getNumericValue('radius', 20) : dir.length();
-		const secondPoint = this.popup.isLocked('radius')
-			? firstPoint.clone().addScaledVector(dir, diameter / length)
-			: cursor;
+		const diameter = this.getDiameter(firstPoint.distanceTo(cursor));
+		const secondPoint = this.getDiameterEnd(firstPoint, cursor, diameter);
 		const center = new Vec2().midpoint(firstPoint, secondPoint);
 		const screenA = ctx.viewport.worldToScreen(firstPoint);
 		const screenB = ctx.viewport.worldToScreen(secondPoint);
@@ -548,7 +555,7 @@ export class CircleTool extends BaseTool {
 
 	private renderThreePointPreview(ctx: ToolRenderContext, cursor: Vec2): void {
 		const circle = this.popup.isLocked('radius')
-			? this.getThreePointCircleForDiameter(this.popup.getNumericValue('radius', 20), cursor)
+			? this.getThreePointCircleForDiameter(this.getDiameter(0), cursor)
 			: this.getThreePointCircle(cursor);
 
 		if (circle) {
