@@ -1,5 +1,6 @@
 import { DEFAULT_ZOOM } from '../constants';
 import { Vec2, type XY } from '../math/vector';
+import { getGridStep } from './gridSpacing';
 import type { AABB } from '../math/aabb';
 
 export class Viewport {
@@ -163,25 +164,6 @@ export class Viewport {
 	}
 
 	getGridStep(): { step: number; subStep: number } {
-		// Dynamic double grid with multiplicity of 5
-		const targetPx = 80;
-		const rawStep = targetPx / this.zoom;
-		const exponent = Math.floor(Math.log10(rawStep));
-		const power = Math.pow(10, exponent);
-		const frac = rawStep / power;
-
-		let step: number;
-		if (frac < 1.7) {
-			step = 1 * power;
-		} else if (frac < 3.8) {
-			step = 2.5 * power;
-		} else if (frac < 7.5) {
-			step = 5 * power;
-		} else {
-			step = 10 * power;
-		}
-
-		// Always 5 subdivisions per major step (multiplicity of 5)
-		return { step, subStep: step / 5 };
+		return getGridStep(this.zoom);
 	}
 }

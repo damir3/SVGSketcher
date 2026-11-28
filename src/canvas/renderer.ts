@@ -75,6 +75,7 @@ export class SVGRenderer {
 	private svg: SVGSVGElement;
 	private defsEl: SVGDefsElement;
 	private gridGroup: SVGGElement;
+	private gridVisible = true;
 	private imageGroup: SVGGElement;
 	private originAxisGroup: SVGGElement;
 	private geometryGroup: SVGGElement;
@@ -182,7 +183,7 @@ export class SVGRenderer {
 		this.patternAngleHandle = null;
 		this.rectangularGizmoHandles.clear();
 		this.patternCheckboxGroup.innerHTML = '';
-		this.renderGrid(sketch, viewport, options.showGrid ?? true, options);
+		this.renderGrid(sketch, viewport, options.showGrid ?? this.gridVisible, options);
 		this.renderImages(sketch, viewport, options.imagePreview);
 		this.renderRegions(sketch, viewport, options.regionHoverPoint ?? null);
 		this.renderGeometry(sketch, viewport, options);
@@ -258,6 +259,10 @@ export class SVGRenderer {
 		const hovered = hoverPoint ? regionsContainingPoint(hoverPoint, this.cachedRegions) : [];
 		if (this.cachedViewport) this.drawRegions(hoverPoint, hovered);
 		return hovered.some(Boolean);
+	}
+
+	setGridVisible(visible: boolean): void {
+		this.gridVisible = visible;
 	}
 
 	setRegionsVisible(visible: boolean): void {

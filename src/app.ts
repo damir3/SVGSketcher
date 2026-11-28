@@ -14,6 +14,7 @@ import { DimensionModal } from './ui/modal';
 import { DeleteConstraintDialog, type ConfirmConstraintDelete } from './ui/delete-constraint-dialog';
 import { ParametersPopup } from './ui/parameters-popup';
 import { ICONS } from './ui/icons';
+import { setupGridToggle } from './ui/gridToggle';
 import { setToolIconProvider } from './ui/panels/tools/iconProvider';
 import { preloadFonts, setOnFontLoaded } from './canvas/fonts';
 import { initializeGeometryKernel } from './kernel/browser';
@@ -44,6 +45,7 @@ export interface SketcherApp {
 	fit(): void;
 	setSketchName(name: string): void;
 	redraw(): void;
+	setGridVisible(visible: boolean): void;
 	setReferenceGeometry(references: SnapReferences): void;
 	getHoveredId(): string | null;
 }
@@ -52,6 +54,8 @@ export interface SketcherOptions {
 	/** Use the imported or exported filename as the header title. Defaults to true. */
 	useFileNameAsSketchName?: boolean;
 	onReady?: (editor: SketcherApp) => void;
+	/** Called when the grid button is pressed. */
+	onGridVisibilityChange?: (visible: boolean) => void;
 }
 
 function initApp(options: SketcherOptions): void {
@@ -96,6 +100,7 @@ function initApp(options: SketcherOptions): void {
 				<button class="btn-header btn-icon active" id="btn-snap-header" title="Toggle Snapping" aria-label="Toggle Snapping">
 					${ICONS.snap}
 				</button>
+				<button class="btn-header btn-icon" id="grid-toggle" type="button"></button>
 				<button class="btn-header btn-icon active" id="btn-regions-header" title="Toggle Region Fill" aria-label="Toggle Region Fill" aria-pressed="true">
 					${ICONS.regions}
 				</button>
@@ -411,6 +416,21 @@ function initApp(options: SketcherOptions): void {
 	}
 
 	btnFitView.addEventListener('click', () => fitToView(true));
+
+	const gridToggle = setupGridToggle(document.getElementById('grid-toggle') as HTMLButtonElement, visible => {
+		updateGridVisibility(visible);
+		options.onGridVisibilityChange?.(visible);
+	});
+
+	function setGridVisible(visible: boolean): void {
+		gridToggle.setVisible(visible);
+		updateGridVisibility(visible);
+	}
+
+	function updateGridVisibility(visible: boolean): void {
+		renderer.setGridVisible(visible);
+		interaction.render();
+	}
 
 	btnSnapHeader?.addEventListener('click', () => {
 		interaction.toggleSnapping();
@@ -785,6 +805,7 @@ function initApp(options: SketcherOptions): void {
 		fit: () => fitToView(false),
 		setSketchName,
 		redraw: () => interaction.render(),
+		setGridVisible,
 		setReferenceGeometry: references => {
 			renderer.externalRegionCurves = references.curves;
 			interaction.snapReferences = references;
